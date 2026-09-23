@@ -58,7 +58,7 @@ ITEMS     ink bar labels (white)         7.5 / 700     one line, always
           sub-lines                      7 grey        indent 2mm
           TOTAL row                      700           between two ink rules
 PAYMENTS  bar labels                     7.5 / 700
-          body                           8             dates `9 Aug 26`
+          body                           8             dates `9 Aug 2026`
 MONEY     amount-in-words                7 grey        68mm column, top=Subtotal
           Subtotal / Paid to date        8.5           4.0mm rows
           BALANCE DUE                    10.5 / 700    one rule above
@@ -98,13 +98,15 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
 - **SALES ORDER INFO** (renamed from ORDER DETAILS, owner 2026-09-21):
   colon-aligned, 46mm label gutter, in THIS order —
   `SO No · SO Doc Date · Proceed Date · Customer Requested Delivery Date ·
-  Sales Location · Salesperson`. Body dates are mixed-case `Mon, 21 Sep 26`.
+  Sales Location · Salesperson`. Body dates are mixed-case `Mon, 21 Sep 2026` — FOUR-DIGIT YEAR (owner,
+  Jess 2026-09-23; DOCUMENT-KIT.md §4). The `Mon, 21 Sep 26` form is retired:
+  it contradicted the kit and disagreed with the PO on the same day's paper.
   `Customer Requested Delivery Date` prints on **TWO deliberate lines**
   (owner, 2026-09-21) with an explicit newline, on a 32mm gutter:
 
   ```
   Customer Requested
-  Delivery Date        : Tue, 20 Oct 26
+  Delivery Date        : Tue, 20 Oct 2026
   ```
 
   The colon and value sit on the label's LAST line — SALES ORDER INFO rows are
@@ -187,7 +189,7 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
 
 - No standalone title: the ink bar's method column reads **`PAYMENT RECEIVED`**
   (round 10). Columns: `DATE · PAYMENT RECEIVED · APPROVAL CODE · COLLECTED BY ·
-  AMOUNT (RM)`. Body 8.5pt, dates `9 Aug 26`, digits-only amounts.
+  AMOUNT (RM)`. Body 8.5pt, dates `9 Aug 2026`, digits-only amounts.
 - **The zone ALWAYS prints, even with no payments** (owner, 2026-09-21, from the
   Houzs compare): a block that silently vanishes reads as a printing fault.
   COPY-STANDARD's absence law — absence is a sentence.
@@ -405,3 +407,4 @@ are no longer an SO concern; they move to the DO with the §8 gate.
 | 2026-09-21 | Money zone UNPINNED — content flows top-to-bottom like Houzs; the bottom-anchored unit and the frozen four-row payments block are deleted (they bought identical BALANCE DUE placement at the cost of a half-page hole on short orders). Legal entity settled: **CARRES SDN. BHD.**; the POS terms heading said `Carres Group Sdn Bhd` — a second company name the customer was signing under — and is now just `Terms & Conditions`, the entity living on the letterhead where a legal name belongs. | Loo |
 | 2026-09-21 | Stress pass DONE (40 lines → 3 pages) and the answer to §5's DEFERRED question is recorded: continuation pages print item rows with **no column bar** — a reader on page 2 cannot tell Unit from Discount from Amount — and the last page can be money-only, so a blanket `fixed` bar would stamp an items header over nothing. Needs real chunking; opened as its own card, not hacked. Also: PAYMENTS gets the SAME box as the goods table (one table style per document) with every row closed including the last; all rows carry a 9mm minimum so heights read even; the signature/totals row loses its 4mm inset — 110 + 6 + 70 = 186mm, so both outer edges land on the table rails and the two boxes are exactly the same height; category bands lose their grey fill. | Loo |
 | 2026-09-21 | `Subtotal` RETIRED from this document (owner: "subtotal is confused me"). "Sub-" promises that something is still to be added, and on a Carres SO nothing is: delivery rides as a line, there is no order-level discount, tax is nil — so Subtotal always equalled Total and the word described a step that never happens. The money card now reads **`Goods total · Tax · Total payable · Paid to date · BALANCE DUE`** and the items table closes on **`GOODS TOTAL`** — one figure, one name, in words a furniture customer reads without accounting training. (The tax-invoice register — `Total excluding tax / Total including tax` — was the alternative and belongs to the INVOICE, not to a customer's order.) The Sales Invoice still says `Subtotal (excl. SST)` and must be brought into line on its own card. | Loo |
+| 2026-09-23 | **Four-digit year, family-wide** (owner, Jess): every printed date reads `Wed, 23 Sep 2026`. `Mon, 21 Sep 26` is retired — it contradicted DOCUMENT-KIT §4 and disagreed with the PO on the same day's paper, and a Carres document outlives its year. One line (`capsDate`) moves SALES ORDER INFO and the payments table together. Measured at 8pt: +3.1mm per date; the tightest cell, the payments `DATE` column at 22.5mm usable, takes `23 Sep 2026` (15.7mm) with 6.8mm spare. BUILT. | Jess |
