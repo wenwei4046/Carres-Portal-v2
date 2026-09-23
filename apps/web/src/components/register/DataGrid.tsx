@@ -235,6 +235,10 @@ export type DataGridProps<T> = {
     /** True when `dragged` may take `target`'s place. A move the server would
         refuse must answer false here, so the screen never offers it. */
     canDrop: (dragged: T, target: T) => boolean;
+    /** Alt + ArrowUp / ArrowDown's own test, when a keyboard step must stay
+        narrower than a drop (0570: the chart's Alt + arrow stays among
+        siblings while a drop may land on another heading). Absent = `canDrop`. */
+    canStep?: (dragged: T, target: T) => boolean;
     /** Put `dragged` where `target` is. The page persists it. */
     onMove: (dragged: T, target: T) => void;
   };
@@ -2332,9 +2336,10 @@ function DataGridInner<T>({
               const order = renderList.filter((it) => it.kind === "row");
               const at = order.findIndex((it) => it.kind === "row" && rowKey(it.row) === key);
               const step = e.key === "ArrowDown" ? 1 : -1;
+              const accepts = rowDrag.canStep ?? rowDrag.canDrop;
               for (let i = at + step; i >= 0 && i < order.length; i += step) {
                 const cand = order[i];
-                if (!cand || cand.kind !== "row" || !rowDrag.canDrop(row, cand.row)) continue;
+                if (!cand || cand.kind !== "row" || !accepts(row, cand.row)) continue;
                 e.preventDefault();
                 pendingRowFocus.current = key;
                 setActiveRowKey(key);

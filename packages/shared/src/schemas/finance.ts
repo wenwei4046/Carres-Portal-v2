@@ -368,14 +368,38 @@ export const ledgerAccountUpdateInput = z.object({
  * `parentCode` is null for a top-level account — the chart's roots are siblings
  * of each other. The refusal sentences are the database's (COPY-STANDARD 0557).
  */
+/* A code in a move or reorder body. Both shapes 0550/0570 accept, so an account
+   renumbered to 100-0001 can still be dragged. */
+const chartCode = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.');
+
 export const ledgerAccountReorderInput = z.object({
-  parentCode: z.string().trim().regex(/^\d{4}$/, 'That account is not in the chart.').nullable(),
-  was: z.array(z.string().trim().regex(/^\d{4}$/, 'That account is not in the chart.'))
-    .min(1, 'Send the order the chart was in before the drag.'),
-  now: z.array(z.string().trim().regex(/^\d{4}$/, 'That account is not in the chart.'))
-    .min(1, 'Send every account under this heading, in the order you want them.'),
+  parentCode: chartCode.nullable(),
+  was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
+  now: z.array(chartCode).min(1, 'Send every account under this heading, in the order you want them.'),
 }).strict();
 export type LedgerAccountReorderInput = z.infer<typeof ledgerAccountReorderInput>;
+
+/**
+ * Put one account under another heading (0570). The number and name stay.
+ *
+ * Two before/after pairs travel, one per heading: `from` is the heading it
+ * leaves, `to` the heading it joins. `gl_account_move` refuses when either
+ * `was` is no longer the stored order. `from.now` is empty when the account
+ * was the heading's last one.
+ */
+export const ledgerAccountMoveInput = z.object({
+  code: chartCode,
+  toParentCode: chartCode,
+  from: z.object({
+    was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
+    now: z.array(chartCode),
+  }).strict(),
+  to: z.object({
+    was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
+    now: z.array(chartCode).min(1, 'Send every account under this heading, in the order you want them.'),
+  }).strict(),
+}).strict();
+export type LedgerAccountMoveInput = z.infer<typeof ledgerAccountMoveInput>;
 
 /** A trial balance or a balance sheet as it stood at the end of one day.
  *  Omitted = today in Malaysia. */

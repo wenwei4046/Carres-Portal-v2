@@ -3881,7 +3881,7 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 |---|---|---|
 | Tabs | **`Money accounts`** · **`Chart of accounts`** | The two tabs of Finance Settings. The second is `?tab=chart`. |
 | Chart | `{code} {name}` | One account, indented under its parent. A heading account (one that other accounts sit under) is bold; nothing is ever posted to it. |
-| Form | `Account` · `{code} · {kind}` | The rename form's heading, and the line under it. Only the name changes; the code never does. |
+| Form | `Account` · `{code} · {kind}` | The account form's heading, and the line under it. The name and the number change here, for an account and a heading alike (0570); a heading's accounts stay under it when its number changes. |
 | Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
 | Account | **`Accrued expenses`** | The name of account 2130, under 2100 Payables: expenses owed at month end that no bill has arrived for yet. Posted by a manual journal, cleared by a payment voucher line. |
 | Refusals (database, 0557 — moving an account) | `The chart changed while you were dragging. Open it again and redo the move.` · `Move an account only among the accounts under the same heading.` · `Send every account under this heading, in the order you want them.` · `Send the order the chart was in before the drag.` · `The same account is listed twice.` · `The order has a blank where an account should be.` | Six causes, six sentences — **a refusal may not borrow another refusal's cause.** In order: somebody else moved an account while this screen was open, so this move is refused whole and nothing of theirs is lost · the move crossed into another heading, which is a reparent and a different ruling · the list left an account out, or was empty · the caller sent no before-order to check against · one account twice · a blank where a code should be. `Only Finance changes the chart of accounts.` and `That account is not in the chart.` are reused from 0539, unchanged. |
@@ -3890,10 +3890,24 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 Finance -> Settings -> Chart of accounts is dragged among the accounts under its own heading; `rowDrag`
 was added to the shared `DataGrid` for it, using the browser's own drag and drop. The six sentences
 above are the server's refusals and the screen prints them as they come, so their wording is already
-settled. The screen never offers a move across a heading, so `Move an account only among the accounts
-under the same heading.` should not be reachable from this page.
+settled. A drop on an account under the same heading reorders; a drop on another heading puts the
+account under it (0570, below). `Move an account only among the accounts under the same heading.` stays
+the refusal for an order that names an account from another heading; the screen never sends one.
 
 | PROPOSAL - PENDING APPROVAL | `Drag an account to move it. Hold Alt and press the up or down arrow to move it from the keyboard.` | One line above the chart. A drag with no keyboard equal locks out anyone not using a mouse, and a keyboard move nobody is told about is not a control. Plain ASCII throughout; the only punctuation is the full stop. **NOT APPROVED — it is on the screen in this branch and must be approved or replaced before merge.** |
+
+**An account can move under another heading, and a heading's number can change (0570).** Owner:
+*"it doesnt change account number or name, it's just that it falls under different header so that in
+report that account belongs in the new header"* and *"header name and number need to be changeable as
+well"*. The move changes the heading and the place under it; the P&L and the Balance Sheet print the
+account under its new heading on their next read. Every sentence below is NEW and NOT APPROVED.
+
+| Group | Word | Meaning |
+|---|---|---|
+| PROPOSAL - PENDING APPROVAL | `To put it under another heading, drop it on that heading, or press Shift+F10 and choose the heading.` | Added to the one line above the chart, after the sentence above and one space. ASCII only; `Shift+F10` is the key name, with a PLUS SIGN. |
+| PROPOSAL - PENDING APPROVAL | `Move under {code} {name}` | One item per heading in the row menu (Shift+F10, the Menu key or a right-click). Only headings the account may go under are listed: the same kind, not the heading it is under now, and not the account itself or anything inside it. |
+| PROPOSAL - PENDING APPROVAL — refusals (database, 0570 — the number) | `A number is four digits, or three digits, a dash and four — 1210 or 100-0001.` · `An account numbered {code} is already in the chart.` | The number's shape, and a number another account has. The first contains an EM DASH (U+2014) before the two examples. Both are shown under `Number` on the account form, for an account and a heading alike. |
+| PROPOSAL - PENDING APPROVAL — refusals (database, 0570 — a move under another heading) | `That account is already under this heading.` · `A heading cannot move under itself or under anything inside it.` · `{code} {name} is not a heading. Move the account under a heading.` · `An account moves only under a heading of the same kind.` | Four causes, four sentences. In order: the target is the heading it is under now · the target is the account itself or sits inside it · the target has no accounts under it, so it is an account, not a heading · the target is another kind (asset, liability, equity, income, expense), which would put the account on a different statement. The screen never offers any of these; they are the database's own guard. Reused unchanged: `That account is not in the chart.` (0539) and the 0557 sentences above, which now also cover the heading an account joins. |
 
 Finance words that never appear on screen. A finance person says the word on the left; the screen
 always says the word on the right. One fact, one word (rule 2).

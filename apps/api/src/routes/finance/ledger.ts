@@ -4,6 +4,7 @@ import {
   departmentRpcArgs,
   ledgerAccountCodeShape,
   ledgerAccountLedgerQuery,
+  ledgerAccountMoveInput,
   ledgerAccountReorderInput,
   ledgerAccountUpdateInput,
   ledgerAsOfQuery,
@@ -60,6 +61,8 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *                           triggers as a 422/500, not by anything here.
  *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) —
  *                           writes sort_order only; a move never writes the number.
+ *   POST  /accounts/move    put one account under another heading (gl_account_move, 0570) —
+ *                           writes parent and order; never the number or the name.
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -452,6 +455,28 @@ financeLedgerRouter.post("/accounts/reorder", requireFinance, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ moved: Number(data ?? 0) });
+});
+
+/**
+ * Put one account under another heading (0570). Both before/after pairs are
+ * forwarded untouched: the database refuses with 409 when either `was` is no
+ * longer the stored order under its heading. Refusal tags go up as `code`, the
+ * same way the PATCH above sends them.
+ */
+financeLedgerRouter.post("/accounts/move", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountMoveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_move", {
+    p_code: body.data.code,
+    p_to_parent: body.data.toParentCode,
+    p_from_was: body.data.from.was,
+    p_from_now: body.data.from.now,
+    p_to_was: body.data.to.was,
+    p_to_now: body.data.to.now,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) });
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────

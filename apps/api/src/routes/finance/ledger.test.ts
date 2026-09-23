@@ -542,6 +542,79 @@ describe("PATCH /accounts/:code", () => {
   });
 });
 
+describe("POST /accounts/move and /accounts/reorder", () => {
+  const post = async (path: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  const MOVE = {
+    code: "5200",
+    toParentCode: "6000",
+    from: { was: ["5100", "5200"], now: ["5100"] },
+    to: { was: ["6100", "6500"], now: ["6100", "6500", "5200"] },
+  };
+
+  it("forwards both headings' before and after orders to gl_account_move untouched", async () => {
+    const { sb } = fakeClient(() => ok("5200"));
+    const res = await post("/accounts/move", MOVE);
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "5200" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_move", {
+      p_code: "5200",
+      p_to_parent: "6000",
+      p_from_was: ["5100", "5200"],
+      p_from_now: ["5100"],
+      p_to_was: ["6100", "6500"],
+      p_to_now: ["6100", "6500", "5200"],
+    });
+  });
+
+  it("takes an empty after-order for a heading the account was the last one under", async () => {
+    const { sb } = fakeClient(() => ok("1310"));
+    const res = await post("/accounts/move", {
+      code: "1310", toParentCode: "1200",
+      from: { was: ["1310"], now: [] },
+      to: { was: ["1210"], now: ["1210", "1310"] },
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_move", expect.objectContaining({ p_from_now: [] }));
+  });
+
+  it("refuses operation, a missing before-order and an extra field before the database", async () => {
+    expect((await post("/accounts/move", MOVE, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post("/accounts/move", { ...MOVE, to: { was: [], now: ["5200"] } })).status).toBe(422);
+    expect((await post("/accounts/move", { ...MOVE, name: "Freight" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["order_stale", "40001", 409, "The chart changed while you were dragging. Open it again and redo the move."],
+    ["move_onto_account", "22023", 422, "6500 Bank and payment charges is not a heading. Move the account under a heading."],
+    ["move_other_kind", "22023", 422, "An account moves only under a heading of the same kind."],
+    ["move_into_itself", "22023", 422, "A heading cannot move under itself or under anything inside it."],
+  ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
+    fakeClient(() => refuse(sqlstate, details as string, message as string));
+    const res = await post("/accounts/move", MOVE);
+    expect(res.status).toBe(status);
+    const body = await json(res);
+    expect(body.code).toBe(details);
+    expect(body.message).toBe(message);
+  });
+
+  it("reorders an account that carries the dashed number shape", async () => {
+    const { sb } = fakeClient(() => ok(2));
+    const res = await post("/accounts/reorder", { parentCode: "600-0000", was: ["610-0001", "610-0002"], now: ["610-0002", "610-0001"] });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_accounts_reorder", {
+      p_parent_code: "600-0000", p_was: ["610-0001", "610-0002"], p_now: ["610-0002", "610-0001"],
+    });
+  });
+});
+
 describe("GET /trial-balance", () => {
   const tbRow = (o: AnyJson) => ({ report_status: "OK", go_live_on: "2026-09-01", as_of: "2026-09-10", ...o });
 
