@@ -406,6 +406,20 @@ held at Diglant, production under an existing PO, verified shortage and unknown 
 unknowns before buying; a timing shortfall is not an automatic quantity purchase; evaluate each SO
 line separately. The operating target is approved, not built; expected supply remains non-Ready Stock.
 
+**Outright launch and shared identity — OWNER-APPROVED conceptual boundary, 2026-09-23.**
+Outright is the two-day launch priority. Subscription contract/QR functionality and supplier
+physical QR are not prerequisites for that launch. Preserve existing Outright internal Unit and
+exact-stock controls. Sales Orders distinguish business types; Subscription retains its own
+commercial agreement, while Purchasing, Stock and Delivery each retain a single owning module.
+SO, PO, DO, Unit and agreement lineage follows records and lines, never matching number tails.
+One physical Unit retains its permanent identity through display, delivery, repair and return;
+never encode mutable business usage in that identity. A replacement physical mattress has its own
+Unit ID; retain the agreement's associations with both prior and replacement Units. This approves
+no replacement entitlement, price or billing policy and no post-issued-DO Unit swapping.
+Diglant label capability and the exact scan-to-DO issuance/freeze sequence remain unconfirmed.
+Concrete numbering is governed by the later approved consolidated table above; these concepts do
+not reopen those format approvals. PLAN only: no application code, Cards or deployment authorized.
+
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
 gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
