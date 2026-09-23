@@ -257,15 +257,27 @@ purchase links the actual Case, an `Internal Staff Purchase` names the real staf
 emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
-vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (Jess, 2026-09-18);
-overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPR-YYYYMMDD-RRRR`
-(`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
-reused. It names the request, not a supplier document: the supplier still receives only the PO
-(approved target `POYYMMDD-NNNN`; existing issued numbers remain unchanged), and one request may become several POs. Consignment Orders, Repair Orders and
-other documents keep their own numbers; MPR covers only Manual Purchase requests. Historical
-`MPR-…` values keep their numbers; historical `REQ-####` values stay searchable. The build restores
-the allocator that migration 0424 turned off (a new migration; 0424 is never edited). `MP` is not
-used — it is the Mattress Protector SKU code.
+vocabulary.
+
+**Manual Purchase name and prefixes — final owner ruling, Jess, 2026-09-23;
+APPROVED TARGET / NOT BUILT for Subscription prefix.** The name remains **Manual
+Purchase**. The prefix is **`MPR` for Outright** and **`SMPR` for Subscription**.
+The proposed name Purchase Request and proposed `PR` / `SPR` or `REQ` / `SREQ`
+future prefixes are withdrawn; they are not alternative targets. `MP` remains
+Mattress Protector. `PR` remains Purchase Return and must not name a purchase request.
+This scoped approval covers the name and prefixes only, not a date pattern,
+separator, digit length, navigation change, the full numbering table, application
+implementation or live cutover. Other proposed numbering decisions require their
+own approval; this ruling does not grant it.
+
+Each Manual Purchase has a permanent identity and may lead to several POs; the
+supplier still receives the PO, not the internal request. Approval, allocation and
+source-lineage rules remain unchanged. The existing Outright implementation uses
+`MPR-YYYYMMDD-RRRR` (migration 0546); that is implementation evidence, not new
+approval of the suffix format. Existing `MPR-…` values, historical documents and
+records remain unchanged; historical `REQ-####` references stay searchable.
+Do not renumber existing Purchase Returns or alter their `PR-` identifiers.
+
 **Approval — APPROVED / LOCKED (Jess, 2026-09-16); BUILT in Manual Purchase Round 2, migration
 0522.** Every Manual Purchase requires approval, whatever its purpose or amount; no purpose or
 amount bypass exists. `purchasing_create_request` always stores `approval_required = true` and no
@@ -624,22 +636,24 @@ taken. Production minted `PO-2054` from `max(seq) + 1` until then — a number t
 holding two of our purchase orders how much Carres bought in between. **Existing identities are
 permanent and are NOT renumbered.**
 
-| Prefix | Document |
+| Existing implementation prefix (not full target-table approval) | Document |
 |---|---|
 | `PO` | Purchase Order |
-| `MPR` | Manual Purchase Request |
+| `MPR` | Manual Purchase (Outright) |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
-| `PRTN` | Purchase Return |
+| `PR` | Purchase Return (visible prefix; migration 0548) |
 | `RO` | Repair Order |
 | `DR` | Display Request |
 | `CO` | Consignment Order |
 | `CRTN` | Consignment Return |
 | `CSN` | Consignment Sale Notice |
 
-Internal records still use invisible permanent technical IDs. `MPR` is the Manual Purchase Request
-number (owner ruling 2026-09-18, reinstated after the 2026-09-04 retirement): each Manual Purchase
-request has one; CO, RO and other documents keep their own numbers. Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable.
+Internal records still use invisible permanent technical IDs. Manual Purchase uses
+`MPR` for Outright and the approved/not-built target `SMPR` for Subscription (§5.2).
+This is not approval of a complete identifier format or a new navigation name.
+Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable. The
+visible Purchase Return prefix is `PR` (0548), not `PRTN`; its identity is unchanged.
 
 ### 6.2 Unit ID
 
