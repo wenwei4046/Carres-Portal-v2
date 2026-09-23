@@ -57,7 +57,12 @@ const MARGIN = mm(12);
 const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
 
-/** `2026-08-09` → `SUN, 9 AUG 26` (textual parse — timezone-proof). */
+/** `2026-08-09` → `SUN, 9 AUG 2026` (textual parse — timezone-proof).
+ *  FOUR-DIGIT YEAR (owner, Jess 2026-09-23; DOCUMENT-KIT.md §4). Every SO
+ *  date flows through here, so this one line moves SALES ORDER INFO and the
+ *  payments table together. Measured at 8pt: each date grows 3.1mm, and the
+ *  tightest cell — the payments `DATE` column, 22.5mm of usable width —
+ *  takes `23 Sep 2026` at 15.7mm with 6.8mm to spare. */
 function capsDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
@@ -67,10 +72,10 @@ function capsDate(iso: string | null | undefined): string | null {
     new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
   ];
   const mon = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][mo - 1];
-  return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
+  return `${dow}, ${d} ${mon} ${y}`;
 }
 
-/** Body dates read mixed-case — `9 Aug 26`, or `Mon, 24 Aug 26` with the
+/** Body dates read mixed-case — `9 Aug 2026`, or `Mon, 24 Aug 2026` with the
  *  weekday. ALL-CAPS dates live in the header only; inside tables they were
  *  noise (owner review 2026-08-09: "payment received part messy"). */
 function niceDate(iso: string | null | undefined, withDow = false): string | null {

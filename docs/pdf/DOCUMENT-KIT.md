@@ -139,7 +139,12 @@ FOOTER   fixed on every page: {doc no} · {audit actor} | the legal sentence |
 - **Every document's own date is `{DOC} Doc Date`** — `SO Doc Date` ·
   `PO Doc Date` · `GRN Doc Date` · `DO Doc Date` · `RO Doc Date` · `PR Doc
   Date`, and every document added later (owner, 2026-09-23).
-- Printed dates read `Fri, 9 Oct 2026`. A time reads `3:42 PM`.
+- **Printed dates read `Fri, 9 Oct 2026` — FOUR digits of year, always**
+  (owner, Jess 2026-09-23, confirming this rule against the SO's own
+  `Mon, 21 Sep 26`). A Carres document outlives the year it was issued in —
+  a guarantee, a rental agreement, a claim — and on a fax or a WhatsApp
+  photo `26` reads as part of the day. It costs 3.1mm per date at 8pt.
+  A time reads `3:42 PM`.
 - **A money-free document cannot print a figure**: its payload carries none, and
   a source-scan test keeps it that way. The money-free documents are
   **PO · DO · GRN · Purchase Return · Repair Order** (owner, Jess 2026-09-23:
