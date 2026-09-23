@@ -197,8 +197,11 @@ export default function SalesOrderAttribution({
        grammar: `Change delivery date` sits under the date it moves). What is
        left here is the REQUEST panel, which is truth and does deserve a rule,
        and the modal, which draws nothing until it opens. With neither present
-       this renders an empty, invisible div. */
-    <div className={request ? "mt-3 border-t border-kit-slate-5 pt-3" : ""} data-testid="attribution-lane">
+       this renders an EMPTY div — truly empty, so the SO section body's one
+       12px gap skips it (kit-sizes card, 2026-09-23: an always-present empty
+       button row here cost SO info a phantom 12px). No top margin: the body
+       spaces its groups. */
+    <div className={request ? "border-t border-kit-slate-5 pt-3" : ""} data-testid="attribution-lane">
       {request ? (
         <div
           className="rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 py-2.5"
@@ -313,7 +316,7 @@ export default function SalesOrderAttribution({
               : "The sales order has not changed yet. Applying writes it and mints a revision."}
           </p>
         </div>
-      ) : (
+      ) : canRequest && inlineTrigger ? (
         <div className="flex flex-wrap items-center justify-end gap-2">
           {/* ⭐ READ-ONLY FOR OPERATION — owner ruling 2026-08-15. Who gets paid
               is not an Operation correction, and a button that always refuses
@@ -331,18 +334,16 @@ export default function SalesOrderAttribution({
               So the two standing lines go and the suffix goes with them; what
               was a warning becomes a verb. `COPY-STANDARD.md` records the new
               word and keeps every rejected rename in its `Do NOT use` column. */}
-          {canRequest && inlineTrigger && (
-            <Button
-              size="sm"
-              variant="neutral"
-              onClick={() => setFormOpen(true)}
-              data-testid="attribution-open"
-            >
-              Change salesperson
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="neutral"
+            onClick={() => setFormOpen(true)}
+            data-testid="attribution-open"
+          >
+            Change salesperson
+          </Button>
         </div>
-      )}
+      ) : null}
 
       <Modal
         open={formOpen}
