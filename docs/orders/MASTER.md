@@ -779,8 +779,12 @@ Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole 56
 applying cleanly): approve with nothing recorded is refused; a blank reference is refused; an
 ungoverned kind is refused; a WhatsApp confirmation is accepted and read back as covering the
 proposal; changing the terms afterwards re-refuses the approval; reject still succeeds; a covered
-approval applies and mints Rev 2; a decided amendment refuses a backdated basis. Screen words are
-registered in COPY-STANDARD § "Customer agreement evidence".
+approval applies and mints Rev 2; a decided amendment refuses a backdated basis. Screen words are recorded in COPY-STANDARD
+§ "Customer agreement evidence" and are explicitly **PROPOSAL / NOT LAW** awaiting owner review —
+the ruling settled the rule, not the wording, and writing a word into the dictionary records a
+proposal rather than approving it. The approved amendment words it reuses unchanged are
+`Management decision reason`, `Reject`, `Approve and apply`, `Waiting for management` and
+`Before approval`.
 
 **Still not built in this scope:** whole-page `Edit` with server-chosen `Save` vs
 `Submit amendment request`, catalogue `Add item` / `Remove` / `Restore`, the `Before` / `After`
