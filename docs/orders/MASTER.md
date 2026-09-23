@@ -170,7 +170,7 @@ Unit identity is the explicit shared exception. This replaces earlier common-doc
 |---|---|---|
 | Sales Order / Subscription Agreement | `SOYYMM-NNNN(1)` | `SUBYYMM-NNNNN(1)` |
 | Delivery Order | `DOYYMM-NNNN` | `SDOYYMM-NNNNN` |
-| Manual Purchase Request | `MPR…` | `SMPR…` |
+| Manual Purchase Request | `MPRYYMMDD-NNNN` | `SMPRYYMMDD-NNNN` |
 | Purchase Order | `POYYMMDD-NNNN(1)` | `SPOYYMMDD-NNNN(1)` |
 | Goods Receipt Note | `GRNYYMMDD-NNNN` | `SGRNYYMMDD-NNNN` |
 | Customer invoice / monthly bill | `INVYYMM-NNNN` | `SINVYYMM-NNNNNN` |
@@ -178,35 +178,36 @@ Unit identity is the explicit shared exception. This replaces earlier common-doc
 | Credit note | `CNYYMM-NNNN` | `SCNYYMM-NNNNN` |
 | Customer Service Case | `CSYYMM-NNNN` | `SCSYYMM-NNNNN` |
 | Loan note | `LNYYMM-NNNN` | `SLNYYMM-NNNNN` |
-| Stock Transfer | `TR…` | `STR…` |
-| Supplier Claim | `CLM…` | `SCLM…` |
-| Purchase Return | `PR…` | `SPR…` |
-| Repair Order | `RO…` | `SRO…` |
-| Display Request | `DR…` | `SDR…` |
-| Consignment Order | `CO…` | `SCO…` |
-| Consignment Return | `CRTN…` | `SCRTN…` |
-| Consignment Sale Notice | `CSN…` | `SCSN…` |
-| Supplier Bill | `SB…` | `SSB…` |
-| Payment Voucher | `PV…` | `SPV…` |
-| Other Receivable Invoice | `ARI…` | `SARI…` |
-| Other Receipt Voucher | `RV…` | `SRV…` |
-| Supplier Money Back | `SMB…` | `SSMB…` |
-| Internal Money Movement | `MM…` | `SMM…` |
-| Journal Entry | `JE…` | `SJE…` |
-| Manual Journal | `MJ…` | `SMJ…` |
+| Stock Transfer | `TRYYMMDD-NNNN` | `STRYYMMDD-NNNN` |
+| Supplier Claim | `CLMYYMMDD-NNNN` | `SCLMYYMMDD-NNNN` |
+| Purchase Return | `PRYYMMDD-NNNN` | `SPRYYMMDD-NNNN` |
+| Repair Order | `ROYYMMDD-NNNN` | `SROYYMMDD-NNNN` |
+| Display Request | `DRYYMMDD-NNNN` | `SDRYYMMDD-NNNN` |
+| Consignment Order | `COYYMMDD-NNNN` | `SCOYYMMDD-NNNN` |
+| Consignment Return | `CRTNYYMMDD-NNNN` | `SCRTNYYMMDD-NNNN` |
+| Consignment Sale Notice | `CSNYYMMDD-NNNN` | `SCSNYYMMDD-NNNN` |
+| Supplier Bill | `SBYYMMDD-NNNN` | `SSBYYMMDD-NNNN` |
+| Payment Voucher | `PVYYMMDD-NNNN` | `SPVYYMMDD-NNNN` |
+| Other Receivable Invoice | `ARIYYMMDD-NNNN` | `SARIYYMMDD-NNNN` |
+| Other Receipt Voucher | `RVYYMMDD-NNNN` | `SRVYYMMDD-NNNN` |
+| Supplier Money Back | `SMBYYMMDD-NNNN` | `SSMBYYMMDD-NNNN` |
+| Internal Money Movement | `MMYYMMDD-NNNN` | `SMMYYMMDD-NNNN` |
+| Journal Entry | `JEYYMMDD-NNNN` | `SJEYYMMDD-NNNN` |
+| Manual Journal | `MJYYMMDD-NNNN` | `SMJYYMMDD-NNNN` |
 | Physical Unit ID | `U1-000-001` | Shared; no S prefix |
 
 `N` is a random decimal digit, with leading zeros. Each prefix has its own independent pool:
-four digits = 10,000 per encoded period, five = 100,000, six = 1,000,000. Date-only PO/SPO and
-GRN/SGRN pools reset by date; the displayed monthly formats use monthly pools. These are finite
+four digits = 10,000 per encoded period, five = 100,000, six = 1,000,000. All YYMMDD families have independent daily pools; YYMM families have monthly pools. These are finite
 capacities, not forecasts. Monitor headroom internally; no automatic digit-length change or
 3,000-document alert threshold is approved. Enforce uniqueness and never reuse void identities.
 For DO use original issue month, not scheduled delivery month; GRN uses actual receipt posting
 date. One receipt can contain many Units; split receipts get distinct GRNs, not new Unit IDs.
 
 **Scope of this approval:** explicit formats above are approved targets, not implemented facts.
-An ellipsis approves only the prefix and business separation: date pattern and suffix length
-remain unspecified. Financial numbering retains accounting/e-invoice validation before live use.
+Jess additionally approved all previously unspecified formats as original document date
+(YYMMDD) plus four fixed random decimal digits, with the Subscription S prefix and independent
+10,000-reference daily capacity per prefix. The previously explicit formats remain unchanged.
+Financial numbering retains accounting/e-invoice validation before live use.
 Cross-business transfers and company-wide transactions still require an ownership rule before
 finalizing their use of these prefixes. No new documents are mandated for workflows that do not
 need them. No whole-module completion, engineering implementation or live cutover is authorized.
