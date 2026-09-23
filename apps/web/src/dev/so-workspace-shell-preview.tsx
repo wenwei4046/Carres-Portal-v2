@@ -67,7 +67,12 @@ const LINES = [
 const ADDONS = [
   { addon_key: "DELIVERY", qty: 1, unit_price: 250, attrs: null },
   { addon_key: "STAIR_CARRY", qty: 1, unit_price: 100, attrs: null },
+  /* `?state=disposal` walks a lower-case catalogue key (`dispose-mattress`):
+     the Item Code prints upper case, and Delivery states the disposal from
+     this same row without charging it again. */
+  ...(STATE === "disposal" ? [{ addon_key: "dispose-mattress", qty: 2, unit_price: 80, attrs: { size: "Queen" } }] : []),
 ];
+const SERVICES_TOTAL = ADDONS.reduce((n, a) => n + a.qty * a.unit_price, 0);
 
 const PAYMENTS = [
   { id: "p1", order_id: ID, amount: 2499.5, paid_on: "2026-09-02", method: "bank",
@@ -177,7 +182,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     ], entryConfig: { formFields: null } });
   if (url.includes("order-entry-config")) return json({ entryConfig: { formFields: null } });
   if (url.match(/\/api\/operation\/orders\/[0-9a-f-]+$/))
-    return json({ order: ORDER, lines: LINES, addons: ADDONS, total: 4130,
+    return json({ order: ORDER, lines: LINES, addons: ADDONS, total: 3780 + SERVICES_TOTAL,
       warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
   return realFetch(input as RequestInfo, init);
 };

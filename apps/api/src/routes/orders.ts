@@ -119,6 +119,9 @@ type SalesOrderData = {
   }>;
   addons: Array<{
     label: string;
+    /** The stored `addon_key`, printed as the Item Code (upper-cased by the
+     *  template). An absent code printed the `ADD-ON` placeholder. */
+    sku: string;
     qty: number;
     unit_price: number;
     line_total: number;
@@ -4154,6 +4157,11 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     const unitPrice = Number(a.unit_price);
     return {
       label: addonNameByKey.get(String(a.addon_key)) ?? String(a.addon_key),
+      /* The service's own code for the Item Code cell. Without it the paper
+         printed the `ADD-ON` placeholder where the page printed the key —
+         an empty/placeholder Item Code is a defect (owner review 2026-08-09,
+         `lib/pdf/types.ts`). The template upper-cases it for display. */
+      sku: String(a.addon_key),
       qty,
       unit_price: unitPrice,
       line_total: qty * unitPrice,
