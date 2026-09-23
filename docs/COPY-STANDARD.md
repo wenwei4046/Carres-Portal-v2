@@ -1624,7 +1624,7 @@ entry, and both were live on Carres screens for months with none.
 |---|---|---|
 | Add one more line to a form (SO object draft exception: see Sales Order amendment words) | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
 | Take a line back out, before it is submitted | **`Remove`** | Delete · Remove line · Clear · Discard · `×` alone |
-| Put a removed line back, before it is submitted — the SO amendment draft (owner approval 2026-09-22) | **`Restore`** · after approval the line reads **`Cancelled · Rev {n}`** | Undo · Removed (as a state) · `Cancel item` (collides with the edit `Cancel` and `Cancel SO`) |
+| Put a removed line back, before it is submitted — the SO amendment draft (owner approval 2026-09-22) | **`Restore`** · after approval the line reads **`Cancelled · ({n})`** | Undo · Removed (as a state) · `Cancel item` (collides with the edit `Cancel` and `Cancel SO`) |
 
 **Loo chose from three candidates with their costs attached**, and the two he did not choose
 are recorded because each was already on a real screen and a later chat will find them:
@@ -2585,7 +2585,7 @@ what has not happened yet, in the plainest words available:
 | The photo is on file | **`Uploaded by {name}`** + **`Uploaded: {date}`** | Done · Complete |
 | A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
 | A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
-| A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · Rev {n}`** | Removed · Deleted · Void |
+| A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · ({n})`** | Removed · Deleted · Void |
 
 **BANNED on this surface, as everywhere:** `No data` · `No results` · `Not available`. Every empty
 state answers three things — what is missing, why, and who does what next.
@@ -2644,7 +2644,7 @@ surface is how a dictionary splits.
 **APPROVED / LOCKED — owner approval 2026-09-22.** For the Sales Order object draft only,
 `Add item` is the approved catalogue action. This explicit surface exception replaces the generic
 `Add line` restriction here; other forms retain `Add line`. `Remove` / `Restore` describe draft
-operations; `Cancelled · Rev {n}` describes approved cancellation. A receiving-state word does not
+operations; `Cancelled · ({n})` describes approved cancellation. A receiving-state word does not
 automatically become a Sales Order state. These words are approved target copy, not build proof.
 
 | Meaning | Use exactly |
@@ -4205,10 +4205,21 @@ Approved wording is reused wherever it already exists: the decision controls sta
 Each kind's field label names what to type, because a blank box called `Reference` teaches nobody:
 `The file name of the document the customer signed` · `Where the customer's own message can be
 found — for example WhatsApp, the date and the number` · `The revision whose signed agreement
-already covers this — for example Rev 1`. **All three are PROPOSAL.**
+already covers this — for example (1)`. **All three are PROPOSAL.**
 
 **What IS approved, and is not open to re-wording:** there is no tick box and there never may be
 one. *"A manager's statement or checkbox saying the customer agreed is not sufficient by itself and
 cannot substitute for the evidence."* Every kind carries a reference that points at something
 findable outside the record. `Approve and apply` is refused until one is recorded and still covers
 the proposal; `Reject` never is.
+
+## SO document identity and revision — owner approved 2026-09-23
+
+The approved target SO reference is `SOYYMM-NNNNN` (original creation year/month, five fixed
+random decimal digits, including leading zeros). Display its revision immediately afterwards,
+without a space: `SO2609-48271(1)`, `SO2609-48271(2)`. The original shows `(1)`; the revision
+suffix is not part of the permanent base reference. Do not display `Rev 1`, `V1` or `-1` as
+the SO revision suffix. Within a cancelled-line status, retain the cancellation word and use
+`Cancelled · ({n})` for the revision reference. This records approved target copy, not shipped
+behavior, and does not change historical issued documents. Governing scope and limits remain
+in `docs/orders/MASTER.md`, External numbering privacy.

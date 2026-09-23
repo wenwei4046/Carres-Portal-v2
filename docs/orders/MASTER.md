@@ -235,7 +235,7 @@ not place actor, role, event and raw field values on one line merely because eve
 REVISIONS
 
 Original order
-Rev 1 · Current
+{SO reference}(1) · Current
 Recorded by {real staff name} · Mon, 24 Aug 11:16
 
 HISTORY
@@ -245,7 +245,7 @@ Order created
 No deposit · Online order
 ```
 
-- **Revisions** remains the complete-version index. `Original order` is Rev 1; each later row names
+- **Revisions** remains the complete-version index. `Original order` is revision 1; each later row names
   the approved/applied change. Selecting a row opens the complete read-only SO version and its
   historical PDF/document truth.
 - **History** remains the append-only event ledger. Line 1 states the event in Primary School
@@ -750,7 +750,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
    Worked sample (SO-1319): Mattress 2 · Accessory 1; Delivery fee + Stair carry; goods RM3,780.00 +
    services RM350.00 = Total payable RM4,130.00; Paid to date RM1,999.50 (voided RM1,200 excluded);
    Balance due RM2,130.50. This presentation change does not change the money or separate SST rules.
-5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
+5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · ({n})` is a
    cancellation mark on the new version, never a substitute for the full old document and its record.
 
 **Refined 2026-09-22 (owner approval of the reviewed plan):**
@@ -762,7 +762,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
 - **Services follow their own pricing contract:** per-trip charges show qty 1; per-piece charges keep
   their real quantity.
 - **Draft line words (owner-approved):** `Remove` / `Restore` before commit (a line is struck and stays
-  visible); after approval the line reads `Cancelled · Rev {n}`. `Cancel item` is rejected — it collides
+  visible); after approval the line reads `Cancelled · ({n})`. `Cancel item` is rejected — it collides
   with the edit-mode `Cancel` and `Cancel SO`.
 - **Before submitting** the reason (required) and a `Before` / `After` review show the category quantities and changed service quantities, the
   amount change and each affected object with its owner: purchase demand, an issued PO or promised
@@ -800,7 +800,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
   made exactly the claim this rule forbids. Measured at x=34.0 y=385.3, on the box's own ground, so
   the caption below it does not move. A genuinely unsigned order still prints the empty box, and a
   signature the document is entitled to show still prints. An earlier draft of this
-  section asserted the customer signed Rev 1. Nothing records that: `sales_order_snapshot` stores
+  section asserted the customer signed revision 1. Nothing records that: `sales_order_snapshot` stores
   no signing fact and `orders.signature_url` carries no capture timestamp. So a historical version
   does not REPRODUCE a mark it cannot attribute, and it does not claim the version was unsigned
   either. The evidence is preserved untouched — the signature stays on the order and still prints
@@ -895,7 +895,7 @@ Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole ch
 applying cleanly): approve with nothing recorded is refused; a blank reference is refused; an
 ungoverned kind is refused; a WhatsApp confirmation is accepted and read back as covering the
 proposal; changing the terms afterwards re-refuses the approval; reject still succeeds; a covered
-approval applies and mints Rev 2; a decided amendment refuses a backdated basis. Screen words are recorded in COPY-STANDARD
+approval applies and mints revision 2; a decided amendment refuses a backdated basis. Screen words are recorded in COPY-STANDARD
 § "Customer agreement evidence" and are explicitly **PROPOSAL / NOT LAW** awaiting owner review —
 the ruling settled the rule, not the wording, and writing a word into the dictionary records a
 proposal rather than approving it. The approved amendment words it reuses unchanged are
@@ -907,11 +907,11 @@ proposal rather than approving it. The approved amendment words it reuses unchan
 **FIXED: a historical version no longer borrows today's signature.**
 `snapshotTemplateData` read `base.signed` and `base.signature_url` — the live order's eSign PNG —
 so every revision printed the same customer signature under a different set of goods, prices and
-dates. A customer could be shown Rev 2 carrying the mark they put on Rev 1.
+dates. A customer could be shown revision 2 carrying the mark they put on revision 1.
 
 **AND THE OPPOSITE CLAIM IS ALSO UNPROVEN — the correction this review forced.** Not reproducing
 the mark is not the same as asserting the version was unsigned, and an earlier draft of this
-MASTER said both (it named Rev 1 as the signed revision, which nothing records). What ships:
+MASTER said both (it named revision 1 as the signed revision, which nothing records). What ships:
 the mark is not reproduced on a version it cannot be attributed to · the signature evidence is
 preserved untouched on the order and still prints on the CURRENT document · the page states the
 unknown in words · the customer document gains no new words and asserts nothing either way.
@@ -1193,8 +1193,8 @@ read only as implementation history.
   cancelled. A placed PO does not force cancel/reorder; it changes a simple edit into a governed
   Amendment with explicit downstream impact handling. `Staff correction`, `Customer change` and
   `Fulfilment replacement` are different causes and may not be collapsed.
-- Rev 1 is permanently the original SO. A pending or rejected amendment is not a Revision. Every
-  approved, applied amendment creates Rev 2/3/4… and preserves the complete historical version and
+- revision 1 is permanently the original SO. A pending or rejected amendment is not a Revision. Every
+  approved, applied amendment creates revisions (2), (3), (4)… and preserves the complete historical version and
   its PDF/document truth. **Revisions are complete versions; History is an event ledger. They are
   separate views and concepts.**
 - Amendment impact is computed before approval across supplier/PO commitments, Unit/warehouse
@@ -1371,7 +1371,7 @@ The status word is the owning module's own translation — no internal enum reac
 | Split quantity | one fork per Purchase Order, each in its own column |
 | Partial receiving | `1 of 2 received`, and RECEIVING holds the goods CURRENT |
 | Service lines | no goods fork; a linked case appears on the strip only |
-| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · Rev {n}`, **no chain and no gate edge** |
+| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |
 | Amended line | the map always reflects the CURRENT effective Revision |
 | Delivered | DELIVER complete with its date; DELIVERY PHOTO becomes the open step |
 
@@ -1803,7 +1803,7 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   under the header in BOTH states: `This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`
   It is absent when no supplier commitment exists.
   **Page header (owner, 2026-09-21, from the 2990 reference):** one line `SO-{n} — {CUSTOMER NAME}` at page size — no facts line under it
-  (owner, 2026-09-21: SO Doc Date lives in SO info, Rev in Revisions); right side: `Print ▾` · dark primary `Edit` · **`⋮` LAST, ICON ONLY — owner ruling
+  (owner, 2026-09-21: SO Doc Date lives in SO info, revision identity in Revisions); right side: `Print ▾` · dark primary `Edit` · **`⋮` LAST, ICON ONLY — owner ruling
   (Jess, 2026-09-21): no visible word beside the three dots** ("English not good does not mean cannot read 3 dot";
   Gmail, Google and SAP print no word on it). It stays last because it is the drawer that grows; its accessible
   name and tooltip are `More actions`, and it keeps `Cancel SO`. **No amount in the header (owner ruling
@@ -2096,10 +2096,10 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 | View / Preview | Built workspace presents saved truth and the actual PDF; explicit Edit changes context | 2990 detail is read-only until Edit | **KEEP / ADAPT** | PR #754 production-verified 2026-08-13; direct SO/PO/DO lineage completeness remains in the later dependency scopes |
 | Edit / field contract | Built UI and API restrict Edit to safe customer/contact/address/access/proceed-date corrections; items and promised delivery remain read-only | 2990 has a comprehensive backend form | **KEEP / IMPROVE** | PR #754 production-verified 2026-08-13; authoritative Sales Portal/POS parity and the complete role matrix continue through Amendment/Approval |
 | Amendment request + approval | Request/apply foundations and stale detection exist; current UI places amendment beside items | 2990 has separate Amendments and amend fields | **ADAPT / BUILD** | Sales ownership, operation routing, management approval/rejection through the governed gates, structured Before/After/reason; impact preview across all owners |
-| Revisions | Revision snapshots and historical rendering/PDF exist; current UI combines `History / Revision`; Rev 1 may be minted only on first save | 2990 exposes Revisions and current document identity | **ADAPT / BUILD** | Backstop original Rev 1 at transaction birth; only approved applied amendment mints next Rev; separate complete-version view |
+| Revisions | Revision snapshots and historical rendering/PDF exist; current UI combines `History / Revision`; revision 1 may be minted only on first save | 2990 exposes Revisions and current document identity | **ADAPT / BUILD** | Backstop original revision 1 at transaction birth; only approved applied amendment mints the next revision; separate complete-version view |
 | History / audit | Order history and revision events render together; actor/cause coverage is partial | 2990 has History | **ADAPT / BUILD** | Separate append-only event view; actor/time/reason/Before/After and permission decisions |
 | Actual PDF + Print | One live renderer and historical snapshot rendering exist; Print opens same blob | 2990 has Print PDF | **KEEP / ADAPT** | Archive/address stable current + per-Revision document truth; follow `SO-PDF-STANDARD.md` |
-| Copy to new SO | Built as a governed seed of the authoritative create form; the register keeps `Copy SO No` as a separate clipboard act | Mature document systems copy into a new draft/transaction, never duplicate identity | **KEEP** | PR #764 production-verified 2026-08-13 (SO-1303 → SO-1320 · Rev 1); money, promised/proceed dates, history, payments and PO/DO/unit links are excluded by construction |
+| Copy to new SO | Built as a governed seed of the authoritative create form; the register keeps `Copy SO No` as a separate clipboard act | Mature document systems copy into a new draft/transaction, never duplicate identity | **KEEP** | PR #764 production-verified 2026-08-13 (SO-1303 → SO-1320 · revision 1); money, promised/proceed dates, history, payments and PO/DO/unit links are excluded by construction |
 | Cancel SO | Built as the ONE governed door — register + Workspace both reach the single existing writer; migration 0350 adds the owner-impact read, the required reason and the pre-write impact stamp | 2990 detail exposes Cancel SO | **KEEP** | Production-verified 2026-08-14 (SO-1320 cancelled, SO-1313 refused). Place-only fails safe; the proceeded-cancel approval lane stays Card 7's deferred item |
 | Scan / import | Not built. The AutoCount CSV importer stays on frozen Old Orders and is NOT the answer here — different act, different source, and it retires at go-live (CLAUDE.md §6) | 2990's `ScanOrderModal` + `scan-so.ts` prove the source exactly: a photo/PDF of the **handwritten showroom sale-order slip** | **BUILD — own card** | Source and write boundary now settled (§11 · Sales Order Intake). Depends on Sales Order Settings (the extractor matches ACTIVE option lists) and on a vision credential only the owner can set |
 | Settings / Maintenance | Built as `Sales Order Settings`, a section of the one Settings Workspace reached from the Page Header gear; `SO Maintenance` retired | 2990 exposes SO Maintenance and global Settings | **KEEP** | Owns Order Entry fields, payment methods and the option lists Sales Orders actually controls. Another module's master data is named and linked, never edited here; a source guard holds "never an edit door into historical Sales Orders" |
@@ -2139,8 +2139,8 @@ official Card numbers.
 2. **CLOSED / PRODUCTION-VERIFIED 2026-08-13 — Sales Order Detail + Authoritative Edit Contract** —
    PR #754 merged to `main` as `3bdc7ada`. Authenticated production verification on SO-1318 proved
    the saved Current/Order truth, explicit Edit context, one-page current PDF with no render error
-   and the enabled Print PDF control. A safe phone correction saved as immutable Rev 5; restoring
-   the fixture's original value saved as immutable Rev 6. Items and promised delivery stayed
+   and the enabled Print PDF control. A safe phone correction saved as immutable revision 5; restoring
+   the fixture's original value saved as immutable revision 6. Items and promised delivery stayed
    read-only in Edit. The first forged promised-date API probe exposed a stale Worker, so main was
    deployed as Worker version `53442e20-7024-4b69-81bf-f1ba68b06bbd`; the repeated authenticated
    probe then failed at the API boundary with 422 `invalid_param` before the revision RPC. The
@@ -2151,8 +2151,8 @@ official Card numbers.
    refusal, atomic apply, complete immutable versions, separate event History, historical PDFs and
    rollback-as-new-proposal; PR #758 closed the strict CI finding. Migration 0348 was applied and
    its RPCs/constraint/audit column probed. Production verification on SO-1318 submitted a proposal
-   from Rev 6, computed impact across every owner, rejected it under an active principal identity,
-   preserved Rev 6 and showed both the submission and rejection in History. The live PO schema
+   from revision 6, computed impact across every owner, rejected it under an active principal identity,
+   preserved revision 6 and showed both the submission and rejection in History. The live PO schema
    exposed its `so` linkage during that probe; the function was corrected in production and the
    immutable repo correction is migration 0349 (PR #761). Exact main `f17f85ff` converged on both
    Pages projects, both custom domains and Worker version `5bca7fff-693a-40db-8396-ccf43fc38e6e`.
@@ -2182,7 +2182,7 @@ official Card numbers.
    **The copy boundary held on every excluded fact:** the source's `paid` RM 1,250 rendered as
    `Paid RM 0`, and its fixed `2026-08-30` promised delivery and `2026-08-09` proceed date both
    rendered empty — a copy inherits goods and counterparty, never money, never a promise, never
-   execution. Completing the draft minted **SO-1320 · Rev 1** as a NEW identity with
+   execution. Completing the draft minted **SO-1320, revision 1** as a NEW identity with
    `paid = 0.00`, `delivery_date = null`, `delivery_date_tbd = true`, `proceed_date = null`, zero
    payments and zero PO/DO/unit links, while **SO-1303 was left unchanged**. Identity is never
    duplicated; a copy is a new transaction.
@@ -2395,8 +2395,8 @@ over this question is gone.
 - Cannot answer "how much is physically fulfilled" — that is Card 2 (units)
   + Card 5 (delivery attempts), on purpose.
 
-**Evidence order SO-1318** (`CARD-1 EVIDENCE`) carries the proven chain: Rev 1
-original → Rev 2 Staff correction → Rev 3 Customer change → Rev 4 contact fix
+**Evidence order SO-1318** (`CARD-1 EVIDENCE`) carries the proven chain: revision 1
+original → revision 2 Staff correction → revision 3 Customer change → revision 4 contact fix
 (auto Staff correction). Keep until Card 1 is owner-accepted, then it may be
 cleaned with the other fixtures.
 
