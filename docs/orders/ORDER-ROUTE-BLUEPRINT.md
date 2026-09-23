@@ -152,17 +152,22 @@ An operator who reads `No Purchase Order yet` will raise a purchase that already
 This is the same class of defect the repo has already been bitten by twice and written rules about:
 *"absence is not zero"* and *"a blank may never carry two meanings"*.
 
-**Recommended — a sixth mark, `unknown`, and one sentence.**
+**Recommended — a sixth mark, `unreadable`, and one sentence.**
+
+⚠️ **NOT `unknown`.** That word is already taken in this exact file, and it means something
+different: `sales-order-route.ts:817/1016/1023` use "unknown" for an unknown MONEY VALUE — *"An
+unknown value never holds a delivery"*. Two meanings for one word in one resolver is how the next
+reader gets it wrong. `unreadable` says what actually happened: the read failed.
 
 ```
 ⚠  Could not read Purchasing for this line.
    This does NOT mean there is no purchase order.  Try again →
 ```
 
-- `unknown` renders like `blocked` (amber `⚠`) — it IS an exception, just not a business one.
+- `unreadable` renders like `blocked` (amber `⚠`) — it IS an exception, just not a business one.
 - The second line is not optional. Without it the operator draws the same wrong conclusion from a
   different word.
-- **A node in `unknown` may never be ticked and may never be `CURRENT`.** An unknown is not a position.
+- **A node in `unreadable` may never be ticked and may never be `CURRENT`.** A failed read is not a position.
 - The route stays **whole**: one branch failing must not blank the map, in exactly the way
   `docByRevision` on the Sales Order page already fails soft (a failed document read leaves every
   version reporting "no stored file" instead of the version list refusing to load).
@@ -234,7 +239,7 @@ Everything she did was **read**. The map still writes nothing.
 Dependency-ordered. **No Cards are authored here** — that belongs to a BUILD lane.
 
 ```
-1. §3.3  unknown mark            — smallest, highest harm prevented, no upstream dependency
+1. §3.3  unreadable mark         — smallest, highest harm prevented, no upstream dependency
 2. §3.1  amendment banner        — reads facts that already exist on the Order tab
 3. §3.4  partial counts          — needs the receipt read to answer "how many of how many"
 4. §3.2  split-delivery trips    — MUST wait for the DO numbering fix (#1550 / 0575)
@@ -265,7 +270,7 @@ Everything else in this document is an engineering or design judgement and I hav
 |---|---|
 | Node marks, kinds, branches | `packages/shared/src/sales-order-route.ts:81–104` |
 | `amend` absent from the resolver | zero matches, whole file |
-| Failed reads absent | no `unreadable`/`error` concept in the marks or input |
+| Failed reads absent | marks are `complete · current · waiting · blocked · future` only; the four `unknown` hits at `:817/1016/1023` all mean an unknown MONEY VALUE, not a failed read |
 | One booking, one DO number | `SalesOrderRouteInput.delivery`, `:330–345` |
 | Split delivery is real and shipped | `supabase/migrations/0542_a_split_delivery_has_one_document_per_trip.sql:1–14` |
 | Multiple POs already modelled | `purchaseOrders: ReadonlyArray<RoutePurchaseOrder>` `:326`, `purchaseSlices()` `:602` |
