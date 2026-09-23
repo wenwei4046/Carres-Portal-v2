@@ -4,11 +4,25 @@ import WorkSplitShell from "./WorkSplitShell";
 
 describe("WorkSplitShell", () => {
   it("uses the governed three-panel geometry without cards or gutters", () => {
-    render(<WorkSplitShell layout="three" rail="Days" list="Actions" detail="Detail" />);
+    render(<WorkSplitShell layout="three" rail={<aside aria-label="Work filters">Days</aside>} list="Actions" detail="Detail" />);
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "three");
-    expect(screen.getByRole("complementary", { name: "Work filters" })).toHaveClass("w-60");
+    expect(screen.getByRole("complementary", { name: "Work filters" }).parentElement).toHaveClass("w-60");
     expect(screen.getByRole("region", { name: "Work actions" })).toHaveClass("w-[360px]");
     expect(screen.getByRole("region", { name: "Selected work" })).toHaveClass("min-w-[500px]");
+  });
+
+  it("keeps the filter rail while the second panel replaces list with detail", () => {
+    const { rerender } = render(
+      <WorkSplitShell layout="two" activePanel="list" rail="Days" list="Actions" detail="Detail" />,
+    );
+    expect(screen.getByText("Days")).toBeInTheDocument();
+    expect(screen.getByText("Actions")).toBeInTheDocument();
+    expect(screen.queryByText("Detail")).not.toBeInTheDocument();
+
+    rerender(<WorkSplitShell layout="two" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
+    expect(screen.getByText("Days")).toBeInTheDocument();
+    expect(screen.queryByText("Actions")).not.toBeInTheDocument();
+    expect(screen.getByText("Detail")).toBeInTheDocument();
   });
 
   it("shows one active panel on mobile", () => {

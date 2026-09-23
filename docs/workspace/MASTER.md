@@ -720,16 +720,17 @@ System automation that should have happened immediately is a source/integrity fa
 person task. Supervisory escalation is a notification/management receipt derived from the same
 identity; it never changes the owner, due date or completion fact.
 
-### 5.7 · Work current → proposed gap audit — 2026-09-14
+### 5.7 · Work current → proposed gap audit — 2026-09-23
 
 | Current branch evidence | Required Blueprint state |
 |---|---|
 | My Work / Team Work use one server-composed open feed | Retain; make all admitted modules use the same transport contract and source health |
 | My Work defaults correctly and Team groups by normal owner | Retain; add complete cover/handover and unresolved-Duty evidence everywhere |
 | Right Rail reads the same cache and opens `day` filters; since HF-3 (2026-09-17) the badge, the panel and My Work share one identity (the signed-in account id), one focus day (`workFocusDay`) and one `Missed` + `Today` count (`myMissedAndToday`); the badge accessible name is `My Work · {n} missed · {n} today`; loading keeps count placeholders and a failed refresh keeps the last-safe counts with `Last updated {time}` and source words | Retain; all supported filters must be URL-visible and use the same vocabulary |
-| Current main Work page has scope toggles and limited Rail-linked time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
-| Current rows show object, problem, action and due; Delivery/Warehouse show required result | Make required result accessible on every item and visible whenever completion would otherwise be ambiguous |
-| Current rows use truncation on narrow content | Replace with wrapping under 1024px; prove object/problem/action/result/due remain readable at 390px |
+| Current production still renders the retired rounded toolbar/day strip. The Work v4 branch now uses the flat 50px header, 45px toolbar, governed FilterRail and canvas-measured three/two/one-panel shell | Merge only after measured 1440/1180/820/390 visual acceptance; production evidence, not branch code, closes this row |
+| Current production can truthfully return no personal actions for a shared Principal account but offers no supervisory next door. The Work v4 branch keeps `Nothing assigned to you` and adds `Open Team Work` only for Principal/Operation | Production-verify the empty Principal/Operation path and prove Sales/Finance do not receive Team Work or protected counts |
+| Current production still uses a page-local row and old selected brief. The Work v4 branch uses the shared 64px-minimum `WorkActionRow`, `WorkActionPanel` and shared `Avatar`; object/problem/action wrap and required result stays in Panel 3 | Complete visual, keyboard and screen-reader acceptance, including focus return and the 390px wrapped-content proof |
+| Search, module/day/owner selection, source-failure isolation and true-empty/no-match states exist; remaining approved filters are not complete | Add waiting-for-reply, blocker and source filters plus individually removable applied-filter chips without inventing client-side business truth |
 | Current source composition is one all-or-nothing read and the item shape omits parts of §5.2.1 | Build the permission-scoped feed envelope, isolate source failures, distinguish true empty from no match and preserve governed last-safe observation |
 | No completed/history surface exists in shared Work | Add read-only history only after durable source result/actor evidence can support it; never synthesize Done rows |
 | Warehouse external queue and acceptance exist on the pending branch | Complete identity/offboarding/transfer guards and production proof before admission claim |

@@ -21,6 +21,12 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-23 — Workspace Work v4 is assembled from the governed flat `PageShell` Work variant,
+  the shared `FilterRail` and one shared `Avatar` identity chip. Its responsive shape is measured
+  from the Work canvas: 240/360/min-500 at three panels; the 240px rail plus list/detail replacement
+  at two panels; one panel below 768px. Actions use the shared 64px-minimum `WorkActionRow`; the
+  selected brief uses `WorkActionPanel`. Principal/Operation empty My Work remains truthful and
+  provides `Open Team Work`; roles without Team permission do not receive that door.
 - 2026-09-16 — Owner-approved Work is an execution workspace, not a read-only directory. My Work
   opens with `Missed` plus the actual current governed day (or next eligible day when a named public
   holiday admits no operation) while the full week remains visible. Panel 3 declares `embedded`,
@@ -40,6 +46,11 @@ copy, component, or business-rule system.
 ## Components
 
 - Existing Carres shared component inventory is authoritative; inspect before extending.
+- Shared staff identity chip — `apps/web/src/components/kit/Avatar.tsx`; one initials algorithm,
+  full-name tooltip/focus label and the governed staff colour mapping.
+- Work shell primitives — `PageShell variant="work"`, `WorkSplitShell`, `WorkDayNav`,
+  `WorkActionRow` and `WorkActionPanel`. They own layout and presentation only; the server Work
+  contract owns assignment, dates, completion and source health.
 - Workspace Work authority and measured UI contract — `docs/workspace/MASTER.md` §§5–6.
 - Rejected/exploratory Workspace HTML and companion specification under `docs/prototypes/` must not
   be used as implementation authority.

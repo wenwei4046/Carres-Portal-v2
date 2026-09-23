@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 
@@ -145,8 +145,35 @@ describe("Operation Work — one server feed", () => {
   it("defaults everyone, including a manager, to My Work", () => {
     authState = { role: "principal", email: "shasha@carres.test" };
     show();
-    expect(screen.getByTestId("work-view-mine")).toHaveClass("bg-base-900");
+    expect(screen.getByRole("tab", { name: "My Work" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
+  });
+
+  it("gives a manager with no My Work a truthful door into Team Work", async () => {
+    authState = { role: "principal", email: "shasha@carres.test" };
+    workState.data!.items = [item({
+      owner: {
+        rule: "salesperson",
+        dutyKey: null,
+        normal: { userId: YJ, name: "Yu Jun" },
+        activeCover: null,
+        coverEvidence: null,
+        acting: { userId: YJ, name: "Yu Jun" },
+        state: "primary",
+      },
+    })];
+    show();
+    expect(screen.getByTestId("work-empty")).toHaveTextContent("Nothing assigned to you");
+    fireEvent.click(screen.getByRole("button", { name: "Open Team Work" }));
+    expect(await screen.findByTestId(`work-owner-group-${YJ}`)).toBeInTheDocument();
+  });
+
+  it("does not expose Team Work to a My Work-only role, even through a copied URL", () => {
+    authState = { role: "salesperson", email: "shasha@carres.test" };
+    show("/operation?tab=work&scope=team");
+    expect(screen.getByRole("tab", { name: "My Work" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "Team Work" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Team Work" })).not.toBeInTheDocument();
   });
 
   it("renders object, problem, then action without repeating the owner", () => {
@@ -158,7 +185,7 @@ describe("Operation Work — one server feed", () => {
     expect(row).not.toHaveTextContent("Shasha");
   });
 
-  it("routes covered work to the acting person's My Work but groups Team Work under normal owner", () => {
+  it("routes covered work to the acting person's My Work but groups Team Work under normal owner", async () => {
     workState.data!.items = [item({
       owner: {
         rule: "salesperson",
@@ -174,8 +201,8 @@ describe("Operation Work — one server feed", () => {
     show();
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date"))
       .toHaveTextContent("Covered for Shasha");
-    fireEvent.click(screen.getByTestId("work-view-team"));
-    const group = screen.getByTestId(`work-owner-group-${SH}`);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Team Work" }), { button: 0, ctrlKey: false });
+    const group = await screen.findByTestId(`work-owner-group-${SH}`);
     expect(within(group).getByText(/Shasha/)).toBeInTheDocument();
     expect(within(group).getByTestId("work-row-SO-1318-ask_delivery_date"))
       .toHaveTextContent("Covered by Yu Jun");
@@ -213,7 +240,7 @@ describe("Operation Work — one server feed", () => {
     expect(screen.getByRole("searchbox", { name: "Search work…" })).toHaveValue("Acme");
   });
 
-  it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {
+  it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", async () => {
     workState.data!.items = [item({
       id: "delivery:order-1:assign_logistics",
       module: "delivery",
@@ -230,8 +257,9 @@ describe("Operation Work — one server feed", () => {
       },
     })];
     show();
-    fireEvent.click(screen.getByTestId("work-view-team"));
-    const group = screen.getByTestId("work-owner-group-duty:delivery_duty");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Team Work" }), { button: 0, ctrlKey: false });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Team Work" })).toHaveAttribute("aria-selected", "true"));
+    const group = await screen.findByTestId("work-owner-group-duty:delivery_duty");
     expect(within(group).getByText("Delivery Duty")).toBeInTheDocument();
     expect(group).not.toHaveTextContent("Shasha");
     const failure = within(group).getByTestId("work-duty-unassigned-delivery_duty");
