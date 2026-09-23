@@ -95,6 +95,7 @@ import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import PaymentLedger from "./components/SalesOrderPaymentLedger";
 import { SO_HEAD_ROW, SO_TABLE, SO_TH } from "./components/so-document-table";
+import { serviceCodeWord } from "@/lib/service-code";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -136,7 +137,7 @@ import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
 import type { RecordedAgreement } from "./customer-agreement";
-import { configWords, diffRows, NOT_IN_CATALOG, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { configWords, diffRows, isDisposalService, NOT_IN_CATALOG, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
@@ -1936,6 +1937,18 @@ function SalesOrderWorkspaceBody() {
   const orderPaymentsQ = useOrderPayments(isNew ? null : (orderId ?? null));
   const nameOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.label || sku, [catalogBySku]);
   const nameOfAddon = useCallback((key: string) => addonNameByKey.get(key) ?? key, [addonNameByKey]);
+  /** ONE act adds a service to the draft — `Add service` under Items and
+   *  `Add disposal` under Delivery both call it, so a disposal picked in either
+   *  place is the same `addons` row, priced once, in the one Items table. */
+  const addServiceToDraft = (key: string) => {
+    const hit = (catalogQ.data?.addons ?? []).find((x) => x.key === key);
+    if (!hit) return;
+    setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
+  };
+  const disposals = draft.addons.filter((a) => isDisposalService(a.addon_key, nameOfAddon(a.addon_key)));
+  const disposalOptions = (catalogQ.data?.addons ?? []).filter(
+    (x) => (x as { active?: boolean }).active !== false && isDisposalService(x.key, x.name),
+  );
   const categoryOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.category ?? null, [catalogBySku]);
   const consequencesFor = (after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
     const out: string[] = [];
@@ -2851,7 +2864,7 @@ function SalesOrderWorkspaceBody() {
               return (
                 <tr key={a.key} className="border-b border-kit-slate-5 align-top" data-testid={`edit-service-${a.addon_key}`}>
                   <td className="px-2 py-2" />
-                  <td className={`break-words px-2 py-2 ${strike}`}>{a.addon_key}</td>
+                  <td className={`break-words px-2 py-2 ${strike}`}>{serviceCodeWord(a.addon_key)}</td>
                   <td className="px-2 py-2">
                     <div className={strike}>{nameOfAddon(a.addon_key)}</div>
                     {typeof a.attrs?.["size"] === "string" && <div className={`text-meta text-base-600 ${strike}`}>{String(a.attrs["size"])}</div>}
@@ -2945,11 +2958,7 @@ function SalesOrderWorkspaceBody() {
         </div>
         <div data-pos-field="orderAddons">
           <Select id="so-add-service" label="Add service" value=""
-            onValueChange={(key) => {
-              const hit = (catalogQ.data?.addons ?? []).find((x) => x.key === key);
-              if (!hit) return;
-              setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
-            }}
+            onValueChange={addServiceToDraft}
             options={(catalogQ.data?.addons ?? [])
               .filter((x) => x.key !== STAIR_CARRY_ADDON_KEY && (x as { active?: boolean }).active !== false)
               .map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
@@ -3676,6 +3685,27 @@ function SalesOrderWorkspaceBody() {
               </span>
             </p>
           )}
+          {/* ⭐ DISPOSAL READS WITH THE DELIVERY IT RIDES ON (SO page kit-sizes
+              card, 2026-09-23). The lorry that delivers is the lorry that takes
+              the old mattress away, so the Delivery section states it — but it
+              is NOT a second record: it reads the same `draft.addons` rows the
+              Items table prices, prints no money, and `Add disposal` calls the
+              same `addServiceToDraft` as `Add service`. Remove and quantity stay
+              on the Items row, the one place that shows the charge. No in-card
+              heading (Delivery is ONE group, owner ruling 2026-09-21) — a
+              labelled field. */}
+          {(disposals.length > 0 || editing) && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="delivery-disposal">
+              <div className="sm:col-span-2">
+                <Fact label="Disposal" value={servicesWords(disposals, nameOfAddon)} own={false} />
+              </div>
+              {editing && disposalOptions.length > 0 && (
+                <Select id="so-add-disposal" label="Add disposal" value=""
+                  onValueChange={addServiceToDraft}
+                  options={disposalOptions.map((x) => ({ value: x.key, label: x.name }))} />
+              )}
+            </div>
+          )}
       </Block>
       </fieldset>
 
@@ -3869,7 +3899,7 @@ function SalesOrderWorkspaceBody() {
             No rule above the block — the ledger's last row already draws one,
             and the section body's 12px gap spaces it. */}
         <div className="flex justify-end">
-          <div className="grid min-w-[240px] grid-cols-[1fr_auto] gap-y-1 text-body"
+          <div className="grid w-full grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]"
             data-testid="payment-totals">
             <span className="pr-6 text-base-500">Goods</span>
             <span className="text-right tabular-nums text-base-900" data-testid="money-goods">
