@@ -12,6 +12,7 @@
  * because it has six fields and no lines.
  */
 import { useMemo, useState } from "react";
+import type { UseMutationResult } from "@tanstack/react-query";
 import {
   MONEY_MOVE_KIND_WORD,
   MONEY_MOVE_KINDS,
@@ -20,6 +21,7 @@ import {
   moneyMoveGross,
   moneyMoveInput,
   moveAccounts,
+  type MoneyMoveInput,
   type MoneyMoveKind,
   type MoneyMoveRow,
 } from "@carres/shared/money-moves";
@@ -234,18 +236,44 @@ export default function MoneyMovesPage() {
   );
 }
 
-function MoneyMoveForm({ onClose }: { onClose: () => void }) {
+/** What a caller already knows; staff still choose the accounts and press Prepare. */
+export interface MoneyMoveFormInitial {
+  kind: MoneyMoveKind;
+  /** Null: staff type it (a GHL day, whose file has no settlement date). */
+  date: string | null;
+  amount: number;
+  fee: number;
+  reference: string;
+}
+
+/**
+ * 0572 — Card settlement opens this form filled from a matched day and passes
+ * its own `prepareDay`: the kind, amount, fee and reference are the file's and
+ * cannot be changed here; staff give the date the bank received it and the
+ * accounts.
+ */
+export function MoneyMoveForm({
+  onClose,
+  initial,
+  prepareDay,
+}: {
+  onClose: () => void;
+  initial?: MoneyMoveFormInitial;
+  prepareDay?: UseMutationResult<unknown, Error, MoneyMoveInput>;
+}) {
   const accounts = useMoneyAccounts();
   const chart = useLedgerChart();
-  const prepare = usePrepareMoneyMove();
+  const prepareMove = usePrepareMoneyMove();
+  const prepare = prepareDay ?? prepareMove;
+  const fixed = prepareDay !== undefined;
   const [key] = useState(() => crypto.randomUUID());
-  const [kind, setKind] = useState<MoneyMoveKind>("TRANSFER");
-  const [date, setDate] = useState<string | null>(appTodayIso());
+  const [kind, setKind] = useState<MoneyMoveKind>(initial?.kind ?? "TRANSFER");
+  const [date, setDate] = useState<string | null>(initial ? initial.date : appTodayIso());
   const [fromCode, setFromCode] = useState<string | undefined>();
   const [toCode, setToCode] = useState<string | undefined>();
-  const [amount, setAmount] = useState("");
-  const [fee, setFee] = useState("");
-  const [reference, setReference] = useState("");
+  const [amount, setAmount] = useState(initial ? initial.amount.toFixed(2) : "");
+  const [fee, setFee] = useState(initial ? initial.fee.toFixed(2) : "");
+  const [reference, setReference] = useState(initial?.reference ?? "");
   const [note, setNote] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
   /* 0541 — a card payout's bank defaults from Finance Settings' route; still changeable. */
@@ -256,8 +284,22 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
     if (bank && moveAccounts("CARD_PAYOUT", "to", accounts.data ?? []).some((a) => a.code === bank)) setToCode(bank);
   };
 
-  const options = (side: "from" | "to") =>
-    moveAccounts(kind, side, accounts.data ?? []).map((a) => ({ value: a.code, label: accountLabel(a) }));
+  /* 0572 — a card account a route serves is paid out on Card settlement (Approve day) only; the database refuses it here too. */
+  const routed = new Set((routes.data ?? []).map((r) => r.holding_code));
+  const cardSettlementOnly = kind === "CARD_PAYOUT" && !fixed && routed.size > 0;
+  /* 0572 — Approve day pays only from a card account a route serves into that route's bank; the database refuses any other. */
+  const routeBanks = (holding: string | undefined) =>
+    new Set((routes.data ?? []).filter((r) => r.holding_code === holding).map((r) => r.bank_code));
+  const options = (side: "from" | "to", holding?: string) =>
+    moveAccounts(kind, side, accounts.data ?? [])
+      .filter((a) => !(cardSettlementOnly && side === "from" && routed.has(a.code)))
+      .filter((a) => !fixed || (side === "from" ? routed.has(a.code) : routeBanks(holding).has(a.code)))
+      .map((a) => ({ value: a.code, label: accountLabel(a) }));
+  const onlyOne = (o: { value: string }[]) => (fixed && o.length === 1 ? o[0]!.value : undefined);
+  const fromOptions = options("from");
+  const from = fromCode ?? onlyOne(fromOptions);
+  const toOptions = options("to", from);
+  const to = toCode ?? onlyOne(toOptions);
   const amountN = parseTypedAmount(amount);
   // 0537: a bank credit always comes from the other-income account, a bank
   // charge always goes to the bank-charges account. 0570: which accounts those
@@ -277,8 +319,8 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
     const parsed = moneyMoveInput.safeParse({
       kind,
       move_date: date ?? "",
-      from_account_code: fixedFrom ?? fromCode ?? "",
-      to_account_code: fixedTo ?? toCode ?? "",
+      from_account_code: fixedFrom ?? from ?? "",
+      to_account_code: fixedTo ?? to ?? "",
       amount: amountN === null || Number.isNaN(amountN) ? undefined : amountN,
       fee: Number.isNaN(feeN) ? undefined : feeN,
       reference: reference.trim() || null,
@@ -321,6 +363,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
           label="Kind"
           required
           value={kind}
+          disabled={fixed}
           onValueChange={(v) => {
             setKind(v as MoneyMoveKind);
             setFromCode(undefined);
@@ -328,18 +371,26 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
           }}
           options={MONEY_MOVE_KINDS.map((k) => ({ value: k, label: MONEY_MOVE_KIND_WORD[k] }))}
         />
-        <DatePicker id="move-date" label="Date" required value={date} onChange={setDate} />
+        <DatePicker id="move-date" label={fixed ? "Date the bank received it" : "Date"} required value={date} onChange={setDate} />
         {fixedFrom === undefined && (
           <Select
             id="move-from"
             label="Paid from"
             required
-            value={fromCode}
+            value={from}
             onValueChange={(v) => {
               setFromCode(v);
+              if (fixed) setToCode(undefined);
               if (kind === "CARD_PAYOUT") routeBank(v, channel);
             }}
-            options={options("from")}
+            options={fromOptions}
+            hint={
+              cardSettlementOnly
+                ? "A card account that has a payout bank in Finance Settings is paid out on Card settlement."
+                : fixed && routes.isSuccess && fromOptions.length === 0
+                  ? "No card account has a payout bank in Finance Settings yet. Set one there first."
+                  : undefined
+            }
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
         )}
@@ -350,7 +401,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             value={channel}
             onValueChange={(v) => {
               setChannel(v as CardChannel);
-              routeBank(fromCode, v as CardChannel);
+              routeBank(from, v as CardChannel);
             }}
             options={CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }))}
           />
@@ -360,9 +411,9 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             id="move-to"
             label="Paid into"
             required
-            value={toCode}
+            value={to}
             onValueChange={setToCode}
-            options={options("to")}
+            options={toOptions}
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
         )}
@@ -371,6 +422,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
           label={kind === "CARD_PAYOUT" ? "Paid into the bank (RM)" : "Amount (RM)"}
           required
           inputMode="decimal"
+          readOnly={fixed}
           hint={
             !fixedRole
               ? undefined
@@ -390,12 +442,13 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             id="move-fee"
             label="Card company fee (RM)"
             inputMode="decimal"
+            readOnly={fixed}
             value={fee}
-            hint={gross !== null ? `${rm(gross)} leaves ${fromCode ?? "the holding account"}` : undefined}
+            hint={gross !== null ? `${rm(gross)} leaves ${from ?? "the holding account"}` : undefined}
             onChange={(e) => setFee(e.target.value)}
           />
         )}
-        <Input id="move-reference" label="Reference" maxLength={120} value={reference} onChange={(e) => setReference(e.target.value)} />
+        <Input id="move-reference" label="Reference" maxLength={120} readOnly={fixed} value={reference} onChange={(e) => setReference(e.target.value)} />
         <Textarea id="move-note" label="Note" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
         {accounts.isError && <p role="alert">The accounts could not be loaded. Try again.</p>}
         {refusal && (

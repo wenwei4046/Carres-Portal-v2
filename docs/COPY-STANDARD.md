@@ -4068,6 +4068,74 @@ Payables, 18 Sep 2026. Words new to this standard:
   `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
   not yet signed. A draft voucher has no number and no PDF.
 
+### PROPOSAL — PENDING APPROVAL (card-settlement, migration 0572, PR 1538)
+
+**PROPOSAL / NOT LAW.** Page: Finance → `Card settlement` (`/finance/card-settlement`). None of
+these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; everything else is ASCII.
+
+- Nav and header: `Card settlement` · tab title `Card settlement — Carres`
+- Columns: `Card company` · `Paid out` · `Sale date` (GHL only) · `Machine` · `Sales` · `Matched` ·
+  `Sales total` · `Fee` · `Paid into bank` · `Recorded in Carres` · `Status` · cells
+  `Nothing matched` · `All machines · {merchant}` (Maybank) · `Not in the file` (a GHL file whose
+  name carries no statement date)
+- Status: `To check` · `Matched` · `Payout prepared` · `Payout approved`
+- Toolbar: placeholder `Choose the card company` · options `Public Bank` · `GHL` · `Maybank` ·
+  button `Import file` · search `Search card settlement…` · summary `{n} days · {n} to check`
+  (`day` when 1)
+- Empty: `No card settlement file yet. Choose the card company and press Import file.`
+- Expand title: `Check the sales`
+- Row: `Row {n} · {date} · {RM} · Approval code {code}` (`not printed` when blank; left out for
+  GHL) `· Terminal {id} · Card {masked}`
+- Matched: `Matched by approval code` · `Matched by amount and date` · `Suggestion approved` ·
+  `Adjusted by hand`
+- Suggestions: `Same approval code and amount` · `Same approval code, another amount` ·
+  `Approval code may be typed wrong` · `Same amount, same day` · `Same amount, {n} days apart`
+  (`day` when 1)
+- Payment: `{RM} · {date} · {receipt} · SO-{n} · Approval code {typed}` ·
+  `Approval code not typed` · `Payment not available`
+- Buttons: `Approve match` · `Adjust match` · `Take off match` · `Approve day` · `Save match`
+- `No recorded card payment is close to this sale. Adjust the match by hand.`
+- `{n} sales are not matched yet. Match every sale before you approve the day.` (`1 sale is`)
+- `Payout prepared · {move no}` · `Payout approved · {move no}` · `Move number not available`
+- Approve day opens the Money moves card payout form with the file's amount, fee and reference
+  read only; its date label reads `Date the bank received it`.
+- Picker: title `Adjust the match for row {n}` · description
+  `{date} · {RM}. The payment and its approval code are not changed.` · label `Card payment` ·
+  placeholder `Choose the card payment` · `No open card payment within 31 days`
+- Toasts: `Row {n} matched.` · `Row {n} is open again.` ·
+  `{i} of {r} rows imported · {m} matched.` · `Choose the card company first.`
+- Load failure: `Card settlement could not be loaded. Try again.`
+- Refusals (API and database): `Only Finance works on card settlement.` ·
+  `Choose Public Bank, GHL or Maybank.` · `The file has no name.` · `The file has no sales.` ·
+  `This file was imported before.` ·
+  `This is not a {Public Bank|GHL|Maybank} settlement file. Check the card company and the file.` ·
+  `Row {n} is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one.` ·
+  `Row {n} could not be read. Import the file as it came from the card company.` ·
+  `This file has refunds or adjustments. Carres does not import these until their sign is confirmed on a real one.` ·
+  `The file's totals do not add up. Import the file as it came from the card company.` ·
+  `That settlement row is not there.` · `Choose a card payment that is not voided.` ·
+  `That payment is already matched to another row.` · `The file name is too long.` ·
+  `The file is too big for a card settlement file.` · `Choose a date.` ·
+  `That card settlement day is not there.` · `Match every sale before you approve the day.` ·
+  `The payout for this day is already prepared.` ·
+  `The payout for this day is already prepared. Cancel that money move before you change a match.` ·
+  `Row {n} is for a day whose payout is already prepared. Cancel that money move first.`
+- Payout reference: `Card settlement {PBB|GHL|MAYBANK} {machine} {YYYY-MM-DD}`
+- Added in the PR 1538 fix (PROPOSAL — PENDING APPROVAL, 23 Sep 2026):
+  - Import toast tail: `· {n} opened again to check` (after `{m} matched`, only when an
+    automatic match was taken off because another file made it uncertain)
+  - Expand line (red, one per payout): `Card payout {move no} of {RM} from {code} on {date} is not
+    linked to any card settlement day. Check it is not this day's money before you approve the day.`
+  - Money moves → Card payout, `Paid from` hint: `A card account that has a payout bank in Finance
+    Settings is paid out on Card settlement.`
+  - Refusals (database): `A card payout from this card account is prepared on Card settlement.
+    Approve the day there.` · `This form was used before. Close it and press Approve day again.`
+- Added in the PR 1538 round 3 fix (PROPOSAL — PENDING APPROVAL, 23 Sep 2026):
+  - Approve day's card payout form offers only a card account that has a payout bank in Finance
+    Settings and that account's payout bank, each chosen already when it is the only one. `Paid from`
+    hint when none has: `No card account has a payout bank in Finance Settings yet. Set one there first.`
+  - Refusals (database): `Choose a card account that has a payout bank in Finance Settings.` ·
+    `Choose the payout bank Finance Settings sets for this card account.`
 
 ## Sales Orders navigation — owner approved 2026-09-23 · BUILT 2026-09-23
 
