@@ -1042,7 +1042,7 @@ Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · G
 | `Not confirmed by supplier` · `Confirmed by supplier` | RETIRED on this listing with the merged `Expected Delivery Date` cell they explained |
 | A receipt record that carries no arrival clock | `Time not recorded`, under the date |
 | Unknown original date | `Not recorded` |
-| Current version | `PO V{n}` |
+| Current version | `{PO No}({n})` |
 | Current version sending evidence, supporting line | `PO sent to supplier · {channel} · {date}` / `Sending not confirmed` |
 | Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
 | Multiple physical receipts | `{n} receipt dates` |
@@ -1176,7 +1176,7 @@ with an absence word that implies one is owed.
 recorded before the evidence law reads `Supplier reply recorded without evidence · {date}`; it never
 claims the governed `Supplier Confirmed Delivery Date` and never reads as `Not confirmed`, because a recorded
 answer is not a proven absence. The object's `Reply history` lists every reply by version —
-`PO V{n} · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
+`{PO No}({n}) · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
 `Delayed — {reason}` · `Date reported` — with its `Reply evidence` link where evidence exists.
 A demand an open purchase order already fully covers refuses issue with
 `An open purchase order ({PO No}) already covers this line.` /
@@ -1188,7 +1188,7 @@ Keep the label `Issue PO`; no second recovery click is needed. If that read fail
 use `Could not open {PO No}.` / `Try again.`; the same button retries opening that PO.
 
 **Sent documents — correction card 2026-09-06.** Revisions lists each version the supplier
-actually received as `Sent document · PO V{n}` · `Recorded at the confirmed send`, with
+actually received as `Sent document · {PO No}({n})` · `Recorded at the confirmed send`, with
 `Download PDF`. A version sent before document keeping began answers
 `No kept document for this PO version` — a named absence, never a reconstruction.
 
@@ -1291,7 +1291,7 @@ These stock-picker words do not rename every Warehouse screen.
 | Stock picker actions | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel`. No per-Unit Undo; save writes, checkbox alone does not. |
 | Stock picker feedback | `{n} selected` · `Not saved` · `Stock selection saved.` · `Choose up to {n} Units for {SO No}.` · `{n} of {N} reserved for {SO No}.` · `Save or cancel your stock selection before issuing a PO.` · `Choose no more than {n} Units.` |
 | The record's heading | **`Purchase order details`** — never `Covered by` (retired: one heading, three questions) and never `ON PO` (that is the goods table's quantity column; a heading repeating a column name makes the number and the section read as one thing). |
-| The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in FULL: `PO-20260904-4665`, **never** `PO-260904-4665`. **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
+| The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in full in the ruled form `PO260924-4827` (owner 2026-09-23: YYMMDD, no hyphen after the prefix — overwrites the four-digit-year `PO-20260904-4665` form). **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
 | `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Waiting for goods from supplier`** · **`Sending not confirmed`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
 | A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
 | HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
@@ -2751,7 +2751,7 @@ detail's work card and Order Route:
 | `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` |
 | `The supplier delivery date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
-| `PO V{n} has not been sent` | `Issue PO V{n} to {supplier}` |
+| `{PO No}({n}) has not been sent` | `Issue {PO No}({n}) to {supplier}` |
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
 
 The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their

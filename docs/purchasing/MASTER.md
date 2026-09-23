@@ -601,7 +601,13 @@ PO260924-4827(2)     the same PO after one revision
   share a PO still follows the purchasing grouping rules.
 - Unique, never reused, fixed width, capacity watched internally; any change of width is an owner
   decision. Existing PO numbers and issued PDFs are kept (test data; clean start).
-- This replaces `PO-YYYYMMDD-RRRR` and `· Version 2` for the PO only. The other prefixes below keep
+- **Build consequence (not a UI change):** Outright and Subscription now have separate PO series
+  (`PO…` / `SPO…`), so one PO belongs to one business. Business becomes a SIXTH document-partition
+  fact beside Supplier × Category × Deliver To × Purpose × MPR Delivery Date — in the SQL partition
+  (`purchasing_issue_pos_batch`'s caller) and `manualPurchaseIssueDocuments` at once — and the
+  request/demand rows need a business fact to partition by, which does not exist yet. A supplier
+  serving both businesses receives separate POs.
+- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for the PO only. The other prefixes below keep
   the family rule that follows until each is ruled.
 
 **Family rule for the other formal documents (unchanged until each is ruled):**
@@ -2363,7 +2369,7 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   actual receipt in Receiving. `Received Qty` is the shared `warehouseReceiptTotals` reader, so the
   count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
   wrong-item units are not received, which is that same arithmetic, not a second one.
-- `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` for the current version,
+- `PO Version`: `{PO No}({n})` with `PO sent to supplier · {channel} · {date}` for the current version,
   or `Sending not confirmed` when the CURRENT version's confirmation is missing. Earlier evidence
   stays in Revisions. Missing evidence never proves the PO was never sent.
 
@@ -2989,9 +2995,10 @@ pending decision for this PLAN.
 
 #### Claim facts and identity
 
-**RESOLVED:** keep permanent internal identity and the formal `SC-YYYYMMDD-RRRR` number family,
-shared daily code pool, Malaysia date and non-reuse law in §6.1. Old `SC-1019`-style numbers remain
-unchanged. Revisions keep the number; links, not matching digits, show family relationships.
+**RESOLVED:** keep permanent internal identity. **Prefix `CLM` (Outright) / `SCLM` (Subscription) — owner
+ruling 2026-09-23, prospective only:** existing `SC-…` numbers are permanent and never renumbered
+(they are test data; clean start). Date pattern and digits for `CLM` are still open; non-reuse law in
+§6.1 holds. Revisions keep the number; links, not matching digits, show family relationships.
 
 **APPROVED:** intake creates the permanent workstream ID. The formal SC number is allocated when
 the first supplier claim instruction is issued; before that the object shows its source/problem
