@@ -139,33 +139,42 @@ amendment preserves that number. Search by the base reference must make its vers
 without requiring the parentheses. This is approved target presentation, not a claim of shipped
 behavior. Historical issued PDFs remain preserved.
 
-**RULING / APPROVED — SO base format, 2026-09-23.** Jess approved `SOYYMM-NNNNN`,
-for example `SO2609-48271`: year and month of original order creation plus a fixed five-digit
-random decimal suffix. Leading zeros are allowed (`00000` through `99999`), providing 100,000
-possible SO references per calendar month. Display the original as `SO2609-48271 (1)` and the
-second version as `SO2609-48271 (2)`. Amendment never changes the base reference or its original
-year/month, including amendments made in a later month. The encoded month is not the delivery,
-receipt, warranty-start, or amendment month; use the actual governed dates for those purposes.
+**RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
+the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-Suffix length stays fixed; do not silently expand it based on issuance volume. Allocation must
-ensure unique references and retry random collisions; repeated submission must identify the same
-business request. Void references are not reused. Preserve authoritative record links, existing
-order numbers and historical issued documents. Search by the base reference makes its versions
-available without requiring a revision suffix.
+| Document | Outright | Subscription |
+|---|---|---|
+| Order | `SO2609-4827 (1)` — `SO` + creation YYMM + **4** random digits | `SUB2609-48271 (1)` — `SUB` + creation YYMM + **5** random digits |
+| Delivery document | `DO2609-48271` | `SDO2609-48271` |
+
+- Leading zeros allowed: Outright holds **10,000** SO numbers a month; Subscription **100,000** SUB
+  numbers a month (Subscription is expected to be the high-volume business; owner benchmark
+  Coway ≈ 5,000–8,000 orders/month, Cuckoo ≈ 1,000/month — her figures, not measured).
+- `SUB` is the one customer-facing number of a Subscription; it replaces the `RA-` agreement
+  number (`RA-` rows are test data). A Subscription customer is never handed a second `SO` number.
+- **Width is fixed.** The system never changes the number of digits. Capacity is watched internally
+  only; any widening is an explicit owner decision, never automatic.
+- Every series draws independently and guarantees uniqueness with collision retry; repeated
+  submission identifies the same business request; void numbers are never reused.
+- Amendment never changes the base number or its original year/month, including amendments made
+  in a later month. The encoded month is the creation month — not delivery, receipt,
+  warranty-start or amendment month; use the actual governed dates for those purposes.
+- **Unit ID stays ONE shared series for both businesses** — one physical item has one identity;
+  its format is not decided by this ruling.
 
 **Acceptance boundary / limitations.** Capacity is finite and must be monitored before exhaustion;
-100,000 per month is not a verified forecast or an unlimited guarantee. Fixed random references
+the monthly limits are not a verified forecast or an unlimited guarantee. Fixed random references
 conceal a running counter, not every inference from transaction activity, and are never
-authorization secrets. Reconcile §9's message-reference rules before cutover; an SO display code
-does not authorize sending SO numbers to suppliers.
+authorization secrets. Reconcile §9's message-reference rules before cutover; an order display code
+does not authorize sending order numbers to suppliers.
 
-**Scope boundary.** This approval covers SO numbering and its revision presentation only. DO numbering
-was approved separately the same day (`docs/delivery/MASTER.md` §3.1). PO,
-GRN, RA and Service Case numbering require their own capacity and governing-business-rule review
-before adopting a similar appearance. It does not approve their revision, rescheduling, voiding or
-correction workflows. Unit IDs, INV and RC remain outside this change. This is approved target
-truth, not shipped behavior, whole-blueprint approval or authorization for application code,
-production writes, migration or cutover in this PLAN lane.
+**Scope boundary.** This approval covers the Outright/Subscription order numbers, their delivery-document
+prefixes and the revision presentation (DO detail: `docs/delivery/MASTER.md` §3.1). PO, GRN,
+Service Case, INV/RC (accountant first) and the Unit ID format require their own capacity and
+governing-business-rule review. It does not approve revision, rescheduling, voiding or correction
+workflows of other documents. This is approved target truth, not shipped behavior, whole-blueprint
+approval or authorization for application code, production writes, migration or cutover in this
+PLAN lane.
 
 ## One purpose and one navigation home
 

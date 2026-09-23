@@ -173,15 +173,17 @@ leg's arrangement carries its partner and its agreed day and the order's money a
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
-- **DO number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET / NOT BUILT.**
-  `DO` + two-digit year + two-digit month of **issue** + `-` + **exactly five random digits**,
-  e.g. `DO2609-48271`. Leading zeros allowed: 100,000 DO numbers per month. Fixed width — never
-  grows automatically. Drawn independently of the SO number (a shared tail means nothing); the
-  link to the SO/trip is the record link. **Unique across every order; never reused**; a voided DO
+- **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET /
+  NOT BUILT.** Outright trips issue **`DO2609-48271`**, Subscription trips issue
+  **`SDO2609-48271`**: prefix + two-digit year + two-digit month of **issue** + `-` + **exactly
+  five random digits** (leading zeros allowed; 100,000 a month per prefix). The two businesses are
+  told apart by the prefix; the document model, gates and team are one. Fixed width — the system
+  never widens it. Drawn independently of the order number (a shared tail means nothing); the link
+  to the order/trip is the record link. **Unique across every order; never reused**; a voided DO
   keeps its number forever. A retry, refresh or reprint returns the SAME stored number; a
-  rebooked or failed-then-redelivered trip is a NEW DO with a NEW number (no `-B` letter). Old
-  `DO-DDMMYY-NNNN` numbers are test data (clean start). Same appearance as the SO ruling
-  (`docs/orders/MASTER.md` → *SO number*).
+  rebooked or failed-then-redelivered trip is a NEW document with a NEW number (no `-B` letter).
+  Old `DO-DDMMYY-NNNN` numbers are test data (clean start). Order side: `docs/orders/MASTER.md`
+  → *order numbers by business*.
 - **🔴 P0 FACT, measured 2026-09-23 on origin/main `855c305c4` — must be gone before Outright go-live,
   whatever the format.** Today `docNumber` seeds the tail on the ORDER id (`FNV mod 10⁴`), and the
   collision check reads only the SAME order's numbers (`apps/api/src/lib/delivery-order-issue.ts:163-178`).

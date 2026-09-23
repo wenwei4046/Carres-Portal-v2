@@ -19,6 +19,12 @@ records; **pages not read line by line.***
 **Live scale: ONE agreement (`RA-1003`), 0 Stripe subscriptions.** Almost every rule below is
 therefore proved by test and by rolled-back production transactions, **not by daily use.**
 
+**Number — OWNER RULING 2026-09-23 (Jess) · APPROVED TARGET / NOT BUILT.** A Subscription's one
+customer-facing number is `SUB2609-48271` (creation YYMM + fixed five random digits); its delivery
+documents are `SDO2609-48271`. `SUB` replaces the `RA-` agreement number (`RA-` rows are test
+data). Unit IDs stay one shared series with Outright. Authority: `docs/orders/MASTER.md` → *order
+numbers by business*.
+
 ---
 
 # §2 · Frozen rules
