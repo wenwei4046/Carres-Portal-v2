@@ -49,7 +49,7 @@ import {
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkRail, { WorkDateSection, WorkDayStrip, WorkModuleSection } from "./work/WorkDayNav";
+import WorkRail, { WorkDateSection, WorkDateTrigger, WorkModuleSection } from "./work/WorkDayNav";
 
 type ViewKey = "mine" | "team";
 
@@ -168,7 +168,7 @@ export default function OperationWork() {
   const [params, setParams] = useSearchParams();
   const workAreaRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<WorkLayout>(() =>
-    typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
+    typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth, window.innerWidth),
   );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
 
@@ -181,7 +181,7 @@ export default function OperationWork() {
     if (!area) return;
     const measure = () => {
       const width = area.getBoundingClientRect().width;
-      setLayout(workLayoutFor(width > 0 ? width : window.innerWidth));
+      setLayout(workLayoutFor(width > 0 ? width : window.innerWidth, window.innerWidth));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -318,6 +318,16 @@ export default function OperationWork() {
   );
   const railSelected = selectedDay === "missed" || selectedDay === "no_date" || isWorkDate(selectedDay) ? selectedDay : null;
   const moduleCounts = workModuleCounts(moduleCountRows);
+  /** The narrow trigger's words for what the list shows now. */
+  const dateSelection = day === "missed"
+    ? "Missed"
+    : day === "no_date"
+      ? "No working date"
+      : day === "all"
+        ? "All dates"
+        : day === "focus"
+          ? (railDates?.missed ? `Missed · ${fmtDate(focusDay)}` : fmtDate(focusDay))
+          : fmtDate(day);
   const railModules = WORK_MODULES.map((key) => ({ key, label: MODULE_LABEL[key] }));
 
   /* The four empty states, checked in order (HF-1, owner ruling 2026-09-17):
@@ -512,9 +522,11 @@ export default function OperationWork() {
         ) : null}
         list={(<div className="h-full overflow-y-auto" data-testid="work-list">
         {layout === "one" && railDates ? (
-          <WorkDayStrip
+          <WorkDateTrigger
             dates={railDates}
             selected={railSelected}
+            selection={dateSelection}
+            count={visible.length}
             onSelect={(key) => updateParam("day", key)}
             onWeek={(monday) => updateParam("week", monday)}
           />

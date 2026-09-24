@@ -122,11 +122,6 @@ function show(url = "/operation?tab=work") {
   );
 }
 
-const dateSection = () => screen.getByRole("region", { name: "Date" });
-const moduleSection = () => screen.getByRole("region", { name: "Module" });
-const day = (name: RegExp) => within(dateSection()).getByRole("button", { name });
-const listRows = () => within(screen.getByTestId("work-list")).queryAllByRole("button", { name: /Ask customer/ });
-const countOf = (el: HTMLElement) => el.querySelector("[data-rail-count]")?.textContent ?? null;
 const url = () => new URLSearchParams(lastSearch);
 
 const savedTz = process.env.TZ;
