@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -34,6 +35,23 @@ vi.mock("react-router-dom", async () => {
 vi.mock("@/lib/pdf/render", () => ({
   renderPoPdf: vi.fn(async () => new Blob(["%PDF-1.4"], { type: "application/pdf" })),
 }));
+
+
+/* Page-journey tests model the viewer readiness boundary; PdfPreview.test.tsx
+   exercises actual page painting, failure and cancellation separately. */
+const previewState = vi.hoisted(() => ({ ready: true }));
+vi.mock("@/components/kit/PdfPreview", () => ({
+  default: ({ src, title, onReady, "data-testid": testId }: {
+    src: string; title: string; onReady: (ready: boolean) => void; "data-testid": string;
+  }) => {
+    useEffect(() => { onReady(previewState.ready); }, [src]);
+    return <section aria-label={title} data-testid={testId} data-src={src} />;
+  },
+}));
+async function clickIssue() {
+  await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+}
 
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async () => {
@@ -364,6 +382,12 @@ function respond(url: string, init?: RequestInit): unknown {
 }
 
 beforeEach(() => {
+  previewState.ready = true;
+  let nextUrl = 0;
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true, value: vi.fn(() => `blob:mpr-${++nextUrl}`),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
   apiFetch.mockReset();
   navigate.mockReset();
   apiFetch.mockImplementation((url: string, init?: RequestInit) =>
@@ -1788,7 +1812,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
      is the whole journey: tick → review → Issue PO. */
   async function issueFromReview() {
     fireEvent.click(screen.getByTestId("mp-issue-selected"));
-    fireEvent.click(await screen.findByTestId("so-batch-issue-create"));
+    await clickIssue();
     return screen.findByTestId("so-batch-issue-error");
   }
 
@@ -2451,7 +2475,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
        documents; nothing is posted until the review's own `Issue PO`. */
     await screen.findByTestId("so-batch-issue-workspace");
     expect(posted).toHaveLength(0);
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await waitFor(() => expect(posted).toHaveLength(1));
     /* ⭐ THE ISSUE CARRIES THE CHOSEN LINES — the tick narrows what is bought
        instead of buying the whole request. */
@@ -3105,7 +3129,7 @@ describe("Card 04 · selection and PO Duty", () => {
     fireEvent.click(screen.getByTestId(`mp-select-${REQ4}`));
 
     fireEvent.click(await screen.findByTestId("mp-issue-selected"));
-    fireEvent.click(await screen.findByTestId("so-batch-issue-create"));
+    await clickIssue();
     await waitFor(() => expect(posted).toHaveLength(1));
     const body = posted[0] as { demandIds?: string[]; requestIds?: string[] };
 
@@ -3141,12 +3165,25 @@ describe("Card 04 · selection and PO Duty", () => {
     fireEvent.click(await screen.findByTestId("mp-issue-selected"));
     const review = await screen.findByTestId("so-batch-issue-workspace");
     const count = within(review).getByTestId("so-batch-issue-count").textContent ?? "";
-    const documents = Number(count.split(" of ")[1]);
+    const documents = Number(count.match(/of (\d+)/)?.[1]);
     expect(documents).toBeGreaterThan(0);
     /* The register's own sentence predicted the same number. */
     expect(screen.getByTestId("selection-bar").textContent).toContain(
       `Issue ${documents} PO`,
     );
+  });
+
+  it("cannot issue an MPR while its actual PDF preview is not ready", async () => {
+    previewState.ready = false;
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    await screen.findByTestId("so-batch-draft-pdf");
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    expect(apiFetch.mock.calls.some(([url, init]) =>
+      String(url).endsWith("/purchasing/requests/issue") && init?.method === "POST",
+    )).toBe(false);
   });
 
   it("a refused issue keeps the operator on the document, and creates nothing", async () => {
@@ -3167,7 +3204,7 @@ describe("Card 04 · selection and PO Duty", () => {
     });
     fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
     fireEvent.click(await screen.findByTestId("mp-issue-selected"));
-    fireEvent.click(await screen.findByTestId("so-batch-issue-create"));
+    await clickIssue();
     const err = await screen.findByTestId("so-batch-issue-error");
     // The server's two lines, on the surface the operator is reading.
     expect(err).toHaveTextContent("X-NEW-K has no transaction cost.");
@@ -3181,7 +3218,7 @@ describe("Card 04 · selection and PO Duty", () => {
     fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
     fireEvent.click(await screen.findByTestId("mp-issue-selected"));
     /* The review surface stands between the tick and the door. */
-    fireEvent.click(await screen.findByTestId("so-batch-issue-create"));
+    await clickIssue();
     await waitFor(() => {
       const post = apiFetch.mock.calls.find((c) =>
         String(c[0]).endsWith("/purchasing/requests/issue"),

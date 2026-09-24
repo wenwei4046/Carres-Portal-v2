@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import {
   myHolidaySet,
+  poDeliveryDateOf,
+  productionWorkingDaysFor,
   purchaseDemandBlockerOf,
   purchaseDemandQuantities,
   purchaseDemandTimingOf,
@@ -353,7 +355,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
 
   const res = await loadToOrder(sb);
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
-  const { proposals, registerFacts, supplierNames, supplierKinds, catalog, today, settings } =
+  const { proposals, registerFacts, supplierNames, supplierAddresses, supplierKinds, catalog, today, settings } =
     res.data;
   /* The SAME holiday set the engine planned with — the classification only
      compares the engine's dates, it never re-plans them. */
@@ -598,6 +600,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           skus: build.codes ? build.codes.split(" · ") : [],
           supplierId: proposal.supplierId,
           supplier: proposal.supplierName,
+          supplierAddress: supplierAddresses?.get(proposal.supplierId) ?? null,
+          poDate: today,
+          poDeliveryDate: poDeliveryDateOf(settings, { supplierId: proposal.supplierId, category: proposal.category, poDateIso: today }),
+          poDeliveryWorkingDays: productionWorkingDaysFor(settings, proposal.supplierId, proposal.category),
           qtyNeeded: q.qtyNeeded,
           readyStock: q.readyStock,
           takenFromStock: q.takenFromStock,
@@ -753,7 +759,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
      lineage read above already follows. */
   const dest = await sb
     .from("purchasing_destinations")
-    .select("id, name, is_default, active")
+    .select("id, name, is_default, active, address, warehouse_id, warehouses(address)")
     .order("name");
   if (dest.error) {
     console.error("so batch — destinations unavailable", dest.error.message);
@@ -769,12 +775,17 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   }
   const destinations: PurchasingDestination[] = (
     (dest.data ?? []) as Record<string, unknown>[]
-  ).map((d) => ({
-    id: d.id as string,
-    name: (d.name as string) ?? "",
-    isDefault: d.is_default === true,
-    active: d.active !== false,
-  }));
+  ).map((d) => {
+    const warehouses = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
+    const warehouseAddress = Array.isArray(warehouses) ? warehouses[0]?.address : warehouses?.address;
+    return {
+      address: d.warehouse_id != null ? warehouseAddress ?? null : (d.address as string | null) ?? null,
+      id: d.id as string,
+      name: (d.name as string) ?? "",
+      isDefault: d.is_default === true,
+      active: d.active !== false,
+    };
+  });
   const defaultDestination = destinations.find((d) => d.isDefault && d.active) ?? null;
 
   /* WHO MAY COLLECT FROM A FACTORY. Read here rather than on the issue POST so

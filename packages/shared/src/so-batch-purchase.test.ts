@@ -869,7 +869,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
   });
 
   it("one supplier split across two destinations becomes TWO documents", () => {
-    const r = row({ toBuy: 11 });
+    const r = row({ toBuy: 11, parts: [{ sku: "B1201S-K", qty: 11, unitCost: null }] });
     const docs = groupSelectionsIntoDocuments(
       [sel(r, [
         { destinationId: KLANG.id, qty: 10 },
@@ -878,10 +878,22 @@ describe("documents are grouped by supplier × Deliver To", () => {
       new Map([[r.id, r]]),
     );
     expect(docs).toHaveLength(2);
+    expect(docs.map((d) => d.lines[0]!.parts[0]!.qty)).toEqual([10, 1]);
     expect(docs.map((d) => d.destinationId).sort()).toEqual(
       [KLANG.id, SG_BULOH.id].sort(),
     );
     expect(docs.every((d) => d.supplierId === "s-hooka")).toBe(true);
+  });
+
+  it("carries the selected destination address and server dates to its own draft", () => {
+    const r = row({ toBuy: 2, supplierAddress: "Factory address", poDate: "2026-09-24",
+      poDeliveryDate: "2026-10-05", poDeliveryWorkingDays: 7 });
+    const [document] = groupSelectionsIntoDocuments(
+      [sel(r, [{ destinationId: SG_BULOH.id, qty: 2 }])], new Map([[r.id, r]]),
+      [{ ...KLANG, address: "Klang warehouse" }, { ...SG_BULOH, address: "Buloh warehouse" }],
+    );
+    expect(document).toMatchObject({ destinationName: "AL Sungai Buloh", destinationAddress: "Buloh warehouse",
+      supplierAddress: "Factory address", poDate: "2026-09-24", poDeliveryDate: "2026-10-05", poDeliveryWorkingDays: 7 });
   });
 
   it("two Sales Orders on one supplier and one destination share ONE document", () => {
@@ -913,7 +925,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
     expect(docs).toHaveLength(2);
   });
 
-  it("the grouping is a HINT — it carries no price, number or arrival date", () => {
+  it("the grouping carries only server-resolved draft facts, never an official identity", () => {
     const r = row({ toBuy: 2 });
     const [doc] = groupSelectionsIntoDocuments(
       [sel(r, [{ destinationId: KLANG.id, qty: 2 }])],
@@ -923,6 +935,8 @@ describe("documents are grouped by supplier × Deliver To", () => {
       [
         "destinationId", "key", "lines", "qty", "supplierId", "supplierName",
         "supplierKind", "supplierCollection", "category", "orderId",
+        "supplierAddress", "destinationName", "destinationAddress", "poDate",
+        "poDeliveryDate", "poDeliveryWorkingDays", "deliveryMethod",
       ].sort(),
     );
     // Still no price, no number and no arrival date on the GROUPING itself —
@@ -935,7 +949,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
 describe("the selection bar counts lines, units and documents", () => {
   it("says how many lines, how many units and how many POs will be created", () => {
     const a = row({ id: "a", toBuy: 2 });
-    const b = row({ id: "b", supplierId: "s-ohana", supplier: "Ohana", toBuy: 5 });
+    const b = row({ id: "b", orderId: "o2", lineIds: ["l2"], supplierId: "s-ohana", supplier: "Ohana", toBuy: 5 });
     const summary = soBatchSelectionSummary(
       [
         sel(a, [{ destinationId: KLANG.id, qty: 2 }]),
@@ -949,7 +963,7 @@ describe("the selection bar counts lines, units and documents", () => {
     expect(summary.lines).toBe(2);
     expect(summary.units).toBe(7);
     expect(summary.documents).toBe(3);
-    expect(summary.text).toBe("2 selected · 7 units · Issue 3 POs");
+    expect(summary.text).toBe("2 Sales Orders · 2 items · 7 units · Issue 3 POs");
   });
 
   it("says nothing at all when nothing is selected", () => {
@@ -964,7 +978,7 @@ describe("the selection bar counts lines, units and documents", () => {
       [sel(a, [{ destinationId: KLANG.id, qty: 1 }])],
       new Map([[a.id, a]]),
     );
-    expect(summary.text).toBe("1 selected · 1 unit · Issue 1 PO");
+    expect(summary.text).toBe("1 Sales Order · 1 item · 1 unit · Issue 1 PO");
   });
 });
 

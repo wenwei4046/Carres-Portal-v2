@@ -123,7 +123,7 @@ const TABLES = () => ({
   purchasing_setting_changes: { data: [], error: null },
   suppliers: {
     data: [
-      { id: NICE, name: "Nice Future", kind: "own_logistics" },
+      { id: NICE, name: "Nice Future", kind: "own_logistics", address: "Supplier address" },
       { id: OHANA, name: "Ohana", kind: "own_logistics" },
     ],
     error: null,
@@ -275,7 +275,7 @@ const TABLES = () => ({
   },
   purchasing_destinations: {
     data: [
-      { id: KLANG_DEST, name: "Carres Klang", is_default: true, active: true },
+      { id: KLANG_DEST, name: "Carres Klang", is_default: true, active: true, warehouse_id: WAREHOUSE, address: "Stale destination copy", warehouses: { address: "Warehouse authority" } },
       { id: BULOH_DEST, name: "AL Sungai Buloh", is_default: false, active: true },
       { id: CLOSED_DEST, name: "Old Yard", is_default: false, active: false },
     ],
@@ -910,6 +910,17 @@ describe("the destinations a buy may be sent to", () => {
     const klang = body.destinations.find((d) => d.id === KLANG_DEST)!;
     expect(klang.isDefault).toBe(true);
     expect(klang.active).toBe(true);
+    expect(klang.address).toBe("Warehouse authority");
+  });
+
+  it("carries provisional supplier and date facts without substituting the goods deadline", async () => {
+    const { body, rows } = await rowsOf();
+    const line = rows.find((row) => row.supplierId === NICE && row.issueRef)!;
+    expect(line.supplierAddress).toBe("Supplier address");
+    expect(line.poDate).toBe(body.today);
+    expect(line.poDeliveryWorkingDays).toBe(7);
+    expect(line.poDeliveryDate).toBeTruthy();
+    expect(line.poDeliveryDate).not.toBe(line.goodsMustArrive);
   });
 
   it("a closed destination is RETURNED but marked inactive — history still reads", async () => {
