@@ -362,7 +362,7 @@ and evidence viewer promised for Supplier Claims.
 §9.5). Deployed in #1593, with authenticated Receiving and production example readback
 2026-09-24 (evidence in Purchasing MASTER §9.5). Receiving's existing
 arrival-evidence controls are the first consumer. Claim-record photos also adopt it
-locally (2026-09-24; production proof owed); Stock/Service and per-Unit Claim expansion
+in production (#1594; authenticated readback 2026-09-24); Stock/Service and per-Unit Claim expansion
 integrations remain separate work and must reuse this component.
 
 **Contract.** The owning authorised reader supplies stable file IDs, kind, signed URL
