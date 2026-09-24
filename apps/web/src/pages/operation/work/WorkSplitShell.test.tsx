@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import WorkSplitShell from "./WorkSplitShell";
 
 describe("WorkSplitShell", () => {
-  it("uses the governed three-panel geometry without cards or gutters", () => {
+  it("uses the governed three-panel geometry with 16px separation", () => {
     render(<WorkSplitShell layout="three" rail={<aside aria-label="Work filters">Days</aside>} list="Actions" detail="Detail" />);
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "three");
+    expect(screen.getByTestId("work-split-shell")).toHaveClass("gap-4");
     expect(screen.getByRole("complementary", { name: "Work filters" }).parentElement).toHaveClass("w-60");
+    expect(screen.getByRole("complementary", { name: "Work filters" }).parentElement).toHaveClass("rounded-panel", "border");
     expect(screen.getByRole("region", { name: "Work actions" })).toHaveClass("w-[360px]");
     expect(screen.getByRole("region", { name: "Selected work" })).toHaveClass("min-w-[500px]");
   });

@@ -21,21 +21,21 @@ export default function WorkSplitShell({
   if (layout === "one") {
     const content = activePanel === "rail" ? rail : activePanel === "detail" ? detail : list;
     const label = activePanel === "rail" ? "Work filters" : activePanel === "detail" ? "Selected work" : "Work actions";
-    return <section data-testid="work-split-shell" data-layout="one" aria-label={label} className={`min-h-0 min-w-0 flex-1 overflow-y-auto bg-white ${className}`}>{content}</section>;
+    return <section data-testid="work-split-shell" data-layout="one" aria-label={label} className={`min-h-0 min-w-0 flex-1 overflow-y-auto bg-base-50 ${className}`}>{content}</section>;
   }
 
   return (
-    <div data-testid="work-split-shell" data-layout={layout} className={`flex min-h-0 min-w-0 flex-1 overflow-hidden bg-white ${className}`}>
-      <div className="w-60 shrink-0 overflow-hidden">
+    <div data-testid="work-split-shell" data-layout={layout} className={`flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden bg-base-50 ${className}`}>
+      <div className="w-60 shrink-0 overflow-hidden rounded-panel border border-kit-slate-5 bg-white">
         {rail}
       </div>
       {layout === "two" ? (
-        <section aria-label={activePanel === "detail" ? "Selected work" : "Work actions"} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <section aria-label={activePanel === "detail" ? "Selected work" : "Work actions"} className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-panel border border-kit-slate-5 bg-white">
           {activePanel === "detail" ? detail : list}
         </section>
       ) : (
         <>
-          <section aria-label="Work actions" className="w-[360px] shrink-0 overflow-y-auto border-r border-kit-slate-5">
+          <section aria-label="Work actions" className="w-[360px] shrink-0 overflow-y-auto rounded-panel border border-kit-slate-5 bg-white">
             {list}
           </section>
           <section aria-label="Selected work" className="min-h-0 min-w-[500px] flex-1 overflow-y-auto">

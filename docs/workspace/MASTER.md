@@ -348,7 +348,8 @@ not a Dashboard, Kanban board or second module record. **OWNER APPROVED 2026-09-
 v4 reference artifact and its `Broken commitment` grouping, combined list heading, three-line row
 grammar and repeated selected-action brief are superseded. No rejected prototype is authority.
 
-At a Work canvas of 1104px or wider, the page has three columns inside the global shell:
+At a Work canvas of 1132px or wider, the page has three columns inside the global shell. The threshold
+is the exact sum `240 + 360 + 500 + 16 + 16` and therefore cannot be 1104px:
 
 1. a 240px scope column containing separate `Working day` and `Module` Panels;
 2. a 360px list column containing compact Work cards grouped by date in My Work or by normal owner
@@ -523,7 +524,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   header. The controls contain `My Work · Team Work`, Search, applied filters, `Clear all` when
   narrowed and the toolbar `Filters` door; freshness is a read fact, not a manual business action.
 - Breakpoints use the available Work canvas after the global shell, not the browser width. At
-  **1104px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
+  **1132px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
   360px; Panel 3 takes the remainder and never falls below 500px. The full composition may use up
   to the governed 1280px content width. Straight 1px `slate-5` dividers separate panels; the shell
   has no card radius, shadow or gutters between panels.

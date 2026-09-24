@@ -114,7 +114,7 @@ export function workFocusDay(today: string, dueIsos: readonly (string | null)[])
 
 /** Panels follow the Work area's own width, never the window's. */
 export function workLayoutFor(width: number): WorkLayout {
-  return width >= 1104 ? "three" : width >= 768 ? "two" : "one";
+  return width >= 1132 ? "three" : width >= 768 ? "two" : "one";
 }
 
 /** Source words for Work source health — never the raw feed key. */

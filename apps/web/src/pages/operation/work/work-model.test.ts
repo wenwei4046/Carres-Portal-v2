@@ -114,9 +114,9 @@ describe("workFocusDay — the day the focus list opens on", () => {
 });
 
 describe("workLayoutFor — panels follow the Work area width", () => {
-  it("uses three panels from 1104px, two from 768px, else one", () => {
-    expect(workLayoutFor(1104)).toBe("three");
-    expect(workLayoutFor(1103)).toBe("two");
+  it("uses three panels from 1132px, two from 768px, else one", () => {
+    expect(workLayoutFor(1132)).toBe("three");
+    expect(workLayoutFor(1131)).toBe("two");
     expect(workLayoutFor(950)).toBe("two");
     expect(workLayoutFor(768)).toBe("two");
     expect(workLayoutFor(767)).toBe("one");

@@ -28,7 +28,7 @@ copy, component, or business-rule system.
 
 - 2026-09-23 — Workspace Work v4 is assembled from the governed flat `PageShell` Work variant,
   the shared `FilterRail` and one shared `Avatar` identity chip. Its responsive shape is measured
-  from the Work canvas: 240/360/min-500 at three panels; the 240px rail plus list/detail replacement
+  from the Work canvas: 240/360/min-500 with two 16px separations at 1132px; the 240px rail plus list/detail replacement
   at two panels; one panel below 768px. Actions use the shared 64px-minimum `WorkActionRow`; the
   selected brief uses `WorkActionPanel`. Principal/Operation empty My Work remains truthful and
   provides `Open Team Work`; roles without Team permission do not receive that door.
