@@ -1779,7 +1779,7 @@ order by hand.
 | Paid summary without transaction history | `The order records a paid amount. Individual payment transactions are not available.` | Preserve saved customer payment evidence without manufacturing a receipt. |
 | Payment evidence with zero paid | `Payment evidence is saved, but the recorded paid amount is zero. Check this order in Payments.` | Flag the inconsistent records; never infer an amount from a reference or attached file. |
 | Historical fulfilment evidence absent | `Not recorded in this revision` | Current Unit/destination facts must not be attached by row position to an older agreement. |
-| Saved payment capture on the order | `Payment details recorded at sale` | Method, recorded instalment months, reference and slip only; not a synthesized transaction. |
+| Saved payment capture on the order | `Payment details recorded at sale` | Method, recorded instalment months, reference and slip only; labelled read-only fields using the Delivery field treatment, not a synthesized transaction. |
 | Goods evidence read failed | `The goods could not be opened.` | Never show an allocation shortage or missing destination as the result of a failed read. |
 
 ### The On hand Category filter words (card 2026-08-19)
