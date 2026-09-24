@@ -6,16 +6,77 @@ One discussion Card, no build sequence or implementation authorization. Review a
 
 **Numbering authority (approved target, not implementation evidence):** Current `origin/main` Orders MASTER §0.1, “Complete document numbering table”, governs fictional examples: Outright `SO2609-4827(1)` (four digits), Subscription `SUB2609-48271(1)` (five digits), revision attached without a space. Preserve historical references such as `SO-1365`. Panels consume the saved source reference; never reconstruct `SO-{integer}` or infer a reference from the event date. The SO generator remains unbuilt in the source audit; this review changes no numbering implementation.
 
+## 0. Complete purpose and cross-module Blueprint — revised recommendation
+
+**PROPOSAL / NOT APPROVED.** The existing UI audit is useful evidence, but its two-source Calendar and Sales-Orders-only Activity were incomplete as a product recommendation. This section replaces that scope. “All modules” means eligible authorized facts from their owners; it does not mean every date column, a module's full calendar embedded in a small panel, or unrestricted company visibility.
+
+### Why these three exist
+
+| Surface | Question | Useful moment | Where the work actually happens |
+|---|---|---|---|
+| Calendar | What is arranged or due on a selected date? | While reading an SO, check arrival, delivery and payment commitments without visiting three modules | Click the exact owner arrangement/record; its full calendar supports scheduling/capacity |
+| My Work | What do I personally need to handle? | Notice missed/current-day obligations from any page and enter the existing prioritized Work list | Formal My Work → exact action destination; completion comes from the owning module |
+| Activity | What changed, by whom and when? | Explain why an arrangement, balance or custody now differs without opening several object histories | Source object's History; full audit/export stays in its owner |
+
+The three panels are optional quick views. Nobody must open all three every morning. Work is the daily action starting point; Calendar is for date coordination; Activity is for context and handover. An unchanged Activity feed is not proof that no work remains. A quiet Calendar is not proof that My Work is clear.
+
+### Source-to-surface capability matrix
+
+**Status key:** R = resolved approved authority; P = this recommendation; target does not imply built. Source eligibility must not be confused with current connector coverage.
+
+| Owner / evidence | Calendar facts | My Work role | Activity facts / destination | Disposition and boundary |
+|---|---|---|---|---|
+| Sales Orders; UI §5 and Orders object authority | Read actual delivery/loan commitments from their owners, not Order creation date or an invented booking | Existing admitted SO obligations only | Material order/revision/cancellation changes → SO History | KEEP source identity; do not count one delivery once as SO and again as Delivery |
+| Purchasing / Receiving; Purchasing §§9–10 | Supplier promised arrivals, balance arrivals, collection/return and repair dates where governed | Confirm dates, approve/issue, chase replies, receive/prove outcomes | Supplier date changed, PO version sent, receipt accepted → exact PO/receipt/repair/claim source | ADAPT approved dates; supplier-ready ≠ expected arrival; a document's issue date is not a schedule |
+| Delivery; §10 | R: confirmed delivery, contact and handover deadlines, failed-delivery follow-up, returns | R: owned calls, arrangements, missing results/proof | R: assignment/contact/handover/result/proof/corrections → arrangement/DO History | KEEP all approved date types; distinguish deadline from booked movement |
+| Warehouse / Stock; shared integrations section | R: Counts, collections, arrivals, outbound handovers, returns, repair out/back, supplier collection, month-end commitments | Governed Site/person actions; no invented individual assignment for organisation queues | R: Unit, receipt, Count, handover facts → owning object History | KEEP; share physical-event identity with Delivery/Receiving to avoid duplicates |
+| Payment; §§10–11 | R: payment deadline, customer promise, free-storage end, charge start, approved-free end | R: collection and exception obligations from Work projection | Recorded payment/correction/waiver → authorized source History | KEEP deadlines. Money received belongs in Activity, not a Calendar appointment; sensitive amounts follow permissions |
+| Subscription / Service Package; Rental §5.9–5.11, Service subscription boundary | Approved dated lifecycle facts read from their owners; P: expose governed visit bookings/due dates and recovery dates in shared Calendar | Existing/admitted visit, evidence, activation and recovery obligations | Booking changed, completion accepted, recovery recorded → Subscription/visit source | ADAPT approved target; normal cleaning visit is not a Service Case; booking consumes no entitlement |
+| Service Cases / Guarantee; Service approved playbooks | P: only an evidenced supplier appointment or a governed case deadline, never an invented Carres inspection visit | Case-owned next actions and escalations | Case decision/evidence/remedy changes → Case History; physical movement stays with its owner | ADAPT selectively; eligibility dates are not automatically Calendar events; no generic warranty technician workflow |
+| People / HR; HR §1–2, Workspace person-calendar law | No general HR schedule feed established by this review | Working-day/eligibility facts constrain resolver, not fabricated HR tasks | No salary/personnel feed in shared Activity | REJECT automatic inclusion of private staff records; authorized People is the home |
+| Issue Tracker; intentional rejects | R: no Issue calendar | Only already-governed action projection, not another issue backlog | P: no general Issue event feed; object accountability remains in Issue Tracker | KEEP the explicit calendar non-goal |
+| Catalog / Finance outside Payment | No complete current module/source contract established here | No invented adapters or duties | No speculative feed of confidential postings | NOT CONNECTED; future source admission needs its owning authority and permission contract |
+
+### One employee's day, with one connected example
+
+**Morning:** Open formal My Work. It already prioritizes assigned missed/current obligations. The rail shows the same counts wherever the employee goes; it is not a second task list.
+
+**Customer asks about delivery:** From the SO, open Calendar at the proposed date. See the linked supplier arrival, booked delivery and payment deadline with their different meanings. Open Delivery to arrange the delivery; the rail cannot promise stock, capacity or a new date.
+
+**Supplier changes an arrival:** Purchasing records the new evidenced promise once. Calendar reflects that date; Activity explains the change; Work changes only if an authoritative action rule now requires someone to respond. An ETA change alone must not fabricate a task or silently move a booked delivery.
+
+**Customer promises payment:** Payment owns the promise and deadline. Calendar can show that promise. My Work may ask the responsible employee to contact the customer on a different lawful working day. When payment is recorded, Activity records it and the Work obligation recalculates; the calendar does not pretend the bank receipt was an appointment.
+
+**End of day:** Staff check remaining Work and hand over governed obligations. Calendar supports preparation for the next day's arrangements. Activity can explain material changes, but is not an acknowledgment checklist or evidence that someone completed a task.
+
+### Activity complete target and noise control
+
+P: cross-module, permission-filtered recent business changes. Show the connected source set, actual time window, observation time; filters are Source, Type, Person and search. Default stays stable across pages. Future/unconnected modules are never advertised as complete. Source filter appears only when usable; no inert dropdown. Current implementation remains Orders-centric and capped; it must not wear “All business activity”.
+
+Include meaningful saved changes and outcomes; exclude page views, polling, reminder attempts and raw system logs. A source event is shown once even if it affects several modules. Display what changed → who/when → result and source link. An Activity row opens its source History, never silently transforms the panel into one object's timeline. Preserve the existing Add note/escalation capability in its owning order History before removing any rail writer; removing a redundant location must not remove the capability. No new unread inbox or read/acknowledge workflow is proposed.
+
+### What is settled, what still needs product approval
+
+R: read/link ownership; Work counts-only rail; Calendar delivery/contact/payment/warehouse dates; permission boundaries; normal visits versus Cases. Approved but not proven built: broad source coverage. Measured current: Calendar delivery/arrival reads, shared Work projection, Orders-centric Activity and state defects in the audit. P: Calendar Arrangements/Deadlines grouping, explicit source filtering/coverage, cross-module Activity admission/noise rules and shared frame refinements.
+
+No “include calls?” decision remains: preserve approved contact deadlines, labeled as deadlines. The owner review is the complete proposed composition, not a request to approve those business rules again. No Card execution, production change or new task system is authorized.
+
+### Reference correction and falsifier
+
+[Outlook My Day](https://support.microsoft.com/en-us/outlook/calendar/use-my-day-with-to-do-in-outlook) supports contextual calendar/tasks access across Outlook. [Google Calendar Tasks](https://support.google.com/calendar/answer/9901136?hl=en-uk) explicitly supports dated tasks in Calendar. Therefore “mature calendars forbid tasks” is unsupported. ADAPT contextual access and distinct event meaning; REJECT foreign task creation/completion because Carres modules own completion. These are primary-document findings, not authenticated product operation.
+
+Trade-off: broader coverage adds noise. Separate arrangements/deadlines and visible source filters address it without deleting approved capabilities. Falsifier: if staff cannot identify the source, date meaning and correct destination of an item, or a shared event appears twice, the recommendation fails. Operator testing remains unverified; earlier visual scores are not proof of end-to-end usability.
+
 ## 1. Owner review in one minute
 
-**Recommendation:** retain three small, read-only doors with different jobs: **Calendar = dated operations; My Work = my Missed/Today counts; Activity = recent changes across permitted Sales Orders.** Every record opens its real owner. Make scope and data health visible before counts. Keep individual order **History** inside the order.
+**Recommendation:** retain three small, read-only doors with different jobs: **Calendar = cross-module arrangements and governed deadlines; My Work = my Missed/Today counts; Activity = recent business changes across permitted, connected modules.** Every record opens its real owner. Make scope and data health visible before counts. Keep individual order **History** inside the order.
 
 Current → problem → better design → trade-off → recommendation:
 
 - 🔴 Calendar and Activity can turn a failed read into an empty answer. Show unknown/error separately from a verified empty result. This costs one status line; it prevents staff treating missing information as no work.
 - 🔴 My Work's panel names a failed source while its icon can still announce an unqualified zero. Give panel, badge and accessible name the same health state. Preserve genuinely last-safe counts with their timestamp; never present partial counts as the complete total.
 - 🟡 Calendar event cards look clickable but are not links. Use one explicit owner link per entry. This adds a line but removes the need to search for that record elsewhere.
-- 🟡 Activity truncates the change and actor/date, exposes internal filter words and silently changes scope. Keep its global Sales Orders scope stable, show readable change/actor/result ranks, and link directly to object History. The operator makes one deliberate navigation instead of falling into another hidden feed.
+- 🟡 Activity truncates the change and actor/date, exposes internal filter words and silently changes scope. Keep its explicit permitted source scope stable, show readable change/actor/result ranks, and link directly to object History. The operator makes one deliberate navigation instead of falling into another hidden feed.
 - 🟡 Side-panel controls lack consistent focus/close behavior and are smaller than the frozen 40px target. Admit a shared non-modal rail shell and improve the existing calendar/control recipes once. Do not draw a private component per panel.
 
 **Do not reopen:** Work ownership, working-day calculations, completion facts, permissions or the approved Missed + Today focus window. No task editing, schedule dragging, new reminders, manual Done, or Order Route redesign.
@@ -24,7 +85,7 @@ Current → problem → better design → trade-off → recommendation:
 
 ### Evidence boundary
 
-FACT: primary checkout is `docs/delivery-03-closure` at `c194a8915`, with unrelated changes. Its rail and Workspace documents are older than current main. The existing clean review worktree `.worktrees/shared-rail-plan` is at `3aa6e5a98` (same as the inspected `origin/main`). This review uses that worktree's authority and code. The neighboring `.worktrees/rail-panels` is a build branch; it was inspected read-only. No duplicate combined discussion Card was found in either worktree's current cards. The old activity-actor bug Card is a different, narrower delivered change.
+FACT: primary checkout is `docs/delivery-03-closure` at `c194a8915`, with unrelated changes. Its rail and Workspace documents are older than current main. The existing clean review worktree `.worktrees/shared-rail-plan` is at `3aa6e5a98` (same as the inspected `origin/main`). This review uses that worktree's authority and code. The neighboring `.worktrees/rail-panels` is a build branch; it was inspected read-only. Two overlapping discussion Cards were subsequently found. Their useful findings are consolidated in this Card; the duplicate is removed in the same change. Git preserves both prior versions. The old activity-actor bug Card is a different, narrower delivered change.
 
 FACT: read `AGENTS.md` → `CLAUDE.md` → ERP architecture → UI MASTER §5 and mandatory §§6.7–6.10 → Workspace MASTER §§5,7–7.1; relevant Delivery §§5,8.2,10, Purchasing §§9.4,10, Orders object History/numbering; COPY-STANDARD; 01 tokens, 02 components, 03 patterns and Action Flow. The later Workspace §7 replaces the older local draft's Late/Covering counts with **Missed + Today only**. Team duty editing now belongs in Staff & Duties. UI §5's four-slot inventory is stale relative to the measured three-slot implementation and newer duty authority; this review does not restore Team.
 
@@ -93,26 +154,25 @@ Skills: UI/UX Pro Max searches `keyboard focus modal` and `error recovery loadin
 
 ### Shared shell and session behavior
 
-**RECOMMENDATION:** one non-modal desktop rail recipe, observed 340px body + 52px strip. This width is a proposal to settle the measured width inconsistency, not a silent token override. Header 48px: existing 18px icon, 15/22 semibold title, 40px close target. Body 16px padding, 12px gaps, 24px between major blocks; scope/freshness in 12/16 secondary ink. Neutral surfaces; blue only selection/primary action; red only a real urgent/failed fact. No ornamental category colors.
+**RECOMMENDATION:** one non-modal desktop rail recipe, observed 340px body + 52px strip. This width is a proposal to settle the measured width inconsistency, not a silent token override. Header 50px: existing 18px icon, 15/22 semibold title, 40px close target. Body 16px padding, 12px gaps, 24px between major blocks; scope/freshness in 12/16 secondary ink. Neutral surfaces; blue only selection/primary action; red only a real urgent/failed fact. No ornamental category colors.
 
 Icon click opens the selected panel; click again closes; another icon switches it. Header stays fixed, one body scroll area; no page scroll and no nested Calendar scrolling trap. Opening places keyboard focus on panel heading; next Tab reaches first control. No desktop focus trap. Escape closes from inside panel; a nested popover consumes Escape first. Closing returns focus to opening icon. Switching retains per-panel filters, chosen day and scroll in the current session. Logout clears them and data; no cross-user persistence. Refresh never resets selection or steals focus.
 
 Scope is explicit and stable across module/object navigation. No permissions expansion: an unavailable source is named without exposing forbidden object/count data. The shell is a projection container, not a new global module destination.
 
-### Calendar — “Which dated movements can I open?”
+### Calendar — “What is arranged or due on this date?”
 
-Order of content:
-1. Header `Calendar`, close.
-2. Scope line **Deliveries · Supplier arrivals**; Malaysia time and last successful observation. Copy additions are proposed in §8.
-3. Existing actual-date chips for current business day, next calendar day and `This week`. The week retains existing defined span, not a new rolling-seven-day promise. Show its exact start/end alongside or in focusable tooltip.
-4. Month caption with Previous/Next (one month), then full month on shared calendar engine. Selected day is blue; current day outline is separate. Arrows select first day of newly visible month; one actual-day selection and range selection are mutually exclusive. Month selection carries matching agenda heading.
-5. Picked date/range and **separate factual counts**: customer deliveries, transfers if present, expected supplier arrivals. A marker's accessible label states full date and the same breakdown; day with unknown source says count unavailable, never zero. No unread badge on Calendar icon.
-6. Agenda grouped by actual date, then type. Each event: complete document reference + party at 13px; date/slot and explicit state at 12px; optional logistics/location at 12px; one owner link. Long required facts wrap. No event edit, completion checkbox or nested clickable card.
-7. Module-level links `Delivery schedule` and `Receiving` only when authorized. Preserve range at destination visibly; event link carries exact stable source id, not a text search.
+The complete cross-module scope and owner matrix in §0 govern this recommendation. Delivery/Receiving are current implementation coverage, not the product boundary. Preserve already-approved Delivery contact deadlines and Payment deadlines. No new owner decision is required to keep them.
 
-Data contract: source owners supply dated events, stable identity, category, actual date basis, authorization, destination and observation/completeness. Delivery reads the same source as current Delivery schedule, preserving final deliveries versus transfer legs and confirmed/provisional state. Never infer physical movement from promised SO date, PO issue date, status=delivered, or stock quantity. Receiving uses governed expected supplier-arrival facts; if only a factory-ready date exists, do not relabel it as an arrival. An unscheduled source is absent from dated counts but its Work obligation remains in main Work. One SO may have several dated legs; don't collapse them into one SO event. Supplier arrival count is occurrences/commitments, not units; display units separately only when authoritative.
+Order: Calendar title/close → permitted connected sources and freshness → source/type filters with Clear filters → actual-date chips and month navigation → selected date heading → **Arrangements**, then **Deadlines**, with separately named counts → exact source links. These group/filter labels are proposed COPY additions, not approved production wording. Default includes both groups for authorized connected sources. A remembered source filter remains visible across navigation; never silently follow the current module. A filter changes the calendar markers and agenda together.
 
-Recorded date-only values remain their source business day. Timestamps display Asia/Kuala_Lumpur; holidays affect computed Work dates, never move a supplier's recorded promise. Midnight refresh updates chips/current-day marker; deliberately picked dates remain picked. Invalid/missing dates are named in owner view, never assigned today. Full source range and authorization must be known before a healthy zero is shown.
+An arrangement row names what happens, full source reference and party, actual date/time, provisional/confirmed state, Site or partner when relevant. A deadline row names what is due, source reference/party, actual deadline and its authoritative owner where permitted. Row click opens the owning arrangement or obligation, with the selected source revealed. Neither group offers an edit, Done, drag-to-reschedule or new-event control.
+
+Month markers say e.g. “3 arrangements · 2 deadlines”, not an ambiguous total of five tasks. Calendar counts occurrences; My Work counts owned actionable obligations. They are not expected to equal. A single occurrence reflected by Delivery, Stock and Payment appears once, with the owning event identity; a transfer leg and customer delivery remain distinct events. A deadline and the Work action it produces may both be visible, using one source identity and no independently computed due date.
+
+Date-only facts retain their recorded business day; timestamps display Asia/Kuala_Lumpur. A supplier-ready date is not arrival. A requested customer date is not a confirmed booking. A Saturday business deadline may have a Friday Work action date; show each with its correct meaning. Missing dates remain in the owner/Work destination and never acquire today's date. Finished or cancelled events retain source status when reviewing that date; they never remain open Work merely because they remain on a calendar.
+
+Counts require full authorized date-range coverage, not the latest 500 SOs. Source owners supply stable event identity, semantic type, date basis, authorization, state, exact destination and completeness. Unsupported sources say not connected; failed connected sources say unavailable; neither means no events. Partial results show each healthy group plus an incomplete warning, never a complete total. Source permissions are checked before displaying names, parties, counts or links. The existing detailed state/keyboard contract still applies.
 
 ### My Work — “What needs my attention now?”
 
@@ -126,11 +186,11 @@ Missed → `/operation?tab=work&scope=mine&day=missed`; Today → the **same wor
 
 The collapsed badge keeps the approved **Missed + Today** number. Red when Missed>0, otherwise neutral; zero has no badge. Exact full count remains accessible if visual badge is 99+. If any source is incomplete and no complete last-safe snapshot exists, withhold numeric total and say refresh failed in the accessible name. If a complete permitted older snapshot exists, display it only as last updated, including that qualification in icon name/tooltip. Both peek and main Work must show the same observation, never separately recomputed totals. Manager identity still opens My Work, not Team Work.
 
-### Activity — “What changed across Sales Orders?”
+### Activity — “What changed across connected business sources?”
 
 1. Header `Activity`, close.
-2. Persistent scope `Sales Orders` plus proposed recent-window text and observation time. This does not claim every ERP module is covered. Opening an order must not silently narrow it.
-3. One labeled SearchInput (`Search order, customer, or staff…`), then Type and Person selects. Use registered labels (Alerts/Notes/Milestones/Money/Changes/Stock/System), not category keys. No inert Module select while only one module source is admitted. Active conditions and `Clear filters` appear only when narrowed.
+2. Persistent scope lists permitted connected sources plus proposed recent-window text and observation time. Current source coverage remains Orders-centric; the cross-module view is a target. Opening an order must not silently narrow it.
+3. One labeled SearchInput (`Search order, customer, or staff…`), then Source (when multiple sources are connected), Type and Person selects. Use registered labels (Alerts/Notes/Milestones/Money/Changes/Stock/System), not category keys. No inert Module select while only one module source is admitted. Active conditions and `Clear filters` appear only when narrowed.
 4. Today/Yesterday/Earlier groups, latest first, stable event-id tie-break. Each row: event title 13/18 semibold; actor + authorized role if provided + exact time 12/16; important before/after/result 11/14 normal; source number + party as a visible link. No raw payload/field/status, no fabricated role or actor. Unknown taxonomy uses governed `Activity`; unknown field detail is withheld and reported to engineering, never de-underscored.
 5. Source link opens **that object's History**, with event anchor where supported, using existing navigation/dirty guard. It does not set activeOrder behind the page. Object History retains the complete ledger, revisions stay separate. Proven system event says System; unresolved actor is labeled unavailable, never falsely attributed to System.
 6. `Load more` for an explicit bounded recent window (proposed last 30 Malaysia days), preserving query/filter and stable pagination. Search/filters apply to the entire authorized window, not just the latest loaded 200. Once exhausted, state end of that window and link to source History for earlier records. No new global audit/report page.
@@ -157,15 +217,15 @@ Long change details wrap; large notes disclose `Show more` inline without naviga
 | Switch / close / return | Preserve panel state in session; return focus | Same | Same |
 | Dirty object | Peek does not save/discard; owner navigation uses existing guard; cancel leaves draft intact | Same | Same |
 | Reordered/rescheduled source | Owner invalidates projection; event moves to actual new day once, old date becomes History | Source closes/moves work; peek never marks done | Immutable change added; historical record not rewritten |
-| Narrow and zoom | Proposed Calendar option in existing shell menu opens full-width kit Drawer; source links remain | **No narrow rail/drawer**; existing Work destination opens main My Work | Proposed Activity option in existing shell menu opens full-width kit Drawer |
+| Narrow and zoom | Use owning full Calendar/Monitor destinations; no global rail on narrow screens | **No narrow rail/drawer**; existing Work destination opens main My Work | Use owning object History; no new global drawer |
 
-Narrow composition activates when the main canvas cannot remain usable with 392px rail; propose below desktop-min-width 1024, and for zoom-reduced CSS viewport. No permanent floating rail. Calendar/Activity drawer uses existing modal focus trap/backdrop and returns focus to menu trigger; My Work follows locked no-mini-queue rule. At 320/390px, labels and controls stack, no horizontal page scroll, one vertical body scroll. Required targets 40px. This new Calendar/Activity menu placement is a proposal, not existing authority.
+Below 1024px and on zoom-reduced viewports, omit the global rail and use existing full Work, module calendars and object History. This loses the cross-module quick peek on a phone; preserving existing usable full destinations is the chosen trade-off. No additional mobile drawer or menu destination is proposed. Required existing destination targets remain governed by the 40px minimum.
 
 ## 7. Kit versus module responsibilities; exact visual contract
 
 | Element | Existing contract / exact recommendation | Ownership / gap |
 |---|---|---|
-| Desktop panel shell | 340px measured rail, 52px strip, 48px header; nonmodal semantics | **Proposed kit admission:** shared RailPanel recipe; Side Panel is currently listed unbuilt. Generic Drawer remains 420px; do not overwrite it |
+| Desktop panel shell | 340px measured rail, 52px strip, 50px header; nonmodal semantics | **Proposed kit admission:** shared RailPanel recipe; Side Panel is currently listed unbuilt. Generic Drawer remains 420px; do not overwrite it |
 | Narrow Calendar/Activity | Existing Drawer/DialogFrame behavior, width constrained to viewport | Kit adaptation only; never apply to My Work |
 | Type scale | Heading strong 15/22/600; event title body 13/18/600; actor/time and scope meta 12/16/400; event result label 11/14/400 | Existing tokens, no new sizes. 13/12/11 History grammar per tokens §1 |
 | Spacing | Body p-4=16; control gap-2=8; row/section gap-3=12; major blocks gap-6=24; icon gap-1.5=6 | Existing scale. Remove present 14/10px ad hoc padding |
@@ -175,20 +235,20 @@ Narrow composition activates when the main canvas cannot remain usable with 392p
 | Health | Scope + observation + failed-source text composed with existing EmptyState/Loading/Button | Proposed reusable read-state recipe; no need for new decorative Alert, Badge tone or Toast |
 | Event row | Existing History text grammar, separate source link, optional detail disclosure | Shared renderer; module supplies event taxonomy, formatting and authorized destination |
 | Work counts | Existing shared selector/response; badge accessible count | Workspace owns timing/identity; shell owns health presentation, never Work arithmetic |
-| Calendar truth | Booking/arrival/transfer source facts | Delivery and Receiving/Purchasing own event meaning, date and completeness |
+| Calendar truth | Arrangements and governed deadlines | Each matrix owner supplies meaning/date/completeness; shared views do not recalculate |
 | Permissions | Server grants + RLS, same across count/list/filter/link | No new permission tier or broadened access is proposed |
 
 **Capability readiness:** Work count projection is READY to reuse; generic controls/History formatting are READY with named defects. Keyboard calendar engine is COPY REQUIRED from existing kit, with the explicit mixed-source/touch adaptation above. Reusable desktop shell/read-health recipe is a LOCAL KIT GAP, not proof that nobody has solved side panels. Complete Calendar event coverage and bounded Activity server search remain NOT VERIFIED / source-contract gaps; do not label them invented-engine work or promise production readiness.
 
 ## 8. Proposed copy and component admission (one review, not a sequence of questions)
 
-Existing wording is reused wherever available. These exact new phrases/uses are **PROPOSED COPY / NOT LAW** in the viewable mockups: `Malaysia time` · `Deliveries · Supplier arrivals` (scope) · `{n} customer deliveries · {n} transfers · {n} expected supplier arrivals` · `Calendar could not be refreshed` · `Activity could not be refreshed` · `Counts unavailable` · `Recent 30 days` · `No activity recorded in these 30 days` · `No more activity in these 30 days` · `Person not available` · `Sign in again` (only when existing auth gate establishes that remedy) · `Show more` / `Show less` for a long event detail · `Load more` for the bounded feed. `Last updated`, `Try again`, actual dates, My Work/Missed/Today/Open My Work, Delivery schedule, Receiving, History and Clear filters reuse governed vocabulary/owner contracts. No production word is admitted by this Card.
+Existing wording is reused wherever available. These exact new phrases/uses are **PROPOSED COPY / NOT LAW** in the viewable mockups: `Malaysia time` · `Connected sources` · `Arrangements` · `Deadlines` · `Arrangements & deadlines` (scope/grouping) · `{n} customer deliveries · {n} transfers · {n} expected supplier arrivals` · `Calendar could not be refreshed` · `Activity could not be refreshed` · `Counts unavailable` · `Recent 30 days` · `No activity recorded in these 30 days` · `No more activity in these 30 days` · `Person not available` · `Sign in again` (only when existing auth gate establishes that remedy) · `Show more` / `Show less` for a long event detail · `Load more` for the bounded feed. `Last updated`, `Try again`, actual dates, My Work/Missed/Today/Open My Work, Delivery schedule, Receiving, History and Clear filters reuse governed vocabulary/owner contracts. No production word is admitted by this Card.
 
 Component request is explicit: admit RailPanel and shared read-state recipes; extend the existing kit calendar/controls for the named context and target sizes. No new palette, font, radius, source assignment or application implementation is requested.
 
 ## 9. Critique, revision and score
 
-Initial recommendation was challenged before presentation: (a) discarded the old local Late/Covering design after reading main; (b) removed a tempting mobile My Work drawer because Workspace §7 prohibits it; (c) removed inert Module filtering rather than invent an all-ERP feed; (d) retained delivery/transfer distinction; (e) rejected adding a second event editor; (f) identified 340/320/420 width and 32/40 target mismatches rather than silently styling around them; (g) chose server-window search instead of calling the latest 200 records a complete result.
+Initial recommendation was challenged before presentation: (a) discarded the old local Late/Covering design after reading main; (b) removed a tempting mobile My Work drawer because Workspace §7 prohibits it; (c) removed the inert current Module filter; the complete target adds a real source filter only for connected sources; (d) retained delivery/transfer distinction; (e) rejected adding a second event editor; (f) identified 340/320/420 width and 32/40 target mismatches rather than silently styling around them; (g) chose server-window search instead of calling the latest 200 records a complete result.
 
 Scores are **evidence-weighted design review**, not measured usability. Untested portions receive no perfect mark. Current score combines source and fixture evidence at `3aa6e5a98`, not a blanket score for every production role.
 
@@ -235,3 +295,9 @@ After owner approval: overwrite the affected current UI §5 and component/copy c
 ### Artifact validation record
 
 24 Sep 2026: opened the standalone review HTML in the in-app browser; checked populated rendering, switched to healthy empty and first-load failure, and selected narrow composition. The first-load-error calendar announces unavailable counts; all three proposed panels show recovery instead of empty success. These checks validate the illustration, not a working production implementation. The narrow switch is a composition example; actual 320/390 viewport and screen-reader verification remain owed. The HTML is intentionally a lightweight review artifact, not production component code: date/week/month and destination buttons simulate or explain their intended behavior.
+
+## Consolidated verification notes
+
+The duplicate review contributed: the Calendar reads a newest-500-order list (date coverage risk); the shell header is 48px against the 50px shell header; the existing Module filter is inert; note/escalation relocation must preserve the capability. Its “latest 300” claim is corrected: two 150-row reads are merged and capped at 200. Its “only commitments” owner question is withdrawn against Delivery, Payment and Stock authority. No source was chosen because it was saved first. The complete source/data audit above remains evidence, not a claim that all proposed connectors are built. Narrow screens use Work and owning full module destinations; no new global rail drawer is proposed.
+
+Verification of revised review artifact: browser walk confirmed populated arrangements/deadlines, explicit Calendar/Activity errors, healthy empty and the narrow full-destination explanation; reset to populated desktop. Controls that only explain a target are explicitly prototype simulations, not implemented source queries. No live connector, all-role or operator usability claim is made.
