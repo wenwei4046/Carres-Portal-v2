@@ -134,6 +134,9 @@ describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before ch
     await as(U.boss);
     expect(await reply({ supplierDate: "2026-10-20", reason: "Production Delay", screenshots: [`${PO}/delay-1.png`] })).toBe("reason_required");
     expect(await reply({ supplierDate: "2026-10-20", reason: "Other", screenshots: [`${PO}/delay-1.png`] })).toBe("other_note_required");
+    // 0560's law: whitespace is not an answer — a tab or a newline is blank.
+    expect(await reply({ supplierDate: "2026-10-20", reason: "Other", remarks: " \t\n", screenshots: [`${PO}/delay-1.png`] })).toBe("other_note_required");
+    expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", recipient: "\t", screenshots: [`${PO}/delay-1.png`] })).toBe("reply_evidence_required");
     expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", screenshots: [] })).toBe("screenshot_required");
     // The existing form's single evidence file is a screenshot too — but it must be uploaded for THIS PO.
     expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", evidence: `${PO}/missing.png` })).toBe("screenshot_not_found");
@@ -174,6 +177,8 @@ describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before ch
     expect(await confirm({ forDate: "2026-10-20", evidence: [] })).toBe("evidence_required");
     expect(await confirm({ forDate: "2026-10-20", kind: "supplier_do" })).toBe("23514");
     expect(await confirm({ forDate: "2026-10-20", channel: null })).toBe("23514");
+    expect(await confirm({ forDate: "2026-10-20", recipient: " \t " })).toBe("23514");
+    expect(await confirm({ forDate: "2026-10-20", kind: "supplier_do", supplierDoNo: "\n" })).toBe("23514");
     expect(await confirm({ forDate: "2026-10-20" })).toBe("ok");
     expect(await confirm({ forDate: "2026-10-20", kind: "supplier_do", supplierDoNo: "NF-DO-8812", evidence: [`${PO}/confirm.png`] })).toBe("ok");
     await q("reset role");

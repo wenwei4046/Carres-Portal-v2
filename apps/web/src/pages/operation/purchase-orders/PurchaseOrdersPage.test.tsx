@@ -670,10 +670,11 @@ describe("the evidenced supplier reply door", () => {
     /* Evidence complete, reason NOT chosen — the save must stay closed. */
     expect(screen.getByTestId("po-supplier-date-reason")).toHaveValue("");
     expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
-    fireEvent.change(screen.getByTestId("po-supplier-date-reason"), { target: { value: "Material Shortage" } });
+    /* 0582 · the eight governed reasons (owner ruling 2026-09-24). */
+    fireEvent.change(screen.getByTestId("po-supplier-date-reason"), { target: { value: "Material unavailable" } });
     fireEvent.click(screen.getByTestId("po-supplier-date-save"));
     expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
-      poVersion: 2, supplierDate: "2026-09-15", reason: "Material Shortage",
+      poVersion: 2, supplierDate: "2026-09-15", reason: "Material unavailable",
       channel: "whatsapp", recipient: "Factory group", evidence: "PO-20260828-4827/reply.png",
       reportedBy: "Factory staff",
     });
