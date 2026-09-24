@@ -526,7 +526,7 @@ export default function OperationWork() {
           <FilterRail testId="work-filter-rail" ariaLabel="Work filters" className="gap-4 border-r-0 bg-transparent px-0 pb-0">
             <FilterRailGroup title="Working day" icon="date" className="rounded-panel border border-kit-slate-5 bg-white px-3">
               {dayChoices.map((choice) => "holiday" in choice && choice.holiday ? (
-                <div key={choice.key} data-holiday={choice.key} className="flex min-h-[36px] flex-col justify-center px-2 py-1 text-body text-kit-slate-11">
+                <div key={choice.key} data-holiday={choice.key} className="flex min-h-9 flex-col justify-center px-2 py-1 text-body text-kit-slate-11">
                   <span>{choice.label}</span>
                   <span className="text-meta">Public holiday · {choice.holiday}</span>
                 </div>
@@ -605,10 +605,10 @@ export default function OperationWork() {
           <div className="p-2" aria-label="Loading work" data-testid="work-loading">
             {[0, 1, 2].map((index) => (
               <div key={index} className="mb-2 overflow-hidden rounded-control border border-kit-slate-5 bg-white px-3 py-2 motion-safe:animate-pulse">
-                <div className="h-3 w-24 rounded bg-base-100" />
-                <div className="mt-2 h-4 w-56 max-w-full rounded bg-base-100" />
-                <div className="mt-2 h-3 w-80 max-w-full rounded bg-base-100" />
-                <div className="mt-2 h-7 border-t border-kit-slate-5 pt-2"><div className="h-2.5 w-20 rounded bg-base-100" /></div>
+                <div className="h-3 w-24 rounded bg-kit-slate-3" />
+                <div className="mt-2 h-4 w-56 max-w-full rounded bg-kit-slate-3" />
+                <div className="mt-2 h-3 w-80 max-w-full rounded bg-kit-slate-3" />
+                <div className="mt-2 h-7 border-t border-kit-slate-5 pt-2"><div className="h-2.5 w-20 rounded bg-kit-slate-3" /></div>
               </div>
             ))}
           </div>
@@ -675,7 +675,7 @@ export default function OperationWork() {
                 // The governed configuration failure with its ONE door
                 // (workspace/MASTER §4 · Delivery MASTER §13.1): never a
                 // fallback person, never a Work-local assignment control.
-                <p className="mb-1.5 text-label text-base-500" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
+                <p className="mb-1.5 text-label text-kit-slate-11" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
                   Nobody holds {g.name}.{" "}
                   <Link className="text-kit-blue-11 underline" to="/operation?tab=staff-duties">
                     Set the holder in Workspace → Staff &amp; Duties

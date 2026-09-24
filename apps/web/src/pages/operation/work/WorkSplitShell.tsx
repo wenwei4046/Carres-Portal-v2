@@ -21,11 +21,11 @@ export default function WorkSplitShell({
   if (layout === "one") {
     const content = activePanel === "rail" ? rail : activePanel === "detail" ? detail : list;
     const label = activePanel === "rail" ? "Work filters" : activePanel === "detail" ? "Selected work" : "Work actions";
-    return <section data-testid="work-split-shell" data-layout="one" aria-label={label} className={`min-h-0 min-w-0 flex-1 overflow-y-auto bg-base-50 ${className}`}>{content}</section>;
+    return <section data-testid="work-split-shell" data-layout="one" aria-label={label} className={`min-h-0 min-w-0 flex-1 overflow-y-auto bg-kit-slate-3 ${className}`}>{content}</section>;
   }
 
   return (
-    <div data-testid="work-split-shell" data-layout={layout} className={`flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden bg-base-50 ${className}`}>
+    <div data-testid="work-split-shell" data-layout={layout} className={`flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden bg-kit-slate-3 ${className}`}>
       <div className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto">
         {rail}
       </div>

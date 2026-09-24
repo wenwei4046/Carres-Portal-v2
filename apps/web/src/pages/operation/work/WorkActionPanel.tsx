@@ -38,7 +38,7 @@ export default function WorkActionPanel({ item, embedded, onOpen, onCompleted, c
     : null;
   return (
     <div
-      className={`min-h-full bg-base-50 p-4 ${className}`}
+      className={`min-h-full bg-kit-slate-3 p-4 ${className}`}
       onKeyDown={(event) => {
         if (event.key.toLowerCase() === "o" && !event.altKey && !event.ctrlKey && !event.metaKey && !isTextEntry(event.target)) {
           event.preventDefault();
