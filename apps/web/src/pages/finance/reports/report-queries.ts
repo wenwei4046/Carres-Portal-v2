@@ -31,12 +31,17 @@ export interface StatementLine {
   reclassifiedFor: "CUSTOMER" | "SUPPLIER" | null;
 }
 
-/** The accounts under one chart header, and the subtotal the ledger served. */
+/** The accounts under one chart header, and the subtotal the ledger served.
+ *  The subtotal counts every account under the header at any depth (0579).
+ *  `depth` is 1 at the top; `parentCode` is the header this one sits under.
+ *  Rows served before 0579 carry neither, and read as depth 1, no parent. */
 export interface StatementGroup {
   code: string;
   name: string | null;
   subtotal: number;
   lines: StatementLine[];
+  depth: number;
+  parentCode: string | null;
 }
 
 /** Income, Expense, Asset, Liability or Equity, with its served total.
@@ -130,6 +135,13 @@ function movedFor(r: Raw, moved: number | null, bad: Fail): StatementLine["recla
   return v;
 }
 
+/** 0579's header_depth: 1 at the top. Absent before 0579, read as 1. */
+function headerDepth(v: unknown, bad: Fail): number {
+  if (v === undefined || v === null) return 1;
+  if (typeof v !== "number" || !Number.isInteger(v) || v < 1) throw bad();
+  return v;
+}
+
 /** In the database's own order. `ordinal` is its row number. */
 function inOrder(rows: Raw[], bad: Fail): Raw[] {
   if (!rows.every((r) => Number.isInteger(r.ordinal))) throw bad();
@@ -143,7 +155,9 @@ function inOrder(rows: Raw[], bad: Fail): Raw[] {
 interface Draft {
   kind: string;
   total: number | null;
-  groups: Map<string, { code: string; name: string | null; subtotal: number | null; lines: StatementLine[] }>;
+  groups: Map<string, { code: string; name: string | null; subtotal: number | null; lines: StatementLine[]; depth: number; parentCode: string | null }>;
+  /** Header codes in the order their subtotal rows were served: the chart's order. */
+  subtotalOrder: string[];
   unclosedResult: number | null;
 }
 
@@ -168,7 +182,7 @@ function readBody(
     if (typeof kind !== "string" || !sectionKinds.includes(kind)) throw bad();
     let d = drafts.get(kind);
     if (!d) {
-      d = { kind, total: null, groups: new Map(), unclosedResult: null };
+      d = { kind, total: null, groups: new Map(), subtotalOrder: [], unclosedResult: null };
       drafts.set(kind, d);
     }
     return d;
@@ -177,7 +191,7 @@ function readBody(
     const hdr = code(r.header_code, bad);
     let g = d.groups.get(hdr);
     if (!g) {
-      g = { code: hdr, name: nameOf(r.header_name, bad), subtotal: null, lines: [] };
+      g = { code: hdr, name: nameOf(r.header_name, bad), subtotal: null, lines: [], depth: 1, parentCode: null };
       d.groups.set(hdr, g);
     }
     return g;
@@ -199,9 +213,13 @@ function readBody(
         break;
       }
       case "HEADER_SUBTOTAL": {
-        const g = group(section(r.section), r);
+        const d = section(r.section);
+        const g = group(d, r);
         if (g.subtotal !== null) throw bad();
         g.subtotal = money(r.amount, bad);
+        g.depth = headerDepth(r.header_depth, bad);
+        g.parentCode = r.parent_header_code === undefined || r.parent_header_code === null ? null : code(r.parent_header_code, bad);
+        d.subtotalOrder.push(g.code);
         break;
       }
       case "SECTION_TOTAL": {
@@ -228,10 +246,14 @@ function readBody(
   for (const d of drafts.values()) {
     if (d.total === null || d.groups.size === 0) throw bad();
     const groups: StatementGroup[] = [];
-    for (const g of d.groups.values()) {
-      if (g.subtotal === null || g.lines.length === 0) throw bad();
-      groups.push({ code: g.code, name: g.name, subtotal: g.subtotal, lines: g.lines });
+    // A header may hold only headers (0579), so it can have no lines of its
+    // own; it still needs its subtotal.
+    for (const c of d.subtotalOrder) {
+      const g = d.groups.get(c)!;
+      if (g.subtotal === null) throw bad();
+      groups.push({ code: g.code, name: g.name, subtotal: g.subtotal, lines: g.lines, depth: g.depth, parentCode: g.parentCode });
     }
+    if (groups.length !== d.groups.size) throw bad();
     sections.push({ kind: d.kind, total: d.total, groups, unclosedResult: d.unclosedResult });
   }
   return { sections, closing, derivedRows };

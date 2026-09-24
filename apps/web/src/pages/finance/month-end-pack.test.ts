@@ -179,8 +179,8 @@ describe("Export month-end pack", () => {
     });
     await exportMonthEndPack(client(), "2026-10", "2026-11-03");
     const bs = api.book[2]!;
-    const adv = bs.rows.findIndex((r) => r[0] === "1230 Advances to suppliers");
-    expect(bs.rows[adv]).toEqual(["1230 Advances to suppliers", 100]);
+    const adv = bs.rows.findIndex((r) => r[0] === "  1230 Advances to suppliers");
+    expect(bs.rows[adv]).toEqual(["  1230 Advances to suppliers", 100]);
     expect(bs.rows[adv + 1]).toEqual(["Includes RM 100.00 paid to suppliers before their bill."]);
     const pay = bs.rows.findIndex((r) => r[0] === "2110 Trade payables — suppliers");
     expect(bs.rows[pay]).toEqual(["2110 Trade payables — suppliers", 500]);
