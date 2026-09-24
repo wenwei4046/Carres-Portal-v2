@@ -2771,7 +2771,7 @@ no activity. Downloaded assets against #1577’s own deployment proved the direc
 unavailable branch disappeared, the pending state appeared and the Back control
 survived. No receiving result or write path changed and no receipt was posted.
 
-**GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
+**GRN document composition — owner approved 2026-09-23; PARTIALLY DELIVERED, COMPLETE TARGET NOT VERIFIED.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
 do not redesign the receipt as a PO or use it as Manual Purchase's PO preview. The right
 header identifies `GRN No` and `GOODS RECEIVED NOTE`. Preserve the two information blocks:
