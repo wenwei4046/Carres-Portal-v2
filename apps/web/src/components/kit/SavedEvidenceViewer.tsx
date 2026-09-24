@@ -74,9 +74,9 @@ function EvidenceMedia({ file, label, onRetry }: {
     </div>}
     {src && status !== "error" && (file.kind === "video" ?
       <video key={attempt} src={src} controls playsInline preload="metadata" aria-label={label}
-        className="h-80 w-full bg-kit-slate-2 object-contain"
+        className="h-80 w-full bg-kit-slate-3 object-contain"
         onLoadedMetadata={() => setStatus("ready")} onError={() => setStatus("error")} /> :
-      <div ref={pane} className="relative h-80 w-full overflow-hidden bg-kit-slate-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" aria-busy={status === "loading"}
+      <div ref={pane} className="relative h-80 w-full overflow-hidden bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" aria-busy={status === "loading"}
         role="region" aria-label={label} tabIndex={zoom > 1 ? 0 : -1}
         style={{ touchAction: zoom > 1 ? "none" : "auto", cursor: zoom > 1 ? "grab" : "auto" }}
         onKeyDown={(event) => {
