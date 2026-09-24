@@ -110,6 +110,22 @@ here without changing any colour. `slate-3` remains the canvas only on pages not
 `bg-kit-canvas`. `slate-2` was added on 2026-09-16 (owner ruling R5, SO Batch Purchase) — additive,
 no existing step moved.
 
+### 2.1.1 · The Work palette — owner correction 2026-09-24, BUILT (Work page only)
+
+The Work shell and its 124px cards carry six page-scoped steps the owner specified by value. They
+live ONLY in `index.css` (`--work-*`) and `tailwind.config.ts` (`colors.work.*`), are used only
+under `pages/operation/work/**` and `OperationWork.tsx`, and never replace a kit step elsewhere.
+
+| Token | Value | Use |
+|---|---|---|
+| `work-line` | `#ccd7e5` | every Work section and card edge (1px) |
+| `work-line-hover` | `#aebfd3` | a card's hovered edge |
+| `work-ink` | `#17243a` | card fact and date numerals |
+| `work-slate` | `#40516a` | card module · party line |
+| `work-muted` | `#66758b` | card weekday and quiet text |
+| `work-tabs` | `#e9eef5` | the `To do · Waiting · Completed` tab track |
+| `work-missed-*` | fill / line / ink | the `Missed` date badge |
+
 `primary-hover` and `primary-active` are reserved on purpose: the token exists,
 the implementation is not required until something needs it.
 
@@ -165,6 +181,7 @@ own declaration, so a drift back to blue fails the suite.
 |---:|---|---|
 | 4 | `rounded-pill` | **checkbox** |
 | 6 | `rounded-control` | button · input · dropdown |
+| 9 | `rounded-work` | the Work page's sections and 124px cards only (owner correction 2026-09-24) |
 | 10 | `rounded-card` | card · panel · modal · drawer |
 | — | `rounded-full` | **pill · small tag** · avatar · status dot |
 

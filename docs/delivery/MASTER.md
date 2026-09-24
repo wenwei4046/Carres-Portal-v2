@@ -116,9 +116,12 @@ the Service lane, not guessed by Delivery.
   facts on NETS' behalf; every such record says `Recorded by {person} on behalf of NETS`.
 - Operation decides what follows a `Cannot Deliver`: keep NETS with a new date, correct the
   information, hold or cancel the arrangement, or `Change logistics`.
-- AL, TT, TEOW, EU, SSY, HOUZS and other partners without Portal access are assigned manually. The
-  Portal prepares WhatsApp, email or copy-message content; Operation uploads the partner's actual
-  reply before recording a confirmation. Prepared, copied, opened or sent never means confirmed.
+- AL, TT, TEOW, EU, SSY, HOUZS and other partners without Portal access are assigned manually and
+  answer through the **external logistics link** (§5.5, owner ruling 2026-09-24): no OTP, no PIN,
+  no name; whoever holds the link acts for that company on that one delivery, and a save through a
+  valid link IS the company's own external record. When Operation instead records a reply that
+  arrived on WhatsApp, it uploads that actual reply and states `Information received from`.
+  Prepared, copied, opened or sent never means confirmed.
 - One active Delivery Order has one active Logistics. A permitted split uses separate
   Delivery Orders and may use different partners. A Journey leg is its own assignment.
 - NETS Warehouse and NETS Logistics are separate roles and permissions even inside one company.
@@ -316,13 +319,19 @@ counterparty's own act. On the DO page the recorded facts print their event word
 handover` · `Handed over` · `Received by logistics`; those are record words, not Monitor status
 words (§8.4).
 
-## 5 · Customer contact, confirmed date, time and ETA
+## 5 · Customer contact, scheduled date, time and ETA
 
 - **`Requested Delivery Date`** is Sales Orders' customer fact. Delivery reads it and never writes
   it; a wrong or changed promise goes through `Open Sales Order to change`.
-- **`Confirmed Delivery`** is the agreed operational day. **`Confirmed Time`** is the agreed time
-  window. A delivery is booked only when BOTH are recorded; a day without a window prints `No time
-  agreed` and stays contact work.
+- **`Scheduled delivery`** is the agreed operational day (owner ruling 2026-09-24 — overwrites
+  `Confirmed Delivery`). The date is REQUIRED; **`Scheduled time`** is OPTIONAL. A scheduled date
+  alone completes the arrangement, releases the contact work and satisfies the Delivery Order's
+  date requirement; a recorded time prints beside it (`27 Oct · 3:00 PM`), an unrecorded one prints
+  nothing (`27 Oct`) — never `No time agreed`, because an empty optional field is not an exception.
+  A delivery requirement that genuinely needs an appointment time (a specific condominium or
+  building) raises its OWN missing item; no order is forced to carry a time.
+- The three delivery date words are **`Requested delivery`** (Sales' customer request) ·
+  **`Scheduled delivery`** (Delivery's arrangement) · **`Delivered`** (the recorded result).
 - **ETA** is Logistics' later estimated arrival time on the day and never rewrites the confirmed
   day or window.
 - Every date prints through `fmtDate`: `Tue, 18 Aug`, with the year only when it is not the
@@ -385,6 +394,39 @@ special requirements, then `Confirmed date`, `Time window`, `ETA`, contact resul
 screenshot. Its two acts are **`Save Delivery Arrangement`** and **`Cannot Deliver`**. Operation
 proxy records state `Recorded by {person} on behalf of {partner}` with source, reporter, reported
 time, recorded time and original evidence.
+
+### 5.5 · The external logistics link — owner rulings 2026-09-24, APPROVED / BUILT (0581)
+
+A logistics company WITHOUT a Portal login answers one delivery through one link. NETS keeps its
+individual-login portal (§5.4) and never gets a link.
+
+```
+ONE active link per delivery scope (order, leg). Active shows `Copy link` · `Revoke link`;
+none or revoked shows `Create link`. A new link is an explicit act after a revoke; a change of
+company (`Change logistics`) revokes the old company's link in the same request.
+No OTP · no PIN · no name. The actor is the COMPANY: `{company} via external link`. The record
+never claims to know which person pressed the button.
+The page shows the minimum: the customer's own reference (never the SO number), customer, phone,
+delivery address, building, goods without prices, pickup route, requested date, the current
+scheduled date. No money, no other delivery, no commercial term.
+Three structured answers — the save decides the result, no free-text outcome:
+  Save scheduled delivery   date required, time optional → `Scheduled`
+  Ask for another date      date + governed reason       → `Requested another date`
+  Cannot deliver            governed reason (+ words for `Another reason`) → `Cannot deliver`
+A save through a valid link is the company's own record: no WhatsApp screenshot is required.
+`Opened` is recorded when the page RENDERS (never the preview fetch of a chat app); it is the
+observed fact that the company has the delivery details.
+The prepared WhatsApp message inserts the CURRENT link; staff never paste one from memory.
+```
+
+Records: `ops_delivery_partner_links` (Worker-only; no grant to a signed-in role) and the
+arrangement events `arrangement_saved` · `another_date_requested` with `source` (`operation` ·
+`partner_portal` · `external_link`) and `link_id` (0581). Doors: `GET/POST
+/api/operation/delivery-arrangements/:orderId/logistics-card|link|link/revoke` (Operation /
+Principal) and the public `/public/delivery-link/:token` (GET · `opened` · `arrangement` ·
+`another-date` · `cannot-deliver`). The page is `/delivery-link/:token` on the ERP domain.
+**Not offered through the link yet:** the Delivery Order download — the governed DO paper prints
+`SO No`, and the link may not show the SO number; the paper still reaches logistics at handover.
 
 ## 6 · Actual delivery, results and proof
 
@@ -561,7 +603,7 @@ DELIVERY STATUS narrowing.
 **The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
 counts computed over the rows the other groups already narrowed (Law D):
 
-- **`WORK TO DO`**, rows in this order: `All delivery work` · `No logistics picked` · `Call
+- **`WORK TO DO`**, rows in this order: `All delivery work` · `Logistics not assigned` · `Call
   customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
   proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
   2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
@@ -574,7 +616,7 @@ counts computed over the rows the other groups already narrowed (Law D):
   count; leg 1 of a Singapore journey counts under Johor and leg 2 under Singapore; `All` clears
   only this group.
 - **`LOGISTICS`**: a kit dropdown of the partners genuinely carrying a row, governed roster
-  order first; `No logistics picked` is never duplicated here.
+  order first; `Logistics not assigned` is never duplicated here.
 - **`DELIVERY STATUS`**: a kit dropdown offering `All` plus the §8.4 status words, each with its
   live count, zero included.
 
@@ -605,7 +647,7 @@ Month       any width                          the capacity overview
 
 **No three-day layout is ever labelled `Week`,** and the six-day desktop view is `Work week`
 because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfers {n}`,
-`Exceptions {n}` and `No logistics picked {n}` per date, zero lines omitted, with deliveries and
+`Exceptions {n}` and `Logistics not assigned {n}` per date, zero lines omitted, with deliveries and
 transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
 selection; arrows replace the whole window and never scroll it.
 
@@ -710,8 +752,8 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 | 5 | `Customer` | customer name | phone |
 | 6 | `Delivery Location` | city and state, from the one address reading below | building type, floor and lift when recorded; on a JOURNEY LEG, that leg's route instead |
 | 7 | `Requested Delivery Date` | `Thu, 24 Sep` · `To be confirmed` · `No delivery date` | `Customer requested this date` only when a window, not a date, was given |
-| 8 | `Confirmed Delivery` | `Confirmed` · `Not confirmed` | `Thu, 22 Oct` then `2 PM to 5 PM`; `Mon, 14 Sep · No time agreed` for a half booking; NOTHING while unconfirmed — the contact deadline is column 3's, and it is stated once |
-| 9 | `Logistics` | partner name · `No logistics picked` | driver name once assigned |
+| 8 | `Scheduled delivery` | `Scheduled` · `Not scheduled` | `Thu, 22 Oct` then the time when one was recorded (`Thu, 22 Oct · 2 PM to 5 PM`), or the day alone; NOTHING while unscheduled — the contact deadline is column 3's, and it is stated once |
+| 9 | `Logistics` | partner name · `Logistics not assigned` | driver name once assigned |
 | 10 | `Items & Stock` | `Ready` · `Not ready` | `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` |
 | 11 | `Payment` | `Paid` · `Do not deliver` · `Collect RM {amount}` | `RM {amount} still to collect` · `Finance is holding this delivery` · `Cash on delivery` |
 | 12 | `DO No` | the number opens the DO; when absent, muted `DO` with `No delivery order yet` tooltip and accessible name (owner correction 2026-09-14), no action | `DO date` |
@@ -758,10 +800,7 @@ Delivery Orders register offers from the same menu.
 the contact deadline as a glyph and a day:
 
 ```
-Call customer                 nothing has been agreed yet
-[call] Fri, 18 Sep
-
-Confirm delivery time         the DAY is agreed and the window is not
+Call customer                 nothing has been scheduled yet
 [call] Fri, 18 Sep
 
 Call customer                 the deadline has passed
@@ -789,7 +828,7 @@ the label rather than by the internal key.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
-not yet late (`Not confirmed`, `Not ready`, `No logistics picked`, `No delivery date`, `Order
+not yet late (`Not scheduled`, `Not ready`, `Logistics not assigned`, `No delivery date`, `Order
 details incomplete`, an actor-first status word). Red: `Overdue`, `Failed Delivery`, `Do not
 deliver`, a contact deadline that has passed. No generic attention label exists.
 
@@ -1148,10 +1187,9 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | no partner on the scope | `Operation must assign logistics` | orange | |
 | partner set, no contact record, the partner contacts the customer | `Call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | partner set, no contact record, Carres contacts the customer | `Call customer` — the same act, a different owner | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, the DAY is agreed and the window is not | `Confirm delivery time` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
-| day and window recorded — a CUSTOMER leg | `Confirmed` | green | the window |
-| day and window recorded — a TRANSFER leg | `Transfer confirmed` | none | the window |
+| scheduled date recorded (time optional) — a CUSTOMER leg | `Scheduled` | green | the time, when recorded |
+| scheduled date recorded (time optional) — a TRANSFER leg | `Transfer confirmed` | none | the time, when recorded |
 | DO exists, no handover recorded | `Waiting for {partner} pickup` | none | `Handover {date}` when Warehouse scheduled it |
 | Warehouse handed over and the partner's receipt is recorded — a CUSTOMER leg | `Collected by {partner}` | none | `Collected {date} {time}` |
 | Warehouse handed over and the partner's receipt is recorded — a TRANSFER leg | `Collected for transfer` | none | `Collected {date} {time}` |
@@ -1272,13 +1310,13 @@ registers retain their existing behavior. Non-virtualized lists disable the unus
 so it cannot reset this position on mount.
 
 **Delivery Dates edit state.** `Update date and time` is the panel's one right-slot control. It
-flips the panel body into a focused edit state showing exactly: `Confirmed date` (Sunday and
-Malaysian public holidays refused) · `Confirmed time` (governed windows) · `Information received
-from` (`{partner}` · `Customer` · `Operation on behalf of {partner}`) · `WhatsApp proof` (required
-when the new date is later than `Requested Delivery Date`) · `Save confirmed delivery`. The Save
-button names its gap while disabled: `Save confirmed delivery — upload the WhatsApp reply`.
-Cancel restores the read state. A day saved without a window keeps the row in `Call customer`
-with `No time agreed`.
+flips the panel body into a focused edit state showing exactly: `Scheduled date` (required; Sunday
+and Malaysian public holidays refused) · `Scheduled time (optional)` (governed windows) ·
+`Information received from` (`{partner}` · `Customer` · `Operation on behalf of {partner}`) ·
+`WhatsApp proof` (required when the new date is later than `Requested delivery`) · `Save scheduled
+delivery`. The Save button names its gap while disabled: `Save scheduled delivery — upload the
+WhatsApp reply`. Cancel restores the read state. A date saved without a time is a complete
+arrangement (owner ruling 2026-09-24).
 
 **A later date is never a silent edit.** When the new date is later than the customer's
 `Requested Delivery Date`, Operation must have contacted the customer: the save records the
@@ -1462,7 +1500,7 @@ number.
 ## 10 · Daily operator journey, Work and Quick Rail
 
 Operation starts in Monitor and works the rail in order: `Failed Delivery`, `Overdue delivery`,
-`Upload delivery proof`, `No logistics picked`, `Call customer`, then the calendar for the days
+`Upload delivery proof`, `Logistics not assigned`, `Call customer`, then the calendar for the days
 ahead. From assignment through confirmation, Warehouse preparation, handover, delivery day,
 result, proof and return, every row states one concrete next fact and one resolved owner.
 
@@ -1474,9 +1512,8 @@ appears in any line. The row's status word carries the fact.
 | Trigger | Line 1 | Line 2 | Owner rule | Completion fact |
 |---|---|---|---|---|
 | no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | partner recorded |
-| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Confirm the delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
-| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Confirm the delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
-| day agreed, no window | `Call NETS` | `Confirm the delivery time` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | window recorded |
+| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
+| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
 | new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | contact record with proof |
 | collected, no ETA | `Ask NETS` | `Record the delivery ETA` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | ETA recorded |
 | confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
@@ -1607,8 +1644,10 @@ export.
   sees money, other Partners or commercial terms and cannot reassign.
 - Sales, Finance and Service read the facts relevant to their ownership and act only in their own
   module.
-- AL, TT, TEOW, EU, SSY, HOUZS and other no-Portal partners are represented only through truthful
-  Operation proxy records with actual reply or report evidence.
+- AL, TT, TEOW, EU, SSY, HOUZS and other no-Portal partners answer through their external link
+  (§5.5) as a company-level actor — Save scheduled delivery · Ask for another date · Cannot
+  deliver, nothing else — or are represented through truthful Operation proxy records with actual
+  reply or report evidence. Only Operation or the Principal creates or revokes a link.
 
 WhatsApp and email preparation records target and content but never confirms a business fact. A
 phone record states that a person recorded a call; governed high-risk facts may require additional
@@ -1635,6 +1674,11 @@ is absence, never an invented row.
 The same feed admits a Warehouse login only when its token is bound to a Warehouse and keeps only
 that Warehouse's Units. The Logistics boundary is the same projection narrowed by
 authenticated assignment: a Partner sees only its assigned rows and only the admitted fields.
+
+**THE CHASE CARRIES THE ANSWER DOOR — owner ruling 2026-09-24, cross-module law in
+`../ERP-ARCHITECTURE.md` §6.4.** For Delivery: every remind/chase message to a Logistics Partner
+links to that Partner's Logistics Work at the named rows, and the Partner's answers are this
+MASTER's existing arrangement writes. NETS is the first Partner.
 Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence
 and before confirmed arrival; Stock owns the custody word and Delivery never writes it. **DO No**
 means an outbound customer Delivery Order; inbound receiving stays under its PO/CO source.
@@ -1642,6 +1686,12 @@ means an outbound customer Delivery Order; inbound receiving stays under its PO/
 ## 14 · Journeys, Loan, current versus intentional future
 
 ### 14.1 · Journeys
+
+**Outstation release — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; cross-module law
+`../ERP-ARCHITECTURE.md` §6.5).** Before an outstation first leg leaves Carres Klang, Operation
+sends the prepared customer WhatsApp (delivery date, balance, payment link, storage charge on a
+later delay) and records the customer's reply with proof. Without that confirmation Delivery
+refuses the first-leg handover. The payment deadline is Payment's outstation timing row.
 
 **Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
 leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own

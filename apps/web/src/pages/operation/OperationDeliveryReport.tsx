@@ -221,7 +221,7 @@ export default function OperationDeliveryReport() {
       Logistics: r.name, Trips: r.trips, Delivered: r.delivered, "Partly delivered": r.partial,
       Failed: r.failed, "Cannot Deliver": r.cannotDeliver ?? DR.notAvailable })));
     add("Warehouse", warehouse.map((r) => ({
-      "DO No": r.row.doNumber, "Confirmed Delivery": r.row.confirmedDelivery ?? "",
+      "DO No": r.row.doNumber, "Scheduled delivery": r.row.confirmedDelivery ?? "",
       Ready: r.readyAt?.slice(0, 10) ?? "", "Handed over": r.handedOverAt?.slice(0, 10) ?? "",
       "Received by logistics": r.receivedAt?.slice(0, 10) ?? "",
       Result: r.byDeliveryDay === null ? "" : r.byDeliveryDay ? DR.handedOverByDeliveryDay : DR.handedOverAfterDeliveryDay })));

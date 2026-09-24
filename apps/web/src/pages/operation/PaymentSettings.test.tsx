@@ -169,9 +169,9 @@ describe("Settings → Payment (§16)", () => {
     show();
     const card = await screen.findByTestId("payment-settings-collection-timing");
     expect(card).toHaveTextContent("Start asking the customer to pay");
-    expect(card).toHaveTextContent("3 working days before Confirmed Delivery");
+    expect(card).toHaveTextContent("3 working days before Scheduled delivery");
     expect(card).toHaveTextContent("Payment must be complete");
-    expect(card).toHaveTextContent("2 working days before Confirmed Delivery");
+    expect(card).toHaveTextContent("2 working days before Scheduled delivery");
     fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText(/Start asking/), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText(/Payment must be complete/), { target: { value: "2" } });

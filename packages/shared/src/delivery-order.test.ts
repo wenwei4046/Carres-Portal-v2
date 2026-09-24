@@ -78,13 +78,12 @@ describe("deliveryOrderIssueGate — when the document may exist", () => {
   it("refuses without the customer's confirmation", () => {
     expect(run({ bookingConfirmed: false }).ok).toBe(false);
     expect(run({ confirmedDateIso: null }).reasons[0]).toContain(
-      "has not confirmed a delivery date and time slot",
+      "has no scheduled date yet",
     );
   });
 
-  it("refuses a date with no time slot — a date alone is not a confirmation", () => {
-    // 0277's CHECK ties the two together; a row missing one predates it.
-    expect(run({ confirmedTimeSlot: null }).ok).toBe(false);
+  it("a scheduled date with no time passes — the time is optional (owner ruling 2026-09-24)", () => {
+    expect(run({ confirmedTimeSlot: null })).toEqual({ ok: true, reasons: [] });
   });
 
   it("refuses goods that are not reserved, and names them", () => {

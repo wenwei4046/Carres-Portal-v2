@@ -10,7 +10,7 @@
  *     14
  *     Deliveries            5
  *     Exceptions            1      (only when > 0, the warning tone)
- *     No logistics picked   2      (only when > 0)
+ *     Logistics not assigned   2      (only when > 0)
  *
  * The numbers are the signal — never colour alone — and the day button's aria
  * sentence says the same three facts in words. Sunday stays visible in the

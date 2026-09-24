@@ -3,6 +3,8 @@ import { cors } from "hono/cors";
 import { authMiddleware } from "./middleware/auth";
 import analyticsRouter from "./routes/analytics";
 import authRouter from "./routes/auth";
+import deliveryLinksRouter from "./routes/operation/delivery-links";
+import publicDeliveryLinkRouter from "./routes/public/delivery-link";
 import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
 import ordersRouter from "./routes/orders";
@@ -173,6 +175,10 @@ app.get("/health", (c) => c.json({ ok: true, commit: c.env.DEPLOY_SHA ?? "local"
 // there is no Supabase JWT). Signature verification is the trust boundary.
 app.route("/stripe", stripeWebhookRouter);
 
+// THE EXTERNAL LOGISTICS LINK (0581) — OUTSIDE the signed-in /api group: the
+// logistics company has no login. The 256-bit token is the trust boundary.
+app.route("/public/delivery-link", publicDeliveryLinkRouter);
+
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
 // POS-parity — MAINTAIN → Sales analysis flattened feed (principal only).
@@ -218,6 +224,7 @@ api.route("/operation/orders", deliveryChainRouter);
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
 api.route("/operation/delivery-arrangements", deliveryArrangementsRouter);
+api.route("/operation/delivery-arrangements", deliveryLinksRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
 api.route("/operation/payment-approvals", paymentApprovalsRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate

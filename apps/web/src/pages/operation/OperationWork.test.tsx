@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 
@@ -13,6 +13,9 @@ let workState: {
 let authState = { role: "operation", email: "shasha@carres.test" };
 const refetch = vi.fn();
 
+/* The party cards read Delivery through their own queries; their behaviour is
+   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+vi.mock("./work/WorkParties", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
@@ -145,7 +148,7 @@ describe("Operation Work — one server feed", () => {
   it("defaults everyone, including a manager, to My Work", () => {
     authState = { role: "principal", email: "shasha@carres.test" };
     show();
-    expect(screen.getByTestId("work-view-mine")).toHaveClass("bg-base-900");
+    expect(screen.getByTestId("work-view-mine")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
   });
 
@@ -181,16 +184,20 @@ describe("Operation Work — one server feed", () => {
       .toHaveTextContent("Covered by Yu Jun");
   });
 
-  it("uses the governed My Work section order and keeps No date separate", () => {
+  it("keeps the governed My Work order in one card run: broken, missed, then No date", () => {
     workState.data!.items = [
-      item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
-      item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
       item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
+      item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
+      item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
     ];
     show("/operation?tab=work&day=all");
-    expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
-    expect(screen.getByTestId("work-section-overdue")).toBeInTheDocument();
-    expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
+    const cards = [...screen.getByTestId("work-section-list").querySelectorAll("[data-work-card]")];
+    expect(cards.map((card) => card.getAttribute("data-testid"))).toEqual([
+      "work-row-SO-1318-ask_delivery_date",
+      "work-row-SO-1318-issue_po",
+      "work-row-SO-1318-confirm_supplier_date",
+    ]);
+    expect(cards[2]).toHaveTextContent("No date");
   });
 
   it("reads search and filters from the URL", () => {
@@ -287,6 +294,40 @@ describe("Operation Work — one server feed", () => {
     expect(screen.getByTestId("work-error")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the last good list and the filters when a refresh fails, with one retry row", () => {
+    workState = { ...workState, isError: true };
+    show("/operation?tab=work&day=all");
+    expect(screen.getByTestId("work-refresh-failed")).toHaveTextContent("Work could not be loaded. Try again.");
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-error")).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("work-refresh-failed")).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("draws 50 cards, then 50 more when the list end scrolls into view; choosing a card never shrinks it", () => {
+    let reveal: (() => void) | null = null;
+    const Observer = vi.fn(function (this: unknown, callback: IntersectionObserverCallback) {
+      reveal = () => callback([{ isIntersecting: true } as IntersectionObserverEntry], this as IntersectionObserver);
+      return { observe: vi.fn(), disconnect: vi.fn(), unobserve: vi.fn(), takeRecords: vi.fn() };
+    });
+    vi.stubGlobal("IntersectionObserver", Observer);
+    workState.data!.items = Array.from({ length: 120 }, (_, n) => item({
+      id: `orders:${n}`,
+      object: { kind: "sales_order", id: `so-${n}`, label: `SO-${2000 + n}` },
+    }));
+    show("/operation?tab=work&day=all");
+    const cards = () => screen.getByTestId("work-section-list").querySelectorAll("[data-work-card]");
+    expect(cards()).toHaveLength(50);
+    act(() => reveal?.());
+    expect(cards()).toHaveLength(100);
+    fireEvent.click(cards()[80]);
+    expect(cards()).toHaveLength(100);
+    act(() => reveal?.());
+    expect(cards()).toHaveLength(120);
+    expect(screen.queryByTestId("work-list-more")).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it("shows a stable loading shell", () => {

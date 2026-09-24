@@ -17,6 +17,9 @@ let workState: {
 };
 const refetch = vi.fn();
 
+/* The party cards read Delivery through their own queries; their behaviour is
+   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+vi.mock("./work/WorkParties", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return { ...actual, useOperationWork: () => ({ ...workState, refetch }) };
@@ -142,7 +145,7 @@ afterAll(() => {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-09-17T02:00:00.000Z"));
-  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
   workState = { data: feed("2026-09-17", []), isLoading: false, isError: false };
 });
 afterEach(() => {
@@ -246,13 +249,17 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
-  it("9 · a 950px Work area inside a 1280px window uses two panels", () => {
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  it("9 · a 1180px page collapses only the rail; Filters reopens it beside the list", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      width: 950, height: 800, top: 0, left: 0, right: 950, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
+      width: 1180, height: 800, top: 0, left: 0, right: 1180, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect);
     show();
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
+    expect(screen.queryByRole("complementary", { name: "Work filters" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("work-filters-toggle"));
+    expect(screen.getByRole("complementary", { name: "Work filters" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
   });
 
   it("10 · a link that opens every open action (`day=all`) still lists them all", () => {
@@ -270,7 +277,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     workState.data = feed("2026-09-17", [missed]);
     show();
     const list = screen.getByTestId("work-list");
-    expect(list).toHaveTextContent("Required Wed, 5 Aug");
+    const card = list.querySelector("[data-work-card]") as HTMLElement;
+    expect(card.getAttribute("aria-label")).toContain("Wednesday, 5 August 2026 · Missed");
     expect(list).not.toHaveTextContent("working days missed");
   });
 });

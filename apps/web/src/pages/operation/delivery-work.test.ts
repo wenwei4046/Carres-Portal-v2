@@ -172,11 +172,10 @@ describe("delivery scopes and journey legs", () => {
     /* The document's own handover facts speak: the partner collected. */
     expect(rows[0]!.status.kind).toBe("collected");
     expect(rows[0]!.receivedAt).toBe("2026-08-25T03:00:00Z");
-    /* Leg 2, no document yet: the chain's own words. Its day is scheduled and
-       no window is agreed, so the rung is the one that asks for the TIME
-       (owner ruling 2026-09-14) — never the one that re-opens the day. */
-    expect(rows[1]!.status.kind).toBe("confirm_time");
-    expect(rows[1]!.status.label).toBe("Confirm delivery time");
+    /* Leg 2, no document yet: its day is scheduled, and a scheduled date
+       alone completes the arrangement (owner ruling 2026-09-24). */
+    expect(rows[1]!.status.kind).toBe("confirmed");
+    expect(rows[1]!.status.label).toMatch(/^Scheduled for /);
   });
 
   it("speaks a leg's status in the shared ACTOR-FIRST words (§8.4), never `Pending`", () => {
@@ -186,12 +185,10 @@ describe("delivery scopes and journey legs", () => {
     /* The ACT, never the actor (owner ruling 2026-09-14): the party is the
        row's Logistics field, and a leg speaks the same words as a scope. */
     expect(legWorkStatusOf({ status: "pending" }, null, "TEOW").label).toBe("Call customer");
-    /* A day alone is still contact work — and it names the missing HALF. */
-    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe(
-      "Confirm delivery time",
-    );
+    /* A scheduled day alone completes the leg — the time is optional. */
+    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe("Scheduled for Tue, 25 Aug");
     const booked = legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW", "9am–12pm");
-    expect(booked.label).toBe("Confirmed for Tue, 25 Aug");
+    expect(booked.label).toBe("Scheduled for Tue, 25 Aug");
     expect(booked.second).toBe("9am–12pm");
     expect(legWorkStatusOf({ status: "picked_up" }, null, "TEOW").label).toBe("Goods collected by TEOW");
     /* Leg 1 handing over at the named JB warehouse is that leg's ARRIVAL —
@@ -451,7 +448,7 @@ describe("the arrangement is what Delivery wrote", () => {
     });
     expect(rows[0]!.confirmedIso).toBe("2026-08-28");
     expect(rows[0]!.confirmedTime).toBe("9am–12pm");
-    expect(rows[0]!.status.label).toBe("Confirmed for Fri, 28 Aug");
+    expect(rows[0]!.status.label).toBe("Scheduled for Fri, 28 Aug");
     expect(rows[0]!.status.second).toBe("9am–12pm");
     expect(rows[0]!.status.tone).toBe("green");
   });
