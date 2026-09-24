@@ -48,7 +48,6 @@ function PartyShell({ title, summary, children, testId }: { title: string; summa
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
-        aria-label={open ? PARTY_COPY.collapse(title) : PARTY_COPY.expand(title)}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-start gap-3 rounded-work px-4 py-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9"
       >

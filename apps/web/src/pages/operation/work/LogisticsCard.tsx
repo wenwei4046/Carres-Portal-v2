@@ -304,7 +304,6 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
-        aria-label={open ? PARTY_COPY.collapse(LOGISTICS_COPY.heading) : PARTY_COPY.expand(LOGISTICS_COPY.heading)}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-start gap-3 rounded-work px-4 py-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9"
         data-testid="logistics-card-toggle"
