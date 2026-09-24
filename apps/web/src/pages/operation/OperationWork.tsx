@@ -412,8 +412,8 @@ export default function OperationWork() {
         layout={layout}
         activePanel={activePanel}
         rail={(
-          <FilterRail testId="work-filter-rail" ariaLabel="Work filters">
-            <FilterRailGroup title="Working day" icon="date">
+          <FilterRail testId="work-filter-rail" ariaLabel="Work filters" className="gap-4 border-r-0 bg-transparent px-0 pb-0">
+            <FilterRailGroup title="Working day" icon="date" className="rounded-panel border border-kit-slate-5 bg-white px-3">
               {dayChoices.map((choice) => "holiday" in choice && choice.holiday ? (
                 <div key={choice.key} data-holiday={choice.key} className="flex min-h-[36px] flex-col justify-center px-2 py-1 text-body text-kit-slate-11">
                   <span>{choice.label}</span>
@@ -431,7 +431,7 @@ export default function OperationWork() {
                 />
               ))}
             </FilterRailGroup>
-            <FilterRailGroup title="Module" icon="order">
+            <FilterRailGroup title="Module" icon="order" className="rounded-panel border border-kit-slate-5 bg-white px-3">
               <FilterRailRow
                 testId="work-module-all"
                 label="All modules"
@@ -452,7 +452,7 @@ export default function OperationWork() {
               ))}
             </FilterRailGroup>
             {activeView === "team" ? (
-              <FilterRailGroup title="Owner" icon="people">
+              <FilterRailGroup title="Owner" icon="people" className="rounded-panel border border-kit-slate-5 bg-white px-3">
                 {ownerOptions.map((option) => (
                   <FilterRailRow
                     key={option.value}

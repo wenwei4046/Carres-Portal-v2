@@ -26,7 +26,7 @@ export default function WorkSplitShell({
 
   return (
     <div data-testid="work-split-shell" data-layout={layout} className={`flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden bg-base-50 ${className}`}>
-      <div className="w-60 shrink-0 overflow-hidden rounded-panel border border-kit-slate-5 bg-white">
+      <div className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto">
         {rail}
       </div>
       {layout === "two" ? (

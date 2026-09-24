@@ -8,7 +8,7 @@ describe("WorkSplitShell", () => {
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "three");
     expect(screen.getByTestId("work-split-shell")).toHaveClass("gap-4");
     expect(screen.getByRole("complementary", { name: "Work filters" }).parentElement).toHaveClass("w-60");
-    expect(screen.getByRole("complementary", { name: "Work filters" }).parentElement).toHaveClass("rounded-panel", "border");
+    expect(screen.getByRole("complementary", { name: "Work filters" }).parentElement).toHaveClass("gap-4");
     expect(screen.getByRole("region", { name: "Work actions" })).toHaveClass("w-[360px]");
     expect(screen.getByRole("region", { name: "Selected work" })).toHaveClass("min-w-[500px]");
   });

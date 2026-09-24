@@ -277,6 +277,7 @@ export function FilterRailGroup({
   children,
   chosen,
   groupKey,
+  className,
 }: {
   title: string;
   icon: IconName;
@@ -284,6 +285,8 @@ export function FilterRailGroup({
   chosen?: string | null;
   /** Stable storage name when the title is not (defaults to the title). */
   groupKey?: string;
+  /** Page-local surface treatment; the filter semantics remain shared. */
+  className?: string;
 }) {
   const { railKey } = useContext(RailContext);
   const storageKey = railStorageKey(railKey, groupKey ?? title);
@@ -312,7 +315,7 @@ export function FilterRailGroup({
   };
   return (
     <div
-      className="border-t border-kit-slate-5 py-2 first-of-type:border-t-0"
+      className={`border-t border-kit-slate-5 py-2 first-of-type:border-t-0 ${className ?? ""}`}
       data-rail-group={groupKey ?? title}
     >
       <button

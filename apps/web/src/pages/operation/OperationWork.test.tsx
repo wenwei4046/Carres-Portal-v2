@@ -231,6 +231,13 @@ describe("Operation Work — one server feed", () => {
     expect(screen.queryByText(/Missed 1 · Mon, 7 Sep 1/)).not.toBeInTheDocument();
   });
 
+  it("draws Working day and Module as separate governed panels", () => {
+    show();
+    const rail = screen.getByRole("complementary", { name: "Work filters" });
+    expect(rail.querySelector('[data-rail-group="Working day"]')).toHaveClass("rounded-panel", "border");
+    expect(rail.querySelector('[data-rail-group="Module"]')).toHaveClass("rounded-panel", "border");
+  });
+
   it("reads search and filters from the URL", () => {
     workState.data!.items = [
       item(),
