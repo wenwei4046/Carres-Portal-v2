@@ -155,9 +155,11 @@ export default function WorkCard({
           {action}
         </span>
         <span className="-mx-4 mt-auto flex h-[34px] shrink-0 items-center gap-2 border-t border-work-line pl-4 pr-2.5">
-          <span title={cover ? `${item.soRef} · ${cover}` : item.soRef} className="min-w-0 truncate text-[12px] text-work-muted">
-            {item.soRef}
-            {cover ? <span className="text-kit-amber-11"> · {cover}</span> : null}
+          {/* The number never shrinks; only the cover name may, and its tooltip
+              keeps the whole sentence. */}
+          <span title={cover ? `${item.soRef} · ${cover}` : item.soRef} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[12px] text-work-muted">
+            <span className={cover ? "shrink-0" : "min-w-0 truncate"}>{item.soRef}</span>
+            {cover ? <span className="min-w-0 truncate text-kit-amber-11">· {cover}</span> : null}
           </span>
           <button
             type="button"

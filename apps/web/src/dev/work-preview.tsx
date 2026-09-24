@@ -134,6 +134,20 @@ const FEED: OperationWorkResponse = {
   ],
 };
 
+// One covered job (Wed 16 Sep, Delivery · NETS): Shasha acts for Li Ching
+// today, so the card footer carries `Covered for Li Ching` beside its number.
+const coveredItem = FEED.items.find((i) => i.module === "delivery" && i.timing.actionOn === "2026-09-16" && i.recipient === "NETS");
+if (coveredItem) {
+  coveredItem.owner = {
+    ...coveredItem.owner,
+    normal: { userId: "00000000-0000-4000-8000-0000000000bb", name: "Li Ching" },
+    activeCover: { userId: ME, name: "Shasha" },
+    coverEvidence: { id: "cover-1", startsOn: TODAY, endsOn: TODAY },
+    acting: { userId: ME, name: "Shasha" },
+    state: "covered",
+  };
+}
+
 const realFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;

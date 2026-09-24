@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Work · review board (1440 · 1180 · 820 · 390)</title>
+    <!--
+      DEV ONLY review board. `vite build` emits index.html's graph and nothing
+      else, so this page cannot reach production. Each frame is the real Work
+      preview (`work-preview.html`, invented data) at an exact viewport width.
+    -->
+    <style>
+      body { margin: 0; padding: 16px; background: #e9eef5; font: 13px/18px Inter, system-ui, sans-serif; color: #17243a; }
+      nav { position: sticky; top: 0; z-index: 1; display: flex; gap: 8px; align-items: center; padding: 8px 12px; margin-bottom: 16px; background: #fff; border: 1px solid #ccd7e5; border-radius: 9px; }
+      nav a { color: #0878d1; text-decoration: none; padding: 4px 8px; border-radius: 6px; }
+      nav a:hover { background: #f1f3f5; }
+      section { margin-bottom: 32px; }
+      h2 { margin: 0 0 8px; font-size: 15px; }
+      h2 small { font-weight: 400; color: #66758b; }
+      .frame { overflow-x: auto; }
+      iframe { display: block; border: 1px solid #ccd7e5; background: #fff; }
+      .issue { margin: 8px 0 0; padding: 8px 12px; border: 1px solid #efb7bd; background: #fff0f1; border-radius: 9px; color: #c62835; max-width: 760px; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <strong>Work review board</strong>
+      <a href="#w1440">1440</a><a href="#w1180">1180</a><a href="#w820">820</a><a href="#w390">390</a>
+      <a href="/work-preview.html" target="_blank">Open the preview alone</a>
+    </nav>
+    <section id="w1440"><h2>1440 × 900 <small>three columns · 240 / 420 / rest</small></h2>
+      <div class="frame"><iframe src="/work-preview.html" width="1440" height="900" title="Work at 1440"></iframe></div></section>
+    <section id="w1180"><h2>1180 × 820 <small>rail collapsed · Filters reopens it</small></h2>
+      <div class="frame"><iframe src="/work-preview.html" width="1180" height="820" title="Work at 1180"></iframe></div></section>
+    <section id="w820"><h2>820 × 900 <small>one stage · Date and Module compact controls</small></h2>
+      <div class="frame"><iframe src="/work-preview.html" width="820" height="900" title="Work at 820"></iframe></div></section>
+    <section id="w390"><h2>390 × 844 <small>one stage · tap a card for detail, Back returns</small></h2>
+      <div class="frame"><iframe src="/work-preview.html" width="390" height="844" title="Work at 390"></iframe></div>
+      <p class="issue"><strong>Unresolved responsive issue (owner, 2026-09-24):</strong> at 390px the toolbar is 172px tall (four wrapped rows). Recorded, not redesigned yet.</p></section>
+  </body>
+</html>
