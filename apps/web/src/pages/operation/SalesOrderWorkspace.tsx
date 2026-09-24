@@ -1757,7 +1757,7 @@ function SalesOrderWorkspaceBody() {
      whole draft and either saves the correction or submits the request. ── */
   const createMut = useCreateSalesOrder({
     onSuccess: (r) => {
-      toast.success(`SO-${r.so} created · Rev 1`);
+      toast.success(`SO-${r.so}(1) created`);
       navigate(`/operation/orders/so/${r.id}`, { replace: true });
     },
     onError: (e) => toast.error(e.message),
@@ -2089,7 +2089,7 @@ function SalesOrderWorkspaceBody() {
 
   const changesMut = useSubmitSalesOrderChanges(orderId ?? "", {
     onSuccess: (r) => {
-      if (r.action === "saved") toast.success(`Saved · Rev ${r.revision}`);
+      if (r.action === "saved") toast.success(`Saved (${r.revision})`);
       else {
         toast.success("Sent for approval. The order stays as it is until management approves.");
         if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded — record it on the request.");
@@ -2124,7 +2124,7 @@ function SalesOrderWorkspaceBody() {
   };
   const decideMut = useDecideSalesOrderAmendment(orderId ?? "", {
     onSuccess: (r) => {
-      toast.success(r.status === "applied" ? `Approved and applied · Rev ${r.revision}` : "Rejected. The order is unchanged.");
+      toast.success(r.status === "applied" ? `Approved and applied (${r.revision})` : "Rejected. The order is unchanged.");
       void revisionsQ.refetch();
       void baseQ.refetch();
       void detailQ.refetch();
@@ -2997,7 +2997,7 @@ function SalesOrderWorkspaceBody() {
       {mode === "oldrev" && viewedRevision && (
         <div className="px-1" data-testid="oldrev-notice">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
-            Viewing Rev {viewedRevision.revision} · read-only
+            Viewing ({viewedRevision.revision}) · read-only
           </span>
           {/* ⭐ TWO CASES, AND ONLY ONE OF THEM IS A RECONSTRUCTION — owner
               ruling 2026-09-23: "Legacy PDFs that were never stored: use the
@@ -4077,6 +4077,7 @@ function SalesOrderWorkspaceBody() {
               />
             ) : (
             <SalesOrderLedger
+              orderReference={order ? `SO-${order.so}` : ""}
               revisions={revisions}
               history={detailQ.data?.history ?? []}
               currentRevision={currentRev}
@@ -4183,7 +4184,7 @@ function SalesOrderWorkspaceBody() {
                       data={storedDocumentUrl}
                       type="application/pdf"
                       data-testid="issued-document-pane"
-                      aria-label={`The document Rev ${viewedRevision?.revision ?? ""} was issued as`}
+                      aria-label={`The document (${viewedRevision?.revision ?? ""}) was issued as`}
                       className="h-[860px] w-full rounded-card border border-kit-slate-5 bg-white"
                     />
                   ) : (

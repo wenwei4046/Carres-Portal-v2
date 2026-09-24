@@ -590,7 +590,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <View key={`addon-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
             <ColumnRules />
             <View style={styles.bNo}><Text style={styles.cellNo}>{lines.length + idx + 1}</Text></View>
-            <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}>{a.sku ?? "ADD-ON"}</Text></View>
+            <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}>{(a.sku ?? "ADD-ON").split("-").join("-\u200b")}</Text></View>
             <View style={[styles.desc, styles.gridV]}>
               <Text style={styles.descMain}>{a.label}</Text>
               {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
@@ -962,10 +962,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={styles.totalsValue}>{money(serviceAmount)}</Text>
               </View>
             )}
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Tax</Text>
-              <Text style={styles.totalsValue}>{dash}</Text>
-            </View>
             <View style={styles.totalsRow}>
               <Text style={styles.totalsLabel}>Total payable</Text>
               <Text style={styles.totalsValue}>{money(total)}</Text>

@@ -193,7 +193,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("const seed = `${orderId}:rev:${viewRev}`");
     expect(workspace).toContain('disabled={mode === "oldrev"}');
     expect(workspace).toContain("<fieldset");
-    expect(workspace).toContain("Viewing Rev {viewedRevision.revision} · read-only");
+    expect(workspace).toContain("Viewing ({viewedRevision.revision}) · read-only");
     /* 0562 — the editable cards carry their own lock so a saved order reads
        until `Edit`; the outer fieldset still locks a historical version whole. */
     expect(workspace).toContain('<fieldset disabled={formLocked} className="contents">');
@@ -1594,7 +1594,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
     expect(workspace).toContain("{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}");
     expect(workspace).toContain("(key) => serviceCodeWord(key, addonSkuByKey.get(key))");
     /* The paper prints what the payload sends; the API applies the same rule. */
-    expect(pdfTemplate).toContain('{a.sku ?? "ADD-ON"}');
+    expect(pdfTemplate).toContain('(a.sku ?? "ADD-ON").split("-")');
     /* The stored key is what the draft still writes. */
     expect(workspace).toContain("addon_key: hit.key");
   });

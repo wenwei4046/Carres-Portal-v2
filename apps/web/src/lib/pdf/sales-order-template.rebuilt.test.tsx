@@ -256,3 +256,20 @@ describe.skipIf(!process.env.SO_REBUILT_PREVIEW)("visual inspection", () => {
     expect(fs.statSync(out("so-reconstructed.pdf")).size).toBeGreaterThan(1000);
   }, 180000);
 });
+
+it("keeps long service references inside their code column and omits the unused tax row", async () => {
+  const bytes = await renderPdf({ ...BASE,
+    addons: [{ sku: "SVC-DISPOSE-MATTRESS", label: "Dispose old mattress", qty: 1, unit_price: 80, line_total: 80 }],
+    total: 3860, balance_due: 3860,
+  });
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: false }).promise;
+  const content = await (await doc.getPage(1)).getTextContent();
+  const items = content.items.filter((item): item is import("pdfjs-dist/types/src/display/api").TextItem => "str" in item);
+  expect(items.map((item) => item.str).join(" ")).not.toMatch(/\bTax\b/);
+  const parts = items.filter((item) => /SVC|DISPOSE|MATTRESS/.test(item.str) && item.str !== "MATTRESS · 1 item");
+  const codeParts = parts.filter((item) => item.transform[4] > 50 && item.transform[4] < 140);
+  expect(codeParts.length).toBeGreaterThan(0);
+  for (const item of codeParts) expect(item.transform[4] + item.width).toBeLessThanOrEqual(136.1);
+  await doc.destroy();
+}, 120000);
