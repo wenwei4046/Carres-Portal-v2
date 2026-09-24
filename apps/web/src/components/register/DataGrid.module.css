@@ -1439,3 +1439,8 @@ div:first-child > .columnsMenuGroup {
   z-index: 1;
   background: var(--grid-expansion, var(--c-cream));
 }
+
+/* A disabled input must not swallow the existing row-fact tooltip. */
+.checkRefused { cursor: help; }
+.checkRefused input:disabled { pointer-events: none; }
+.checkRefused:focus-visible { outline: 2px solid theme("colors.kit.blue.9"); outline-offset: -2px; }

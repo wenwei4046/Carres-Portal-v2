@@ -1061,6 +1061,16 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
+**Disabled selection explanation — local implementation, 2026-09-24; delivery proof owed.**
+The shared grid's optional refusal description names the same existing facts used by
+SO Batch eligibility/planning and Manual Purchase approval/remainder. It is attached
+to the disabled checkbox and reachable by keyboard through the existing kit tooltip;
+the same facts remain visible on the row or in its expansion. The checked state,
+select-all, stock allocation and PO issue authority are unchanged. Open PR #1490's
+overlap was reviewed; only this still-missing behavior was ported against current main,
+with unique description IDs across grids and a keyboard-focusable trigger.
+
+
 **Shared dictionary — APPROVED / NOT BUILT (Jess, 2026-09-18).** All four reviewed listings
 (§9.1–§9.4), their detail facts and exports use [COPY-STANDARD: Purchasing UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
 The exact lists below are the owner's order; never rearrange them using a generic ordering heuristic.
@@ -2568,12 +2578,19 @@ somebody filed paperwork, not the time a lorry arrived. **Fix, and it is Receivi
 arrival time on the receipt (a new column and the Receiving form field that fills it), then this
 column prints it with no change here. Until then the gap is stated on screen, not hidden.
 
-**PO date vocabulary convergence — local implementation, 2026-09-24; delivery proof owed.**
+**PO date vocabulary convergence — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1587).**
 The register/export uses `PO Doc Date`; the object and its reply form use
 `Supplier Confirmed Delivery Date`, and the destination fact uses `Supplier Deliver To`.
 A confirmed supplier date is printed as the actual date even when it matches the PO date;
 `Same as PO` remains only the form's comparison feedback. No supplier answer, date
 calculation, evidence or version guard changes through these display corrections.
+
+CI `35983290332` passed. Merge `f3a5b84498065820b102bcf8980f6f5f49665d05`
+was deployed by `35984352691`; all five canonical endpoints reported that SHA.
+Authenticated production showed `PO Doc Date` on the 63-order register and the corrected
+supplier/date labels on PO-20260903-4354's object and reply form. Its old reply without
+evidence still read `Not confirmed`; no answer or sending was recorded. A fixture
+separately proved that an evidenced date matching the PO prints the actual date.
 
 **Groups — APPROVED / LOCKED, wording correction Jess 2026-09-17:** `Confirm PO sent to supplier`
 and `Waiting for goods from supplier` are open headings; `Completed` and `Cancelled` are collapsed
@@ -2713,7 +2730,7 @@ The 62 existing Receiving page/save tests pass. No receipt was posted,
 no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
 Unit result or write authority changed. This does not implement the GRN PDF below.
 
-**GRN detail narrow layout — local implementation, 2026-09-24; delivery proof owed.**
+**GRN detail narrow layout — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1587).**
 The continuation walk found that the record and Amend Receiving still cut off item
 identity. They now use the existing receiving form container rules; item names wrap,
 inputs/files stay within the pane and amendment actions wrap. In the real-component
@@ -2721,6 +2738,14 @@ fixture at a 278px viewport (246px content), all seven amendment controls stayed
 x=16–262 and page/scroll widths both equalled 278px. After Cancel the full item name
 remained visible in a 246px row with no row overflow. These changes neither save an
 amendment nor alter quantities or permissions.
+
+The same #1587 deployment above was checked at a 390px production viewport on
+GRN-20260904-1064. Before: the 148px item name was clipped into 38px. After: its
+row/client/scroll width was 246px and the full name remained readable; the page
+client/scroll width stayed 390px. This principal account exposed no Amend action,
+so the seven-control amendment walk remains fixture evidence, not a production save.
+Asset comparison used the own URLs `20cb17a6.carres-portal.pages.dev` (before) and
+`282a960f.carres-portal.pages.dev` (after), with `Time not recorded` as an unchanged control.
 
 **Receiving PO loading state, 2026-09-24 — DEPLOYED + AUTHENTICATED READBACK #1578 (`5ce58beeb`).**
 The authenticated walk exposed a false `This purchase order could not be opened`
@@ -2777,7 +2802,7 @@ the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabr
 PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
 the sample correction does not forbid a real destination exception.
 
-**Item/Unit document linkage — local implementation, 2026-09-24; delivery proof owed.**
+**Item/Unit document linkage — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1584).**
 The detail reader now resolves each recorded stock-item identity through its existing
 `ops_stock_items.po_line_id`, matching the register's source relationship. Only a line
 actually in this receipt may bind a Unit; matching SKU text never establishes lineage.
@@ -2791,6 +2816,16 @@ uses `Supplier Deliver To`, `Goods Received Date` and the date-only `Time not re
 The register, filters and exports now name `GRN Doc Date`; the record and amendment
 form use the same corrected supplier/date labels. Normal posted GRNs carry no `Valid`
 badge, while cancelled records retain their explicit status.
+
+CI `35982087566` passed; merged SHA `acdcde97f0d63124ca9b3f2515486265f7c01e96`
+was deployed by `35983102329` and all five canonical surfaces reported that exact SHA.
+Authenticated readback of GRN-20260904-1064 showed U1-000-064 below its SMOKE King
+Mattress on the rendered official PDF, with the amended marking/history preserved.
+The record showed accepted 0, damaged 1 and pending 1; the corrected labels and
+`Time not recorded` were visible, with no ordinary Valid badge. No receipt or
+amendment was saved. The preceding own deployment was `27b143d5.carres-portal.pages.dev`
+(42c8bc9a); the new own deployment was `20cb17a6.carres-portal.pages.dev` (acdcde97).
+Their downloaded assets were compared alongside the authenticated rendered readback.
 
 **GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
 The existing renderer now prints the PO-family logo, legal identity and three address
@@ -2808,7 +2843,11 @@ posting evidence; resolve the authoritative receiver before claiming the complet
 target. Actual arrival time remains a separate schema gap under §9.3; never derive it
 from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
 other GRN document requirements remain open; the implemented composition and linkage
-do not claim the complete document target.
+do not claim the complete document target. The authenticated historical SMOKE item
+also printed `Other goods`: the receipt reader calls the shared
+`goodsCategoryWordOf` fallback. This is a measured category-convergence gap, not proof
+that the Catalog recorded that category; do not silently replace Catalog facts or
+infer a missing-row result from an unsuccessful read.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval

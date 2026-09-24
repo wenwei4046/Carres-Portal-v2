@@ -1593,6 +1593,20 @@ export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly Pu
   };
 }
 
+/** Explain the same eligibility facts that the checkbox and planning cell read. */
+export function soBatchOrderUnselectableReason(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): string | null {
+  if (order.status === "ordered") return null;
+  if (leaves.some((row) => isSelectableForOrder(row, order.status))) return null;
+  const blocked = [...new Set(leaves.filter((row) => !isPurchaseDemandTimingState(row.state)).map((row) => stateWords[row.state]))];
+  if (blocked.length > 0) return blocked.join(" · ");
+  const plan = soBatchOrderPlanning(order, leaves);
+  return plan.absence ? soBatchOrderByAbsenceWord(plan.absence) : null;
+}
+
 /** Why a `To buy` order has no Order By (S1). */
 export type SoBatchOrderByAbsence = "not_planned" | "already_on_po" | "coverage_not_checked";
 
