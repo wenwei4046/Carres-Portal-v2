@@ -2,32 +2,33 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import WorkSplitShell from "./WorkSplitShell";
 
-describe("WorkSplitShell", () => {
-  it("uses the governed three-panel geometry without cards or gutters", () => {
+describe("WorkSplitShell — the unframed workspace (owner correction 2026-09-24)", () => {
+  it("lays three columns 240 · 420 · rest with 16px gaps and no frame of its own", () => {
     render(<WorkSplitShell layout="three" rail="Days" list="Actions" detail="Detail" />);
-    expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "three");
-    expect(screen.getByRole("complementary", { name: "Work filters" })).toHaveClass("w-60");
-    expect(screen.getByRole("region", { name: "Work actions" })).toHaveClass("w-[360px]");
-    expect(screen.getByRole("region", { name: "Selected work" })).toHaveClass("min-w-[500px]");
+    const shell = screen.getByTestId("work-split-shell");
+    expect(shell.className).toContain("grid-cols-[240px_420px_minmax(480px,1fr)]");
+    expect(shell.className).toContain("gap-4");
+    expect(shell.className).not.toMatch(/\b(border|bg-white|rounded|shadow)/);
   });
 
-  it("shows one active panel on mobile", () => {
-    render(<WorkSplitShell layout="one" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
+  it("collapses only the rail at 960–1279px; the list can never be collapsed", () => {
+    const first = render(<WorkSplitShell layout="two" rail="Days" list="Actions" detail="Detail" />);
     expect(screen.queryByText("Days")).not.toBeInTheDocument();
-    expect(screen.queryByText("Actions")).not.toBeInTheDocument();
+    expect(screen.getByText("Actions")).toBeInTheDocument();
     expect(screen.getByText("Detail")).toBeInTheDocument();
-  });
-});
-
-describe("WorkSplitShell · 768–1103px", () => {
-  it("keeps the rail beside one work column: the list, or the chosen job in its place", () => {
-    const first = render(<WorkSplitShell layout="two" activePanel="list" rail="Days" list="Actions" detail="Detail" />);
+    first.unmount();
+    render(<WorkSplitShell layout="two" railOpen rail="Days" list="Actions" detail="Detail" />);
     expect(screen.getByRole("complementary", { name: "Work filters" })).toHaveTextContent("Days");
     expect(screen.getByText("Actions")).toBeInTheDocument();
+  });
+
+  it("below 960px the list and the detail share one stage", () => {
+    const first = render(<WorkSplitShell layout="one" activePanel="list" rail="Days" list="Actions" detail="Detail" />);
+    expect(screen.getByText("Actions")).toBeInTheDocument();
     expect(screen.queryByText("Detail")).not.toBeInTheDocument();
+    expect(screen.queryByText("Days")).not.toBeInTheDocument();
     first.unmount();
-    render(<WorkSplitShell layout="two" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
-    expect(screen.getByText("Days")).toBeInTheDocument();
+    render(<WorkSplitShell layout="one" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
     expect(screen.queryByText("Actions")).not.toBeInTheDocument();
     expect(screen.getByText("Detail")).toBeInTheDocument();
   });

@@ -25,7 +25,30 @@ const ME = "00000000-0000-4000-8000-0000000000aa";
 const TODAY = "2026-09-17";
 
 let seq = 0;
+type Words = { problem: string; action: string; recipient: string | null; ref?: string };
+const WORDS: Record<OperationWorkModule, Words[]> = {
+  orders: [
+    { problem: "No delivery date", action: "Ask customer for a delivery date", recipient: "Tan Qu Qu" },
+    { problem: "Customer asked to change the sofa colour after the order was confirmed", action: "Confirm the new colour with the customer", recipient: "Lim Mei Ling" },
+  ],
+  purchasing: [
+    { problem: "Supplier has not confirmed the PO", action: "Chase the supplier for PO confirmation", recipient: "Dreamland Factory", ref: "PO2609-1042" },
+    { problem: "Production date not set", action: "Ask the factory for a production date", recipient: "Sleepwell Sdn Bhd", ref: "PO2609-1057" },
+  ],
+  receiving: [{ problem: "Goods arrived without a GRN", action: "Record the goods received", recipient: "Warehouse Klang", ref: "PO2609-1031" }],
+  delivery: [
+    { problem: "Not delivered", action: "Arrange a new delivery date", recipient: "NETS" },
+    { problem: "Delivery proof needs review", action: "Review the delivery proof", recipient: "AL Logistic", ref: "DO2609-20411" },
+  ],
+  payment: [{ problem: "Customer balance due", action: "Ask customer to pay", recipient: "Wong Kah Wai" }],
+  issue_tracker: [{ problem: "Issue waiting for a reply", action: "Reply to the issue", recipient: null }],
+};
+const used: Partial<Record<OperationWorkModule, number>> = {};
+
 function item(module: OperationWorkModule, actionOn: string | null, missedDays = 0): OperationWorkItem {
+  const n = used[module] ?? 0;
+  used[module] = n + 1;
+  const words = WORDS[module][n % WORDS[module].length];
   seq += 1;
   const id = `obj-${seq}`;
   return {
@@ -34,10 +57,10 @@ function item(module: OperationWorkModule, actionOn: string | null, missedDays =
     module,
     ruleKey: "follow",
     ruleVersion: 1,
-    object: { kind: "sales_order", id, label: `SO2609-${4800 + seq}` },
-    problem: "No delivery date",
-    action: "Ask customer for a delivery date",
-    recipient: "Tan Qu Qu",
+    object: { kind: "sales_order", id, label: words.ref ?? `SO2609-${4800 + seq}` },
+    problem: words.problem,
+    action: words.action,
+    recipient: words.recipient,
     requiredResult: "Customer Delivery exists",
     completionPredicate: "orders.delivery_date exists",
     completionStatement: "Customer Delivery exists",
@@ -111,6 +134,20 @@ const FEED: OperationWorkResponse = {
   ],
 };
 
+// One covered job (Wed 16 Sep, Delivery · NETS): Shasha acts for Li Ching
+// today, so the card footer carries `Covered for Li Ching` beside its number.
+const coveredItem = FEED.items.find((i) => i.module === "delivery" && i.timing.actionOn === "2026-09-16" && i.recipient === "NETS");
+if (coveredItem) {
+  coveredItem.owner = {
+    ...coveredItem.owner,
+    normal: { userId: "00000000-0000-4000-8000-0000000000bb", name: "Li Ching" },
+    activeCover: { userId: ME, name: "Shasha" },
+    coverEvidence: { id: "cover-1", startsOn: TODAY, endsOn: TODAY },
+    acting: { userId: ME, name: "Shasha" },
+    state: "covered",
+  };
+}
+
 const realFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -130,7 +167,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[start]}>
-        <PreviewFrame label="Work left rail (illustrative data)">
+        <PreviewFrame label="Work shell and middle cards (illustrative data)">
           <div className="flex h-full flex-col">
             <OperationWork />
           </div>
