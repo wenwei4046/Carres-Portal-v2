@@ -1636,16 +1636,10 @@ The same feed admits a Warehouse login only when its token is bound to a Warehou
 that Warehouse's Units. The Logistics boundary is the same projection narrowed by
 authenticated assignment: a Partner sees only its assigned rows and only the admitted fields.
 
-**THE CHASE CARRIES THE ANSWER DOOR — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT).**
-NETS uses the Portal. Every prepared remind or chase message to a Logistics Partner carries one
-link to that Partner's own Logistics Work, opened at exactly the rows the message names. The
-Partner's personal login answers there — customer contacted, confirmed date and time, ETA, or
-`Cannot Deliver` with its governed reason — and those answers are the same Delivery arrangement
-writes this MASTER already owns; no second acknowledgement record exists. The WhatsApp group stays
-the channel, and a reply given only in the group still needs the recorded answer plus its uploaded
-proof. Sending the link is not confirmation: silence leaves the row unconfirmed and chaseable.
-NETS is the first Partner; issuing production Partner logins and telling NETS to use them is an
-external cutover that needs its own owner authorisation.
+**THE CHASE CARRIES THE ANSWER DOOR — owner ruling 2026-09-24, cross-module law in
+`../ERP-ARCHITECTURE.md` §6.4.** For Delivery: every remind/chase message to a Logistics Partner
+links to that Partner's Logistics Work at the named rows, and the Partner's answers are this
+MASTER's existing arrangement writes. NETS is the first Partner.
 Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence
 and before confirmed arrival; Stock owns the custody word and Delivery never writes it. **DO No**
 means an outbound customer Delivery Order; inbound receiving stays under its PO/CO source.
@@ -1653,6 +1647,12 @@ means an outbound customer Delivery Order; inbound receiving stays under its PO/
 ## 14 · Journeys, Loan, current versus intentional future
 
 ### 14.1 · Journeys
+
+**Outstation release — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; cross-module law
+`../ERP-ARCHITECTURE.md` §6.5).** Before an outstation first leg leaves Carres Klang, Operation
+sends the prepared customer WhatsApp (delivery date, balance, payment link, storage charge on a
+later delay) and records the customer's reply with proof. Without that confirmation Delivery
+refuses the first-leg handover. The payment deadline is Payment's outstation timing row.
 
 **Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
 leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own
