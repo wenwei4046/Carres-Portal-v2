@@ -758,6 +758,74 @@ describe("GET /trial-balance", () => {
     expect(body).toMatchObject({ total_debit: 150, total_credit: 150, difference: 0, balances: true });
   });
 
+  // A chart three headings deep, in the order Finance dragged it (1120 above
+  // 1110), with a heading that holds nothing that moved (1300).
+  const DEEP = [
+    { code: "1000", name: "Assets", kind: "ASSET", parent_code: null, sort_order: 0 },
+    { code: "1100", name: "Current assets", kind: "ASSET", parent_code: "1000", sort_order: 0 },
+    { code: "1120", name: "Bank", kind: "ASSET", parent_code: "1100", sort_order: -1 },
+    { code: "1121", name: "Maybank", kind: "ASSET", parent_code: "1120", sort_order: 0 },
+    { code: "1122", name: "Public Bank", kind: "ASSET", parent_code: "1120", sort_order: 0 },
+    { code: "1110", name: "Cash in hand", kind: "ASSET", parent_code: "1100", sort_order: 0 },
+    { code: "1300", name: "Stock", kind: "ASSET", parent_code: "1000", sort_order: 0 },
+    { code: "1310", name: "Finished goods", kind: "ASSET", parent_code: "1300", sort_order: 0 },
+    { code: "4000", name: "Income", kind: "INCOME", parent_code: null, sort_order: 0 },
+    { code: "4100", name: "Sales", kind: "INCOME", parent_code: "4000", sort_order: 0 },
+  ].map((a) => ({ is_control: false, control_for: null, is_active: true, ...a }));
+  const deepAnswer = (moved: Record<string, [number, number]>) => (call: Call): Result => {
+    // readChart asks for sort_order, then code, across the whole chart.
+    if (call.name === "gl_accounts") return ok([...DEEP].sort((a, b) => a.sort_order - b.sort_order || a.code.localeCompare(b.code)));
+    if (call.name === "gl_config") return ok({ go_live_on: "2026-09-01" });
+    if (call.name !== "gl_trial_balance") return ok([]);
+    const accounts = [...DEEP].sort((a, b) => a.code.localeCompare(b.code)).map((a, i) => {
+      const [dr, cr] = moved[a.code] ?? [0, 0];
+      return tbRow({ ordinal: i + 1, row_kind: "ACCOUNT", account_code: a.code, account_name: a.name, kind: a.kind,
+        is_control: false, is_active: true, total_debit: dr.toFixed(2), total_credit: cr.toFixed(2), natural_balance: "0" });
+    });
+    const dr = Object.values(moved).reduce((t, [d]) => t + d, 0);
+    const cr = Object.values(moved).reduce((t, [, c]) => t + c, 0);
+    return ok([...accounts, tbRow({ ordinal: accounts.length + 1, row_kind: "TOTAL", total_debit: dr, total_credit: cr, balances: dr === cr })]);
+  };
+
+  it("gives every heading its own debit and credit subtotal at every depth, in the chart's order", async () => {
+    // 1121 sits 500 on the debit side, 1122 is overdrawn 30, 1110 holds 20; sales take the 490.
+    fakeClient(deepAnswer({ "1121": [700, 200], "1122": [10, 40], "1110": [20, 0], "4100": [0, 490] }));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10"));
+    expect(body.headings.map((h: AnyJson) => [h.code, h.depth, h.parent_code, h.debit, h.credit])).toEqual([
+      ["1000", 1, null, 520, 30],
+      ["1100", 2, "1000", 520, 30],
+      ["1120", 3, "1100", 500, 30],
+      ["1300", 2, "1000", 0, 0],
+      ["4000", 1, null, 0, 490],
+    ]);
+    // The accounts in the chart's order, each under its heading; no heading prints as an account.
+    expect(body.accounts.map((a: AnyJson) => [a.account_code, a.header_code])).toEqual([
+      ["1121", "1120"], ["1122", "1120"], ["1110", "1100"], ["1310", "1300"], ["4100", "4000"],
+    ]);
+    // The totals are still the ledger's, and they still balance.
+    expect(body).toMatchObject({ total_debit: 730, total_credit: 730, difference: 0, balances: true });
+  });
+
+  it("keeps the department filter, and the subtotals are that department's", async () => {
+    const { sb } = fakeClient(deepAnswer({ "1110": [20, 0], "4100": [0, 20] }));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10&departmentType=SHOWROOM"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10", p_department_type: "SHOWROOM", p_department_id: null });
+    expect(body.headings.find((h: AnyJson) => h.code === "1000")).toMatchObject({ debit: 20, credit: 0 });
+    expect(body.headings.find((h: AnyJson) => h.code === "1120")).toMatchObject({ debit: 0, credit: 0 });
+  });
+
+  it("refuses a trial balance with an account the chart does not hold, never prints it short", async () => {
+    const answer = deepAnswer({});
+    fakeClient((call) => {
+      if (call.name !== "gl_trial_balance") return answer(call);
+      return ok([
+        tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "9999", account_name: "Stray", kind: "ASSET", total_debit: "5.00", total_credit: "0" }),
+        tbRow({ ordinal: 2, row_kind: "TOTAL", total_debit: "5.00", total_credit: "0", balances: false }),
+      ]);
+    });
+    expect((await get("/trial-balance?asOf=2026-09-10")).status).toBe(500);
+  });
+
   it("defaults to today in Malaysia", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-10T17:30:00Z")); // 01:30 on the 11th in Malaysia

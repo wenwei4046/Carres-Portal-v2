@@ -1,7 +1,10 @@
 /**
  * Finance → Trial Balance. Every account's balance on one day, debits beside
  * credits, grouped by kind — and the one check the page exists for: the two
- * columns are equal.
+ * columns are equal. Inside each kind the accounts sit under their headings
+ * in the chart's order, and every heading, at every depth, carries its own
+ * Debit and Credit subtotal, nested the way the Balance Sheet and the Profit
+ * and Loss nest theirs (0579). The API adds those subtotals up.
  *
  * It is a Register (§6.7), so there is no KPI strip. The debit and credit
  * totals are the grid's own footer row; the difference sits in the status
@@ -11,8 +14,8 @@
  */
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { TrialBalanceAccountRow } from "@carres/shared/finance-ledger";
-import { isZeroMoney, ledgerAccountHref, ledgerKindWord } from "@carres/shared/finance-ledger";
+import type { TrialBalanceReport } from "@carres/shared/finance-ledger";
+import { isZeroMoney, ledgerAccountHref, ledgerKindWord, trialBalanceSides } from "@carres/shared/finance-ledger";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { DateField } from "@/components/register/DateField";
@@ -21,16 +24,53 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useTrialBalance } from "./ledger-queries";
 import { DepartmentFilter, useDepartmentParam } from "../department";
+import { indent, nestedHeadings } from "../reports/StatementTable";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** A debit balance sits in Debit, a credit balance in Credit — the side the
- *  account's own debits and credits leave it on, whatever its kind. */
-const net = (r: TrialBalanceAccountRow) => Math.round((r.total_debit - r.total_credit) * 100) / 100;
-const debitSide = (r: TrialBalanceAccountRow) => Math.max(net(r), 0);
-const creditSide = (r: TrialBalanceAccountRow) => Math.max(-net(r), 0);
-const sum = (rows: TrialBalanceAccountRow[], side: (r: TrialBalanceAccountRow) => number) =>
-  rows.reduce((s, r) => s + side(r), 0);
+/** One printed row: a heading with its subtotal, or an account with its
+ *  balance on the side its own debits and credits leave it. */
+export interface TrialBalanceLine {
+  heading: boolean;
+  code: string;
+  name: string;
+  kind: string;
+  depth: number;
+  debit: number;
+  credit: number;
+}
+
+/**
+ * The rows in print order. An account nothing was posted to has no balance
+ * to try and is left out; so is a heading with no such account under it,
+ * which is how an empty heading adds no line.
+ */
+export function trialBalanceLines(tb: TrialBalanceReport): TrialBalanceLine[] {
+  const moved = tb.accounts.filter((a) => !isZeroMoney(a.total_debit) || !isZeroMoney(a.total_credit));
+  const account = (a: (typeof moved)[number], depth: number): TrialBalanceLine =>
+    ({ heading: false, code: a.account_code, name: a.account_name, kind: a.kind, depth, ...trialBalanceSides(a) });
+  // An answer from before headings were sent prints its accounts flat.
+  if (!tb.headings?.length) return moved.map((a) => account(a, 1));
+  const under = new Map<string, typeof moved>();
+  for (const a of moved) under.set(a.header_code, [...(under.get(a.header_code) ?? []), a]);
+  const out: TrialBalanceLine[] = [];
+  for (const kind of new Set(tb.headings.map((h) => h.kind))) {
+    const groups = tb.headings.filter((h) => h.kind === kind).map((h) => ({ ...h, parentCode: h.parent_code }));
+    const { headed, order } = nestedHeadings(groups, (g) => under.has(g.code));
+    for (const { group: g, depth } of order) {
+      if (headed) out.push({ heading: true, code: g.code, name: g.name, kind, depth, debit: g.debit, credit: g.credit });
+      for (const a of under.get(g.code) ?? []) out.push(account(a, headed ? depth + 1 : depth));
+    }
+  }
+  return out;
+}
+
+const count = (rows: TrialBalanceLine[]) => rows.filter((r) => !r.heading).length;
+const sum = (rows: TrialBalanceLine[], side: "debit" | "credit") =>
+  rows.reduce((s, r) => (r.heading ? s : s + r[side]), 0);
+const money = (n: number) => (n > 0 ? rm(n) : "");
+/** Two spaces a level in an export, as the month-end pack indents its statements. */
+export const trialBalanceLabel = (r: TrialBalanceLine) => "  ".repeat(r.depth - 1) + (r.heading ? r.name : `${r.code} ${r.name}`);
 
 export default function LedgerTrialBalance() {
   const [params, setParams] = useSearchParams();
@@ -46,30 +86,29 @@ export default function LedgerTrialBalance() {
   const report = query.data;
   const notStarted = (query.error as { status?: number } | null)?.status === 409;
 
-  // An account nothing was ever posted to has no balance to try. Leaving it
-  // out keeps the page to the accounts that make up the totals.
-  const rows = useMemo(
-    () => (report?.accounts ?? []).filter((a) => !isZeroMoney(a.total_debit) || !isZeroMoney(a.total_credit)),
-    [report],
-  );
+  const rows = useMemo(() => (report?.status === "ok" ? trialBalanceLines(report) : []), [report]);
   const goLive = report?.go_live_on ?? null;
 
-  const columns = useMemo<DataGridColumn<TrialBalanceAccountRow>[]>(() => [
-    { key: "account", label: "Account", width: 300,
-      accessor: (r) => <Link className="underline underline-offset-2"
-        to={ledgerAccountHref(r.account_code, goLive, asOf)}>{r.account_code} {r.account_name}</Link>,
-      searchValue: (r) => `${r.account_code} ${r.account_name}`,
-      exportValue: (r) => `${r.account_code} ${r.account_name}` },
-    { key: "kind", label: "Kind", width: 130, accessor: (r) => ledgerKindWord(r.kind),
+  // Not sortable: the order is the chart's, and a sort would pull the
+  // accounts out from under their headings.
+  const columns = useMemo<DataGridColumn<TrialBalanceLine>[]>(() => [
+    { key: "account", label: "Account", width: 300, sortable: false,
+      accessor: (r) => r.heading
+        ? <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>
+        : <span className={indent(r.depth)}><Link className="underline underline-offset-2"
+          to={ledgerAccountHref(r.code, goLive, asOf)}>{r.code} {r.name}</Link></span>,
+      searchValue: (r) => `${r.code} ${r.name}`,
+      exportValue: trialBalanceLabel },
+    { key: "kind", label: "Kind", width: 130, sortable: false, accessor: (r) => ledgerKindWord(r.kind),
       groupValue: (r) => ledgerKindWord(r.kind), filterType: "enum" },
-    { key: "debit", label: "Debit", width: 150, align: "right",
-      accessor: (r) => (debitSide(r) > 0 ? rm(debitSide(r)) : ""),
-      numberValue: debitSide, exportValue: debitSide,
-      footerTotal: (visible) => rm(sum(visible, debitSide)) },
-    { key: "credit", label: "Credit", width: 150, align: "right",
-      accessor: (r) => (creditSide(r) > 0 ? rm(creditSide(r)) : ""),
-      numberValue: creditSide, exportValue: creditSide,
-      footerTotal: (visible) => rm(sum(visible, creditSide)) },
+    { key: "debit", label: "Debit", width: 150, align: "right", sortable: false,
+      accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.debit)}</span> : money(r.debit)),
+      numberValue: (r) => r.debit, exportValue: (r) => r.debit,
+      footerTotal: (visible) => rm(sum(visible, "debit")) },
+    { key: "credit", label: "Credit", width: 150, align: "right", sortable: false,
+      accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.credit)}</span> : money(r.credit)),
+      numberValue: (r) => r.credit, exportValue: (r) => r.credit,
+      footerTotal: (visible) => rm(sum(visible, "credit")) },
   ], [goLive, asOf]);
 
   const difference = report?.status === "ok" ? report.difference : null;
@@ -90,8 +129,8 @@ export default function LedgerTrialBalance() {
         <Link className="underline underline-offset-2" to="/finance/ledger/self-check">Open Self-check</Link>
       </div>}
       <ListPageShell register>
-        <DataGrid rows={report?.status === "ok" ? rows : []} columns={columns} rowKey={(r) => r.account_code}
-          storageKey="carres.finance.trial-balance.v1" appearance="reference" exportName="Trial Balance"
+        <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.heading ? "heading" : "account"}:${r.code}`}
+          storageKey="carres.finance.trial-balance.v2" appearance="reference" exportName="Trial Balance"
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search accounts…"
           toolbarStart={<span className="flex items-center gap-3 text-body">
@@ -106,7 +145,7 @@ export default function LedgerTrialBalance() {
             ? `The ledger started on ${fmtDate(report.go_live_on)}. Pick a day from then on.`
             : "No entries up to this day."}
           statusSummary={(visible) => <span data-testid="trial-balance-summary">
-            {visible.length} {visible.length === 1 ? "account" : "accounts"}
+            {count(visible)} {count(visible) === 1 ? "account" : "accounts"}
             {" · "}{difference === null ? "Difference not checked" : `Difference ${rm(Math.abs(difference))}`}
           </span>}
         />

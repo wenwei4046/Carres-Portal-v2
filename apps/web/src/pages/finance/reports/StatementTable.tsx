@@ -14,7 +14,7 @@ import Button from "@/components/kit/Button";
 import DataTable, { type Column, type GroupRowCell } from "@/components/kit/DataTable";
 import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
-import type { StatementGroup, StatementLine, StatementSection } from "./report-queries";
+import type { StatementLine, StatementSection } from "./report-queries";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -68,6 +68,38 @@ export type StatementRow =
   | { id: string; section: string; kind: "nothing" };
 
 /**
+ * One section's headers in the order they print, each with its depth: a
+ * header, then the headers under it, to any depth (0579). A header with no
+ * line that moved anywhere under it is left out, so an empty header prints
+ * nothing. `headed` is false when one header holds the whole section and no
+ * header sits inside it: its lines then print without a header line.
+ * The Balance Sheet, the Profit and Loss and the Trial Balance all nest this way.
+ */
+export function nestedHeadings<G extends { code: string; parentCode: string | null }>(
+  groups: readonly G[],
+  hasLine: (g: G) => boolean,
+): { headed: boolean; order: { group: G; depth: number }[] } {
+  const codes = new Set(groups.map((g) => g.code));
+  const children = new Map<string | null, G[]>();
+  for (const g of groups) {
+    const parent = g.parentCode !== null && codes.has(g.parentCode) ? g.parentCode : null;
+    children.set(parent, [...(children.get(parent) ?? []), g]);
+  }
+  const shown = (g: G): boolean => hasLine(g) || (children.get(g.code) ?? []).some(shown);
+  const roots = (children.get(null) ?? []).filter(shown);
+  // A header line only earns its place when there is more than one header,
+  // or when a header holds headers.
+  const headed = roots.length > 1 || groups.some((g) => g.parentCode !== null && codes.has(g.parentCode) && shown(g));
+  const order: { group: G; depth: number }[] = [];
+  const walk = (g: G, depth: number) => {
+    order.push({ group: g, depth });
+    for (const c of (children.get(g.code) ?? []).filter(shown)) walk(c, depth + 1);
+  };
+  for (const g of roots) walk(g, 1);
+  return { headed, order };
+}
+
+/**
  * The rows the table prints. A header line comes first, then its own
  * accounts, then the headers under it, each with its own subtotal, down to
  * any depth (0579). An account at RM 0.00 is left out, as the Trial Balance
@@ -79,20 +111,9 @@ export type StatementRow =
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
   for (const s of sections) {
-    const codes = new Set(s.groups.map((g) => g.code));
-    const children = new Map<string | null, StatementGroup[]>();
-    for (const g of s.groups) {
-      const parent = g.parentCode !== null && codes.has(g.parentCode) ? g.parentCode : null;
-      children.set(parent, [...(children.get(parent) ?? []), g]);
-    }
-    const shown = (g: StatementGroup): boolean =>
-      g.lines.some((l) => !isZeroMoney(l.amount)) || (children.get(g.code) ?? []).some(shown);
-    const roots = (children.get(null) ?? []).filter(shown);
-    // A header line only earns its place when there is more than one header,
-    // or when a header holds headers.
-    const headed = roots.length > 1 || s.groups.some((g) => g.parentCode !== null && codes.has(g.parentCode) && shown(g));
+    const { headed, order } = nestedHeadings(s.groups, (g) => g.lines.some((l) => !isZeroMoney(l.amount)));
     const before = out.length;
-    const emit = (g: StatementGroup, depth: number) => {
+    for (const { group: g, depth } of order) {
       if (headed) {
         out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal, depth });
       }
@@ -103,9 +124,7 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
           reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
         });
       }
-      for (const c of (children.get(g.code) ?? []).filter(shown)) emit(c, depth + 1);
-    };
-    for (const g of roots) emit(g, 1);
+    }
     if (s.unclosedResult !== null && !isZeroMoney(s.unclosedResult)) {
       out.push({ id: `${s.kind}:unclosed`, section: s.kind, kind: "unclosed", amount: s.unclosedResult });
     }
@@ -116,7 +135,7 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
 
 /** Left padding by depth: a header at depth 1 sits flush, each level in one step. */
 const INDENT = ["", "", "pl-4", "pl-8", "pl-12"] as const;
-const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
+export const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
 
 export default function StatementTable({
   label,
