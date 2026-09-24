@@ -2568,6 +2568,13 @@ somebody filed paperwork, not the time a lorry arrived. **Fix, and it is Receivi
 arrival time on the receipt (a new column and the Receiving form field that fills it), then this
 column prints it with no change here. Until then the gap is stated on screen, not hidden.
 
+**PO date vocabulary convergence — local implementation, 2026-09-24; delivery proof owed.**
+The register/export uses `PO Doc Date`; the object and its reply form use
+`Supplier Confirmed Delivery Date`, and the destination fact uses `Supplier Deliver To`.
+A confirmed supplier date is printed as the actual date even when it matches the PO date;
+`Same as PO` remains only the form's comparison feedback. No supplier answer, date
+calculation, evidence or version guard changes through these display corrections.
+
 **Groups — APPROVED / LOCKED, wording correction Jess 2026-09-17:** `Confirm PO sent to supplier`
 and `Waiting for goods from supplier` are open headings; `Completed` and `Cancelled` are collapsed
 buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
