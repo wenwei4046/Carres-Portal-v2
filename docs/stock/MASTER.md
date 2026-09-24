@@ -48,6 +48,12 @@ supplier date where present, otherwise the PO/source date). Awaiting receipt / F
 arrivals are the three filters. Physical arrival never substitutes for accepted correct quantity.
 Receive opens the existing ReceivingWorkspace full width in Inbound; returning preserves the list.
 
+**Supplier-delay boundary — owner-approved 2026-09-24.** Purchasing owns the exact PO/version,
+original PO Delivery Date, revised effective arrival, governed delay reason and WhatsApp evidence.
+Warehouse reads the revised effective arrival for planning only. A supplier message, screenshot,
+promise or Supplier DO never creates a receipt or GRN. Only the Receiving write door establishes
+Goods Received Date, received quantity, condition and physical Site.
+
 Outbound keeps DO/SO, pickup date, product quantity, the Loading entry and separate Required / Loaded /
 Driver confirmed counts visible. The default includes outstanding loading, missing loading evidence
 and outstanding driver confirmation. Warehouse loading does not impersonate driver acceptance.

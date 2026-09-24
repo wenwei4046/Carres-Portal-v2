@@ -186,7 +186,8 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work blocked job (owner ruling 2026-09-17) | `Blocked by {dependency}` on the row, inside its own working-day group · filter option `Blocked` | `Blocked` as a group · `Waiting` alone · hiding a blocked missed job |
 | Work filters door (owner ruling 2026-09-17) | `Filters` — the toolbar door only | `Filters` as a left-panel or rail heading |
 | Work communication controls (owner ruling 2026-09-17) | the owning module's own `Open WhatsApp group` · `Open WhatsApp` · `Copy message` in the right panel's `COMMUNICATION` section, labelled by the door the click opens | `Send` · `Sent` · `Message sent` · treating an opened WhatsApp or a copied message as sent evidence |
-| Work action sentences (owner ruling 2026-09-17) | fact `Overdue delivery` · `Call {logistics}` over `Arrange a new delivery date` · `Ask {logistics}` over `Record the delivery result` · fact `Supplier has not confirmed the PO date` with action `Ask {supplier} to confirm the PO delivery date` · button `Record supplier answer` only after the supplier-reply action is admitted in Work | `Date passed` · `Reschedule` · `Follow up supplier` · `Record supplier answer` before the supplier reply is admitted |
+| Work action sentences (owner ruling 2026-09-17; supplier correction 2026-09-24) | fact `Overdue delivery` · `Call {logistics}` over `Arrange a new delivery date` · `Ask {logistics}` over `Record the delivery result` · `Confirm tomorrow's supplier delivery` only one Office working day before the effective arrival · button `Record supplier answer` only on an admitted date-specific or exception action | `Date passed` · `Reschedule` · generic `Follow up supplier` · an immediate `Supplier has not confirmed the PO date` action after sending |
+| Purchasing arrival and delay words (owner ruling 2026-09-24) | `PO Delivery Date` for the immutable planned/default date · `Waiting for goods from supplier` after confirmed send · `Supplier DO` for the supplier's dispatch document · `Confirm tomorrow's supplier delivery` · `Confirmed for {date}` only with evidence · `Delayed · New expected date {date}` | `Supplier confirmed` for the calculated default date · `Delivery Order` when Supplier DO is meant · treating a WhatsApp screenshot or Supplier DO as Goods Received |
 | Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
 | Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
 | Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
@@ -837,7 +838,7 @@ the governed transit calculation. The stored `shipping` answer value is unchange
 ledger value, never a word on a screen.
 
 **The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
-model, 2026-08-29). `Confirm supplier delivery`, `Supplier has not confirmed the PO date`,
+model, 2026-08-29; immediate-confirmation correction 2026-09-24). `Confirm tomorrow's supplier delivery`,
 `Supplier delivery date passed` and `Balance date missing` close only when the structured answer/date
 is stored together with the supplier's WhatsApp or equivalent response evidence, recipient/channel,
 actual actor and time.
@@ -1062,7 +1063,7 @@ approved 2026-09-18). Exact IDs exist from official PO issue; quantity goods dis
 
 | Rail group | Visible rows |
 |---|---|
-| `Supplier reply` | `Supplier has not confirmed the PO date` · `Supplier Confirmed Delivery Date changed` · `Supplier delivery date passed` |
+| `Supplier reply` | `Confirm tomorrow's supplier delivery` · `Supplier Confirmed Delivery Date changed` · `Supplier delivery date passed` |
 | `Receiving` | `Partly received` |
 | `Supplier` | Supplier facts |
 | `Supplier Deliver To` | Destination facts |
@@ -1080,7 +1081,7 @@ these copy retirements do not delete business facts or ban their words on other 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
-| `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every supplier has confirmed the PO delivery date.` |
+| `Confirm tomorrow's supplier delivery` | `Ask {supplier} for the Supplier DO or confirmation for {date}` | `Record supplier answer` | `Supplier answer recorded` | `No supplier delivery needs confirmation today.` |
 | `Supplier delivery date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier delivery date has passed.` |
 | `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
@@ -2763,7 +2764,7 @@ detail's work card and Order Route:
 | Fact (line 1) | Action (line 2, with structured owner avatar) |
 |---|---|
 | `The PO PDF has not been sent` | `Issue the purchase order to {supplier}` |
-| `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` |
+| `Confirm tomorrow's supplier delivery` | `Ask {supplier} for the Supplier DO or confirmation for {date}` |
 | `The supplier delivery date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
 | `{PO No}({n}) has not been sent` | `Issue {PO No}({n}) to {supplier}` |

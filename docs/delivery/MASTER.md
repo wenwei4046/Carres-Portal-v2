@@ -42,6 +42,14 @@ append-only history.
 Delivery never creates a second commercial-order, stock, money, duty, calendar, Service or
 Guarantee editor. It records what happened and links the owner that must decide a remedy.
 
+**Supplier-delay boundary — owner-approved 2026-09-24.** A revised supplier/PO arrival remains a
+Purchasing and stock-planning fact. Delivery may show its derived stock-risk/customer-impact signal,
+but never labels it a confirmed or scheduled customer delivery, places it in the confirmed-delivery
+schedule, or issues a customer Delivery Order from supplier evidence. Customer Requested Delivery
+Date, confirmed operational date/time and actual attempt/result remain separate Delivery/Sales
+facts. If supplier delay threatens the customer commitment, the governed Operation customer-contact
+action records the customer outcome; only that outcome may change the customer booking.
+
 ### 1.1 · One Unit, one physical event chain
 
 **OWNER-APPROVED / LOCKED 2026-09-01.** Receiving, Stock / Warehouse and Delivery never keep
