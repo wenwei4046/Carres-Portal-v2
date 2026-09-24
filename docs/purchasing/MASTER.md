@@ -2578,12 +2578,19 @@ somebody filed paperwork, not the time a lorry arrived. **Fix, and it is Receivi
 arrival time on the receipt (a new column and the Receiving form field that fills it), then this
 column prints it with no change here. Until then the gap is stated on screen, not hidden.
 
-**PO date vocabulary convergence — local implementation, 2026-09-24; delivery proof owed.**
+**PO date vocabulary convergence — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1587).**
 The register/export uses `PO Doc Date`; the object and its reply form use
 `Supplier Confirmed Delivery Date`, and the destination fact uses `Supplier Deliver To`.
 A confirmed supplier date is printed as the actual date even when it matches the PO date;
 `Same as PO` remains only the form's comparison feedback. No supplier answer, date
 calculation, evidence or version guard changes through these display corrections.
+
+CI `35983290332` passed. Merge `f3a5b84498065820b102bcf8980f6f5f49665d05`
+was deployed by `35984352691`; all five canonical endpoints reported that SHA.
+Authenticated production showed `PO Doc Date` on the 63-order register and the corrected
+supplier/date labels on PO-20260903-4354's object and reply form. Its old reply without
+evidence still read `Not confirmed`; no answer or sending was recorded. A fixture
+separately proved that an evidenced date matching the PO prints the actual date.
 
 **Groups — APPROVED / LOCKED, wording correction Jess 2026-09-17:** `Confirm PO sent to supplier`
 and `Waiting for goods from supplier` are open headings; `Completed` and `Cancelled` are collapsed
@@ -2723,7 +2730,7 @@ The 62 existing Receiving page/save tests pass. No receipt was posted,
 no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
 Unit result or write authority changed. This does not implement the GRN PDF below.
 
-**GRN detail narrow layout — local implementation, 2026-09-24; delivery proof owed.**
+**GRN detail narrow layout — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1587).**
 The continuation walk found that the record and Amend Receiving still cut off item
 identity. They now use the existing receiving form container rules; item names wrap,
 inputs/files stay within the pane and amendment actions wrap. In the real-component
@@ -2731,6 +2738,14 @@ fixture at a 278px viewport (246px content), all seven amendment controls stayed
 x=16–262 and page/scroll widths both equalled 278px. After Cancel the full item name
 remained visible in a 246px row with no row overflow. These changes neither save an
 amendment nor alter quantities or permissions.
+
+The same #1587 deployment above was checked at a 390px production viewport on
+GRN-20260904-1064. Before: the 148px item name was clipped into 38px. After: its
+row/client/scroll width was 246px and the full name remained readable; the page
+client/scroll width stayed 390px. This principal account exposed no Amend action,
+so the seven-control amendment walk remains fixture evidence, not a production save.
+Asset comparison used the own URLs `20cb17a6.carres-portal.pages.dev` (before) and
+`282a960f.carres-portal.pages.dev` (after), with `Time not recorded` as an unchanged control.
 
 **Receiving PO loading state, 2026-09-24 — DEPLOYED + AUTHENTICATED READBACK #1578 (`5ce58beeb`).**
 The authenticated walk exposed a false `This purchase order could not be opened`
