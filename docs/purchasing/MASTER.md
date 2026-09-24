@@ -3799,6 +3799,15 @@ played/paused, sought to second 4 and entered/exited fullscreen. Close returned 
 to View. This is synthetic video playback proof, not saved business-video proof.
 No permissions, evidence, receipt, claim or stock facts were changed.
 
+**Fullscreen keyboard correction — local implementation 2026-09-24; production proof owed.**
+A further production check found native video controls retained focus after leaving
+fullscreen, so a subsequent Escape did not close the viewer. The shared viewer now
+returns focus to its media region on the next animation frame after fullscreen exit;
+this avoids the exiting Escape also dismissing the dialog. Local browser verification
+kept the viewer open after exit, then the next Escape closed it and returned focus to
+View. A regression test covers fullscreen exit, viewer focus, Escape and opener return.
+22 Claim/viewer tests passed. This correction is not yet production-verified.
+
 **Claim-record photo adoption — local implementation, 2026-09-24; production proof owed.**
 The existing full-width record opens its saved photos in `SavedEvidenceViewer`, including
 known files whose signed URL is missing. Retry reuses the existing authenticated Claim

@@ -375,6 +375,8 @@ no opening control; a known file without a readable URL remains visible as a fai
 and scroll lock; photo zoom, drag, Reset, Previous/Next; native video playback, seeking
 and fullscreen. Each file switch resets enlargement and keeps its own context. Loading,
 media failure and retry differ; a late retry cannot replace a newly selected file.
+A local fullscreen-focus correction (2026-09-24; production proof owed) returns focus
+to the viewer after native fullscreen exit so a subsequent Escape can close it.
 The `/ui` example includes a clearly marked photo, an unreadable file and an eight-second
 synthetic H.264 video (`ui-evidence-example.mp4`, generated colour/motion test pattern,
 320×180 at 12fps; no recorded business or personal content). Receiving
