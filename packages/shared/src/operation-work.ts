@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { operationWorkLifecycleSchema } from "./work-lifecycle";
+import { operationWorkCompletedSchema, operationWorkLifecycleSchema } from "./work-lifecycle";
 import { WORK_RULES, type WorkItem } from "./work-engine";
 
 export const operationWorkModuleSchema = z.enum([
@@ -205,6 +205,9 @@ export const operationWorkResponseSchema = z.object({
   generatedOn: z.string().date(),
   closureReceipt: operationWorkClosureReceiptSchema.nullable(),
   sources: operationWorkSourcesSchema,
+  /** Completed occurrences from the 0581 ledger (recent window), written only
+   *  by the owning modules' completion facts. Absent on a read without it. */
+  completed: z.array(operationWorkCompletedSchema).optional(),
 }).strict().superRefine((response, ctx) => {
   if (response.complete && response.sources.some((source) => source.state !== "healthy")) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["complete"], message: "A response with a non-current source cannot be complete" });
@@ -222,6 +225,27 @@ export type OperationWorkResponse = z.infer<typeof operationWorkResponseSchema>;
 
 function identityPart(value: string): string {
   return value.trim().replaceAll(":", "%3A");
+}
+
+/** `orders:{object}:{rule}` or its later generation `…:g2` → its parts. The
+ *  object part keeps its escaping; module and rule never contain `:`. */
+export function parseWorkOccurrenceId(id: string): {
+  module: OperationWorkModule;
+  objectId: string;
+  ruleKey: string;
+  generation: number;
+} | null {
+  const parts = id.split(":");
+  if (parts.length !== 3 && parts.length !== 4) return null;
+  const module = operationWorkModuleSchema.safeParse(parts[0]);
+  if (!module.success || !parts[1] || !parts[2]) return null;
+  let generation = 1;
+  if (parts.length === 4) {
+    const match = /^g(\d+)$/.exec(parts[3]!);
+    if (!match || Number(match[1]) < 2) return null;
+    generation = Number(match[1]);
+  }
+  return { module: module.data, objectId: parts[1].replaceAll("%3A", ":"), ruleKey: parts[2], generation };
 }
 
 export function operationWorkStableId(

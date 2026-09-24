@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
@@ -575,7 +576,12 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
  * direction for a gate standing between a customer and a call they should not
  * receive.
  */
-orderControlRouter.post("/:id/delay-decision", async (c) => {
+orderControlRouter.post(
+  "/:id/delay-decision",
+  // 0581 — the recorded decision is Sales Orders' completion fact for
+  // `delay_planning`.
+  salesOrderWorkCompletion({ rules: ["delay_planning"], orderId: (c) => c.req.param("id") ?? null }),
+  async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
 

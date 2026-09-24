@@ -108,7 +108,7 @@ describe("operation Work response composition", () => {
       "/api/operation/work",
       createOperationWorkRouter(
         async () => composeOperationWorkResponse(healthySources([base]), [], "2026-09-06"),
-        { read: async () => [], recordRequestSent: async () => "", recordReplyReceived: async () => "" },
+        { read: async () => [], readCompleted: async () => [], recordRequestSent: async () => "", recordReplyReceived: async () => "" },
       ),
     );
 

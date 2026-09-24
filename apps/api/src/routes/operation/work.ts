@@ -46,6 +46,9 @@ import {
   WORK_CONTACT_KINDS,
   workLifecycleOf,
   workOccurrenceEventSchema,
+  workOccurrenceGenerationId,
+  parseWorkOccurrenceId,
+  type OperationWorkCompleted,
   workReplyDueOn,
   type OperationWorkLifecycle,
   type WorkChannel,
@@ -1582,11 +1585,55 @@ export interface WorkLedgerWrite {
 
 export interface WorkLedger {
   read(c: Context<AppEnv>, occurrenceIds: readonly string[]): Promise<WorkOccurrenceEvent[]>;
+  /** Every `completed` event recorded on or after `sinceIso` (a Malaysia date). */
+  readCompleted(c: Context<AppEnv>, sinceIso: string): Promise<WorkOccurrenceEvent[]>;
   recordRequestSent(c: Context<AppEnv>, args: WorkLedgerWrite & { replyDueOn: string }): Promise<string>;
   recordReplyReceived(c: Context<AppEnv>, args: WorkLedgerWrite): Promise<string>;
 }
 
 const LEDGER_CHUNK = 200;
+const LEDGER_COLUMNS =
+  "id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version, action_on, object_label";
+/** `YYYY-MM-DD` moved by whole days — string arithmetic, no clock. */
+function addDaysIsoUtc(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** How far back the Completed read reaches, in calendar days. */
+export const WORK_COMPLETED_WINDOW_DAYS = 60;
+
+function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
+  return workOccurrenceEventSchema.parse({
+    id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
+    channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
+    replyDueOn: r.reply_due_on, resultReference: r.result_reference, sourceVersion: r.source_version,
+    actionOn: r.action_on, objectLabel: r.object_label,
+  });
+}
+
+/** One ledger completion as Work shows it, with the recorder's name from the
+ *  feed's own staff list (a person outside it keeps their id, name null). */
+export function workCompletedOf(
+  event: WorkOccurrenceEvent,
+  staff: OperationWorkResponse["staff"],
+): OperationWorkCompleted | null {
+  const parsed = parseWorkOccurrenceId(event.occurrenceId);
+  if (!parsed || !event.objectLabel || !event.resultReference) return null;
+  return {
+    occurrenceId: event.occurrenceId,
+    module: parsed.module,
+    ruleKey: parsed.ruleKey,
+    actionOn: event.actionOn,
+    objectLabel: event.objectLabel,
+    completedAt: event.at,
+    completedBy: event.actorId
+      ? { userId: event.actorId, name: staff.find((person) => person.userId === event.actorId)?.name ?? null }
+      : null,
+    resultReference: event.resultReference,
+  };
+}
 
 function refusalOf(error: { code?: string; details?: string | null; message: string }): WorkLedgerRefusal {
   const detail = String(error.details ?? "").trim();
@@ -1605,20 +1652,25 @@ export const supabaseWorkLedger: WorkLedger = {
       const ids = occurrenceIds.slice(i, i + LEDGER_CHUNK);
       const { data, error } = await sb
         .from("work_occurrence_events")
-        .select("id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version, action_on, object_label")
+        .select(LEDGER_COLUMNS)
         .in("occurrence_id", ids)
         .order("at", { ascending: true });
       if (error) throw new Error(`work ledger read failed: ${error.message}`);
-      for (const r of (data ?? []) as Array<Record<string, unknown>>) {
-        rows.push(workOccurrenceEventSchema.parse({
-          id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
-          channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
-          replyDueOn: r.reply_due_on, resultReference: r.result_reference, sourceVersion: r.source_version,
-          actionOn: r.action_on, objectLabel: r.object_label,
-        }));
-      }
+      for (const r of (data ?? []) as Array<Record<string, unknown>>) rows.push(ledgerRow(r));
     }
     return rows;
+  },
+  async readCompleted(c, sinceIso) {
+    // `at` is compared at Malaysian midnight, the same day the feed names.
+    const { data, error } = await userClient(c.env, c.var.auth.jwt)
+      .from("work_occurrence_events")
+      .select(LEDGER_COLUMNS)
+      .eq("event", "completed")
+      .gte("at", `${sinceIso}T00:00:00+08:00`)
+      .order("at", { ascending: false })
+      .limit(2000);
+    if (error) throw new Error(`work ledger completed read failed: ${error.message}`);
+    return ((data ?? []) as Array<Record<string, unknown>>).map(ledgerRow);
   },
   async recordRequestSent(c, args) {
     const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("work_record_request_sent", {
@@ -1647,10 +1699,42 @@ export const supabaseWorkLedger: WorkLedger = {
   },
 };
 
-/** Attach each open occurrence's To do / Waiting. */
+/** How many generations one read will walk before it stops (a problem that
+ *  recurred more often than this is still listed, on its latest known id). */
+const MAX_WORK_GENERATIONS = 20;
+
+/**
+ * Resolve each open item's CURRENT occurrence identity and read its ledger.
+ * An identity whose ledger already holds `completed` is history: the same
+ * problem open again is the next generation.
+ */
+export async function readWorkLedger(
+  c: Context<AppEnv>,
+  ledger: WorkLedger,
+  baseIds: readonly string[],
+): Promise<{ currentId: Map<string, string>; events: WorkOccurrenceEvent[] }> {
+  const currentId = new Map(baseIds.map((id) => [id, id]));
+  const generation = new Map(baseIds.map((id) => [id, 1]));
+  const events = [...await ledger.read(c, baseIds)];
+  for (let step = 1; step < MAX_WORK_GENERATIONS; step += 1) {
+    const completed = new Set(events.filter((e) => e.event === "completed").map((e) => e.occurrenceId));
+    const advancing = baseIds.filter((base) => completed.has(currentId.get(base)!));
+    if (advancing.length === 0) break;
+    for (const base of advancing) {
+      const next = generation.get(base)! + 1;
+      generation.set(base, next);
+      currentId.set(base, workOccurrenceGenerationId(base, next));
+    }
+    events.push(...await ledger.read(c, advancing.map((base) => currentId.get(base)!)));
+  }
+  return { currentId, events };
+}
+
+/** Attach each open occurrence's current identity and its To do / Waiting. */
 export function withWorkLifecycle(
   response: OperationWorkResponse,
   events: readonly WorkOccurrenceEvent[],
+  currentId: ReadonlyMap<string, string> = new Map(),
 ): OperationWorkResponse {
   const byOccurrence = new Map<string, WorkOccurrenceEvent[]>();
   for (const e of events) {
@@ -1660,10 +1744,14 @@ export function withWorkLifecycle(
   }
   return {
     ...response,
-    items: response.items.map((item) => ({
-      ...item,
-      lifecycle: workLifecycleOf(byOccurrence.get(item.id) ?? [], response.generatedOn),
-    })),
+    items: response.items.map((item) => {
+      const id = currentId.get(item.id) ?? item.id;
+      return {
+        ...item,
+        id,
+        lifecycle: workLifecycleOf(byOccurrence.get(id) ?? [], response.generatedOn),
+      };
+    }),
   };
 }
 
@@ -1686,24 +1774,47 @@ const REFUSAL_STATUS: Record<string, 403 | 409 | 422 | 502> = {
   invalid: 422,
 };
 
+/**
+ * THE Work read with its ledger: the composed open set, each item on its
+ * current occurrence identity with To do / Waiting, and the recent Completed.
+ * The page, the staff doors and the module completion writers all read this
+ * one function — so "was it open, and which occurrence" has one answer.
+ */
+export async function readOperationWorkWithLedger(
+c: Context<AppEnv>,
+loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
+ledger: WorkLedger = supabaseWorkLedger,
+): Promise<{ response: OperationWorkResponse; events: WorkOccurrenceEvent[] }> {
+  const response = await loader(c);
+  let read: Awaited<ReturnType<typeof readWorkLedger>>;
+  let completedEvents: WorkOccurrenceEvent[];
+  try {
+    [read, completedEvents] = await Promise.all([
+      readWorkLedger(c, ledger, response.items.map((item) => item.id)),
+      ledger.readCompleted(c, addDaysIsoUtc(response.generatedOn, -WORK_COMPLETED_WINDOW_DAYS)),
+    ]);
+  } catch {
+    // Never pretend every item is To do, and never print a Completed count
+    // that is really "could not read": a Waiting item shown as To do would
+    // send a second request to someone already asked.
+    throw new HTTPException(503, { message: "Work status could not be loaded. Try again." });
+  }
+  const completed = completedEvents
+    .map((event) => workCompletedOf(event, response.staff))
+    .filter((row): row is OperationWorkCompleted => row !== null);
+  return {
+    response: { ...withWorkLifecycle(response, read.events, read.currentId), completed },
+    events: read.events,
+  };
+};
+
 export function createOperationWorkRouter(
   loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
   ledger: WorkLedger = supabaseWorkLedger,
 ): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
-  const readWithLifecycle = async (c: Context<AppEnv>) => {
-    const response = await loader(c);
-    let events: WorkOccurrenceEvent[];
-    try {
-      events = await ledger.read(c, response.items.map((item) => item.id));
-    } catch {
-      // Never pretend every item is To do: a Waiting item shown as To do
-      // would send a second request to someone already asked.
-      throw new HTTPException(503, { message: "Work status could not be loaded. Try again." });
-    }
-    return { response: withWorkLifecycle(response, events), events };
-  };
+  const readWithLifecycle = (c: Context<AppEnv>) => readOperationWorkWithLedger(c, loader, ledger);
 
   router.get("/", requireOperation, async (c) => c.json((await readWithLifecycle(c)).response));
 

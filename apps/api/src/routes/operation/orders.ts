@@ -1,8 +1,9 @@
 import { Hono } from "hono";
+import { bodyTouchesDeliveryDate, salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import {
   abandonOrderInput,
@@ -1855,7 +1856,18 @@ const saveRevisionInput = z
   })
   .strict();
 
-operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
+operationOrdersRouter.post(
+  "/:id/save",
+  requireOperation,
+  // 0581 — an office save that records the Requested Delivery Date (or the
+  // customer's "not yet") completes `ask_delivery_date`; a save that does not
+  // touch it costs no Work read.
+  salesOrderWorkCompletion({
+    rules: ["ask_delivery_date"],
+    orderId: (c) => c.req.param("id") ?? null,
+    when: bodyTouchesDeliveryDate,
+  }),
+  async (c) => {
   const id = c.req.param("id");
   const raw = await c.req.json().catch(() => ({}));
   const parsed = saveRevisionInput.safeParse(raw);
@@ -2557,9 +2569,28 @@ const amendmentDecisionInput = z
     }
   });
 
+/** The order an amendment belongs to, read under the caller's own RLS
+ *  (null = unknown: the completion writer then observes nothing). */
+async function amendmentOrderId(c: Context<AppEnv>): Promise<string | null> {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt)
+    .from("sales_order_amendments")
+    .select("order_id")
+    .eq("id", c.req.param("amendmentId") ?? "")
+    .maybeSingle();
+  if (error) return null;
+  return (data as { order_id?: string } | null)?.order_id ?? null;
+}
+
 operationOrdersRouter.post(
   "/amendment/:amendmentId/decide",
   requirePrincipal,
+  // 0581 — an APPROVED amendment applies its Requested Delivery Date to the
+  // order: that is the completion fact for `ask_delivery_date`.
+  salesOrderWorkCompletion({
+    rules: ["ask_delivery_date"],
+    orderId: amendmentOrderId,
+    when: async (c) => ((await c.req.json().catch(() => null)) as { decision?: string } | null)?.decision === "approve",
+  }),
   async (c) => {
     const raw = await c.req.json().catch(() => ({}));
     const parsed = amendmentDecisionInput.safeParse(raw);

@@ -20,6 +20,15 @@ import { _setJwksForTesting } from "../../middleware/auth";
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { userClient } from "../../lib/supabase";
 
+// The Work Completed writer (0581) observes this door from a middleware and is
+// proven in lib/sales-order-work-completion*.test.ts; here it passes through,
+// so these tests keep asserting only what the door itself writes.
+vi.mock("../../lib/sales-order-work-completion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/sales-order-work-completion")>()),
+  salesOrderWorkCompletion: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
+
+
 const env = {
   SUPABASE_URL: "https://t.x",
   SUPABASE_ANON_KEY: "a",

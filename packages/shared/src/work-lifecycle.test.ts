@@ -90,3 +90,17 @@ describe("workReplyDueOn — Malaysian working days", () => {
     expect(workReplyDueOn("2026-09-18")).toBe("2026-09-21");
   });
 });
+
+describe("workOccurrenceGenerationId + parseWorkOccurrenceId", () => {
+  it("generation 1 keeps the plain identity; later ones carry :gN and parse back", async () => {
+    const { workOccurrenceGenerationId } = await import("./work-lifecycle");
+    const { parseWorkOccurrenceId, operationWorkStableId } = await import("./operation-work");
+    const base = operationWorkStableId("orders", "ord:1", "delay_planning");
+    expect(workOccurrenceGenerationId(base, 1)).toBe(base);
+    expect(workOccurrenceGenerationId(base, 3)).toBe(`${base}:g3`);
+    expect(parseWorkOccurrenceId(base)).toEqual({ module: "orders", objectId: "ord:1", ruleKey: "delay_planning", generation: 1 });
+    expect(parseWorkOccurrenceId(`${base}:g3`)).toEqual({ module: "orders", objectId: "ord:1", ruleKey: "delay_planning", generation: 3 });
+    expect(parseWorkOccurrenceId(`${base}:g1`)).toBeNull();
+    expect(parseWorkOccurrenceId("claims:x:y")).toBeNull();
+  });
+});

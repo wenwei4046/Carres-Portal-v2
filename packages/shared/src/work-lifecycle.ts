@@ -63,6 +63,23 @@ export const operationWorkLifecycleSchema = z.object({
 
 export type OperationWorkLifecycle = z.infer<typeof operationWorkLifecycleSchema>;
 
+/** One Completed occurrence as Work shows it: what, which document, on which
+ *  Work date, when, by whom, with what result. */
+export const operationWorkCompletedSchema = z.object({
+  occurrenceId: z.string().min(5),
+  module: z.enum(["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"]),
+  ruleKey: z.string().min(1),
+  /** The original Work date — the Date filter counts it here (null = No working date). */
+  actionOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  objectLabel: z.string().min(1),
+  completedAt: z.string().min(10),
+  /** Who recorded the module's result; null when the module recorded nobody. */
+  completedBy: z.object({ userId: z.string().uuid(), name: z.string().nullable() }).strict().nullable(),
+  resultReference: z.string().min(1),
+}).strict();
+
+export type OperationWorkCompleted = z.infer<typeof operationWorkCompletedSchema>;
+
 export const WORK_LIFECYCLE_TO_DO: OperationWorkLifecycle = {
   state: "to_do",
   waitingSince: null,
@@ -113,4 +130,17 @@ export function workReplyDueOn(sentOn: string, ruleKey?: string): string {
 /** An item's lifecycle, To do when the read attached none. */
 export function workLifecycleOrToDo(item: { lifecycle?: OperationWorkLifecycle }): OperationWorkLifecycle {
   return item.lifecycle ?? WORK_LIFECYCLE_TO_DO;
+}
+
+/**
+ * ⭐ A RECURRING PROBLEM IS A NEW OCCURRENCE (owner ruling 2026-09-24;
+ * Workspace MASTER §2 "module + rule + source object + occurrence identity").
+ * A projector names the problem (`orders:{order}:delay_planning`); the ledger
+ * names which time it is. Generation 1 keeps the plain identity, so every
+ * existing link still opens it; once that identity is completed, the same
+ * problem appearing again is generation 2 (`…:g2`), and so on. Completed
+ * history is never reopened and its sends never attach to the new occurrence.
+ */
+export function workOccurrenceGenerationId(baseId: string, generation: number): string {
+  return generation <= 1 ? baseId : `${baseId}:g${generation}`;
 }

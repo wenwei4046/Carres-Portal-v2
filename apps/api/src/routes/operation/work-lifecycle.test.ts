@@ -67,6 +67,7 @@ function memoryLedger(rows: WorkOccurrenceEvent[] = []) {
   let n = 0;
   const ledger: WorkLedger = {
     async read(_c, ids) { return rows.filter((r) => ids.includes(r.occurrenceId)); },
+    async readCompleted(_c, sinceIso) { return rows.filter((r) => r.event === "completed" && r.at.slice(0, 10) >= sinceIso); },
     async recordRequestSent(_c, args) {
       calls.push({ kind: "request_sent", ...args });
       if (args.channel === ("fax" as never)) throw new WorkLedgerRefusal("invalid", "bad channel");
@@ -204,5 +205,86 @@ describe("POST …/reply-received", () => {
     const response = await post(app([], ledger), "reply-received", { channel: "whatsapp", contactKind: null, contactId: null, sourceVersion: "orders:v7", idempotencyKey: "reply-0003-abcd" });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: "work_occurrence_not_open" });
+  });
+});
+
+function completedRow(occurrenceId: string, extra: Partial<WorkOccurrenceEvent> = {}): WorkOccurrenceEvent {
+  return {
+    id: "00000000-0000-4000-8000-00000000c0de", occurrenceId, event: "completed", actorId: ME,
+    at: "2026-09-16T03:00:00.000Z", channel: null, contactKind: null, contactId: null, replyDueOn: null,
+    resultReference: "orders.delivery_date=2026-10-01", sourceVersion: "orders:v6",
+    actionOn: "2026-09-16", objectLabel: "SO-1318", ...extra,
+  };
+}
+
+describe("Completed read — the ledger's completions with their Work date, document, time and person", () => {
+  it("returns action_on, object_label, completion time and who recorded it, by name", async () => {
+    const { ledger } = memoryLedger([completedRow("orders:order-9:ask_delivery_date")]);
+    const a = new Hono<AppEnv>();
+    a.use("*", async (c, next) => {
+      c.set("auth", { id: ME, email: "sha@carres.test", role: "operation", dealerId: null, supplierId: null, partnerId: null, outletId: null, warehouseId: null, jwt: "jwt" } as never);
+      await next();
+    });
+    a.route("/api/operation/work", createOperationWorkRouter(async () => ({
+      ...feed([item]),
+      staff: [{ userId: ME, name: "Shasha", email: "sha@carres.test" }],
+    }), ledger));
+    const body = await (await a.request("/api/operation/work")).json() as OperationWorkResponse;
+    expect(body.completed).toEqual([{
+      occurrenceId: "orders:order-9:ask_delivery_date",
+      module: "orders",
+      ruleKey: "ask_delivery_date",
+      actionOn: "2026-09-16",
+      objectLabel: "SO-1318",
+      completedAt: "2026-09-16T03:00:00.000Z",
+      completedBy: { userId: ME, name: "Shasha" },
+      resultReference: "orders.delivery_date=2026-10-01",
+    }]);
+  });
+
+  it("keeps a completion the module recorded without a person, and never invents one", async () => {
+    const { ledger } = memoryLedger([completedRow("orders:order-9:ask_delivery_date", { actorId: null })]);
+    const body = await (await app([item], ledger).request("/api/operation/work")).json() as OperationWorkResponse;
+    expect(body.completed?.[0]?.completedBy).toBeNull();
+  });
+
+  it("reads the recent window only (60 days before the feed's date)", async () => {
+    const { ledger } = memoryLedger([
+      completedRow("orders:order-8:ask_delivery_date", { at: "2026-07-01T03:00:00.000Z" }),
+      completedRow("orders:order-9:ask_delivery_date", { at: "2026-07-20T03:00:00.000Z" }),
+    ]);
+    const body = await (await app([item], ledger).request("/api/operation/work")).json() as OperationWorkResponse;
+    expect(body.completed?.map((c) => c.occurrenceId)).toEqual(["orders:order-9:ask_delivery_date"]);
+  });
+
+  it("a completed ledger that cannot be read fails the read (no fake Completed count)", async () => {
+    const { ledger } = memoryLedger();
+    ledger.readCompleted = async () => { throw new Error("down"); };
+    expect((await app([item], ledger).request("/api/operation/work")).status).toBe(503);
+  });
+});
+
+describe("a recurring problem is a new occurrence", () => {
+  it("an identity already completed is history: the same problem open again is generation 2, with none of the old sends", async () => {
+    const { ledger } = memoryLedger([
+      { ...completedRow(OCC), id: "00000000-0000-4000-8000-0000000000a1", event: "request_sent", actionOn: null, objectLabel: null, resultReference: null, channel: "whatsapp", contactKind: "customer", contactId: CUSTOMER, replyDueOn: "2026-09-18", at: "2026-09-15T01:00:00.000Z" },
+      completedRow(OCC),
+    ]);
+    const a = app([item], ledger);
+    const body = await (await a.request("/api/operation/work")).json() as OperationWorkResponse;
+    expect(body.items[0]!.id).toBe(`${OCC}:g2`);
+    expect(body.items[0]!.lifecycle?.state).toBe("to_do");
+    // The staff doors address the CURRENT occurrence.
+    const sent = await a.request(`/api/operation/work/${encodeURIComponent(`${OCC}:g2`)}/request-sent`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(SEND),
+    });
+    expect(sent.status).toBe(201);
+    expect((await post(a, "request-sent", { ...SEND, idempotencyKey: "send-0002-abcd" })).status).toBe(409);
+  });
+
+  it("walks past several completed generations", async () => {
+    const { ledger } = memoryLedger([completedRow(OCC), completedRow(`${OCC}:g2`), completedRow(`${OCC}:g3`)]);
+    const body = await (await app([item], ledger).request("/api/operation/work")).json() as OperationWorkResponse;
+    expect(body.items[0]!.id).toBe(`${OCC}:g4`);
   });
 });
