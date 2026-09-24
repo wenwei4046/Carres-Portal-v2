@@ -23,7 +23,7 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { orderActionLines, workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
@@ -52,6 +52,9 @@ import WorkRail, { WorkDateSection, WorkModuleSection } from "./work/WorkDayNav"
 import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
 
 type ViewKey = "mine" | "team";
+
+/** Cards drawn per step once a list passes 50 (card kit §List states). */
+const CARD_STEP = 50;
 
 const MODULE_LABEL: Record<OperationWorkModule, string> = {
   orders: "Sales Orders",
@@ -120,7 +123,7 @@ export default function OperationWork() {
   }, []);
 
   // One identity, shared with the Right Rail (HF-3): the signed-in account id.
-  const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, retry } = useOpenWorkSet();
+  const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, refreshFailed, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -308,6 +311,37 @@ export default function OperationWork() {
     if (layout === "one") setActivePanel("detail");
   };
 
+  /* Card kit §List states: past 50 cards the list draws 50 more each time its
+     end scrolls into view, in the same order, so keyboard order never jumps.
+     A new selection of filters starts again at 50. */
+  const [cardLimit, setCardLimit] = useState(CARD_STEP);
+  // Choosing a card is not a new selection of filters: `selected` never resets.
+  const listKey = [...params.entries()].filter(([key]) => key !== "selected").map(([k, v]) => `${k}=${v}`).join("&");
+  useEffect(() => setCardLimit(CARD_STEP), [listKey]);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const listTotal = activeView === "mine" ? myItems.length : displayTeamGroups.reduce((n, g) => n + g.items.length, 0);
+  const hasMore = listTotal > cardLimit;
+  useEffect(() => {
+    const sentinel = moreRef.current;
+    if (!sentinel || !hasMore) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setCardLimit(Number.POSITIVE_INFINITY);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setCardLimit((limit) => limit + CARD_STEP);
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, cardLimit]);
+  let teamBudget = cardLimit;
+  const shownTeamGroups = displayTeamGroups.flatMap((g) => {
+    if (teamBudget <= 0) return [];
+    const items = g.items.slice(0, teamBudget);
+    teamBudget -= items.length;
+    return [{ ...g, items }];
+  });
+
   const listTab: WorkListTab = params.get("list") === "waiting" || params.get("list") === "completed"
     ? params.get("list") as WorkListTab
     : "todo";
@@ -372,7 +406,7 @@ export default function OperationWork() {
     </p>
   ) : loading ? (
     <WorkCardSkeleton />
-  ) : error ? (
+  ) : error && !refreshFailed ? (
     <div className="rounded-work border border-work-line bg-white px-4 py-3" data-testid="work-error">
       <p className="text-body text-danger">Work could not be loaded. Try again.</p>
       <button type="button" onClick={retry} className="mt-2 rounded-control border border-kit-slate-4 bg-white px-3 py-1.5 text-body text-kit-slate-12">
@@ -381,13 +415,13 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="flex flex-col gap-2" data-testid="work-section-list">{myItems.map(card)}</div>
+      <div className="flex flex-col gap-2" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
   ) : (
     <div className="flex flex-col gap-4">
-      {displayTeamGroups.map((g) => (
+      {shownTeamGroups.map((g) => (
         <section key={g.key} className="flex flex-col gap-2" data-testid={`work-owner-group-${g.key}`}>
           <h3 className="flex items-center gap-2">
             {g.person ? (
@@ -615,8 +649,21 @@ export default function OperationWork() {
                   ))}
                 </div>
               ) : null}
+              {refreshFailed ? (
+                // A failed refresh keeps the last good list and the filters;
+                // only this row says so (card kit §List states).
+                <div className="mt-3 flex shrink-0 items-center gap-3 rounded-work border border-work-line bg-white px-3 py-2" role="status" data-testid="work-refresh-failed">
+                  <p className="min-w-0 flex-1 text-body text-danger">Work could not be loaded. Try again.</p>
+                  <button type="button" onClick={retry} className="h-8 shrink-0 rounded-control border border-kit-slate-4 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3">
+                    Try again
+                  </button>
+                </div>
+              ) : null}
               <div className="mt-3 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
-                {listBody}
+                <div key={listTab} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
+                  {listBody}
+                </div>
+                {hasMore && listTab === "todo" ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
               </div>
             </div>
           )}
