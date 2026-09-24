@@ -830,6 +830,8 @@ export default function OperationReceiving() {
         <ArrivalSourceWorkspace receiving sourceId={arrivalId} />
       ) : sessionId ? (
         <ReceivingRecord sessionId={sessionId} onBack={closeObject} />
+      ) : poId && posQ.isLoading ? (
+        <p role="status" className="p-4 text-body">Loading…</p>
       ) : poId ? (
         <PoReceivingView
           poId={poId}
