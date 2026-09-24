@@ -51,9 +51,9 @@ beforeEach(() => {
     "GET /api/finance/money-moves": [row({}), MINE],
     "GET /api/finance/money-moves/me": { mayApprove: true },
     "GET /api/finance/ledger/money-accounts": [
-      { code: "310-5000", name: "Public Bank", money_kind: "BANK", is_active: true },
-      { code: "310-2000", name: "Hong Leong", money_kind: "BANK", is_active: true },
-      { code: "311-G001", name: "GHL", money_kind: "HOLDING", is_active: true },
+      { code: "310-5000", name: "Public Bank", money_kind: "BANK", is_active: true, is_card_account: false },
+      { code: "310-2000", name: "Hong Leong", money_kind: "BANK", is_active: true, is_card_account: false },
+      { code: "311-G001", name: "GHL", money_kind: "HOLDING", is_active: true, is_card_account: true },
     ],
     [`POST /api/finance/money-moves/${row({}).move_id}/approve`]: { id: row({}).move_id },
     // An AutoCount-shaped chart: the bank-charges and other-income accounts are
@@ -104,23 +104,40 @@ describe("Money moves", () => {
     );
   });
 
-  it("a card payout from a card account with a payout bank is not offered here: Card settlement pays it out", async () => {
-    net.routes["GET /api/finance/ledger/money-accounts"] = [
-      { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true },
-      { code: "1130", name: "Other card", money_kind: "HOLDING", is_active: true },
-      { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
-    ];
-    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [{ holding_code: "1131", channel: "dealer", bank_code: "1123" }];
+  const HINT = "A card account is paid out on Card settlement.";
+  /** Opens a new Card payout; returns what Paid from offers and whether the hint shows. */
+  const cardPayoutFrom = async () => {
     show();
     await screen.findByText("MM-20260917-1111");
     fireEvent.click(screen.getByRole("button", { name: /New money move/ }));
     const form = await screen.findByTestId("money-move-form");
     fireEvent.keyDown(within(form).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("option", { name: "Card payout" }));
-    expect(await within(form).findByText("A card account with a payout bank is paid out on Card settlement.")).toBeInTheDocument();
     fireEvent.keyDown(within(form).getByRole("combobox", { name: /Paid from/ }), { key: "Enter" });
-    const options = await screen.findAllByRole("option");
-    expect(options.map((o) => o.textContent)).toEqual(["1130 · Other card"]);
+    const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    return { options, hint: within(form).queryByText(HINT) !== null };
+  };
+  const accounts = (...card: Array<[string, string, boolean]>) => [
+    { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true, is_card_account: false },
+    ...card.map(([code, name, is_card_account]) => ({ code, name, money_kind: "HOLDING", is_active: true, is_card_account })),
+  ];
+
+  it("a card payout from a card account is not offered here, with a payout bank or without: Card settlement pays it out", async () => {
+    net.routes["GET /api/finance/ledger/money-accounts"] = accounts(["1130", "Other card", false], ["1131", "GHL", true], ["1132", "Visa", true]);
+    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [{ holding_code: "1131", channel: "dealer", bank_code: "1123" }];
+    expect(await cardPayoutFrom()).toEqual({ options: ["1130 · Other card"], hint: true });
+  });
+
+  it("0576: a card account a card method maps to, with no payout bank anywhere, is not offered, and the hint still shows", async () => {
+    net.routes["GET /api/finance/ledger/money-accounts"] = accounts(["1130", "Other card", false], ["1132", "Visa", true]);
+    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [];
+    expect(await cardPayoutFrom()).toEqual({ options: ["1130 · Other card"], hint: true });
+  });
+
+  it("with no card account, a card payout offers every holding account and no hint", async () => {
+    net.routes["GET /api/finance/ledger/money-accounts"] = accounts(["1130", "Other card", false]);
+    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [];
+    expect(await cardPayoutFrom()).toEqual({ options: ["1130 · Other card"], hint: false });
   });
 
   it("the form refuses a move with no accounts before the server", async () => {

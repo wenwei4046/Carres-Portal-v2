@@ -10,7 +10,7 @@ import {
 } from "./money-accounts";
 
 const row = (money_kind: MoneyAccountRow["money_kind"], is_active = true): MoneyAccountRow =>
-  ({ code: "1121", name: "Public Bank", money_kind, is_active });
+  ({ code: "1121", name: "Public Bank", money_kind, is_active, is_card_account: false });
 
 describe("the money-account rule (0512)", () => {
   it("pays out of cash and banks only, never a holding account", () => {
