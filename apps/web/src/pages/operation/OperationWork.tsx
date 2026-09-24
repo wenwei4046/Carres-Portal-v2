@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/auth";
 import { personLabel } from "@/lib/staff-avatar";
 import Avatar from "@/components/kit/Avatar";
 import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import PageShell from "@/components/kit/PageShell";
 import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
@@ -269,7 +270,8 @@ export default function OperationWork() {
     return next;
   }, { replace: true });
   const emptyBody = emptyState === "failed" ? null : (
-    <div className="px-4 py-8 text-body text-kit-slate-11" data-testid="work-empty">
+    <div className="mx-3 my-4 flex min-h-44 flex-col items-center justify-center rounded-panel border border-kit-slate-5 bg-white px-5 py-8 text-center text-body text-kit-slate-11" data-testid="work-empty">
+      <span className="mb-3 grid h-10 w-10 place-items-center rounded-full bg-kit-slate-3 text-kit-slate-11"><Icon name="order" size={18} /></span>
       {emptyState === "no_match" ? (
         <>
           <p>No work matches these filters</p>
@@ -491,21 +493,21 @@ export default function OperationWork() {
           </div>
         ) : null}
         {loading ? (
-          <div className="divide-y divide-kit-slate-5" aria-label="Loading work" data-testid="work-loading">
+          <div className="p-2" aria-label="Loading work" data-testid="work-loading">
             {[0, 1, 2].map((index) => (
-              <div key={index} className="min-h-[64px] bg-white px-4 py-2 motion-safe:animate-pulse">
+              <div key={index} className="mb-2 overflow-hidden rounded-control border border-kit-slate-5 bg-white px-3 py-2 motion-safe:animate-pulse">
                 <div className="h-3 w-24 rounded bg-base-100" />
                 <div className="mt-2 h-4 w-56 max-w-full rounded bg-base-100" />
                 <div className="mt-2 h-3 w-80 max-w-full rounded bg-base-100" />
+                <div className="mt-2 h-7 border-t border-kit-slate-5 pt-2"><div className="h-2.5 w-20 rounded bg-base-100" /></div>
               </div>
             ))}
           </div>
         ) : error ? (
-          <div className="px-4 py-8" data-testid="work-error">
+          <div className="mx-3 my-4 flex min-h-44 flex-col items-center justify-center rounded-panel border border-kit-red-6 bg-white px-5 py-8 text-center" data-testid="work-error">
+            <span className="mb-3 grid h-10 w-10 place-items-center rounded-full bg-kit-red-3 text-kit-red-11"><Icon name="late" size={18} /></span>
             <p className="text-body text-danger">Work could not be loaded. Try again.</p>
-            <button type="button" onClick={retry} className="mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700">
-              Try again
-            </button>
+            <div className="mt-3"><Button type="button" variant="neutral" onClick={retry}>Try again</Button></div>
           </div>
         ) : activeView === "mine" ? (
           displayMyGroups.length === 0 ? (
