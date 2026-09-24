@@ -707,13 +707,13 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-                        → `Services` (owner card 2026-09-23, BUILT; words settled 2026-09-24): a labelled field
-                        reading the SAME `order_addons` rows Items prices — every service's name, ×qty, NO
-                        money — and, in Edit, the page's existing `Add service`, offering the disposal family
-                        (catalogue `SVC-DISPOSE-…`) and calling the same act as the Items door (one row,
-                        priced once in Items). Remove and quantity stay on the Items row. Shown when the
-                        order carries a service or the page is in Edit. `Disposal` / `Add disposal` are a
-                        PROPOSAL / NOT LAW (COPY-STANDARD) — not screen copy
+                        → `Services`: Delivery owns the ONE service editor (owner correction 2026-09-24).
+                        Add, quantity, per-unit Size and Remove/Restore operate on the same draft addon rows.
+                        Catalogue names, selectable sizes and per-unit size summaries use the Sales Portal
+                        contract; no local renaming or invented size category. Server-owned delivery/stair
+                        charges are read-only. Items and PDF project the same quantity, configuration and
+                        charge; Items has no second Add service or service quantity/removal control.
+                        Read mode shows each service's name, configuration and ×qty without prices here.
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, BUILT 2026-09-23): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
@@ -816,8 +816,11 @@ overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section
 
 **ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
 items stay (existing Class A rule). The one journey is:
-`Edit → Add / Remove (restorable before commit) → Reason for change → review the changes and their
-impact → Save or Submit amendment request → approval takes effect → each owning module handles its part`.
+`Edit → change fields / Add / Remove (restorable before commit) → Save or Submit amendment request
+opens Your changes → review Before/After and impact, enter Reason for change → confirm → approval
+takes effect where required → each owning module handles its part`. The review uses the shared Modal
+at submission, not a panel inserted above SO info during typing. Cancel closes the review and preserves
+the draft; reason and customer-agreement gates remain unchanged.
 1. **Submitting changes nothing.** While editing, a removed line is struck through and can be restored.
    After `Submit amendment request` the current order and its official PDF stay exactly as they were;
    the new version takes effect only on `Approve and apply`. `Reject` leaves the order unchanged.

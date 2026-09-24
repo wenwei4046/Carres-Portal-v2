@@ -80,7 +80,8 @@ describe("Sales Order object template contract", () => {
        the same function the server runs on commit (Law D). */
     expect(workspace).toContain("salesOrderCommitWord");
     expect(workspace).toContain("classifySalesOrderChange");
-    expect(workspace).toContain("{changeReason.trim() ? commitWord : `${commitWord} — say why`}");
+    expect(workspace).toContain('data-testid="workspace-confirm-save"');
+    expect(workspace).toContain('<Modal open={reviewOpen}');
     expect(workspace).toContain('data-testid="change-count"');
     /* The old always-editable page's save bar is retired with the mode. */
     expect(workspace).not.toContain('data-testid="save-bar"');
@@ -1197,7 +1198,7 @@ describe("Sales Order object page — one form grammar", () => {
     /* The row writers are gated on the lock, not merely disabled by CSS. */
     expect(workspace).toContain("{!formLocked && canConfig && !protectedLine(l) && (");
     expect(workspace).toContain("{formLocked || protectedLine(l) ? null : l.removed ? (");
-    expect(workspace).toContain("{!stamped && !formLocked && (");
+    expect(workspace).toContain("{!owned && <Button");
   });
 
   it("reads SO info in the RULED order, and in the same order as the paper beside it", () => {
@@ -1508,10 +1509,9 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).not.toContain("<ServiceRowActions");
     expect(workspace).toContain('data-testid={`edit-service-${a.addon_key}`}');
     expect(workspace).toContain("nameOfAddon(a.addon_key)");
-    expect(workspace).toContain('aria-label={`Remove ${nameOfAddon(a.addon_key)}`}');
-    expect(workspace).toContain('aria-label={`Restore ${nameOfAddon(a.addon_key)}`}');
+    expect(workspace).toContain('data-testid={`delivery-service-${a.addon_key}`}');
     /* A per-trip charge and the stamped stair carry keep their quantity. */
-    expect(workspace).toContain("const fixedQtyService = (key: string) =>");
+    expect(workspace).toContain("const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key)");
     expect(workspace).toContain("STAIR_CARRY_ADDON_KEY");
   });
 
@@ -1602,8 +1602,9 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   it("states the order's Services in Delivery from the SAME rows, adding through the ONE act, in approved words only", () => {
     expect(workspace).toContain('data-testid="delivery-services"');
     expect(workspace).toContain('<Fact label="Services" own={false} framed value={');
-    /* Both `Add service` doors call the one act. */
-    expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(2);
+    /* Delivery owns the only service input; Items only projects its charge. */
+    expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(1);
+    expect(workspace).not.toContain('id="so-add-service"');
     /* The Delivery door offers the disposal family, known by its catalogue code. */
     expect(changeHelpers).toContain('catalogServiceSku.startsWith("SVC-DISPOSE-")');
     /* Unapproved words stay off the screen (recorded as a PROPOSAL in COPY). */
