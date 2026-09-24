@@ -111,3 +111,9 @@ Not exercised on production: `Add disposal` (it writes a draft; walked in the sh
 
 **Tests.** Contracts rewritten for the rule; API test covers a linked and an unlinked service. Control
 run against the upper-case build: 2 contracts + 1 API test red.
+
+**Production (2026-09-24, PR #1562 squash `81b7a018`, all five surfaces converged; signed-in read of
+SO-1365, no write).** Page Item Code `SVC-DISPOSE-SOFA` · `SVC-DISPOSE-MATTRESS`; Delivery reads
+`Services — Dispose old sofa (small size) · Dispose old mattress`; Items total = `Total payable` =
+RM 1,529.00. The SO document payload the PDF prints from (`/api/orders/:id/sales-order-data`, 200)
+sends the same two codes, total 1,529, paid 765, balance 764 — page and paper tally.
