@@ -43,6 +43,26 @@ function EvidenceMedia({ file, label, onRetry }: {
   const [status, setStatus] = useState<"loading" | "ready" | "error">(file.url ? "loading" : "error");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const media = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    let wasFullscreen = false;
+    let focusFrame = 0;
+    const changed = () => {
+      const isFullscreen = document.fullscreenElement === video.current && video.current !== null;
+      // Native fullscreen controls can retain Escape after exiting. Return focus
+      // to the viewer so the next Escape belongs to Modal again.
+      if (wasFullscreen && !document.fullscreenElement) {
+        focusFrame = requestAnimationFrame(() => media.current?.focus());
+      }
+      wasFullscreen = isFullscreen;
+    };
+    document.addEventListener("fullscreenchange", changed);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("fullscreenchange", changed);
+    };
+  }, []);
   const pane = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const alive = useRef(true);
@@ -60,7 +80,7 @@ function EvidenceMedia({ file, label, onRetry }: {
       setStatus(url ? "loading" : "error");
     } catch { if (alive.current) setStatus("error"); }
   }
-  return <div className="flex min-w-0 flex-col gap-3" data-kit="saved-evidence-viewer">
+  return <div ref={media} tabIndex={-1} className="flex min-w-0 flex-col gap-3 focus:outline-none" data-kit="saved-evidence-viewer">
     {file.unitCodes?.length ? <div className="break-words font-mono text-body text-kit-slate-12">{file.unitCodes.join(" · ")}</div> : null}
     {file.kind === "photo" && <div className="flex flex-wrap gap-2">
       <Button disabled={status !== "ready" || zoom <= 1} onClick={() => { setZoom((n) => Math.max(1, n - 0.5)); setPan({ x: 0, y: 0 }); }}>Zoom out</Button>
@@ -73,7 +93,7 @@ function EvidenceMedia({ file, label, onRetry }: {
       <Button onClick={() => void retry()}>Try again</Button>
     </div>}
     {src && status !== "error" && (file.kind === "video" ?
-      <video key={attempt} src={src} controls playsInline preload="metadata" aria-label={label}
+      <video ref={video} key={attempt} src={src} controls playsInline preload="metadata" aria-label={label}
         className="h-80 w-full bg-kit-slate-3 object-contain"
         onLoadedMetadata={() => setStatus("ready")} onError={() => setStatus("error")} /> :
       <div ref={pane} className="relative h-80 w-full overflow-hidden bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" aria-busy={status === "loading"}

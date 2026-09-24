@@ -359,7 +359,8 @@ and evidence viewer promised for Supplier Claims.
 ## SavedEvidenceViewer
 
 **Purpose.** The approved shared read-only saved-photo/video viewer (Purchasing MASTER
-§9.5). Local implementation 2026-09-24; production readback owed. Receiving's existing
+§9.5). Deployed in #1593, with authenticated Receiving and production example readback
+2026-09-24 (evidence in Purchasing MASTER §9.5). Receiving's existing
 arrival-evidence controls are the first consumer. Claim-record photos also adopt it
 locally (2026-09-24; production proof owed); Stock/Service and per-Unit Claim expansion
 integrations remain separate work and must reuse this component.
@@ -374,6 +375,8 @@ no opening control; a known file without a readable URL remains visible as a fai
 and scroll lock; photo zoom, drag, Reset, Previous/Next; native video playback, seeking
 and fullscreen. Each file switch resets enlargement and keeps its own context. Loading,
 media failure and retry differ; a late retry cannot replace a newly selected file.
+A local fullscreen-focus correction (2026-09-24; production proof owed) returns focus
+to the viewer after native fullscreen exit so a subsequent Escape can close it.
 The `/ui` example includes a clearly marked photo, an unreadable file and an eight-second
 synthetic H.264 video (`ui-evidence-example.mp4`, generated colour/motion test pattern,
 320×180 at 12fps; no recorded business or personal content). Receiving

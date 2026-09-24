@@ -78,6 +78,30 @@ describe("saved evidence viewer", () => {
     expect(screen.getByRole("button", { name: "Zoom in" })).toBeEnabled();
   });
 
+  it("returns keyboard focus from native fullscreen controls so Escape closes the viewer", async () => {
+    let fullscreenElement: Element | null = null;
+    const original = Object.getOwnPropertyDescriptor(document, "fullscreenElement");
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => fullscreenElement });
+    try {
+      render(<Harness />);
+      const opener = screen.getByRole("button", { name: "Open evidence" });
+      await click(opener);
+      await click(screen.getByRole("button", { name: "Next" }));
+      await click(screen.getByRole("button", { name: "Next" }));
+      fullscreenElement = screen.getByLabelText("Video 3", { selector: "video" });
+      fireEvent(document, new Event("fullscreenchange"));
+      fullscreenElement = null;
+      fireEvent(document, new Event("fullscreenchange"));
+      await waitFor(() => expect(document.activeElement).toHaveAttribute("data-kit", "saved-evidence-viewer"));
+      fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(opener).toHaveFocus();
+    } finally {
+      if (original) Object.defineProperty(document, "fullscreenElement", original);
+      else Reflect.deleteProperty(document, "fullscreenElement");
+    }
+  });
+
   it("cannot replace another file with a late retry, and video keeps native playback controls without photo zoom", async () => {
     let finish!: (url: string | null) => void;
     render(<Harness retry={() => new Promise((resolve) => { finish = resolve; })} />);
