@@ -835,6 +835,7 @@ describe("GET /duty", () => {
 describe("GET /:id — one Receiving Session / GRN record", () => {
   const DETAIL_ROW = {
     ...RECEIPT_ROW,
+    lines: RECEIPT_ROW.lines.map((line) => ({ ...line, id: LINE })),
     status: "posted",
     grn_no: "GRN-20260904-0001",
     actual_site_id: SITE,
@@ -864,6 +865,9 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
           ],
           error: null,
         },
+      },
+      ops_stock_items: {
+        list: { data: [{ id: "si1", po_line_id: LINE, identity_scope: "unit" }], error: null },
       },
       receiving_events: {
         list: {
@@ -952,6 +956,7 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     expect(body.receipt.unit_results).toEqual([
       {
         stock_item_id: "si1",
+        po_line_id: LINE,
         unit_code: "MS01-K-0001",
         outcome: "good",
         issue_kind: null,
@@ -963,6 +968,44 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
       event: "posted",
       actor_name: "Buddy cover",
     });
+  });
+
+  it.each(["receiving_unit_results", "receiving_events", "purchase_orders", "ops_stock_items"])(
+    "refuses an incomplete document when %s cannot be read",
+    async (table) => {
+      const failure = { data: null, error: { code: "XX000", message: "read failed" } };
+      const sb = makeSb({ ...detailTables(), [table]: { list: failure, single: failure } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(await res.json()).not.toHaveProperty("receipt");
+    },
+  );
+
+  it("keeps unknown lineage unassigned and suppresses counted-stock technical IDs", async () => {
+    const tables = detailTables();
+    const sb = makeSb({
+      ...tables,
+      receiving_unit_results: { list: { data: [
+        ...tables.receiving_unit_results.list.data,
+        { stock_item_id: "si2", unit_code: "COUNTED", outcome: "received" },
+        { stock_item_id: "si3", unit_code: "U-003", outcome: "received" },
+      ], error: null } },
+      ops_stock_items: { list: { data: [
+        { id: "si1", po_line_id: "other-receipt-line", identity_scope: "unit" },
+        { id: "si2", po_line_id: LINE, identity_scope: "quantity" },
+      ], error: null } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { receipt: { unit_results: unknown[] } };
+    expect(body.receipt.unit_results).toEqual([
+      expect.objectContaining({ stock_item_id: "si1", po_line_id: null }),
+      expect.objectContaining({ stock_item_id: "si3", po_line_id: null }),
+    ]);
   });
 
   it("404 when the record is not there", async () => {

@@ -201,7 +201,7 @@ function ReadMode({
             </span>
           </Prop>
           <Prop label="Supplier">{supplierName}</Prop>
-          <Prop label="Deliver To">{warehouseName}</Prop>
+          <Prop label="Supplier Deliver To">{warehouseName}</Prop>
           {po.eta_date ? (
             <Prop label="Expected arrival">
               <span className="tabular-nums">{fmtDateShort(po.eta_date)}</span>
@@ -464,7 +464,7 @@ function ReceivingMode({
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  /** `Deliver To` is the instruction; `Actual Site` is where the goods
+  /** `Supplier Deliver To` is the instruction; `Actual Site` is where the goods
    *  physically arrived. "" = the PO's own booked warehouse. */
   const [actualSiteId, setActualSiteId] = useState<string>("");
   const [arrivalEvidence, setArrivalEvidence] = useState<
@@ -691,20 +691,20 @@ function ReceivingMode({
       <Section title="Receiving Details">
         <div className="receiving-details-row flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Goods received on
+            Goods Received Date
           </span>
           <input
             type="date"
             value={goodsReceivedAt}
             onChange={(e) => setGoodsReceivedAt(e.target.value)}
-            aria-label="Goods received on"
+            aria-label="Goods Received Date"
             data-testid="goods-received-at"
             className={FIELD}
           />
         </div>
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Deliver To
+            Supplier Deliver To
           </span>
           <span className="text-body text-kit-slate-12">{warehouseName}</span>
         </div>
@@ -713,7 +713,7 @@ function ReceivingMode({
             Goods arrived at
           </span>
           {/* Where the goods PHYSICALLY arrived. It never overwrites
-              `Deliver To` — both facts are preserved (owner correction
+              `Supplier Deliver To` — both facts are preserved (owner correction
               2026-09-06 §3; the retired label was `Actual Site`). */}
           <select
             value={actualSiteId || po.warehouse_id}
@@ -731,13 +731,13 @@ function ReceivingMode({
         </div>
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Supplier DO No.
+            Supplier DO No
           </span>
           <input
             type="text"
             value={doNumber}
             onChange={(e) => setDoNumber(e.target.value)}
-            aria-label="Supplier DO No."
+            aria-label="Supplier DO No"
             data-testid="do-number"
             className={`${FIELD} flex-1`}
           />

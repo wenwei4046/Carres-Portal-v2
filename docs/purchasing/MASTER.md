@@ -2568,6 +2568,13 @@ somebody filed paperwork, not the time a lorry arrived. **Fix, and it is Receivi
 arrival time on the receipt (a new column and the Receiving form field that fills it), then this
 column prints it with no change here. Until then the gap is stated on screen, not hidden.
 
+**PO date vocabulary convergence — local implementation, 2026-09-24; delivery proof owed.**
+The register/export uses `PO Doc Date`; the object and its reply form use
+`Supplier Confirmed Delivery Date`, and the destination fact uses `Supplier Deliver To`.
+A confirmed supplier date is printed as the actual date even when it matches the PO date;
+`Same as PO` remains only the form's comparison feedback. No supplier answer, date
+calculation, evidence or version guard changes through these display corrections.
+
 **Groups — APPROVED / LOCKED, wording correction Jess 2026-09-17:** `Confirm PO sent to supplier`
 and `Waiting for goods from supplier` are open headings; `Completed` and `Cancelled` are collapsed
 buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
@@ -2706,6 +2713,15 @@ The 62 existing Receiving page/save tests pass. No receipt was posted,
 no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
 Unit result or write authority changed. This does not implement the GRN PDF below.
 
+**GRN detail narrow layout — local implementation, 2026-09-24; delivery proof owed.**
+The continuation walk found that the record and Amend Receiving still cut off item
+identity. They now use the existing receiving form container rules; item names wrap,
+inputs/files stay within the pane and amendment actions wrap. In the real-component
+fixture at a 278px viewport (246px content), all seven amendment controls stayed within
+x=16–262 and page/scroll widths both equalled 278px. After Cancel the full item name
+remained visible in a 246px row with no row overflow. These changes neither save an
+amendment nor alter quantities or permissions.
+
 **Receiving PO loading state, 2026-09-24 — DEPLOYED + AUTHENTICATED READBACK #1578 (`5ce58beeb`).**
 The authenticated walk exposed a false `This purchase order could not be opened`
 while the initial PO list was still loading. Receiving now uses the same pending
@@ -2761,15 +2777,38 @@ the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabr
 PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
 the sample correction does not forbid a real destination exception.
 
-**Measured implementation boundary, 2026-09-24.** `ReceivingSessionDetail` currently
-carries posting actor/duty evidence, but no distinct evidenced physical receiver.
-Its `unit_results` carry stock-item identity and outcome without the source PO
-line identity; `grnTemplateDataOf` consequently feeds a separate Unit-results list
-to the PDF. The approved item/Unit grouping and physical-receiver fact are not
-implemented by restyling that paper. Preserve posting evidence as posting evidence;
-resolve the authoritative receiver and Unit-to-line projection before claiming the
-complete GRN target. Actual arrival time also remains a separate schema gap under
-§9.3; never derive it from the filing timestamp.
+**Item/Unit document linkage — local implementation, 2026-09-24; delivery proof owed.**
+The detail reader now resolves each recorded stock-item identity through its existing
+`ops_stock_items.po_line_id`, matching the register's source relationship. Only a line
+actually in this receipt may bind a Unit; matching SKU text never establishes lineage.
+Quantity-managed technical identities are suppressed. The shared GRN data builder puts
+bound outcomes below their item, once; unresolved historical outcomes remain in the
+separate Unit-results section rather than being invented or lost. Failed Unit, source
+PO, event or stock-identity reads refuse the document instead of pretending the evidence
+is empty. API and builder tests cover failures, unknown lineage and repeated SKUs; an
+actual rendered PDF checks item/Unit order and preserves the unmatched result. The PDF
+uses `Supplier Deliver To`, `Goods Received Date` and the date-only `Time not recorded`.
+The register, filters and exports now name `GRN Doc Date`; the record and amendment
+form use the same corrected supplier/date labels. Normal posted GRNs carry no `Valid`
+badge, while cancelled records retain their explicit status.
+
+**GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
+The existing renderer now prints the PO-family logo, legal identity and three address
+lines on every page, with the full GRN identity. Two information blocks separate
+supplier/source/instruction from document date and actual arrival facts. Unknown
+values print `Not recorded`. Order/Received columns always remain; zero-only
+Damaged/Wrong/Pending columns become one explicit zero-value line, while mixed
+columns retain quiet zeroes. Render tests cover real continuation pages, separate
+instruction/arrival positions and zero-only exception columns. Quantity arithmetic,
+posting evidence and the outstanding receiver/time/scope gaps are unchanged.
+
+**Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
+evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
+posting evidence; resolve the authoritative receiver before claiming the complete GRN
+target. Actual arrival time remains a separate schema gap under §9.3; never derive it
+from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
+other GRN document requirements remain open; the implemented composition and linkage
+do not claim the complete document target.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
@@ -3087,15 +3126,20 @@ and Claim completion cannot close the Case.
 
 #### No calendar-created product claims
 
-**Existing rule; implementation convergence REQUIRED, not yet built.** A passed ETA or routine
-partial delivery alone never opens a product Claim. Current source still calls
-`runSupplierClaimSweepCron` from `apps/api/src/index.ts`; its RPC
-`supplier_claim_sweep_overdue()` is defined in migration 0519. This is source evidence, not a live
-production scheduler or data-count verification.
+**Application retirement — local implementation, 2026-09-24; deployment and database closure owed.**
+A passed ETA or routine partial delivery alone never opens a product Claim.
+The Worker daily schedule no longer calls `runSupplierClaimSweepCron`; the retained
+compatibility export performs no database access and returns zero. Contact-by and
+follow-up maintenance still run. Source caller inventory found no HTTP caller or
+other application scheduler; the dashboard test only checks that reads do not call it.
+The committed database definitions remain in 0288, 0291 and 0519, with service-role
+execute permission. No production scheduler inventory or SQL change has been performed.
 
-The build must retire this automatic creation path, inventory every caller and scheduled trigger,
-and remove or disable the obsolete RPC safely in a new migration after dependency review. Do not
-edit applied migrations or stop unrelated daily jobs. Preserve PO balance and date follow-up in
+The remaining database closure must inventory live callers/schedules and disable the
+obsolete `supplier_claim_sweep_overdue()` safely through a new governed migration.
+No controlled database tool is exposed in this session, so neither migration numbering
+nor application has been fabricated; applied migration files are unchanged.
+Preserve PO balance and date follow-up in
 Purchase Orders and shared My Work: `Date passed` uses the governed evidenced supplier date,
 never a calculated ETA described as a supplier promise. Missing confirmation remains its own fact.
 Historical `Late delivery` claims remain searchable and keep their history; no new selectable

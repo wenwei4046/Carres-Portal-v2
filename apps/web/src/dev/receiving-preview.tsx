@@ -210,6 +210,7 @@ const DETAIL = {
     ...POSTED_ROW,
     unit_results: [
       {
+        po_line_id: "l1",
         stock_item_id: "u1",
         unit_code: "U1-000-101",
         outcome: "received",
@@ -217,6 +218,7 @@ const DETAIL = {
         note: null,
       },
       {
+        po_line_id: "l1",
         stock_item_id: "u2",
         unit_code: "U1-000-102",
         outcome: "received",
@@ -224,6 +226,7 @@ const DETAIL = {
         note: null,
       },
       {
+        po_line_id: "l1",
         stock_item_id: "u3",
         unit_code: "U1-000-103",
         outcome: "received_with_issue",
@@ -231,6 +234,7 @@ const DETAIL = {
         note: null,
       },
       {
+        po_line_id: "l1",
         stock_item_id: "u4",
         unit_code: "U1-000-104",
         outcome: "not_received",
