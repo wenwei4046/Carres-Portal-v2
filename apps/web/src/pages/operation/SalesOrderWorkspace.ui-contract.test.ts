@@ -106,7 +106,9 @@ describe("Sales Order object template contract", () => {
     /* ⭐ AND THE BLUE IS THE SALES ORDER'S ALONE. `Block` is shared with
        `PurchaseOrdersPage`, so the ruling is opt-in: every Sales Order card
        asks for it and no other page moves. */
-    expect(workspace.match(/titleTone="sales-order"/g)).toHaveLength(6);
+    /* Six Order-tab cards + the Revisions/History card (kit-sizes card,
+       2026-09-23), which now wears the same section grammar. */
+    expect(workspace.match(/titleTone="sales-order"/g)).toHaveLength(7);
     expect(workspace).toContain('titleTone = "shared"');
     /* The tab underline is the screen's one accent, and it marks the current
        view — the accent's own job. */
@@ -1599,5 +1601,11 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
     /* It prints no money: the charge is stated once, in Items. */
     expect(workspace).toContain('<Fact label="Disposal" value={servicesWords(disposals, nameOfAddon)} own={false} />');
     expect(changeHelpers).toContain("export const isDisposalService");
+  });
+
+  it("draws Revisions and History through the same SO section Block — no off-scale p-5, no 20px title", () => {
+    expect(workspace).toContain('<Block titleTone="sales-order" title={objectView}>');
+    expect(workspace).not.toContain("rounded-card border border-kit-slate-5 bg-white p-5");
+    expect(workspace).not.toContain('<h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>');
   });
 });

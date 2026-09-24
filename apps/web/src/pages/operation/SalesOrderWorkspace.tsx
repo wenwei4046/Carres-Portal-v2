@@ -4038,8 +4038,13 @@ function SalesOrderWorkspaceBody() {
         </div>
       ) : (objectView === "Revisions" && mode !== "oldrev") || objectView === "History" ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
-          <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
-            <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>
+          {/* ⭐ THE SAME SECTION GRAMMAR AS THE ORDER TAB (kit-sizes card,
+              2026-09-23). This card was `p-5` — 20px, off the spacing scale —
+              under a 20px `text-title`, beside an Order tab whose every section
+              is a 15px blue title over a 1px rule. It is now that same `Block`,
+              so padding, title and gap come from one place. */}
+          <div className="mx-auto max-w-5xl">
+          <Block titleTone="sales-order" title={objectView}>
             {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
                 guards a 403 or a 500 falls straight through to the ledger's
                 governed EMPTY sentences (`No revisions recorded` / `No history
@@ -4097,6 +4102,7 @@ function SalesOrderWorkspaceBody() {
               }}
             />
             )}
+          </Block>
           </div>
         </div>
       ) : (
