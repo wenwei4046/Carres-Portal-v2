@@ -382,10 +382,11 @@ Optional payload fields the template already renders when sent: `customer.email`
 `delivery.address`, **`issued_by`** (audit_log actor — §9). Nullable floor/lift
 are no longer an SO concern; they move to the DO with the §8 gate.
 
-`addons[].sku` is CLOSED (Sales Orders Card 13, 2026-09-23): the SO document payload sends each
-service's stored key, and the ITEM CODE cell prints it UPPER CASE through `lib/service-code.ts` — the
-same function the SO page uses, so page and paper tally. Before this the cell printed the `ADD-ON`
-placeholder on every issued SO. The stored key is never rewritten.
+`addons[].sku` is CLOSED (Sales Orders Card 13, 2026-09-23/24): the SO document payload sends each
+service's governed code — the catalogue Service SKU (`addons.service_sku`, 0172) when the service is
+linked, otherwise the saved `addon_key` exactly as stored — and the ITEM CODE cell prints it as sent.
+The SO page applies the same rule (`lib/service-code.ts`), so page and paper tally. Before this the
+cell printed the `ADD-ON` placeholder on every issued SO. Nothing is upper-cased or rewritten.
 
 ## Change Log
 
@@ -407,4 +408,4 @@ placeholder on every issued SO. The stored key is never rewritten.
 | 2026-09-21 | Stress pass DONE (40 lines → 3 pages) and the answer to §5's DEFERRED question is recorded: continuation pages print item rows with **no column bar** — a reader on page 2 cannot tell Unit from Discount from Amount — and the last page can be money-only, so a blanket `fixed` bar would stamp an items header over nothing. Needs real chunking; opened as its own card, not hacked. Also: PAYMENTS gets the SAME box as the goods table (one table style per document) with every row closed including the last; all rows carry a 9mm minimum so heights read even; the signature/totals row loses its 4mm inset — 110 + 6 + 70 = 186mm, so both outer edges land on the table rails and the two boxes are exactly the same height; category bands lose their grey fill. | Loo |
 | 2026-09-21 | `Subtotal` RETIRED from this document (owner: "subtotal is confused me"). "Sub-" promises that something is still to be added, and on a Carres SO nothing is: delivery rides as a line, there is no order-level discount, tax is nil — so Subtotal always equalled Total and the word described a step that never happens. The money card now reads **`Goods total · Tax · Total payable · Paid to date · BALANCE DUE`** and the items table closes on **`GOODS TOTAL`** — one figure, one name, in words a furniture customer reads without accounting training. (The tax-invoice register — `Total excluding tax / Total including tax` — was the alternative and belongs to the INVOICE, not to a customer's order.) The Sales Invoice still says `Subtotal (excl. SST)` and must be brought into line on its own card. | Loo |
 | 2026-09-23 | **Four-digit year, family-wide** (owner, Jess): every printed date reads `Wed, 23 Sep 2026`. `Mon, 21 Sep 26` is retired — it contradicted DOCUMENT-KIT §4 and disagreed with the PO on the same day's paper, and a Carres document outlives its year. One line (`capsDate`) moves SALES ORDER INFO and the payments table together. Measured at 8pt: +3.1mm per date; the tightest cell, the payments `DATE` column at 22.5mm usable, takes `23 Sep 2026` (15.7mm) with 6.8mm spare. BUILT. | Jess |
-| 2026-09-23 | §10: `addons[].sku` sent by the SO document payload; service ITEM CODE printed upper case from the one page/paper function (Sales Orders Card 13). | Jess (Card 13 mission) |
+| 2026-09-24 | §10: `addons[].sku` sent by the SO document payload — catalogue Service SKU when linked, saved key otherwise; printed as sent (Sales Orders Card 13). | Jess (Card 13 follow-up) |
