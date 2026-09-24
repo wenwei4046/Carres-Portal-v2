@@ -117,7 +117,7 @@ function StateIcon({ row }: { row: LogisticsCheckRow }) {
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h4 className="text-label font-semibold uppercase tracking-[0.04em] text-kit-slate-11">{children}</h4>;
+  return <h4 className="text-[11px] font-semibold uppercase leading-[14px] tracking-[0.04em] text-kit-slate-11">{children}</h4>;
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -251,25 +251,25 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
   const doorFor = (door: LogisticsAction["door"]): ReactNode => {
     if (door === "assign" || door === "decide") {
       return (
-        <Button size="sm" variant="primary" onClick={() => setEditing("logistics")} data-testid="logistics-card-edit-logistics">
+        <Button size="touch" variant="primary" onClick={() => setEditing("logistics")} data-testid="logistics-card-edit-logistics">
           {partnerName ? PARTY_COPY.changeLogistics : PARTY_COPY.assignLogistics}
         </Button>
       );
     }
     if (door === "schedule") {
       return (
-        <Button size="sm" variant="primary" onClick={() => setEditing("schedule")} data-testid="logistics-card-edit-schedule">
+        <Button size="touch" variant="primary" onClick={() => setEditing("schedule")} data-testid="logistics-card-edit-schedule">
           {PARTY_COPY.recordScheduled}
         </Button>
       );
     }
     if (door === "contact") {
       return partner && !partner.hasPortal && !facts?.link ? (
-        <Button size="sm" variant="primary" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link">
+        <Button size="touch" variant="primary" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link">
           {LINK_COPY.createLink}
         </Button>
       ) : (
-        <Button size="sm" variant="primary" onClick={() => void copy(message, PARTY_COPY.copied, true)} data-testid="logistics-card-copy-message">
+        <Button size="touch" variant="primary" onClick={() => void copy(message, PARTY_COPY.copied, true)} data-testid="logistics-card-copy-message">
           {PARTY_COPY.copyMessage}
         </Button>
       );
@@ -310,15 +310,15 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span className={`text-body font-semibold ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
+            <span className={`text-[15px] font-semibold leading-5 ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
               {heading}
             </span>
-            <span className="text-label text-kit-slate-11" data-testid="logistics-card-progress">{LOGISTICS_COPY.checks(model.doneCount)}</span>
+            <span className="text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-progress">{LOGISTICS_COPY.checks(model.doneCount)}</span>
           </div>
           {action ? (
             <div className="mt-1" data-testid="logistics-card-action">
-              <div className="text-body font-semibold text-kit-slate-12">{action.act}</div>
-              <div className={`text-label ${timingTone}`}>
+              <div className="text-[14px] font-semibold leading-5 text-kit-slate-12">{action.act}</div>
+              <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>
                 {[action.result, dueText(action)].filter(Boolean).join(" · ")}
               </div>
             </div>
@@ -347,8 +347,8 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
             {action ? (
               <>
                 <div>
-                  <div className="text-body font-semibold text-kit-slate-12">{action.act}</div>
-                  <div className={`text-label ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
+                  <div className="text-[14px] font-semibold leading-5 text-kit-slate-12">{action.act}</div>
+                  <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
                 </div>
                 {editing === null ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -384,11 +384,11 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                   <div className="flex items-start gap-2">
                     <StateIcon row={row} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-label text-kit-slate-11">
+                      <div className="text-[12px] font-normal leading-4 text-kit-slate-11">
                         {row.label}
                         {row.dueIso ? ` · ${spell(row.dueIso)}` : ""}
                       </div>
-                      <div className={`text-body ${row.state === "missed" ? "text-kit-red-11" : "text-kit-slate-12"}`}>
+                      <div className={`text-[13px] font-normal leading-[18px] ${row.state === "missed" ? "text-kit-red-11" : "text-kit-slate-12"}`}>
                         {row.state === "not_needed"
                           ? LOGISTICS_COPY.notNeeded
                           : row.fact ?? (row.dueIso ? LOGISTICS_COPY.opens(spell(row.dueIso)) : LOGISTICS_COPY.noRequested)}
@@ -432,7 +432,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                 ) : null}
               </div>
               {editing === null ? (
-                <Button size="sm" onClick={() => setEditing("logistics")} data-testid="logistics-card-assignment-edit">
+                <Button size="touch" onClick={() => setEditing("logistics")} data-testid="logistics-card-assignment-edit">
                   {partnerName ? PARTY_COPY.changeLogistics : PARTY_COPY.assignLogistics}
                 </Button>
               ) : null}
@@ -495,10 +495,10 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                     : LINK_COPY.notOpened}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" icon="copy" onClick={() => void copy(linkUrl, LINK_COPY.linkCopied)} data-testid="logistics-card-copy-link">
+                  <Button size="touch" icon="copy" onClick={() => void copy(linkUrl, LINK_COPY.linkCopied)} data-testid="logistics-card-copy-link">
                     {LINK_COPY.copyLink}
                   </Button>
-                  <Button size="sm" disabled={acts.revoke.isPending} onClick={() => void revokeLink()} data-testid="logistics-card-revoke-link">
+                  <Button size="touch" disabled={acts.revoke.isPending} onClick={() => void revokeLink()} data-testid="logistics-card-revoke-link">
                     {LINK_COPY.revokeLink}
                   </Button>
                 </div>
@@ -512,7 +512,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                     `Create link`, this section states the fact and adds no twin. */}
                 {action?.door === "contact" ? null : (
                   <span className="self-start">
-                    <Button size="sm" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link-section">
+                    <Button size="touch" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link-section">
                       {LINK_COPY.createLink}
                     </Button>
                   </span>
@@ -530,7 +530,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                   {message}
                 </pre>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" icon="copy" onClick={() => void copy(message, PARTY_COPY.copied, true)}>
+                  <Button size="touch" icon="copy" onClick={() => void copy(message, PARTY_COPY.copied, true)}>
                     {PARTY_COPY.copyMessage}
                   </Button>
                   {partnerRow?.whatsapp_group_url ? (
@@ -558,10 +558,10 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
               <ol className="flex flex-col gap-2">
                 {(facts?.history ?? []).map((h, i) => (
                   <li key={`${h.at}-${i}`}>
-                    <div className="text-body font-semibold text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
-                    <div className="text-meta text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
+                    <div className="text-[12px] font-normal leading-4 text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
+                    <div className="text-[12px] font-normal leading-4 text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
                     {h.detail ? (
-                      <div className="text-label text-kit-slate-11">
+                      <div className="text-[12px] font-normal leading-4 text-kit-slate-11">
                         {/* The API hands ISO days; the screen spells them (COPY: no ISO on screen). */}
                         {h.detail.replace(/\d{4}-\d{2}-\d{2}/g, (iso) => spell(iso))}
                       </div>

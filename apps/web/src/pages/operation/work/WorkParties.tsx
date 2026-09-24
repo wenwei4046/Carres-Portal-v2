@@ -72,7 +72,7 @@ function CustomerCard({ orderId }: { orderId: string }) {
     <PartyShell
       title={PARTIES_COPY.customer}
       testId="party-customer"
-      summary={<span className="text-body font-semibold text-kit-slate-12">{PARTIES_COPY.customer} · {name}</span>}
+      summary={<span className="text-[15px] font-semibold leading-5 text-kit-slate-12">{PARTIES_COPY.customer} · {name}</span>}
     >
       <div className="text-body text-kit-slate-12">{PARTIES_COPY.phone}: {o.customer_phone || PARTIES_COPY.notRecorded}</div>
       <div className="text-body text-kit-slate-12">{PARTIES_COPY.address}: {(o.customer_address ?? "").trim() || PARTIES_COPY.notRecorded}</div>
@@ -93,7 +93,7 @@ function SupplierCard({ orderId }: { orderId: string }) {
       title={PARTIES_COPY.supplier}
       testId="party-supplier"
       summary={
-        <span className="text-body font-semibold text-kit-slate-12">
+        <span className="text-[15px] font-semibold leading-5 text-kit-slate-12">
           {PARTIES_COPY.supplier} · {suppliers.length > 0 ? suppliers.join(" · ") : PARTIES_COPY.noSupplier}
         </span>
       }

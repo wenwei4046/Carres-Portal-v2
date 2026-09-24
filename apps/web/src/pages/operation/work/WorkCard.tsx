@@ -5,15 +5,16 @@
  * ```
  *   ┌────────┬──────────────────────────────────────────┐
  *   │  TUE   │ [truck] DELIVERY · NETS                  │
- *   │   15   │ Not delivered                            │  ← fact, 18px, one line
- *   │ MISSED │ Arrange a new delivery date              │  ← action, 14px, one line
+ *   │   15   │ Not delivered                            │  ← problem, 15px, one line
+ *   │ MISSED │ Arrange a new delivery date              │  ← action, 12px, one line
  *   │        ├──────────────────────────────────────────┤
  *   │        │ SO-1318                          [open]  │  ← the ONLY navigating control
  *   └────────┴──────────────────────────────────────────┘
  * ```
  *
- * Every card is exactly 124px: fact and action truncate, the card never
- * grows. Selecting the card stays on Work (the right panel shows it); only the
+ * Every card is exactly 104px (owner density ruling 2026-09-25): a 60px date
+ * rail beside the content, a 28px footer; problem and action truncate, the
+ * card never grows. Selecting the card stays on Work (the right panel shows it); only the
  * footer's open-record button leaves for the owning module. No coloured
  * corner, no shadow, no action arrow.
  *
@@ -123,48 +124,48 @@ export default function WorkCard({
       data-work-card
       onClick={onSelect}
       onKeyDown={onKeyDown}
-      className={`grid h-[124px] w-full shrink-0 cursor-pointer grid-cols-[72px_minmax(0,1fr)] overflow-hidden rounded-work border bg-white text-left transition-colors duration-[120ms] ease-out motion-reduce:transition-none focus-visible:outline-offset-[3px] ${FOCUS} ${selected ? "border-kit-blue-9 ring-1 ring-kit-blue-9" : "border-work-line hover:border-work-line-hover"}`}
+      className={`grid h-[104px] w-full shrink-0 cursor-pointer grid-cols-[60px_minmax(0,1fr)] overflow-hidden rounded-work border bg-white text-left transition-colors duration-[120ms] ease-out motion-reduce:transition-none focus-visible:outline-offset-[3px] ${FOCUS} ${selected ? "border-kit-blue-9 ring-1 ring-kit-blue-9" : "border-work-line hover:border-work-line-hover"}`}
     >
-      <span className="flex flex-col items-center justify-center gap-[7px] border-r border-work-line px-2 py-[9px]">
+      <span className="flex min-w-0 flex-col items-center justify-center gap-1 border-r border-work-line px-1.5 py-2">
         {parts ? (
-          <span aria-hidden className="grid h-[52px] w-12 grid-rows-[20px_32px] text-center">
-            <span className={`grid place-items-center text-[14px] font-semibold uppercase tracking-[0.06em] ${status === "today" ? "text-kit-blue-11" : "text-work-muted"}`}>
+          <span aria-hidden className="grid h-11 w-12 grid-rows-[14px_24px] content-center gap-0.5 text-center" data-testid="work-card-date">
+            <span className={`grid place-items-center text-[11px] font-semibold uppercase leading-[14px] tracking-[0.06em] ${status === "today" ? "text-kit-blue-11" : "text-work-muted"}`}>
               {parts.weekday}
             </span>
-            <span className="grid place-items-center text-[28px] font-semibold leading-none text-work-ink">{parts.day}</span>
+            <span className="grid place-items-center text-[22px] font-semibold leading-6 text-work-ink">{parts.day}</span>
           </span>
         ) : (
-          <span aria-hidden className="grid h-[52px] w-12 place-items-center text-work-muted">
+          <span aria-hidden className="grid h-11 w-12 place-items-center text-work-muted">
             <Icon name="noDate" />
           </span>
         )}
         {STATUS_WORD[status] ? (
-          <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-[11px] tracking-[0.06em] ${STATUS_CLASS[status]}`}>
+          <span className={`max-h-[17px] whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-[11px] tracking-[0.06em] ${STATUS_CLASS[status]}`}>
             {STATUS_WORD[status]}
           </span>
         ) : (
           <span aria-hidden className="h-[17px]" />
         )}
       </span>
-      <span className="flex min-w-0 flex-col px-4 pt-2.5">
-        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold uppercase leading-4 tracking-[0.07em] text-work-slate">
-          <ModuleIcon aria-hidden size={16} strokeWidth={1.8} className="shrink-0 text-kit-blue-9" />
+      <span className="flex min-w-0 flex-col px-3 pt-2">
+        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold uppercase leading-[14px] tracking-[0.06em] text-work-slate" data-testid="work-card-module">
+          <ModuleIcon aria-hidden size={14} strokeWidth={1.8} className="shrink-0 text-kit-blue-9" />
           <span className="shrink-0">{moduleLabel}</span>
           {item.recipient ? (
-            <span className="min-w-0 truncate text-[12px] font-semibold normal-case tracking-normal text-work-muted">· {item.recipient}</span>
+            <span className="min-w-0 truncate text-[11px] font-medium leading-[14px] normal-case tracking-normal text-work-muted">· {item.recipient}</span>
           ) : null}
         </span>
-        <span title={item.problem} className="mt-[5px] truncate text-[18px] font-semibold leading-[22.5px] text-work-ink">
+        <span title={item.problem} className="mt-0.5 truncate text-[15px] font-semibold leading-5 text-work-ink" data-testid="work-card-problem">
           {item.problem}
         </span>
-        <span title={action} className="truncate text-[14px] font-semibold leading-[18px] text-work-slate">
-          {item.locked ? <Lock size={14} strokeWidth={2.5} className="-mt-0.5 mr-1 inline" aria-label="Held by Finance" /> : null}
+        <span title={action} className="truncate text-[12px] font-medium leading-4 text-work-slate" data-testid="work-card-action">
+          {item.locked ? <Lock size={12} strokeWidth={2.5} className="-mt-0.5 mr-1 inline" aria-label="Held by Finance" /> : null}
           {action}
         </span>
-        <span className="-mx-4 mt-auto flex h-[34px] shrink-0 items-center gap-2 border-t border-work-line pl-4 pr-2.5">
+        <span className="-mx-3 mt-auto flex h-7 shrink-0 items-center gap-2 border-t border-work-line pl-3 pr-2" data-testid="work-card-footer">
           {/* The number never shrinks; only the cover name may, and its tooltip
               keeps the whole sentence. */}
-          <span title={cover ? `${item.soRef} · ${cover}` : item.soRef} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[12px] text-work-muted">
+          <span title={cover ? `${item.soRef} · ${cover}` : item.soRef} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[11px] leading-4 text-work-muted">
             <span className={cover ? "shrink-0" : "min-w-0 truncate"}>{item.soRef}</span>
             {cover ? <span className="min-w-0 truncate text-kit-amber-11">· {cover}</span> : null}
           </span>
@@ -178,9 +179,9 @@ export default function WorkCard({
               onOpenRecord();
             }}
             onKeyDown={(event) => event.stopPropagation()}
-            className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-control text-work-muted hover:bg-kit-slate-3 hover:text-kit-blue-11 focus-visible:outline-offset-1 ${FOCUS}`}
+            className={`-my-0.5 ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-control text-work-muted hover:bg-kit-slate-3 hover:text-kit-blue-11 focus-visible:outline-offset-1 ${FOCUS}`}
           >
-            <Icon name="open" />
+            <Icon name="open" size={14} />
           </button>
         </span>
       </span>
@@ -213,24 +214,24 @@ export function WorkListTabs({
           aria-selected={value === tab}
           data-testid={`work-tab-${tab}`}
           onClick={() => onChange(tab)}
-          className={`rounded-[5px] text-meta font-semibold transition-colors duration-[120ms] motion-reduce:transition-none ${FOCUS} focus-visible:outline-offset-1 ${value === tab ? "bg-white text-work-ink" : "text-work-muted hover:text-work-ink"}`}
+          className={`rounded-[5px] text-[13px] font-semibold leading-[18px] transition-colors duration-[120ms] motion-reduce:transition-none ${FOCUS} focus-visible:outline-offset-1 ${value === tab ? "bg-white text-work-ink" : "text-work-muted hover:text-work-ink"}`}
         >
           {TAB_WORD[tab]}
-          {counts[tab] !== undefined ? <span className="ml-1 tabular-nums text-work-muted">{counts[tab]}</span> : null}
+          {counts[tab] !== undefined ? <span className="ml-1 font-medium tabular-nums text-work-muted">{counts[tab]}</span> : null}
         </button>
       ))}
     </div>
   );
 }
 
-/** Three 124px neutral placeholders; no shimmer under reduced motion. */
+/** Three 104px neutral placeholders; no shimmer under reduced motion. */
 export function WorkCardSkeleton() {
   return (
     <div className="flex flex-col gap-2" aria-label="Loading work" data-testid="work-loading">
       {[0, 1, 2].map((index) => (
-        <div key={index} className="grid h-[124px] grid-cols-[72px_minmax(0,1fr)] overflow-hidden rounded-work border border-work-line bg-white motion-safe:animate-pulse">
+        <div key={index} className="grid h-[104px] grid-cols-[60px_minmax(0,1fr)] overflow-hidden rounded-work border border-work-line bg-white motion-safe:animate-pulse">
           <span className="border-r border-work-line" />
-          <span className="flex flex-col gap-2 px-4 pt-3">
+          <span className="flex flex-col gap-2 px-3 pt-2">
             <span className="h-3 w-24 rounded bg-kit-slate-3" />
             <span className="h-4 w-56 max-w-full rounded bg-kit-slate-3" />
             <span className="h-3 w-40 max-w-full rounded bg-kit-slate-3" />

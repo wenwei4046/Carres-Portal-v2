@@ -1,5 +1,5 @@
 /**
- * THE WORK SHELL — owner correction 2026-09-24.
+ * THE WORK SHELL — owner correction 2026-09-24; density ruling 2026-09-25.
  *
  * ```
  *   grey canvas · 16px padding
@@ -8,8 +8,8 @@
  *                            16px
  *   ┌ Date ──┐   Heading                 ┌ detail section ─────────┐
  *   └────────┘   [To do|Waiting|Done]    └─────────────────────────┘
- *     16px       ┌ card 124 ┐   8px      ┌ detail section ─────────┐
- *   ┌ Module ┐   ┌ card 124 ┐            └─────────────────────────┘
+ *     16px       ┌ card 104 ┐   8px      ┌ detail section ─────────┐
+ *   ┌ Module ┐   ┌ card 104 ┐            └─────────────────────────┘
  *   └────────┘
  *    240px   16   420px               16   remaining (≥480px)
  * ```
@@ -20,10 +20,10 @@
  *
  *   three  ≥1280px of page — rail · list · detail
  *   two    960–1279px      — the rail collapses (a toolbar control reopens
- *                            it); the list stays 360–400px and can never be
- *                            collapsed
+ *                            it); the list is exactly 400px and can never
+ *                            be collapsed
  *   one    <960px          — Date and Module open from compact controls; the
- *                            list and the detail share ONE stage
+ *                            list (100% wide) and the detail share ONE stage
  */
 import type { ReactNode } from "react";
 
@@ -64,8 +64,8 @@ export default function WorkSplitShell({
   const columns = layout === "three"
     ? "grid-cols-[240px_420px_minmax(480px,1fr)]"
     : showRail
-      ? "grid-cols-[240px_minmax(360px,400px)_minmax(0,1fr)]"
-      : "grid-cols-[minmax(360px,400px)_minmax(0,1fr)]";
+      ? "grid-cols-[240px_400px_minmax(0,1fr)]"
+      : "grid-cols-[400px_minmax(0,1fr)]";
   return (
     <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 gap-4 ${columns}`}>
       {showRail ? (

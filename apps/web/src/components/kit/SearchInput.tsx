@@ -18,12 +18,15 @@ export default function SearchInput({
   id,
   placeholder = "Search",
   pill = false,
+  toolbar = false,
   ...rest
 }: {
   id: string;
   placeholder?: string;
   /** The top-strip shape — fully rounded, the Orders page's own search. */
   pill?: boolean;
+  /** A workspace toolbar control — 36px, 40px below 600px. */
+  toolbar?: boolean;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "style" | "type" | "id">) {
   return (
     <div className="relative">
@@ -38,7 +41,7 @@ export default function SearchInput({
         placeholder={placeholder}
         aria-label={rest["aria-label"] ?? placeholder}
         data-kit="search-input"
-        className={`${controlClass(false, pill ? "pill" : "single")} pl-8`}
+        className={`${controlClass(false, toolbar ? "toolbar" : pill ? "pill" : "single")} pl-8`}
         {...rest}
       />
     </div>
