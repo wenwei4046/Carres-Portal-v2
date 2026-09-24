@@ -513,7 +513,7 @@ describe("DeliveryOrderPage", () => {
       mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
       const photo = screen.getByRole("img", { name: "Photos 1" });
       fireEvent.error(photo);
-      expect(screen.getByText("Photo could not be loaded · Try again")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(/Photo could not be loaded.*Try again/);
       expect(screen.getByRole("radio", { name: "Accept proof" })).toBeDisabled();
       expect(screen.getByRole("radio", { name: "Request more proof" })).not.toBeDisabled();
       fireEvent.load(photo);

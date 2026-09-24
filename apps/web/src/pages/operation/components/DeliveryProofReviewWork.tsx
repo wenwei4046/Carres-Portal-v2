@@ -84,7 +84,7 @@ export default function DeliveryProofReviewWork({
             key={`${photo.path}-${retryVersion}`}
             type="button"
             aria-label={`View delivery proof photo ${index + 1}`}
-            className="rounded-control border border-transparent text-left hover:border-kit-blue-7 active:border-kit-blue-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-control border border-transparent text-left hover:border-kit-blue-6 active:border-kit-blue-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 disabled:cursor-not-allowed disabled:opacity-40"
             onClick={() => setViewerIndex(index)}
           >
             <img

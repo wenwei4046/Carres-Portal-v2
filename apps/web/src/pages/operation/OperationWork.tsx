@@ -613,7 +613,7 @@ export default function OperationWork() {
             ))}
           </div>
         ) : error ? (
-          <div className="mx-3 my-4 flex min-h-44 flex-col items-center justify-center rounded-panel border border-kit-red-6 bg-white px-5 py-8 text-center" data-testid="work-error">
+          <div className="mx-3 my-4 flex min-h-44 flex-col items-center justify-center rounded-panel border border-kit-red-9 bg-white px-5 py-8 text-center" data-testid="work-error">
             <span className="mb-3 grid h-10 w-10 place-items-center rounded-full bg-kit-red-3 text-kit-red-11"><Icon name="late" size={18} /></span>
             <p className="text-body text-danger">Work could not be loaded. Try again.</p>
             <div className="mt-3"><Button type="button" variant="neutral" onClick={retry}>Try again</Button></div>

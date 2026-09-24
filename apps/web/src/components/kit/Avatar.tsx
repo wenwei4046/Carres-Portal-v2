@@ -15,7 +15,7 @@ export interface AvatarProps {
 }
 
 const SIZE = {
-  sm: "h-6 w-6 text-[10px]",
+  sm: "h-6 w-6 text-label",
   md: "h-8 w-8 text-label",
 } as const;
 
