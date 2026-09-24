@@ -39,6 +39,13 @@
 --     heading's subtotal from the rows that print, so an empty heading prints
 --     no line at all, not a 0.00 line.
 --
+--   * Every door that changes the chart's structure (gl_account_move,
+--     gl_account_add, gl_money_account_add, gl_account_update) takes one
+--     transaction lock, gl_chart_structure, straight after its role check.
+--     Their checks walk up and down the chart through rows they do not lock,
+--     so two changes at once could each pass on the chart as it was and
+--     together put an ordinary account under the money accounts heading.
+--
 -- gl_trial_balance is not changed: it lists every account, and the API drops
 -- the headings from it by this same flag.
 --
@@ -910,6 +917,8 @@ begin
     raise exception 'Only Finance changes the chart of accounts.'
       using errcode = '42501', detail = 'not_finance';
   end if;
+  -- 0580: one change to the chart's structure at a time (see gl_account_move).
+  perform pg_advisory_xact_lock(hashtext('gl_chart_structure'));
   -- Two people adding at once must not both pass the "already in the chart" checks.
   perform pg_advisory_xact_lock(hashtext('gl_account_add'));
 
@@ -1008,6 +1017,13 @@ begin
     raise exception 'Only Finance changes the chart of accounts.'
       using errcode = '42501', detail = 'not_finance';
   end if;
+  -- 0580: one change to the chart's structure at a time. The checks below walk
+  -- up and down the chart through rows this move does not lock, so two moves
+  -- (or a move and an add) at once could each pass on the chart as it was and
+  -- together put an ordinary account under the money accounts heading, or a
+  -- heading under itself. gl_account_add, gl_money_account_add and
+  -- gl_account_update take the same lock.
+  perform pg_advisory_xact_lock(hashtext('gl_chart_structure'));
 
   if exists (select 1 from unnest(coalesce(p_from_was, '{}') || coalesce(p_from_now, '{}')
                               || coalesce(p_to_was, '{}') || coalesce(p_to_now, '{}')) c
@@ -1621,6 +1637,189 @@ begin
 end;
 $function$
 ;
+
+-- 16 · gl_money_account_add (0577): takes the chart-structure lock.
+CREATE OR REPLACE FUNCTION public.gl_money_account_add(p_name text, p_kind text, p_code text DEFAULT NULL::text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role text := public.app_role()::text;
+  v_name text;
+  v_code text;
+  v_head public.gl_accounts%rowtype;
+begin
+  if v_role is null or v_role not in ('finance','principal') then
+    raise exception 'Only Finance changes the money accounts.'
+      using errcode = '42501', detail = 'not_finance';
+  end if;
+  if p_kind is null or p_kind not in ('BANK','HOLDING') then
+    raise exception 'Choose the kind: a bank, or an online payment company.'
+      using errcode = '22023', detail = 'kind_invalid';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('gl_chart_structure'));  -- 0580
+  perform pg_advisory_xact_lock(hashtext('gl_money_account_add'));
+  v_name := public._gl_money_account_name(p_name, null);
+
+  select a.* into v_head from public.gl_accounts a
+   where a.code = public.gl_account_for('MONEY_ACCOUNTS_HEADING');
+
+  if nullif(btrim(p_code), '') is not null then
+    -- 0577: a number Finance typed, checked as gl_account_update checks one.
+    v_code := btrim(p_code);
+    if v_code ~ '^([0-9]{4}|[0-9]{3}-[0-9A-Za-z][0-9]{3})$' then
+      v_code := upper(v_code);
+    end if;
+    if v_code !~ '^([0-9]{4}|[0-9]{3}-[0-9A-Z][0-9]{3})$' then
+      raise exception 'A number is four digits, like 1210, or AutoCount''s form, like 100-0001 or 900-A001.'
+        using errcode = '22023', detail = 'code_shape';
+    end if;
+    if exists (select 1 from public.gl_accounts a where a.code = v_code) then
+      raise exception 'An account numbered % is already in the chart.', v_code
+        using errcode = '22023', detail = 'code_exists';
+    end if;
+  elsif v_head.code ~ '^[0-9]{3}-0000$' then
+    select min(c.code) into v_code
+      from (select left(v_head.code, 4) || k::text || '000' as code
+              from generate_series(1, 9) k) c
+     where not exists (select 1 from public.gl_accounts a where a.code = c.code);
+  elsif v_head.code ~ '^[0-9]{2}00$' then
+    select min(c.code) into v_code
+      from (select left(v_head.code, 2) || lpad(k::text, 2, '0') as code
+              from generate_series(1, 99) k) c
+     where not exists (select 1 from public.gl_accounts a where a.code = c.code);
+  else
+    -- 0577: no number to follow; Finance types one.
+    raise exception 'Type a number for the new account. % % does not end in 00 or -0000, so no number is picked for you.',
+      coalesce(v_head.code, 'The money accounts heading'), coalesce(v_head.name, '')
+      using errcode = '22023', detail = 'code_needed';
+  end if;
+  if v_code is null then
+    -- 0577: every number is used. Ask for one instead of stopping here.
+    raise exception 'Every number under % % is used. Type a number for the new account.', v_head.code, v_head.name
+      using errcode = '22023', detail = 'code_needed';
+  end if;
+
+  insert into public.gl_accounts (code, name, kind, parent_code, is_control, is_active, control_for)
+  values (v_code, v_name, 'ASSET', v_head.code, false, true, null);
+  insert into public.gl_money_accounts (account_code, money_kind, created_by, updated_by)
+  values (v_code, p_kind, auth.uid(), auth.uid());
+  return v_code;
+end;
+$function$
+;
+
+-- 17 · gl_account_update (0570): a renumber changes the chart's structure too,
+-- so it takes the chart-structure lock.
+CREATE OR REPLACE FUNCTION public.gl_account_update(p_code text, p_name text, p_new_code text DEFAULT NULL::text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role text := public.app_role()::text;
+  v_old  text;
+  v_name text := btrim(coalesce(p_name, ''));
+  v_code text := btrim(coalesce(p_new_code, p_code));
+begin
+  -- 0570: the number is stored in upper case, so 900-a001 is kept as 900-A001.
+  -- The shape is checked first, on the typed text with [A-Za-z], because
+  -- upper() turns some non-ASCII letters into ASCII ones.
+  if v_code ~ '^([0-9]{4}|[0-9]{3}-[0-9A-Za-z][0-9]{3})$' then
+    v_code := upper(v_code);
+  end if;
+  if v_role is null or v_role not in ('finance','principal') then
+    raise exception 'Only Finance changes the chart of accounts.'
+      using errcode = '42501', detail = 'not_finance';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('gl_chart_structure'));  -- 0580
+  select a.name into v_old from public.gl_accounts a where a.code = p_code for update;
+  if not found then
+    raise exception 'That account is not in the chart.'
+      using errcode = 'P0002', detail = 'account_missing';
+  end if;
+  if coalesce(p_name, '') !~ '[^[:space:]]' then
+    raise exception 'Type the account name.'
+      using errcode = '22023', detail = 'name_missing';
+  end if;
+  if length(v_name) > 60 then
+    raise exception 'Keep the name to 60 characters.'
+      using errcode = '22023', detail = 'name_too_long';
+  end if;
+  if exists (select 1 from public.gl_accounts a
+              where lower(a.name) = lower(v_name) and a.code <> p_code) then
+    raise exception 'An account named % is already in the chart.', v_name
+      using errcode = '22023', detail = 'name_exists';
+  end if;
+  -- [0-9], not \d: \d can take a non-ASCII digit on some collations.
+  -- Today's four digits, or AutoCount's: three digits, a dash, then a digit
+  -- or a capital letter and three digits (310-1000, 900-A001).
+  if v_code !~ '^([0-9]{4}|[0-9]{3}-[0-9A-Z][0-9]{3})$' then
+    raise exception 'A number is four digits, like 1210, or AutoCount''s form, like 100-0001 or 900-A001.'
+      using errcode = '22023', detail = 'code_shape';
+  end if;
+  if v_code <> p_code and exists (select 1 from public.gl_accounts a where a.code = v_code) then
+    raise exception 'An account numbered % is already in the chart.', v_code
+      using errcode = '22023', detail = 'code_exists';
+  end if;
+
+  if v_name is distinct from v_old then
+    update public.gl_accounts set name = v_name where code = p_code;
+  end if;
+  -- The number goes last, so the name update above still finds the row by its
+  -- old number. Section 1 carries the new number to every row that names it,
+  -- including the accounts under a heading; the two settings tell each frozen
+  -- document's trigger that this is a renumber (section 3), and are cleared
+  -- straight after so nothing later in the transaction can lean on them.
+  if v_code <> p_code then
+    perform set_config('carres.gl_renumber_from', p_code, true),
+            set_config('carres.gl_renumber_to',   v_code, true);
+    update public.gl_accounts set code = v_code where code = p_code;
+    perform set_config('carres.gl_renumber_from', '', true),
+            set_config('carres.gl_renumber_to',   '', true);
+  end if;
+  return v_code;
+end;
+$function$
+;
+
+-- The four doors: Finance signs in, so authenticated runs them; anon never does.
+revoke all on function public.gl_account_move(text, text, text[], text[], text[], text[]) from public, anon;
+grant execute on function public.gl_account_move(text, text, text[], text[], text[], text[]) to authenticated;
+revoke all on function public.gl_account_add(text, text, text, text, text) from public, anon;
+grant execute on function public.gl_account_add(text, text, text, text, text) to authenticated;
+revoke all on function public.gl_money_account_add(text, text, text) from public, anon;
+grant execute on function public.gl_money_account_add(text, text, text) to authenticated;
+revoke all on function public.gl_account_update(text, text, text) from public, anon;
+grant execute on function public.gl_account_update(text, text, text) to authenticated;
+
+-- Sanity: every door that changes the chart's structure takes the one lock,
+-- and none of the new or replaced definer functions is open to anon.
+do $sanity$
+declare
+  v_fn text;
+begin
+  foreach v_fn in array array[
+    'public.gl_account_move(text, text, text[], text[], text[], text[])',
+    'public.gl_account_add(text, text, text, text, text)',
+    'public.gl_money_account_add(text, text, text)',
+    'public.gl_account_update(text, text, text)'] loop
+    if position('gl_chart_structure' in pg_get_functiondef(v_fn::regprocedure)) = 0 then
+      raise exception '0580 sanity: % does not take the chart-structure lock', v_fn;
+    end if;
+    if has_function_privilege('anon', v_fn, 'execute') then
+      raise exception '0580 sanity: anon can run %', v_fn;
+    end if;
+  end loop;
+  if has_function_privilege('anon', 'public.gl_accounts_parent_is_heading()', 'execute')
+     or has_function_privilege('authenticated', 'public.gl_accounts_parent_is_heading()', 'execute') then
+    raise exception '0580 sanity: the heading trigger function can be called directly';
+  end if;
+end
+$sanity$;
 
 comment on function public.gl_report_chart_tree() is
   '0579: each account with its depth, the headings above it, and its place in the chart order (sort_order, then code). is_heading: 0580 gl_accounts.is_heading, or sits at the top. Read only by the report functions.';

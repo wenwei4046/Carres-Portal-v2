@@ -218,3 +218,87 @@ describe.skipIf(!URL)("chart moves between any two headings of the same kind (re
     await actAs(U.finance);
   });
 });
+
+/**
+ * Two changes to the chart at once. Each door walks up and down the chart
+ * through rows it does not lock, so without one shared lock a move into an
+ * empty heading and a move of that heading's parent under the money accounts
+ * heading could both pass and put an ordinary account under Cash and bank.
+ * Each session below is its own connection and its own transaction, rolled back.
+ */
+describe.skipIf(!URL)("one change to the chart's structure at a time (real PostgreSQL, 0580)", () => {
+  const open: pg.Client[] = [];
+  let n = 0;
+  /** A connection inside an open transaction, signed in as a Finance user of its own. */
+  async function financeSession(): Promise<pg.Client> {
+    if (!LOCAL) throw new Error("CARRES_TEST_DATABASE_URL must point at localhost");
+    const c = new pg.Client({ connectionString: URL });
+    await c.connect();
+    open.push(c);
+    const id = uid(`f${++n}`);
+    const email = `it-chart-lock-${n}-${RUN}@carres.test`;
+    await c.query("begin");
+    await c.query("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+    await c.query("insert into app_users (id, email, name, role, status) values ($1, $2, $3, 'finance', 'active')", [
+      id, email, `IT lock ${n}`,
+    ]);
+    await c.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: id, role: "authenticated" })]);
+    return c;
+  }
+  /** Asked from a third connection: is the chart-structure lock free right now? */
+  async function lockIsFree(): Promise<boolean> {
+    const c = new pg.Client({ connectionString: URL });
+    await c.connect();
+    try {
+      return (await c.query("select pg_try_advisory_xact_lock(hashtext('gl_chart_structure')) as free")).rows[0].free as boolean;
+    } finally {
+      await c.end();
+    }
+  }
+  const settle = async (p: Promise<unknown>) => p.then(() => "ok", (e: { code?: string }) => e.code ?? "error");
+
+  afterAll(async () => {
+    for (const c of open) {
+      await c.query("rollback").catch(() => undefined);
+      await c.end().catch(() => undefined);
+    }
+  });
+
+  const kids = async (c: pg.Client, parent: string): Promise<string[]> =>
+    (await c.query("select coalesce(array_agg(code order by sort_order, code), '{}') as k from gl_accounts where parent_code = $1", [parent])).rows[0].k;
+  /** 2310 out of 2300 into 2100, as the chart screen sends it. */
+  async function move2310(c: pg.Client) {
+    const from = await kids(c, "2300");
+    const to = await kids(c, "2100");
+    return c.query("select public.gl_account_move('2310', '2100', $1, $2, $3, $4)", [
+      from, from.filter((x) => x !== "2310"), to, [...to, "2310"],
+    ]);
+  }
+
+  // Each call must SUCCEED: a statement that fails aborts its transaction, and
+  // PostgreSQL lets go of that transaction's locks there and then.
+  it.each([
+    ["gl_account_move", (c: pg.Client) => move2310(c)],
+    ["gl_account_add", (c: pg.Client) => c.query("select public.gl_account_add('6000', '6600', 'Travel', '6610', 'Air fares')")],
+    ["gl_money_account_add", (c: pg.Client) => c.query("select public.gl_money_account_add($1, 'BANK')", [`IT lock bank ${RUN}`])],
+    ["gl_account_update", (c: pg.Client) => c.query("select public.gl_account_update('2310', (select name from gl_accounts where code = '2310'))")],
+  ])("%s holds the chart-structure lock until its transaction ends", async (_name, call) => {
+    expect(await lockIsFree()).toBe(true);
+    const s = await financeSession();
+    await call(s);
+    expect(await lockIsFree()).toBe(false);
+    await s.query("rollback");
+    expect(await lockIsFree()).toBe(true);
+  });
+
+  it("an add waits for a move elsewhere in the chart to finish", async () => {
+    const first = await financeSession();
+    const second = await financeSession();
+    // The first moves 2310 out of 2300 and has not committed.
+    await move2310(first);
+    // The second adds under 6000: not one row in common with the move, so
+    // only the shared lock makes it wait.
+    await second.query("set local lock_timeout = '300ms'");
+    expect(await settle(second.query("select public.gl_account_add('6000', '6600', 'Travel', '6610', 'Air fares')"))).toBe("55P03");
+  });
+});
