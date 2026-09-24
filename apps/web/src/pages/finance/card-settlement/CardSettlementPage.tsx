@@ -352,6 +352,11 @@ function DayExpansion({
         <p>
           {day.payout_status === "approved" ? "Payout approved" : "Payout prepared"} · {day.payout_move_no ?? "Move number not available"}
         </p>
+      ) : dayMayApprove(day) && day.holding_codes.length === 0 ? (
+        <p role="alert" className="text-kit-red-11">
+          The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each
+          sale.
+        </p>
       ) : dayMayApprove(day) && day.holding_codes.length > 1 ? (
         <p role="alert" className="text-kit-red-11">
           The sales on this day were paid into more than one card account ({day.holding_codes.join(", ")}), so one payout cannot cover

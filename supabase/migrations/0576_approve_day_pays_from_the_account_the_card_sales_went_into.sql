@@ -4,7 +4,7 @@
 --   1. Approve day took any routed card account as Paid from. It now must be
 --      the account the day's matched payments were paid into, found through
 --      gl_payment_account_map (gl_account_for_payment_method). A day whose
---      payments went into more than one account is refused.
+--      payments went into no card account, or into more than one, is refused.
 --   2. gl_money_move_create refused a Money moves card payout only from a
 --      routed card account. It now refuses one from every card account: any
 --      account a card payment method maps to, and any routed account.
@@ -252,11 +252,15 @@ begin
             from public.card_settlement_lines l
             join public.order_payments p on p.id = l.payment_id
            where l.acquirer = p_acquirer and l.day_date = p_day_date and l.group_key = p_group_key) s;
+  if cardinality(v_holding) = 0 then
+    raise exception 'The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.'
+      using errcode = '22023', detail = 'day_no_holding';
+  end if;
   if cardinality(v_holding) > 1 then
     raise exception 'The sales on this day were paid into more than one card account, so one payout cannot cover them. Check the payment method of each sale.'
       using errcode = '22023', detail = 'day_many_holdings';
   end if;
-  if cardinality(v_holding) = 1 and v_holding[1] is distinct from btrim(p_from_account_code) then
+  if v_holding[1] is distinct from btrim(p_from_account_code) then
     raise exception 'Pay this day out from %, the card account its sales were paid into.', v_holding[1]
       using errcode = '22023', detail = 'from_not_day_holding';
   end if;
@@ -302,6 +306,6 @@ $function$;
 comment on function public.card_settlement_review() is
   '0572, 0576: the card settlement days (per machine per day; per merchant for Maybank), each with its live payout from card_settlement_payouts, the card accounts its matched payments were paid into (holding_codes), and any live card payout linked to no day from any card account on the day''s date; their rows with each open row''s suggestions, and the card payments a row can be matched to. Finance and principal. Read only.';
 comment on function public.card_settlement_payout_prepare(text, date, text, date, text, text, text, uuid) is
-  '0572, 0576: Approve day. Prepares the day''s one CARD_PAYOUT money move (0529, via gl_money_move_create) with the file''s net and fee and a fixed reference, and links it to the day. Refuses a day not fully matched, a day whose payments went into more than one card account, a from account that is not the one they went into, a day whose payout is prepared or approved, a from account no card settlement route serves, a to account that is not that route''s bank, and an idempotency key that is not this day''s own live payout. The only door for a card payout from a card account. Posts nothing: the finance approver approves the move.';
+  '0572, 0576: Approve day. Prepares the day''s one CARD_PAYOUT money move (0529, via gl_money_move_create) with the file''s net and fee and a fixed reference, and links it to the day. Refuses a day not fully matched, a day whose payments went into no card account or more than one, a from account that is not the one they went into, a day whose payout is prepared or approved, a from account no card settlement route serves, a to account that is not that route''s bank, and an idempotency key that is not this day''s own live payout. The only door for a card payout from a card account. Posts nothing: the finance approver approves the move.';
 
 commit;

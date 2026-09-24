@@ -4216,6 +4216,7 @@ the proposal; `Reject` never is.
 ## PROPOSAL — PENDING APPROVAL (0576, Approve day pays from the day's card account)
 
 - The sales on this day were paid into more than one card account ({codes}), so one payout cannot cover them. Check the payment method of each sale.
+- The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.
 - Pay this day out from {code}, the card account its sales were paid into.
 - {code} has no payout bank in Finance Settings yet. Set one there first.
 - The payout banks did not load. Close this and try again.
