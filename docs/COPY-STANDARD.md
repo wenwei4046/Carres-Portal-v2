@@ -4225,3 +4225,5 @@ Database sentences (shown as written):
 - `<code> <name> is inside <code> <name>. A heading cannot go under a heading inside it.`
 - `Every number under <code> <name> is used. Type a number for the new account.`
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
+- `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
+- `<code> <name> decides how money may be recorded. A heading cannot go under it.`

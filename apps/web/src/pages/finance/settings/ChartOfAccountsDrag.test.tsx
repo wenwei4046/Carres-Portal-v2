@@ -327,17 +327,21 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     await nothingHappened();
   });
 
-  it("puts a heading under another heading, and its accounts go with it (0577)", async () => {
+  it("never puts a heading under another heading: a drop beside it only changes its place", async () => {
     show();
     await ready();
 
     // 401-0000 and 402-0000 are headings side by side under 400-0000.
     drag("401-0000", "402-0000");
 
-    await waitFor(() => expect(net.moves).toHaveLength(1));
-    expect(net.posts).toHaveLength(0);
-    expect(net.moves[0]).toMatchObject({ code: "401-0000", toParentCode: "402-0000" });
-    expect(net.chart.filter((a) => a.parent_code === "401-0000").map((a) => a.code)).toEqual(["401-A001", "401-D001", "401-E001"]);
+    await waitFor(() => expect(net.posts).toHaveLength(1));
+    expect(net.moves).toHaveLength(0);
+    expect(net.posts[0]).toMatchObject({
+      parentCode: "400-0000",
+      was: ["401-0000", "402-0000", "403-0000", "404-0000"],
+      now: ["402-0000", "401-0000", "403-0000", "404-0000"],
+    });
+    expect(net.chart.find((a) => a.code === "401-0000")).toMatchObject({ parent_code: "400-0000" });
   });
 
   it("never puts a heading under a heading inside it (0577)", async () => {

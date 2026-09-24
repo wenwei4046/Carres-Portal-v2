@@ -108,6 +108,9 @@ export default function ChartOfAccounts() {
   };
 
   const ruleHeadings = useMemo(() => new Set(query.data?.rule_headings ?? []), [query.data]);
+  /** Bank and cash accounts are added in Money accounts, so the Add account
+      form never offers this heading or one inside it (0577). */
+  const moneyHeading = query.data?.roles?.MONEY_ACCOUNTS_HEADING;
 
   /** True when `h` is `a` or sits anywhere under it (0577: a heading never
       goes under a heading inside it). */
@@ -158,6 +161,9 @@ export default function ChartOfAccounts() {
       a drop on the heading row itself was offered, so a drag onto the accounts
       of another heading did nothing. */
   const headingToJoin = (a: LedgerAccount, b: LedgerAccount) => {
+    // Two headings side by side: a drop only changes the place, as before
+    // 0577. A heading goes under one beside it through the row menu.
+    if (a.is_header && b.is_header && a.parent_code === b.parent_code) return null;
     if (b.is_header) return canGoUnder(a, b) ? { heading: b, at: undefined } : null;
     const h = accounts.find((x) => x.code === b.parent_code);
     return h && b.parent_code !== a.parent_code && canGoUnder(a, h) ? { heading: h, at: b.code } : null;
@@ -265,7 +271,12 @@ export default function ChartOfAccounts() {
         }
       />
       {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
-      {adding && <AddAccountModal headings={rows.filter((r) => r.is_header)} onClose={() => setAdding(false)} />}
+      {adding && (
+        <AddAccountModal
+          headings={rows.filter((r) => r.is_header && !(moneyHeading && isInside(r, { code: moneyHeading } as LedgerAccount)))}
+          onClose={() => setAdding(false)}
+        />
+      )}
     </ListPageShell>
   );
 }

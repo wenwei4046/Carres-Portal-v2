@@ -105,6 +105,8 @@ as $fn$
 declare
   v_role  text := public.app_role()::text;
   v_head  public.gl_accounts%rowtype;
+  v_hdr   public.gl_accounts%rowtype;
+  v_rule  text;
   v_code  text;
   v_first text;
 begin
@@ -123,6 +125,42 @@ begin
   if not exists (select 1 from public.gl_accounts c where c.parent_code = v_head.code) then
     raise exception '% % is not a heading. Add the account under a heading.', v_head.code, v_head.name
       using errcode = '22023', detail = 'add_onto_account';
+  end if;
+  -- A bank or cash account needs its gl_money_accounts row, which only
+  -- gl_money_account_add writes. So nothing is added in the money accounts
+  -- heading, or in a heading inside it, through this door.
+  if exists (
+    with recursive up(code) as (
+      select v_head.code
+      union
+      select a.parent_code from public.gl_accounts a join up on a.code = up.code
+       where a.parent_code is not null
+    )
+    select 1 from up where up.code = public.gl_account_for('MONEY_ACCOUNTS_HEADING')
+  ) then
+    raise exception '% % holds the bank and cash accounts. Add a bank or cash account in Money accounts.', v_head.code, v_head.name
+      using errcode = '22023', detail = 'add_money_account';
+  end if;
+  -- A gl_rule_headings heading decides how money may be recorded, and that
+  -- check reads the immediate parent only. So no heading goes under one, and
+  -- nothing is added under a heading inside one. A plain account directly
+  -- under it is still checked by that rule.
+  select u.code into v_rule from (
+    with recursive up(code, depth) as (
+      select v_head.code, 0
+      union
+      select a.parent_code, up.depth + 1 from public.gl_accounts a join up on a.code = up.code
+       where a.parent_code is not null
+    )
+    select up.code, up.depth from up
+  ) u
+   where u.code = any (public.gl_rule_headings())
+     and (u.depth > 0 or p_first_code is not null or p_first_name is not null)
+   limit 1;
+  if v_rule is not null then
+    select * into v_hdr from public.gl_accounts a where a.code = v_rule;
+    raise exception '% % decides how money may be recorded. A heading cannot go under it.', v_hdr.code, v_hdr.name
+      using errcode = '22023', detail = 'add_rule_heading';
   end if;
 
   v_code := public._gl_account_new_row_check(p_code, p_name);
@@ -174,6 +212,7 @@ declare
   v_acc   public.gl_accounts%rowtype;
   v_to    public.gl_accounts%rowtype;
   v_hdr   public.gl_accounts%rowtype;
+  v_rule  text;
   v_order text[];
 begin
   if v_role is null or v_role not in ('finance','principal') then
@@ -238,9 +277,21 @@ begin
     raise exception 'An account moves only under a heading of the same kind.'
       using errcode = '22023', detail = 'move_other_kind';
   end if;
-  if v_from = any (public.gl_rule_headings()) or p_to_parent = any (public.gl_rule_headings()) then
-    select * into v_hdr from public.gl_accounts a
-     where a.code = case when v_from = any (public.gl_rule_headings()) then v_from else p_to_parent end;
+  -- 0577: the rule heading may sit above the heading it leaves or joins, not
+  -- only be it. Walk up from both, or a two-step move gets around 0570's check.
+  select u.code into v_rule from (
+    with recursive up(code) as (
+      select c from unnest(array[v_from, p_to_parent]) c where c is not null
+      union
+      select a.parent_code from public.gl_accounts a join up on a.code = up.code
+       where a.parent_code is not null
+    )
+    select up.code from up
+  ) u
+   where u.code = any (public.gl_rule_headings())
+   limit 1;
+  if v_rule is not null then
+    select * into v_hdr from public.gl_accounts a where a.code = v_rule;
     raise exception '% % decides how money may be recorded, not only where an account prints. No account moves into or out of it.', v_hdr.code, v_hdr.name
       using errcode = '22023', detail = 'move_rule_heading';
   end if;
