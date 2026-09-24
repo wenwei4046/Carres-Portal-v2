@@ -13,7 +13,9 @@ Show the version immediately after the base reference without a space: `(1)` for
 original month; this display ruling adds no new amendment approval or eligibility workflow.
 Subscription procurement uses `SPOYYMMDD-NNNN`, independently numbered from Outright PO;
 a purchase order belongs to one business only (Purchasing MASTER §6.1).
-Subscription deliveries use `SDOYYMM-NNNNN`, governed by `docs/delivery/MASTER.md` §3.1.
+Subscription deliveries use `SDOYYMM-NNNNN`, governed by `docs/delivery/MASTER.md` §3.1;
+the Delivery-owned allocator is BUILT in migration 0575 (merged PR #1558), unlike the
+still-unbuilt SUB agreement change. This is not a claim of live Subscription journey verification.
 SUB and SDO each have an independent 100,000-reference monthly pool, with enforced uniqueness and
 no reuse of void references. Capacity alerts are internal; no automatic length increase or
 3,000-document threshold is approved. Preserve existing RA identities and issued documents.
@@ -26,6 +28,33 @@ receipt `SRCYYMM-NNNNNN`, credit note `SCNYYMM-NNNNN`, Service Case `SCSYYMM-NNN
 format/ownership gaps are governed by the complete approved table in Orders MASTER, External
 numbering privacy. Financial formats retain accounting/e-invoice validation before live use.
 Manual Purchase Request is the approved screen name; `SMPR260924-4827` (`SMPRYYMMDD-NNNN`, own daily 10,000 pool) is the approved format.
+
+### Numbering convergence evidence and handoff — 2026-09-24, PLAN
+
+Measured at `origin/main` `6f09c6027`; no production writes or live verification in this audit.
+The complete approved table in Orders MASTER remains format authority. Its blanket “every row
+except Delivery Order ... NOT BUILT” status lags ordinary PO: Purchasing CARD 14 / PR #1551 and
+0574 implemented PO's short form (closure PR #1552). That does not implement SPO.
+
+| Surface | Measured source truth | Remaining boundary / existing owner |
+|---|---|---|
+| Agreement creation | 0249 still defaults `agreement_no` to sequential `RA-` + `rental_agreement_seq`; no later migration replaces that default | SUB monthly fixed random pool, creation idempotency, immutable saved base and governed revision display are missing. No dedicated SUB BUILD Card/PR or executing BUILD owner identified in the current Cards/open-PR audit; this task remains PLAN |
+| Agreement readers | `OperationRental.tsx` renders saved `agreementNo`; rental API returns `agreement_no` | Preserve those readers; carry the same saved SUB reference through detail, search, Route, PDF and export. Do not generate numbers in consumers |
+| Second customer number | 0275 creates a linked fulfilment order; `FinanceSubscriptionMonth.tsx:29` still constructs `SO-${r.orderSo}` beside Agreement | Keep internal fulfilment linkage but meet the approved one customer-facing SUB rule. Audit every customer-facing consumer; an internal legacy link is not permission to expose a second customer number |
+| Delivery | 0575 chooses SDO from `orders.source_system = 'rental'`, stores the drawn identity and enforces independent pools | Reuse Delivery's existing implementation/owner, not another allocator; future Subscription creation must preserve or explicitly converge this classifier. PR #1558 is merged; its GitHub author is not proof of a particular active task/engineer assignment |
+| Advance procurement | 0574 enables the short form for PO only; independent daily prefix pools are shared capability | SPO/SMPR/SGRN require business classification before a customer SO exists. Purchasing/Receiving own writers; do not infer Subscription from supplier Diglant, a first-letter S, or an absent SO. Mixed-business documents remain forbidden by approved target |
+| Other S families | Approved table specifies SINV/SRC/SCN/SCS/SLN and remaining daily S-prefixed families | Owning modules deliver their respective writers/consumers. Numbering creates no new billing, entitlement, scan or approval policy; no duplicate Cards are commissioned here |
+
+**Concrete handoff, not a new Card or BUILD authorization:** the existing Sales Orders go-live
+coordination lane must converge source business classification for customer creation and advance
+procurement, then route SUB generation/persistence and customer-facing identity convergence to
+the actual authorised Subscription BUILD owner once assigned. Acceptance spans one saved reference
+from generation through list/detail/search/Route/PDF/export; immutable base under amendment;
+leading zeros, collision/retry, independent fixed capacity and no reuse; existing RA/SO references,
+issued documents and lifelong shared Unit IDs preserved. SDO consumes that same source business
+classification; it does not need rebuilding. Unrelated unapproved Subscription policies remain
+proposals. This PLAN lane reports this evidence and maintains target wording; it does not invent
+a Card, new task, owner assignment or implementation permission.
 
 # §1 · Overview
 
