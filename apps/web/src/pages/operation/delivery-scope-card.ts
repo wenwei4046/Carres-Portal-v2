@@ -34,7 +34,7 @@ export function useOrderIdFromRef(ref: { orderId?: string | null; soLabel?: stri
     if (ref.orderId) return ref.orderId;
     if (ref.doNumber) {
       const doc = (docsQ.data?.deliveryOrders ?? []).find((d) => d.do_number === ref.doNumber);
-      if (doc) return doc.order_id;
+      if (doc?.order_id) return doc.order_id;
     }
     const so = ref.soLabel?.match(/^SO-(\d+)/)?.[1];
     if (so) {

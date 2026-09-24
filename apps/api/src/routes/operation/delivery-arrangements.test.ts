@@ -665,7 +665,7 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string; error: string };
     expect(body.code).toBe("later_date_needs_reply_proof");
-    expect(body.error).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(body.error).toBe("Save scheduled delivery — upload the WhatsApp reply");
     expect(upserts).toHaveLength(0);
   });
 
