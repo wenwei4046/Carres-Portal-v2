@@ -36,16 +36,20 @@ import Select from "@/components/kit/Select";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 import {
   filterWork,
+  inWorkDay,
+  isWorkDate,
+  parseWorkWeek,
+  WORK_MODULES,
   workFocusDay,
-  workHoliday,
   workLayoutFor,
+  workModuleCounts,
+  workRailDates,
   workSections,
-  workWeek,
   type WorkWhen,
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkDayNav from "./work/WorkDayNav";
+import WorkRail, { WorkDateSection, WorkDayStrip, WorkModuleSection } from "./work/WorkDayNav";
 
 type ViewKey = "mine" | "team";
 
@@ -203,9 +207,9 @@ export default function OperationWork() {
     ? linkedWhen as WorkWhen
     : "all";
   const moduleParam = params.get("module");
-  const moduleFilter: OperationWorkModule | "all" = [
-    "orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker",
-  ].includes(moduleParam ?? "") ? moduleParam as OperationWorkModule : "all";
+  const moduleFilter: OperationWorkModule | "all" = WORK_MODULES.includes(moduleParam as OperationWorkModule)
+    ? moduleParam as OperationWorkModule
+    : "all";
   const covered = params.get("covered") === "1";
   const day = params.get("day") ?? (params.get("when") ? "all" : "focus");
 
@@ -292,17 +296,7 @@ export default function OperationWork() {
   /** MASTER §5.1: today when it is a working day, else the next working day. */
   const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
   const selectedDay = day === "focus" ? focusDay : day;
-  const inDay = (item: WorkRow) => {
-    if (day === "all") return true;
-    if (item.timingBucket === "overdue") return day === "missed" || day === "focus";
-    if (day === "missed") return false;
-    if (day === "no_date") return item.dueIso === null;
-    // The focus list also holds anything due between today and the focus day
-    // (work dated on today's holiday or Sunday), so opening on the next
-    // working day never hides it.
-    if (day === "focus") return item.dueIso !== null && item.dueIso >= generatedOn && item.dueIso <= focusDay;
-    return item.dueIso === day;
-  };
+  const inDay = (item: WorkRow) => inWorkDay(item, day, generatedOn, focusDay);
   const visible = beforeDay.filter(inDay);
   const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
 
@@ -314,31 +308,24 @@ export default function OperationWork() {
     : filterWork(allItems, { ...filters, module: "all" }).filter((item) => !ownerFocus || ownerGroupKey(item) === ownerFocus)
   ).filter(inDay);
 
-  const workingDays = useMemo(
-    () => (focusDay ? workWeek(focusDay, dueIsos) : []),
-    [dueIsos, focusDay],
+  /** The rail's visible week (owner ruling 2026-09-24): the URL's `week`,
+   *  else the week of the chosen date, else the week of the focus day. The
+   *  arrows move it one work week without touching the chosen Date. */
+  const week = parseWorkWeek(params.get("week")) ?? (isWorkDate(day) ? day : focusDay);
+  const railDates = useMemo(
+    () => (week ? workRailDates(beforeDay, generatedOn, week) : null),
+    [beforeDay, generatedOn, week],
   );
-  const dayChoices = useMemo(() => [
-    { key: "missed", label: "Missed", count: beforeDay.filter((item) => item.timingBucket === "overdue").length },
-    ...workingDays.map((date) => {
-      const holiday = workHoliday(date);
-      return {
-        key: date,
-        label: fmtDate(date),
-        count: beforeDay.filter((item) => item.dueIso === date && item.timingBucket !== "overdue").length,
-        ...(holiday ? { holiday } : {}),
-      };
-    }),
-    { key: "no_date", label: "No working date", count: beforeDay.filter((item) => item.dueIso === null).length },
-    { key: "all", label: "All", count: beforeDay.length },
-  ], [beforeDay, workingDays]);
+  const railSelected = selectedDay === "missed" || selectedDay === "no_date" || isWorkDate(selectedDay) ? selectedDay : null;
+  const moduleCounts = workModuleCounts(moduleCountRows);
+  const railModules = WORK_MODULES.map((key) => ({ key, label: MODULE_LABEL[key] }));
 
   /* The four empty states, checked in order (HF-1, owner ruling 2026-09-17):
      a failed source · filters with no match · an empty day while other work
      is open · nothing open at all. Zero matches is never zero work. */
   const filtersActive = Boolean(search) || when !== "all" || moduleFilter !== "all" || covered
     || (activeView === "team" && Boolean(ownerFocus));
-  const missedCount = dayChoices[0]!.count;
+  const missedCount = railDates?.missed ?? 0;
   const emptyDoor: { key: string; label: string } | null = (() => {
     if (missedCount > 0 && day !== "missed") return { key: "missed", label: "Open Missed" };
     const nextDate = beforeDay
@@ -391,7 +378,7 @@ export default function OperationWork() {
     .filter((group) => group.items.length > 0);
   const openRow = (i: WorkRow) => {
     updateParam("selected", i.id);
-    if (layout === "one") setActivePanel("detail");
+    if (layout !== "three") setActivePanel("detail");
   };
 
   return (
@@ -491,7 +478,7 @@ export default function OperationWork() {
               type="button"
               onClick={() => setParams((before) => {
                 const next = new URLSearchParams(before);
-                for (const key of ["q", "when", "module", "covered", "owner", "day", "selected"]) next.delete(key);
+                for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
                 return next;
               }, { replace: true })}
               className="px-2 py-1.5 text-body text-kit-blue-11"
@@ -506,50 +493,30 @@ export default function OperationWork() {
       <WorkSplitShell
         layout={layout}
         activePanel={activePanel}
-        rail={(
-          <div className="p-3">
-            <p className="text-label font-semibold text-kit-slate-12">Working day</p>
-            <div className="mt-2 flex flex-col gap-1">
-              {dayChoices.map((choice) => "holiday" in choice && choice.holiday ? (
-                <div key={choice.key} data-holiday={choice.key} className="flex min-h-8 flex-col justify-center px-2 py-1 text-body text-kit-slate-11">
-                  <span>{choice.label}</span>
-                  <span className="text-meta">Public holiday · {choice.holiday}</span>
-                </div>
-              ) : (
-                <button
-                  key={choice.key}
-                  type="button"
-                  aria-pressed={selectedDay === choice.key}
-                  onClick={() => updateParam("day", choice.key)}
-                  className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${selectedDay === choice.key ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
-                >
-                  <span>{choice.label}</span><span>{choice.count} actions</span>
-                </button>
-              ))}
-            </div>
-            <p className="mt-6 text-label font-semibold text-kit-slate-12">Module</p>
-            <div className="mt-2 flex flex-col gap-1">
-              {(["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((module) => (
-                <button
-                  key={module}
-                  type="button"
-                  aria-pressed={moduleFilter === module}
-                  onClick={() => updateParam("module", moduleFilter === module ? null : module)}
-                  className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${moduleFilter === module ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
-                >
-                  <span>{MODULE_LABEL[module]}</span>
-                  <span>{moduleCountRows.filter((item) => item.module === module).length}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        rail={railDates ? (
+          <WorkRail>
+            <WorkDateSection
+              dates={railDates}
+              selected={railSelected}
+              onSelect={(key) => updateParam("day", key)}
+              onWeek={(monday) => updateParam("week", monday)}
+            />
+            <WorkModuleSection
+              modules={railModules}
+              counts={moduleCounts}
+              total={moduleCountRows.length}
+              selected={moduleFilter}
+              onSelect={(module) => updateParam("module", module)}
+            />
+          </WorkRail>
+        ) : null}
         list={(<div className="h-full overflow-y-auto" data-testid="work-list">
-        {layout !== "three" ? (
-          <WorkDayNav
-            days={dayChoices}
-            value={selectedDay}
-            onChange={(key) => updateParam("day", key)}
+        {layout === "one" && railDates ? (
+          <WorkDayStrip
+            dates={railDates}
+            selected={railSelected}
+            onSelect={(key) => updateParam("day", key)}
+            onWeek={(monday) => updateParam("week", monday)}
           />
         ) : null}
         <div className="px-4 py-3">
@@ -660,7 +627,7 @@ export default function OperationWork() {
         </div>)}
         detail={selected ? (
           <div>
-            {layout === "one" ? (
+            {layout !== "three" ? (
               <button type="button" className="min-h-10 px-4 text-body text-kit-blue-11" onClick={() => setActivePanel("list")}>Back to work</button>
             ) : null}
             <WorkActionPanel item={selected.source} onOpen={() => navigate(selected.destination)} />
