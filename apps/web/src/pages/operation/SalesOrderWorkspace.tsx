@@ -3611,8 +3611,8 @@ function SalesOrderWorkspaceBody() {
           {(draft.addons.some((a) => !a.removed) || editing) && (
             <div className={`flex min-w-0 flex-col gap-3${editing ? " sm:col-span-2" : ""}`} data-testid="delivery-services" data-pos-field="orderAddons">
               {editing ? (
-                <FieldFrame id="so-services-editor" label="Services">
-                  <div id="so-services-editor" className="flex flex-col gap-3">
+                <FieldFrame id="so-services-editor">
+                  <div id="so-services-editor" role="group" aria-label="Services" className="flex flex-col gap-3">
                     {draft.addons.map((a) => {
                       const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key);
                       const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
