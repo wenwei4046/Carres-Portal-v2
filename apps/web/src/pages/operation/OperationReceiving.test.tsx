@@ -62,6 +62,7 @@ const h = vi.hoisted(() => ({
   /** Every ask the page sent the paged register hook — filters + offset. */
   registerAsks: [] as Array<Record<string, unknown>>,
   pos: [] as unknown[],
+  posLoading: false,
   poReceiving: {
     sessions: [] as unknown[],
     events: [] as unknown[],
@@ -160,7 +161,7 @@ vi.mock("@/lib/queries", async () => {
     },
     useOperationPos: () => ({
       data: { pos: h.pos },
-      isLoading: false,
+      isLoading: h.posLoading,
       isError: false,
     }),
     useOperationSuppliers: () => ({
@@ -551,6 +552,7 @@ beforeEach(() => {
   h.registerAsks.length = 0;
   h.lineInfo = { ...LINE_INFO };
   h.pos = [...FIND_POS];
+  h.posLoading = false;
   h.poReceiving = { sessions: [], events: [], expected_units: [] };
   h.sessionDetail = null;
   h.officeReceive.length = 0;
@@ -919,6 +921,31 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(
       screen.queryByTestId("rail-category-Pillow"),
     ).not.toBeInTheDocument();
+  });
+
+  it("waits for PO data before claiming the receiving object could not be opened", () => {
+    h.pos = [];
+    h.posLoading = true;
+    renderPage("/operation?tab=receiving&po=PO-2001");
+    expect(screen.getByText("Loading…")).toHaveAttribute("role", "status");
+    expect(screen.queryByTestId("receiving-po-missing")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("receiving-po-view")).not.toBeInTheDocument();
+  });
+
+  it("shows the unavailable PO state only after the PO read has settled", () => {
+    h.pos = [];
+    renderPage("/operation?tab=receiving&po=PO-2001");
+    expect(screen.getByTestId("receiving-po-missing")).toHaveTextContent(
+      "This purchase order could not be opened",
+    );
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  });
+
+  it("opens the requested PO when its data is available", () => {
+    renderPage("/operation?tab=receiving&po=PO-2001");
+    expect(screen.getByTestId("receiving-po-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("receiving-po-missing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
   it("Start Receiving opens Find PO or CO, and typing narrows the candidates", async () => {

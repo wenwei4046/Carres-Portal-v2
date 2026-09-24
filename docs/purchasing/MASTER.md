@@ -1813,7 +1813,7 @@ one PO. No Payment / Paid to date / Balance due / financial-progress section.
 Use the existing top action placement and governed submission action; typing,
 previewing, printing or downloading never submits a request or sends a PO.
 
-**MPR → PO completion scope — owner approved 2026-09-22; APPROVED / NOT BUILT.**
+**MPR → PO completion scope — owner approved 2026-09-22; implementation delivered in Cards 13/13-B and #1573; authenticated issue lifecycle still owed.**
 The scope is Manual Purchase create/returned-request edit, its internal live MPR
 preview, the concrete Register corrections below, and the MPR-to-PO review/issue
 journey. Subscription is outside this scope. Approval of scope is not production
@@ -1836,12 +1836,12 @@ verification or approval of unreviewed visual details.
   Purpose × MPR Delivery Date. Only matching groups combine across requests.
   Different destinations at initial issue produce different POs. This does not
   revoke §5.4's permitted later multi-destination revision of the SAME PO.
-- Reuse/adapt the existing SO Batch review capability, not a new parallel issue
-  workspace. **COPY REQUIRED, not ready by renaming:** the measured
-  `so-batch/SoBatchIssueWorkspace.tsx` already renders review/draft/evidence states
-  but calls the SO batch issue endpoint; the MPR entry must retain its own source,
-  approval, remaining-quantity and allocation validation. Existing money gates
-  must not be copied as new financial placement gates.
+- Reuse the existing SO Batch review capability, not a parallel issue workspace.
+  **BUILT (Card 13-B):** `so-batch/SoBatchIssueWorkspace.tsx` receives the MPR
+  lane's own issue callback and retains its source, approval, remaining-quantity
+  and allocation validation. §8.2 records #1573's shared actual-PDF improvement
+  and its production verification boundary. No new financial placement gate is
+  inferred from sharing the review.
 - Official issue allocates the real PO identity and, for tracked goods only,
   exact Unit IDs through the existing authority. Counted-only goods receive no
   Unit IDs. Preserve exact MPR-to-PO source lineage in both directions. Re-read
@@ -1852,8 +1852,10 @@ verification or approval of unreviewed visual details.
   does not delete it or reopen its covered demand. Download/print are not sending.
 - `Purchase requirement` is optional for every purpose and persists on create
   and returned-request edit. It is distinct from the required Other Purchase
-  `What is this for?`; current `why`-only handling does not implement this target.
-  The MPR preview, saved facts and later review must retain the same requirement.
+  `What is this for?`. **BUILT (Card 13, migrations 0562–0563):** the create and
+  resubmit APIs carry `purchaseRequirement` separately from `why`; the form,
+  internal preview and saved detail read that same fact. Its authenticated saved
+  round trip remains owed; no request was submitted for the read-only walk.
 
 **Approval boundary — owner selected A, 2026-09-22; APPROVED.**
 Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,
@@ -1867,15 +1869,16 @@ never automatically removes the gate or appoints another approver. Changing
 that operating rule requires a new owner ruling. Price entry on a PO does not
 add an MPR price editor by inference.
 
-**Date boundary — resolved target, owner approved 2026-09-22; NOT BUILT.**
+**Date boundary — owner approved 2026-09-22; BUILT (Cards 13/13-B), actual MPR issuance walk still owed.**
 MPR `Delivery Date` remains the requested arrival date and remains an initial
 PO grouping fact. PO `PO Delivery Date` is calculated from PO Date using the
 recorded applicable Settings working days under §5.7, skipping applicable
 weekends/public holidays, with NO added transit days. Do not copy the MPR date
 into the PO's original date. Preserve both facts and make any mismatch visible
 in review; never silently alter the request or claim a supplier has confirmed it.
-Current issue code's approved-MPR-date handoff is implementation evidence to be
-changed, not an alternative approved calculation. Do not rewrite historical POs.
+The register projection and issue path now call the shared `poDeliveryDateOf`;
+#1573 carries the provisional PO Date and Settings days into the selected draft.
+Do not rewrite historical POs.
 
 **Empty PO fact — BUILT (CARD 13).** Where a request has no linked PO, print
 `No PO yet`, never a blank, a dash, or `Not ordered yet`. Failed/unknown lineage
@@ -1977,8 +1980,9 @@ and category.
 **APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**
 Every request requires approval, regardless of purpose or amount; the decision and issue doors
 enforce it. Per-purpose approval configuration is retired. The Register, rail, object rounds and
-the historical create-form implementation below describe the built page; the 2026-09-22 create blueprint above is not built; fixture walks cover every state, and the
-authenticated owner walk remains owed.
+the create-form implementation above describe the built page. Cards 13/13-B
+implemented the 2026-09-22 blueprint; §2.1 and the dated evidence above retain
+its measured presentation/requester gaps and the authenticated lifecycle still owed.
 
 **Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
 `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
@@ -2697,6 +2701,15 @@ The 62 existing Receiving page/save tests pass. No receipt was posted,
 no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
 Unit result or write authority changed. This does not implement the GRN PDF below.
 
+**Receiving PO loading state, 2026-09-24 — BUILT; production readback owed.**
+The authenticated walk exposed a false `This purchase order could not be opened`
+while the initial PO list was still loading. Receiving now uses the same pending
+read guard already used by Warehouse Inbound: `Loading…` until the query settles,
+then the actual PO or the existing unavailable-object state. Three page tests
+separate pending, settled-missing and available data; the pending test failed on
+the old implementation, and all 65 Receiving page/save tests pass after the fix.
+No receiving result or write path changes.
+
 **GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
 do not redesign the receipt as a PO or use it as Manual Purchase's PO preview. The right
@@ -2736,6 +2749,16 @@ rather than inventing a replacement ID. Remove the unrelated four-pillow order f
 the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabricated
 PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
 the sample correction does not forbid a real destination exception.
+
+**Measured implementation boundary, 2026-09-24.** `ReceivingSessionDetail` currently
+carries posting actor/duty evidence, but no distinct evidenced physical receiver.
+Its `unit_results` carry stock-item identity and outcome without the source PO
+line identity; `grnTemplateDataOf` consequently feeds a separate Unit-results list
+to the PDF. The approved item/Unit grouping and physical-receiver fact are not
+implemented by restyling that paper. Preserve posting evidence as posting evidence;
+resolve the authoritative receiver and Unit-to-line projection before claiming the
+complete GRN target. Actual arrival time also remains a separate schema gap under
+§9.3; never derive it from the filing timestamp.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
