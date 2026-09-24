@@ -398,8 +398,10 @@ export default function OperationWork() {
     />
   );
 
+  /* One toolbar control: 36px from 960px, 40px below; 14/20; 12px sides. */
+  const toolbarRow = layout === "one" ? "flex flex-wrap items-center gap-2" : "contents";
   const toolbarButton = (active: boolean) =>
-    `inline-flex h-8 items-center gap-1.5 rounded-control border px-3 text-body ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
+    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[960px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
 
   const listBody = listTab !== "todo" ? (
     <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
@@ -424,11 +426,11 @@ export default function OperationWork() {
     <div className="flex flex-col gap-4">
       {shownTeamGroups.map((g) => (
         <section key={g.key} className="flex flex-col gap-2" data-testid={`work-owner-group-${g.key}`}>
-          <h3 className="flex items-center gap-2">
+          <h3 className="flex h-8 min-w-0 items-center gap-2 whitespace-nowrap" data-testid={`work-owner-heading-${g.key}`}>
             {g.person ? (
               <span
                 aria-hidden="true"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-label font-semibold"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold leading-4"
                 style={{
                   /* Stable per-person colour — the account id where one
                      exists, else the group key (a salesperson has no ops
@@ -440,13 +442,13 @@ export default function OperationWork() {
                 {personInitials(g.name, "")}
               </span>
             ) : null}
-            <span className="text-body font-semibold text-kit-slate-12">{g.name}</span>
-            <span className="text-label font-normal text-kit-slate-11">
+            <span className="min-w-0 truncate text-[15px] font-semibold leading-5 text-kit-slate-12">{g.name}</span>
+            <span className="shrink-0 text-[12px] font-normal leading-4 text-kit-slate-11">
               {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
-              {g.late > 0 && <span className="text-danger"> · {g.late} missed</span>}
+              {g.late > 0 && <span className="font-medium text-danger"> · {g.late} missed</span>}
             </span>
             {g.coverName && (
-              <span className="text-label font-normal text-kit-amber-11">
+              <span className="min-w-0 truncate text-[12px] font-normal leading-4 text-kit-amber-11">
                 Cover today: {g.coverName}
               </span>
             )}
@@ -475,130 +477,142 @@ export default function OperationWork() {
       workspace
       titleRight={
         // Every count says WHAT it counts (card §7 — supersedes `open · overdue`).
-        <span className="text-label text-base-400">
+        <span className="text-[12px] font-normal leading-4 text-base-400 min-[960px]:text-[13px] min-[960px]:leading-[18px]" data-testid="work-header-count">
           {visible.length} action{visible.length === 1 ? "" : "s"} to do
           {lateCount > 0 ? ` · ${lateCount} missed` : ""}
         </span>
       }
     >
       <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-        {/* The toolbar: ONE independent white section. */}
-        <WorkSection aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-2" data-testid="work-toolbar">
-          {layout === "two" ? (
-            <button
-              type="button"
-              aria-expanded={railOpen}
-              aria-controls="work-filters"
-              data-testid="work-filters-toggle"
-              onClick={() => setRailOpen((open) => !open)}
-              className={toolbarButton(railOpen)}
-            >
-              <Icon name="panelToggle" />
-              Filters
-            </button>
-          ) : null}
-          {layout === "one" ? (
-            <>
+        {/* The toolbar: ONE independent white section (owner density ruling
+            2026-09-25). Below 960px it is exactly two rows — Date · Module ·
+            My/Team, then Search · Owner · Covered — and below 600px four:
+            Date · Module / My/Team / Search / Owner · Covered. */}
+        <WorkSection aria-label="Work toolbar" className={`flex shrink-0 gap-2 p-2.5 min-[600px]:p-3 ${layout === "one" ? "flex-col" : "flex-wrap items-center"}`} data-testid="work-toolbar">
+          <div className={toolbarRow} data-testid="work-toolbar-row-1">
+            {layout === "two" ? (
               <button
                 type="button"
-                aria-expanded={compact === "date"}
-                data-testid="work-compact-date"
-                onClick={() => setCompact((open) => (open === "date" ? null : "date"))}
-                className={toolbarButton(compact === "date")}
+                aria-expanded={railOpen}
+                aria-controls="work-filters"
+                data-testid="work-filters-toggle"
+                onClick={() => setRailOpen((open) => !open)}
+                className={toolbarButton(railOpen)}
               >
-                <Icon name="date" />
-                {listHeading}
+                <Icon name="panelToggle" />
+                Filters
               </button>
-              <button
-                type="button"
-                aria-expanded={compact === "module"}
-                data-testid="work-compact-module"
-                onClick={() => setCompact((open) => (open === "module" ? null : "module"))}
-                className={toolbarButton(compact === "module")}
-              >
-                <Icon name="modules" />
-                {moduleWord}
-              </button>
-            </>
-          ) : null}
-          <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4">
-            {(
-              [
-                ["mine", "My Work"],
-                ["team", "Team Work"],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                data-testid={`work-view-${k}`}
-                aria-pressed={activeView === k}
-                onClick={() => {
-                  setParams((before) => {
-                    const next = new URLSearchParams(before);
-                    if (k === "mine") {
-                      next.delete("scope");
-                      next.delete("owner");
-                    } else next.set("scope", "team");
-                    return next;
-                  }, { replace: true });
-                }}
-                className={`h-8 px-3 text-body ${
-                  activeView === k
-                    ? "bg-kit-slate-12 font-semibold text-white"
-                    : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            ) : null}
+            {layout === "one" ? (
+              <>
+                <button
+                  type="button"
+                  aria-expanded={compact === "date"}
+                  data-testid="work-compact-date"
+                  onClick={() => setCompact((open) => (open === "date" ? null : "date"))}
+                  className={toolbarButton(compact === "date")}
+                >
+                  <Icon name="date" />
+                  {listHeading}
+                </button>
+                <button
+                  type="button"
+                  aria-expanded={compact === "module"}
+                  data-testid="work-compact-module"
+                  onClick={() => setCompact((open) => (open === "module" ? null : "module"))}
+                  className={toolbarButton(compact === "module")}
+                >
+                  <Icon name="modules" />
+                  {moduleWord}
+                </button>
+              </>
+            ) : null}
+            {/* The border is inside the 36px (40px): each segment is 34px (38px). */}
+            <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
+              {(
+                [
+                  ["mine", "My Work"],
+                  ["team", "Team Work"],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  data-testid={`work-view-${k}`}
+                  aria-pressed={activeView === k}
+                  onClick={() => {
+                    setParams((before) => {
+                      const next = new URLSearchParams(before);
+                      if (k === "mine") {
+                        next.delete("scope");
+                        next.delete("owner");
+                      } else next.set("scope", "team");
+                      return next;
+                    }, { replace: true });
+                  }}
+                  className={`h-[38px] px-3 text-control min-[960px]:h-[34px] max-[599px]:flex-1 ${
+                    activeView === k
+                      ? "bg-kit-slate-12 font-semibold text-white"
+                      : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          {activeView === "team" && ownerFocus && (
+          <div className={toolbarRow} data-testid="work-toolbar-row-2">
+            <div className={layout === "one" ? "min-w-[160px] flex-1 max-[599px]:basis-full" : "w-60 shrink-0"}>
+              <SearchInput
+                toolbar
+                id="work-search"
+                value={search}
+                onChange={(event) => updateParam("q", event.target.value)}
+                placeholder="Search work…"
+              />
+            </div>
+            {activeView === "team" && (
+              <Select
+                id="work-owner"
+                value={ownerFocus ?? "all"}
+                onValueChange={(value) => updateParam("owner", value)}
+                options={ownerOptions}
+                toolbar
+              />
+            )}
             <button
               type="button"
-              data-testid="work-owner-clear"
-              onClick={() => updateParam("owner", null)}
-              className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
+              aria-pressed={covered}
+              onClick={() => updateParam("covered", covered ? null : "1")}
+              className={toolbarButton(covered)}
             >
-              {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
-              · Clear
+              Covered
             </button>
-          )}
-          <SearchInput
-            id="work-search"
-            value={search}
-            onChange={(event) => updateParam("q", event.target.value)}
-            placeholder="Search work…"
-          />
-          {activeView === "team" && (
-            <Select
-              id="work-owner"
-              value={ownerFocus ?? "all"}
-              onValueChange={(value) => updateParam("owner", value)}
-              options={ownerOptions}
-            />
-          )}
-          <button
-            type="button"
-            aria-pressed={covered}
-            onClick={() => updateParam("covered", covered ? null : "1")}
-            className={toolbarButton(covered)}
-          >
-            Covered
-          </button>
-          {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
-            <button
-              type="button"
-              onClick={() => setParams((before) => {
-                const next = new URLSearchParams(before);
-                for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
-                return next;
-              }, { replace: true })}
-              className="h-8 px-2 text-body text-kit-blue-11"
-            >
-              Clear all
-            </button>
-          )}
+            {activeView === "team" && ownerFocus && (
+              <button
+                type="button"
+                data-testid="work-owner-clear"
+                onClick={() => updateParam("owner", null)}
+                className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
+              >
+                {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
+                · Clear
+              </button>
+            )}
+            {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
+              <button
+                type="button"
+                onClick={() => setParams((before) => {
+                  const next = new URLSearchParams(before);
+                  for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
+                  return next;
+                }, { replace: true })}
+                className="h-10 px-2 text-control text-kit-blue-11 min-[960px]:h-9"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
         </WorkSection>
 
         {/* Below 960px the chosen compact control opens its section here. */}
@@ -624,9 +638,9 @@ export default function OperationWork() {
             <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
               {/* The heading and tabs stay put; the cards scroll beneath them. */}
               <div className="shrink-0">
-                <h2 className="mb-2.5 flex items-baseline gap-1.5 text-strong font-bold text-work-ink" data-testid="work-list-heading">
+                <h2 className="mb-2 flex min-h-6 flex-wrap items-baseline gap-x-1.5 text-[16px] font-semibold leading-[22px] text-work-ink" data-testid="work-list-heading">
                   {listHeading}
-                  <span className="text-body font-semibold text-work-muted">
+                  <span className="text-[13px] font-medium leading-[18px] text-work-muted">
                     {visible.length} action{visible.length === 1 ? "" : "s"} to do
                   </span>
                 </h2>
@@ -660,7 +674,7 @@ export default function OperationWork() {
                   </button>
                 </div>
               ) : null}
-              <div className="mt-3 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
+              <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
                 <div key={listTab} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
                   {listBody}
                 </div>

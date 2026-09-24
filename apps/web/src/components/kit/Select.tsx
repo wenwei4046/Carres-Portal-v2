@@ -43,6 +43,7 @@ export default function Select({
   onValueChange,
   placeholder = "Select",
   options,
+  toolbar = false,
 }: {
   id: string;
   label?: string;
@@ -56,6 +57,8 @@ export default function Select({
   onValueChange: (value: string) => void;
   placeholder?: string;
   options: readonly SelectOption[];
+  /** A workspace toolbar control — 36px, 40px below 960px. */
+  toolbar?: boolean;
 }) {
   /* D0.5b.1 — null outside a dialog, which is Radix's own "use <body>", so the
    * ordinary case does not move. */
@@ -68,7 +71,7 @@ export default function Select({
           data-kit="select"
           aria-invalid={error ? true : undefined}
           aria-describedby={error || hint ? `${id}-msg` : undefined}
-          className={`${controlClass(Boolean(error), "single")} inline-flex items-center justify-between gap-2 text-left data-[placeholder]:text-kit-slate-9`}
+          className={`${controlClass(Boolean(error), toolbar ? "toolbar" : "single")} inline-flex items-center justify-between gap-2 text-left data-[placeholder]:text-kit-slate-9`}
         >
           <RadixSelect.Value placeholder={placeholder} />
           <RadixSelect.Icon className="text-kit-slate-9">
