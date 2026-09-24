@@ -401,7 +401,7 @@ export default function OperationWork() {
   /* One toolbar control: 36px from 600px, 40px below; 14/20; 12px sides. */
   const toolbarRow = layout === "one" ? "flex flex-wrap items-center gap-2" : "contents";
   const toolbarButton = (active: boolean) =>
-    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-[14px] leading-5 min-[600px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
+    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[600px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
 
   const listBody = listTab !== "todo" ? (
     <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
@@ -550,7 +550,7 @@ export default function OperationWork() {
                       return next;
                     }, { replace: true });
                   }}
-                  className={`h-[38px] px-3 text-[14px] leading-5 min-[600px]:h-[34px] max-[599px]:flex-1 ${
+                  className={`h-[38px] px-3 text-control min-[600px]:h-[34px] max-[599px]:flex-1 ${
                     activeView === k
                       ? "bg-kit-slate-12 font-semibold text-white"
                       : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
@@ -607,7 +607,7 @@ export default function OperationWork() {
                   for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
                   return next;
                 }, { replace: true })}
-                className="h-10 px-2 text-[14px] leading-5 text-kit-blue-11 min-[600px]:h-9"
+                className="h-10 px-2 text-control text-kit-blue-11 min-[600px]:h-9"
               >
                 Clear all
               </button>

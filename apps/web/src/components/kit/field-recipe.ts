@@ -42,7 +42,7 @@ export const CONTROL_MULTI_LINE = "px-2 py-1";
  * `toolbar` — a workspace toolbar control (Work, owner density ruling
  * 2026-09-25): 36px from 600px, 40px below, 14/20 type, 12px sides.
  */
-export const CONTROL_TOOLBAR = "h-10 min-[600px]:h-9 px-3 text-[14px] leading-5";
+export const CONTROL_TOOLBAR = "h-10 min-[600px]:h-9 px-3 text-control";
 
 export function controlClass(error: boolean, shape: "single" | "multi" | "pill" | "toolbar"): string {
   if (shape === "toolbar") {

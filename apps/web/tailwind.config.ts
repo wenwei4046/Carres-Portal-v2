@@ -173,6 +173,9 @@ export default {
         body: ["13px", { lineHeight: "18px", fontWeight: "400" }],
         meta: ["12px", { lineHeight: "16px", fontWeight: "400" }],
         label: ["11px", { lineHeight: "14px", fontWeight: "500" }],
+        /* The workspace toolbar control (Work, owner density ruling
+           2026-09-25): 14/20 in a 36px (40px below 600px) control. */
+        control: ["14px", { lineHeight: "20px", fontWeight: "400" }],
       },
       fontFamily: {
         // v17 (2026-06-09): Inter is the workhorse UI font for body + display.

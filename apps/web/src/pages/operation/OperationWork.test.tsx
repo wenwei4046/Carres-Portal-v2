@@ -200,6 +200,101 @@ describe("Operation Work — one server feed", () => {
     expect(cards[2]).toHaveTextContent("No date");
   });
 
+  /* THE OWNER DENSITY RULING 2026-09-25 — exact values. The production walk
+     reads the computed pixels; these lock the classes that decide them. */
+  it("locks the density: header 72/64, title 28/24, heading 16, toolbar 36/40 in two rows", () => {
+    const savedWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 743 });
+    try {
+      show();
+      expect(screen.getByTestId("work-area")).toHaveAttribute("data-layout", "one");
+      const header = screen.getByTestId("workspace-header");
+      expect(header.className).toContain("h-16");
+      expect(header.className).toContain("min-[960px]:h-[72px]");
+      expect(header.className).toContain("px-4");
+      expect(header.className).toContain("min-[960px]:px-6");
+      const title = within(header).getByRole("heading", { name: "Work" });
+      expect(title.className).toContain("text-[24px]");
+      expect(title.className).toContain("min-[960px]:text-[28px]");
+      expect(title.className).toContain("min-[960px]:leading-[34px]");
+      const count = screen.getByTestId("work-header-count");
+      expect(count.className).toContain("text-[12px]");
+      expect(count.className).toContain("min-[960px]:text-[13px]");
+
+      const heading = screen.getByTestId("work-list-heading");
+      expect(heading.className).toContain("text-[16px]");
+      expect(heading.className).toContain("leading-[22px]");
+      expect(heading.className).toContain("min-h-6");
+      expect(heading.className).toContain("mb-2");
+      expect(heading.className).not.toMatch(/text-strong|font-bold/);
+      expect(heading.querySelector("span")?.className).toContain("text-[13px]");
+      expect(screen.getByTestId("work-card-scroll").className).toContain("mt-2");
+
+      const toolbar = screen.getByTestId("work-toolbar");
+      expect(toolbar.className).toContain("p-2.5");
+      expect(toolbar.className).toContain("min-[600px]:p-3");
+      expect(toolbar.className).toContain("gap-2");
+      // Below 960px: exactly two row groups (four lines below 600px).
+      const rows = within(toolbar).getAllByTestId(/^work-toolbar-row-/);
+      expect(rows.map((r) => r.dataset.testid)).toEqual(["work-toolbar-row-1", "work-toolbar-row-2"]);
+      expect(within(rows[0]).getByTestId("work-compact-date")).toBeInTheDocument();
+      expect(within(rows[0]).getByTestId("work-compact-module")).toBeInTheDocument();
+      expect(within(rows[0]).getByTestId("work-view-mine")).toBeInTheDocument();
+      expect(within(rows[1]).getByRole("searchbox")).toBeInTheDocument();
+      expect(within(rows[1]).getByRole("button", { name: "Covered" })).toBeInTheDocument();
+      for (const control of [
+        screen.getByTestId("work-compact-date"),
+        screen.getByRole("searchbox"),
+        screen.getByRole("button", { name: "Covered" }),
+      ]) {
+        // 40px below 600px, 36px from 600px; 14/20 type.
+        expect(control.className).toContain("h-10");
+        expect(control.className).toContain("min-[600px]:h-9");
+        expect(control.className).toContain("text-control");
+      }
+      // The segmented control's 1px border sits inside the 36px (40px).
+      expect(screen.getByTestId("work-view-mine").className).toContain("h-[38px]");
+      expect(screen.getByTestId("work-view-mine").className).toContain("min-[600px]:h-[34px]");
+      expect(screen.getByTestId("work-view-mine").className).toContain("font-semibold");
+      expect(screen.getByTestId("work-view-switch").className).toContain("max-[599px]:basis-full");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
+    }
+  });
+
+  it("from 960px the toolbar is one row, search 240px, controls 36px (40px below 600px)", () => {
+    const savedWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+    try {
+      show();
+      const toolbar = screen.getByTestId("work-toolbar");
+      expect(toolbar.className).toContain("flex-wrap");
+      for (const row of within(toolbar).getAllByTestId(/^work-toolbar-row-/)) expect(row.className).toBe("contents");
+      expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-60");
+      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[600px]:h-9");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
+    }
+  });
+
+  it("locks the Team owner line: 32px avatar, 12px initials, 15px name, 12px counts on one 32px line", () => {
+    show();
+    fireEvent.click(screen.getByTestId("work-view-team"));
+    const heading = screen.getByTestId(`work-owner-heading-${SH}`);
+    expect(heading.className).toContain("h-8");
+    expect(heading.className).toContain("gap-2");
+    expect(heading.className).toContain("whitespace-nowrap");
+    const [avatar, name, count] = Array.from(heading.children) as HTMLElement[];
+    expect(avatar.className).toContain("h-8");
+    expect(avatar.className).toContain("w-8");
+    expect(avatar.className).toContain("text-[12px]");
+    expect(name).toHaveTextContent("Shasha");
+    expect(name.className).toContain("text-[15px]");
+    expect(name.className).toContain("leading-5");
+    expect(count.className).toContain("text-[12px]");
+    expect(count.className).toContain("font-normal");
+  });
+
   it("reads search and filters from the URL", () => {
     workState.data!.items = [
       item(),
