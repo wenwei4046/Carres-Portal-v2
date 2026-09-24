@@ -26,7 +26,7 @@ import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/render
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY, niceDate } from "./letterhead";
 import type { GrnTemplateData } from "./types";
-import { UnitCode } from "./po-template";
+import { UnitCode, unitRuns } from "./po-template";
 
 const INK = "#1A1714";
 const GREY = "#7A7268";
@@ -128,6 +128,17 @@ const styles = StyleSheet.create({
   footerCenter: { fontSize: 7.5, color: GREY, textAlign: "center", flex: 1 },
   footerPage: { fontSize: 7.5, color: GREY, width: mm(45), textAlign: "right" },
 });
+
+function outcomeRuns(results: NonNullable<GrnTemplateData["unit_results"]>) {
+  const groups = new Map<string, string[]>();
+  for (const result of results) {
+    const codes = groups.get(result.outcome_label) ?? [];
+    codes.push(result.unit_code);
+    groups.set(result.outcome_label, codes);
+  }
+  return [...groups].flatMap(([outcome, codes]) =>
+    unitRuns(codes).map((run) => ({ ...run, outcome })));
+}
 
 export function GrnTemplate(data: GrnTemplateData) {
   const logoSrc = (globalThis as { __CARRES_LOGO_SRC__?: string }).__CARRES_LOGO_SRC__ ?? "/carres-logo.png";
@@ -278,9 +289,9 @@ export function GrnTemplate(data: GrnTemplateData) {
             <View style={styles.desc}>
               <Text style={styles.descMain}>{l.description}</Text>
               <Text style={styles.descSku}>{l.sku}</Text>
-              {(l.unit_results ?? []).map((u) => (
-                <Text key={u.unit_code} style={styles.unitLine}>
-                  <UnitCode code={u.unit_code} /> — {u.outcome_label}
+              {outcomeRuns(l.unit_results ?? []).map((u) => (
+                <Text key={`${u.first}-${u.outcome}`} style={styles.unitLine}>
+                  <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
                 </Text>
               ))}
             </View>
@@ -316,9 +327,9 @@ export function GrnTemplate(data: GrnTemplateData) {
         {(unit_results ?? []).length > 0 ? (
           <View style={styles.noteBlock} wrap={false}>
             <Text style={styles.blockLabel}>Unit results</Text>
-            {(unit_results ?? []).map((u) => (
-              <Text key={u.unit_code} style={[styles.unitLine, { paddingLeft: 0 }]}>
-                · <UnitCode code={u.unit_code} /> — {u.outcome_label}
+            {outcomeRuns(unit_results ?? []).map((u) => (
+              <Text key={`${u.first}-${u.outcome}`} style={[styles.unitLine, { paddingLeft: 0 }]}>
+                · <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
               </Text>
             ))}
           </View>

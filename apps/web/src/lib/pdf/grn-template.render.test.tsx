@@ -119,3 +119,26 @@ it("keeps zero-only exception quantities out of the table while stating their ab
   expect(text).toContain("Damaged Qty 0 · Wrong Item Qty 0 · Pending Delivery Qty 0");
   await doc.destroy();
 });
+
+
+it("compresses only consecutive Units with the same outcome, never hiding a gap or damage", async () => {
+  const data = sample();
+  data.lines[0].unit_results = [
+    { unit_code: "U1-000-001", outcome_label: "Received" },
+    { unit_code: "U1-000-002", outcome_label: "Received" },
+    { unit_code: "U1-000-003", outcome_label: "Received" },
+    { unit_code: "U1-000-004", outcome_label: "Received with issue · damaged" },
+    { unit_code: "U1-000-005", outcome_label: "Received" },
+  ];
+  data.lines = [data.lines[0]];
+  const doc = await render(data);
+  const content = await (await doc.getPage(1)).getTextContent();
+  const text = content.items.flatMap((item) => "str" in item ? [item.str] : []).join(" ")
+    .replace(/\s+/g, " ").replace(/(U\d+-\d{3}-)\s+(\d{3})/g, "$1$2");
+  expect(text).toContain("U1-000-001 to U1-000-003 — Received");
+  expect(text).toContain("U1-000-005 — Received");
+  expect(text).toContain("U1-000-004 — Received with issue · damaged");
+  expect(text).not.toContain("U1-000-001 to U1-000-005");
+  expect(text).toContain("U1-000-099 — Not received");
+  await doc.destroy();
+});
