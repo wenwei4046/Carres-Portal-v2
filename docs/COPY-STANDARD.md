@@ -4235,3 +4235,18 @@ the proposal; `Reject` never is.
 - Pay this day out from {code}, the card account its sales were paid into.
 - {code} has no payout bank in Finance Settings yet. Set one there first.
 - The payout banks did not load. Close this and try again.
+
+## PROPOSAL — PENDING APPROVAL · Chart of accounts: add, heading move, typed money number (0577)
+
+Screen words (Finance Settings):
+- Button: `Add account`. Modal title: `Add account`.
+- Fields: `Under`, `Number`, `Name`, checkbox `It is a heading`, `First account number`, `First account name`.
+- Money account add, field `Number`, hint `Leave blank to use the next free number.`
+
+Database sentences (shown as written):
+- `<code> <name> is not a heading. Add the account under a heading.`
+- `<code> <name> is inside <code> <name>. A heading cannot go under a heading inside it.`
+- `Every number under <code> <name> is used. Type a number for the new account.`
+- `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
+- `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
+- `<code> <name> decides how money may be recorded. A heading cannot go under it.`

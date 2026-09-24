@@ -48,8 +48,19 @@ financeMoneyAccountsRouter.post("/", requireFinance, async (c) => {
   const body = await parseJsonBody(c, moneyAccountAddInput);
   if (!body.ok) return c.json(body.body, body.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_money_account_add", { p_name: body.data.name, p_kind: body.data.kind });
-  if (error) return fail(c, error);
+  // 0577: a typed number goes up; none means the next free one under the heading.
+  const { data, error } = await sb.rpc("gl_money_account_add", {
+    p_name: body.data.name,
+    p_kind: body.data.kind,
+    p_code: body.data.code ?? null,
+  });
+  // The tag (code_needed, code_shape, code_exists) goes up as `code`, so the
+  // form can show the Number field when the database asks for one.
+  if (error) {
+    const m = mapPgError(error);
+    if (error.details && m.status !== 500) return c.json({ ...m.body, code: error.details }, m.status);
+    return c.json(m.body, m.status);
+  }
   return c.json({ code: data as string }, 201);
 });
 

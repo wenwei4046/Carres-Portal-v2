@@ -87,8 +87,30 @@ describe("add", () => {
     const sb = stubRpc({ data: "1125", error: null });
     const res = await call("POST", "", { name: "  CIMB ", kind: "BANK" });
     expect(res.status).toBe(201);
-    expect(sb.rpc).toHaveBeenCalledWith("gl_money_account_add", { p_name: "CIMB", p_kind: "BANK" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_money_account_add", { p_name: "CIMB", p_kind: "BANK", p_code: null });
     expect(await res.json()).toEqual({ code: "1125" });
+  });
+
+  it("sends a typed number in capitals (0577)", async () => {
+    const sb = stubRpc({ data: "310-A000", error: null });
+    const res = await call("POST", "", { name: "CIMB", kind: "BANK", code: " 310-a000 " });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_money_account_add", { p_name: "CIMB", p_kind: "BANK", p_code: "310-A000" });
+  });
+
+  it("forwards the database's ask for a number as code_needed (0577)", async () => {
+    stubRpc({ data: null, error: { code: "22023", details: "code_needed", message: "Every number under 310-0000 Cash at bank is used. Type a number for the new account." } });
+    const res = await call("POST", "", { name: "CIMB", kind: "BANK" });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("code_needed");
+    expect(body.message).toBe("Every number under 310-0000 Cash at bank is used. Type a number for the new account.");
+  });
+
+  it("refuses a badly shaped typed number before the database", async () => {
+    const sb = stubRpc({ data: "x", error: null });
+    expect((await call("POST", "", { name: "CIMB", kind: "BANK", code: "12" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("refuses cash and a blank name before the database", async () => {
