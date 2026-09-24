@@ -4234,6 +4234,30 @@ cannot substitute for the evidence."* Every kind carries a reference that points
 findable outside the record. `Approve and apply` is refused until one is recorded and still covers
 the proposal; `Reject` never is.
 
+## PROPOSAL — PENDING APPROVAL · Money accounts: the number changes on an opened account (24 Sep)
+
+The rule is YH's (24 Sep 2026): an opened money account on Finance Settings → Money accounts shows
+its number, and the number can be changed there, not only on Chart of accounts. The placement below
+is the proposal. No new sentence is added.
+
+- Field `Number` on the `Money account` form, below `Active`, holding the account's number. A blank
+  box keeps the account's own number, so clearing it by mistake changes nothing. Same word as the
+  add form's `Number` (0577, still pending); the hint `Leave blank to use the next free number.`
+  shows only when adding.
+- A new number is saved by the Chart of accounts form's own request, so every record follows it,
+  exactly as on that tab.
+- Shown under `Number`, as the database wrote them (already in this file):
+  `A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.` and
+  `An account numbered {code} is already in the chart.` (approved 23 Sep, 0570), and
+  `Only Finance changes the chart of accounts.` (0539). The last one differs from this form's own
+  `Only Finance changes the money accounts.`, because the number is changed through the chart.
+- Any other refusal from the chart (a name already in the chart, an account no longer in the chart,
+  a server break) shows at the foot of the form, never under `Number`.
+- A new name goes with the new number in that one request, so a name the chart refuses is never
+  saved. When `Active` changed too, `Active` alone is saved first (under the old name), so a refusal
+  about money still in the account comes before the number is touched. If the chart then refuses,
+  `Active` stays saved, and the sentence says why the name or number did not change.
+
 ## PROPOSAL — PENDING APPROVAL (0576, Approve day pays from the day's card account)
 
 - The sales on this day were paid into more than one card account ({codes}), so one payout cannot cover them. Check the payment method of each sale.
