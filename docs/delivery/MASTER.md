@@ -1635,6 +1635,17 @@ is absence, never an invented row.
 The same feed admits a Warehouse login only when its token is bound to a Warehouse and keeps only
 that Warehouse's Units. The Logistics boundary is the same projection narrowed by
 authenticated assignment: a Partner sees only its assigned rows and only the admitted fields.
+
+**THE CHASE CARRIES THE ANSWER DOOR — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT).**
+NETS uses the Portal. Every prepared remind or chase message to a Logistics Partner carries one
+link to that Partner's own Logistics Work, opened at exactly the rows the message names. The
+Partner's personal login answers there — customer contacted, confirmed date and time, ETA, or
+`Cannot Deliver` with its governed reason — and those answers are the same Delivery arrangement
+writes this MASTER already owns; no second acknowledgement record exists. The WhatsApp group stays
+the channel, and a reply given only in the group still needs the recorded answer plus its uploaded
+proof. Sending the link is not confirmation: silence leaves the row unconfirmed and chaseable.
+NETS is the first Partner; issuing production Partner logins and telling NETS to use them is an
+external cutover that needs its own owner authorisation.
 Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence
 and before confirmed arrival; Stock owns the custody word and Delivery never writes it. **DO No**
 means an outbound customer Delivery Order; inbound receiving stays under its PO/CO source.
