@@ -56,13 +56,13 @@ export function qtyWords(
 }
 
 /**
- * A disposal service — the old mattress or bedframe the lorry takes away. The
- * `addons` catalogue carries no category, so a disposal is known by its key or
- * its catalogue name (`dispose-mattress` · `Dispose old mattress`). Falsifier:
- * the catalogue gains a service category — then read that instead.
+ * A disposal service — the old mattress, sofa or bed frame the lorry takes
+ * away — known by the catalogue's own Service SKU family `SVC-DISPOSE-…`
+ * (0172; production 2026-09-24: mattress · sofa · big sofa · bed frame). Not a
+ * name match. Falsifier: the catalogue gains a service category — read that.
  */
-export const isDisposalService = (key: string, name: string): boolean =>
-  /dispos/i.test(key) || /dispos/i.test(name);
+export const isDisposalService = (catalogServiceSku: string | null | undefined): boolean =>
+  typeof catalogServiceSku === "string" && catalogServiceSku.startsWith("SVC-DISPOSE-");
 
 /** `Dispose old mattress ×2 · Delivery fee` — name, and quantity when above 1. */
 export function servicesWords(
