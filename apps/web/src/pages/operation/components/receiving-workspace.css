@@ -22,3 +22,10 @@
   }
   .receiving-actions [data-testid="receiving-save"] { margin-left: auto; }
 }
+
+/* The GRN record and its amend form share the receiving form's width rules. */
+.receiving-record-sheet { overflow-wrap: anywhere; }
+.receiving-record-sheet input[type="file"] { min-width: 0; max-width: 100%; }
+@container receiving-form (width < 480px) {
+  .receiving-item-row > :first-child { flex-basis: 100%; }
+}
