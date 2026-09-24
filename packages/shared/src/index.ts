@@ -3260,3 +3260,4 @@ export {
 } from "./purchase-return";
 
 export * from "./department";
+export * from "./logistics-card";
