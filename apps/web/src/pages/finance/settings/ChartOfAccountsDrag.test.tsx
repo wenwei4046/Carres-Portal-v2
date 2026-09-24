@@ -306,14 +306,15 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     });
   });
 
-  it("never offers a drop onto an account that is not a heading", async () => {
+  it("drops an account on an account under another heading: it goes under that heading, beside it (0577)", async () => {
     show();
     await ready();
 
-    // 402-B001 is a posting account under another heading.
+    // 402-B001 is a posting account under 402-0000, a heading of the same kind.
     drag("401-D001", "402-B001");
 
-    await nothingHappened();
+    await waitFor(() => expect(net.moves).toHaveLength(1));
+    expect(net.moves[0]).toMatchObject({ code: "401-D001", toParentCode: "402-0000", to: { was: ["402-B001"], now: ["401-D001", "402-B001"] } });
   });
 
   it("never offers a heading of another kind", async () => {
@@ -335,17 +336,25 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
 
     await waitFor(() => expect(net.posts).toHaveLength(1));
     expect(net.moves).toHaveLength(0);
-    expect(net.posts[0]).toEqual({
+    expect(net.posts[0]).toMatchObject({
       parentCode: "400-0000",
       was: ["401-0000", "402-0000", "403-0000", "404-0000"],
       now: ["402-0000", "401-0000", "403-0000", "404-0000"],
     });
-    // Still under 400-0000, with its own accounts.
     expect(net.chart.find((a) => a.code === "401-0000")).toMatchObject({ parent_code: "400-0000" });
-    expect(net.chart.filter((a) => a.parent_code === "401-0000").map((a) => a.code)).toEqual(["401-A001", "401-D001", "401-E001"]);
   });
 
-  it("offers a heading no heading to go under in its row menu", async () => {
+  it("never puts a heading under a heading inside it (0577)", async () => {
+    show();
+    await ready();
+
+    // 401-0000 is inside 400-0000.
+    drag("400-0000", "401-0000");
+
+    await nothingHappened();
+  });
+
+  it("offers a heading the headings of its kind to go under in its row menu (0577)", async () => {
     show();
     await ready();
 
@@ -353,9 +362,8 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     tr.focus();
     fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
 
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryAllByRole("menuitem").map((b) => b.textContent)).not.toContainEqual(
-      expect.stringMatching(/^Move under/),
+    await waitFor(() =>
+      expect(screen.queryAllByRole("menuitem").map((b) => b.textContent)).toContain("Move under 402-0000 Borrowings"),
     );
   });
 

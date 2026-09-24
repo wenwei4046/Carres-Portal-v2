@@ -269,7 +269,7 @@ export default function CardSettlementPage() {
         <MoneyMoveForm
           onClose={() => setPaying(null)}
           prepareDay={prepareDay}
-          initial={{ kind: "CARD_PAYOUT", date: paying.payout_date, amount: Number(paying.net), fee: dayFee(paying), reference: paying.reference }}
+          initial={{ kind: "CARD_PAYOUT", date: paying.payout_date, amount: Number(paying.net), fee: dayFee(paying), reference: paying.reference, from: paying.holding_codes[0] }}
         />
       )}
     </div>
@@ -303,7 +303,7 @@ function DayExpansion({
           <p className="text-strong">
             Row {r.line_no} · {fmtDate(r.txn_date)} · {rm(Number(r.amount))}
             {r.acquirer !== "GHL" ? ` · Approval code ${r.approval_code ?? "not printed"}` : ""}
-            {r.terminal_id ? ` · Terminal ${r.terminal_id}` : ""}
+            {r.terminal_id ? ` · Machine ${r.terminal_id}` : ""}
             {r.card_no ? ` · Card ${r.card_no}` : ""}
           </p>
           {r.payment_id ? (
@@ -344,13 +344,23 @@ function DayExpansion({
       ))}
       {day.unlinked_payouts.map((u) => (
         <p key={u.move_id} role="alert" className="text-kit-red-11" data-testid={`card-unlinked-${u.move_no}`}>
-          Card payout {u.move_no} of {rm(Number(u.amount))} from {u.from_account_code} on {fmtDate(u.move_date)} is not linked to any
-          card settlement day. Check it is not this day's money before you approve the day.
+          Card payout {u.move_no} of {rm(Number(u.amount))} from {u.from_account_code} on {fmtDate(u.move_date)} has no card settlement
+          day. Check it is not this day's money before you approve the day.
         </p>
       ))}
       {day.payout_status !== null ? (
         <p>
           {day.payout_status === "approved" ? "Payout approved" : "Payout prepared"} · {day.payout_move_no ?? "Move number not available"}
+        </p>
+      ) : dayMayApprove(day) && day.holding_codes.length === 0 ? (
+        <p role="alert" className="text-kit-red-11">
+          The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each
+          sale.
+        </p>
+      ) : dayMayApprove(day) && day.holding_codes.length > 1 ? (
+        <p role="alert" className="text-kit-red-11">
+          The sales on this day were paid into more than one card account ({day.holding_codes.join(", ")}), so one payout cannot cover
+          them. Check the payment method of each sale.
         </p>
       ) : dayMayApprove(day) ? (
         <Button variant="primary" onClick={() => onApproveDay(day)}>

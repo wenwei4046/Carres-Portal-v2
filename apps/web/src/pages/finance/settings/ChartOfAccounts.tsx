@@ -65,7 +65,9 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import { LoadFailed } from "../other-money-in/parts";
-import { useMoveAccount, useReorderAccounts, useSaveAccount } from "./api";
+import Checkbox from "@/components/kit/Checkbox";
+import Select from "@/components/kit/Select";
+import { useAddAccount, useMoveAccount, useReorderAccounts, useSaveAccount } from "./api";
 
 type Row = LedgerAccount & { depth: number };
 
@@ -90,6 +92,7 @@ export default function ChartOfAccounts() {
   const accounts = useMemo(() => moved ?? served ?? [], [moved, served]);
   const rows = useMemo(() => chartTree(accounts), [accounts]);
   const [editing, setEditing] = useState<Row | null>(null);
+  const [adding, setAdding] = useState(false);
 
   /** The codes under one heading in the order the screen is reading them —
       exactly what a `was` has to be. */
@@ -105,15 +108,26 @@ export default function ChartOfAccounts() {
   };
 
   const ruleHeadings = useMemo(() => new Set(query.data?.rule_headings ?? []), [query.data]);
+  /** Bank and cash accounts are added in Money accounts, so the Add account
+      form never offers this heading or one inside it (0577). */
+  const moneyHeading = query.data?.roles?.MONEY_ACCOUNTS_HEADING;
 
-  /** A heading posting account `a` may go under — gl_account_move's own
-      refusals, so the screen never offers one: `a` is not a heading, `h` is a
-      heading of the same kind and not the one `a` is under, neither heading
-      decides how money may be recorded, and `a` is not the last account
-      under its heading (active or retired). */
+  /** True when `h` is `a` or sits anywhere under it (0577: a heading never
+      goes under a heading inside it). */
+  const isInside = (h: LedgerAccount, a: LedgerAccount) => {
+    const parentOf = new Map(accounts.map((x) => [x.code, x.parent_code]));
+    for (let c: string | null | undefined = h.code; c; c = parentOf.get(c)) if (c === a.code) return true;
+    return false;
+  };
+
+  /** A heading account `a` may go under — gl_account_move's own refusals, so
+      the screen never offers one: `h` is a heading of the same kind and not
+      the one `a` is under, not `a` itself or inside it (a heading moves too
+      since 0577), neither heading decides how money may be recorded, and `a`
+      is not the last account under its heading (active or retired). */
   const canGoUnder = (a: LedgerAccount, h: LedgerAccount) =>
-    !a.is_header &&
     h.is_header &&
+    !isInside(h, a) &&
     h.kind === a.kind &&
     h.code !== a.parent_code &&
     !ruleHeadings.has(h.code) &&
@@ -142,20 +156,36 @@ export default function ChartOfAccounts() {
     reorder.mutate({ parentCode: dragged.parent_code, was, now }, { onError: refused });
   };
 
-  /** Put `dragged` at the end of another heading (0570). Two before/after
-      pairs go up, one per heading; the number and the name are not sent. */
-  const putUnder = (dragged: LedgerAccount, heading: LedgerAccount) => {
+  /** The heading an account row sits under, when `a` may go there. A drop on
+      an account under another heading puts `a` beside it (0577): before, only
+      a drop on the heading row itself was offered, so a drag onto the accounts
+      of another heading did nothing. */
+  const headingToJoin = (a: LedgerAccount, b: LedgerAccount) => {
+    // Two headings side by side: a drop only changes the place, as before
+    // 0577. A heading goes under one beside it through the row menu.
+    if (a.is_header && b.is_header && a.parent_code === b.parent_code) return null;
+    if (b.is_header) return canGoUnder(a, b) ? { heading: b, at: undefined } : null;
+    const h = accounts.find((x) => x.code === b.parent_code);
+    return h && b.parent_code !== a.parent_code && canGoUnder(a, h) ? { heading: h, at: b.code } : null;
+  };
+
+  /** Put `dragged` under another heading (0570), at the end or just before
+      the account `at`. Two before/after pairs go up, one per heading; the
+      number and the name are not sent. */
+  const putUnder = (dragged: LedgerAccount, heading: LedgerAccount, at?: string) => {
     const fromWas = childrenOf(dragged.parent_code);
     const fromNow = fromWas.filter((c) => c !== dragged.code);
     const toWas = childrenOf(heading.code);
-    const toNow = [...toWas, dragged.code];
+    const toNow = [...toWas];
+    const at0 = at ? toNow.indexOf(at) : -1;
+    toNow.splice(at0 < 0 ? toNow.length : at0, 0, dragged.code);
     setRefusal(null);
     setMoved(
       accounts.map((a) => {
-        if (a.code === dragged.code) return { ...a, parent_code: heading.code, sort_order: toNow.length };
+        if (a.code === dragged.code) return { ...a, parent_code: heading.code, sort_order: toNow.indexOf(a.code) + 1 };
         const i = fromNow.indexOf(a.code);
         if (i >= 0) return { ...a, sort_order: i + 1 };
-        const j = toWas.indexOf(a.code);
+        const j = toNow.indexOf(a.code);
         return j < 0 ? a : { ...a, sort_order: j + 1 };
       }),
     );
@@ -193,6 +223,12 @@ export default function ChartOfAccounts() {
       <p className="text-body text-kit-slate-11">
         Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.
       </p>
+      {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0577). */}
+      <div>
+        <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
+          Add account
+        </Button>
+      </div>
       {refusal && (
         <p role="alert" data-testid="chart-refusal" className="text-body text-kit-red-11">
           {refusal}
@@ -212,8 +248,12 @@ export default function ChartOfAccounts() {
           /* A drop on a heading the account may go under puts it there, a
              sibling heading included; any other drop on a sibling reorders.
              Nothing while a move is in flight. */
-          canDrop: (a, b) => !busy && a.code !== b.code && (a.parent_code === b.parent_code || canGoUnder(a, b)),
-          onMove: (a, b) => (canGoUnder(a, b) ? putUnder(a, b) : move(a, b)),
+          canDrop: (a, b) => !busy && a.code !== b.code && (a.parent_code === b.parent_code || headingToJoin(a, b) !== null),
+          onMove: (a, b) => {
+            const j = headingToJoin(a, b);
+            if (j) putUnder(a, j.heading, j.at);
+            else move(a, b);
+          },
           /* Alt + up/down only reorders among siblings, headings included. */
           canStep: (a, b) => !busy && a.code !== b.code && a.parent_code === b.parent_code,
           onStep: move,
@@ -231,6 +271,12 @@ export default function ChartOfAccounts() {
         }
       />
       {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
+      {adding && (
+        <AddAccountModal
+          headings={rows.filter((r) => r.is_header && !(moneyHeading && isInside(r, { code: moneyHeading } as LedgerAccount)))}
+          onClose={() => setAdding(false)}
+        />
+      )}
     </ListPageShell>
   );
 }
@@ -296,6 +342,83 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
         <Input id="account-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
         {refusal?.field === "code" && <FieldError>{refusal.message}</FieldError>}
         {refusal && refusal.field === null && <FieldError>{refusal.message}</FieldError>}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Add an account under a heading, or a heading with its first account (0577).
+ * The kind follows the heading, so it is not asked. A heading is an account
+ * with an account under it, so "It is a heading" asks for that first account
+ * too and both are added in one go. The refusals are gl_account_update's
+ * sentences, shown as the database wrote them.
+ */
+function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () => void }) {
+  const add = useAddAccount();
+  const [parent, setParent] = useState<string | undefined>(undefined);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [isHeading, setIsHeading] = useState(false);
+  const [firstCode, setFirstCode] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const ready = !!parent && !!code.trim() && !!name.trim() && (!isHeading || (!!firstCode.trim() && !!firstName.trim()));
+  const submit = () => {
+    setRefusal(null);
+    const shaped = ledgerAccountCodeInput.safeParse(code);
+    const firstShaped = ledgerAccountCodeInput.safeParse(firstCode);
+    if (!parent || !shaped.success || (isHeading && !firstShaped.success)) {
+      setRefusal(LEDGER_ACCOUNT_CODE_MESSAGE);
+      return;
+    }
+    add.mutate(
+      {
+        parentCode: parent,
+        code: shaped.data,
+        name: name.trim(),
+        ...(isHeading && firstShaped.success ? { first: { code: firstShaped.data, name: firstName.trim() } } : {}),
+      },
+      { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
+    );
+  };
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title="Add account"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" loading={add.isPending} disabled={!ready} onClick={submit}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3" data-testid="account-add-form">
+        <Select
+          id="account-add-under"
+          label="Under"
+          required
+          value={parent}
+          onValueChange={setParent}
+          options={headings.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))}
+        />
+        <Input id="account-add-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
+        <Input id="account-add-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={setIsHeading} />
+        {isHeading && (
+          <>
+            <Input id="account-add-first-code" label="First account number" required maxLength={8} value={firstCode} onChange={(e) => setFirstCode(e.target.value)} />
+            <Input id="account-add-first-name" label="First account name" required maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </>
+        )}
+        {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>
   );

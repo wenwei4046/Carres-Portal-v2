@@ -363,6 +363,20 @@ export const ledgerAccountUpdateInput = z.object({
   code: ledgerAccountCodeInput.optional(),
 }).strict();
 
+/** Add an account under a heading on Finance Settings → Chart of accounts
+ *  (0577). The kind follows the heading. A heading is added with its first
+ *  account (`first`), because a heading is an account with an account under it. */
+export const ledgerAccountAddInput = z.object({
+  parentCode: z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.'),
+  code: ledgerAccountCodeInput,
+  name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  first: z.object({
+    code: ledgerAccountCodeInput,
+    name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  }).strict().optional(),
+}).strict();
+export type LedgerAccountAddInput = z.infer<typeof ledgerAccountAddInput>;
+
 /**
  * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
  *

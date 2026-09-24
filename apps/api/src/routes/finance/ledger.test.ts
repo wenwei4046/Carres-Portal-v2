@@ -622,6 +622,51 @@ describe("PATCH /accounts/:code", () => {
   });
 });
 
+describe("POST /accounts (0577)", () => {
+  const post = async (body: unknown, role = "finance") =>
+    app.fetch(new Request("http://t/api/finance/ledger/accounts", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("adds an account under a heading, the number in capitals", async () => {
+    const { sb } = fakeClient(() => ok("900-A001"));
+    const res = await post({ parentCode: "6000", code: "900-a001", name: " Freight " });
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual({ code: "900-A001" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: "6000", p_code: "900-A001", p_name: "Freight", p_first_code: null, p_first_name: null,
+    });
+  });
+
+  it("adds a heading with its first account", async () => {
+    const { sb } = fakeClient(() => ok("1400"));
+    const res = await post({ parentCode: "1000", code: "1400", name: "Deposits paid", first: { code: "1410", name: "Rental deposits" } });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: "1000", p_code: "1400", p_name: "Deposits paid", p_first_code: "1410", p_first_name: "Rental deposits",
+    });
+  });
+
+  it("refuses operation, a bad number and a blank name before the database", async () => {
+    expect((await post({ parentCode: "6000", code: "6998", name: "Freight" }, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: "6000", code: "12", name: "Freight" })).status).toBe(422);
+    expect((await post({ parentCode: "6000", code: "6998", name: " " })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("forwards the database's refusal and its tag", async () => {
+    fakeClient(() => refuse("22023", "code_exists", "An account numbered 6500 is already in the chart."));
+    const res = await post({ parentCode: "6000", code: "6500", name: "Freight" });
+    expect(res.status).toBe(422);
+    const body = await json(res);
+    expect(body.code).toBe("code_exists");
+    expect(body.message).toBe("An account numbered 6500 is already in the chart.");
+  });
+});
+
 describe("POST /accounts/move and /accounts/reorder", () => {
   const post = async (path: string, body: unknown, role = "finance") =>
     app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
@@ -672,7 +717,7 @@ describe("POST /accounts/move and /accounts/reorder", () => {
     ["order_stale", "40001", 409, "The chart changed while you were dragging. Open it again and redo the move."],
     ["move_onto_account", "22023", 422, "6500 Bank and payment charges is not a heading. Move the account under a heading."],
     ["move_other_kind", "22023", 422, "An account moves only under a heading of the same kind."],
-    ["move_heading", "22023", 422, "2100 Payables is a heading. A heading stays where it is; drag it among the headings beside it to change its place."],
+    ["move_into_itself", "22023", 422, "1200 Receivables is inside 1100 Cash and bank. A heading cannot go under a heading inside it."],
     ["move_rule_heading", "22023", 422, "2200 Customer money held decides how money may be recorded, not only where an account prints. No account moves into or out of it."],
     ["move_last_child", "22023", 422, "2310 SST payable is the last account under 2300 Taxes. Move another account under that heading first."],
   ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {

@@ -93,9 +93,9 @@ describe.skipIf(!URL)("money moves (real PostgreSQL, 0529)", () => {
     expect(await create("TRANSFER", "1121", "1123", 10, 1)).toEqual({ ok: false, detail: "fee_on_transfer" });
     expect(await create("TRANSFER", "1121", "2110", 10)).toEqual({ ok: false, detail: "to_account_refused" });
     expect(await create("CARD_PAYOUT", "1121", "1123", 10)).toEqual({ ok: false, detail: "from_account_refused" });
-    expect(await create("CARD_PAYOUT", "1131", "1110", 10)).toEqual({ ok: false, detail: "to_account_refused" });
-    expect(await create("CARD_PAYOUT", "1131", "1123", 10.005)).toEqual({ ok: false, detail: "amount_invalid" });
-    expect(await create("CARD_PAYOUT", "1131", "1123", 10, -1)).toEqual({ ok: false, detail: "fee_invalid" });
+    expect(await create("CARD_PAYOUT", "1132", "1110", 10)).toEqual({ ok: false, detail: "to_account_refused" });
+    expect(await create("CARD_PAYOUT", "1132", "1123", 10.005)).toEqual({ ok: false, detail: "amount_invalid" });
+    expect(await create("CARD_PAYOUT", "1132", "1123", 10, -1)).toEqual({ ok: false, detail: "fee_invalid" });
   });
 
   it("a transfer posts only on approval, by someone else: Dr to, Cr from", async () => {
@@ -128,13 +128,13 @@ describe.skipIf(!URL)("money moves (real PostgreSQL, 0529)", () => {
 
   it("a card payout posts Dr bank net, Dr 6500 fee, Cr holding gross; reversing posts it back", async () => {
     await actAs(U.preparer);
-    const id = ((await create("CARD_PAYOUT", "1131", "1123", 97.5, 2.5)) as { value: string }).value;
+    const id = ((await create("CARD_PAYOUT", "1132", "1123", 97.5, 2.5)) as { value: string }).value;
     await actAs(U.principal);
     const entry = (await attempt("select public.gl_money_move_approve($1)", [id])) as { ok: true; value: string };
     expect(entry.ok).toBe(true);
     expect(await linesOf(id)).toEqual([
       { account_code: "1123", debit: 97.5, credit: 0 },
-      { account_code: "1131", debit: 0, credit: 100 },
+      { account_code: "1132", debit: 0, credit: 100 },
       { account_code: "6500", debit: 2.5, credit: 0 },
     ]);
     const src = await q("select source_type from gl_entries where id = $1", [entry.value]);
@@ -148,7 +148,7 @@ describe.skipIf(!URL)("money moves (real PostgreSQL, 0529)", () => {
     expect((await attempt("select public.gl_money_move_reverse($1, 'wrong bank')", [id])).ok).toBe(true);
     const after = await q(
       `select m.status, (select sum(l.debit - l.credit)::float from gl_entry_lines l
-                           where l.entry_id in (m.gl_entry_id, m.reversal_entry_id) and l.account_code = '1131') as holding
+                           where l.entry_id in (m.gl_entry_id, m.reversal_entry_id) and l.account_code = '1132') as holding
          from gl_money_moves m where m.id = $1`,
       [id],
     );
