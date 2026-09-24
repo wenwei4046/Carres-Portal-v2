@@ -114,6 +114,9 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
   const [name, setName] = useState(account?.name ?? "");
   const [kind, setKind] = useState<"BANK" | "HOLDING">("BANK");
   const [active, setActive] = useState(account?.is_active ?? true);
+  /* 0577: blank = the next free number under the heading. When every number
+     is used the database asks for one, and this field is where it goes. */
+  const [code, setCode] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
   const trimmed = name.trim();
 
@@ -124,7 +127,7 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
     save.mutate(
       account
         ? { code: account.code, input: { name: trimmed, is_active: active } }
-        : { code: null, input: { name: trimmed, kind } },
+        : { code: null, input: code.trim() ? { name: trimmed, kind, code: code.trim().toUpperCase() } : { name: trimmed, kind } },
       { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
     );
   };
@@ -158,6 +161,17 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
             value={kind}
             onValueChange={(v) => setKind(v as "BANK" | "HOLDING")}
             options={KIND_OPTIONS}
+          />
+        )}
+        {!account && (
+          // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0577).
+          <Input
+            id="money-account-code"
+            label="Number"
+            hint="Leave blank to use the next free number."
+            maxLength={8}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
           />
         )}
         {refusal && (

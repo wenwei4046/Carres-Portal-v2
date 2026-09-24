@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import type { ZodError } from "zod";
 import {
   departmentRpcArgs,
+  ledgerAccountAddInput,
   ledgerAccountCodeShape,
   ledgerAccountLedgerQuery,
   ledgerAccountMoveInput,
@@ -61,8 +62,10 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *                           frozen trigger lets the number through and nothing else.
  *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) —
  *                           writes sort_order only; a move never writes the number.
- *   POST  /accounts/move    put one posting account under another heading (gl_account_move,
- *                           0570) — writes parent and order; never the number or the name.
+ *   POST  /accounts/move    put one account or heading under another heading (gl_account_move,
+ *                           0570, headings since 0577) — writes parent and order; never the number or the name.
+ *   POST  /accounts         add an account under a heading, or a heading with its first
+ *                           account (gl_account_add, 0577). The kind follows the heading.
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -496,6 +499,26 @@ financeLedgerRouter.post("/accounts/move", requireFinance, async (c) => {
   });
   if (error) return accountError(c, error);
   return c.json({ code: String(data) });
+});
+
+/**
+ * Add an account under a heading, or a heading with its first account (0577).
+ * The refusals are gl_account_update's sentences, and their tags go up as
+ * `code` so the form puts each under its field.
+ */
+financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountAddInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_add", {
+    p_parent_code: body.data.parentCode,
+    p_code: body.data.code,
+    p_name: body.data.name,
+    p_first_code: body.data.first?.code ?? null,
+    p_first_name: body.data.first?.name ?? null,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) }, 201);
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────
