@@ -61,7 +61,7 @@ export const LOGISTICS_COPY = {
   decideNextResult: (partner: string) => `Keep ${partner} with a new date, or change logistics`,
   nothingMissing: "Nothing missing",
   stillToCollect: (amount: string) => `RM ${amount} still to collect`,
-  financeHolding: (reason: string) => `Finance is holding this delivery: ${reason}`,
+  financeHolding: (reason: string) => (reason ? `Finance is holding this delivery: ${reason}` : "Finance is holding this delivery"),
 } as const;
 
 /* ── the stock route ───────────────────────────────────────────────────── */
@@ -247,7 +247,7 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
   /* ── 1 working day before — exceptions only ── */
   const t1Open = stateFor(t1Due, today, input.startedIso);
   const gaps: LogisticsGap[] = [...input.dayBeforeGaps];
-  if (input.financeHold) gaps.unshift({ fact: LOGISTICS_COPY.financeHolding(input.financeHold), action: null });
+  if (input.financeHold !== null) gaps.unshift({ fact: LOGISTICS_COPY.financeHolding(input.financeHold), action: null });
   if (input.moneyOwed) gaps.unshift({ fact: LOGISTICS_COPY.stillToCollect(input.moneyOwed), action: null });
   const t1Checked = t1Open === "open" || t1Open === "missed";
   const t1: LogisticsCheckRow = {
@@ -315,7 +315,7 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
   let exception: string | null = null;
   if (!input.settled) {
     if (input.answer?.kind === "cannot_deliver" && !t2Done) exception = LOGISTICS_COPY.cannotDeliver(input.answer.reasonLabel);
-    else if (input.financeHold) exception = LOGISTICS_COPY.financeHolding(input.financeHold);
+    else if (input.financeHold !== null) exception = LOGISTICS_COPY.financeHolding(input.financeHold);
     else if (input.moneyOwed) exception = LOGISTICS_COPY.stillToCollect(input.moneyOwed);
     else if (t1Checked && t1.gaps[0]) exception = t1.gaps[0].fact;
   }
