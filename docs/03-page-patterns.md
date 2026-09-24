@@ -77,19 +77,24 @@ Carres Examples**
 
 # Dashboard
 
-**Purpose.** What management needs to know. One independent top-level destination, never under
-Workspace. The complete approved product contract lives in `workspace/MASTER.md` §8.
+**Purpose.** What management needs to know or intervene in. One independent top-level destination.
+The complete product authority is `workspace/MASTER.md` §8.
 
-**Information Hierarchy.** Source health and scope → Management attention → Commitment health →
-Material exposure → Work health. Recent material change and trends are held outside v1 until the
-owning evidence qualifies; do not fill their space with placeholders or activity.
+**Information Hierarchy.** Scope/source health → Needs intervention (full-width Panel) → Today's
+operation → Work health → Business exposure → Recent material changes. Show only qualified source
+facts, never invented data to fill an unadmitted region.
 
-**Regions.** Read-only governed aggregates with one exact filtered owning-module/Team Work door.
-Required-Duty gaps open the exact Staff & Duties view. No action queue, KPI-volume preamble,
-assignment/completion control, pipeline or annotation inbox.
+**Regions.** Confirmed Carres Panels, blue section title, white bordered surface on cool-grey
+canvas, square/low-radius geometry; no decorative blue outline or KPI-card wall. Needs intervention
+uses exact fact / dated object evidence / business consequence / one right destination icon.
+Its scoped typography is governed in `01-design-tokens.md`.
 
-**Responsive.** Paired sections at 1440px+, stacked at 1024–1439px, continuous document below 1024px.
-Preserve complete values and accessible source evidence. Existing kit/tokens bind unchanged.
+**Boundary.** No copied Work cards, action queue, business form, assignment/completion button, Duty
+editor, generic metrics or notification feed. Ownership issues open exact filtered Team Work;
+business issues open the owning object; source failures open safe source-health detail.
+
+**Responsive.** Needs intervention is full width; narrower screens stack in reading order. Evidence
+wraps, money stays complete, row navigation works by keyboard/touch. Never import Work panel widths.
 
 ---
 

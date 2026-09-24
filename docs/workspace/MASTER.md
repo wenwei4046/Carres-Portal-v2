@@ -761,58 +761,156 @@ remains legacy debt and may not be presented as this contract.
 - desktop keyboard/focus behavior and the narrow-screen absence of the Rail leave one obvious Work
   destination without clipped counts or hover-only meaning.
 
-## 8 · Global Dashboard Blueprint — APPROVED / LOCKED, 2026-09-16
+## 8 · Global Dashboard Blueprint — composition and intervention contract APPROVED / LOCKED, 2026-09-24
 
-Jess approved persistence of the complete Dashboard Blueprint after owner review. This is the one
-Dashboard authority, replacing the former provisional measure register. Approval is product truth,
+Jess approved the composition and Needs intervention contract; detailed refinements in §8.1.2
+remain PROPOSAL / NOT LAW. This is the one Dashboard authority. Approval is product truth,
 not proof of implementation or production readiness. No production code, Cards or deployment is
 authorised by this PLAN closure.
 
-### 8.1 · Purpose, composition and management journey
+### 8.1 · Purpose and composition — owner-approved, 2026-09-24
 
-Dashboard answers **what management needs to know**; Work answers **what someone needs to do**.
-There is exactly one independent top-level `Dashboard`; `WORKSPACE` contains only `Work`,
-`Staff & Duties`, and `Issue Tracker`. Dashboard owns no transaction, assignment, deadline,
-severity, calculation or completion. It contains no action rows, forms, manual completion, copied
-pipeline, annotation inbox or generic navigation cards. Right Rail remains a separate My Work door.
-
-The questions are: which confirmed commitments failed; which customer money should have arrived;
-which work, Duty or cover is missing; and whether those observations are complete and reliable.
+Dashboard answers **what management needs to know or intervene in**; Work answers **what staff
+must do**. Exactly one independent top-level Dashboard; WORKSPACE contains only Work, Staff & Duties
+and Issue Tracker. Dashboard owns no business write, assignment, deadline or completion. Its approved
+reading order replaces the earlier composition:
 
 ```text
-1440px and above
-┌ Dashboard ─────────────────────────────────────── Refresh ┐
-│ Scope · business date · observation time · source health │
-├ Management attention ───────────────────────────────────┤
-│ Non-zero facts; unit + oldest date / amount + exact door │
-├ Commitment health ─────────────┬ Material exposure ──────┤
-│ Overdue delivery               │ Payment should have     │
-│ Failed / partial delivery      │ been received           │
-│ Supplier date passed           │ {n} orders              │
-│ Supplier reply day missed      │ Amount needed RM {x.xx} │
-├ Work health ───────────────────┴─────────────────────────┤
-│ Actions to do · Missed · Blocked · ownership/source gaps │
-│ Required Duty vacancies · no eligible cover              │
-│ Normal owner       Actions to do       Missed   Blocked  │
-│ {name}             {n}                 {n}      {n}      │
-│ Covered by {name}, when applicable                       │
-└─────────────────────────────────────────────────────────┘
+Dashboard — scope · business date · source health
+┌ Needs intervention ────────────────────────────── count ┐
+│ Exact fact / object + dated evidence / consequence   open│
+├ Today's operation ──────────────────────────────────────┤
+│ Delivery · expected/received goods · customer money     │
+│ Critical Issue / Service events                         │
+├ Work health ────────────────────────────────────────────┤
+│ Normal-owner summaries · Not assigned · Blocked filter  │
+├ Business exposure ──────────────────────────────────────┤
+│ Customer / supplier promises · cash · stock · delivery  │
+│ Unrecovered claim / service cost — separate tracks       │
+├ Recent material changes ────────────────────────────────┤
+│ Only evidenced changes affecting management decisions   │
+└────────────────────────────────────────────────────────┘
 ```
 
-Management attention repeats the SAME measure identity, observation and destination shown below,
-not a second calculation. Never add a cross-module `total problems`: one SO can affect several
-measures. Source integrity warnings stay at the top. Reading order is customer delivery failure,
-supplier commitment, overdue money, missed supplier reply, then ownership/cover/blocking gaps.
-This is presentation order, not a new severity system. Within a measure, the oldest governed date
-leads. `Material exposure` v1 covers only the overdue customer money defined below, never a claim
-that goods, cases and recovery have all been checked. Routine due-today/due-later volumes remain
-in Work and owning schedules, not a new KPI strip.
+Today's operation reads dated business facts (planned/failed/threatened delivery; goods expected,
+arrived or date unconfirmed; money due/received/material risk; critical Issue/Service events), not
+arbitrary Today/Upcoming/Pending KPI cards. Inclusion requires a management intervention, priority,
+approval, unblock or investigation consequence. Do not copy My Work, all open POs/orders, future
+task lists, notifications or a Duty editor. Every live fact still requires its owner's meaning,
+threshold where applicable, permission, observation, recovery and exact destination contract.
 
-Morning: verify coverage/health, read attention, open the exact affected population. Enter Team
-Work for action ownership, Staff & Duties for Duty gaps. Staff record results in the owning module;
-returning refreshes Dashboard. At close, review remaining commitments/money/ownership without
-replacing Finance close, Stock count or Issue review. Reports, exports, calendar and external
-communications keep their existing homes; no Dashboard export, notification engine or new calendar.
+Work health reads the same Team Work population/filters and normal-owner resolution. Current
+Operation roster is Shasha and Yu Jun; names are read from active People/resolver facts, not coded
+as a list. Disabled Khor Yee must not appear in current grouping (historical actor evidence remains).
+Not assigned is the unresolved set; Blocked is orthogonal, not a fictional normal owner or an
+additive extra group. Work's authority is b9661e36e on codex/workspace-work-v4, PR #1533; do not
+rewrite its sections, copy Work cards or import its 240/360/detail panel widths into Dashboard.
+
+Business exposure never nets unlike tracks. Recent material changes requires durable, idempotent
+owning-source evidence; failed reads, dismissed notices and lost access are not recoveries. Existing
+§8.2 definitions remain valid only within their named measure scopes; the expanded intervention
+families below are approved candidates, not a claim that every source is already admitted/built.
+Held-source prerequisites in §8.3 remain binding, not permission to silently omit domain coverage.
+Right Rail, Reports, exports, calendar and external communication keep their own homes.
+
+### 8.1.1 · Needs intervention — owner-approved contract, 2026-09-24
+
+One full-width first Panel, never KPI cards or a second Work queue. Each row has an exact management
+fact (14px/600), object plus dated evidence (12px/500), business consequence (muted 12px), and a
+right-aligned approved destination icon. Use the confirmed Carres kit: blue section title, white
+bordered Panel on cool-grey canvas, square/low-radius geometry, no decorative blue outline or
+card-wall styling. The scoped typography ruling is recorded in 01-design-tokens; it does not change
+Work or any other page. ASCII symbols in owner sketches are not production icons.
+
+Every intervention supplies fact, business consequence, materiality/threshold source, owner OR
+responsible module, observed time, exact deep link and recovery condition. Missing owner is allowed
+as the fact only when the responsible module is known. A routine Missed action without a business
+consequence remains in Team Work. Severity/threshold belongs to its owning module, not Dashboard.
+
+Approved candidate families (permission and source evidence still gate each live row):
+
+- Customer: promised delivery did not happen; promised payment not received; approved recovery has
+  no next step; material Service Case exceeded its governed response/solution clock.
+- Purchasing: supplier promised date passed; material purchase cannot proceed; supplier claim lacks
+  governed resolution; critical receipt/stock discrepancy affects a customer commitment.
+- Delivery/Warehouse: failed delivery without a next step; customer delivery blocked; loan item not
+  collected; critical goods unavailable for confirmed delivery.
+- Money: payment exception blocks delivery; material balance crossed its governed threshold;
+  overpayment/refund decision awaits authorised approver; money source failed or cannot reconcile
+  material exposure. This grants no new refund policy, approval permission or unpaid-delivery release.
+- People/system: no owner; no cover on an actionable date; material overload against governed peer
+  capacity; module source failed; calendar/permission failure hides actionable work. No overload
+  threshold, work-effort weight or peer-capacity assumption is invented by this approval.
+
+Whole row opens exactly one true management destination: ownership → Team Work exact filter;
+module business fact → exact object/module view; source failure → safe source-health/error detail.
+No Done, Assign or business form. Source-health detail must remain available when the business
+source fails; a raw exception/stack/credential is never exposed. Normal permission exclusion is
+not a system fault; only an evidenced unexpected failure of required authorised coverage qualifies.
+
+A recovered issue leaves only on its owning recovery condition. It may enter Recent material
+changes only through a durable idempotent source transition, never by guessing from absence, a
+failed refresh or lost permission. An unresolved occurrence can change its fact without duplicating
+its identity. Do not use standalone Urgent, High priority, Needs attention, Problem or Exception.
+A specific statement such as Payment exception blocks delivery is allowed: it says what happened.
+
+### 8.1.2 · Needs intervention refinement — PROPOSAL / NOT LAW
+
+The approved contract above is persisted immediately. The following detailed presentation and
+admission recommendations await owner review; they must not silently become business policy.
+
+- Header count counts distinct authorised intervention rows, not affected actions, orders, RM or
+  the sum of heterogeneous populations. One grouped owner gap affecting three actions counts as
+  one row; each distinct source failure counts once. Complete data and identical predicates must
+  reconcile count and rows. For partial data use `{n} confirmed · incomplete`, never a complete 0.
+- Stable identity is owning rule/version + source scope + occurrence. Group only identical fact,
+  consequence and recovery semantics whose exact union has ONE destination. A grouped ownership
+  row deduplicates action IDs; orders without PIC qualify only where that absence demonstrably
+  leaves an admitted action owner unresolved. PIC absence alone is not ownerlessness.
+- Distinct business failures on one SO may remain separate when their recovery and management
+  destinations differ. A specific payment-block row replaces a generic delivery-block row for the
+  exact same cause/scope; other independent blockers stay visible. Overdue and no-next-step are
+  distinct facts but combine only when one exact destination explains both without losing evidence.
+- Order by source-owned critical/safety consequence, failed customer commitment or blocked confirmed
+  delivery, other governed material exposure, ownership/capacity failure, then source-health gaps;
+  persistent coverage warning stays visible above rows. Within each band sort by oldest governing
+  business date then occurrence ID. No generated priority labels or staff ranking.
+- Show earliest relevant business deadline in evidence; observed time remains separately readable.
+  A passed date with no result is `Delivery result missing`, not proof of actual non-delivery;
+  `Delivery promise missed` requires source evidence of missed customer delivery. Rebooking after
+  a missed promise does not erase its history or alone prove recovery.
+- Missing proof is distinct from missing result. Customer remedy/claim no-next-step requires a
+  defined source continuation rule and demonstrably absent successor, not an empty UI section.
+- Approved Service solution clock can be used with its lawful extension/calendar; do not invent a
+  response clock or infer materiality from age. Supplier Claim uses its current owning timing rules,
+  not PO reply timing. A supplier's physical non-arrival allegation first checks Receiving evidence.
+- Loan collection requires the source due event and absent accepted return evidence. Confirmed goods
+  shortage requires exact reserved scope/readiness, never a generic SKU low-stock count. A future
+  supplier PO is not received Ready Stock and cannot be counted again with its received Unit.
+- Material purchase, material balance, claim/Service exposure, refund decision and peer overload
+  remain source-unqualified where their governing threshold/approval/capacity contract is missing.
+  Report a proven source/configuration gap with its consequence, not a fabricated business incident.
+- Overpayment requiring an existing Payment Approver decision reads canonical unallocated/excess
+  money; resolution is source-recorded allocation/classification/authorised decision. An approved
+  refund path is distinct; ordinary refunds are not introduced by this candidate.
+- `Delivery is blocked by payment review` is the proposed consequence instead of `Delivery cannot
+  be released`: the latter suggests a manual Release door that existing Delivery law retires.
+  Clearing the payment-review incident does not claim all remaining Delivery gates have passed.
+- Row click/Enter follow the same link with one focus target; right icon is not a second action.
+  Approved entity icons (delivery, money, supplier, people) identify domain; use open for the right
+  destination and refresh for source-read failure. Text carries severity; no emoji, local glyph or
+  unapproved warning icon. At 390px all three levels wrap, evidence and money never truncate.
+- No nested scrolling or capped top-five hiding. If pagination is needed, visible range and total
+  count use the identical authorised population and one document scroll; every row remains reachable.
+- Empty complete state: `No intervention needed in this scope.` Failed initial read has no count;
+  delayed rows retain explicitly historical observation; source failure never removes prior incidents
+  as recovered. Revoked access removes protected rows without recording a recovery. Returning from a
+  destination refreshes, restores focus/scroll, and announces any source-confirmed disappearance.
+- Acceptance: plain Missed excluded; header4/owner-actions3 example; same-action dedup; PIC≠owner;
+  same-cause block dedup; independent causes retained; date/result/proof split; missing threshold;
+  calendar failure; absent unauthorised vs unexpectedly failed permission; no peer weights invented;
+  disabled staff excluded from current grouping; source failure cannot recover; source-confirmed
+  recovery deduplicates transition; 1440/1024/390 keyboard/touch and row/count/target reconciliation.
 
 ### 8.2 · First-release measure register and arithmetic
 
@@ -887,8 +985,8 @@ void, replacement and settlement must reconcile with the same Monitor footer.
 **W.** Same stable admitted open occurrences and health envelope as §5.2.1, all dates (not only the
 current week). Readings: Actions to do; Missed (governed action day before today); Blocked (named
 dependency/resolving door); Not assigned (no normal owner); no eligible actor on the required day;
-Source failed (number of failed admitted sources, never guessed missing actions). Every positive
-Missed/blocker/ownership/calendar/source gap qualifies for attention; total open work alone does not.
+Source failed (number of failed admitted sources, never guessed missing actions). Only a gap with a concrete business consequence and the §8.1.1 contract qualifies for Needs
+intervention; ordinary Missed/blocked work stays in Team Work. Total open work alone does not.
 Normal-owner rows show Actions to do / Missed / Blocked; cover is separate metadata, never double
 counted. No staff league table, productivity score or invented capacity percentage. No working date
 is not missed/today. Show oldest required action date; numeric missed age only from the shared
@@ -914,7 +1012,7 @@ filter must reproduce this exact predicate before admission. No assignment contr
 | Goods shortage/quarantine/controlled totals | Hold: one owning meaning, compatible counting units, Site scope, governed management threshold, exact Unit/document destination; never rename Needs checking to generic Quarantine |
 | Issue recovery exposure | Hold: Finance-owned amount/deadline, configured materiality, restricted-record permissions and exact Finance destination |
 | Trends, percentages, sparklines | No comparison in v1; reproducible historical observations and compatible populations required |
-| Recent material change | Hold until durable idempotent transition receipts and exact object links exist |
+| Recent material changes | Hold until durable idempotent transition receipts and exact object links exist |
 | Active orders, GMV, open POs, generic low stock | Reject as management indicators; routine volume is not intervention |
 | AP, ledger/profit, targets, rental, guarantee totals | Outside v1, remain in their owning modules/Reports; absence never means zero/healthy |
 
@@ -927,7 +1025,7 @@ Missing baseline, changed rule/scope, partial failure or zero denominator suppre
 with its reason. Do not reconstruct yesterday from mutable current records or present a rule change
 as improvement. No decorative arrows or default percentage.
 
-Future Recent material change admits only newly broken/recovered admitted commitments, crossing a
+Future Recent material changes admits only newly broken/recovered admitted commitments, crossing a
 source-owned materiality threshold, owner/cover/source failure or recovery, and evidenced material
 financial recovery. Receipt identity, event time, prior/new fact and one exact owning-object door
 are mandatory; retries deduplicate. Routine edits, new orders, notes and uploads do not qualify.
@@ -958,7 +1056,7 @@ drilling down must not establish owners or write transactions, even through an i
 Unread pages, truncated results and malformed payloads mean incomplete, never a smaller total.
 Do not label a healthy-source subtotal as all-company/all-Work. Suppress affected complete totals;
 explicitly scoped healthy module readings may remain. Show coverage of admitted/excluded domains.
-`No management attention needed` requires all admitted measures in the stated authorised scope
+A no-intervention clear state requires all admitted measures in the stated authorised scope
 healthy and zero; retain coverage alongside it. Never claim whole-ERP health. Inaccessible domains
 must not leak even through their source-health labels.
 
@@ -977,15 +1075,13 @@ state that results refreshed to current truth; never silently open a generic Reg
 a true empty filtered set. Failed sources never open fabricated zero sets; Source failed opens the
 exact Team Work source-health context even without action rows. Historical access is never expanded.
 
-Responsive: 1440px+ paired commitment/exposure with full-width attention and Work; 1024–1439px stack
-paired sections; below 1024px one continuous document: source health → attention → commitments →
-exposure → Work. V1 omits the held recent-change section. At 390px each complete measure and each
-owner's labelled readings wrap vertically. No horizontal KPI strip/five-column pipeline. Counts and
-money never truncate; source/definition evidence works with keyboard, focus and touch, not hover only.
-Use existing Panel, Card, SectionHeader, Button, Loading and EmptyState; no new global component.
-Token values stay unchanged, tabular numbers and shared date/currency formatters bind, minimum touch
-40px. Colour supports explicit words, not decoration. Narrative summaries are not forced into fixed
-transaction rows. Right Rail retains its independent governed desktop/mobile entry.
+Responsive: Needs intervention spans full width on desktop. The approved reading order is source
+health → Needs intervention → Today's operation → Work health → Business exposure → Recent material
+changes. At 1024–1439px and below, stack without sideways KPI strips; 390px preserves each row's
+complete fact/evidence/consequence. Unqualified domains state coverage without invented values.
+Source evidence is keyboard/touch accessible. Use existing Carres Panel and kit geometry with the
+scoped typography ruling in 01-design-tokens; do not rebuild Work geometry or force register rows.
+Right Rail retains its independent entry. Exact new detail recommendations remain §8.1.2 proposals.
 
 COPY-STANDARD owns exact words (Dashboard dictionary). No At Risk, SLA, unqualified All on track,
 No alerts checkmark, annotation Escalations, bare counts or rounded money. No inline operational act.
@@ -1054,7 +1150,8 @@ These are required acceptance scenarios, not executed-test or deployment claims:
    without posting does not reduce money. Unknown/unissued amounts never become zero or debt.
 8. Friday action for Saturday payment deadline is not Friday overdue money. Unknown arrival does
    not invent ordinary collection; real missed promises retain their own lawful rule.
-9. Required Duty vacancy remains visible with no actions; Duty/action counts never mix. Cover
+9. Required Duty vacancy remains visible with no actions when its stated business consequence
+   qualifies; Duty/action counts never mix. Ownership-action problems open Team Work, not an editor. Cover
    changes acting context without duplicating work or rewriting normal owner/actual-actor history.
    Holder present but no eligible actor is not Nobody holds Duty; no unnecessary Buddy warning.
 10. All-date Work totals/drill-downs match; stable occurrences count once, blocked stays missed when
@@ -1070,8 +1167,8 @@ These are required acceptance scenarios, not executed-test or deployment claims:
 15. 1440/1024/390px keyboard, screen-reader, focus-return and touch preserve full meanings/dates/money;
     no hover-only evidence, action queue, generic KPI, annotation inbox, fake trend or unadmitted count.
 
-PLAN MISSION COMPLETE — the complete owner-reviewed operating model is persisted here. No open
-owner business-policy question remains for v1. Source qualification, lawful calendars, shared feed
+PLAN REVIEW ACTIVE — composition and §8.1.1 are approved and persisted. The new detailed
+Needs intervention recommendation in §8.1.2 awaits owner review; do not describe it as approved. Source qualification, lawful calendars, shared feed
 health/read-only behaviour, exact filters and production reconciliation remain delivery acceptance
 obligations, not permission to substitute defaults. The next lane is BUILD/DELIVERY only after an
 explicit takeover, constrained by those dependencies; this PLAN authors no Cards or implementation.

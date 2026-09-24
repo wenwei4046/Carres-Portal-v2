@@ -77,6 +77,17 @@ remaining ranks do not collapse into one sentence. The law itself is in
 
 ---
 
+### Dashboard Needs intervention — scoped owner ruling, 2026-09-24
+
+For this Panel only: exact management fact is **14px / 600**; object + dated evidence is
+**12px / 500**; business consequence is **12px**, muted with the existing secondary-text token.
+This explicit owner ruling adds a scoped 14px role; it does not change body/meta tokens or Work.
+The six-token-only prohibition above has this one approved exception. Line-height and token/code
+mirror wiring must be resolved through the governed kit in BUILD; this PLAN changes no code or
+claims a compiled token already exists. No page-local hard-coded bypass is permitted.
+
+---
+
 ## 2 · Colour
 
 **Source: `@radix-ui/colors`. No file in this repo maintains a hex table, so

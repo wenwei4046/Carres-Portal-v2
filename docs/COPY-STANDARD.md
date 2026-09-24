@@ -215,7 +215,7 @@ These are Dashboard-specific words, not permission to change owning-module vocab
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Sections | `Management attention` · `Commitment health` · `Material exposure` · `Work health` | Workspace Dashboard · KPI wall |
+| Sections | `Needs intervention` · `Today's operation` · `Work health` · `Business exposure` · `Recent material changes` | Workspace Dashboard · KPI wall |
 | Customer delivery facts | `Overdue delivery` · `Failed Delivery / Partially Delivered` | Requested date as a broken promise · proof missing as delivery missing |
 | Supplier facts | `Supplier delivery date passed` · `Supplier has not confirmed the PO date` | Open POs as an alert |
 | Reply population qualifier | `Reply working day missed` | Supplier SLA |
@@ -228,14 +228,30 @@ These are Dashboard-specific words, not permission to change owning-module vocab
 | Freshness / failure | `Data is delayed.` · `Could not refresh {source}` · `Could not load {source}` · `Last available {date and time}` | 0 after failure |
 | Incomplete aggregate | `Some sources could not be read. The total is unavailable.` | healthy-source subtotal labelled as the complete total |
 | Changed drill-down population | `Results refreshed. Records have changed since the Dashboard was read.` | silently opening a different population |
-| Clear state, only complete healthy admitted scope | `No management attention needed` | All on track · No alerts ✓ |
+| Clear state, only complete healthy admitted scope | a scope-qualified clear state after complete healthy reads | All on track · No alerts ✓ |
 | Controls | `Refresh` · `Try again` · `Open Team Work` · `Open {module}` | Done · Assign on Dashboard |
-| Future qualified section | `Recent material change` | Activity · unreviewed Escalations |
+| Future qualified section | `Recent material changes` | Activity · unreviewed Escalations |
 
 Counts name their units. Dates use the shared formatter; money always has two decimals. Technical
 rule keys, table names and error bodies never substitute for these readable statements. A source
 or scope label must itself be authorised. Source-health copy does not override the Work page's own
 `Last updated {time}` contract.
+
+### Needs intervention — owner-approved wording boundary, 2026-09-24
+
+Exact fact → object and dated evidence → business consequence → one destination. Approved fact
+examples: `Delivery promise missed` · `Payment exception blocks delivery` · `Nobody owns {n} actions`
+· `{module} could not be refreshed`; historical evidence uses `Last available {time}` with date
+when not today. Illustrative SO numbers, amounts, dates, names and counts are never seed data.
+Do not use standalone `Urgent`, `High priority`, `Needs attention`, `Problem` or `Exception`.
+The specific payment-exception sentence is allowed because it names the actual consequence.
+`Orders without PIC` is not interchangeable with ownerless actions: the source must establish that
+PIC absence actually leaves those action identities ownerless. Ordinary Missed stays in Team Work
+unless a concrete business consequence and the complete intervention contract qualify it.
+
+**PROPOSAL / NOT LAW:** `Delivery is blocked by payment review` replaces illustrative
+`Delivery cannot be released` to avoid implying a manual Release door. Other detailed sentences,
+header-count/partial-count and empty-state recommendations await review in Workspace §8.1.2.
 
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
