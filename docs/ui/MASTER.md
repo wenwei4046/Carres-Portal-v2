@@ -1923,6 +1923,13 @@ page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
 edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
+**Local implementation 2026-09-24, production proof owed:** DataGrid's optional
+`selectable.unselectableReason` adds an accessible description and the existing kit
+Tooltip to a refused checkbox. The label is keyboard-focusable and description IDs
+are unique per grid and row. It explains facts already visible on that owning page;
+never make the tooltip their only copy. Omitted callers retain their existing behavior,
+and no selectability or bulk-action rule changes.
+
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
   not equal widths or stretching to fill a canvas. Same field/role shares its default width.
   Personal resizing remains supported. No global 144/160/192px type-width proposal was approved.

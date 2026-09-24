@@ -1061,6 +1061,16 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
+**Disabled selection explanation — local implementation, 2026-09-24; delivery proof owed.**
+The shared grid's optional refusal description names the same existing facts used by
+SO Batch eligibility/planning and Manual Purchase approval/remainder. It is attached
+to the disabled checkbox and reachable by keyboard through the existing kit tooltip;
+the same facts remain visible on the row or in its expansion. The checked state,
+select-all, stock allocation and PO issue authority are unchanged. Open PR #1490's
+overlap was reviewed; only this still-missing behavior was ported against current main,
+with unique description IDs across grids and a keyboard-focusable trigger.
+
+
 **Shared dictionary — APPROVED / NOT BUILT (Jess, 2026-09-18).** All four reviewed listings
 (§9.1–§9.4), their detail facts and exports use [COPY-STANDARD: Purchasing UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
 The exact lists below are the owner's order; never rearrange them using a generic ordering heuristic.

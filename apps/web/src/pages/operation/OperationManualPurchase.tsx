@@ -1831,6 +1831,8 @@ export default function OperationManualPurchase() {
                   return next;
                 }),
               isSelectable: (r: RequestRegisterRow) => selectable(r),
+              unselectableReason: (r: RequestRegisterRow) =>
+                deadReason(r) ?? (r.approval.kind === "approved" ? null : r.approval.label),
               testId: (r: RequestRegisterRow) => `mp-select-${r.id}`,
             }}
             selectionSummary={() =>

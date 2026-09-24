@@ -10,7 +10,7 @@ import type {
   SoBatchOrderRow,
   SoBatchPurchaseResponse,
 } from "@carres/shared";
-import { soBatchAction } from "@carres/shared";
+import { soBatchAction, purchaseDemandStateWords } from "@carres/shared";
 import type { SalesOrderExpansionResponse } from "@/lib/queries";
 
 const navigate = vi.fn();
@@ -799,6 +799,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     const panel = screen.getByTestId(`so-batch-blocker-build::ob::${state}`);
     expect(panel.textContent).toBeTruthy();
     expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-ob")).toHaveAccessibleDescription(purchaseDemandStateWords(data().safetyDays)[state]);
   });
 
   it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
@@ -1914,6 +1915,7 @@ describe("fourteen documents on a one-unit line", () => {
       registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
     });
     expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-o14")).toHaveAccessibleDescription("Coverage not checked");
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const demand = within(box).getByTestId("so-batch-part-B1201S-K");

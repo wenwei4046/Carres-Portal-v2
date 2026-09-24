@@ -17,6 +17,7 @@ import {
   soBatchOrderSelection,
   soBatchOrderLineOutstandingQty,
   soBatchOrderPlanning,
+  soBatchOrderUnselectableReason,
   soBatchOrderSafetyDays,
   soBatchOrderStatusWord,
   soBatchOrderByAbsenceWord,
@@ -1344,6 +1345,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
                 },
                 isSelectable: (o: SoBatchOrderRow) =>
                   (eligibleByOrder.get(o.orderId) ?? []).length > 0,
+                unselectableReason: (o: SoBatchOrderRow) =>
+                  soBatchOrderUnselectableReason(o, leafsByOrder.get(o.orderId) ?? [], stateWords),
                 isIndeterminate: (o: SoBatchOrderRow) =>
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
