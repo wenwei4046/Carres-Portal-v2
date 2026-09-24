@@ -41,19 +41,15 @@ function row(overrides: Partial<WorkRow> = {}): WorkRow {
 }
 
 describe("Work presentation model", () => {
-  it("keeps the locked section order and gives broken commitments one home", () => {
+  it("keeps promise failures in their lawful date group without a duplicate section", () => {
     const sections = workSections([
       row({ id: "no-date", timingBucket: "no_date", dueIso: null }),
       row({ id: "later", timingBucket: "later" }),
       row({ id: "broken", broken: true, timingBucket: "overdue", workingDaysLate: 2 }),
       row({ id: "late", timingBucket: "overdue", workingDaysLate: 1 }),
     ]);
-    expect(sections.map((section) => section.label)).toEqual([
-      "Broken commitments",
-      "Missed",
-      "Later",
-      "No working date",
-    ]);
+    expect(sections.map((section) => section.label)).toEqual(["Missed", "Later", "No working date"]);
+    expect(sections[0]?.items.map((item) => item.id)).toEqual(expect.arrayContaining(["broken", "late"]));
     expect(sections.flatMap((section) => section.items).filter((item) => item.id === "broken")).toHaveLength(1);
   });
 
@@ -118,9 +114,9 @@ describe("workFocusDay — the day the focus list opens on", () => {
 });
 
 describe("workLayoutFor — panels follow the Work area width", () => {
-  it("uses three panels from 1104px, two from 768px, else one", () => {
-    expect(workLayoutFor(1104)).toBe("three");
-    expect(workLayoutFor(1103)).toBe("two");
+  it("uses three panels from 1132px, two from 768px, else one", () => {
+    expect(workLayoutFor(1132)).toBe("three");
+    expect(workLayoutFor(1131)).toBe("two");
     expect(workLayoutFor(950)).toBe("two");
     expect(workLayoutFor(768)).toBe("two");
     expect(workLayoutFor(767)).toBe("one");

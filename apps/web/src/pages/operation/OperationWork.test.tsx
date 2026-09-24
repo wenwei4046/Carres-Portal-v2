@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 
@@ -38,6 +38,11 @@ vi.mock("@/lib/auth", () => ({
       // sign in by email, so the account id follows the email.
       user: { id: authState.email.startsWith("yujun") ? YJ : SH, email: authState.email },
     }),
+}));
+vi.mock("./components/DeliveryProofReviewWork", () => ({
+  default: ({ doNumber, onSaved }: { doNumber: string; onSaved?: (receipt: string) => void }) => (
+    <button type="button" onClick={() => onSaved?.(`Delivery proof accepted · ${doNumber}`)}>Complete proof review</button>
+  ),
 }));
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -145,20 +150,47 @@ describe("Operation Work — one server feed", () => {
   it("defaults everyone, including a manager, to My Work", () => {
     authState = { role: "principal", email: "shasha@carres.test" };
     show();
-    expect(screen.getByTestId("work-view-mine")).toHaveClass("bg-base-900");
+    expect(screen.getByRole("tab", { name: "My Work" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
   });
 
-  it("renders object, problem, then action without repeating the owner", () => {
+  it("gives a manager with no My Work a truthful door into Team Work", async () => {
+    authState = { role: "principal", email: "shasha@carres.test" };
+    workState.data!.items = [item({
+      owner: {
+        rule: "salesperson",
+        dutyKey: null,
+        normal: { userId: YJ, name: "Yu Jun" },
+        activeCover: null,
+        coverEvidence: null,
+        acting: { userId: YJ, name: "Yu Jun" },
+        state: "primary",
+      },
+    })];
+    show();
+    expect(screen.getByTestId("work-empty")).toHaveTextContent("Nothing assigned to you");
+    fireEvent.click(screen.getByRole("button", { name: "Open Team Work" }));
+    expect(await screen.findByTestId(`work-owner-group-${YJ}`)).toBeInTheDocument();
+  });
+
+  it("does not expose Team Work to a My Work-only role, even through a copied URL", () => {
+    authState = { role: "salesperson", email: "shasha@carres.test" };
+    show("/operation?tab=work&scope=team");
+    expect(screen.getByRole("tab", { name: "My Work" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "Team Work" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Team Work" })).not.toBeInTheDocument();
+  });
+
+  it("renders fact then action, with the object in the footer and no repeated owner", () => {
     show();
     const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
-    expect(row).toHaveTextContent("SO-1318");
     expect(row).toHaveTextContent("No delivery date");
     expect(row).toHaveTextContent("Ask customer for a delivery date");
     expect(row).not.toHaveTextContent("Shasha");
+    expect(screen.getByTestId("work-card-footer")).toHaveTextContent("SO-1318");
   });
 
-  it("routes covered work to the acting person's My Work but groups Team Work under normal owner", () => {
+  it("routes covered work to the acting person's My Work but groups Team Work under normal owner", async () => {
     workState.data!.items = [item({
       owner: {
         rule: "salesperson",
@@ -174,23 +206,41 @@ describe("Operation Work — one server feed", () => {
     show();
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date"))
       .toHaveTextContent("Covered for Shasha");
-    fireEvent.click(screen.getByTestId("work-view-team"));
-    const group = screen.getByTestId(`work-owner-group-${SH}`);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Team Work" }), { button: 0, ctrlKey: false });
+    const group = await screen.findByTestId(`work-owner-group-${SH}`);
     expect(within(group).getByText(/Shasha/)).toBeInTheDocument();
     expect(within(group).getByTestId("work-row-SO-1318-ask_delivery_date"))
       .toHaveTextContent("Covered by Yu Jun");
   });
 
-  it("uses the governed My Work section order and keeps No date separate", () => {
+  it("keeps promise failures inside Missed and keeps No date separate", () => {
     workState.data!.items = [
       item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
       item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
       item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
     ];
     show("/operation?tab=work&day=all");
-    expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-section-broken")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-section-overdue")).toBeInTheDocument();
     expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
+  });
+
+  it("uses separate Missed and dated group headings, never the retired combined heading", () => {
+    workState.data!.items = [
+      item({ id: "orders:late", timing: timing("2026-09-04", 1) }),
+      item({ id: "orders:today", ruleKey: "confirm_delivery_date", timing: timing("2026-09-07") }),
+    ];
+    show();
+    expect(screen.getByTestId("work-section-overdue")).toHaveTextContent("Missed 1");
+    expect(screen.getByTestId("work-section-date-2026-09-07")).toHaveTextContent("Mon, 7 Sep 1");
+    expect(screen.queryByText(/Missed 1 · Mon, 7 Sep 1/)).not.toBeInTheDocument();
+  });
+
+  it("draws Working day and Module as separate governed panels", () => {
+    show();
+    const rail = screen.getByRole("complementary", { name: "Work filters" });
+    expect(rail.querySelector('[data-rail-group="Working day"]')).toHaveClass("rounded-panel", "border");
+    expect(rail.querySelector('[data-rail-group="Module"]')).toHaveClass("rounded-panel", "border");
   });
 
   it("reads search and filters from the URL", () => {
@@ -213,7 +263,7 @@ describe("Operation Work — one server feed", () => {
     expect(screen.getByRole("searchbox", { name: "Search work…" })).toHaveValue("Acme");
   });
 
-  it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {
+  it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", async () => {
     workState.data!.items = [item({
       id: "delivery:order-1:assign_logistics",
       module: "delivery",
@@ -230,8 +280,9 @@ describe("Operation Work — one server feed", () => {
       },
     })];
     show();
-    fireEvent.click(screen.getByTestId("work-view-team"));
-    const group = screen.getByTestId("work-owner-group-duty:delivery_duty");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Team Work" }), { button: 0, ctrlKey: false });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Team Work" })).toHaveAttribute("aria-selected", "true"));
+    const group = await screen.findByTestId("work-owner-group-duty:delivery_duty");
     expect(within(group).getByText("Delivery Duty")).toBeInTheDocument();
     expect(group).not.toHaveTextContent("Shasha");
     const failure = within(group).getByTestId("work-duty-unassigned-delivery_duty");
@@ -243,10 +294,25 @@ describe("Operation Work — one server feed", () => {
   it("selects work in the action panel before opening the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
-    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("Customer Delivery exists");
+    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("No delivery date");
+    expect(screen.getByRole("region", { name: "Selected work" })).not.toHaveTextContent("REQUIRED RESULT");
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Open SO-1318" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
+  });
+
+  it("uses O only from Work navigation, never while the operator is typing", () => {
+    show();
+    const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
+    row.focus();
+    fireEvent.keyDown(row, { key: "o" });
+    expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
+
+    navigate.mockReset();
+    const search = screen.getByRole("searchbox", { name: "Search work…" });
+    search.focus();
+    fireEvent.keyDown(search, { key: "o" });
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it("keeps a Delivery item on its exact Delivery Order door", () => {
@@ -263,6 +329,51 @@ describe("Operation Work — one server feed", () => {
     fireEvent.click(screen.getByTestId("work-row-DO-2041-deliver_today"));
     fireEvent.click(screen.getByRole("button", { name: "Open DO-2041" }));
     expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
+  });
+
+  it("waits for refreshed source closure, leaves the receipt in the old row and selects the next item", async () => {
+    const proof = item({
+      id: "delivery:DO-2041:check_delivery_proof",
+      module: "delivery",
+      ruleKey: "check_delivery_proof",
+      object: { kind: "delivery_order", id: "DO-2041", label: "DO-2041" },
+      problem: "Delivery proof needs review",
+      action: "Check delivery proof",
+      destination: "/operation/delivery-orders/DO-2041",
+      interaction: {
+        mode: "embedded",
+        actionKey: "delivery.proof_review",
+        componentKey: "delivery.proof_review",
+        capability: "POST /api/operation/delivery-orders/:doNumber/proof-review",
+        inputContract: "ProofReviewInput",
+        evidenceContract: "Latest governed Delivery proof package",
+        idempotencyKey: "ProofReviewInput.idempotencyKey",
+        staleVersion: "ProofReviewInput.sourceVersion",
+        staleRefusal: "stale_proof_evidence",
+        successReceipt: "Delivery proof review result, actor, time and source version",
+        fallbackDestination: "/operation/delivery-orders/DO-2041",
+      },
+    });
+    const next = item({
+      id: "orders:order-2:ask_delivery_date",
+      object: { kind: "sales_order", id: "order-2", label: "SO-1319" },
+    });
+    workState.data!.items = [proof, next];
+    const view = show();
+    const proofRow = screen.getByTestId("work-row-DO-2041-check_delivery_proof");
+    proofRow.focus();
+    fireEvent.keyDown(proofRow, { key: "Enter" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Complete proof review" })).toHaveFocus());
+    fireEvent.click(screen.getByRole("button", { name: "Complete proof review" }));
+    expect(screen.queryByTestId("work-completion-receipt")).not.toBeInTheDocument();
+
+    workState.data = { ...workState.data!, items: [next] };
+    view.rerender(<MemoryRouter initialEntries={["/operation?tab=work"]}><OperationWork /></MemoryRouter>);
+
+    const receipt = await screen.findByTestId("work-completion-receipt");
+    expect(receipt).toHaveTextContent("Delivery proof accepted · DO-2041");
+    expect(receipt).toHaveFocus();
+    expect(screen.getByTestId("work-row-SO-1319-ask_delivery_date")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps Payment collection on its exact Invoice door", () => {

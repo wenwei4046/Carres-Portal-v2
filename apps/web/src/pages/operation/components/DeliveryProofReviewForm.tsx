@@ -34,23 +34,30 @@ export default function DeliveryProofReviewForm({
   attemptId,
   sourceVersion,
   allEvidenceReadable,
+  onRetryEvidence,
   onSaved,
 }: {
   doNumber: string;
   attemptId: string | null;
   sourceVersion: string;
   allEvidenceReadable: boolean;
-  onSaved?: () => void;
+  onRetryEvidence?: () => void;
+  onSaved?: (receipt: "Delivery proof accepted" | "More proof requested" | "Delivery proof rejected") => void;
 }) {
   const [decision, setDecision] = useState<ProofDecisionKey | null>(null);
   const [reason, setReason] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const review = useReviewDeliveryProof(doNumber, {
     onSuccess: () => {
+      const receipt = decision === "accepted"
+        ? "Delivery proof accepted"
+        : decision === "more_required"
+          ? "More proof requested"
+          : "Delivery proof rejected";
       setDecision(null);
       setReason("");
       setIdempotencyKey(crypto.randomUUID());
-      onSaved?.();
+      onSaved?.(receipt);
     },
   });
 
@@ -81,9 +88,10 @@ export default function DeliveryProofReviewForm({
       }}
     >
       {!allEvidenceReadable ? (
-        <p className="text-label text-kit-amber-11" role="alert">
-          Photo could not be loaded · Try again
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-label text-kit-amber-11" role="alert">
+          <span>Photo could not be loaded</span>
+          {onRetryEvidence ? <Button type="button" variant="neutral" size="sm" icon="refresh" onClick={onRetryEvidence}>Try again</Button> : <span>· Try again</span>}
+        </div>
       ) : null}
 
       <fieldset className="flex flex-col gap-2">

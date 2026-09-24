@@ -4,7 +4,7 @@ import type { OperationWorkItem } from "@carres/shared";
 import WorkActionPanel from "./WorkActionPanel";
 
 vi.mock("../components/DeliveryProofReviewWork", () => ({
-  default: ({ doNumber }: { doNumber: string }) => <div>Delivery proof form for {doNumber}</div>,
+  default: ({ doNumber, onSaved }: { doNumber: string; onSaved?: (receipt: string) => void }) => <div>Delivery proof form for {doNumber}<button type="button" onClick={() => onSaved?.(`Delivery proof accepted · ${doNumber}`)}>Complete proof review</button></div>,
 }));
 
 const base = {
@@ -18,12 +18,22 @@ const base = {
 describe("WorkActionPanel", () => {
   it("shows operator-safe completion words and hosts the owning embedded form", () => {
     render(<WorkActionPanel item={{ ...base, interaction: { mode: "embedded" } } as OperationWorkItem} embedded={<div>Delivery owned form</div>} onOpen={() => {}} />);
-    expect(screen.getByText("Finish when: The proof review is recorded")).toBeInTheDocument();
+    expect(screen.getByText("The proof review is recorded")).toBeInTheDocument();
+    expect(screen.queryByText(/Finish when:/i)).not.toBeInTheDocument();
     expect(screen.queryByText("delivery_proof_reviews exists")).not.toBeInTheDocument();
     expect(screen.getByText("Delivery owned form")).toBeInTheDocument();
   });
 
+  it("does not repeat the selected card as CURRENT FACT, ACTION and REQUIRED RESULT blocks", () => {
+    render(<WorkActionPanel item={{ ...base, interaction: { mode: "open_module", fallbackDestination: base.destination } } as OperationWorkItem} onOpen={() => {}} />);
+    expect(screen.queryByText("CURRENT FACT")).not.toBeInTheDocument();
+    expect(screen.queryByText("ACTION")).not.toBeInTheDocument();
+    expect(screen.queryByText("REQUIRED RESULT")).not.toBeInTheDocument();
+    expect(screen.getByText("Delivery proof needs review")).toBeInTheDocument();
+  });
+
   it("resolves the admitted Delivery proof component without a Workspace copy of the form", () => {
+    const completed = vi.fn();
     render(<WorkActionPanel item={{
       ...base,
       object: { ...base.object, id: "DO-140926-0007" },
@@ -40,8 +50,10 @@ describe("WorkActionPanel", () => {
         successReceipt: "Delivery proof review result, actor, time and source version",
         fallbackDestination: base.destination,
       },
-    } as OperationWorkItem} onOpen={() => {}} />);
+    } as OperationWorkItem} onOpen={() => {}} onCompleted={completed} />);
     expect(screen.getByText("Delivery proof form for DO-140926-0007")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Complete proof review" }));
+    expect(completed).toHaveBeenCalledWith("Delivery proof accepted · DO-140926-0007");
   });
 
   it("opens the owning object and gives read-only work no fake completion control", () => {
@@ -51,5 +63,21 @@ describe("WorkActionPanel", () => {
     expect(screen.queryByRole("button", { name: /Save|Done|Record/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open DO-140926-0007" }));
     expect(open).toHaveBeenCalled();
+  });
+
+  it("opens with O in the detail navigation but never while typing in a field", () => {
+    const open = vi.fn();
+    const view = render(
+      <WorkActionPanel
+        item={{ ...base, interaction: { mode: "embedded" } } as OperationWorkItem}
+        embedded={<textarea aria-label="Reason" />}
+        onOpen={open}
+      />,
+    );
+    fireEvent.keyDown(view.container.firstElementChild as HTMLElement, { key: "o" });
+    expect(open).toHaveBeenCalledOnce();
+    open.mockReset();
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Reason" }), { key: "o" });
+    expect(open).not.toHaveBeenCalled();
   });
 });

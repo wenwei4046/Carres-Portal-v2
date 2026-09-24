@@ -343,235 +343,134 @@ Team Work   the same actions grouped by normal owner
 
 ### 5.1 · One Work composition
 
-Work is one page with two scopes over one open set. It is an operator workspace, not a Dashboard,
-Kanban board or second module record. Owner-approved 2026-09-16: large desktop uses three working
-panels inside the existing global shell. My Work opens with a focus list containing `Missed`
-followed by the actual current governed weekday/date. On a public holiday with no authorised
-holiday operation, the holiday remains named in Panel 1 and the focus list uses the next eligible
-governed working day; an authorised holiday operation remains on the named holiday. The complete
-working week remains visible and choosing a day narrows Panel 2 to that day. The opening focus list
-does not create a second occurrence or count.
+Work is one page with two scopes over one permission-scoped open set. It is an operator workspace,
+not a Dashboard, Kanban board or second module record. **OWNER APPROVED 2026-09-24:** the previous
+v4 reference artifact and its `Broken commitment` grouping, combined list heading, three-line row
+grammar and repeated selected-action brief are superseded. No rejected prototype is authority.
 
-**OWNER APPROVED — Work v4, 2026-09-17.** This section, §§5.2–5.5 and §5.8 carry the v4 rulings;
-the reference review surface is https://claude.ai/artifact/HcREkf3UTPj35gYj339mCA (v4). Its
-records, people, dates and simulated saves remain fixtures and are not authority.
+At a Work canvas of 1132px or wider, the page has three columns inside the global shell. The threshold
+is the exact sum `240 + 360 + 500 + 16 + 16` and therefore cannot be 1104px:
 
-```text
-┌ WORKING DAY ─────────┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
-│ Missed      {count}  │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
-│ Mon, {date} {count}  │▌{object} · {module}         │ {recipient, when applicable} │
-│ Tue, {date} {count}  │▌{fact}                      │                              │
-│ {holiday name}       │▌{action} · {contact} {when} │ CURRENT FACT                 │
-│ Thu, {date} {count}  │ MISSED                      │ {fact or problem}            │
-│ Fri, {date} {count}  │ {object} · {module}         │                              │
-│ Sat, {date} {count}  │ {fact}                      │ ACTION                       │
-│ No working date      │ {action} · {contact} {when} │ {specific action}            │
-│             {count}  │ Blocked by {dependency}     │                              │
-│                      │ THU, {date}                 │ COMMUNICATION (when admitted)│
-│ MODULE               │ {object} · {module}         │ [Open WhatsApp group]        │
-│ All modules  {count} │ {fact}                      │ [Copy message]               │
-│ Sales Orders {count} │ {action} · {contact} {when} │                              │
-│ Purchasing   {count} │                             │ REQUIRED RESULT · FINISH WHEN│
-│ Receiving    {count} │                             │ {module action when admitted}│
-│ Delivery     {count} │                             │                              │
-│ Payment      {count} │                             │ [Open {object}]              │
-│ Issue Tracker{count} │                             │                              │
-└──────────────────────┴─────────────────────────────┴──────────────────────────────┘
-▌ = thin red row edge of a broken commitment (no row badge)
-```
+1. a 240px scope column containing separate `Working day` and `Module` Panels;
+2. a 360px list column containing compact Work cards grouped by date in My Work or by normal owner
+   in Team Work;
+3. a detail column of at least 500px containing the selected action's executable Panels.
 
-Panel 1 chooses the working day and module. Panel 2 lists the matching authorised actions; on first
-open it shows `Missed` followed by the actual current or next eligible governed weekday/date under
-the holiday law above. Panel 3 shows one selected action's fact, specific act, source-owned
-communication where admitted, required result, admitted owning-module action and exact
-owning-object door. `Missed` contains actions whose governed working day has passed;
-the original day and working-day age remain visible. Previous/next controls move the selected week
-without changing scope or filters. Monday through Friday always show. Saturday appears only when an
-authoritative module action remains scheduled on Saturday after applying that module's rule and the
-resolved owner's working calendar. Payment keeps its locked Friday-action rule for a Saturday
-deadline. Physical Receiving or Delivery work remains on Saturday when its authoritative rule and
-resolved actor admit Saturday; without a qualified actor it is `Not assigned`, not silently moved.
-There is no invented `Saturday Duty`. A separate preparation action may appear on Friday only when
-its owning module generates that action. A public holiday remains visible and is named; normal work advances by
-the source calendar, while an authorised holiday operation remains on the holiday and says so.
-`No working date` is an admitted obligation without a lawful day and never pretends to belong to
-today.
+The canvas is the confirmed Carres light-grey page surface. Each scope/detail session is a white
+Panel with 1px grey border, 10px radius, no shadow, 16px padding, one blue section title and one
+divider. Panels have 16px separation. A compact Work card is one object, never nested sessions:
+white surface, 1px grey border, 6px radius, no shadow, 10–12px padding, natural height and at most
+one footer divider. Selection uses only a quiet blue-grey fill; it has no blue outline, corner or
+selection edge. A failed external promise may add a thin red attention edge only when the exact
+failure words remain visible.
 
-Panel 1 has two groups with two different count scopes:
+Panel 1 has two independent Panels. `Working day` shows `Missed`, Monday–Friday, Saturday only
+when an admitted action remains there, named public holidays and `No working date`; zero counts
+are omitted. `Module` shows `All modules` and admitted modules with the same governed icons as
+navigation. Rows are flat, counts are neutral/right-aligned/tabular and selection uses the governed
+quiet fill. Working-day counts cover the selected week. Module counts equal the currently visible
+Panel 2 set and sum to `All modules`.
 
-- **`WORKING DAY`** counts the whole selected week, one row per day: `Missed`, the governed
-  weekdays, Saturday only when an admitted action remains there, and `No working date`. A public
-  holiday row is named and carries no ordinary work.
-- **`MODULE`** opens with `All modules`, then each admitted module. It counts only the occurrences
-  currently in the Panel 2 list (on first open: `Missed` plus the selected day). `All modules` always
-  equals the number of Panel 2 rows, and the module rows sum to `All modules`.
+My Work first opens with two distinct sticky list groups: `Missed {n}`, then the current or next
+eligible governed weekday/date `{weekday, date} {n}`. It never combines them into one heading.
+Selecting a single day shows only that group. There is no visible or counted `Broken commitment`
+group: an external promise failure sorts first inside its lawful date group and prints the exact
+promise and failed fact. It remains one occurrence. A blocker likewise stays in the original group
+and prints its exact dependency; there is no Blocked group.
 
-The Panel 2 heading is `Missed {n} · {weekday, date} {n}` on first open; when a single day is
-selected it is `{weekday, date} {n}`. Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
-`MISSED` → the selected day. A broken commitment is shown in the `BROKEN COMMITMENT` group with a red
-group heading and a thin red row edge; the row carries no badge, and its accessible name still says
-`Broken commitment`. It still counts under its own working day in Panel 1 (for example `Missed`) and
-is never counted twice. There is no `Blocked` group: a blocked occurrence stays in its own group
-(`BROKEN COMMITMENT`, `MISSED` or its day), keeps its date and missed age, and prints `Blocked by {dependency}`, so blocked
-missed work is never hidden.
+Team Work is available to Operation, Principal and Jess without widening module permission. It uses
+the same filters and cards but groups Panel 2 by normal owner. Each owner header shows the governed
+avatar/full name and `{n} actions · {n} missed`. A card does not repeat that owner. Acting cover
+appears only as `Covered by {acting person}`; the card remains under its normal owner. Unresolved
+work appears last under `Not assigned` with the exact Duty and Staff & Duties correction door.
+Khor Yee is disabled and cannot appear as a current owner or cover. Shared/generic accounts never
+form a human owner group.
 
-Every action belongs to exactly one working-day count. Once its governed action day is before today,
-it moves into `Missed`; the row retains and prints the original required date, but that occurrence is
-not counted again under the past weekday. Module and owner totals count the same occurrence once.
-Day selection never creates a second copy.
+At 768–1103px of Work canvas, Panel 1 stays visible beside one work column. Selecting a card replaces
+the list with detail; `Back to work` restores the exact card, filters and scroll. Below 768px,
+Working day becomes a horizontal selector, Module moves into Filters, and list/detail replace one
+another full width. Every touch target is at least 40px.
 
-Team Work uses the same three panels and week. It is visible to the whole Operation team: Principal,
-Operation and Jess. Visibility does not grant new module data or action permission. Panel 1
-additionally selects normal owner or `Not assigned`; a Site queue must not appear until its governed
-identity, permission and acceptance path are built and admitted. Panel 2 keeps actions grouped or visibly identified by that normal owner and
-Panel 3 preserves cover evidence. Counts always name actions.
+Clicking a card selects its detail. Clicking the footer's external-link icon alone opens the owning
+object. The detail does not repeat the whole card: its compact identity is module + full object door
++ current fact/problem, followed immediately by genuine work-step Panels. Communication, recording
+the authoritative result and other steps are separate sessions only when they are separate acts.
+Completion is supporting copy inside the result Panel, never a separate decorative Panel.
 
-My Work is available to every active internal role that may own an admitted action, including Sales
-and Finance, and returns only occurrences routed to that signed-in acting person plus source health
-they are authorised to know. Team Work remains limited to Principal, Operation and Jess and still
-applies underlying module permissions. The Work read boundary therefore cannot remain the current
-Operation/Principal-only guard; widening the endpoint never widens an owning-module object door.
-
-Workspace never owns or stores module truth. Panel 3 is an action surface, not Object Detail and not
-a Workspace-owned form. Every occurrence declares one interaction mode: `embedded`, `open_module`
-or `read_only`. `embedded` renders the owning module's governed component and calls that module's
-authoritative API with the same permission, validation, evidence, source-version, idempotency and
-completion law. `open_module` uses one `Open {object}` door for complex or high-risk work.
-`read_only` explains that the user can view the action here but has no admitted execution door.
-Workspace never recreates a similar form or writes a substitute result.
-
-An embedded action is admitted rule by rule, not inferred from a small-looking form. Its contract
-must name the component, authoritative API/action key, permission, exact source version, required
-evidence, completion predicate, specific success receipt, stale-state refusal, idempotency behaviour
-and fallback owning-object door. Missing any one keeps the occurrence `open_module`. Opening
-WhatsApp, copying text, uploading ungoverned evidence or marking a local checkbox never completes
-business work.
-A `FINISH WHEN` block prints the operator-safe completion statement supplied beside the
-authoritative machine completion predicate. It does not expose table names or substitute
-`requiredResult` merely because that sentence already exists. `WHAT HAPPENS NEXT` appears only when
-the owning module supplies a separate governed consequence; Workspace never relabels the completion
-predicate, required result or a likely consequence as one another.
-The first admitted embedded vertical slice is Delivery proof review: `Accept proof`, `Request more
-proof` or `Reject proof`, using Delivery's existing review truth. The existing Delivery review form
-must first become one shared owning-module component used by Delivery and Work; Workspace does not
-copy it. Supplier reply remains unadmitted until its API proves exact current-PO-version refusal and
-evidence law. Customer delivery booking, Delivery result, Issue PO, Receiving/GRN, Payment, refund
-and Service outcome remain `open_module` until separately admitted. A Case request, approval,
-uploaded slip or checkbox never means Finance paid a refund.
-
-For Delivery proof review, every file in the latest governed proof package must be readable before
-`Accept proof` is available. A failed file says `Photo could not be loaded · Try again`; `Request
-more proof`, `Reject proof` and the secondary `Open {Delivery Order}` door remain available. Once
-all current files load, acceptance may resume. `Viewed` is temporary page assistance only: it is
-not stored, is not completion evidence and creates no Work history. The UI never claims that a
-driver was contacted merely because `Request more proof` was recorded; its truthful supporting
-result is `More proof is required`.
+Workspace never owns or stores module truth. Every occurrence declares `embedded`, `open_module`
+or `read_only`, but those engineering modes are not visible card badges. An embedded action reuses
+the owning module's component, API, permission, validation, evidence, source-version, idempotency,
+completion and receipt law. Missing any admission fact keeps the action an exact object-door flow.
 
 ### 5.2 · Work-item presentation contract
 
-Each visible item uses the approved three-line row grammar (owner ruling 2026-09-17):
+**OWNER APPROVED 2026-09-24:** a compact card is fact/problem first. Neither the action, recipient
+nor document number is its largest text.
 
 ```text
-OBJECT LABEL · MODULE OR SITE CONTEXT                       line 1
-FACT OR PROBLEM                                             line 2
-ACTION · CONTACT (when applicable) · TIMING / MISSED AGE    line 3
-Blocked by {dependency} · exceptional state (only when true) wraps below
+MODULE                                                     small metadata
+{context or promise date}                                  small supporting fact
+{exact fact or problem}                                    main emphasis
+{specific action}                                          secondary
+{recipient / contact / location, when applicable}          supporting
+──────────────────────────────────────────────────────────────────────────
+{source object label} [external-link icon]                 footer metadata
 ```
 
-- Object identity belongs in the item header and is not repeated in the action.
-- Owner belongs in the Team group/avatar or exceptional cover/handover metadata, never the sentence.
-- My Work omits the signed-in person's avatar. It shows `Covered for {normal owner}` when routed by
-  active cover. Team Work keeps the normal owner's group and shows `Covered by {acting person}`.
-- A future Site queue is an owner state, not a person. It may render only after a governed queue
-  identity, permission and atomic acceptance path are built and admitted; until then unresolved
-  site work is `Not assigned`.
-- The action begins with a specific verb and names its business object only when the header does not
-  already make it unambiguous. `Follow up`, `Check`, `Handle`, `Process` and `Pending` alone are
-  forbidden.
-- Required result belongs in Panel 3 for physical handover, multi-result and otherwise ambiguous
-  acts; it remains available as accessible supporting text for every item.
-- Required result describes the result the actor must produce. The machine completion predicate is
-  the source rule that closes the occurrence. `FINISH WHEN` uses a third, operator-safe completion
-  statement bound to that predicate. These may coincide in simple cases but the UI never assumes
-  they are interchangeable and never exposes schema/table language.
-- Communication is a structured source-owned `COMMUNICATION` block in Panel 3: recipient, channel,
-  actual sent evidence and reply state when the source truly supplies them. It is absent for
-  non-communication work. Workspace does not copy or store a second conversation. Where the owning
-  module admits them, Panel 3 renders that module's own `Open WhatsApp group`, `Open WhatsApp` or
-  `Copy message` control with the module's label law (COPY-STANDARD: the word follows the door the
-  click opens) and the module's message text; Workspace never writes its own message or label.
-  Opening WhatsApp or copying a message is never sent evidence and records nothing. A result control
-  such as `Record supplier answer` appears only after that module's supplier-reply rule is admitted
-  as an embedded action (§5.1).
-- Avatar initials are a chip with the full current name on hover, focus and tap. Departed people may
-  appear only in historical evidence.
+The fixed hierarchy is:
+
+- fact/problem: 14px/600;
+- action: 12px/500;
+- recipient/contact/location: 12px/400–500;
+- supporting fact: 11–12px/400;
+- module, object and metadata: 10–11px/500–600.
+
+Module belongs at the top; object number belongs only in the footer and never in the header. Long
+document numbers stay on one line, use a governed middle-short display preserving prefix and suffix,
+and expose the full accessible value; detail shows the full value. The action uses a specific verb.
+`Follow up`, `Check`, `Handle`, `Process` and `Pending` alone remain forbidden.
+
+`Broken commitment` is no longer operator-facing vocabulary. The feed retains the structured
+attention fact for ordering, while UI prints the actual business evidence, for example:
+
+```text
+Promised Tue, 22 Sep
+Not delivered
+```
+
+Likewise, operator cards do not print abstract `{n} working day(s) missed`, `Late`, `Overdue`,
+`Due` or `Upcoming`. The `Missed` group expresses internal lateness; the card prints the exact
+action date and unresolved fact only when needed. Missed age remains structured sorting/management
+evidence. `Today` may mark the current selector but is not stored status text.
+
+My Work omits the signed-in owner. It prints only exceptional `Covered for {normal owner}`.
+Team Work owns the normal-owner group and prints only exceptional `Covered by {acting person}`.
+Owner never enters the action sentence.
+
+Communication detail follows the approved composer law. Its Panel header is `Contact {recipient}`
+with icon doors for WhatsApp, Email when a valid address exists, and More. WhatsApp uses its brand
+icon; other controls use governed icons. The message body auto-loads the rule's default owning-module
+template and remains editable. The composer footer shows the applied template and Copy icon. More
+contains `Use another template`, `Save as template` and `Communication history`; personal and
+team template visibility remain distinct. Icon-only controls have tooltip, focus/tap help and full
+accessible names. Mutations that write business truth always use icon + words.
+
+Opening WhatsApp or an external email app and copying text record nothing. On return, the source-owned
+composer may ask `Did you send the message?` with `Not sent` and `Record sent`; only confirmed
+recording creates actor/time/message-snapshot evidence. A server-sent email may record success only
+after server confirmation. Communication evidence never closes business work.
+
+A simple admitted result Panel places related fields on one row where space permits, uses governed
+calendar/clock icons and one primary mutation, then states the exact completion effect as supporting
+copy. Example: `Work closes after the date and time are saved.` There is no separate Completion
+Panel. The row leaves only after the feed re-read proves the owning completion predicate removed it.
+
+The first target embedded actions are Delivery proof review, confirmed supplier date and Delivery
+date/time arrangement; each still requires the full admission contract before production. Receiving/
+GRN, Delivery result, Issue PO, Payment allocation/refund and other complex work keep the exact
+owning-object door until their own shared component is admitted.
 
 #### 5.2.1 · Authoritative Work feed contract
-
-The three panels render one permission-scoped server response. They do not join module reads in the
-browser, infer missing facts or keep a second Work database. Every admitted open occurrence carries
-the following structured facts; display sentences are generated from these facts and are not a
-separate editable truth.
-
-| Contract group | Required facts |
-|---|---|
-| Identity | Stable occurrence ID; admitted rule key and version; module; source object kind, ID and display label |
-| Action | Fact/problem; specific action; recipient when applicable; required result; authoritative machine completion predicate; operator-safe completion statement |
-| Ownership | Owner rule; Duty key when used; normal owner; today's acting person; active cover evidence; explicit unresolved state |
-| Timing | Business deadline when one exists; governed action date/time; calendar key and source; working-day/missed calculation evidence; no-date reason when lawful |
-| Calendar health | Module-calendar state; resolved-person calendar state; holiday name when applicable; `not configured` and `read failed` remain distinct |
-| Communication | Optional source-owned channel, recipient, actual sent evidence and reply evidence/state; never a Workspace draft, send control or inferred conversation |
-| Resolution | Blocker and resolving door when blocked; optional separately governed next consequence; exact owning-object deep link |
-| Observation | Source observation time and source version needed to prove that the row and selected brief describe the same fact |
-| Interaction | `embedded`, `open_module` or `read_only`; for embedded actions, owning component/action key, API capability, input/evidence contract, idempotency law, stale-version refusal and specific success-receipt contract |
-
-`Business deadline` and `governed action date` are separate facts. For example, a Payment deadline
-on Saturday may lawfully generate a Friday action without rewriting the Saturday deadline. Receiving
-or Delivery may retain Saturday as both facts only when their rule and resolved actor calendar admit
-it. The feed never asks the UI to reverse-engineer one from the other.
-
-The response also carries one health record for every admitted source requested by the current
-authorised scope:
-
-| Source state | Required behaviour |
-|---|---|
-| `Healthy` | Return its current authorised items and observation time |
-| `Delayed` | Preserve its governed last-safe observation and name when it was last read successfully |
-| `Failed` | Name the unavailable source without exposing protected detail; do not replace its possible work with zero |
-| `Not admitted` | Never return its objects, module option or count as if they were Work |
-
-A failed source does not discard healthy-source actions. The envelope states whether the returned
-set is complete, which sources are not current and the last successful observation available for
-each. All visible counts, day/module/owner totals and Panel 2 rows derive from this same authorised
-item set and health envelope. No separately queried total may disagree with the list. Permission
-scoping happens before items, people and counts enter the response; a refused scope returns no
-protected count or identity.
-
-The permission-scoped envelope may additionally carry a short-lived closure receipt for the
-previously selected occurrence: source-owned result, actual actor when durably recorded, closure
-reason/time and source version. It is not Work history and cannot be invented from disappearance.
-Until a receipt exists, external closure uses the neutral fallback `No longer needed`; it never
-names a person or result that the source did not supply.
-
-The selected action is addressed by its stable occurrence ID in the URL. After refresh, if source
-completion law removed it from the open set, Work returns focus to the next visible row and shows
-the authorised closure receipt or neutral fallback; it does not preserve a stale actionable brief.
-An embedded mutation does not remove the row optimistically: Work re-reads the feed, confirms the
-owning completion predicate removed that identity, then selects the next visible row. If closure
-cannot be confirmed, the action stays visible and offers an idempotent retry. If a
-filter removed it, the list retains the filter and selects the first matching row. If its source
-failed, the last-safe brief is visibly non-current and has only its safe owning-object door.
-
-Current implementation gap: contract v2 now separates deadline/action date, missed placement/age,
-calendar health, rule/source version and cover evidence, and its strict transport shape requires a
-viewer-resolved interaction plus an optional source-versioned closure receipt. Current projectors
-truthfully default to `open_module`; viewer capability resolution and source-owned receipt loading
-are not built. People-owned working eligibility, complete resolver cover periods and governed
-last-safe delayed-source observations also remain incomplete. Delivery proof review still lives
-inside its Delivery page component and is not admitted in Work. UI construction may use fixtures
-for review, but production acceptance requires these facts and may not disguise a gap with client
-defaults, hard-coded people/calendars, independent source calls or a copied mutation form.
-
 ### 5.3 · Filter, search and URL contract
 
 Search matches the authorised open set by object number/label, customer, supplier, recipient,
@@ -580,8 +479,8 @@ problem and action. It never broadens permission scope and never searches a sepa
 The toolbar `Filters` door is governed for Work. It lives in the toolbar only and is never a Panel 1
 or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
 Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
-`Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
-`Missed`. Multiple filters combine and every active filter is
+`Blocked`, `Not assigned` (Team only) and `Source failed`. External promise failure remains
+structured ordering evidence and exact card copy, not a generic filter or label. Multiple filters combine and every active filter is
 visible, individually removable and represented in the URL so Dashboard and Right Rail can open
 the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
 does not change business state.
@@ -590,8 +489,8 @@ The Module filter lists only currently admitted projections: `Sales Orders` · `
 `Receiving` · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`, `Warehouse Outbound` and
 `Claims` do not appear until their admission gates and live projection close.
 
-Panel 2 group order is `BROKEN COMMITMENT` → `MISSED` → selected day (§5.1). Default ordering inside
-a group is module-governed materiality, oldest opened occurrence, then object label. Users may narrow
+My Work group order is `Missed` → selected day (§5.1). Exact external promise failures sort first
+inside their lawful group, then module-governed materiality, oldest opened occurrence and object label. Users may narrow
 the view but cannot manually reprioritise authoritative due facts. Search and filter results keep
 the same group and item grammar; zero matches is not the same as zero work.
 
@@ -603,7 +502,7 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Empty My Work | `Nothing assigned to you` · `Open Team Work` for authorised supervisors; source freshness remains visible |
 | Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
 | No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
-| Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
+| Missed | The occurrence stays under `Missed` and prints its exact required date/unresolved fact when needed; missed age is sorting/management evidence, not generic card copy |
 | Saturday | Appears only when an admitted action remains on Saturday after module and resolved-owner calendar law; retains the Saturday business date |
 | Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
 | Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
@@ -625,7 +524,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   header. The controls contain `My Work · Team Work`, Search, applied filters, `Clear all` when
   narrowed and the toolbar `Filters` door; freshness is a read fact, not a manual business action.
 - Breakpoints use the available Work canvas after the global shell, not the browser width. At
-  **1104px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
+  **1132px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
   360px; Panel 3 takes the remainder and never falls below 500px. The full composition may use up
   to the governed 1280px content width. Straight 1px `slate-5` dividers separate panels; the shell
   has no card radius, shadow or gutters between panels.
@@ -645,20 +544,15 @@ the same group and item grammar; zero matches is not the same as zero work.
   row gap and 36px minimum rows. Selected rows use `blue-3` plus the straight 2px `blue-9` inset
   marker; hover is `slate-3`. Counts are neutral, right-aligned and tabular. Long governed labels
   wrap; the rail never truncates them.
-- Panel 2 has a 44px heading and selectable action rows with 1px `slate-5` dividers. A row is at
-  least 64px and grows for long text; it never truncates. Its lines are object · module, then
-  fact/problem, then action with contact and timing (§5.2); `Blocked by {dependency}` wraps below
-  when true. A broken-commitment row adds only the thin red edge. Selection uses the same
-  `blue-3` + 2px inset marker; hover remains grey. Work items are rows, never individual Cards.
-  An admitted embedded row alone may carry the neutral `Do it here`; ordinary module-door and
-  read-only rows carry no repeated mode badge.
-- Panel 3 has 24px horizontal / 16px vertical heading padding and a left-aligned detail body no wider
-  than 760px. `open_module` and `read_only` retain the full structured brief. `embedded` is compact:
-  object/module header; one current-fact line; module-owned form with `Finish when: {statement}` as
-  supporting copy immediately below its heading; one primary mutation; then the secondary
-  `Open {object}` door and expandable owner/timing/source evidence. At 1440×900 the primary mutation
-  must be visible without scrolling for every admitted embedded action. There is no generic sticky
-  send/record bar and no second primary action.
+- Panel 2 uses compact Work cards governed by §5.2. Cards grow for content and never truncate.
+  Selection uses quiet `blue-3` fill without a blue outline/edge; hover remains grey. A failed
+  external promise may add only the thin red edge while exact failure words remain visible. No
+  interaction-mode badge (`Do it here`, `Open module`, `Read only`) appears on a card.
+- Panel 3 is a grey detail canvas with separate Carres Panels and a left-aligned body no wider than
+  760px. Its compact identity is module + full object door + current fact/problem; it does not repeat
+  the card. Each genuine step has one Panel. An admitted result Panel contains the owning-module
+  form, one primary mutation and its exact work-closes supporting sentence; no separate Completion
+  Panel or generic sticky bar exists. At 1440×900 the primary mutation is visible without scrolling.
 - Desktop controls retain their owning kit geometry; Work does not force Tabs, SearchInput, Select
   and Button to one height. Below 768px, every interactive target is at least 40px high
   with 8px between adjacent targets. Page padding is 24px on multi-panel content headings and 12px
@@ -696,9 +590,11 @@ not promoted into the global kit until a separately governed second use exists.
 Workspace does not store a free-form priority or invent one global SLA. Severity is derived in this
 order from module truth:
 
-1. `Broken commitment` — an explicit customer, supplier, payment or delivery promise is past and
-   its completion fact is absent.
-2. `Missed` — the governed working day is before today on that rule's calendar.
+1. An explicit customer, supplier, payment or delivery promise is past and its completion fact is
+   absent. This structured attention fact sorts first but UI prints the exact promise/failure, never
+   the retired generic `Broken commitment` label.
+2. `Missed` — the governed working day is before today on that rule's calendar; missed age remains
+   internal sorting/management evidence rather than generic card copy.
 3. The selected calendar-admitted working day, with `Today` marked explicitly only when today is a
    working day for that action's authoritative calendar.
 4. A later working day in the selected or a later week.
@@ -720,16 +616,17 @@ System automation that should have happened immediately is a source/integrity fa
 person task. Supervisory escalation is a notification/management receipt derived from the same
 identity; it never changes the owner, due date or completion fact.
 
-### 5.7 · Work current → proposed gap audit — 2026-09-14
+### 5.7 · Work current → proposed gap audit — 2026-09-23
 
 | Current branch evidence | Required Blueprint state |
 |---|---|
 | My Work / Team Work use one server-composed open feed | Retain; make all admitted modules use the same transport contract and source health |
 | My Work defaults correctly and Team groups by normal owner | Retain; add complete cover/handover and unresolved-Duty evidence everywhere |
 | Right Rail reads the same cache and opens `day` filters; since HF-3 (2026-09-17) the badge, the panel and My Work share one identity (the signed-in account id), one focus day (`workFocusDay`) and one `Missed` + `Today` count (`myMissedAndToday`); the badge accessible name is `My Work · {n} missed · {n} today`; loading keeps count placeholders and a failed refresh keeps the last-safe counts with `Last updated {time}` and source words | Retain; all supported filters must be URL-visible and use the same vocabulary |
-| Current main Work page has scope toggles and limited Rail-linked time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
-| Current rows show object, problem, action and due; Delivery/Warehouse show required result | Make required result accessible on every item and visible whenever completion would otherwise be ambiguous |
-| Current rows use truncation on narrow content | Replace with wrapping under 1024px; prove object/problem/action/result/due remain readable at 390px |
+| Current production still renders the retired rounded toolbar/day strip. The Work v4 branch now uses the flat 50px header, 45px toolbar, governed FilterRail and canvas-measured three/two/one-panel shell | Merge only after measured 1440/1180/820/390 visual acceptance; production evidence, not branch code, closes this row |
+| Current production can truthfully return no personal actions for a shared Principal account but offers no supervisory next door. The Work v4 branch keeps `Nothing assigned to you` and adds `Open Team Work` only for Principal/Operation | Production-verify the empty Principal/Operation path and prove Sales/Finance do not receive Team Work or protected counts |
+| Current production still uses a page-local row and old selected brief. The Work v4 branch uses the shared 64px-minimum `WorkActionRow`, `WorkActionPanel` and shared `Avatar`; object/problem/action wrap and required result stays in Panel 3 | Complete visual, keyboard and screen-reader acceptance, including focus return and the 390px wrapped-content proof |
+| Search, module/day/owner selection, source-failure isolation and true-empty/no-match states exist; remaining approved filters are not complete | Add waiting-for-reply, blocker and source filters plus individually removable applied-filter chips without inventing client-side business truth |
 | Current source composition is one all-or-nothing read and the item shape omits parts of §5.2.1 | Build the permission-scoped feed envelope, isolate source failures, distinguish true empty from no match and preserve governed last-safe observation |
 | No completed/history surface exists in shared Work | Add read-only history only after durable source result/actor evidence can support it; never synthesize Done rows |
 | Warehouse external queue and acceptance exist on the pending branch | Complete identity/offboarding/transfer guards and production proof before admission claim |
@@ -756,17 +653,16 @@ Work is ready for owner acceptance only when all are demonstrable:
   due/late fact and exact owning door without repeating owner/object in sentence prose;
 - first open shows `Missed` followed by the actual current or next eligible governed weekday/date,
   names a public holiday and never duplicates an occurrence or hides the complete working week;
-- `WORKING DAY` counts the whole week; `All modules` equals the Panel 2 row count and the module rows
-  sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
-- Panel 2 orders `BROKEN COMMITMENT` → `MISSED` → selected day; a broken commitment has a red group
-  heading and red row edge with no badge and still counts once under its own working day; a blocked
-  job stays in its own group with `Blocked by {dependency}`;
-- rows are at least 64px and never truncate; after a confirmed completion the receipt stays in place,
+- `WORKING DAY` counts the whole week; `All modules` equals the visible card count and the module rows
+  sum to it; first open has separate `Missed {n}` and `{weekday, date} {n}` groups;
+- exact external promise failures sort first inside their lawful group and carry no generic group or
+  badge; a blocked job stays in its original group with its exact dependency;
+- cards never truncate; after a confirmed completion the receipt stays in place,
   the next row is selected with focus on it, `Enter` moves into Panel 3 and `O` opens the object;
 - at a 768–1103px canvas Panel 1 plus one work column shows; choosing a job replaces the column and
   `Back to work` returns focus to the same row;
-- a communication job renders only the owning module's `Open WhatsApp group` / `Open WhatsApp` /
-  `Copy message` controls and records nothing when they are used;
+- a communication job uses the owning-module composer, approved channel/template/history icon
+  language and records nothing merely from external launch or Copy;
 - each occurrence's interaction mode is explicit; an embedded action uses the owning component/API,
   refuses stale source versions, is idempotent, preserves permission/cover evidence and disappears
   only after the refreshed feed proves its completion predicate;

@@ -166,13 +166,13 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 |---|---|---|
 | Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
-| Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` · `Public holiday` · `Holiday operation` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
+| Work timing | `Missed` · governed working weekdays · conditional Saturday · `Today` helper · named public holiday · `No working date`; exact promise/failure replaces the retired generic commitment label | Broken commitment · Due as the primary structure · Upcoming · Later · Overdue · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
 | Work applied filters | `Clear all` | Reset · Clear everything |
-| Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
+| Work selected-action sections | compact module/object/problem identity followed only by genuine step Panels such as `Contact {recipient}` and `Record {result}`; completion effect is supporting copy inside the result Panel | CURRENT FACT · ACTION · REQUIRED RESULT · FINISH WHEN · a separate Completion Panel |
 | Work selected-action navigation | `Back to work` · `Open {object}` | Close · Go back · View details |
 | Work embedded result | icon plus `Nice Future confirmed Fri, 18 Sep` · `Delivery proof accepted` (the exact source result; icon/colour never stands alone) | Done · Completed · Success · icon alone |
 | Work closure by another actor | icon plus `Done by {person}` only when the source supplies durable actor evidence | inferring the actor from assignment or cover |
@@ -181,13 +181,13 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
 | Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
 | Work left-panel groups (owner ruling 2026-09-17) | `WORKING DAY` (counts the whole week: `Missed` · weekdays · Saturday only when an admitted action remains there · `No working date`; a public holiday is named and carries no ordinary work) · `MODULE` with first row `All modules` (counts only the jobs in the centre list; `All modules` equals the centre row count) | a separate list-count label · a module total that excludes visible Missed rows · counting one occurrence twice |
-| Work centre heading (owner ruling 2026-09-17) | `Missed {n} · {weekday, date} {n}` on first open · `{weekday, date} {n}` when one day is selected | a list-count suffix · a heading count that differs from `All modules` |
-| Work centre groups, in order (owner ruling 2026-09-17) | `BROKEN COMMITMENT` → `MISSED` → `{WEEKDAY, DATE}` · a broken commitment is a red group heading plus a thin red row edge, no row badge, and still counts under its own working day | a Broken badge on the row · a `BLOCKED` group · counting a broken commitment twice |
+| Work centre headings (owner ruling 2026-09-24) | separate `Missed {n}` then `{weekday, date} {n}` sticky groups; one selected day shows only its group | combined `Missed {n} · {date} {n}` · a count that differs from visible cards |
+| Work centre ordering (owner ruling 2026-09-24) | external promise failures sort first inside their lawful date group and print exact facts; then materiality/age/object | BROKEN COMMITMENT group or badge · a BLOCKED group · counting one occurrence twice |
 | Work blocked job (owner ruling 2026-09-17) | `Blocked by {dependency}` on the row, inside its own working-day group · filter option `Blocked` | `Blocked` as a group · `Waiting` alone · hiding a blocked missed job |
 | Work filters door (owner ruling 2026-09-17) | `Filters` — the toolbar door only | `Filters` as a left-panel or rail heading |
-| Work communication controls (owner ruling 2026-09-17) | the owning module's own `Open WhatsApp group` · `Open WhatsApp` · `Copy message` in the right panel's `COMMUNICATION` section, labelled by the door the click opens | `Send` · `Sent` · `Message sent` · treating an opened WhatsApp or a copied message as sent evidence |
+| Work communication controls (owner ruling 2026-09-24) | `Contact {recipient}` header with governed WhatsApp/Email/More icons; More owns `Use another template` · `Save as template` · `Communication history`; Copy is an icon; external launch may ask `Did you send the message?` with `Not sent` / `Record sent` | duplicated channel rows/buttons · claiming open/copy is sent evidence |
 | Work action sentences (owner ruling 2026-09-17) | fact `Overdue delivery` · `Call {logistics}` over `Arrange a new delivery date` · `Ask {logistics}` over `Record the delivery result` · fact `Supplier has not confirmed the PO date` with action `Ask {supplier} to confirm the PO delivery date` · button `Record supplier answer` only after the supplier-reply action is admitted in Work | `Date passed` · `Reschedule` · `Follow up supplier` · `Record supplier answer` before the supplier reply is admitted |
-| Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
+| Work interaction mode | no visible card badge; card selects detail and the object footer's external-link icon opens the owning object | Do it here · Open module · Read only badges |
 | Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
 | Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
 | Delivery proof supporting result | `More proof is required` | The driver is asked for more proof |
@@ -3324,46 +3324,51 @@ a raw key (`stock_flag_repair` → `stock flag repair`) puts the database's voca
 to describe an event the portal cannot name. An undeclared type is an engineering defect, and
 the row still carries its order, its person and its time.
 
-## The Work module words (SO V2 Card 10, owner ruling 2026-08-11)
+## The Work module words (owner presentation ruling 2026-09-24)
 
-The Work page adds **no new action vocabulary** — every row line is the same
-`orderActionLine` the Orders list prints, and every due date is the ruled
-weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
+Work adds no second action vocabulary. Every card is generated from the owning module's structured
+fact/problem, specific action, recipient and completion rule.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| The sidebar door / page | **Work** | Tasks · To-do · Queue · Dashboard |
-| The two filters over the one set | **My Work · Team Work** | My tasks · Everyone · All work |
-| Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
-| The tally — page, staff group and rail row | **{n} actions to do · {n} late** | **{n} open · {n} overdue** (superseded) · Total · Outstanding |
-| A row's due date, on line 2 | **due {fmtDate}** (`due Wed, 20 Aug`) | Today · Tomorrow · a bare date |
-| A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
-| The clear state | **No open work — every track is clear.** | All done · Empty |
+| Sidebar door / page | **Work** | Tasks · To-do · Queue · Workspace Dashboard |
+| Ownership scopes | **My Work · Team Work** | My tasks · Everyone · All work |
+| Passed governed action date | **Missed** (group/filter only) | Late · Overdue · Due |
+| Obligation without a lawful action date | **No working date** | No date · Unscheduled · Someday · TBD |
+| Team tally | **{n} actions · {n} missed** | {n} open · {n} overdue · Total · Outstanding |
+| Current-day group | **{fmtDate}** with optional live **Today** helper | Due today · Tomorrow |
+| True My Work empty | **Nothing assigned to you** | All done · Empty |
+| True Team Work empty | **No open work** | All clear while a source failed |
+| Selected-day empty | **No work on {fmtDate}** | Nothing assigned to you |
+| Search/filter empty | **No work matches these filters** · **Clear filters** | No open work |
+| Source failure | **Could not refresh {source}** · **Last updated {time}** · **Try again** | 0 |
+| External-app launch confirmation | **Did you send the message?** · **Not sent** · **Record sent** | Sent (inferred from opening/copying) |
+| Stale write | **Action changed · Review again** | Saved · Done |
+| Failed write | **Not saved · Try again** | Unknown error |
+| Neutral external closure | **No longer needed** | Done by {person} without source evidence |
 
-> **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
-> OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a
-> low-English operator nothing; `{n} actions to do · {n} late` says the thing itself. The rail's
-> Team peek and the Work page speak the same pair.
+**`Broken commitment` is retired from operator UI.** It remains structured ordering evidence only.
+Print the actual promise and failed fact on separate lines, for example
+`Promised Tue, 22 Sep` / `Not delivered`. A card does not print generic `{n} working day(s)
+missed`; the Missed group carries internal lateness while exact dates/facts remain visible.
 
-**THE TWO-LINE WORK ROW HAS ONE MAPPING (card §7).** Line 1 is the action's registered SHORT
-display — **the dictionary's own QUEUE word**, no second definition of any act. Line 2 carries
-names · document numbers · the due date, and only line 2 does.
+**Compact Work card mapping:** module metadata → context/promise date → exact fact/problem (main) →
+specific action (secondary) → recipient/location (supporting) → footer object label and external-link
+icon. Object number never appears in the header. Owner belongs to My/Team grouping or exceptional
+cover evidence, never the action sentence.
 
-**TWO NEW ACTS — registered by the blueprint card (owner-approved 2026-08-16):**
+**Communication words and icons:** the Panel title is `Contact {recipient}`. WhatsApp, Email,
+Template, Copy, History, More and object doors use governed icons with tooltip/accessibility text.
+More owns `Use another template`, `Save as template` and `Communication history`. A valid email
+address is required before Email appears. Opening WhatsApp/email or copying records nothing.
 
-| Act | Queue / line 1 | Owner rule | Due |
-|---|---|---|---|
-| The loan comes back on the trip | **Collect the loan item** over **Bring back {Unit ID} on the delivery day** (the 2026-08-16 generic form — a loan is not always a sofa; two lines since 2026-09-13) | the `delivery_duty` rule through the Shared Duty Resolver (owner ruling 2026-09-13) | the delivery day itself |
-| Finance lifts the one money blocker | **Resolve the payment exception** | the Finance owner — only Finance clears it, with evidence | immediately |
+**System work has no generic Done button.** It leaves only after the owning module proves its
+completion fact. A human follow-up may use its governed explicit completion act.
 
-Neither is ever a button on a register or an object page; they are WORK, composed from the
-module facts (`ops_sofa_loans` · `order_finance_exceptions`) by the Work engine. A duty with no
-roster holder yet shows its DUTY WORD where a name cannot stand — never a hand-picked person.
-
-**System work has NO Done button** — an item leaves when its owning module
-records the completion fact. A human follow-up stays `ops_tasks`, labelled
-human, and is the only explicitly completable thing.
-
+**The loan and Finance acts remain:** `Collect the loan item` / `Bring back {Unit ID} on the
+delivery day` is owned by the Sales Order PIC with buddy cover and Delivery Duty fallback only when
+the order has no PIC; `Resolve the payment exception` belongs to the Finance owner and requires
+clearance evidence.
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.

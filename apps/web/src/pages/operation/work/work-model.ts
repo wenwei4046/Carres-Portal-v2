@@ -15,13 +15,12 @@ export interface WorkFilters {
 }
 
 export interface WorkSection {
-  key: "broken" | "overdue" | "today" | "later" | "no_date";
-  label: "Broken commitments" | "Missed" | "Today" | "Later" | "No working date";
+  key: "overdue" | "today" | "later" | "no_date";
+  label: "Missed" | "Today" | "Later" | "No working date";
   items: WorkRow[];
 }
 
 const SECTION_ORDER: readonly WorkSection["key"][] = [
-  "broken",
   "overdue",
   "today",
   "later",
@@ -29,7 +28,6 @@ const SECTION_ORDER: readonly WorkSection["key"][] = [
 ];
 
 const SECTION_LABEL: Record<WorkSection["key"], WorkSection["label"]> = {
-  broken: "Broken commitments",
   overdue: "Missed",
   today: "Today",
   later: "Later",
@@ -64,7 +62,7 @@ export function filterWork(items: readonly WorkRow[], filters: WorkFilters): Wor
 export function workSections(items: readonly WorkRow[]): WorkSection[] {
   const buckets = new Map<WorkSection["key"], WorkRow[]>();
   for (const item of items) {
-    const key: WorkSection["key"] = item.broken ? "broken" : item.timingBucket;
+    const key: WorkSection["key"] = item.timingBucket;
     const bucket = buckets.get(key) ?? [];
     bucket.push(item);
     buckets.set(key, bucket);
@@ -116,7 +114,7 @@ export function workFocusDay(today: string, dueIsos: readonly (string | null)[])
 
 /** Panels follow the Work area's own width, never the window's. */
 export function workLayoutFor(width: number): WorkLayout {
-  return width >= 1104 ? "three" : width >= 768 ? "two" : "one";
+  return width >= 1132 ? "three" : width >= 768 ? "two" : "one";
 }
 
 /** Source words for Work source health — never the raw feed key. */

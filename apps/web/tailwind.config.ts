@@ -15,6 +15,12 @@ export default {
       screens: { "2xl": "1400px" },
     },
     extend: {
+      height: {
+        "page-header": "50px",
+      },
+      minHeight: {
+        "work-toolbar": "45px",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

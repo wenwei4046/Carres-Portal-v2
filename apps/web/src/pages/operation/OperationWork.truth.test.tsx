@@ -127,7 +127,7 @@ function show(url = "/operation?tab=work") {
   );
 }
 
-const dayNav = () => screen.getByRole("navigation", { name: "Working day" });
+const workRail = () => screen.getByRole("complementary", { name: "Work filters" });
 
 const savedTz = process.env.TZ;
 const savedWidth = window.innerWidth;
@@ -158,7 +158,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
 
   it("1 · a Thursday shows the week Mon, 14 Sep … Fri, 18 Sep through fmtDate", () => {
     show();
-    const nav = dayNav();
+    const nav = workRail();
     expect(nav).toHaveTextContent("Mon, 14 Sep");
     expect(nav).toHaveTextContent("Tue, 15 Sep");
     expect(nav).toHaveTextContent("Thu, 17 Sep");
@@ -170,12 +170,12 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
   it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18")]);
     show();
-    expect(within(dayNav()).getByRole("button", { name: "Fri, 18 Sep · 1 action" })).toBeInTheDocument();
+    expect(within(workRail()).getByTestId("work-day-2026-09-18")).toHaveTextContent("Fri, 18 Sep1");
   });
 
   it("3 · Wed, 16 Sep reads Public holiday · Malaysia Day, with no count and no button", () => {
     show();
-    const holiday = within(dayNav()).getByText(/Public holiday · Malaysia Day/);
+    const holiday = within(workRail()).getByText(/Public holiday · Malaysia Day/);
     expect(holiday.closest("button")).toBeNull();
     const row = holiday.closest("[data-holiday]");
     expect(row).not.toBeNull();
@@ -186,7 +186,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
     workState.data = feed("2026-09-16", [item("2026-09-17"), item("2026-09-18")]);
     show();
-    expect(within(dayNav()).getByRole("button", { name: /^Thu, 17 Sep/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(workRail()).getByTestId("work-day-2026-09-17")).toHaveAttribute("aria-pressed", "true");
     const list = screen.getByTestId("work-list");
     expect(list).toHaveTextContent(/SO-\d+/);
     expect(within(list).getAllByRole("button", { name: /Ask customer for a delivery date/ })).toHaveLength(1);
@@ -194,11 +194,11 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
 
   it("5 · Saturday appears only when something is due Sat, 19 Sep", () => {
     const first = show();
-    expect(dayNav()).not.toHaveTextContent("Sat, 19 Sep");
+    expect(workRail()).not.toHaveTextContent("Sat, 19 Sep");
     first.unmount();
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
     show();
-    expect(within(dayNav()).getByRole("button", { name: "Sat, 19 Sep · 1 action" })).toBeInTheDocument();
+    expect(within(workRail()).getByTestId("work-day-2026-09-19")).toHaveTextContent("Sat, 19 Sep1");
   });
 
   it("6 · My Work with nothing today and 2 on Friday does not say Nothing assigned to you", () => {
@@ -264,7 +264,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     workState.data = feed("2026-09-17", [item("2026-09-17"), item("2026-09-18"), item(null)]);
     show();
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(1);
-    fireEvent.click(within(dayNav()).getByRole("button", { name: "All · 3 actions" }));
+    fireEvent.click(within(workRail()).getByTestId("work-day-all"));
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(3);
   });
 

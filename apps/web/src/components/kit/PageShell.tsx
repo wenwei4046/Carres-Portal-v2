@@ -28,7 +28,7 @@ import type { ReactNode } from "react";
 import Icon from "./Icon";
 
 /** §1.3's four page types, with the fixed-chrome budget each one gets. */
-export type PageVariant = "list" | "dashboard" | "detail" | "settings";
+export type PageVariant = "list" | "dashboard" | "detail" | "settings" | "work";
 
 /** The budget in px. `null` = no band budget (§1.3 states it for two of them). */
 export const CHROME_BUDGET: Record<PageVariant, number | null> = {
@@ -36,6 +36,7 @@ export const CHROME_BUDGET: Record<PageVariant, number | null> = {
   dashboard: 280,
   detail: null,
   settings: null,
+  work: 95,
 };
 
 /**
@@ -87,7 +88,8 @@ export type PageShellProps =
   | ({ variant: "list" } & CommonProps)
   | ({ variant: "dashboard"; kpi?: ReactNode } & CommonProps)
   | ({ variant: "detail" } & CommonProps)
-  | ({ variant: "settings" } & CommonProps);
+  | ({ variant: "settings" } & CommonProps)
+  | ({ variant: "work" } & CommonProps);
 
 export default function PageShell(props: PageShellProps) {
   const {
@@ -109,17 +111,21 @@ export default function PageShell(props: PageShellProps) {
   /* §8.3: a module-tabbed page renders no title band, because the active tab
    * already says where you are and the band costs ~80px of a 200px budget. */
   const hasTitleBand = title != null || titleRight != null;
+  const isWork = variant === "work";
 
   return (
     <div data-kit="page-shell" data-variant={variant} className="flex h-full min-h-0 flex-col bg-kit-slate-3">
       {hasTitleBand && (
-        <div className="flex shrink-0 items-center justify-between gap-4 px-6 py-2">
+        <div className={isWork
+          ? "flex h-page-header shrink-0 items-center justify-between gap-4 border-b border-kit-slate-5 bg-white px-6"
+          : "flex shrink-0 items-center justify-between gap-4 px-6 py-2"}
+        >
           <div className="min-w-0 truncate text-page text-kit-slate-12">{title}</div>
           {titleRight && <div className="flex shrink-0 items-center gap-2">{titleRight}</div>}
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 gap-4 px-6 pb-6">
+      <div className={isWork ? "flex min-h-0 flex-1" : "flex min-h-0 flex-1 gap-4 px-6 pb-6"}>
         {hasFacet && facetOpen && (
           <aside
             data-kit="page-facet"
@@ -149,7 +155,9 @@ export default function PageShell(props: PageShellProps) {
             (toolbar || toolbarRight || (hasFacet && !facetOpen)) && (
               <div
                 data-kit="page-toolbar"
-                className="mb-3 flex shrink-0 items-center justify-between gap-4 rounded-card border border-kit-slate-5 bg-white px-3 py-2"
+                className={isWork
+                  ? "flex min-h-work-toolbar shrink-0 items-center justify-between gap-4 border-b border-kit-slate-5 bg-white px-6 py-1.5"
+                  : "mb-3 flex shrink-0 items-center justify-between gap-4 rounded-card border border-kit-slate-5 bg-white px-3 py-2"}
               >
                 <div className="flex min-w-0 items-center gap-2">
                   {hasFacet && !facetOpen && (
