@@ -21,6 +21,11 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-24 — Delivery proof review inside Work uses Delivery's existing mutation and evidence
+  source, with an in-page governed picture viewer, arrow-key navigation, trigger-focus return and
+  a real image retry. Acceptance stays unavailable until every photo in the latest proof is readable;
+  request-more and reject remain available so an unreadable submission can still be resolved.
+
 - 2026-09-24 — Work compact cards rank exact problem/fact first, action second, recipient third and
   keep the document number in a footer object door. Promise failures stay inside their lawful date
   group and print the exact promise/failure rather than a generic badge. Selected detail uses the
@@ -58,6 +63,9 @@ copy, component, or business-rule system.
   (`apps/web/src/pages/operation/work/WorkActionPanel.tsx`). They own layout and presentation only; the server Work
   contract owns assignment, dates, completion and source health.
 - Workspace Work authority and measured UI contract — `docs/workspace/MASTER.md` §§5–6.
+- Embedded Delivery proof review — `apps/web/src/pages/operation/components/DeliveryProofReviewWork.tsx`
+  and `DeliveryProofReviewForm.tsx`; reuses the Delivery mutation and renders its current photos in
+  the shared `Modal width="viewer"` rather than opening a browser tab.
 - Rejected/exploratory Workspace HTML and companion specification under `docs/prototypes/` must not
   be used as implementation authority.
 - Payment Register configuration — `apps/web/src/pages/finance/PaymentRegister.tsx`.

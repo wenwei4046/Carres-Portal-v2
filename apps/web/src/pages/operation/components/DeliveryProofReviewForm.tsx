@@ -34,12 +34,14 @@ export default function DeliveryProofReviewForm({
   attemptId,
   sourceVersion,
   allEvidenceReadable,
+  onRetryEvidence,
   onSaved,
 }: {
   doNumber: string;
   attemptId: string | null;
   sourceVersion: string;
   allEvidenceReadable: boolean;
+  onRetryEvidence?: () => void;
   onSaved?: () => void;
 }) {
   const [decision, setDecision] = useState<ProofDecisionKey | null>(null);
@@ -81,9 +83,10 @@ export default function DeliveryProofReviewForm({
       }}
     >
       {!allEvidenceReadable ? (
-        <p className="text-label text-kit-amber-11" role="alert">
-          Photo could not be loaded · Try again
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-label text-kit-amber-11" role="alert">
+          <span>Photo could not be loaded</span>
+          {onRetryEvidence ? <Button type="button" variant="neutral" size="sm" icon="refresh" onClick={onRetryEvidence}>Try again</Button> : <span>· Try again</span>}
+        </div>
       ) : null}
 
       <fieldset className="flex flex-col gap-2">

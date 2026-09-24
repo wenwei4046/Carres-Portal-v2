@@ -61,7 +61,7 @@ describe("DeliveryProofReviewForm — Delivery's one governed review form", () =
   it("blocks acceptance when any current proof file cannot be read", () => {
     show(false);
     expect(screen.getByRole("radio", { name: "Accept proof" })).toBeDisabled();
-    expect(screen.getByText("Photo could not be loaded · Try again")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Photo could not be loaded.*Try again/);
     expect(screen.getByRole("radio", { name: "Request more proof" })).not.toBeDisabled();
     expect(screen.getByRole("radio", { name: "Reject proof" })).not.toBeDisabled();
   });
