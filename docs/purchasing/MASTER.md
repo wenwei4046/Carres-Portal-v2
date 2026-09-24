@@ -68,7 +68,7 @@ receipt posted, or stock mutated for this audit.
 |---|---|---|
 | SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice lacked its reason. Loading and named selection summary corrected by #1573; authenticated Back retained selection. | Explain disabled choices and reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
 | Shared PO review | #1573 deployed; authenticated SO read-only walk verified 3 actual drafts, 1074px split, 150% zoom, 390px stacking and Back selection. Missing supplier addresses are named. | §8.2 records proof and limits. MPR has no eligible Need PO request; no real issuance or sending is claimed. |
-| Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. Old section styling and requester identity remain open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
+| Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. The form reuses the shared Block; the Sales Order blue title is a separate opt-in. Actual-person requester verification remains open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
 | Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply capture still lacked governed readable evidence; old Supplier Delivery Date wording remained. | §9.3 object, evidence, date and revision walkthrough. Multi-receipt and revision writes remain unverified. |
 | Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. #1574/#1577/#1578 production checks verified narrow controls/actions, separated supplier/PO header and truthful initial PO loading. | §9.4 GRN document review and receipt lifecycle; no posting performed. |
 | Claims / Returns | Claims still showed the former twelve-column composition; Returns showed an empty register. | §9.5–9.6 approved columns, source-linked workflows and evidence. Empty Returns data proves no execution lifecycle. |
@@ -1793,6 +1793,15 @@ the original header actions remain visible and the footer stays hidden. The
 unsent draft was cancelled. CI `35963457606` passed (12,596 tests, 100 existing
 skips); deploy `35964281215` succeeded and all five canonical SHA endpoints
 converged. No submission, approval, requester identity or stock-intent rule changes.
+
+**Read-only requester check, 2026-09-24.** The live register had four requests:
+one in Need approval and none in Need PO. The missing historical requester displayed
+`Staff identity not recorded`. The current principal account's unsent create form and
+preview both displayed `principal`, resolved from the existing Staff list in
+`OperationManualPurchase.tsx`; this is not proof of a named operational employee's
+saved-request lifecycle. The empty draft was cancelled. The form already uses the
+shared `Block`; its default shared title treatment is not evidence of an unimplemented
+composition merely because Sales Order uses its separate blue-title opt-in.
 
 The three sections, in the SAME reading order on the form and preview, are:
 
