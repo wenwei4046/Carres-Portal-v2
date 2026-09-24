@@ -2868,6 +2868,17 @@ Unit `U1-000-064` remained under SMOKE King Mattress; the AMENDED band and histo
 remained visible. Local rendered tests cover continuation pages; this one-page live
 record does not independently prove pagination. No receipt or amendment was saved.
 
+**GRN table and Unit typography — local implementation, 2026-09-24; production proof owed.**
+Item rows now use the Document Kit's boxed hairline grid. Full-height column rules
+follow the visible quantity columns, including when zero-only exception columns disappear.
+GRN reuses the existing PO `UnitCode` renderer for full identifiers with the final three
+digits bold, both under items and for unresolved Unit evidence. Actual PDF text tests
+verify the suffix uses the bold font without losing IDs or their outcomes; rendered
+mixed-outcome and zero-only examples were visually checked. No quantities or Unit
+association rules changed. Consecutive Units reuse the PO range helper only within the
+same item and outcome; gaps and different outcomes start separate lines. The remaining
+facts below are not claimed complete by this typography change.
+
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
 posting evidence; resolve the authoritative receiver before claiming the complete GRN
