@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { configWords, diffRows, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { configWords, diffRows, qtyWords, servicesWords, resizeService, sizeServiceUnit, type EditAddon, type EditLine } from "./sales-order-change";
 
 const line = (o: Partial<EditLine> & { sku: string }): EditLine => ({ key: o.sku, qty: 1, unit_price: 0, ...o });
 const addon = (o: Partial<EditAddon> & { addon_key: string }): EditAddon => ({ key: o.addon_key, qty: 1, unit_price: 0, ...o });
@@ -82,5 +82,23 @@ describe("diffRows — Before / After", () => {
     expect(rows[0]!.what).toBe("Dispose old mattress");
     expect(rows[0]!.before).toBe("—");
     expect(rows.find((r) => r.what === "Services")!.after).toBe("Delivery fee · Dispose old mattress ×2");
+  });
+});
+
+
+describe("service configuration — POS parity without losing saved attrs", () => {
+  it("growing quantity preserves the chosen size and leaves the new unit unpicked", () => {
+    const row = addon({ addon_key: "dispose-mattress", attrs: { size: "Single", note: "Keep" } });
+    const grown = { ...row, ...resizeService(row, 2) };
+    expect(grown.attrs).toEqual({ size: "Single", sizes: ["Single", ""], note: "Keep" });
+    const sized = { ...grown, ...sizeServiceUnit(grown, 1, "Queen") };
+    expect(sized.attrs).toEqual({ size: "Single + Queen", sizes: ["Single", "Queen"], note: "Keep" });
+    expect(servicesWords([sized], nameOfAddon)).toBe("Dispose old mattress · Single + Queen ×2");
+    expect(resizeService(sized, 1).attrs).toEqual({ size: "Single", sizes: ["Single"], note: "Keep" });
+  });
+  it("uses catalog size configuration for services outside the legacy mattress family", () => {
+    const row = addon({ addon_key: "custom-disposal", qty: 1, attrs: { size: "3 seater" } });
+    expect(resizeService(row, 2, ["2 seater", "3 seater"]).attrs).toEqual({ size: "3 seater", sizes: ["3 seater", ""] });
+    expect(resizeService(row, 2)).toEqual({ qty: 2 });
   });
 });

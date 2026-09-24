@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
-import { filterWork, workFocusDay, workHoliday, workLayoutFor, workSections, workWeek } from "./work-model";
+import { filterWork, parseWorkWeek, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workSections, workWeek } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
@@ -124,5 +124,61 @@ describe("workLayoutFor — panels follow the Work area width", () => {
     expect(workLayoutFor(950)).toBe("two");
     expect(workLayoutFor(768)).toBe("two");
     expect(workLayoutFor(767)).toBe("one");
+  });
+});
+
+describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
+  const savedTz = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = "Asia/Kuala_Lumpur";
+  });
+  afterAll(() => {
+    if (savedTz === undefined) delete process.env.TZ;
+    else process.env.TZ = savedTz;
+  });
+
+  it("names Monday to Friday of the week, the holiday, today and the counts", () => {
+    const rail = workRailDates([
+      row({ id: "a", dueIso: "2026-09-16", timingBucket: "later" }),
+      row({ id: "b", dueIso: "2026-09-10", timingBucket: "overdue" }),
+      row({ id: "c", dueIso: null, timingBucket: "no_date" }),
+    ], "2026-09-15", "2026-09-17");
+    expect(rail.month).toBe("Sep 2026");
+    expect(rail.previousWeek).toBe("2026-09-07");
+    expect(rail.nextWeek).toBe("2026-09-21");
+    expect(rail.missed).toBe(1);
+    expect(rail.noDate).toBe(1);
+    expect(rail.days.map((d) => [d.iso, d.label, d.dayNumber, d.weekday, d.holiday, d.count, d.today])).toEqual([
+      ["2026-09-14", "Mon, 14 Sep", "14", "MON", null, 0, false],
+      ["2026-09-15", "Tue, 15 Sep", "15", "TUE", null, 0, true],
+      ["2026-09-16", "Wed, 16 Sep", "16", "WED", "Malaysia Day", 1, false],
+      ["2026-09-17", "Thu, 17 Sep", "17", "THU", null, 0, false],
+      ["2026-09-18", "Fri, 18 Sep", "18", "FRI", null, 0, false],
+    ]);
+  });
+
+  it("a missed action is counted once, under Missed, never again on its past weekday", () => {
+    const rail = workRailDates([row({ dueIso: "2026-09-14", timingBucket: "overdue" })], "2026-09-17", "2026-09-14");
+    expect(rail.missed).toBe(1);
+    expect(rail.days[0]!.count).toBe(0);
+  });
+
+  it("a week across two months takes the month of its Thursday; the year turns cleanly", () => {
+    expect(workRailDates([], "2026-09-17", "2026-09-28").month).toBe("Oct 2026");
+    const turn = workRailDates([], "2026-12-30", "2026-12-28");
+    expect(turn.days.map((d) => d.iso)).toEqual(["2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"]);
+    expect(turn.days[4]!.dayNumber).toBe("1");
+    expect(turn.nextWeek).toBe("2027-01-04");
+  });
+
+  it("a week URL value normalises to its Monday; anything else is no week", () => {
+    expect(parseWorkWeek("2026-09-17")).toBe("2026-09-14");
+    expect(parseWorkWeek("next")).toBeNull();
+    expect(parseWorkWeek(null)).toBeNull();
+  });
+
+  it("module counts cover every admitted module and add up to the rows", () => {
+    const counts = workModuleCounts([row({ module: "delivery" }), row({ module: "delivery" }), row({ module: "payment" })]);
+    expect(counts).toEqual({ orders: 0, purchasing: 0, receiving: 0, delivery: 2, payment: 1, issue_tracker: 0 });
   });
 });

@@ -88,7 +88,7 @@ describe("closed sets", () => {
     // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa (Loo, 2026-07-31,
     // the To Order rail); +1 = columnFilter (Jess, 2026-08-01, the Excel ▼).
     // +2 = pillow · protector for the owner-approved line-by-line calendar cards.
-    expect(ICON_NAMES).toHaveLength(47);
+    expect(ICON_NAMES).toHaveLength(50);
     expect(ICON_NAMES).toContain("panelToggle");
     expect(ICON_NAMES).toContain("pillow");
     expect(ICON_NAMES).toContain("protector");

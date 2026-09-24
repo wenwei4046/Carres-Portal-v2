@@ -26,8 +26,10 @@ import {
   Bed,
   BedDouble,
   CalendarDays,
+  CalendarOff,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   CircleHelp,
@@ -39,6 +41,7 @@ import {
   Factory,
   Flag,
   History,
+  LayoutGrid,
   Lightbulb,
   Lock,
   MessageCircle,
@@ -101,6 +104,8 @@ const GLYPH = {
   history: History,
   // NAVIGATION
   back: ArrowLeft,
+  /** The previous period of a calendar control — its week or month. */
+  previous: ChevronLeft,
   forward: ChevronRight,
   expand: ChevronDown,
   /** A column's Excel filter caret (Jess, 2026-08-01: GitHub/Excel's quiet
@@ -123,6 +128,10 @@ const GLYPH = {
   warehouse: Warehouse,
   order: ClipboardList,
   date: CalendarDays,
+  /** Work that has no lawful working date (Work left rail, 2026-09-24). */
+  noDate: CalendarOff,
+  /** The ERP modules as one group — the Work rail's `Module` heading. */
+  modules: LayoutGrid,
   note: Lightbulb,
   activity: ScrollText,
   // The three made-to-order categories (Loo, 2026-07-31 — the To Order rail's

@@ -6,6 +6,7 @@
 
 /* Reflow by the form canvas: the portal's two rails consume phone width. */
 @container receiving-form (width < 480px) {
+  .receiving-workspace .receiving-header { flex-direction: column; align-items: stretch; }
   .receiving-workspace .receiving-details-row {
     flex-direction: column;
     align-items: stretch;

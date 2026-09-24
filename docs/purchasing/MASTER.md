@@ -66,11 +66,11 @@ receipt posted, or stock mutated for this audit.
 
 | Surface | Observed | Remaining work / verification |
 |---|---|---|
-| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice lacked its reason. Initial loading flashed missing destinations. Back from review retained selection. | Correct loading/selection presentation; reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
-| Shared PO review | Desktop stacked under the former cutoff; browser PDF could remain blank; dates, addresses and delivery method missing from review. | §8.2 complete draft, actual readable PDF and completion gate. No issuance proof from opening review. |
-| Manual Purchase | Internal draft and three sections exist; narrow create surface clipped controls and retained old section styling. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
+| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice lacked its reason. Loading and named selection summary corrected by #1573; authenticated Back retained selection. | Explain disabled choices and reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
+| Shared PO review | #1573 deployed; authenticated SO read-only walk verified 3 actual drafts, 1074px split, 150% zoom, 390px stacking and Back selection. Missing supplier addresses are named. | §8.2 records proof and limits. MPR has no eligible Need PO request; no real issuance or sending is claimed. |
+| Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. Old section styling and requester identity remain open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
 | Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply capture still lacked governed readable evidence; old Supplier Delivery Date wording remained. | §9.3 object, evidence, date and revision walkthrough. Multi-receipt and revision writes remain unverified. |
-| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. | §9.4 GRN document review and receipt lifecycle; no posting performed. Warehouse handoff separately measured clipped Receiving Details at 390px. |
+| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. #1574/#1577/#1578 production checks verified narrow controls/actions, separated supplier/PO header and truthful initial PO loading. | §9.4 GRN document review and receipt lifecycle; no posting performed. |
 | Claims / Returns | Claims still showed the former twelve-column composition; Returns showed an empty register. | §9.5–9.6 approved columns, source-linked workflows and evidence. Empty Returns data proves no execution lifecycle. |
 | Repair / showroom documents | Repair Orders, Display Requests, Consignment Orders, Consignment Returns and Sale Notices remained Coming soon. | §9.7–9.11 are not production-built by virtue of their approved blueprint. |
 | Master data | Supplied company CSV read; Carres Klang warehouse address and NETS company address are distinct authorities. | Apply only through an existing authorised update door, preserving IDs and history; no People record creation. No company update claimed yet. |
@@ -1000,11 +1000,13 @@ summary. Action ownership uses structured avatar metadata.
   The selected document is visible before Issue PO, using the PO template and its
   explicit draft treatment in `docs/pdf/PO-PDF-STANDARD.md`. Navigating documents
   changes the draft. Previewing creates nothing; Issue PO remains the creation action.
-- **Review Purchase Orders desktop composition — owner approved 2026-09-24; BUILT (#1573), authenticated production verification pending.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
+- **Review Purchase Orders desktop composition — owner approved 2026-09-24; BUILT + DEPLOYED (#1573); SO read-only production walk verified, MPR issue walk still owed.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
 - **Approved review sequence and scope.** Header: total PO count, goods quantity and an explicit whole-batch issue action. Work pane: current document selection → Supplier → Supplier Deliver To/address and Delivery Method → provisional PO Date and Settings-derived PO Delivery Date → source/items/quantity → actionable missing facts. Preview uses the same selected document and approved PO template. Switching documents updates its paper. Returning preserves selection; issuance is not sending.
 - **A complete draft before commitment.** Both lanes must carry server-resolved supplier/destination addresses, provisional dates and delivery method. The draft reserves no official number or Unit ID; successful issuance records the actual PO Date and revalidates the dates. Goods must arrive is an internal deadline, not a substitute for PO Delivery Date. Missing required document facts identify their owning Settings destination instead of silently disappearing. Unrendered/failed preview is not completed review. Do not invent addresses, prices, dates or identifiers.
 - **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
-- **Implementation slice, 2026-09-24 — MERGED #1573 (`913ef0089`), release verification pending.** Shared review now paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`, so an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. The 1074px portal fixture retained side-by-side panes and enlarged paper scrolled independently; at 390px the panes stack without page overflow and the shared wrapping toolbar keeps the selection summary and all actions visible. Validation: 747 targeted tests passed across shared/API/web, including 189 full-page SO/MPR journey checks, typecheck, lint and production build passed; negative controls failed for a dropped PDF page and the old 11/11 split before restoration. Full CI run `35961742802` passed on `d97ab18f3`: 12,596 tests passed with 100 existing skips, plus migration guard, lint, typecheck, production build and secret-name bundle scan. This does not close the coverage-status discrepancy, the MPR create layout, any database migration, or any real issuance/receiving/sending lifecycle. Automatic deployment and authenticated post-deploy readback are still owed.
+- **Implementation and readback, 2026-09-24 — DEPLOYED #1573 (`913ef00897e5da27bd4aa7be819a7e1f871dad3a`).** Shared review paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`: an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. Full CI `35961742802` passed on `d97ab18f3` (12,596 tests passed, 100 existing skips), as did deployment `35962708358`; all five canonical SHA endpoints converged. Negative controls caught a dropped PDF page and the old split quantities. Bundle fingerprints prove the old draft iframe disappeared, provisional-date copy appeared and preview/Back controls survived.
+- **Authenticated SO read-only proof.** Operation selected SO-1365 + SO-1363: 2 Sales Orders, 3 items, 3 units, 3 POs. All three draft selections changed their document facts and actual paper. At 1074px the two panes were 481px each; 150% paper measured 674px inside a 449px independently scrolling pane. At 390px the page stayed 390px wide and stacked 278px panes; Back retained both selections and the summary plus all actions remained visible. Server destination addresses and supplier-specific delivery dates were shown; missing supplier addresses linked to Suppliers, never invented. The temporary selection was cleared afterward. No final Issue, sending, upload, receiving or stock write occurred.
+- **Verification boundary.** The authenticated MPR register has `Need PO 0`, so its issue walk was not manufactured; 189 full-page SO/MPR journey tests cover selection, refusals and preview readiness. No test or read-only view proves real issuance/receiving/sending. The exact-source versus generic PO-pool coverage discrepancy, remaining MPR composition/requester check, database-dependent work and the rest of the module remain open.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
   `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
@@ -1771,12 +1773,16 @@ below it. This overrides the former blanket ban on a Manual Purchase split
 preview for creation and returned-request editing only. Ordinary saved-object
 view and the Register retain their separately governed layouts.
 
-**Narrow action bar correction, 2026-09-24 — LOCAL; release verification pending.**
+**Narrow action bar correction, 2026-09-24 — DEPLOYED + AUTHENTICATED READBACK #1574 (`68c71c544`).**
 At a 390px portal viewport the long existing stock-intent refusal pushed Cancel
 outside the content canvas. The footer now wraps its action pair and long button
 text. Browser measurements at 320px and 390px keep both actions within the main
-pane; at 1074px the original header actions remain visible and the footer stays
-hidden. No submission, approval, requester identity or stock-intent rule changes.
+pane. Authenticated production at 390px measured the long stock-intent button
+inside x=76–322 (246px wide, 38px high), with Cancel fully visible; at 1074px
+the original header actions remain visible and the footer stays hidden. The
+unsent draft was cancelled. CI `35963457606` passed (12,596 tests, 100 existing
+skips); deploy `35964281215` succeeded and all five canonical SHA endpoints
+converged. No submission, approval, requester identity or stock-intent rule changes.
 
 The three sections, in the SAME reading order on the form and preview, are:
 
@@ -1807,7 +1813,7 @@ one PO. No Payment / Paid to date / Balance due / financial-progress section.
 Use the existing top action placement and governed submission action; typing,
 previewing, printing or downloading never submits a request or sends a PO.
 
-**MPR → PO completion scope — owner approved 2026-09-22; APPROVED / NOT BUILT.**
+**MPR → PO completion scope — owner approved 2026-09-22; implementation delivered in Cards 13/13-B and #1573; authenticated issue lifecycle still owed.**
 The scope is Manual Purchase create/returned-request edit, its internal live MPR
 preview, the concrete Register corrections below, and the MPR-to-PO review/issue
 journey. Subscription is outside this scope. Approval of scope is not production
@@ -1830,12 +1836,12 @@ verification or approval of unreviewed visual details.
   Purpose × MPR Delivery Date. Only matching groups combine across requests.
   Different destinations at initial issue produce different POs. This does not
   revoke §5.4's permitted later multi-destination revision of the SAME PO.
-- Reuse/adapt the existing SO Batch review capability, not a new parallel issue
-  workspace. **COPY REQUIRED, not ready by renaming:** the measured
-  `so-batch/SoBatchIssueWorkspace.tsx` already renders review/draft/evidence states
-  but calls the SO batch issue endpoint; the MPR entry must retain its own source,
-  approval, remaining-quantity and allocation validation. Existing money gates
-  must not be copied as new financial placement gates.
+- Reuse the existing SO Batch review capability, not a parallel issue workspace.
+  **BUILT (Card 13-B):** `so-batch/SoBatchIssueWorkspace.tsx` receives the MPR
+  lane's own issue callback and retains its source, approval, remaining-quantity
+  and allocation validation. §8.2 records #1573's shared actual-PDF improvement
+  and its production verification boundary. No new financial placement gate is
+  inferred from sharing the review.
 - Official issue allocates the real PO identity and, for tracked goods only,
   exact Unit IDs through the existing authority. Counted-only goods receive no
   Unit IDs. Preserve exact MPR-to-PO source lineage in both directions. Re-read
@@ -1846,8 +1852,10 @@ verification or approval of unreviewed visual details.
   does not delete it or reopen its covered demand. Download/print are not sending.
 - `Purchase requirement` is optional for every purpose and persists on create
   and returned-request edit. It is distinct from the required Other Purchase
-  `What is this for?`; current `why`-only handling does not implement this target.
-  The MPR preview, saved facts and later review must retain the same requirement.
+  `What is this for?`. **BUILT (Card 13, migrations 0562–0563):** the create and
+  resubmit APIs carry `purchaseRequirement` separately from `why`; the form,
+  internal preview and saved detail read that same fact. Its authenticated saved
+  round trip remains owed; no request was submitted for the read-only walk.
 
 **Approval boundary — owner selected A, 2026-09-22; APPROVED.**
 Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,
@@ -1861,15 +1869,16 @@ never automatically removes the gate or appoints another approver. Changing
 that operating rule requires a new owner ruling. Price entry on a PO does not
 add an MPR price editor by inference.
 
-**Date boundary — resolved target, owner approved 2026-09-22; NOT BUILT.**
+**Date boundary — owner approved 2026-09-22; BUILT (Cards 13/13-B), actual MPR issuance walk still owed.**
 MPR `Delivery Date` remains the requested arrival date and remains an initial
 PO grouping fact. PO `PO Delivery Date` is calculated from PO Date using the
 recorded applicable Settings working days under §5.7, skipping applicable
 weekends/public holidays, with NO added transit days. Do not copy the MPR date
 into the PO's original date. Preserve both facts and make any mismatch visible
 in review; never silently alter the request or claim a supplier has confirmed it.
-Current issue code's approved-MPR-date handoff is implementation evidence to be
-changed, not an alternative approved calculation. Do not rewrite historical POs.
+The register projection and issue path now call the shared `poDeliveryDateOf`;
+#1573 carries the provisional PO Date and Settings days into the selected draft.
+Do not rewrite historical POs.
 
 **Empty PO fact — BUILT (CARD 13).** Where a request has no linked PO, print
 `No PO yet`, never a blank, a dash, or `Not ordered yet`. Failed/unknown lineage
@@ -1971,8 +1980,9 @@ and category.
 **APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**
 Every request requires approval, regardless of purpose or amount; the decision and issue doors
 enforce it. Per-purpose approval configuration is retired. The Register, rail, object rounds and
-the historical create-form implementation below describe the built page; the 2026-09-22 create blueprint above is not built; fixture walks cover every state, and the
-authenticated owner walk remains owed.
+the create-form implementation above describe the built page. Cards 13/13-B
+implemented the 2026-09-22 blueprint; §2.1 and the dated evidence above retain
+its measured presentation/requester gaps and the authenticated lifecycle still owed.
 
 **Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
 `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
@@ -2673,14 +2683,43 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
-**Receiving Session narrow layout, 2026-09-24 — LOCAL; release verification pending.**
+**Receiving Session narrow layout, 2026-09-24 — #1574 + #1577 DEPLOYED; controls, actions and header production-verified.**
 The existing Receiving Details rows now stack by the form's available width,
 including the file inputs; the existing pending quantity and action area wraps.
 A browser fixture measured a 246px form canvas with equal client/scroll widths,
 all six controls and both actions contained; a 1042px canvas keeps horizontal
-fields. The 62 existing Receiving page/save tests pass. No receipt was posted,
+fields. Authenticated production on PO-20260903-4354 confirmed the same 246px
+form width at a 390px portal viewport, all six controls and both actions within
+x=76–322, and horizontal fields at 1074px (930px form). Cancel returned to
+Received Qty 0 / Pending Delivery Qty 1 with no receiving activity. The screenshot
+exposed supplier-name/PO-number overlap, corrected by #1577 (`55e67a59b`). Its
+CI `35966206963` passed 12,600 tests with 100 existing skips; deploy `35967312977`
+succeeded and all five canonical SHA endpoints converged. Authenticated production
+at 390px now places supplier/destination at y=97–115 and the PO number at y=123–155,
+both within x=76–322; at 1074px they remain a row on a 930px form. Cancel preserved
+Received Qty 0 / Pending Delivery Qty 1 and no activity. Downloaded #1574 assets
+proved the old root disappeared and the form container appeared against #1573’s
+own deployment URL; #1577 likewise replaced the old header class against the
+preceding `1d452e0c9` deployment. The unchanged prefilled-results sentence was the
+control in both comparisons.
+The 62 existing Receiving page/save tests pass. No receipt was posted,
 no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
 Unit result or write authority changed. This does not implement the GRN PDF below.
+
+**Receiving PO loading state, 2026-09-24 — DEPLOYED + AUTHENTICATED READBACK #1578 (`5ce58beeb`).**
+The authenticated walk exposed a false `This purchase order could not be opened`
+while the initial PO list was still loading. Receiving now uses the same pending
+read guard already used by Warehouse Inbound: `Loading…` until the query settles,
+then the actual PO or the existing unavailable-object state. Three page tests
+separate pending, settled-missing and available data; the pending test failed on
+the old implementation, and all 65 Receiving page/save tests pass after the fix.
+Full CI `35967863861` passed 12,603 tests with 100 existing skips; deploy
+`35968971121` succeeded and all five canonical SHA endpoints converged. A fresh
+authenticated load of PO-20260903-4354 visibly showed `Loading…`, then its real
+PO facts and Start Receiving, with Received Qty 0 / Pending Delivery Qty 1 and
+no activity. Downloaded assets against #1577’s own deployment proved the direct
+unavailable branch disappeared, the pending state appeared and the Back control
+survived. No receiving result or write path changed and no receipt was posted.
 
 **GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
@@ -2721,6 +2760,16 @@ rather than inventing a replacement ID. Remove the unrelated four-pillow order f
 the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabricated
 PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
 the sample correction does not forbid a real destination exception.
+
+**Measured implementation boundary, 2026-09-24.** `ReceivingSessionDetail` currently
+carries posting actor/duty evidence, but no distinct evidenced physical receiver.
+Its `unit_results` carry stock-item identity and outcome without the source PO
+line identity; `grnTemplateDataOf` consequently feeds a separate Unit-results list
+to the PDF. The approved item/Unit grouping and physical-receiver fact are not
+implemented by restyling that paper. Preserve posting evidence as posting evidence;
+resolve the authoritative receiver and Unit-to-line projection before claiming the
+complete GRN target. Actual arrival time also remains a separate schema gap under
+§9.3; never derive it from the filing timestamp.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
