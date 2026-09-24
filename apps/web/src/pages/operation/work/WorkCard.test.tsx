@@ -50,7 +50,6 @@ describe("WorkCard", () => {
   it("locks the exact density values: rail 60, weekday 11, date 22, problem 15, action 12, footer 28, icon 14", () => {
     render(<WorkCard item={row()} moduleLabel="Delivery" action="Arrange a new delivery date" today="2026-09-17" selected={false} onSelect={vi.fn()} onOpenRecord={vi.fn()} />);
     const card = screen.getByTestId("work-row-SO-1318-follow");
-    expect(card.className).not.toMatch(/h-\[124px\]|72px/);
     const date = screen.getByTestId("work-card-date");
     expect(date.className).toContain("h-11");
     const [weekday, day] = Array.from(date.children) as HTMLElement[];

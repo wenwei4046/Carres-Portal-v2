@@ -1,6 +1,6 @@
 /**
  * ⭐ THE WORK MIDDLE CARD — owner-approved Work kit, Jess 2026-09-24
- * (`docs/workspace/WORK-MIDDLE-CARD-UI-KIT.md`).
+ * (`docs/workspace/MASTER.md` §5.5; density ruling 2026-09-25).
  *
  * ```
  *   ┌────────┬──────────────────────────────────────────┐

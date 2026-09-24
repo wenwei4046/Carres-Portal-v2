@@ -18,7 +18,7 @@
     --dial-check: #3b6d11;
     --background: 220 23% 97.5%;       /* #F7F8FA — the ONE canvas (UI MASTER §6.7, Jess 2026-09-17); #F3F4F6 retired */
     /* ===== WORK MIDDLE-CARD KIT (owner-approved Work kit 2026-09-24,
-     * docs/workspace/WORK-MIDDLE-CARD-UI-KIT.md) — the Work page's section
+     * docs/workspace/MASTER.md §5.5) — the Work page's section
      * edge, card ink ladder and date-status fills. Read ONLY through the
      * `work-*` Tailwind names; no other page uses them. */
     --work-line: #ccd7e5;          /* every Work section and card edge */

@@ -642,24 +642,46 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 ### 5.5 · Responsive and accessibility contract
 
-- Work uses the existing 50px Page Header and ONE white toolbar section. Its controls may wrap
-  when the canvas is narrow; below 960px `Date` and `Module` join it as compact controls (the 390px
-  toolbar measures 172px tall — recorded as an open presentation item, not redesigned here). It creates no second title, breadcrumb, KPI band or card
-  header. The controls contain `My Work · Team Work`, Search, applied filters, `Clear all` when
-  narrowed and the toolbar `Filters` door; freshness is a read fact, not a manual business action.
+- **THE WORK DENSITY — owner ruling 2026-09-25, APPROVED / BUILT. Exact values, not a direction.**
+  Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
+  on the right, 72px tall with 24px sides from 960px wide; below 960px 24/30/600, 12/16/400, 64px,
+  16px sides. No breadcrumb row, no second title, KPI band or card header.
+- **Toolbar** — ONE white section (`rounded-work`), 12px padding (10px below 600px), 8px between
+  controls. Every control is 36px (40px below 600px), 14/20/400 (`text-control`), 12px sides,
+  `rounded-control`; the active `My Work`/`Team Work` segment is 600. Search is 240px from 960px
+  and fills its row below. From 960px the toolbar is one row (`Filters` · `My Work · Team Work` ·
+  Search · Owner · `Covered` · `Clear all`). **Below 960px it is exactly two rows** — `Date · Module ·
+  My Work/Team Work`, then `Search · Owner · Covered` — **and below 600px exactly four**: `Date ·
+  Module` / `My Work · Team Work` / Search / `Owner · Covered`; rows are 40px apart by 8px. Freshness
+  is a read fact, not a manual business action.
 - **THE WORK SHELL — owner correction 2026-09-24, APPROVED / BUILT.** The workspace is an UNFRAMED
-  grid on the light-grey canvas with 16px padding: no frame, fill, radius or shadow around it. The
-  toolbar is one white section; 16px below it the columns sit 16px apart. Every white surface is
-  its own section: 1px `work-line` (`#ccd7e5`) edge, 9px `rounded-work` radius, no shadow, no
-  coloured corner. Breakpoints read the Work page's own width:
+  grid on the light-grey canvas with 16px padding (12px below 600px): no frame, fill, radius or
+  shadow around it. The toolbar is one white section; 16px below it the columns sit 16px apart.
+  Every white surface is its own section: 1px `work-line` (`#ccd7e5`) edge, 9px `rounded-work`
+  radius, no shadow, no coloured corner. Breakpoints read the Work page's own width:
   **≥1280px** three columns `240px · 420px · remainder (≥480px)` — Date and Module as two separate
   rail sections, the list, the detail; **960–1279px** the rail collapses behind the toolbar
-  `Filters` control and the list is 360–400px (it never collapses); **<960px** Date and Module open
-  from compact toolbar controls and the list and the detail share ONE stage with `Back to work`.
-- The list column is a heading with `{n} actions to do`, then 36px `To do · Waiting · Completed`
-  tabs (`?list=`), 12px, then the 124px work cards 8px apart (`docs/WORK-MIDDLE-CARD-UI-KIT.md`),
-  drawn 50 at a time as the list end scrolls into view; a failed refresh keeps the last good list
-  with one retry row. A card's date rail prints `Missed`, `Today` or `No date` — never `Upcoming`.
+  `Filters` control and the list is exactly 400px (it never collapses); **<960px** Date and Module
+  open from compact toolbar controls and the list (100% wide) and the detail share ONE stage with
+  `Back to work`.
+- **The list column** — the heading (the chosen Date, 16/22/600, with `{n} actions to do` 13/18/500
+  on the same 24px line; at 390px it may wrap once, never grow), 8px, the 36px `To do · Waiting ·
+  Completed` tabs (`?list=`; 3px padding, 2px between tabs, tab 13/18/600 with its count 13/18/500,
+  tab radius 5px, bar 7px), 8px, then the work cards 8px apart, drawn 50 at a time as the list end
+  scrolls into view; a failed refresh keeps the last good list with one retry row. Team Work groups
+  under ONE 32px owner line — `[SH] Shasha  49 actions to do · 88 missed`: 32px avatar with 12/16/600
+  initials, 8px, owner name 15/20/600, count 12/16/400, missed 12/16/500; 8px to its first card,
+  16px from its last card to the next owner.
+- **THE WORK CARD — 104px, never taller.** Full list width; grid `60px / remainder`; `rounded-work`,
+  1px edge, no shadow. **Date rail** 60px: 6px sides, 8px top/bottom; a 44px weekday/date block
+  (weekday 11/14/600 uppercase, date 22/24/600), 4px, then ONE status badge 9/11/600, 6px × 2px
+  padding, at most 17px tall — `Missed`, `Today` or `No date`, never `Upcoming`. **Content** 12px
+  sides, 8px top: a 14px module icon with the module 10/14/600 (0.06em) and `· {recipient}`
+  11/14/500; 2px; the problem 15/20/600 on ONE line; the action 12/16/500 on ONE line. **Footer**
+  28px with a 1px top edge, 12px left / 8px right: the document number (and cover fact) 11/16/400,
+  and the 32×32 open button with a 14px icon — it may overhang the footer by 2px; the card never
+  grows for it. The loading skeleton is the same 104px / 60px geometry. In a 704px list viewport
+  six cards show whole (6 × 104 + 5 × 8 = 664px). At 743px the card keeps exactly this geometry.
 - The detail column stacks independent white sections: the selected action's header, its action
   section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
@@ -810,12 +832,17 @@ facts come from the Monitor card's own builder (`delivery-scope-card.ts`), the r
 #### Collapsed — at most five facts
 
 ```
-Logistics · AL Logistics                         Checks 1 of 3   ▾
-Call AL Logistics                                  ← the ONE current action (13/600)
-Get the scheduled delivery date · due 24 Oct       ← result · due (11; red once missed)
+Logistics · AL Logistics                         Checks 1 of 3   ▾   ← heading 15/20/600
+Call AL Logistics                                  ← the ONE current action (14/20/600)
+Get the scheduled delivery date · due 24 Oct       ← result · due (12/16/400; red once missed)
 Scheduled delivery · 27 Oct                        ← only when scheduled; time only when recorded
 ⚠ RM 1,250.00 still to collect                     ← ONE exception, only when it affects delivery
 ```
+
+**Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
+redesigned):** party heading 15/20/600 · current action 14/20/600 · secondary fact 12/16/400 ·
+section label 11/14/600 uppercase · check row 13/18/400 · history row 12/16/400 · button 13/18/500,
+at least 36px tall (40px below 600px). Customer and Supplier headings use the same 15/20/600.
 
 `Logistics not assigned` replaces the heading when no company carries the delivery. Requested
 date, PO, GRN, DO, money-in-general and the check rows never sit on the collapsed card.
