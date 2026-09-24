@@ -80,6 +80,21 @@
     background: #fff;
     border-top: 1px solid #d0d7e0;
   }
+  /* The governed refusal can be longer than the phone's content canvas.
+     Keep both actions inside the footer, including the full next-step word. */
+  .mp-create-footer .mp-create-actions {
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .mp-create-footer .mp-create-actions > button {
+    max-width: 100%;
+    min-height: 32px;
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .mp-create-page { padding: 0.5rem; }
   .mp-create-body { padding: 0.75rem; }
 }

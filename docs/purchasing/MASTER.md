@@ -1771,6 +1771,13 @@ below it. This overrides the former blanket ban on a Manual Purchase split
 preview for creation and returned-request editing only. Ordinary saved-object
 view and the Register retain their separately governed layouts.
 
+**Narrow action bar correction, 2026-09-24 — LOCAL; release verification pending.**
+At a 390px portal viewport the long existing stock-intent refusal pushed Cancel
+outside the content canvas. The footer now wraps its action pair and long button
+text. Browser measurements at 320px and 390px keep both actions within the main
+pane; at 1074px the original header actions remain visible and the footer stays
+hidden. No submission, approval, requester identity or stock-intent rule changes.
+
 The three sections, in the SAME reading order on the form and preview, are:
 
 1. **Request Details** — `Purpose`; its structured Service Case / Staff member /
