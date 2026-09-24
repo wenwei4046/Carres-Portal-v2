@@ -19,10 +19,12 @@
  * pair once for EACH heading.
  *
  * 0570 also pins what the screen must never offer, because the database would
- * refuse it: a heading moving under another heading, a move into or out of a
- * heading the chart read names in `rule_headings`, and the last account
- * leaving its heading. A drop on a sibling HEADING puts the account under it;
- * Alt + arrow beside that heading still only reorders.
+ * refuse it: a heading of another kind, a move into or out of a heading the
+ * chart read names in `rule_headings`, and (0580) an account that is not a
+ * bank or cash account going under the money accounts heading. A drop on a
+ * sibling HEADING puts the account under it; Alt + arrow beside that heading
+ * still only reorders. Since 0580 the last account may leave its heading, and
+ * the emptied heading is still a heading: bold, a drop target, in the menu.
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -56,12 +58,16 @@ vi.mock("@/lib/api", () => ({
     const method = init?.method ?? "GET";
     if (method === "GET") {
       net.reads += 1;
-      // A heading is derived, as the chart read derives it: any account another names as parent.
+      // 0580: a heading is stored. An account going under another makes that
+      // other a heading, and it stays one when its last account leaves.
+      net.chart = net.chart.map((a) => ({ ...a, is_header: a.is_header === true || net.chart.some((c) => c.parent_code === a.code) }));
       return {
         go_live_on: "2026-09-10",
-        accounts: net.chart.map((a) => ({ ...a, is_header: net.chart.some((c) => c.parent_code === a.code) })),
+        accounts: net.chart,
         // 0570 gl_rule_headings: the customer-money heading below.
         rule_headings: ["403-0000"],
+        roles: { MONEY_ACCOUNTS_HEADING: "310-0000" },
+        money_accounts: ["310-B001", "310-C001"],
       };
     }
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -109,14 +115,19 @@ const acc = (code: string, name: string, parent_code: string | null, kind = "LIA
 });
 /* One heading with three children, and a second heading of the same kind right
    below them: the keyboard has to step OVER it, and a drop may land ON it.
-   402-B001 is the only account under 402-0000, so it may never leave. 403-0000 is a
+   402-B001 is the only account under 402-0000; since 0580 it may leave. 403-0000 is a
    heading money rules read (`rule_headings`): nothing moves into or out of
    it. 404-0000 is a posting account beside the headings under 400-0000. The asset
-   branch is a heading of another kind, which a drop may never reach. */
+   branch is a heading of another kind, which a drop may never reach. Inside it,
+   310-0000 is the money accounts heading with two bank and cash accounts, and
+   320-0000 holds 320-A001, an account that is not one. */
 const CHART = [
   acc("300-0000", "Assets", null, "ASSET"),
   acc("310-0000", "Cash and bank", "300-0000", "ASSET"),
   acc("310-C001", "Cash on hand", "310-0000", "ASSET"),
+  acc("310-B001", "Maybank", "310-0000", "ASSET"),
+  acc("320-0000", "Receivables", "300-0000", "ASSET"),
+  acc("320-A001", "Other debtors", "320-0000", "ASSET"),
   acc("400-0000", "Liabilities", null),
   acc("401-0000", "Payables", "400-0000"),
   acc("401-A001", "Trade payables", "401-0000"),
@@ -129,7 +140,7 @@ const CHART = [
   acc("403-D001", "Advance deposits held", "403-0000"),
   acc("404-0000", "Director's account", "400-0000"),
 ];
-const ASSETS = ["300-0000", "310-0000", "310-C001"];
+const ASSETS = ["300-0000", "310-0000", "310-B001", "310-C001", "320-0000", "320-A001"];
 const BORROWINGS = ["402-0000", "402-B001", "403-0000", "403-C001", "403-D001", "404-0000"];
 
 beforeEach(() => {
@@ -386,14 +397,98 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     await nothingHappened();
   });
 
-  it("never moves the last account out of its heading", async () => {
+  it("moves the last account out of its heading; the heading stays a heading and takes it back (0580)", async () => {
     show();
     await ready();
 
     // 402-B001 is the only account under 402-0000.
     drag("402-B001", "401-0000");
 
+    await waitFor(() => expect(net.moves).toHaveLength(1));
+    expect(net.moves[0]).toEqual({
+      code: "402-B001",
+      toParentCode: "401-0000",
+      from: { was: ["402-B001"], now: [] },
+      to: { was: ["401-A001", "401-D001", "401-E001"], now: ["401-A001", "401-D001", "401-E001", "402-B001"] },
+    });
+    await waitFor(() =>
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-A001", "401-D001", "401-E001", "402-B001", "402-0000", "403-0000", "403-C001", "403-D001", "404-0000"]),
+    );
+    // Still a heading: bold, with nothing under it.
+    expect(row("402-0000").querySelector("span.font-semibold")).toBeTruthy();
+
+    // And still a drop target: an empty heading's order before the drag is [].
+    await waitFor(() => expect(net.reads).toBeGreaterThan(1));
+    drag("402-B001", "402-0000");
+    await waitFor(() => expect(net.moves).toHaveLength(2));
+    expect(net.moves[1]).toEqual({
+      code: "402-B001",
+      toParentCode: "402-0000",
+      from: { was: ["401-A001", "401-D001", "401-E001", "402-B001"], now: ["401-A001", "401-D001", "401-E001"] },
+      to: { was: [], now: ["402-B001"] },
+    });
+    await waitFor(() => expect(codesOnScreen()).toEqual(START));
+  });
+
+  it("offers the emptied heading in the row menu (0580)", async () => {
+    show();
+    await ready();
+    drag("402-B001", "401-0000");
+    await waitFor(() => expect(net.moves).toHaveLength(1));
+    await waitFor(() => expect(net.reads).toBeGreaterThan(1));
+
+    const tr = row("401-D001");
+    tr.focus();
+    fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((b) => b.textContent)).toEqual([
+      "Move under 400-0000 Liabilities",
+      "Move under 402-0000 Borrowings",
+    ]);
+  });
+
+  it("never puts an account that is not a bank or cash account under the money accounts heading (0580)", async () => {
+    show();
+    await ready();
+
+    drag("320-A001", "310-0000");
     await nothingHappened();
+    // Nor beside a bank account inside it.
+    drag("320-A001", "310-C001");
+    await nothingHappened();
+
+    const tr = row("320-A001");
+    tr.focus();
+    fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["Move under 300-0000 Assets"]);
+  });
+
+  it("never puts a heading holding such an account under the money accounts heading (0580)", async () => {
+    show();
+    await ready();
+
+    const tr = row("320-0000");
+    tr.focus();
+    fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
+    // 300-0000 is its own heading, 310-0000 takes bank and cash accounts only,
+    // and 320-0000 cannot go under itself: nothing to offer.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryAllByRole("menuitem")).toEqual([]);
+  });
+
+  it("moves a bank or cash account out of the money accounts heading and back in (0580)", async () => {
+    show();
+    await ready();
+
+    drag("310-B001", "320-0000");
+    await waitFor(() => expect(net.moves).toHaveLength(1));
+    expect(net.moves[0]).toMatchObject({ code: "310-B001", toParentCode: "320-0000", from: { was: ["310-B001", "310-C001"], now: ["310-C001"] } });
+    await waitFor(() => expect(net.reads).toBeGreaterThan(1));
+
+    drag("310-B001", "310-0000");
+    await waitFor(() => expect(net.moves).toHaveLength(2));
+    expect(net.moves[1]).toMatchObject({ code: "310-B001", toParentCode: "310-0000", to: { was: ["310-C001"], now: ["310-C001", "310-B001"] } });
   });
 
   it("drops a posting account on a heading BESIDE it: it goes under that heading", async () => {
