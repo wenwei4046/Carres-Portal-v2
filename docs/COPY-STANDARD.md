@@ -4146,8 +4146,8 @@ changes, already written into the list below (built in migration 0576 and the we
     automatic match was taken off because another file made it uncertain)
   - Expand line (red, one per payout): `Card payout {move no} of {RM} from {code} on {date} has no
     card settlement day. Check it is not this day's money before you approve the day.`
-  - Money moves → Card payout, `Paid from` hint: `A card account with a payout bank is paid out on
-    Card settlement.`
+  - Money moves → Card payout, `Paid from` hint (approved by YH 24 Sep 2026): `A card account is
+    paid out on Card settlement.`
   - Refusals (database): `A card payout from this card account is prepared on Card settlement.
     Approve the day there.` · `This form was used before. Close it and press Approve day again.`
 - Added in the PR 1538 round 3 fix (23 Sep 2026):

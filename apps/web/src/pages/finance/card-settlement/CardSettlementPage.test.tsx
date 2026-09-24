@@ -91,8 +91,8 @@ beforeEach(() => {
   net.routes = {
     "GET /api/finance/card-settlement": REVIEW,
     "GET /api/finance/ledger/money-accounts": [
-      { code: "1123", name: "Test Bank", money_kind: "BANK", is_active: true },
-      { code: "1131", name: "Test Card", money_kind: "HOLDING", is_active: true },
+      { code: "1123", name: "Test Bank", money_kind: "BANK", is_active: true, is_card_account: false },
+      { code: "1131", name: "Test Card", money_kind: "HOLDING", is_active: true, is_card_account: true },
     ],
     "GET /api/finance/ledger/money-accounts/card-routes": [],
   };
@@ -173,11 +173,12 @@ describe("Card settlement", () => {
 
   it("Approve day fills the card payout form with the file's figures, read only, and prepares through the day's door", async () => {
     net.routes["POST /api/finance/card-settlement/days/payout"] = { move_id: "m", move_no: "MM-1" };
+    // 0576: the day's account is a card account; Approve day still offers it (only a new card payout hides them).
     net.routes["GET /api/finance/ledger/money-accounts"] = [
-      { code: "1123", name: "Test Bank", money_kind: "BANK", is_active: true },
-      { code: "1121", name: "Other Bank", money_kind: "BANK", is_active: true },
-      { code: "1131", name: "Test Card", money_kind: "HOLDING", is_active: true },
-      { code: "1132", name: "Other Card", money_kind: "HOLDING", is_active: true },
+      { code: "1123", name: "Test Bank", money_kind: "BANK", is_active: true, is_card_account: false },
+      { code: "1121", name: "Other Bank", money_kind: "BANK", is_active: true, is_card_account: false },
+      { code: "1131", name: "Test Card", money_kind: "HOLDING", is_active: true, is_card_account: true },
+      { code: "1132", name: "Other Card", money_kind: "HOLDING", is_active: true, is_card_account: true },
     ];
     net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [{ holding_code: "1131", channel: "showroom", bank_code: "1123" }];
     show();
