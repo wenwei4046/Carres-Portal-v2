@@ -121,7 +121,7 @@ describe("/api/finance/card-settlement", () => {
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       code: "file_refused",
-      message: "Row 2 is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one.",
+      message: "Row 2 is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT.",
     });
     expect(sb.rpc).not.toHaveBeenCalled();
   });

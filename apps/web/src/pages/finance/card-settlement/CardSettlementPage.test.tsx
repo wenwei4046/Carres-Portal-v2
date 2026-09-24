@@ -34,9 +34,10 @@ const day = (over: Partial<CardSettlementDay>): CardSettlementDay => ({
   gross: 425,
   net: 420.75,
   recorded: 100,
-  reference: "Card settlement PBB 900000000001 / 90000001 2026-09-18",
+  reference: "Card settlement Public Bank 900000000001 / 90000001 18 Sep 2026",
   payout_status: null,
   payout_move_no: null,
+  holding_codes: ["1131"],
   unlinked_payouts: [],
   ...over,
 });
@@ -63,7 +64,7 @@ const line = (over: Partial<CardSettlementRow>): CardSettlementRow => ({
 });
 const MAYBANK = day({
   acquirer: "MAYBANK", group_key: "900000000009", row_count: 2, matched_count: 2, gross: 200, net: 198, recorded: 200,
-  reference: "Card settlement MAYBANK 900000000009 2026-09-18",
+  reference: "Card settlement Maybank 900000000009 18 Sep 2026",
 });
 const REVIEW: CardSettlementReview = {
   days: [day({}), MAYBANK],
@@ -123,6 +124,11 @@ describe("Card settlement", () => {
     fireEvent.click(screen.getAllByTitle("Check the sales")[0]!);
     const pbb = await screen.findByTestId(`card-day-PBB|2026-09-18|900000000001 / 90000001`);
     expect(within(pbb).getByTestId("card-row-2")).toHaveTextContent("Matched by approval code · RM 100.00");
+    // the row names the machine with the column's word
+    expect(within(pbb).getByTestId("card-row-2")).toHaveTextContent(
+      `Row 2 · ${fmtDate("2026-09-17")} · RM 100.00 · Approval code A1B2C3 · Machine 90000001 · Card 400000XXXXXX0001`,
+    );
+    expect(pbb).not.toHaveTextContent("Terminal");
     expect(within(pbb).getByTestId(`card-suggestion-${PAY.typo}`)).toHaveTextContent(
       `Approval code may be typed wrong · RM 250.00 · ${fmtDate("2026-09-17")} · RC-170926-0002 · SO-1002 · Approval code K7M8N0`,
     );
@@ -188,7 +194,7 @@ describe("Card settlement", () => {
     expect(within(form).getByLabelText(/^Card company fee/)).toHaveValue("2.00");
     expect(within(form).getByLabelText(/^Card company fee/)).toHaveAttribute("readonly");
     const ref = within(form).getByLabelText(/^Reference/);
-    expect(ref).toHaveValue("Card settlement MAYBANK 900000000009 2026-09-18");
+    expect(ref).toHaveValue("Card settlement Maybank 900000000009 18 Sep 2026");
     expect(ref).toHaveAttribute("readonly");
     expect(within(form).getByText(/^Date the bank received it/)).toBeInTheDocument();
     expect(posts()).toEqual([]);
@@ -211,7 +217,7 @@ describe("Card settlement", () => {
   it("a GHL day shows its sale date and no paid-out date; the payout form asks for the date the bank received it", async () => {
     const ghlDay = day({
       acquirer: "GHL", day_date: "2026-09-16", payout_date: null, group_key: "TESTTERM01", row_count: 1, matched_count: 1,
-      gross: 300, net: 296.1, recorded: 300, reference: "Card settlement GHL TESTTERM01 2026-09-16",
+      gross: 300, net: 296.1, recorded: 300, reference: "Card settlement GHL TESTTERM01 16 Sep 2026",
     });
     net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [ghlDay], rows: [] };
     show();
@@ -238,7 +244,7 @@ describe("Card settlement", () => {
     show();
     fireEvent.click((await screen.findAllByTitle("Check the sales"))[0]!);
     expect(await screen.findByTestId("card-unlinked-MM-20260918-4444")).toHaveTextContent(
-      `Card payout MM-20260918-4444 of RM 420.75 from 1131 on ${fmtDate("2026-09-18")} is not linked to any card settlement day. Check it is not this day's money before you approve the day.`,
+      `Card payout MM-20260918-4444 of RM 420.75 from 1131 on ${fmtDate("2026-09-18")} has no card settlement day. Check it is not this day's money before you approve the day.`,
     );
   });
 
