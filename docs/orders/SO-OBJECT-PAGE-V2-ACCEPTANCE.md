@@ -82,7 +82,7 @@ One thing in the first draft stands: **the four tabs stay.**
 | 15 | Existing customer carries no order count/link | Customer header ruling 2026-09-21 | **`· {n} orders ›`** (singular `· 1 order ›`) → Register searched by that phone. No new page, no new writer |
 | 16 | `SO Doc Date` drawn as an input-like box | THE SO PAGE FIELD STANDARD 2026-09-22 | **grey box = editable, everywhere**, EXCEPT `SO Doc Date`, the payment rows and the computed totals, which are plain text |
 
-**Type order (ruling):** card title 15px/600 blue → value 13px dark → label 12px grey.
+**Type order (ruling):** card title 15px/600 blue → value 13px dark → label 11px/500 grey — the kit `text-label` (the "12px" first written here was overwritten by Sales Orders Card 13, 2026-09-23; `orders/MASTER.md` § "Order view").
 **Voided payments** stay, struck, with the reason, never counted. **`Open this order in Payments →`** stays.
 
 ---

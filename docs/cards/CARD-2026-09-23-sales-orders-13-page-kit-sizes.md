@@ -53,6 +53,11 @@ under `titleTone="sales-order"`; those pages do not move.
 8. Stale guidance: `/ui` and five source headers pointed at the retired `docs/UI-KIT.md`; two
    doc links resolved outside `docs/`. Repointed to the successors.
 
+9. Follow-up (2026-09-24): the `Revisions` and `History` tabs drew their card at `p-5` (20px, off the
+   spacing scale) under a 20px `text-title`; they now render through the same SO `Block` (15px blue
+   title over a 1px rule, 12/16px padding). The acceptance record's stale "label 12px" line was
+   overwritten.
+
 ## Tests
 
 `SalesOrderWorkspace.ui-contract.test.ts` — three contracts rewritten from the old values, seven
