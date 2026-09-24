@@ -283,7 +283,7 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     console.log("reversal:", JSON.stringify(refused));
     expect(refused).toEqual({
       ok: false, detail: "reversal_refused",
-      message: "Row 2 is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one.",
+      message: "Row 2 is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT.",
     });
     const negative = parsed.rows.map((x, i) => (i === 1 ? { ...x, amount: -40 } : x));
     expect(await attempt("select public.card_settlement_import('PBB', 'refund.csv', $1, $2::jsonb, null) as r", [content, JSON.stringify(negative)]))
@@ -343,6 +343,10 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     expect(await prepareDay(day, uid("aa2"))).toMatchObject({ ok: false, detail: "payout_exists", message: "The payout for this day is already prepared." });
     const moves = (await q("select m.amount, m.fee, m.reference from card_settlement_payouts cp join gl_money_moves m on m.id = cp.move_id")).rows;
     expect(moves).toEqual([{ amount: "480.15", fee: "4.85", reference: day.reference }]);
+    // the card company's screen name and the day as D Mon YYYY (YH, 24 Sep 2026)
+    const [yyyy, mm, dd] = day.day_date.split("-");
+    const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(mm) - 1];
+    expect(day.reference).toBe(`Card settlement Public Bank 900000000001 / 90000001 ${Number(dd)} ${mon} ${yyyy}`);
 
     const after = pbbDay(await review());
     console.log("PBB day after the payout is prepared:", JSON.stringify({ reference: after.reference, payout_status: after.payout_status, payout_move_no: after.payout_move_no }));

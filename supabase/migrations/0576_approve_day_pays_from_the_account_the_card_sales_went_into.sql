@@ -11,6 +11,20 @@
 --   3. card_settlement_review listed unlinked card payouts only from routed
 --      accounts. It now lists them from every card account, and gives each day
 --      its holding_codes.
+--   4. Words approved by YH, 24 Sep 2026. The payout reference names the card
+--      company as the screen does and the day as D Mon YYYY: 'Card settlement
+--      Public Bank 900000000001 / 90000001 1 Sep 2026' (was 'Card settlement
+--      PBB ... 2026-09-01'). One function, _card_settlement_reference, makes it
+--      for both the review and Approve day. Nothing finds a payout by its
+--      reference: a day's payout is its card_settlement_payouts link (the
+--      paid-day check, the idempotency pre-check, the frozen day, the unlinked
+--      listing), and the gl_money_move_create guard compares the reference only
+--      with the setting Approve day sets in the same call. So a payout prepared
+--      with the old reference is still that day's payout and the day is never
+--      paid twice. Old references are not rewritten.
+--   5. card_settlement_import's refund refusal now reads 'Row {n} is a refund,
+--      void or chargeback. Carres cannot import it yet. Give the file to IT.'
+--      Only that sentence changes; every guard is kept.
 -- Bodies are main's pg_get_functiondef at 0575, every guard kept. No account
 -- code is written here. No backfill.
 
@@ -32,6 +46,22 @@ $fn$;
 comment on function public._card_payout_holdings() is
   '0576: every card account. An account a card payment method (card, credit_card, debit_card) maps to in gl_payment_account_map, and a card_settlement_routes holding. A card payout from one of them is prepared on Card settlement only.';
 revoke all on function public._card_payout_holdings() from public, anon, authenticated;
+
+-- the payout reference: the card company's screen name, the machine, the day as D Mon YYYY
+create or replace function public._card_settlement_reference(p_acquirer text, p_group_key text, p_day date)
+returns text
+language sql
+stable
+set search_path = public, pg_temp
+as $fn$
+  select left(format('Card settlement %s %s %s',
+                     case p_acquirer when 'PBB' then 'Public Bank' when 'GHL' then 'GHL'
+                                     when 'MAYBANK' then 'Maybank' else p_acquirer end,
+                     p_group_key, to_char(p_day, 'FMDD Mon YYYY')), 120);
+$fn$;
+comment on function public._card_settlement_reference(text, text, date) is
+  '0576: the card payout reference, e.g. Card settlement Public Bank 900000000001 / 90000001 1 Sep 2026. Written on the move by Approve day and shown by the review. Nothing finds a payout by it.';
+revoke all on function public._card_settlement_reference(text, text, date) from public, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.gl_money_move_create(p_kind text, p_move_date date, p_from_account_code text, p_to_account_code text, p_amount numeric, p_fee numeric DEFAULT 0, p_reference text DEFAULT NULL::text, p_note text DEFAULT NULL::text, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS uuid
@@ -111,7 +141,7 @@ begin
            coalesce(array_agg(distinct public.gl_account_for_payment_method(p.method, p.source_channel))
                       filter (where p.id is not null and public.gl_account_for_payment_method(p.method, p.source_channel) is not null),
                     '{}') as holding_codes,
-           left(format('Card settlement %s %s %s', l.acquirer, l.group_key, to_char(l.day_date, 'YYYY-MM-DD')), 120) as reference
+           public._card_settlement_reference(l.acquirer, l.group_key, l.day_date) as reference
       from public.card_settlement_lines l
       join public.card_settlement_files f on f.id = l.file_id
       left join public.order_payments p on p.id = l.payment_id
@@ -188,7 +218,7 @@ declare
   v_gross   numeric;
   v_net     numeric;
   v_move    uuid;
-  v_ref     text := left(format('Card settlement %s %s %s', p_acquirer, p_group_key, to_char(p_day_date, 'YYYY-MM-DD')), 120);
+  v_ref     text := public._card_settlement_reference(p_acquirer, p_group_key, p_day_date);
   v_key     record;
   v_holding text[];
 begin
@@ -300,6 +330,204 @@ begin
   values (p_acquirer, p_day_date, p_group_key, v_move, auth.uid());
 
   return jsonb_build_object('move_id', v_move, 'move_no', (select m.move_no from public.gl_money_moves m where m.id = v_move));
+end;
+$function$;
+
+-- 0572's import, the refund refusal in YH's words (24 Sep 2026); every guard kept.
+CREATE OR REPLACE FUNCTION public.card_settlement_import(p_acquirer text, p_file_name text, p_content text, p_rows jsonb, p_published jsonb DEFAULT NULL::jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role     text := public.app_role()::text;
+  v_me       uuid := auth.uid();
+  v_file     uuid;
+  v_row      jsonb;
+  v_line     uuid;
+  v_amount   numeric;
+  v_net      numeric;
+  v_merchant text;
+  v_terminal text;
+  v_payout   date;
+  v_new      integer := 0;
+  v_matched  integer := 0;
+  v_released integer := 0;
+  v_paid_row integer;
+  v_auto     jsonb;
+  v_sure     jsonb;
+begin
+  if v_role is null or v_role not in ('finance', 'principal') then
+    raise exception 'Only Finance works on card settlement.' using errcode = '42501', detail = 'not_finance';
+  end if;
+  if p_acquirer is null or p_acquirer not in ('PBB', 'GHL', 'MAYBANK') then
+    raise exception 'Choose Public Bank, GHL or Maybank.' using errcode = '22023', detail = 'bad_acquirer';
+  end if;
+  if coalesce(p_file_name, '') !~ '[^[:space:]]' then
+    raise exception 'The file has no name.' using errcode = '22023', detail = 'no_file_name';
+  end if;
+  if coalesce(p_content, '') !~ '[^[:space:]]'
+     or jsonb_typeof(p_rows) is distinct from 'array' or jsonb_array_length(p_rows) = 0 then
+    raise exception 'The file has no sales.' using errcode = '22023', detail = 'no_rows';
+  end if;
+  -- ponytail: one lock for every card settlement write; Finance is a handful of people.
+  perform pg_advisory_xact_lock(hashtextextended('card_settlement', 0));
+  if exists (select 1 from public.card_settlement_files f
+              where f.acquirer = p_acquirer and md5(f.content) = md5(p_content)) then
+    raise exception 'This file was imported before.' using errcode = '22023', detail = 'file_imported';
+  end if;
+  if p_acquirer = 'MAYBANK' then
+    if public._card_text(p_published ->> 'merchant_id') is null
+       or p_published ->> 'report_date' is null or p_published ->> 'gross' is null
+       or p_published ->> 'fee' is null or p_published ->> 'net' is null then
+      raise exception 'This is not a Maybank settlement file. Check the card company and the file.'
+        using errcode = '22023', detail = 'not_the_format';
+    end if;
+    if exists (select 1 from public.card_settlement_files f
+                where f.acquirer = 'MAYBANK' and f.merchant_id = public._card_text(p_published ->> 'merchant_id')
+                  and f.report_date = (p_published ->> 'report_date')::date) then
+      raise exception 'This file was imported before.' using errcode = '22023', detail = 'file_imported';
+    end if;
+  end if;
+
+  insert into public.card_settlement_files
+    (acquirer, file_name, content, merchant_id, report_date,
+     published_gross, published_fee, published_net, imported_by)
+  values (p_acquirer, public._card_text(p_file_name), p_content,
+          case when p_acquirer = 'MAYBANK' then public._card_text(p_published ->> 'merchant_id') end,
+          case when p_acquirer = 'MAYBANK' then (p_published ->> 'report_date')::date end,
+          case when p_acquirer = 'MAYBANK' then round((p_published ->> 'gross')::numeric, 2) end,
+          case when p_acquirer = 'MAYBANK' then round((p_published ->> 'fee')::numeric, 2) end,
+          case when p_acquirer = 'MAYBANK' then round((p_published ->> 'net')::numeric, 2) end,
+          v_me)
+  returning id into v_file;
+
+  for v_row in select value from jsonb_array_elements(p_rows) loop
+    v_amount := (v_row ->> 'amount')::numeric;
+    v_net    := (v_row ->> 'net_amount')::numeric;
+    -- No sample had a refund, void or chargeback, so their sign is not known.
+    if v_amount is null or v_amount <= 0
+       or (p_acquirer = 'PBB' and (v_row -> 'fields' ->> 'Status') is distinct from 'PURCHASES')
+       or (p_acquirer = 'GHL' and (v_row -> 'fields' ->> 'tx_code_true') is distinct from 'PAYMENT') then
+      raise exception 'Row % is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT.',
+        coalesce(v_row ->> 'line_no', '?')
+        using errcode = '22023', detail = 'reversal_refused';
+    end if;
+    v_merchant := case when p_acquirer = 'MAYBANK' then public._card_text(p_published ->> 'merchant_id')
+                       else public._card_text(v_row ->> 'merchant_id') end;
+    v_terminal := public._card_text(v_row ->> 'terminal_id');
+    -- GHL: the statement date from the file name, or nothing; never the sale date.
+    v_payout   := case when p_acquirer = 'MAYBANK' then (p_published ->> 'report_date')::date
+                       else (v_row ->> 'payout_date')::date end;
+    if v_amount <> round(v_amount, 2) or v_net < 0 or (p_acquirer <> 'MAYBANK' and v_net is null)
+       or (v_row ->> 'txn_date') is null or (p_acquirer <> 'GHL' and v_payout is null)
+       or coalesce(v_row ->> 'raw_line', '') !~ '[^[:space:]]'
+       or jsonb_typeof(v_row -> 'fields') is distinct from 'object'
+       or (p_acquirer = 'PBB' and (v_merchant is null or v_terminal is null))
+       or (p_acquirer = 'GHL' and v_terminal is null) then
+      raise exception 'Row % could not be read. Import the file as it came from the card company.',
+        coalesce(v_row ->> 'line_no', '?')
+        using errcode = '22023', detail = 'row_unreadable';
+    end if;
+
+    v_line := null;
+    insert into public.card_settlement_lines
+      (file_id, acquirer, line_no, raw_line, fields, txn_date, payout_date, merchant_id, terminal_id,
+       group_key, approval_code, card_no, amount, net_amount)
+    values (v_file, p_acquirer, (v_row ->> 'line_no')::integer, v_row ->> 'raw_line', v_row -> 'fields',
+            (v_row ->> 'txn_date')::date, v_payout, v_merchant, v_terminal,
+            case p_acquirer when 'PBB' then v_merchant || ' / ' || v_terminal
+                            when 'GHL' then v_terminal
+                            else v_merchant end,
+            public._card_text(v_row ->> 'approval_code'),
+            public._card_text(v_row ->> 'card_no'),
+            v_amount, round(v_net, 2))
+    on conflict do nothing
+    returning id into v_line;
+    if v_line is not null then
+      v_new := v_new + 1;
+    end if;
+  end loop;
+
+  -- A new row may not change a day whose payout is already prepared or approved.
+  select min(l.line_no) into v_paid_row
+    from public.card_settlement_lines l
+   where l.file_id = v_file
+     and public._card_settlement_live_payout(l.acquirer, l.day_date, l.group_key) is not null;
+  if v_paid_row is not null then
+    raise exception 'Row % is for a day whose payout is already prepared. Cancel that money move first.', v_paid_row
+      using errcode = '22023', detail = 'day_paid';
+  end if;
+
+  -- The match rule runs again over every row, of every file, that is open or
+  -- was matched automatically, so the result does not depend on the order
+  -- the files came in. Never touched: a match made by staff, a row staff took
+  -- the match off (kept_open), and every row of a day whose payout is
+  -- prepared or approved (frozen).
+  -- ponytail: every such row on an unpaid day is read at each import; cut it
+  -- to a date window if unpaid rows ever run into the thousands.
+  --   1. the automatic matches are set aside, so their payments are free again
+  select coalesce(jsonb_object_agg(l.id, jsonb_build_object('payment_id', l.payment_id, 'how', l.matched_how,
+                                                            'by', l.matched_by, 'at', l.matched_at)), '{}'::jsonb)
+    into v_auto
+    from public.card_settlement_lines l
+   where l.matched_how in ('approval_code', 'amount_and_date')
+     and public._card_settlement_live_payout(l.acquirer, l.day_date, l.group_key) is null;
+  update public.card_settlement_lines l
+     set payment_id = null, matched_how = null, matched_by = null, matched_at = null
+   where v_auto ? l.id::text;
+
+  --   2. a pairing is sure when it is unique from both sides: the row has one
+  --      candidate, and that payment is the candidate of no other open row.
+  --      A payment a Public Bank or Maybank row may own (its approval code,
+  --      the code with another amount, or a likely typo of it) is contested
+  --      for GHL: only a suggestion there.
+  with cand as materialized (
+    select o.id as line_id, o.acquirer, o.kept_open, c.payment_id, c.how
+      from public.card_settlement_lines o
+     cross join lateral public._card_settlement_candidates(o.id) c
+     where o.payment_id is null
+       and public._card_settlement_live_payout(o.acquirer, o.day_date, o.group_key) is null
+  ), pairs as (
+    select x.line_id, x.kept_open, x.payment_id, x.how
+      from cand x
+     where x.how in ('approval_code', 'amount_and_date')
+       and not (x.acquirer = 'GHL'
+                and exists (select 1 from cand k
+                             where k.payment_id = x.payment_id and k.acquirer <> 'GHL'
+                               and k.how in ('approval_code', 'code_other_amount', 'code_near')))
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('line_id', p.line_id, 'payment_id', p.payment_id, 'how', p.how)), '[]'::jsonb)
+    into v_sure
+    from pairs p
+   where not p.kept_open
+     and (select count(*) from pairs x where x.line_id = p.line_id) = 1
+     and (select count(*) from pairs x where x.payment_id = p.payment_id) = 1;
+
+  --   3. the sure pairings are matched; one that was already matched keeps who and when
+  update public.card_settlement_lines l
+     set payment_id  = (s ->> 'payment_id')::uuid,
+         matched_how = s ->> 'how',
+         matched_by  = case when v_auto -> (s ->> 'line_id') ->> 'payment_id' = s ->> 'payment_id'
+                            then (v_auto -> (s ->> 'line_id') ->> 'by')::uuid else v_me end,
+         matched_at  = case when v_auto -> (s ->> 'line_id') ->> 'payment_id' = s ->> 'payment_id'
+                            then (v_auto -> (s ->> 'line_id') ->> 'at')::timestamptz else now() end
+    from jsonb_array_elements(v_sure) s
+   where l.id = (s ->> 'line_id')::uuid;
+
+  -- matched: rows matched now that were not matched to that payment before;
+  -- released: automatic matches that did not come back to the same payment
+  select count(*) into v_matched
+    from jsonb_array_elements(v_sure) s
+   where (v_auto -> (s ->> 'line_id') ->> 'payment_id') is distinct from s ->> 'payment_id';
+  select count(*) into v_released
+    from jsonb_each(v_auto) a
+   where not exists (select 1 from jsonb_array_elements(v_sure) s
+                      where s ->> 'line_id' = a.key and s ->> 'payment_id' = a.value ->> 'payment_id');
+
+  return jsonb_build_object('file_id', v_file, 'rows', jsonb_array_length(p_rows),
+                            'imported', v_new, 'matched', v_matched, 'released', v_released);
 end;
 $function$;
 

@@ -22,7 +22,7 @@ describe("parseCardFile — Public Bank", () => {
 
   it("refuses a row that is not a purchase", () => {
     const r = parseCardFile("PBB", pbbFile([sale, { ...sale, status: "REFUND" }]));
-    expect(r).toEqual({ ok: false, message: "Row 3 is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one." });
+    expect(r).toEqual({ ok: false, message: "Row 3 is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT." });
   });
 
   it("refuses a negative amount even when the status says purchase", () => {
@@ -58,7 +58,7 @@ describe("parseCardFile — GHL", () => {
 
   it("refuses anything but a payment", () => {
     const r = parseCardFile("GHL", ghlFile([{ at: "2026-09-03 14:05:11.0", amount: "300.00", fee: "0", net: "300.00", tid: "T1", txId: "1", code: "REFUND" }]));
-    expect(r).toEqual({ ok: false, message: "Row 2 is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one." });
+    expect(r).toEqual({ ok: false, message: "Row 2 is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT." });
   });
 });
 
@@ -85,7 +85,7 @@ describe("parseCardFile — Maybank T41", () => {
 
   it("refuses a file with credits", () => {
     expect(parseCardFile("MAYBANK", maybankFile({ ...base, credit: "10.00" }))).toEqual({
-      ok: false, message: "This file has refunds or adjustments. Carres does not import these until their sign is confirmed on a real one.",
+      ok: false, message: "This file has refunds or adjustments. Carres cannot import it yet. Give the file to IT.",
     });
   });
 

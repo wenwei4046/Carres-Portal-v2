@@ -303,7 +303,7 @@ function DayExpansion({
           <p className="text-strong">
             Row {r.line_no} · {fmtDate(r.txn_date)} · {rm(Number(r.amount))}
             {r.acquirer !== "GHL" ? ` · Approval code ${r.approval_code ?? "not printed"}` : ""}
-            {r.terminal_id ? ` · Terminal ${r.terminal_id}` : ""}
+            {r.terminal_id ? ` · Machine ${r.terminal_id}` : ""}
             {r.card_no ? ` · Card ${r.card_no}` : ""}
           </p>
           {r.payment_id ? (
@@ -344,8 +344,8 @@ function DayExpansion({
       ))}
       {day.unlinked_payouts.map((u) => (
         <p key={u.move_id} role="alert" className="text-kit-red-11" data-testid={`card-unlinked-${u.move_no}`}>
-          Card payout {u.move_no} of {rm(Number(u.amount))} from {u.from_account_code} on {fmtDate(u.move_date)} is not linked to any
-          card settlement day. Check it is not this day's money before you approve the day.
+          Card payout {u.move_no} of {rm(Number(u.amount))} from {u.from_account_code} on {fmtDate(u.move_date)} has no card settlement
+          day. Check it is not this day's money before you approve the day.
         </p>
       ))}
       {day.payout_status !== null ? (

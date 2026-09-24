@@ -388,7 +388,7 @@ export function MoneyMoveForm({
             options={fromOptions}
             hint={
               cardSettlementOnly
-                ? "A card account that has a payout bank in Finance Settings is paid out on Card settlement."
+                ? "A card account with a payout bank is paid out on Card settlement."
                 : fixed && routes.isError
                   ? "The payout banks did not load. Close this and try again."
                   : fixed && routes.isSuccess && fromOptions.length === 0

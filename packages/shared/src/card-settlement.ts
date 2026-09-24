@@ -53,10 +53,10 @@ export type CardFileParse =
 const notTheFile = (a: CardAcquirer) =>
   `This is not a ${CARD_ACQUIRER_WORD[a]} settlement file. Check the card company and the file.`;
 const reversal = (n: number) =>
-  `Row ${n} is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one.`;
+  `Row ${n} is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT.`;
 const unreadable = (n: number) => `Row ${n} could not be read. Import the file as it came from the card company.`;
 const NO_SALES = "The file has no sales.";
-const HAS_CREDITS = "This file has refunds or adjustments. Carres does not import these until their sign is confirmed on a real one.";
+const HAS_CREDITS = "This file has refunds or adjustments. Carres cannot import it yet. Give the file to IT.";
 const TOTALS_OFF = "The file's totals do not add up. Import the file as it came from the card company.";
 
 /** One CSV line into cells; a quoted cell may hold commas and doubled quotes. */
