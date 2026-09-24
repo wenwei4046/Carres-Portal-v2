@@ -1170,7 +1170,7 @@ honest Work for admitted modules.
 
 - **Work left rail — BUILT 2026-09-24 (owner-approved UI, Jess 2026-09-24).** On `7e9da6459` the rail
   was a `Working day` text list with an `All` row, printed `0 actions`, a holiday that could not be
-  chosen, per-row module icons absent but no `All modules` row, no week control and no `week` in the
+  chosen, no `All modules` row, no week control and no `week` in the
   URL; at 768–1103px of Work canvas Panel 1 was dropped entirely and the date strip scrolled
   sideways. Now §5.1's `Date` and `Module` sections render through `WorkDayNav.tsx` over
   `workRailDates` / `workModuleCounts` / `inWorkDay` in `work-model.ts`; 768–1103px keeps the rail
