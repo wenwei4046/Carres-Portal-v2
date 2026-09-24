@@ -2110,9 +2110,10 @@ planned `proceed_date`.
     Delivery uses two equal field columns throughout (single column on narrow screens):
     address lines, state/city, postcode/building, floor/lift, stair count/services.
     Labels, control sizes and the 12px field gaps stay governed by the existing kit.
-    Delivery Services uses the same
-    framed read-only presentation, one active service per line with its saved configuration
-    and quantity, from the Items source; no additional charge or editor is created. Existing wording,
+    In View, Delivery Services uses the same framed read-only presentation, one active service
+    per line with its saved configuration and quantity. In Edit, Delivery owns the single
+    service editor described above; Items projects those same draft rows without another writer.
+    The service editor spans the field grid so per-unit size controls remain readable. Existing wording,
     missing-value labels and evidence notes stay unchanged; no transaction fields are inferred.
     No payment amount, paid date or collector is inferred from the order's cumulative Paid or
     current salesperson. When no transactions exist, a positive Paid keeps the saved capture visible and explains that
