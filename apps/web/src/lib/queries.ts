@@ -4229,6 +4229,8 @@ export interface ReceivingSessionDetail {
   receipt: WarehouseReceiptQueueRow & {
     unit_results: Array<{
       stock_item_id: string;
+      /** Exact source line; absent on older API deployments. Never inferred by SKU. */
+      po_line_id?: string | null;
       unit_code: string;
       outcome: "received" | "received_with_issue" | "not_received";
       issue_kind: "damaged" | "wrong_item" | null;
