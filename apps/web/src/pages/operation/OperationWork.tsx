@@ -510,7 +510,7 @@ export default function OperationWork() {
           ) : (
             displayMyGroups.map((g) => (
               <section key={g.key} data-testid={`work-section-${g.key}`}>
-                <h2 className={`flex min-h-9 items-center border-b border-kit-slate-5 px-4 text-label font-semibold uppercase tracking-wide ${g.key === "broken" ? "text-kit-red-11" : "text-kit-slate-11"}`}>
+                <h2 className="flex min-h-9 items-center border-b border-kit-slate-5 px-4 text-label font-semibold uppercase tracking-wide text-kit-slate-11">
                   {g.label}
                 </h2>
                 <div className="bg-white">
