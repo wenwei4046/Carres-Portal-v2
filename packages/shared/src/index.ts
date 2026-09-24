@@ -2417,6 +2417,7 @@ export {
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
+  soBatchOrderUnselectableReason,
   soBatchOrderSafetyDays,
   soBatchOrderStatusWord,
   type SoBatchSafetyDaysCell,

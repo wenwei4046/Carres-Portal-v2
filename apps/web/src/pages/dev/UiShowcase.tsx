@@ -44,6 +44,7 @@ import Modal from "@/components/kit/Modal";
 import PageShell from "@/components/kit/PageShell";
 import Panel from "@/components/kit/Panel";
 import PdfPreview from "@/components/kit/PdfPreview";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SectionHeader from "@/components/kit/SectionHeader";
 import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
@@ -73,6 +74,20 @@ const FORCED_FOCUS_INPUT = "[&_input]:ring-2 [&_input]:ring-kit-blue-9 [&_input]
 
 const LONG =
   "Kuala Lumpur Sri Damansara warehouse transfer — customer requested the whole set delivered together";
+
+function SavedEvidenceSample() {
+  const [active, setActive] = useState<string | null>(null);
+  return <>
+    <Button onClick={() => setActive("example")}>View</Button>
+    <SavedEvidenceViewer activeId={active} onClose={() => setActive(null)}
+      files={[
+        { id: "example", kind: "photo", url: "/carres-logo.png", context: "Example · Arrival evidence", unitCodes: ["U1-000-001"] },
+        { id: "unreadable", kind: "photo", url: null, context: "Example · Arrival evidence" },
+        { id: "video", kind: "video", url: "/ui-evidence-example.mp4", context: "Example · Arrival evidence" },
+      ]}
+      onRetry={async (id) => id === "example" ? "/carres-logo.png" : id === "video" ? "/ui-evidence-example.mp4" : null} />
+  </>;
+}
 
 function PdfPreviewSample() {
   const [src, setSrc] = useState<string | null>(null);
@@ -304,6 +319,10 @@ export default function UiShowcase() {
         </Section>
 
         {/* ─── 2 · Tokens ─────────────────────────────────────────────────── */}
+        <Section id="saved-evidence" title="Saved evidence" note="Read-only photos and video. Source, Unit and failure states remain visible.">
+          <SavedEvidenceSample />
+        </Section>
+
         <Section id="pdf-preview" title="PDF preview" note="Actual pages, fit width, enlargement, loading and retry. Issuance remains with the owning page.">
           <PdfPreviewSample />
         </Section>

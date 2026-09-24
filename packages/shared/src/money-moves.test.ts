@@ -3,11 +3,11 @@ import { moneyMoveActions, moneyMoveGross, moneyMoveInput, moveAccounts } from "
 import type { MoneyAccountRow } from "./money-accounts";
 
 const rows: MoneyAccountRow[] = [
-  { code: "1110", name: "Cash", money_kind: "CASH", is_active: true },
-  { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true },
-  { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true },
-  { code: "1124", name: "RHB", money_kind: "BANK", is_active: false },
-  { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
+  { code: "1110", name: "Cash", money_kind: "CASH", is_active: true, is_card_account: false },
+  { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, is_card_account: false },
+  { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true, is_card_account: false },
+  { code: "1124", name: "RHB", money_kind: "BANK", is_active: false, is_card_account: false },
+  { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true, is_card_account: false },
 ];
 const codes = (r: MoneyAccountRow[]) => r.map((a) => a.code);
 const good = {

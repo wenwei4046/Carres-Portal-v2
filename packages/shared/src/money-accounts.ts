@@ -17,12 +17,14 @@ import { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE } from "./finance-l
 export const MONEY_ACCOUNT_KINDS = ["CASH", "BANK", "HOLDING"] as const;
 export type MoneyAccountKind = (typeof MONEY_ACCOUNT_KINDS)[number];
 
-/** One row of `gl_money_accounts_list()`. */
+/** One row of `gl_money_accounts_list()`, and whether it is a card account. */
 export interface MoneyAccountRow {
   code: string;
   name: string;
   money_kind: MoneyAccountKind;
   is_active: boolean;
+  /** 0576: one of `_card_payout_holdings()`. A card payout from it is prepared on Card settlement only. */
+  is_card_account: boolean;
 }
 
 /** The kind as the page says it, in COPY-STANDARD's pay-method words:

@@ -2262,6 +2262,7 @@ describe("R2 · group membership", () => {
     expect(groupOfRow(REQ3)).toBe("grid-group-to-buy");
     expect(within(screen.getByTestId(`mp-approval-${REQ2}`)).getByText("Remaining quantity not checked")).toBeInTheDocument();
     expect(screen.getByTestId(`mp-select-${REQ2}`)).toBeDisabled();
+    expect(screen.getByTestId(`mp-select-${REQ2}`)).toHaveAccessibleDescription("Remaining quantity not checked");
     // A request that is NOT approved never reaches To buy, known or not.
     expect(groupOfRow(REQ1)).toBe("grid-group-need-approval");
   });

@@ -45,6 +45,7 @@ import {
   Fragment,
   memo,
   useCallback,
+  useId,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -506,6 +507,8 @@ export type DataGridProps<T> = {
      * every row is selectable, exactly as before.
      */
     isSelectable?: (row: never) => boolean;
+    /** Existing row facts explaining a refused tick; omitted callers stay unchanged. */
+    unselectableReason?: (row: never) => string | null;
     /**
      * ⭐ CARD 02-B (2026-08-27): a row whose checkbox stands for a SET of
      * child records renders indeterminate when only part of that set is
@@ -706,6 +709,7 @@ function DataGridInner<T>({
   onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
+  const selectionReasonId = useId();
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
      expanded row ids; rendering inserts a colSpan sub-<tr> directly under
      each expanded parent. Stored as a Set so the chevron column accessor
@@ -2374,6 +2378,32 @@ function DataGridInner<T>({
           {visibleColumns.map((col) => {
             const w = layout.widths[col.key] ?? col.width ?? 140;
             if (col.key === "__select__" && selectable) {
+              const canSelect = selectable.isSelectable?.(row as never) ?? true;
+              const refusal = canSelect ? null : (selectable.unselectableReason?.(row as never) ?? null);
+              const refusalId = refusal ? `${selectionReasonId}-${encodeURIComponent(key)}` : undefined;
+              const checkLabel = (
+                  <label
+                  className={`${narrowCanvas ? styles.checkHitNarrow : styles.checkHit}${refusal ? ` ${styles.checkRefused}` : ""}`}
+                  tabIndex={refusal ? 0 : undefined}
+                  aria-label={refusal ?? undefined}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label="Select row"
+                    aria-describedby={refusalId}
+                    data-testid={selectable.testId?.(row as never)}
+                    checked={selectable.selectedKeys.has(key)}
+                    disabled={!canSelect}
+                    /* A parent-of-children checkbox's third state — set via the
+                       ref exactly as the header checkbox sets its own. */
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
+                    }}
+                    onChange={() => selectable.onToggle(key)}
+                  />
+                  {refusal ? <span id={refusalId} className="sr-only">{refusal}</span> : null}
+                  </label>
+              );
               return (
                 <td
                   key={col.key}
@@ -2388,21 +2418,7 @@ function DataGridInner<T>({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <label className={narrowCanvas ? styles.checkHitNarrow : styles.checkHit}>
-                  <input
-                    type="checkbox"
-                    aria-label="Select row"
-                    data-testid={selectable.testId?.(row as never)}
-                    checked={selectable.selectedKeys.has(key)}
-                    disabled={!(selectable.isSelectable?.(row as never) ?? true)}
-                    /* A parent-of-children checkbox's third state — set via the
-                       ref exactly as the header checkbox sets its own. */
-                    ref={(el) => {
-                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
-                    }}
-                    onChange={() => selectable.onToggle(key)}
-                  />
-                  </label>
+                  {refusal ? <Tooltip content={refusal} side="right">{checkLabel}</Tooltip> : checkLabel}
                 </td>
               );
             }

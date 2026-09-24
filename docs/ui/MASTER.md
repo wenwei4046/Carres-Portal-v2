@@ -1923,6 +1923,18 @@ page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
 edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
+**DEPLOYED + AUTHENTICATED READBACK 2026-09-24 (#1589):** DataGrid's optional
+`selectable.unselectableReason` adds an accessible description and the existing kit
+Tooltip to a refused checkbox. The label is keyboard-focusable and description IDs
+are unique per grid and row. It explains facts already visible on that owning page;
+never make the tooltip their only copy. Omitted callers retain their existing behavior,
+and no selectability or bulk-action rule changes.
+CI `35986102965` and deployment `35987154529` passed; all five canonical endpoints
+reported `96528e114129fb11d051a59fe81413dcb1c6a4d0`. Authenticated SO-1358 keyboard
+focus displayed `Already on a PO` with zero checked rows; SO-1206 exposed `SKU not found`,
+and the pending MPR row exposed `Need approval`. Purchasing §9.1 records the before/after
+and keeps stock/issue lifecycle verification separate.
+
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
   not equal widths or stretching to fill a canvas. Same field/role shares its default width.
   Personal resizing remains supported. No global 144/160/192px type-width proposal was approved.
@@ -2008,6 +2020,19 @@ One implementation, reused by Supplier Claims, Receiving, Stock and Service Case
   and the existing My Work deep link rather than grow a second editor (Purchasing §9.5).
 
 Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0546): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+
+**Shared saved-evidence viewer — DEPLOYED + RECEIVING PRODUCTION READBACK, 2026-09-24 (#1593).**
+`SavedEvidenceViewer` is admitted under Purchasing §9.5's approved contract and recorded
+in `02-components.md`, with a live `/ui` example. Existing Modal behavior owns focus,
+Escape and scroll lock. Source/event and any actual Unit associations stay with each file;
+permissions and refresh stay with the owning reader. Receiving is the first consumer;
+Claim-record photos are deployed with authenticated readback (#1594). Claims' working
+reply record and per-Unit expansion, Stock and Service adoption remain separate work; this kit
+addition does not claim those workflows delivered.
+Purchasing §9.5 records all-five-surface SHA proof, authenticated GRN failure/retry/focus
+readback and production example photo/video controls; synthetic media is not business proof.
+The fullscreen-exit focus correction is production-verified (#1595): native fullscreen
+exit restores viewer focus; the following Escape closes it and returns to the opener.
 
 ## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
 

@@ -20,8 +20,20 @@ const env = {
 };
 const USER_ID = "11111111-1111-1111-1111-000000000001";
 
-function stubRpc(result: { data: unknown; error: unknown }) {
-  const sb = { rpc: vi.fn().mockResolvedValue(result) };
+/** `tables`: what each table read returns (0576's card-account reads). */
+function stubRpc(result: { data: unknown; error: unknown }, tables: Record<string, { data: unknown; error: unknown }> = {}) {
+  const inCalls: Array<[string, string, unknown]> = [];
+  const from = vi.fn((table: string) => {
+    const res = tables[table] ?? { data: [], error: null };
+    const q = {
+      select: () => q,
+      order: () => q,
+      in: (col: string, vals: unknown) => (inCalls.push([table, col, vals]), q),
+      then: (ok: (v: unknown) => unknown, bad: (e: unknown) => unknown) => Promise.resolve(res).then(ok, bad),
+    };
+    return q;
+  });
+  const sb = { rpc: vi.fn().mockResolvedValue(result), from, inCalls };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(userClient).mockReturnValue(sb as any);
   return sb;
@@ -59,6 +71,7 @@ describe("who may use /api/finance/ledger/money-accounts", () => {
     const res = await call(method, path, body, "operation");
     expect(res.status).toBe(403);
     expect(sb.rpc).not.toHaveBeenCalled();
+    expect(sb.from).not.toHaveBeenCalled();
   });
 
   it("admits principal", async () => {
@@ -73,12 +86,62 @@ describe("the list", () => {
     const sb = stubRpc({ data: rows, error: null });
     const res = await call("GET", "");
     expect(sb.rpc).toHaveBeenCalledWith("gl_money_accounts_list");
-    expect(await res.json()).toEqual(rows);
+    expect(await res.json()).toEqual([{ ...rows[0], is_card_account: false }]);
   });
 
   it("a list that could not be read is an error, never an empty list", async () => {
     stubRpc({ data: null, error: { code: "42501", message: "The money accounts are for Finance." } });
     expect((await call("GET", "")).status).toBe(403);
+  });
+
+  it("marks every card account (0576): one a card method maps to, with or without a route, and a routed one", async () => {
+    const rows = [
+      { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true },
+      { code: "1131", name: "Mapped card", money_kind: "HOLDING", is_active: true },
+      { code: "1132", name: "Routed card", money_kind: "HOLDING", is_active: true },
+      { code: "1133", name: "Stripe", money_kind: "HOLDING", is_active: true },
+    ];
+    const sb = stubRpc({ data: rows, error: null }, {
+      gl_payment_account_map: { data: [{ account_code: "1131" }], error: null },
+      card_settlement_routes: { data: [{ holding_code: "1132" }], error: null },
+    });
+    const res = await call("GET", "");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { code: string; is_card_account: boolean }[]).map((r) => [r.code, r.is_card_account])).toEqual([
+      ["1121", false],
+      ["1131", true],
+      ["1132", true],
+      ["1133", false],
+    ]);
+    expect(sb.inCalls).toEqual([["gl_payment_account_map", "method", ["card", "credit_card", "debit_card"]]]);
+  });
+
+  it("card accounts that could not be read are an error, never a list with none marked", async () => {
+    stubRpc({ data: [{ code: "1131", name: "Card", money_kind: "HOLDING", is_active: true }], error: null }, {
+      card_settlement_routes: { data: null, error: { code: "42501", message: "permission denied for table card_settlement_routes" } },
+    });
+    expect((await call("GET", "")).status).toBe(403);
+  });
+
+  it("reads card accounts exactly as the database's _card_payout_holdings() does, in its latest migration", async () => {
+    const dir = path.resolve(__dirname, "../../../../../supabase/migrations");
+    const head = /create\s+or\s+replace\s+function\s+public\._card_payout_holdings\s*\(\s*\)/i;
+    const latest = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()
+      .filter((f) => head.test(fs.readFileSync(path.join(dir, f), "utf-8"))).at(-1);
+    expect(latest).toBeTruthy();
+    const sql = fs.readFileSync(path.join(dir, latest!), "utf-8");
+    const fn = sql.slice(sql.search(head));
+    const body = fn.slice(fn.indexOf("$fn$") + 4, fn.indexOf("$fn$", fn.indexOf("$fn$") + 4)).replace(/\s+/g, " ").trim();
+
+    const sb = stubRpc({ data: [], error: null });
+    await call("GET", "");
+    const methods = sb.inCalls[0]![2] as string[];
+    expect(body).toBe(
+      "select m.account_code from public.gl_payment_account_map m" +
+        ` where m.method in (${methods.map((m) => `'${m}'`).join(", ")})` +
+        " union select r.holding_code from public.card_settlement_routes r;",
+    );
+    expect(sb.from.mock.calls.map((c) => c[0]).sort()).toEqual(["card_settlement_routes", "gl_payment_account_map"]);
   });
 });
 

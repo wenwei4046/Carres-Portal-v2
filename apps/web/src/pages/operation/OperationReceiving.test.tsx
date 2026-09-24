@@ -184,6 +184,7 @@ vi.mock("@/lib/queries", async () => {
         h.officeReceive.push([poId, input]),
       isPending: false,
     }),
+    fetchReceivingSessionDetail: async () => h.sessionDetail,
     useReceivingSessionDetail: () => ({
       data: h.sessionDetail,
       isLoading: false,
@@ -1386,6 +1387,25 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     renderWithProviders(
       <ReceivingRecord sessionId="r-posted" onBack={() => {}} />,
     );
+
+  it("keeps an unreadable saved arrival photo visible and opens the shared viewer with its GRN source", async () => {
+    h.sessionDetail = postedDetail({ receipt: {
+      arrival_evidence: [{ path: "stored/photo.jpg", kind: "photo" }],
+      arrival_evidence_files: [{ path: "stored/photo.jpg", kind: "photo", url: null }],
+    } });
+    renderRecord();
+    fireEvent.click(screen.getByTestId("arrival-evidence-view"));
+    expect(await screen.findByRole("dialog", { name: "Photo 1" })).toBeVisible();
+    expect(screen.getByText("GRN-20260901-1234 · Arrival evidence")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    h.sessionDetail = postedDetail({ receipt: {
+      arrival_evidence: [{ path: "stored/photo.jpg", kind: "photo" }],
+      arrival_evidence_files: [{ path: "stored/photo.jpg", kind: "photo", url: "https://example.test/renewed.jpg" }],
+    } });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("img", { name: "Photo 1" })).toHaveAttribute("src", "https://example.test/renewed.jpg");
+  });
 
   it("a Valid GRN shows the stored number, the three location/date facts, the duty trio and Unit results", () => {
     h.sessionDetail = postedDetail();

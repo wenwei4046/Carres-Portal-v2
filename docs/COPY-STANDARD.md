@@ -1985,6 +1985,7 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | A claim row's second-line Unit identity, more than one Unit | `{n} Units` | A disclosure link into THAT row's expansion, never a Unit ID and never a second panel. The actual IDs appear on the expanded rows |
 | Quantity-managed goods with no Unit ID | `Counted stock` | The same word §9.1 already uses. There is no Unit ID and there never will be; the genuine quantity still stands in `Qty` |
 | Evidence list that could not be read | `Evidence could not be loaded` + `Try again` | The read failed. Never shown as `Photos 0`, which claims the record holds nothing |
+| Shared saved-evidence viewer controls (Purchasing §9.5 approved contract) | `Photo {n}` · `Video {n}` · `Zoom out` · `Zoom in` · `Reset` · `Previous` · `Next` · `Close` · `Loading…` · `Try again` | Read-only; context prints the recorded source/event and proven Unit IDs. Video uses native playback controls, never local zoom |
 | One saved evidence file that could not be read | `Photo {n} could not be loaded` + `Try again` | A file the record HAS but the viewer could not read. A file the record never had is absent, not failed — the two never render alike |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
@@ -4147,8 +4148,8 @@ changes, already written into the list below (built in migration 0576 and the we
     automatic match was taken off because another file made it uncertain)
   - Expand line (red, one per payout): `Card payout {move no} of {RM} from {code} on {date} has no
     card settlement day. Check it is not this day's money before you approve the day.`
-  - Money moves → Card payout, `Paid from` hint: `A card account with a payout bank is paid out on
-    Card settlement.`
+  - Money moves → Card payout, `Paid from` hint (approved by YH 24 Sep 2026): `A card account is
+    paid out on Card settlement.`
   - Refusals (database): `A card payout from this card account is prepared on Card settlement.
     Approve the day there.` · `This form was used before. Close it and press Approve day again.`
 - Added in the PR 1538 round 3 fix (23 Sep 2026):
@@ -4233,6 +4234,30 @@ one. *"A manager's statement or checkbox saying the customer agreed is not suffi
 cannot substitute for the evidence."* Every kind carries a reference that points at something
 findable outside the record. `Approve and apply` is refused until one is recorded and still covers
 the proposal; `Reject` never is.
+
+## PROPOSAL — PENDING APPROVAL · Money accounts: the number changes on an opened account (24 Sep)
+
+The rule is YH's (24 Sep 2026): an opened money account on Finance Settings → Money accounts shows
+its number, and the number can be changed there, not only on Chart of accounts. The placement below
+is the proposal. No new sentence is added.
+
+- Field `Number` on the `Money account` form, below `Active`, holding the account's number. A blank
+  box keeps the account's own number, so clearing it by mistake changes nothing. Same word as the
+  add form's `Number` (0577, still pending); the hint `Leave blank to use the next free number.`
+  shows only when adding.
+- A new number is saved by the Chart of accounts form's own request, so every record follows it,
+  exactly as on that tab.
+- Shown under `Number`, as the database wrote them (already in this file):
+  `A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.` and
+  `An account numbered {code} is already in the chart.` (approved 23 Sep, 0570), and
+  `Only Finance changes the chart of accounts.` (0539). The last one differs from this form's own
+  `Only Finance changes the money accounts.`, because the number is changed through the chart.
+- Any other refusal from the chart (a name already in the chart, an account no longer in the chart,
+  a server break) shows at the foot of the form, never under `Number`.
+- A new name goes with the new number in that one request, so a name the chart refuses is never
+  saved. When `Active` changed too, `Active` alone is saved first (under the old name), so a refusal
+  about money still in the account comes before the number is touched. If the chart then refuses,
+  `Active` stays saved, and the sentence says why the name or number did not change.
 
 ## PROPOSAL — PENDING APPROVAL (0576, Approve day pays from the day's card account)
 

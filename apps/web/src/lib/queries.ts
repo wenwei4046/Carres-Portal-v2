@@ -3907,16 +3907,19 @@ export interface SupplierClaimPhoto {
 /** Signed URLs for one claim's evidence. Fetched only when the operator opens
  *  the row — the URLs are short-lived, so minting them for a whole list would
  *  be both wasteful and stale by the time anyone clicked. */
+export function fetchOperationSupplierClaimPhotos(claimId: string) {
+  return apiFetch<{ photos: SupplierClaimPhoto[] }>(
+    `/api/operation/supplier-claims/${claimId}/photos`,
+  );
+}
+
 export function useOperationSupplierClaimPhotos(
   claimId: string | null,
   opts?: Partial<UseQueryOptions<{ photos: SupplierClaimPhoto[] }>>,
 ) {
   return useQuery({
     queryKey: qk.operation.supplierClaimPhotos(claimId ?? "none"),
-    queryFn: () =>
-      apiFetch<{ photos: SupplierClaimPhoto[] }>(
-        `/api/operation/supplier-claims/${claimId}/photos`,
-      ),
+    queryFn: () => fetchOperationSupplierClaimPhotos(claimId!),
     enabled: !!claimId,
     staleTime: 10 * 60_000,
     ...opts,
@@ -4256,13 +4259,15 @@ export interface ReceivingSessionDetail {
   events: ReceivingEvent[];
 }
 
+/** One authorised detail reader, also used to renew saved-evidence URLs. */
+export function fetchReceivingSessionDetail(id: string) {
+  return apiFetch<ReceivingSessionDetail>(`/api/operation/warehouse-receipts/${id}`);
+}
+
 export function useReceivingSessionDetail(id: string | null) {
   return useQuery<ReceivingSessionDetail>({
     queryKey: qk.operation.receivingSession(id ?? ""),
-    queryFn: () =>
-      apiFetch<ReceivingSessionDetail>(
-        `/api/operation/warehouse-receipts/${id}`,
-      ),
+    queryFn: () => fetchReceivingSessionDetail(id!),
     enabled: !!id,
   });
 }
