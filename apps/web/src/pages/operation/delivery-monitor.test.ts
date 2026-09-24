@@ -402,18 +402,17 @@ describe("buildDeliveryMonitorCards", () => {
       },
     );
     expect(out[0]!.statusKey).toBe("confirmed");
-    expect(out[0]!.statusLabel).toBe("Confirmed for Fri, 4 Sep");
+    expect(out[0]!.statusLabel).toBe("Scheduled for Fri, 4 Sep");
     expect(out[0]!.statusTone).toBe("green");
     expect(out[0]!.statusSecond).toBe("09:00–11:00");
-    /* A DAY alone is still contact work (owner ruling 2026-09-11) — and the
-       card names the HALF that is missing, never `Confirmed` and never a
-       party (owner ruling 2026-09-14). */
+    /* A SCHEDULED DATE alone completes the arrangement — the time is
+       optional (owner ruling 2026-09-24, overwriting 2026-09-11). */
     const dayOnly = cards(
       [order({ id: "a", so: 1301 })],
       { arrangements: [arrangement({ order_id: "a", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-04" })] },
     );
-    expect(dayOnly[0]!.statusKey).toBe("confirm_time");
-    expect(dayOnly[0]!.statusLabel).toBe("Confirm delivery time");
+    expect(dayOnly[0]!.statusKey).toBe("confirmed");
+    expect(dayOnly[0]!.statusLabel).toBe("Scheduled for Fri, 4 Sep");
     expect(dayOnly[0]!.statusSecond).toBeNull();
   });
 
@@ -1286,10 +1285,11 @@ describe("monitorRowAction — one row, one next act", () => {
     expect(action.label).toBe("Assign logistics");
   });
 
-  it("keeps a known day and asks only for the missing time", () => {
-    const card = chase({ partner_id: "p-al", partner_name: "AL" });
-    const action = monitorRowAction({ ...card, confirmedDate: "2026-09-04", confirmedTime: null, booked: false });
-    expect(action).toEqual({ kind: "confirm_date", call: "Call AL", result: "Confirm the delivery time", label: "Edit Delivery" });
+  it("a known day with no time is SCHEDULED — nothing is left to chase (owner ruling 2026-09-24)", () => {
+    const action = monitorRowAction(
+      chase({ partner_id: "p-al", partner_name: "AL", confirmed_date: "2026-09-04", confirmed_time: null }),
+    );
+    expect(action).toEqual({ kind: "edit_delivery", label: "Edit Delivery" });
   });
 
   it("a partner carries it but no date is agreed → call THAT partner, then Edit Delivery", () => {
@@ -1297,7 +1297,7 @@ describe("monitorRowAction — one row, one next act", () => {
     expect(action).toEqual({
       kind: "confirm_date",
       call: "Call AL",
-      result: "Confirm the delivery date",
+      result: "Get the scheduled delivery date",
       label: "Edit Delivery",
     });
   });
@@ -1310,7 +1310,7 @@ describe("monitorRowAction — one row, one next act", () => {
     /* The words are the shared word module's — one home, two lines. */
     expect(orderActionLines("confirm_delivery_date", { logistics: "Chan Logistics" })).toEqual({
       act: "Call Chan Logistics",
-      result: "Confirm the delivery date",
+      result: "Get the scheduled delivery date",
     });
   });
 
@@ -1331,7 +1331,7 @@ describe("monitorRowAction — one row, one next act", () => {
   it("the exported words are the words on the screen", () => {
     expect(monitorRowActionText(chase({}))).toBe("Assign logistics");
     expect(monitorRowActionText(chase({ partner_id: "p-al", partner_name: "AL" }))).toBe(
-      "Call AL · Confirm the delivery date · Edit Delivery",
+      "Call AL · Get the scheduled delivery date · Edit Delivery",
     );
   });
 
@@ -1545,16 +1545,14 @@ describe("the contact deadline — three working days, counted once", () => {
     expect(card.contactOverdue).toBe(true);
   });
 
-  it("⭐ a DAY with no WINDOW does not close the deadline", () => {
-    /* The customer has not been told when to be home, so the conversation is
-       not finished and the missed deadline is still missed. */
+  it("⭐ a SCHEDULED DATE closes the deadline — the time is optional (owner ruling 2026-09-24)", () => {
     const halfway = cards([order({ id: "a", so: 1301, delivery_date: "2026-08-28" })], {
       arrangements: [arrangement({ order_id: "a", confirmed_date: "2026-09-10" })],
     })[0]!;
-    expect(halfway.booked).toBe(false);
-    expect(halfway.contactOverdue).toBe(true);
+    expect(halfway.booked).toBe(true);
+    expect(halfway.contactOverdue).toBe(false);
 
-    /* BOTH halves agreed — now there is no call left to be late for. */
+    /* A recorded time changes nothing about the deadline. */
     const booked = cards([order({ id: "a", so: 1301, delivery_date: "2026-08-28" })], {
       arrangements: [
         arrangement({
@@ -1692,7 +1690,7 @@ describe("a trip that has already run has no contact work left", () => {
  * confirm the DATE sends them to re-open a question the customer has already
  * answered, and the recorded day is a real fact the row must keep.
  */
-describe("the chase names the half that is missing", () => {
+describe("the chase asks for the scheduled date", () => {
   const chasing = (over: Partial<DeliveryMonitorCard>) =>
     datedCard({
       scopeId: "c",
@@ -1703,36 +1701,22 @@ describe("the chase names the half that is missing", () => {
       ...over,
     });
 
-  it("⭐ a known day with no window asks for the TIME", () => {
-    const action = monitorRowAction(chasing({ confirmedDate: "2026-09-04", confirmedTime: null }));
-    expect(action.kind).toBe("confirm_date");
-    if (action.kind !== "confirm_date") throw new Error("unreachable");
-    expect(action.call).toBe("Call NETS");
-    expect(action.result).toBe("Confirm the delivery time");
-    expect(action.result).not.toContain("delivery date");
-  });
-
-  it("no day at all still asks for the DATE", () => {
+  it("no day at all asks for the SCHEDULED date — never for a time on its own", () => {
     const action = monitorRowAction(chasing({ confirmedDate: null, confirmedTime: null }));
     if (action.kind !== "confirm_date") throw new Error("unreachable");
     expect(action.call).toBe("Call NETS");
-    expect(action.result).toBe("Confirm the delivery date");
+    expect(action.result).toBe("Get the scheduled delivery date");
   });
 
   it("the partner's own name is used, never a hard-coded company", () => {
-    const action = monitorRowAction(
-      chasing({ confirmedDate: "2026-09-04", confirmedTime: null, logisticsPartnerName: "HOUZS" }),
-    );
+    const action = monitorRowAction(chasing({ confirmedDate: null, confirmedTime: null, logisticsPartnerName: "HOUZS" }));
     if (action.kind !== "confirm_date") throw new Error("unreachable");
     expect(action.call).toBe("Call HOUZS");
-    expect(action.result).toBe("Confirm the delivery time");
   });
 
-  it("both sentences reach the export as one spelling", () => {
-    const time = monitorRowActionText(chasing({ confirmedDate: "2026-09-04", confirmedTime: null }));
-    expect(time).toContain("Confirm the delivery time");
+  it("the sentence reaches the export as one spelling", () => {
     const date = monitorRowActionText(chasing({ confirmedDate: null, confirmedTime: null }));
-    expect(date).toContain("Confirm the delivery date");
+    expect(date).toContain("Get the scheduled delivery date");
   });
 });
 

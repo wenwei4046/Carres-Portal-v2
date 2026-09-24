@@ -188,7 +188,7 @@ describe("Payment Monitor — the listing", () => {
     const table = screen.getByRole("table");
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim() ?? "");
     const words = ["SO No", "Customer", "Amount needed", "Items & Stock", "Storage",
-      "Requested Delivery Date", "Confirmed Delivery", "Payment timing"];
+      "Requested Delivery Date", "Scheduled delivery", "Payment timing"];
     const positions = words.map((w) => headers.findIndex((h) => h.startsWith(w)));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -334,7 +334,7 @@ describe("Payment Monitor — the listing", () => {
     expect(screen.getAllByText("No storage charge").length).toBe(2);
   });
 
-  it("Requested Delivery Date keeps the customer's request; Confirmed Delivery is Delivery's fact", () => {
+  it("Requested Delivery Date keeps the customer's request; Scheduled delivery is Delivery's fact", () => {
     const withTime = row({ id: "a", order_id: "o1", so: 1300, delivery_date: "2026-09-18", control: READY });
     withTime.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-22", confirmed_time: "2 PM to 5 PM" }];
     const dayOnly = row({ id: "b", order_id: "o2", so: 1301, delivery_date: "2026-09-18", control: READY });
@@ -350,15 +350,16 @@ describe("Payment Monitor — the listing", () => {
     };
     // The request survives the confirmation of a different day.
     expect(cellOf(1300, "Requested Delivery Date")).toHaveTextContent("Fri, 18 Sep");
-    expect(cellOf(1300, "Confirmed Delivery")).toHaveTextContent("Confirmed");
-    expect(cellOf(1300, "Confirmed Delivery")).toHaveTextContent("Tue, 22 Sep · 2 PM to 5 PM");
-    // A day without a time is Delivery's half booking.
-    expect(cellOf(1301, "Confirmed Delivery")).toHaveTextContent("Not confirmed");
-    expect(cellOf(1301, "Confirmed Delivery")).toHaveTextContent("Sat, 19 Sep · No time agreed");
+    expect(cellOf(1300, "Scheduled delivery")).toHaveTextContent("Scheduled");
+    expect(cellOf(1300, "Scheduled delivery")).toHaveTextContent("Tue, 22 Sep · 2 PM to 5 PM");
+    // A day without a time is SCHEDULED — the time is optional (owner ruling 2026-09-24).
+    expect(cellOf(1301, "Scheduled delivery")).toHaveTextContent("Scheduled");
+    expect(cellOf(1301, "Scheduled delivery")).toHaveTextContent("Sat, 19 Sep");
+    expect(cellOf(1301, "Scheduled delivery")).not.toHaveTextContent("No time agreed");
     // Nothing agreed: `Not confirmed` and nothing beneath; no request word.
-    expect(cellOf(1302, "Confirmed Delivery").textContent?.trim()).toBe("Not confirmed");
+    expect(cellOf(1302, "Scheduled delivery").textContent?.trim()).toBe("Not scheduled");
     expect(cellOf(1302, "Requested Delivery Date")).toHaveTextContent("No delivery date");
-    expect(screen.getByRole("button", { name: /Open Calendar · Confirmed Delivery Confirmed · Tue, 22 Sep/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open Calendar · Scheduled delivery Scheduled · Tue, 22 Sep/ })).toBeInTheDocument();
   });
 
   it("the SO number opens the Sales Order; the customer's reference is its own second line", () => {

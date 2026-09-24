@@ -3047,9 +3047,9 @@ describe("Delivery column (T1 booking truth)", () => {
     // loose regex would match the very line this card is protecting.
     expect(screen.queryByText("NETS — confirm delivery date")).toBeNull();
     // ...and that protected line is still there, as the two structured lines
-    // of the 2026-09-13 ruling (`Call NETS` over `Confirm the delivery date`).
+    // of the 2026-09-13 ruling (`Call NETS` over the 2026-09-24 result words).
     expect(screen.getAllByText(/^Call NETS$/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Confirm the delivery date").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Get the scheduled delivery date").length).toBeGreaterThan(0);
   });
 
   it("C14 · the toolbar's PIC chip row is gone — the rail's TEAM group is its one home", () => {

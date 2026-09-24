@@ -764,7 +764,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     expect(screen.getByTestId("location-probe").textContent).toContain("view=all");
   });
 
-  it("⭐ a day with NO AGREED TIME is visibly incomplete in the row", () => {
+  it("⭐ a day with no time is SCHEDULED — the time is optional (owner ruling 2026-09-24)", () => {
     /* The defect the 2026-09-11 render walk found: the cell printed the day
        twice — `Mon, 14 Sep / Mon, 14 Sep` — so a half-answered booking was
        distinguishable from a finished one only by a missing fragment an
@@ -783,18 +783,15 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
       handoverEvents: [],
     };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
-    /* `Confirmed Delivery` states the half booking on its second line (§8.3):
-       `Fri, 4 Sep · No time agreed` under `Not confirmed`. */
+    /* `Scheduled delivery` prints the day alone — no `No time agreed` line,
+       because an optional field that is empty is not an exception. */
     const list = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(list).getByText("Fri, 4 Sep · No time agreed")).toBeTruthy();
-    expect(within(list).getAllByText("Not confirmed").length).toBeGreaterThan(0);
-    /* And the row KEEPS ITS WORK: the conversation is not finished, so the
-       document still sits in the queue that finishes it. */
-    fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
-    expect(screen.getByText("SO-1322")).toBeTruthy();
+    expect(within(list).getAllByText("Fri, 4 Sep").length).toBeGreaterThan(0);
+    expect(within(list).queryByText(/No time agreed/)).toBeNull();
+    expect(within(list).getAllByText("Scheduled").length).toBeGreaterThan(0);
   });
 
-  it("⭐ the calendar card keeps the DAY, names the missing time, and claims no confirmation", () => {
+  it("⭐ the calendar card keeps the DAY and prints no missing-time line", () => {
     /* Owner ruling 2026-09-12. The day is a recorded fact: losing it to say
        the time is missing trades one error for another, and a `Delivery
        confirmed` pill on a half-answered booking is the error being fixed. */
@@ -815,7 +812,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=week");
     const card = screen.getByTestId("delivery-monitor-card-a");
     expect(screen.getAllByText("Fri, 4 Sep").length).toBeGreaterThan(0);
-    expect(within(card).getByText("No time agreed")).toBeTruthy();
+    expect(within(card).queryByText("No time agreed")).toBeNull();
     expect(within(card).queryByText("Delivery confirmed")).toBeNull();
     expect(within(card).getByRole("link").getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
@@ -855,7 +852,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
       "Customer",
       "Delivery Location",
       "Requested Delivery Date",
-      "Confirmed Delivery",
+      "Scheduled delivery",
       "Logistics",
       "Items & Stock",
       "Payment",
@@ -1404,10 +1401,10 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
        for, and has anybody agreed a day?* is still one glance. The sortable
        columns stay in the chooser for the sheet's own filtering and export. */
     const grid = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(grid).getAllByText("Not confirmed").length).toBeGreaterThan(0);
+    expect(within(grid).getAllByText("Not scheduled").length).toBeGreaterThan(0);
     const found = headers();
     expect(found.some((h) => h.includes("Requested Delivery Date"))).toBe(true);
-    expect(found.some((h) => h.includes("Confirmed Delivery"))).toBe(true);
+    expect(found.some((h) => h.includes("Scheduled delivery"))).toBe(true);
     for (const retired of ["Customer Delivery", "Promised Delivery", "Deliver By"]) {
       expect(found.some((h) => h.includes(retired))).toBe(false);
     }
@@ -1422,7 +1419,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
       "Customer",
       "Delivery Location",
       "Requested Delivery Date",
-      "Confirmed Delivery",
+      "Scheduled delivery",
       "Logistics",
       "Items & Stock",
       "Payment",
@@ -1434,7 +1431,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
     /* The six chooser columns are OFF by default, not deleted — the sheet can
        still sort, filter and export by them. */
-    for (const chooserOnly of ["State", "Expected arrival", "Accessories & services", "Confirmed Time", "Building", "Phone"]) {
+    for (const chooserOnly of ["State", "Expected arrival", "Accessories & services", "Scheduled time", "Building", "Phone"]) {
       expect(found.some((h) => h === chooserOnly)).toBe(false);
     }
   });
@@ -1461,7 +1458,9 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(screen.queryByTestId("assign-logistics-dialog")).toBeNull();
     const edit = screen.getByTestId("delivery-brief-logistics-edit");
     expect(within(edit).getByTestId("delivery-brief-save-logistics").textContent).toBe("Assign logistics");
-    expect(within(edit).getByTestId("delivery-brief-chase-message").textContent).toContain("SO-1502");
+    /* An outside party never sees the SO number: the message leads with the
+       customer's own reference (Orders MASTER, messages rule). */
+    expect(within(edit).getByTestId("delivery-brief-chase-message").textContent).not.toContain("SO-1502");
     fireEvent.click(within(edit).getByTestId("delivery-brief-cancel-logistics"));
     expect(screen.queryByTestId("delivery-brief-logistics-edit")).toBeNull();
   });
@@ -1500,7 +1499,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
     const save = screen.getByTestId("delivery-brief-save-dates");
     /* The button names its gap while disabled — the governed sentence. */
-    expect(save.textContent).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(save.textContent).toBe("Save scheduled delivery — upload the WhatsApp reply");
     expect(save).toBeDisabled();
     /* `Information received from` offers the partner, the customer, and
        Operation on behalf of the partner — nothing else. */
@@ -1534,7 +1533,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     for (const label of ["Confirmed date", "Confirmed time", "Information received from", "WhatsApp proof"]) {
       expect(within(edit).getByText(label)).toBeTruthy();
     }
-    expect(within(edit).getByTestId("delivery-brief-save-dates").textContent).toBe("Save confirmed delivery");
+    expect(within(edit).getByTestId("delivery-brief-save-dates").textContent).toBe("Save scheduled delivery");
     /* The workspace never left: same queue, same narrowing. */
     const url = screen.getByTestId("location-probe").textContent ?? "";
     expect(url).toContain("view=no_confirmed_date");
@@ -1631,7 +1630,7 @@ describe("the phone's chase list", () => {
     expect(within(card).getByText("Logistics")).toBeTruthy();
     expect(within(card).getByText("NETS")).toBeTruthy();
     expect(within(card).getByText("Call NETS")).toBeTruthy();
-    expect(within(card).getByText("Confirm the delivery date")).toBeTruthy();
+    expect(within(card).getByText("Get the scheduled delivery date")).toBeTruthy();
     /* The card unfolds the same brief the sheet's ▸ opens — no editor page. */
     expect(within(card).getByText("Show delivery brief")).toBeTruthy();
     expect(within(card).queryByText("Edit Delivery")).toBeNull();
@@ -1796,7 +1795,7 @@ describe("Call customer — the contact week", () => {
     expect(list.textContent).not.toContain("Call by");
   });
 
-  it("⭐ the day is agreed and the window is not: the row asks for the TIME", () => {
+  it("⭐ the day is scheduled and the time is not: nothing is left to ask (owner ruling 2026-09-24)", () => {
     /* Owner ruling 2026-09-14. `Call customer` here would send the operator
        to re-open a day the customer has already answered. */
     ordersState.data = { orders: [order({ id: "a", so: 1217 })] };
@@ -1813,10 +1812,10 @@ describe("Call customer — the contact week", () => {
     };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const list = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(list).getByText("Confirm delivery time")).toBeTruthy();
+    expect(within(list).queryByText("Confirm delivery time")).toBeNull();
     expect(within(list).queryByText("Call customer")).toBeNull();
-    /* Still one line of act and one of deadline — the glyph and the day. */
-    expect(within(list).getAllByTestId("delivery-monitor-contact-due").length).toBe(1);
+    /* A scheduled row owes no contact deadline. */
+    expect(within(list).queryAllByTestId("delivery-monitor-contact-due").length).toBe(0);
   });
 
   it("an order with NO confirmed delivery date stays in the queue", () => {

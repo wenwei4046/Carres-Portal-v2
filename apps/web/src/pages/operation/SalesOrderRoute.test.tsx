@@ -266,7 +266,7 @@ describe("Order Route — the gate", () => {
     expect(gate).toHaveTextContent("1 of 5 requirements met");
     expect(gate).toHaveTextContent("Goods not ready (0 of 3)");
     expect(gate).toHaveTextContent("Logistics not assigned");
-    expect(gate).toHaveTextContent("Date + slot not confirmed");
+    expect(gate).toHaveTextContent("Scheduled delivery not recorded");
     expect(gate).toHaveTextContent(
       "RM 1,249.00 still outstanding — collect, or request a payment approval",
     );

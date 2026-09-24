@@ -50,7 +50,7 @@ function PartyShell({ title, summary, children, testId }: { title: string; summa
         aria-controls={bodyId}
         aria-label={open ? PARTY_COPY.collapse(title) : PARTY_COPY.expand(title)}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-3 rounded-work px-4 py-3 text-left hover:bg-kit-slate-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-8"
+        className="flex w-full items-start gap-3 rounded-work px-4 py-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9"
       >
         <div className="min-w-0 flex-1">{summary}</div>
         <span className="mt-0.5 text-kit-slate-11"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
