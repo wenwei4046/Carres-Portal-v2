@@ -41,7 +41,10 @@ export type WorkDateStatus = "missed" | "today" | "upcoming" | "no_date";
 const STATUS_WORD: Record<WorkDateStatus, string> = {
   missed: "Missed",
   today: "Today",
-  upcoming: "Upcoming",
+  /* COPY-STANDARD Work timing bans `Upcoming`: a future day is its own
+     weekday + date, and needs no word beside it. The badge keeps its height
+     (an empty slot) so the approved card geometry does not move. */
+  upcoming: "",
   no_date: "No date",
 };
 
@@ -115,7 +118,7 @@ export default function WorkCard({
       role="button"
       tabIndex={0}
       aria-pressed={selected}
-      aria-label={`${item.soRef}. ${item.problem}. ${action}. ${parts ? parts.spoken : "No working date"} · ${STATUS_WORD[status]}`}
+      aria-label={`${item.soRef}. ${item.problem}. ${action}. ${parts ? parts.spoken : "No working date"}${STATUS_WORD[status] ? ` · ${STATUS_WORD[status]}` : ""}`}
       data-testid={`work-row-${item.soRef}-${item.ruleKey}`}
       data-work-card
       onClick={onSelect}
@@ -125,29 +128,33 @@ export default function WorkCard({
       <span className="flex flex-col items-center justify-center gap-[7px] border-r border-work-line px-2 py-[9px]">
         {parts ? (
           <span aria-hidden className="grid h-[52px] w-12 grid-rows-[20px_32px] text-center">
-            <span className={`grid place-items-center text-[14px] font-bold uppercase tracking-[0.06em] ${status === "today" ? "text-kit-blue-11" : "text-work-muted"}`}>
+            <span className={`grid place-items-center text-[14px] font-semibold uppercase tracking-[0.06em] ${status === "today" ? "text-kit-blue-11" : "text-work-muted"}`}>
               {parts.weekday}
             </span>
-            <span className="grid place-items-center text-[28px] font-bold leading-none text-work-ink">{parts.day}</span>
+            <span className="grid place-items-center text-[28px] font-semibold leading-none text-work-ink">{parts.day}</span>
           </span>
         ) : (
           <span aria-hidden className="grid h-[52px] w-12 place-items-center text-work-muted">
             <Icon name="noDate" />
           </span>
         )}
-        <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-extrabold uppercase leading-[11px] tracking-[0.06em] ${STATUS_CLASS[status]}`}>
-          {STATUS_WORD[status]}
-        </span>
+        {STATUS_WORD[status] ? (
+          <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-[11px] tracking-[0.06em] ${STATUS_CLASS[status]}`}>
+            {STATUS_WORD[status]}
+          </span>
+        ) : (
+          <span aria-hidden className="h-[17px]" />
+        )}
       </span>
       <span className="flex min-w-0 flex-col px-4 pt-2.5">
-        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-bold uppercase leading-4 tracking-[0.07em] text-work-slate">
+        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold uppercase leading-4 tracking-[0.07em] text-work-slate">
           <ModuleIcon aria-hidden size={16} strokeWidth={1.8} className="shrink-0 text-kit-blue-9" />
           <span className="shrink-0">{moduleLabel}</span>
           {item.recipient ? (
             <span className="min-w-0 truncate text-[12px] font-semibold normal-case tracking-normal text-work-muted">· {item.recipient}</span>
           ) : null}
         </span>
-        <span title={item.problem} className="mt-[5px] truncate text-[18px] font-bold leading-[22.5px] text-work-ink">
+        <span title={item.problem} className="mt-[5px] truncate text-[18px] font-semibold leading-[22.5px] text-work-ink">
           {item.problem}
         </span>
         <span title={action} className="truncate text-[14px] font-semibold leading-[18px] text-work-slate">

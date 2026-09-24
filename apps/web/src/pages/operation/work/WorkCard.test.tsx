@@ -20,6 +20,12 @@ describe("workDateStatus — exactly one date-status badge", () => {
 });
 
 describe("WorkCard", () => {
+  it("a future day prints no status word — `Upcoming` is banned (COPY Work timing)", () => {
+    render(<WorkCard item={row({ dueIso: "2026-09-18", timingBucket: "later" } as never)} moduleLabel="Delivery" action="Arrange a new delivery date" today="2026-09-17" selected={false} onSelect={vi.fn()} onOpenRecord={vi.fn()} />);
+    expect(document.body.textContent).not.toMatch(/upcoming/i);
+  });
+
+
   it("is a fixed 124px card: date rail, module · party, fact, action, document and one door", () => {
     const select = vi.fn();
     const open = vi.fn();
