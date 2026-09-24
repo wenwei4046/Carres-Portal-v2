@@ -48,6 +48,7 @@ import {
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
+import WorkParties from "./work/WorkParties";
 import WorkRail, { WorkDateSection, WorkModuleSection } from "./work/WorkDayNav";
 import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
 
@@ -676,6 +677,7 @@ export default function OperationWork() {
                 </button>
               ) : null}
               <WorkActionPanel item={selected.source} onOpen={() => navigate(selected.destination)} />
+              <WorkParties item={selected.source} />
             </>
           ) : (
             <WorkSection className="shrink-0 p-6 text-body text-kit-slate-11">Select work to see what to do.</WorkSection>

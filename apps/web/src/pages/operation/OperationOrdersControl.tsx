@@ -2019,13 +2019,13 @@ const ORDER_COL_DEFS: OrderColDef[] = [
  *
  * 1.75 / 3.5 — `delivery` pays TWICE what `customer` pays   ← SHIPPED
  *     customer 123 → 105px · delivery 150 → 114px
- *     every human customer name fits; `No logistics picked` ellipsises.
+ *     every human customer name fits; `Logistics not assigned` ellipsises.
  *     Actions, Deadline, Status, Order, Stock and PIC keep C14's width
  *     to the digit.
  * ```
  *
  * **`delivery` pays the larger share because it carries the least, and this
- * module already ruled why.** Its longest string is `No logistics picked`, and
+ * module already ruled why.** Its longest string is `Logistics not assigned`, and
  * §3's frozen rule is that *"the `Delivery` cell never repeats the sentence
  * `Actions` already carries"* — the row states what to DO about missing
  * logistics one column to the right, in the Actions pill, every time. C14's
@@ -3319,7 +3319,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Multi-select facets: one chip per picked value (✕ removes just that one).
   for (const c of logisticFilter)
     activeChips.push({
-      label: c === NO_CARRIER ? "No logistics picked" : `Logistics: ${c}`,
+      label: c === NO_CARRIER ? "Logistics not assigned" : `Logistics: ${c}`,
       onClear: () => setLogisticFilter((p) => toggleInSet(p, c)),
     });
   for (const rg of regionFilter)
@@ -4034,7 +4034,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       and "Unassigned" is not one of the allowed ones. */}
                   {unassignedCount > 0 && (
                     <KanbanRow
-                      label="No logistics picked"
+                      label="Logistics not assigned"
                       count={unassignedCount}
                       active={logisticFilter.has(NO_CARRIER)}
                       chip={picQueueChip}
@@ -5554,8 +5554,8 @@ function DeliveryCell({ logi }: { logi: LogisticState }) {
          rule is that the Actions cell one column right already says what to DO
          about it. An ellipsis here costs a reader nothing they cannot read on
          the same row. */
-      <span className="t4-caption truncate block" title="No logistics picked">
-        No logistics picked
+      <span className="t4-caption truncate block" title="Logistics not assigned">
+        Logistics not assigned
       </span>
     );
   return (

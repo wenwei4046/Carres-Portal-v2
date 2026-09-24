@@ -168,7 +168,7 @@ export function deliveryWorkStatusLabelOf(
     case "waiting_customer_reply":
       return "Waiting for customer reply";
     case "confirmed":
-      return confirmedDay ? `Confirmed for ${confirmedDay}` : "Confirmed";
+      return confirmedDay ? `Scheduled for ${confirmedDay}` : "Scheduled";
     case "waiting_pickup":
       return `Waiting for ${partner} pickup`;
     case "collected":
@@ -357,10 +357,11 @@ export function deliveryWorkStatusOf(
     );
   }
 
-  /* A booking is a DAY and a WINDOW (owner ruling 2026-09-11). A day alone
-     leaves the conversation open, and the row stays contact work below. */
-  if (input.confirmedDate && input.confirmedTime) {
-    return say("confirmed", time(input.confirmedTime), { day: spell.date(input.confirmedDate) });
+  /* A SCHEDULED DATE COMPLETES THE ARRANGEMENT (owner ruling 2026-09-24,
+     overwriting 2026-09-11's day-AND-window rule). The time is optional: it
+     prints when recorded, and its absence is never contact work. */
+  if (input.confirmedDate) {
+    return say("confirmed", input.confirmedTime ? time(input.confirmedTime) : null, { day: spell.date(input.confirmedDate) });
   }
 
   if (!partner) return say("assign_logistics");
@@ -376,8 +377,6 @@ export function deliveryWorkStatusOf(
      whole sentence lives in the tooltip and the accessible name. The status
      therefore returns NO second line here: `contactDueIso` on the row is the
      one place the deadline is read from, and it is read ONCE. */
-  /* The day is agreed and the window is not — a different question. */
-  if (input.confirmedDate) return say("confirm_time");
   if (input.contactBy === "operation") return say("operation_must_call");
   return say("partner_must_contact");
 }

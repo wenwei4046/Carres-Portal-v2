@@ -13,6 +13,9 @@ let workState: {
 let authState = { role: "operation", email: "shasha@carres.test" };
 const refetch = vi.fn();
 
+/* The party cards read Delivery through their own queries; their behaviour is
+   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+vi.mock("./work/WorkParties", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {

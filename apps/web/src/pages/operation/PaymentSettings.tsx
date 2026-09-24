@@ -200,7 +200,7 @@ export default function PaymentSettings() {
 
 /**
  * Collection timing (0486) — `Start asking the customer to pay {n} working
- * days before Confirmed Delivery` · `Payment must be complete {m} working
+ * days before Scheduled delivery` · `Payment must be complete {m} working
  * days before`. Asking must start earlier than the deadline. A new rule
  * applies to new clocks from its effective date; running clocks keep theirs.
  */
@@ -231,9 +231,9 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
   return <Section title="Collection timing" testId="payment-settings-collection-timing">
     <div className="mt-2 text-body space-y-1">
       <p><span className="font-semibold">Start asking the customer to pay</span><br />
-        {current ? `${current.ask_days_before} working days before Confirmed Delivery` : "3 working days before Confirmed Delivery (the ruled default)"}</p>
+        {current ? `${current.ask_days_before} working days before Scheduled delivery` : "3 working days before Scheduled delivery (the ruled default)"}</p>
       <p><span className="font-semibold">Payment must be complete</span><br />
-        {current ? `${current.deadline_days_before} working days before Confirmed Delivery` : "2 working days before Confirmed Delivery (the ruled default)"}</p>
+        {current ? `${current.deadline_days_before} working days before Scheduled delivery` : "2 working days before Scheduled delivery (the ruled default)"}</p>
       {current && <p className="text-label font-normal text-kit-slate-11">
         In effect from {fmtDate(current.effective_from)}{current.reason ? ` · ${current.reason}` : ""}. An action that lands on a Saturday, Sunday or public holiday moves to the previous working day — Operation does not work on Saturday.
       </p>}
@@ -246,9 +246,9 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       }}>Edit</Button>}
     </div>
     {step !== "view" && <div className="mt-3 grid grid-cols-2 gap-3 rounded-card border border-kit-slate-5 p-4" data-testid="collection-timing-form">
-      <Input id="timing-ask" label="Start asking (working days before Confirmed Delivery)" type="number" min={0} max={60}
+      <Input id="timing-ask" label="Start asking (working days before Scheduled delivery)" type="number" min={0} max={60}
         value={ask} onChange={(e) => setAsk(e.target.value)} disabled={step === "review"} />
-      <Input id="timing-deadline" label="Payment must be complete (working days before Confirmed Delivery)" type="number" min={0} max={60}
+      <Input id="timing-deadline" label="Payment must be complete (working days before Scheduled delivery)" type="number" min={0} max={60}
         value={deadline} onChange={(e) => setDeadline(e.target.value)} disabled={step === "review"} />
       <DatePicker id="timing-effective" label="Effective from" value={effectiveFrom} minDate={appTodayIso()}
         onChange={(iso) => setEffectiveFrom(iso ?? "")} disabled={step === "review"} />

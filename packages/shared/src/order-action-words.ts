@@ -240,14 +240,14 @@ const WORDS: readonly OrderActionWord[] = [
     done: null,
   },
   {
-    // ⭐ WHICH HALF IS MISSING DECIDES LINE TWO (owner ruling 2026-09-12): a
-    // row with a DAY and no window is missing a time, and sending the
-    // operator to confirm the date re-opens a question the customer answered.
+    // ⭐ THE SCHEDULED DATE IS THE RESULT (owner ruling 2026-09-24, overwriting
+    // the 2026-09-12 day-then-window split): the time is optional, so a row
+    // never asks for a time on its own.
     key: "confirm_delivery_date",
     queue: "Confirm delivery date",
     line: (p) => `Call ${party(p.logistics, "logistics")}`,
-    result: (p) => (p.dayAgreed ? "Confirm the delivery time" : "Confirm the delivery date"),
-    button: "Save confirmed delivery",
+    result: () => "Get the scheduled delivery date",
+    button: "Save scheduled delivery",
     done: null,
   },
   {

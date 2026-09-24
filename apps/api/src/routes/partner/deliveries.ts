@@ -280,10 +280,26 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
       logistics_note: parsed.data.note ?? null,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id ?? null,
+      updated_via: "partner_portal",
     },
     { onConflict: "order_id,leg" },
   );
   if (error) return fail(c, error);
+
+  /* 0581 — the partner's own save is a dated fact with its door named, so a
+     scheduled date supersedes an older partner answer on every reader. */
+  if (parsed.data.confirmedDate) {
+    const { error: evErr } = await sb.from("ops_delivery_arrangement_events").insert({
+      order_id: orderId,
+      leg,
+      event: "arrangement_saved",
+      source: "partner_portal",
+      from_partner_id: me.partnerId,
+      note: [parsed.data.confirmedDate, parsed.data.confirmedTime].filter(Boolean).join(" · "),
+      recorded_by: c.var.auth.id ?? null,
+    });
+    if (evErr) return fail(c, evErr);
+  }
 
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,
@@ -335,6 +351,7 @@ partnerDeliveriesRouter.post("/:orderId/cannot-deliver", async (c) => {
     reason_key: parsed.data.reason,
     note: parsed.data.note ?? null,
     recorded_by: c.var.auth.id ?? null,
+    source: "partner_portal",
   });
   if (error) return fail(c, error);
 

@@ -74,9 +74,11 @@ export const DOR_COPY = {
   openVideos: "Open delivery videos",
   openSignedDo: "Open the signed Delivery Order",
   /** Governed absences — muted, never a dash (COPY-STANDARD 2026-08-15). */
-  noConfirmedDate: "No confirmed date",
-  noTime: "No time agreed",
-  noLogistics: "No logistics picked",
+  noConfirmedDate: "Not scheduled",
+  /* Time is optional (owner ruling 2026-09-24): its absence is the plain
+     register absence, never a warning. */
+  noTime: "Not recorded",
+  noLogistics: "Logistics not assigned",
   notDelivered: "Not delivered yet",
   noPhoto: "No delivery photo yet",
   /** A video is never automatically required (owner ruling 2026-09-11), so
@@ -266,7 +268,7 @@ export interface DoRegisterRow {
   /** The SO's promise to the customer — `Requested Delivery Date`. */
   requestedDelivery: string | null;
   requestedTbd: boolean;
-  /** This trip's confirmed operational date — `Confirmed Delivery`. */
+  /** This trip's scheduled operational date — `Scheduled delivery`. */
   confirmedDelivery: string | null;
   confirmedTime: string | null;
   location: string;

@@ -413,7 +413,7 @@ export default function DeliveryOrderPage() {
               </Fact>
               <Fact label="Logistics partner">
                 {arrangementPartner?.name || d.logistics_partner || (
-                  <Absence>No logistics chosen when this document was issued</Absence>
+                  <Absence>Logistics not assigned when this document was issued</Absence>
                 )}
               </Fact>
               <Fact label="Delivery appointment">

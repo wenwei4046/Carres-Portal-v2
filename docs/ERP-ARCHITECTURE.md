@@ -1034,7 +1034,13 @@ Customer (later)   →  Delivery customer contact / Payment promise, per their M
 Work (Workspace) raises the remind/chase and closes it only from that owning record. No module
 keeps a second chase or acknowledgement ledger (Law A, Law C). The WhatsApp group or chat stays
 the channel; an answer given only there still needs the recorded answer plus its uploaded proof.
-Sending the link is not an answer; silence leaves the row unconfirmed and chaseable. Each party's
+Sending the link is not an answer; silence leaves the row unconfirmed and chaseable.
+
+**No-portal logistics companies — owner ruling 2026-09-24, BUILT (0581, Delivery §5.5).** A
+logistics company WITHOUT a portal login (AL, TT, TEOW, EU, SSY, HOUZS …) answers through ONE
+external link per delivery instead: no OTP, no PIN, no name; the actor is the COMPANY (`{company}
+via external link`); one active link at a time, revoked and re-created explicitly; a save through a
+valid link is that company's own record and needs no screenshot. NETS keeps its individual login. Each party's
 rollout — issuing production logins and telling that party to use them — is an external cutover
 needing its own owner authorisation. **NETS is first**; suppliers follow on the same rule.
 
