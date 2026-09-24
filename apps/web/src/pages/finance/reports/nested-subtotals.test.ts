@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseProfitAndLoss } from "./report-queries";
 import { statementRows } from "./StatementTable";
+import { profitAndLossSheet } from "../month-end-pack";
 
 // Rows as 0579 serves them: 6000 > 6T10 > 6T11, each heading with its own
 // subtotal after everything under it, in the chart's order.
@@ -45,6 +46,23 @@ describe("a heading under a heading under a heading", () => {
     ]);
     const lines = statementRows(pl.sections).filter((r) => r.kind === "line");
     expect(lines.reduce((t, r) => t + r.amount, 0)).toBe(pl.sections[0]!.total);
+  });
+
+  it("the month-end pack indents each heading and account one step per level", () => {
+    const pl = parseProfitAndLoss({ rows }, "2026-09-01", "2026-09-30");
+    if (pl.status !== "ok") throw new Error("expected ok");
+    const body = profitAndLossSheet(pl).rows.slice(3, -1);
+    expect(body).toEqual([
+      ["Account", "Amount"],
+      ["Expense", 150],
+      ["H 6000", 150],
+      ["  6200 A 6200", 3],
+      ["  H 6T10", 147],
+      ["    6T14 A 6T14", 7],
+      ["    H 6T11", 140],
+      ["      6T13 A 6T13", 40],
+      ["      6T12 A 6T12", 100],
+    ]);
   });
 
   it("still reads rows served before 0579 (no depth, no parent)", () => {

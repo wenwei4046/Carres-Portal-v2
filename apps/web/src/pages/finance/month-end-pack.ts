@@ -125,9 +125,10 @@ function statementBody(
       out.push([ledgerKindWord(r.section), bySection.get(r.section)?.total ?? ""]);
     }
     switch (r.kind) {
-      case "group": out.push([r.name, r.amount]); break;
+      // Two spaces per level under the top, so a heading inside a heading reads as nested (0579).
+      case "group": out.push(["  ".repeat(r.depth - 1) + r.name, r.amount]); break;
       case "line": {
-        out.push([`${r.code} ${r.name ?? "Account name not available"}`, r.amount]);
+        out.push(["  ".repeat(r.depth - 1) + `${r.code} ${r.name ?? "Account name not available"}`, r.amount]);
         // The note the page shows in the tooltip next to the account, as a row of its own under it.
         const note = lineNote(r);
         if (note) out.push([note]);
