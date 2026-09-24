@@ -2099,8 +2099,12 @@ planned `proceed_date`.
     invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent. Saved `orders.approval_code` is the at-sale reference;
     `orders.payment_slip_url` is the at-sale slip in `orders-attachments`. They appear with the
     saved method/months under `Payment details recorded at sale`, separate from transactions.
-    These saved details use a three-column `Method · Reference · Slip` table with the same
-    table styling as the transaction ledger, for every saved payment method. Existing wording,
+    These saved details use three labelled read-only fields (`Method · Reference · Slip`),
+    with the same FieldFrame, resting border, body text and insets as Delivery; narrow views
+    stack the fields. Actual transactions retain the shared Items/Payment table. The totals
+    share the transaction amount column’s 8px right inset. Delivery Services uses the same
+    framed read-only presentation, one active service per line with its saved configuration
+    and quantity, from the Items source; no additional charge or editor is created. Existing wording,
     missing-value labels and evidence notes stay unchanged; no transaction fields are inferred.
     No payment amount, paid date or collector is inferred from the order's cumulative Paid or
     current salesperson. When no transactions exist, a positive Paid keeps the saved capture visible and explains that

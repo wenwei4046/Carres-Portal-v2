@@ -998,7 +998,7 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
     /* ⭐ THE SO PAGE FIELD STANDARD (2026-09-22): a grey box means editable, and
        the three exceptions print as plain text. */
-    expect(workspace).toContain('data-kit={own ? "readonly-field" : "plain-fact"}');
+    expect(workspace).toContain('data-kit={framed ? "readonly-field" : "plain-fact"}');
     expect(workspace).toContain('<Fact own={false} label="SO Doc Date"');
     expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
     /* Announced as what it is drawn as. A box that looks typable and reads to
@@ -1601,7 +1601,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
 
   it("states the order's Services in Delivery from the SAME rows, adding through the ONE act, in approved words only", () => {
     expect(workspace).toContain('data-testid="delivery-services"');
-    expect(workspace).toContain('<Fact label="Services" value={servicesWords(draft.addons, nameOfAddon)} own={false} />');
+    expect(workspace).toContain('<Fact label="Services" own={false} framed value={');
     /* Both `Add service` doors call the one act. */
     expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(2);
     /* The Delivery door offers the disposal family, known by its catalogue code. */

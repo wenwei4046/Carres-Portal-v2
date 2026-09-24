@@ -1052,7 +1052,7 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
  * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
  * as changeable as the phone number beside it (reviewer finding 16).
  */
-function Fact({ label, value, own = true }: { label: string; value: React.ReactNode; own?: boolean }) {
+function Fact({ label, value, own = true, framed = own }: { label: string; value: React.ReactNode; own?: boolean; framed?: boolean }) {
   const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
     <FieldFrame id={id} label={label}>
@@ -1061,11 +1061,11 @@ function Fact({ label, value, own = true }: { label: string; value: React.ReactN
         role="textbox"
         aria-readonly
         aria-label={label}
-        data-kit={own ? "readonly-field" : "plain-fact"}
+        data-kit={framed ? "readonly-field" : "plain-fact"}
         data-editable={own ? "yes" : "no"}
         data-testid={id}
         className={
-          own
+          framed
             ? `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
             : "flex min-h-8 min-w-0 items-center break-words px-0 py-1 text-body text-base-900"
         }
@@ -3687,8 +3687,17 @@ function SalesOrderWorkspaceBody() {
               ruling 2026-09-21) — a labelled field. */}
           {(draft.addons.some((a) => !a.removed) || editing) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="delivery-services">
-              <div className="sm:col-span-2">
-                <Fact label="Services" value={servicesWords(draft.addons, nameOfAddon)} own={false} />
+              <div className={editing ? "sm:col-span-2" : "sm:col-span-3"}>
+                <Fact label="Services" own={false} framed value={
+                  <div className="flex flex-col gap-1">
+                    {draft.addons.filter((a) => !a.removed).map((a) => (
+                      <div key={a.key}>
+                        {nameOfAddon(a.addon_key)}{configWords(a.attrs) ? ` · ${configWords(a.attrs)}` : ""} ×{a.qty}
+                      </div>
+                    ))}
+                    {!draft.addons.some((a) => !a.removed) && "None"}
+                  </div>
+                } />
               </div>
               {editing && disposalOptions.length > 0 && (
                 <Select id="so-add-delivery-service" label="Add service" value=""
@@ -3889,7 +3898,7 @@ function SalesOrderWorkspaceBody() {
             rule. No KPI treatment: nothing here is larger than a table cell.
             No rule above the block — the ledger's last row already draws one,
             and the section body's 12px gap spaces it. */}
-        <div className="flex justify-end">
+        <div className="flex justify-end px-2">
           <div className="grid w-full grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]"
             data-testid="payment-totals">
             <span className="pr-6 text-base-500">Goods</span>
