@@ -763,8 +763,8 @@ remains legacy debt and may not be presented as this contract.
 
 ## 8 · Global Dashboard Blueprint — composition and intervention contract APPROVED / LOCKED, 2026-09-24
 
-Jess approved the composition and Needs intervention contract; detailed refinements in §8.1.2
-remain PROPOSAL / NOT LAW. This is the one Dashboard authority. Approval is product truth,
+Jess approved the composition and the complete Needs intervention contract and refinement in
+§8.1.1–§8.1.2. This is the one Dashboard authority. Approval is product truth,
 not proof of implementation or production readiness. No production code, Cards or deployment is
 authorised by this PLAN closure.
 
@@ -854,10 +854,11 @@ failed refresh or lost permission. An unresolved occurrence can change its fact 
 its identity. Do not use standalone Urgent, High priority, Needs attention, Problem or Exception.
 A specific statement such as Payment exception blocks delivery is allowed: it says what happened.
 
-### 8.1.2 · Needs intervention refinement — PROPOSAL / NOT LAW
+### 8.1.2 · Needs intervention refinement — APPROVED / LOCKED, 2026-09-24
 
-The approved contract above is persisted immediately. The following detailed presentation and
-admission recommendations await owner review; they must not silently become business policy.
+The owner approved these admission, presentation, deduplication and recovery rules. Each live
+occurrence still requires all seven fields in §8.1.1 and qualified owning-source evidence; this
+approval does not invent missing thresholds, clocks, capacity rules or module capabilities.
 
 - Header count counts distinct authorised intervention rows, not affected actions, orders, RM or
   the sum of heterogeneous populations. One grouped owner gap affecting three actions counts as
@@ -893,7 +894,7 @@ admission recommendations await owner review; they must not silently become busi
 - Overpayment requiring an existing Payment Approver decision reads canonical unallocated/excess
   money; resolution is source-recorded allocation/classification/authorised decision. An approved
   refund path is distinct; ordinary refunds are not introduced by this candidate.
-- `Delivery is blocked by payment review` is the proposed consequence instead of `Delivery cannot
+- `Delivery is blocked by payment review` is the approved consequence instead of `Delivery cannot
   be released`: the latter suggests a manual Release door that existing Delivery law retires.
   Clearing the payment-review incident does not claim all remaining Delivery gates have passed.
 - Row click/Enter follow the same link with one focus target; right icon is not a second action.
@@ -911,6 +912,39 @@ admission recommendations await owner review; they must not silently become busi
   calendar failure; absent unauthorised vs unexpectedly failed permission; no peer weights invented;
   disabled staff excluded from current grouping; source failure cannot recover; source-confirmed
   recovery deduplicates transition; 1440/1024/390 keyboard/touch and row/count/target reconciliation.
+
+#### Approved admission and recovery by fact
+
+The following conditions supplement, never replace, the seven-field contract. A candidate without
+its concrete business consequence stays outside this Panel. A source-owned formal resolution must
+address the actual obligation; dismissal, rebooking alone or simply opening a page is not recovery.
+
+| Management fact | Required admission evidence | Authoritative recovery |
+|---|---|---|
+| Customer delivery promise missed | Confirmed customer commitment has passed and Delivery proves it was not fulfilled; missing result alone is a different fact | Completed delivery or formal source-owned resolution; later rebooking preserves the missed promise history |
+| Customer promised payment not received | Valid promise has passed and canonical customer money remains owing | Posted receipt or source-authorised change resolving the promise/debt obligation |
+| Approved customer recovery has no next step | Effective approved remedy requires a successor that is demonstrably absent | Formal executable next step exists with an eligible owner |
+| Material Service Case exceeded its governed clock | Source-owned materiality plus a valid response or solution clock, calendar and permitted extension | The corresponding response or solution is recorded; a reply alone does not resolve a solution breach |
+| Supplier promised date passed | Current valid supplier promise has passed with goods still owing after checking accepted receipt evidence | Required goods received or formal source-owned handling resolves the obligation |
+| Material purchase cannot proceed | A concrete approval, data or supply blocker prevents a governed material purchase and affects a named business commitment | The qualifying blocker is cleared or formally resolved by its owner |
+| Supplier claim has no governed resolution | A decision or continuation required by the Claim's own rule is absent | Formal resolution and any required continuation are recorded |
+| Critical receipt/stock discrepancy affects customer commitment | Verified discrepancy affects exact goods and a confirmed customer commitment | Owner verifies resolution or an authorised substitution resolves that commitment |
+| Delivery failed without next step | Actual failed result and absent mandatory continuation; treat absence as an integrity failure where Delivery requires it | Required continuation is created; any independent unresolved delivery failure remains |
+| Customer delivery blocked | A live source-owned blocker affects a confirmed customer delivery scope | That specific blocker is cleared; independent blockers remain |
+| Loan item not collected | Governing collection/return event is past and no accepted return exists | Formal collection/return evidence is accepted |
+| Critical goods unavailable for confirmed delivery | Exact Unit/reserved scope fails readiness for confirmed customer delivery | Source-owned readiness or formal commitment adjustment resolves that shortage |
+| Payment exception blocks delivery | A live Finance Exception actually triggers the delivery payment gate | Authorised Payment owner clears the review; this does not certify every other delivery gate |
+| Material customer balance crossed threshold | Canonical balance exceeds the owning module's approved threshold | Balance returns within that threshold or the owner records formal resolution |
+| Overpayment/refund decision awaits authorised approver | Canonical excess/unallocated money requires an existing lawful approval path | Recorded allocation, classification or authorised decision resolves that occurrence; no new routine refund path |
+| Money source cannot reconcile material exposure | Source proves a reconciliation failure against governed material exposure | The owning source reconciles the exposure and supplies complete valid evidence |
+| No owner / no cover on an actionable date | Resolver proves an eligible actor is missing for an admitted action on its governed date | Eligible owner/cover resolves for the same action and date |
+| One owner materially overloaded | Governed comparable effort, peer capacity and materiality threshold establish overload | The same governed comparison no longer breaches its threshold; raw action counts alone cannot establish this fact |
+| Module, money, calendar or permission source failed | Required authorised coverage cannot be assessed and the consequence is explicit; normal permission exclusion is not failure | A complete successful authorised read restores the affected assessment |
+
+Ownership facts open Team Work with exact action/owner/date filters. Business facts open their exact
+object/module view. Source/reconciliation failures open safe owning-source health/error detail.
+Resolved occurrences leave this Panel and may produce one durable Recent material changes event;
+current row removal alone never creates that event.
 
 ### 8.2 · First-release measure register and arithmetic
 
@@ -1081,7 +1115,7 @@ changes. At 1024–1439px and below, stack without sideways KPI strips; 390px pr
 complete fact/evidence/consequence. Unqualified domains state coverage without invented values.
 Source evidence is keyboard/touch accessible. Use existing Carres Panel and kit geometry with the
 scoped typography ruling in 01-design-tokens; do not rebuild Work geometry or force register rows.
-Right Rail retains its independent entry. Exact new detail recommendations remain §8.1.2 proposals.
+Right Rail retains its independent entry. Needs intervention detail follows the approved rules in §8.1.2.
 
 COPY-STANDARD owns exact words (Dashboard dictionary). No At Risk, SLA, unqualified All on track,
 No alerts checkmark, annotation Escalations, bare counts or rounded money. No inline operational act.
@@ -1167,9 +1201,10 @@ These are required acceptance scenarios, not executed-test or deployment claims:
 15. 1440/1024/390px keyboard, screen-reader, focus-return and touch preserve full meanings/dates/money;
     no hover-only evidence, action queue, generic KPI, annotation inbox, fake trend or unadmitted count.
 
-PLAN REVIEW ACTIVE — composition and §8.1.1 are approved and persisted. The new detailed
-Needs intervention recommendation in §8.1.2 awaits owner review; do not describe it as approved. Source qualification, lawful calendars, shared feed
-health/read-only behaviour, exact filters and production reconciliation remain delivery acceptance
+PLAN — composition and the complete Needs intervention contract/refinement in §8.1.1–§8.1.2
+are APPROVED / LOCKED and persisted. This does not close detailed planning for the other expanded
+Dashboard sections. Source qualification, lawful calendars, shared feed health/read-only behaviour,
+exact filters and production reconciliation remain delivery acceptance
 obligations, not permission to substitute defaults. The next lane is BUILD/DELIVERY only after an
 explicit takeover, constrained by those dependencies; this PLAN authors no Cards or implementation.
 

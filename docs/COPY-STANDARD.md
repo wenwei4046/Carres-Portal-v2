@@ -249,9 +249,20 @@ The specific payment-exception sentence is allowed because it names the actual c
 PIC absence actually leaves those action identities ownerless. Ordinary Missed stays in Team Work
 unless a concrete business consequence and the complete intervention contract qualify it.
 
-**PROPOSAL / NOT LAW:** `Delivery is blocked by payment review` replaces illustrative
-`Delivery cannot be released` to avoid implying a manual Release door. Other detailed sentences,
-header-count/partial-count and empty-state recommendations await review in Workspace §8.1.2.
+The complete wording and count rules in Workspace §8.1.2 are **APPROVED / LOCKED**.
+
+| Context | Approved copy / meaning |
+|---|---|
+| Past delivery date, result absent | `Delivery result missing`; never infer actual non-delivery from an absent result |
+| Evidenced missed delivery promise | `Delivery promise missed` |
+| Evidenced incomplete confirmed delivery consequence | `Confirmed delivery has not been completed`; use the precise source-supported consequence instead of generic `Customer commitment at risk` |
+| Payment review blocks delivery | `Delivery is blocked by payment review`; replaces illustrative `Delivery cannot be released`, which implies a retired manual Release door |
+| Complete healthy empty scope | `No intervention needed in this scope.` |
+| Partial coverage | `{n} confirmed · incomplete`; n is confirmed intervention rows, never a complete zero claim |
+| Header count | Distinct authorised intervention rows; accessible meaning is `{n} interventions`, not summed actions, orders or amounts |
+
+A `Nobody owns 3 actions` row counts as one intervention. Every consequence must describe the
+actual affected business outcome; illustrative numbers and sentences do not create source evidence.
 
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
