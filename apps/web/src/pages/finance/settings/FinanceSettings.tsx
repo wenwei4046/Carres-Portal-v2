@@ -17,9 +17,14 @@
  * click opens it; the only new phrases are the page word and the add button.
  *
  * A second tab, `?tab=chart`, holds the chart of accounts (ChartOfAccounts.tsx).
+ *
+ * An opened account's number changes here too (YH, 24 Sep 2026), through the
+ * chart's own door: the same request the Chart of accounts form sends
+ * (useSaveAccount, gl_account_update). There is no second renumber.
  */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { LEDGER_ACCOUNT_CODE_MESSAGE } from "@carres/shared/finance-ledger";
 import {
   CARD_CHANNELS,
   CARD_CHANNEL_WORD,
@@ -28,6 +33,7 @@ import {
   type CardRouteRow,
   type MoneyAccountRow,
 } from "@carres/shared/money-accounts";
+import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import Input from "@/components/kit/Input";
@@ -38,7 +44,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { accountLabel, LoadFailed } from "../other-money-in/parts";
-import { useCardRoutes, useMoneyAccounts, useSaveCardRoute, useSaveMoneyAccount } from "./api";
+import { useCardRoutes, useMoneyAccounts, useSaveAccount, useSaveCardRoute, useSaveMoneyAccount } from "./api";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ChartOfAccounts from "./ChartOfAccounts";
 
@@ -109,27 +115,88 @@ function MoneyAccounts() {
   );
 }
 
+/** The tag a chart refusal carries (0550, forwarded by the API as `code`). */
+const refusalTag = (e: unknown): unknown => {
+  const body = (e as { body?: unknown } | null)?.body;
+  return body && typeof body === "object" ? (body as { code?: unknown }).code : undefined;
+};
+
+/* The chart's refusals that are about the number, shown under the Number
+   field. Every other one (a name, an account gone, a server break) goes to
+   the foot, so the field is never blamed for what it did not cause. */
+const NUMBER_REFUSALS = new Set(["code_shape", "code_exists", "not_finance"]);
+
 function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | null; onClose: () => void }) {
   const save = useSaveMoneyAccount();
+  const renumber = useSaveAccount();
   const [name, setName] = useState(account?.name ?? "");
   const [kind, setKind] = useState<"BANK" | "HOLDING">("BANK");
   const [active, setActive] = useState(account?.is_active ?? true);
-  /* 0577: blank = the next free number under the heading. When every number
-     is used the database asks for one, and this field is where it goes. */
-  const [code, setCode] = useState("");
+  /* Adding (0577): blank = the next free number under the heading. When every
+     number is used the database asks for one, and this field is where it goes.
+     Editing: the account's own number; a different one renumbers it, and a
+     blank one keeps it. */
+  const [code, setCode] = useState(account?.code ?? "");
   const [refusal, setRefusal] = useState<string | null>(null);
+  /* A refusal about the number, shown under the Number field. */
+  const [numberRefusal, setNumberRefusal] = useState<string | null>(null);
   const trimmed = name.trim();
 
   /* A blank name cannot be sent (Save stays disabled) and the input stops at
      60 characters, so the only refusals left are the database's own. */
   const submit = () => {
     setRefusal(null);
-    save.mutate(
-      account
-        ? { code: account.code, input: { name: trimmed, is_active: active } }
-        : { code: null, input: code.trim() ? { name: trimmed, kind, code: code.trim().toUpperCase() } : { name: trimmed, kind } },
-      { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
-    );
+    setNumberRefusal(null);
+    if (!account) {
+      save.mutate(
+        { code: null, input: code.trim() ? { name: trimmed, kind, code: code.trim().toUpperCase() } : { name: trimmed, kind } },
+        { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
+      );
+      return;
+    }
+    // A blank number keeps the account's own. Otherwise the chart form's
+    // shape check and sentence, so a wrong number is refused under the field
+    // before anything is sent. 310-a000 goes up as 310-A000.
+    const shaped = code.trim() ? ledgerAccountCodeInput.safeParse(code) : { success: true as const, data: account.code };
+    if (!shaped.success) {
+      setNumberRefusal(LEDGER_ACCOUNT_CODE_MESSAGE);
+      return;
+    }
+    const input = { name: trimmed, is_active: active };
+    if (shaped.data === account.code) {
+      save.mutate({ code: account.code, input }, { onSuccess: onClose, onError: (e) => setRefusal(e.message) });
+      return;
+    }
+    void renumberAccount(account, input, shaped.data);
+  };
+
+  /* A new number. The name and the number go through the chart's door in one
+     request: gl_account_update (0570) saves both in one transaction, checks the
+     name against the whole chart (the money account's door checks it only
+     against other money accounts), and every record follows the number
+     (ON UPDATE CASCADE). A name or number it refuses is never saved.
+     Only when Active changed too is the money account's door asked first, with
+     the OLD name, so that a refusal there (money still in the account) comes
+     before the number is touched. If the chart's door then refuses, Active
+     stays saved and the sentence says why the name or number did not change. */
+  const renumberAccount = async (a: MoneyAccountRow, input: { name: string; is_active: boolean }, newCode: string) => {
+    if (input.is_active !== a.is_active) {
+      try {
+        await save.mutateAsync({ code: a.code, input: { name: a.name, is_active: input.is_active } });
+      } catch (e) {
+        setRefusal((e as Error).message);
+        return;
+      }
+    }
+    try {
+      await renumber.mutateAsync({ code: a.code, name: input.name, newCode });
+    } catch (e) {
+      const tag = refusalTag(e);
+      if (typeof tag === "string" && NUMBER_REFUSALS.has(tag)) setNumberRefusal((e as Error).message);
+      else setRefusal((e as Error).message);
+      return;
+    }
+    onClose();
   };
 
   return (
@@ -144,7 +211,12 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={save.isPending} disabled={!trimmed} onClick={submit}>
+          <Button
+            variant="primary"
+            loading={save.isPending || renumber.isPending}
+            disabled={!trimmed}
+            onClick={submit}
+          >
             Save
           </Button>
         </>
@@ -163,17 +235,17 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
             options={KIND_OPTIONS}
           />
         )}
-        {!account && (
-          // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0577).
-          <Input
-            id="money-account-code"
-            label="Number"
-            hint="Leave blank to use the next free number."
-            maxLength={8}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-        )}
+        {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md): the hint is
+            0577's, adding only; the field on an opened account is 24 Sep's. */}
+        <Input
+          id="money-account-code"
+          label="Number"
+          hint={account ? undefined : "Leave blank to use the next free number."}
+          error={numberRefusal ?? undefined}
+          maxLength={8}
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
         {refusal && (
           <FieldError>
             {refusal}
