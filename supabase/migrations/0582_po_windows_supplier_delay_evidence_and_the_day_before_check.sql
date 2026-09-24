@@ -220,8 +220,9 @@ as $fn$
                'Partial quantity ready', 'Other']::text[];
 $fn$;
 
--- The table trigger keeps every 0432 rule and takes the new reason list; a
--- delay that names `Other` must say what.
+-- The table trigger keeps every rule of its LAST definition (0560 — a blank
+-- answer is not an answer: whitespace-only text is refused, never btrim()'d)
+-- and takes the new reason list; a delay that names `Other` must say what.
 create or replace function public.purchasing_require_reply_evidence()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $fn$
 declare v_po public.purchase_orders; v_who jsonb;
@@ -253,13 +254,13 @@ begin
           or (new.answer='earlier'   and new.new_date >= v_po.official_delivery_date)
           or (new.answer='delayed'   and new.new_date <= v_po.official_delivery_date)))
     or (new.answer='delayed' and not (coalesce(new.reason,'') = any (public.purchasing_supplier_delay_reasons())))
-    or (new.answer='delayed' and new.reason='Other' and nullif(btrim(coalesce(new.remarks,'')),'') is null)
+    or (new.answer='delayed' and new.reason='Other' and coalesce(new.remarks, '') !~ '[^[:space:]]')
     or (new.answer<>'delayed' and new.reason is not null) then
     raise exception 'Record the supplier delivery date and reason.' using errcode='22023',detail='invalid_input';
   end if;
   if new.channel is null or new.channel not in ('whatsapp','email','phone','in_person')
-    or nullif(btrim(new.recipient),'') is null or nullif(btrim(new.evidence),'') is null
-    or nullif(btrim(new.reported_by),'') is null or new.reported_at is null
+    or coalesce(new.recipient, '') !~ '[^[:space:]]' or coalesce(new.evidence, '') !~ '[^[:space:]]'
+    or coalesce(new.reported_by, '') !~ '[^[:space:]]' or new.reported_at is null
     or left(new.evidence,length(new.po_id)+1) is distinct from new.po_id || '/'
     or not exists(select 1 from storage.objects where bucket_id='delivery-orders' and name=new.evidence)
     or length(new.recipient)>200 or length(new.reported_by)>200 or length(new.evidence)>2000
@@ -303,23 +304,23 @@ begin
     when v_date = v_po.official_delivery_date then 'confirmed'
     when v_date < v_po.official_delivery_date then 'earlier'
     else 'delayed' end;
-  v_reason := nullif(btrim(coalesce(p_reply->>'reason','')),'');
+  v_reason := case when coalesce(p_reply->>'reason', '') ~ '[^[:space:]]' then btrim(p_reply->>'reason') end;
   -- The screenshot set: the reply's evidence file (the WhatsApp screenshot the
   -- existing form uploads) first, then any further screenshots.
-  v_evidence := nullif(btrim(coalesce(p_reply->>'evidence','')),'');
+  v_evidence := case when coalesce(p_reply->>'evidence', '') ~ '[^[:space:]]' then btrim(p_reply->>'evidence') end;
   select coalesce(array_agg(x order by ord), '{}') into v_shots
     from (select distinct on (x) x, ord
             from (select v_evidence as x, 0 as ord
                   union all
                   select btrim(e.value), e.ordinality
                     from jsonb_array_elements_text(coalesce(p_reply->'screenshots','[]'::jsonb)) with ordinality e(value, ordinality)) all_shots
-           where nullif(x,'') is not null
+           where coalesce(x, '') ~ '[^[:space:]]'
            order by x, ord) distinct_shots;
   if v_answer = 'delayed' then
     if not (coalesce(v_reason,'') = any (public.purchasing_supplier_delay_reasons())) then
       raise exception 'Choose why the supplier moved the date.' using errcode='22023',detail='reason_required';
     end if;
-    if v_reason = 'Other' and nullif(btrim(coalesce(p_reply->>'remarks','')),'') is null then
+    if v_reason = 'Other' and coalesce(p_reply->>'remarks', '') !~ '[^[:space:]]' then
       raise exception 'Write why the supplier moved the date.' using errcode='22023',detail='other_note_required';
     end if;
     if cardinality(v_shots) = 0 then
@@ -380,8 +381,8 @@ as $fn$
     (select p.new_date from po_supplier_promises p
       where p.po_id = po.id and p.kind = 'tomorrow_delivery'
         and p.po_version = coalesce(po.version, 1)
-        and nullif(btrim(p.channel), '') is not null and nullif(btrim(p.recipient), '') is not null
-        and nullif(btrim(p.evidence), '') is not null and nullif(btrim(p.reported_by), '') is not null
+        and coalesce(p.channel, '') ~ '[^[:space:]]' and coalesce(p.recipient, '') ~ '[^[:space:]]'
+        and coalesce(p.evidence, '') ~ '[^[:space:]]' and coalesce(p.reported_by, '') ~ '[^[:space:]]'
         and p.reported_at is not null and p.recorded_by is not null and p.new_date is not null
       order by p.recorded_at desc, p.id desc limit 1),
     po.official_delivery_date,
@@ -404,7 +405,7 @@ create table if not exists public.po_arrival_confirmations (
   for_date        date not null,
   destination_id  uuid not null references public.purchasing_destinations(id),
   kind            text not null check (kind in ('supplier_do', 'supplier_confirmation')),
-  supplier_do_no  text check (supplier_do_no is null or length(btrim(supplier_do_no)) between 1 and 100),
+  supplier_do_no  text check (supplier_do_no is null or (supplier_do_no ~ '[^[:space:]]' and length(supplier_do_no) <= 100)),
   evidence        text[] not null check (cardinality(evidence) >= 1),
   channel         text check (channel in ('whatsapp', 'email', 'phone', 'in_person')),
   recipient       text check (recipient is null or length(recipient) <= 200),
@@ -418,8 +419,8 @@ create table if not exists public.po_arrival_confirmations (
     check (kind <> 'supplier_do' or supplier_do_no is not null),
   constraint po_arrival_confirmations_confirmation_is_evidenced
     check (kind <> 'supplier_confirmation'
-           or (channel is not null and nullif(btrim(recipient), '') is not null
-               and nullif(btrim(reported_by), '') is not null and reported_at is not null))
+           or (channel is not null and coalesce(recipient, '') ~ '[^[:space:]]'
+               and coalesce(reported_by, '') ~ '[^[:space:]]' and reported_at is not null))
 );
 
 comment on table public.po_arrival_confirmations is
@@ -496,7 +497,7 @@ begin
   end if;
   select coalesce(array_agg(btrim(x)), '{}') into v_shots
     from jsonb_array_elements_text(coalesce(p->'evidence','[]'::jsonb)) x
-   where nullif(btrim(x),'') is not null;
+   where coalesce(x, '') ~ '[^[:space:]]';
   if cardinality(v_shots) = 0 then
     raise exception 'Add the Supplier DO or the WhatsApp screenshot.' using errcode='22023', detail='evidence_required';
   end if;
@@ -516,9 +517,12 @@ begin
     po_id, po_version, for_date, destination_id, kind, supplier_do_no, evidence,
     channel, recipient, reported_by, reported_at, recorded_by, duty_user_id, acting_user_id
   ) values (
-    p_po_id, v_version, v_for, v_po.destination_id, v_kind, nullif(btrim(coalesce(p->>'supplierDoNo','')),''),
-    v_shots, nullif(p->>'channel',''), nullif(btrim(coalesce(p->>'recipient','')),''),
-    nullif(btrim(coalesce(p->>'reportedBy','')),''), nullif(p->>'reportedAt','')::timestamptz, auth.uid(),
+    p_po_id, v_version, v_for, v_po.destination_id, v_kind,
+    case when coalesce(p->>'supplierDoNo', '') ~ '[^[:space:]]' then btrim(p->>'supplierDoNo') end,
+    v_shots, nullif(p->>'channel',''),
+    case when coalesce(p->>'recipient', '') ~ '[^[:space:]]' then btrim(p->>'recipient') end,
+    case when coalesce(p->>'reportedBy', '') ~ '[^[:space:]]' then btrim(p->>'reportedBy') end,
+    nullif(p->>'reportedAt','')::timestamptz, auth.uid(),
     nullif(v_who->>'normal_user_id','')::uuid, nullif(v_who->>'acting_user_id','')::uuid
   ) returning id into v_id;
 
