@@ -2673,6 +2673,15 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
+**Receiving Session narrow layout, 2026-09-24 — LOCAL; release verification pending.**
+The existing Receiving Details rows now stack by the form's available width,
+including the file inputs; the existing pending quantity and action area wraps.
+A browser fixture measured a 246px form canvas with equal client/scroll widths,
+all six controls and both actions contained; a 1042px canvas keeps horizontal
+fields. The 62 existing Receiving page/save tests pass. No receipt was posted,
+no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
+Unit result or write authority changed. This does not implement the GRN PDF below.
+
 **GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
 do not redesign the receipt as a PO or use it as Manual Purchase's PO preview. The right
