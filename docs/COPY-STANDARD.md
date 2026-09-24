@@ -4212,3 +4212,10 @@ one. *"A manager's statement or checkbox saying the customer agreed is not suffi
 cannot substitute for the evidence."* Every kind carries a reference that points at something
 findable outside the record. `Approve and apply` is refused until one is recorded and still covers
 the proposal; `Reject` never is.
+
+## PROPOSAL — PENDING APPROVAL (0576, Approve day pays from the day's card account)
+
+- The sales on this day were paid into more than one card account ({codes}), so one payout cannot cover them. Check the payment method of each sale.
+- Pay this day out from {code}, the card account its sales were paid into.
+- {code} has no payout bank in Finance Settings yet. Set one there first.
+- The payout banks did not load. Close this and try again.

@@ -37,6 +37,7 @@ const day = (over: Partial<CardSettlementDay>): CardSettlementDay => ({
   reference: "Card settlement PBB 900000000001 / 90000001 2026-09-18",
   payout_status: null,
   payout_move_no: null,
+  holding_codes: ["1131"],
   unlinked_payouts: [],
   ...over,
 });

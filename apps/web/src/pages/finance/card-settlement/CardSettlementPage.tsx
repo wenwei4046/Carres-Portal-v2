@@ -269,7 +269,7 @@ export default function CardSettlementPage() {
         <MoneyMoveForm
           onClose={() => setPaying(null)}
           prepareDay={prepareDay}
-          initial={{ kind: "CARD_PAYOUT", date: paying.payout_date, amount: Number(paying.net), fee: dayFee(paying), reference: paying.reference }}
+          initial={{ kind: "CARD_PAYOUT", date: paying.payout_date, amount: Number(paying.net), fee: dayFee(paying), reference: paying.reference, from: paying.holding_codes[0] }}
         />
       )}
     </div>
@@ -351,6 +351,11 @@ function DayExpansion({
       {day.payout_status !== null ? (
         <p>
           {day.payout_status === "approved" ? "Payout approved" : "Payout prepared"} · {day.payout_move_no ?? "Move number not available"}
+        </p>
+      ) : dayMayApprove(day) && day.holding_codes.length > 1 ? (
+        <p role="alert" className="text-kit-red-11">
+          The sales on this day were paid into more than one card account ({day.holding_codes.join(", ")}), so one payout cannot cover
+          them. Check the payment method of each sale.
         </p>
       ) : dayMayApprove(day) ? (
         <Button variant="primary" onClick={() => onApproveDay(day)}>

@@ -288,7 +288,9 @@ export interface CardSettlementDay {
   reference: string;
   payout_status: CardPayoutStatus | null;
   payout_move_no: string | null;
-  /** Live card payouts linked to no day, from a card account a route serves, on this day's date. */
+  /** 0576: the card accounts the day's matched payments were paid into. Approve day pays from the one account. */
+  holding_codes: string[];
+  /** Live card payouts linked to no day, from any card account, on this day's date. */
   unlinked_payouts: CardUnlinkedPayout[];
 }
 
