@@ -18,13 +18,14 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
     ? <DeliveryProofReviewWork doNumber={item.object.id} />
     : null;
   return (
-    <div className="min-h-full bg-white">
-      <header className="border-b border-kit-slate-5 px-6 py-4">
+    <>
+      <header className="shrink-0 rounded-work border border-work-line bg-white px-6 py-4">
         <p className="text-label font-medium text-kit-slate-11">{item.object.label} · {MODULE[item.module]}</p>
         <h2 className="mt-1 text-section font-semibold text-kit-slate-12">{item.problem}</h2>
         <p className="mt-1 text-body text-kit-slate-11">{action}</p>
       </header>
-      <div className="max-w-[760px] px-6 py-4">
+      <section aria-label="What to do" className="shrink-0 rounded-work border border-work-line bg-white px-6 py-4">
+        <div className="max-w-[760px]">
         {item.interaction.mode === "embedded" ? (
           <section aria-label="Do this work" className="flex flex-col gap-3">
             <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
@@ -48,7 +49,8 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
             <p>{item.observedAt}</p>
           </div>
         </details>
-      </div>
-    </div>
+        </div>
+      </section>
+    </>
   );
 }

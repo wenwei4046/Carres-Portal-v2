@@ -37,6 +37,9 @@ export interface ActiveChip {
 interface Props {
   /** The Register engine owns its toolbar and footer; the shell supplies only spacing. */
   register?: boolean;
+  /** A workspace page (Work) draws its own toolbar and unframed columns; the
+   *  shell supplies the header and a 16px canvas padding only. */
+  workspace?: boolean;
   /** Page title → the 56px PageHeader bar (t-h2). Optional: when both `title`
    *  and `breadcrumb` are omitted the whole white header row is skipped — used
    *  by module-tab pages (Purchasing's To Order / Purchase Orders / Receiving)
@@ -83,6 +86,7 @@ interface Props {
 
 export default function ListPageShell({
   register = false,
+  workspace = false,
   title,
   actions,
   breadcrumb,
@@ -147,7 +151,7 @@ export default function ListPageShell({
           on the cream page bg. The strip lives INSIDE the right column, so it
           NEVER spans above the facet: the facet's Summary top sits on the same
           line as the strip top. */}
-      <div className={register ? "flex-1 flex min-h-0 p-2" : "flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5"}>
+      <div className={register ? "flex-1 flex min-h-0 p-2" : workspace ? "flex-1 flex min-h-0 p-4" : "flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5"}>
         {hasFacet && facetOpen && (
           <aside
             style={
