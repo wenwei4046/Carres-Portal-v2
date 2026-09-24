@@ -674,7 +674,7 @@ function ReceivingMode({
   return (
     <div data-testid="receiving-mode" className="receiving-workspace min-w-0 pb-20">
       {/* 1 · header and source facts */}
-      <div className="flex flex-wrap items-start gap-2">
+      <div className="receiving-header flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1 text-body text-kit-slate-12">
           {supplierName} → {warehouseName}
         </div>
