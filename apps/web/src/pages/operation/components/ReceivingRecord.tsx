@@ -28,6 +28,7 @@ import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import { DOC_BTN, DocSection as Section, Prop } from "./workspace-doc";
 import { grnTemplateDataOf, type GrnAmendDraft } from "./grn-template-data";
+import "./receiving-workspace.css";
 
 /**
  * ReceivingRecord — one Receiving Session / formal GRN object
@@ -179,7 +180,7 @@ export default function ReceivingRecord({
 
   /* ── the LEFT half — the Receiving Record, or the correction form ──────── */
   const record = (
-    <div className="mx-auto w-full max-w-4xl px-4 py-3">
+    <div className="receiving-workspace receiving-record-sheet mx-auto w-full min-w-0 max-w-4xl px-4 py-3">
       {/* ── ONE Object Header — back, the identity, the state ── */}
       <button
         type="button"
@@ -383,8 +384,8 @@ export default function ReceivingRecord({
           {/* ── Lines ─────────────────────────────────────────────────── */}
           <Section title="Items">
             {lines.map((l) => (
-              <div key={l.id} className="flex gap-2 py-1 text-body border-b border-kit-slate-4">
-                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
+              <div key={l.id} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
+                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
                   {l.sku}
                 </span>
                 <span className="w-24 text-right tabular-nums">
@@ -403,8 +404,8 @@ export default function ReceivingRecord({
               </div>
             ))}
             {(r.extra_lines ?? []).map((x, i) => (
-              <div key={`x${i}`} className="flex gap-2 py-1 text-body border-b border-kit-slate-4">
-                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
+              <div key={`x${i}`} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
+                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
                   {x.sku}
                 </span>
                 <span className="w-40 text-right tabular-nums text-kit-amber-11">
@@ -887,7 +888,7 @@ function AmendPanel({
         source. Damaged and wrong quantities are corrected through their
         claims, not here.
       </p>
-      <div className="mt-2 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-2 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Correction reason
         </span>
@@ -901,7 +902,7 @@ function AmendPanel({
         />
       </div>
       {/* Original → Corrected, per fact. */}
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Goods Received Date
         </span>
@@ -918,7 +919,7 @@ function AmendPanel({
           className={FIELD}
         />
       </div>
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Goods arrived at
         </span>
@@ -945,7 +946,7 @@ function AmendPanel({
           ))}
         </select>
       </div>
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Supplier DO No
         </span>
@@ -992,8 +993,8 @@ function AmendPanel({
         />
       </div>
       {lines.map((l) => (
-        <div key={l.id} className="mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 truncate font-mono text-label text-kit-slate-9">
+        <div key={l.id} className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 break-words font-mono text-label text-kit-slate-9">
             {l.sku}
           </span>
           {/* Original → Corrected. */}
@@ -1024,7 +1025,7 @@ function AmendPanel({
           {err}
         </p>
       )}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="receiving-actions mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onClose}
@@ -1109,7 +1110,7 @@ function VoidPanel({
         already moved on, or claims were opened, the void is refused with the
         exact blocker.
       </p>
-      <div className="mt-2 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-2 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Void reason
         </span>
@@ -1127,7 +1128,7 @@ function VoidPanel({
           {err}
         </p>
       )}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="receiving-actions mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onClose}
