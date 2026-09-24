@@ -66,6 +66,8 @@ NO INTERNAL ENUM, `—` ruling, rail calendar words) · `docs/01-design-tokens.m
 | S5 🟡 | Panel header is 48px (`h-12`); the page header is 50px (UI MASTER §6.7) — the two rules never line up | `OperationRightRail.tsx:61` | 50px header row |
 | S6 🟡 | Off-token spacing: 14px (`p-3.5`, `px-3.5`); 8px `rounded-lg` | same file | 16px body padding, 12px gaps, `rounded-card` / `rounded-control` |
 | S7 🟡 | No panel says its SCOPE or FRESHNESS; Activity silently switches from "all orders" to "one order" | code + fixture | One scope line under every header: what the panel covers · `Updated {time}` |
+| S9 🟡 | Strip buttons are 36px; the frozen minimum target is 40px | `OperationRightRail.tsx:98` `w-9 h-9`; Tokens §9 | 40px buttons (the 52px strip still fits) |
+| S10 🟡 | Width contradiction: the panel is 340px, Tokens §8 says `side-panel-width 420` | `OperationRightRail.tsx:58`; Tokens §8 | Keep 340 for the rail and record it in Tokens §8 as `rail-panel-width 340` — 420 + 52 would take a third of a 1440 screen from every Register. **Token-value change → part of the approval.** |
 | S8 🟡 | Header docblock still describes "Keep notes / Follow-ups / 60-min SLA" | `OperationRightRail.tsx:11–24` | Rewrite with the build (stale comments mislead the next chat) |
 
 ### 3.2 Calendar
@@ -83,7 +85,8 @@ NO INTERNAL ENUM, `—` ruling, rail calendar words) · `docs/01-design-tokens.m
 | C9 🟡 | Hand-rolled month grid duplicates the kit `MonthCalendar` (Receiving, Delivery Monitor already use it) | `components/kit/MonthCalendar.tsx` | Adopt the kit component; no second calendar engine |
 | C10 🟡 | Carrier load row `NETS   2` has no noun; `Confirmed` vs `Logistics' date` meaning lives in a hover `title` | fixture; `CalendarPanel.tsx:408` | `NETS · 2 booked` / `2 of 8 booked`; meaning on the face, not in hover |
 | C11 🟡 | Month caption uses the browser locale (`toLocaleDateString(undefined, …)`) | `CalendarPanel.tsx:176` | Kit caption (`SEPTEMBER 2026`) |
-| C12 🟡 | Today ring and `Open My Work` use `primary` = flame `#C44D2B`, next to the danger red — two reds, neither meaning "late" | `index.css:28`; Tokens §2.1 names `primary = blue-9` | Kit tokens: today = `slate-12` ring; selection = `blue-3` |
+| C12 🟡 | Today ring and `Open My Work` use `primary` = flame `#C44D2B`, next to the danger red — two reds, neither meaning "late" | `index.css:28`; Tokens §2.1 names `primary = blue-9` | Kit `MonthCalendar` tokens as shipped (selected day `blue-9` fill); today marked by a neutral ring |
+| C13 🟡 | Kit `MonthCalendar` day buttons are 30×36px, below the 40px target | `MonthCalendar.tsx:62`; Tokens §9 | Accepted for the dense desktop rail (the rail does not exist below 1024px); record the exception in the kit entry rather than widening the grid past 340px |
 
 ### 3.3 My Work
 
@@ -146,7 +149,7 @@ See §10 (primary vendor documentation; access limits stated there).
   scope line, body, and five state slots built from existing kit `Loading` (skeleton) and `EmptyState`
   (title · detail · one action). The three panels supply content only. **Needs owner approval to join
   the kit** (Constitution §2).
-- Strip buttons: 36px circle as today; `aria-pressed`, `aria-controls`; kit `Tooltip` on hover and focus.
+- Strip buttons: 40px (Tokens §9); `aria-pressed`, `aria-controls`; kit `Tooltip` on hover and focus.
   Selected = `blue-3` fill / `blue-11` icon for every slot. Badge only on My Work (resolved).
 - Keyboard: `Escape` inside the panel closes it and returns focus to its icon; clicking another icon swaps
   content and keeps focus on that icon (disclosure pattern); the panel is a labelled `complementary` region.
@@ -225,7 +228,7 @@ All Carres · deliveries & arrivals  Updated 10:42
 [Thu, 24 Sep 3] [Fri, 25 Sep 1] [This week 5]    kept chips (owner rulings 2026-08-15)
           SEPTEMBER 2026                         kit MonthCalendar
  S  M  T  W  T  F  S                             count under the day; aria "Thu, 24 Sep — 3 events"
- …        24ring  25                              today ring slate-12 · selected blue-3
+ …        24ring  25                              kit as shipped: selected = blue-9 fill, white text
                    3     1
 THU, 24 SEP · 3 EVENTS
 DELIVERIES · 2                      Open in Delivery ›
@@ -313,6 +316,8 @@ FALSIFIER    If operators, in a walk, look for "who to call today" on the Calend
 | Visual consistency & readability (2) | **0.5** | off-token 14px/8px, 48 vs 50 header, flame primary, raw hex, `slate-400` (#9CA3AF, 2.5:1) captions | **2.0** | All values are existing tokens; `RailPanel` awaits kit approval |
 | Accessibility & responsive (2) | **0.5** | 390px overflow S1, no Escape S2, no pressed state S3, `24 3` day names C8 | **1.5** | No screen-reader or keyboard walk with real AT — UNVERIFIED |
 | **Total** | **2.5 / 10** | | **8.0 / 10** | A critical open item (§8) and untested usability keep it below 10 |
+
+**Cross-check:** a second session ran this same brief in parallel and wrote `docs/cards/SHARED-UI-calendar-work-activity-discussion.md` (uncommitted). Its token findings (40px target, 420 side-panel width, kit day size) were verified and folded in above as S9, S10, C13. **Only one Card may survive** — see the owner note.
 
 **Critique round applied before this version:** (1) first draft kept a `This order` chip in Activity — removed,
 it rebuilt the duplicate History; (2) first draft let the rail float at all widths — changed to push ≥1280 so
