@@ -63,14 +63,14 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
  *
  * ⭐ NO DATE HAS TO BE CHOSEN TO SEE RECORDS (owner ruling 2026-09-18). The
  * page opens on every GRN the operator may see, newest first, server-paged.
- * The rail's `GRN date` group is an OPTIONAL narrowing, and its counts are
+ * The rail's `GRN Doc Date` group is an OPTIONAL narrowing, and its counts are
  * counts of GRN RECORDS — never outstanding work and never pieces of goods.
  *
  * THE RAIL — six groups, in the owner's order (§9.4, 2026-09-17). The month
  * Calendar is RETIRED; the expected-arrival view lives in Warehouse Arrival
  * Schedule.
  *
- *   GRN date          weeks · their days (the arrow opens, it never filters)
+ *   GRN Doc Date          weeks · their days (the arrow opens, it never filters)
  *                     · months · `Choose dates…`
  *   Received with     `Damaged goods` · `Wrong items` · `Extra goods` — a
  *                     record of what was FOUND, and three OVERLAPPING counts
@@ -153,7 +153,7 @@ export default function OperationReceiving() {
   )
     ? (receivedRaw as GrnReceivedWith)
     : null;
-  /** The `GRN date` pick — a day, a week, a month and `Choose dates…` all
+  /** The `GRN Doc Date` pick — a day, a week, a month and `Choose dates…` all
    *  arrive as the same inclusive pair, so the register has one date rule. */
   const fromSel = params.get("from");
   const toSel = params.get("to");
@@ -229,7 +229,7 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
-  /** One `GRN date` choice, whatever shape it was pressed in. Pressing the
+  /** One `GRN Doc Date` choice, whatever shape it was pressed in. Pressing the
    *  same range again clears it — the rail's own rule, every group. */
   function setGrnDate(from: string | null, to: string | null) {
     const next = new URLSearchParams(params);
@@ -283,7 +283,7 @@ export default function OperationReceiving() {
    * and no other (`purchasing/MASTER.md` §9.4):
    *
    * ```
-   * GRN Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
+   * GRN Doc Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
    * Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date ·
    * Goods Received Date · Supplier DO No · Items · Received Qty ·
    * Damaged Qty · Wrong Item Qty · Extra Qty
@@ -303,7 +303,7 @@ export default function OperationReceiving() {
     () => [
       {
         key: "grnDate",
-        label: "GRN Date",
+        label: "GRN Doc Date",
         width: REGISTER_FIELD_WIDTH.date,
         sortable: true,
         /* CREATION — when `Save Receiving` made this document. Never inferred
@@ -663,7 +663,7 @@ export default function OperationReceiving() {
       ? [
           {
             key: "grnDate",
-            label: `GRN date: ${
+            label: `GRN Doc Date: ${
               fromSel === toSel
                 ? fmtDateShort(fromSel)
                 : weekLabel(fromSel!, toSel!)
@@ -830,6 +830,8 @@ export default function OperationReceiving() {
         <ArrivalSourceWorkspace receiving sourceId={arrivalId} />
       ) : sessionId ? (
         <ReceivingRecord sessionId={sessionId} onBack={closeObject} />
+      ) : poId && posQ.isLoading ? (
+        <p role="status" className="p-4 text-body">Loading…</p>
       ) : poId ? (
         <PoReceivingView
           poId={poId}
@@ -865,14 +867,14 @@ export default function OperationReceiving() {
         data-testid="receiving-register"
       >
         <FilterRail testId="receiving-rail">
-          {/* ── GRN date — weeks, their days, months, and Choose dates… ─────
+          {/* ── GRN Doc Date — weeks, their days, months, and Choose dates… ─────
               The date is the GRN's CREATION date. Nothing has to be chosen to
               see records: this group NARROWS a listing that is already
               complete. The arrow beside a week only opens it; pressing a
               week, a month or a day is what filters. Only periods that HAVE
               GRNs are listed — Sunday included, because a GRN can be created
               on one. Every count is a count of GRN RECORDS. */}
-          <FilterRailGroup title="GRN date" icon="date">
+          <FilterRailGroup title="GRN Doc Date" icon="date">
             {weeks.map((w) => (
               <FilterRailExpandableRow
                 key={w.from}
@@ -921,7 +923,7 @@ export default function OperationReceiving() {
               >
                 <span className="text-label text-kit-slate-11">From</span>
                 <DateField
-                  aria-label="GRN date from"
+                  aria-label="GRN Doc Date from"
                   value={fromSel ?? ""}
                   fullWidth
                   onChange={(iso) =>
@@ -930,7 +932,7 @@ export default function OperationReceiving() {
                 />
                 <span className="text-label text-kit-slate-11">To</span>
                 <DateField
-                  aria-label="GRN date to"
+                  aria-label="GRN Doc Date to"
                   value={toSel ?? ""}
                   fullWidth
                   onChange={(iso) =>
@@ -1023,8 +1025,8 @@ export default function OperationReceiving() {
             defaults to `min-width:auto`: without this it refuses to shrink
             below the sixteen columns' 2234px, so the grid's own scroller
             never engages. The page then scrolled on an ANCESTOR, which meant
-            `GRN Date`/`GRN No` did not pin at all (measured: scrolling right
-            drove GRN Date to left −1022, off screen) and the ≥768px canvas
+            `GRN Doc Date`/`GRN No` did not pin at all (measured: scrolling right
+            drove GRN Doc Date to left −1022, off screen) and the ≥768px canvas
             rule never fired, because the grid measured 2234px on a phone.
             Every sibling rail+grid register already carries it. */}
         <div
@@ -1060,7 +1062,7 @@ export default function OperationReceiving() {
               searchPlaceholder="GRN, PO, supplier or DO number…"
               isLoading={registerQ.isLoading}
               onSearchChange={setSearch}
-              /* GRN Date and GRN No lead and pin at a canvas ≥768px; below it
+              /* GRN Doc Date and GRN No lead and pin at a canvas ≥768px; below it
                  the number pins alone. No column is hidden by width. */
               leadingColumns={{ date: "grnDate", identity: "grn" }}
               activeConditions={activeConditions}

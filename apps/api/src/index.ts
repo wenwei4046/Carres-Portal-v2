@@ -138,7 +138,6 @@ import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
-import { runSupplierClaimSweepCron } from "./cron/supplier-claim-sweep";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -341,11 +340,8 @@ export default {
       (async () => {
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
-        // R2 (0288) — an ETA that has passed with units still owed becomes a
-        // late-delivery claim. Idempotent, so a retry costs nothing.
-        await runSupplierClaimSweepCron(env).catch((e) =>
-          console.error("supplier-claim sweep failed:", (e as Error).message),
-        );
+        // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,
+        // never authority to create a product Claim.
       })(),
     );
   },

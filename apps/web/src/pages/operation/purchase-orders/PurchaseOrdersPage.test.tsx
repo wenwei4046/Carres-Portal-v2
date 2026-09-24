@@ -307,7 +307,7 @@ describe("Purchase Orders Register", () => {
     renderPage();
     const grid = screen.getByTestId("register-grid");
     expect(screen.getByTestId("register-columns")).toHaveTextContent(
-      /^PO Date \| PO No \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
+      /^PO Doc Date \| PO No \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
     );
     /* `Expected Delivery Date` is retired BY NAME: what we planned and what
        the factory promised are two facts, and one cell holding whichever it
@@ -663,7 +663,7 @@ describe("the evidenced supplier reply door", () => {
     sent(); queryData.pos[0]!.promises = [];
     renderPage("/operation/procurement?po=PO-20260828-4827");
     /* The input is LABELLED with whose date it is, not a bare "Date". */
-    expect(screen.getByTestId("po-supplier-date-input").closest("label")).toHaveTextContent("Supplier Delivery Date");
+    expect(screen.getByTestId("po-supplier-date-input").closest("label")).toHaveTextContent("Supplier Confirmed Delivery Date");
     fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
     expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Later than the PO date");
     evidence();
@@ -713,7 +713,7 @@ describe("the evidenced supplier reply door", () => {
   });
   it("shows a reply recorded without evidence instead of claiming a proven absence", () => {
     /* 0430 — a pre-evidence reply linked to this version is a recorded fact.
-       It never qualifies as the governed Supplier Delivery Date, but the block
+       It never qualifies as the governed Supplier Confirmed Delivery Date, but the block
        must say what exists rather than 'the supplier has said nothing'. */
     sent();
     queryData.pos[0]!.promises = [{

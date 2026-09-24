@@ -1,172 +1,140 @@
 /**
- * WORK · ACTION OWNER ENGINE PREVIEW — DEV ONLY.
+ * WORK PREVIEW — DEV ONLY.
  *
- * The same contract as `so-batch-preview.tsx`: the REAL component, the REAL
- * stylesheet, only the inputs seeded instead of fetched. It exists to walk the
- * §0.1 Action Owner Engine resolution (built 2026-08-27) without a login:
- *
- *   · `Issue PO` under the PO-duty holder (Yu Jun), never the PIC
- *   · the never-asked missing date under the SALESPERSON'S NAME (Mei Ling)
- *   · the PIC (Shasha) keeping delivery/collect work — collect as governed
- *     cover for the roster-less payment duty
- *   · the loan collection under the duty word `Delivery Duty`
+ * The REAL Work page and stylesheet over a seeded v2 Work feed
+ * (`/api/operation/work`), so the left rail can be walked and measured without
+ * a login: Thu 17 Sep is today, Wed 16 Sep is Malaysia Day, and the opening
+ * URL chooses Wed so today's blue badge and the chosen pale-blue row can be
+ * seen apart. Every party, date and number here is invented.
  *
  * A separate vite entry (`work-preview.html`), not a route: `vite build` only
  * emits `index.html`'s graph, so this cannot reach production. The fetch stub
- * answers ONLY the API reads the page performs; every unmatched path 404s.
+ * answers ONLY the Work read; every other API path 404s.
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationWork from "@/pages/operation/OperationWork";
+import PreviewFrame from "./preview-frame";
 import "@/index.css";
 
-const OP_UID = "00000000-0000-0000-0000-0000000000aa"; // Shasha — the PIC
-const DUTY_UID = "00000000-0000-0000-0000-0000000000bb"; // Yu Jun — PO duty
+const ME = "00000000-0000-4000-8000-0000000000aa";
+const TODAY = "2026-09-17";
 
-const STAFF = {
-  staff: [
-    {
-      user_id: OP_UID,
-      email: "sha@carres.co",
-      name: "Shasha",
-      pooled: true,
-      available: true,
-      note: null,
-      last_seen_at: null,
-      duties: [],
+let seq = 0;
+function item(module: OperationWorkModule, actionOn: string | null, missedDays = 0): OperationWorkItem {
+  seq += 1;
+  const id = `obj-${seq}`;
+  return {
+    contractVersion: 2,
+    id: `${module}:${id}:follow`,
+    module,
+    ruleKey: "follow",
+    ruleVersion: 1,
+    object: { kind: "sales_order", id, label: `SO2609-${4800 + seq}` },
+    problem: "No delivery date",
+    action: "Ask customer for a delivery date",
+    recipient: "Tan Qu Qu",
+    requiredResult: "Customer Delivery exists",
+    completionPredicate: "orders.delivery_date exists",
+    completionStatement: "Customer Delivery exists",
+    owner: {
+      rule: "salesperson",
+      dutyKey: null,
+      normal: { userId: ME, name: "Shasha" },
+      activeCover: null,
+      coverEvidence: null,
+      acting: { userId: ME, name: "Shasha" },
+      state: "primary",
     },
-    {
-      user_id: DUTY_UID,
-      email: "yj@carres.co",
-      name: "Yu Jun",
-      pooled: true,
-      available: true,
-      note: null,
-      last_seen_at: null,
-      duties: [],
+    timing: {
+      businessDueOn: actionOn,
+      actionOn,
+      placement: actionOn === null ? "no_working_date" : missedDays > 0 ? "missed" : "on_day",
+      missedAge: {
+        state: "counted",
+        workingDays: missedDays,
+        basis: { calendarKey: "module+person", from: actionOn ?? TODAY, to: TODAY },
+      },
+      eligibility: "eligible",
+      noDateReason: actionOn === null ? "The owning rule has no working date" : null,
+      calendar: {
+        module: { key: module, source: module, state: "ready" },
+        actor: { key: "person:shasha", source: "people", state: "ready" },
+        holidayName: null,
+      },
     },
-  ],
-  myDuties: [],
-};
+    communication: null,
+    blocker: null,
+    nextConsequence: null,
+    interaction: { mode: "open_module", fallbackDestination: `/operation/orders/so/${id}` },
+    destination: `/operation/orders/so/${id}`,
+    observedAt: `${TODAY}T01:00:00.000Z`,
+    sourceVersion: `${TODAY}T01:00:00.000Z`,
+    tone: "warning",
+    locked: false,
+    broken: false,
+  };
+}
 
-const baseRow = {
-  status: "proceed_order",
-  operation_stage: "ready_to_dispatch",
-  warehouse_id: null,
-  customer_phone: null,
-  customer_address: null,
-  placed_at: "2026-08-20T00:00:00Z",
-  delivery_date: "2026-09-05",
-  delivery_date_tbd: false,
-  source_system: null,
-  source_ref: null,
-  ops_assigned_logistic: null,
-  order_lines: [],
-  delivery_partner_id: null,
-  request_for_delivery_at: null,
-  partner_accepted_at: null,
-  partner_rejected_at: null,
-  partner_rejected_reason: null,
-  delivery_partners: null,
-  do_number: null,
-  dispatched_at: null,
-  delivered_at: null,
-  outlet_id: null,
-  dealer_id: "d-1",
-  dealers: { name: "Carres KL" },
-  order_supplier_threads: [],
-  order_annotations: [],
-  ops_order_control: [{ assigned_staff: OP_UID }],
-};
-
-const ORDERS = {
-  orders: [
-    // Unordered goods + money owing: Issue PO → Yu Jun (PO duty);
-    // Assign logistics + Collect → Shasha (PIC / governed cover).
-    {
-      ...baseRow,
-      id: "o-1318",
-      so: 1318,
-      customer_name: "kong chai yin",
-      operation_stage: "placed",
-      order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
-      paid: 500,
-    },
-    // Never asked for a date: Ask for the delivery date → Mei Ling
-    // (salesperson — a name, not an ops account).
-    {
-      ...baseRow,
-      id: "o-1319",
-      so: 1319,
-      customer_name: "lim kuan yang",
-      delivery_date: null,
-      delivery_date_tbd: false,
-      salespersons: { name: "Mei Ling" },
-    },
-    // Delivered with the loan still out: Collect the loan item →
-    // `Delivery Duty` (duty word — no holder resolved in the preview).
-    {
-      ...baseRow,
-      id: "o-1320",
-      so: 1320,
-      customer_name: "tan siew mei",
-      status: "delivered",
-      operation_stage: "delivered",
-      delivered_at: "2026-08-25T04:00:00Z",
-      ops_sofa_loans: [{ status: "on_loan" }],
-    },
+const FEED: OperationWorkResponse = {
+  contractVersion: 2,
+  complete: true,
+  generatedOn: TODAY,
+  closureReceipt: null,
+  staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }],
+  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+    key,
+    state: "healthy" as const,
+    observedAt: `${TODAY}T01:00:00.000Z`,
+    lastSuccessfulAt: `${TODAY}T01:00:00.000Z`,
+    errorLabel: null,
+  })),
+  items: [
+    item("purchasing", "2026-09-10", 5),
+    item("delivery", "2026-09-11", 4),
+    item("payment", "2026-09-09", 6),
+    item("orders", "2026-09-15"),
+    item("receiving", "2026-09-15"),
+    item("purchasing", "2026-09-16"),
+    item("delivery", "2026-09-16"),
+    item("delivery", "2026-09-16"),
+    item("orders", "2026-09-16"),
+    item("payment", TODAY),
+    item("delivery", "2026-09-18"),
+    item("purchasing", "2026-09-18"),
+    item("orders", null),
+    item("payment", null),
   ],
 };
-
-const PO_DUTY = {
-  month: "2026-08",
-  holder: { userId: DUTY_UID, email: "yj@carres.co", name: "Yu Jun", assignedBy: null },
-};
-
-const FIXTURES: [RegExp, unknown][] = [
-  [/\/api\/operation\/orders(\?|$)/, ORDERS],
-  [/\/api\/operation\/staff$/, STAFF],
-  [/\/api\/operation\/stock$/, { skus: [] }],
-  [/\/api\/operation\/partners$/, { partners: [] }],
-  [/\/api\/operation\/po-duty$/, PO_DUTY],
-];
 
 const realFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  for (const [re, body] of FIXTURES) {
-    if (re.test(url)) {
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+  if (/\/api\/operation\/work(\?|$)/.test(url)) {
+    return new Response(JSON.stringify(FEED), { status: 200, headers: { "Content-Type": "application/json" } });
   }
-  if (url.includes("/api/")) {
-    return new Response(JSON.stringify({ message: "not seeded" }), { status: 404 });
-  }
+  if (url.includes("/api/")) return new Response(JSON.stringify({ message: "not seeded" }), { status: 404 });
   return realFetch(input, init);
 };
 
-// The page reads only role + user.email from the store; a signed-in operation
-// account is seeded directly — no Supabase session exists in this preview.
-useAuth.setState({
-  role: "operation",
-  user: { email: "sha@carres.co" } as never,
-});
+useAuth.setState({ role: "operation", user: { id: ME, email: "sha@carres.co" } as never });
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const start = new URLSearchParams(window.location.search).get("at") ?? "/operation?tab=work&day=2026-09-16";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation?tab=work&scope=team"]}>
-        <div className="flex h-screen flex-col">
-          <OperationWork />
-        </div>
+      <MemoryRouter initialEntries={[start]}>
+        <PreviewFrame label="Work left rail (illustrative data)">
+          <div className="flex h-full flex-col">
+            <OperationWork />
+          </div>
+        </PreviewFrame>
       </MemoryRouter>
     </QueryClientProvider>
   </StrictMode>,

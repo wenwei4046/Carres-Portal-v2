@@ -357,26 +357,26 @@ the reference review surface is https://claude.ai/artifact/HcREkf3UTPj35gYj339mC
 records, people, dates and simulated saves remain fixtures and are not authority.
 
 ```text
-┌ WORKING DAY ─────────┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
-│ Missed      {count}  │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
-│ Mon, {date} {count}  │▌{object} · {module}         │ {recipient, when applicable} │
-│ Tue, {date} {count}  │▌{fact}                      │                              │
-│ {holiday name}       │▌{action} · {contact} {when} │ CURRENT FACT                 │
-│ Thu, {date} {count}  │ MISSED                      │ {fact or problem}            │
-│ Fri, {date} {count}  │ {object} · {module}         │                              │
-│ Sat, {date} {count}  │ {fact}                      │ ACTION                       │
-│ No working date      │ {action} · {contact} {when} │ {specific action}            │
-│             {count}  │ Blocked by {dependency}     │                              │
-│                      │ THU, {date}                 │ COMMUNICATION (when admitted)│
-│ MODULE               │ {object} · {module}         │ [Open WhatsApp group]        │
-│ All modules  {count} │ {fact}                      │ [Copy message]               │
-│ Sales Orders {count} │ {action} · {contact} {when} │                              │
-│ Purchasing   {count} │                             │ REQUIRED RESULT · FINISH WHEN│
-│ Receiving    {count} │                             │ {module action when admitted}│
-│ Delivery     {count} │                             │                              │
-│ Payment      {count} │                             │ [Open {object}]              │
-│ Issue Tracker{count} │                             │                              │
-└──────────────────────┴─────────────────────────────┴──────────────────────────────┘
+┌ 📅 Date   ‹ Sep 2026 › ┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
+│ ⟲ Missed     {count}   │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
+│ [14 MON]               │▌{object} · {module}         │ {recipient, when applicable} │
+│ [15 TUE]     {count}   │▌{fact}                      │                              │
+│ [16 WED] {holiday}  {n}│▌{action} · {contact} {when} │ CURRENT FACT                 │
+│ [17 THU] ← solid blue  │ MISSED                      │ {fact or problem}            │
+│ [18 FRI]     {count}   │ {object} · {module}         │                              │
+│ [19 SAT] when admitted │ {fact}                      │ ACTION                       │
+│ ⊘ No working date {n}  │ {action} · {contact} {when} │ {specific action}            │
+│   (only while n > 0)   │ Blocked by {dependency}     │                              │
+│                        │ THU, {date}                 │ COMMUNICATION (when admitted)│
+│ ▦ Module               │ {object} · {module}         │ [Open WhatsApp group]        │
+│ All modules  {count}   │ {fact}                      │ [Copy message]               │
+│ Sales Orders {count}   │ {action} · {contact} {when} │                              │
+│ Purchasing   {count}   │                             │ REQUIRED RESULT · FINISH WHEN│
+│ Receiving    {count}   │                             │ {module action when admitted}│
+│ Delivery     {count}   │                             │                              │
+│ Payment      {count}   │                             │ [Open {object}]              │
+│ Issue Tracker{count}   │                             │                              │
+└────────────────────────┴─────────────────────────────┴──────────────────────────────┘
 ▌ = thin red row edge of a broken commitment (no row badge)
 ```
 
@@ -397,14 +397,37 @@ the source calendar, while an authorised holiday operation remains on the holida
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
 today.
 
-Panel 1 has two groups with two different count scopes:
+**Panel 1 — the left rail. OWNER APPROVED UI, Jess 2026-09-24; BUILT 2026-09-24.** Two white
+sections on the light-grey canvas, each headed by a blue icon + blue title over an inset divider; no
+shadow and no decorative colour corner. Every row is a real button with a complete accessible name
+and a visible keyboard focus ring. A zero count is never printed. The sections carry two different
+count scopes:
 
-- **`WORKING DAY`** counts the whole selected week, one row per day: `Missed`, the governed
-  weekdays, Saturday only when an admitted action remains there, and `No working date`. A public
-  holiday row is named and carries no ordinary work.
-- **`MODULE`** opens with `All modules`, then each admitted module. It counts only the occurrences
-  currently in the Panel 2 list (on first open: `Missed` plus the selected day). `All modules` always
-  equals the number of Panel 2 rows, and the module rows sum to `All modules`.
+- **`Date`** (calendar icon). The header's right side holds `Previous week` · the week's month and
+  year (`Sep 2026`, the month holding the week's Thursday) · `Next week`; the arrows move the
+  visible week by one work week and change neither the chosen Date, the module nor any filter. The
+  options are `Missed` first, then the governed weekdays of the visible week (Saturday only when an
+  admitted action remains there), then `No working date` only while it has work. Each date is one
+  34 × 34px calendar badge holding the day number over the uppercase weekday, both cut from the one
+  `fmtDate` spelling and moved by whole `YYYY-MM-DD` days — never through `toISOString()` of a local
+  clock. **Today** is the solid-blue badge with white text and is never written on screen (the
+  accessible name carries `· Today`); the **chosen** option is the pale-blue full row. The two
+  states are independent. A public holiday is named beside its badge (`Malaysia Day`) and is a
+  date like any other: it can be chosen and it counts the work dated on it. `Missed`, one date and
+  `No working date` are one mutually exclusive choice. Date counts cover the week's open set after
+  scope, search, the other filters and the chosen module; a missed occurrence counts once, under
+  `Missed`, never again under its past weekday.
+- **`Module`** (modules icon) opens with `All modules`, then each admitted module as a name and a
+  right-aligned count only — no per-row icon. It counts the occurrences of the chosen Date — the
+  Panel 2 list before the module choice — so choosing one module never reduces another module's
+  count; `All modules` equals the Date list and the module rows sum to it. Date and Module choices
+  combine.
+
+The URL carries the visible week (`week`, its Monday), the Date choice (`day` = `missed` ·
+`YYYY-MM-DD` · `no_date`) and the module (`module`); opening that URL restores all three. Without
+`week`, the rail shows the week of the chosen date, else the week of the focus day. The opening
+focus list (no `day`) highlights the focus day's row. `day=all`, reached from the toolbar's timing
+filter or a Dashboard link, lists every open action and highlights no Date option.
 
 The Panel 2 heading is `Missed {n} · {weekday, date} {n}` on first open; when a single day is
 selected it is `{weekday, date} {n}`. Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
@@ -633,18 +656,21 @@ the same group and item grammar; zero matches is not the same as zero work.
   chosen the column is the Panel 2 list. Choosing a job replaces the column with that job's Panel 3
   detail and moves focus to `Back to work`; `Back to work` restores the list and returns focus to the
   same row (or the next visible row when it closed). Panel 1 stays visible throughout.
-- Below **768px**, show one panel at a time. Working day is a horizontally scrollable selector above
-  the list and module/owner live in kit Select controls. Selecting an action replaces the list with
+- Below **768px**, show one panel at a time. The Date options sit above the list without any
+  sideways scroll: the week arrows and month, the week's calendar badges on one wrapping line, then
+  `Missed` and `No working date` written in words (an icon never carries meaning alone), then the
+  week's named holiday. Module and owner live in kit Select controls. Selecting an action replaces the list with
   full-width detail. Browser and visible `Back to work` restore week, day, module, owner, filters,
   selected occurrence and list scroll. No permanent drawer or sideways three-panel page exists.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
-- Panel 1 uses the existing `FilterRail` geometry: 12px outer padding, its governed 20px component
-  group gap (an existing kit exception, not a new page spacing token), and 8px heading-to-
-  row gap and 36px minimum rows. Selected rows use `blue-3` plus the straight 2px `blue-9` inset
-  marker; hover is `slate-3`. Counts are neutral, right-aligned and tabular. Long governed labels
-  wrap; the rail never truncates them.
+- Panel 1 is 240px: 12px outer padding on the `canvas` grey, a 20px gap between its two sections
+  (the governed `FilterRail` group gap), each section a white `card`-radius surface with a 1px
+  `slate-5` edge, a 48px heading row (16px icon + `strong` title in `blue-11`) over a `slate-5`
+  divider inset 12px from both edges, 6px list padding and 40px minimum rows. The chosen row is a
+  full-row `blue-3` fill; hover is `slate-3`. Counts are `meta`, `slate-11`, right-aligned and
+  tabular. A holiday name and long governed labels wrap; the rail never truncates them.
 - Panel 2 has a 44px heading and selectable action rows with 1px `slate-5` dividers. A row is at
   least 64px and grows for long text; it never truncates. Its lines are object · module, then
   fact/problem, then action with contact and timing (§5.2); `Blocked by {dependency}` wraps below
@@ -756,8 +782,8 @@ Work is ready for owner acceptance only when all are demonstrable:
   due/late fact and exact owning door without repeating owner/object in sentence prose;
 - first open shows `Missed` followed by the actual current or next eligible governed weekday/date,
   names a public holiday and never duplicates an occurrence or hides the complete working week;
-- `WORKING DAY` counts the whole week; `All modules` equals the Panel 2 row count and the module rows
-  sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
+- the `Date` section counts the visible week and prints no zero; `All modules` equals the Panel 2 row
+  count before the module choice and the module rows sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
 - Panel 2 orders `BROKEN COMMITMENT` → `MISSED` → selected day; a broken commitment has a red group
   heading and red row edge with no badge and still counts once under its own working day; a blocked
   job stays in its own group with `Blocked by {dependency}`;
@@ -1142,13 +1168,27 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
+- **Work left rail — DEPLOYED 2026-09-24 (`26f718d4`, PR #1581; owner-approved UI, Jess 2026-09-24); signed-in Operation walk OWED.** On `7e9da6459` the rail
+  was a `Working day` text list with an `All` row, printed `0 actions`, a holiday that could not be
+  chosen, no `All modules` row, no week control and no `week` in the
+  URL; at 768–1103px of Work canvas Panel 1 was dropped entirely and the date strip scrolled
+  sideways. Now §5.1's `Date` and `Module` sections render through `WorkDayNav.tsx` over
+  `workRailDates` / `workModuleCounts` / `inWorkDay` in `work-model.ts`; 768–1103px keeps the rail
+  beside one work column (`Back to work` returns); below 768px the Date options wrap. Kit Icon gained
+  `previous` (ChevronLeft), `noDate` (CalendarOff) and `modules` (LayoutGrid). Proof:
+  `OperationWork.left-rail.test.tsx` 12 red on main → 13/13 green under `TZ=Asia/Kuala_Lumpur`,
+  plus model, strip and split-shell tests. Out of scope and unchanged: Panel 2 rows, Panel 3 detail,
+  communication, templates and Delivery proof review.
+  Deploy run 35977633523: both Pages projects, both canonical hosts and the API Worker report
+  `26f718d4`, and the live ERP bundle carries the rail. The signed-in read of `/operation?tab=work`
+  at 1440 / 1180 / 820 / 390 is still owed: no verification browser holds a production session.
 - **Work truth hotfix HF-1 — DEPLOYED to production 2026-09-17 (`a48e5237`, PR #1400, includes YH's
   UTC-safe `workWeek`); authenticated production read OWED.** Measured on `a5776c50`: at UTC+8 the day
   strip read `Sun 13 Sept … Thu 17 Sept`, Malaysia Day was an ordinary `0` row, an empty day said
   `Nothing assigned to you` while Friday held work, one module filter zeroed every other module, and
   the panel count followed `window.innerWidth` (three panels in a ~950px Work area). Now: every day
-  label is `fmtDate`; holidays come from the shared `my-holidays.ts` as `Public holiday · {name}` with
-  no count and no button; the focus day is today when it is a working day, else the next working day
+  label is `fmtDate`; holidays come from the shared `my-holidays.ts` (named in the rail; since the 2026-09-24 left rail a
+  holiday is a choosable date with its own count); the focus day is today when it is a working day, else the next working day
   (Saturday only when something is due that Saturday), and the focus list also keeps work dated
   between today and that day; empty states run failed source → no filter match → `No work on
   {weekday, date}` with `Open Missed` / `Open {weekday, date}` → true empty; module counts ignore only
