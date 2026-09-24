@@ -11,6 +11,15 @@ const MODULE: Record<OperationWorkModule, string> = {
   issue_tracker: "Issue Tracker",
 };
 
+const OBJECT_DESTINATION: Record<OperationWorkModule, string> = {
+  orders: "Sales Order",
+  purchasing: "Purchase Order",
+  receiving: "Receiving",
+  delivery: "Delivery Order",
+  payment: "Payment",
+  issue_tracker: "Issue",
+};
+
 function timingText(item: OperationWorkItem): string {
   if (!item.timing.actionOn) return item.timing.noDateReason ?? "No working date";
   return `${item.broken ? "Promised" : "Required"} ${fmtDate(item.timing.actionOn)}`;
@@ -39,7 +48,7 @@ export default function WorkActionRow({
   const timing = timingText(item);
   return (
     <article
-      className={`relative m-2 overflow-hidden rounded-control border border-kit-slate-5 bg-white ${selected ? "bg-kit-blue-2" : ""} ${item.broken ? "border-l-2 border-l-kit-red-9" : ""} ${className}`}
+      className={`relative m-2 overflow-hidden rounded-control border border-kit-slate-5 bg-white ${selected ? "bg-kit-blue-2" : ""} ${className}`}
     >
       <button type="button" aria-pressed={selected} aria-label={`${item.object.label}. ${MODULE[item.module]}. ${timing}. ${item.problem}. ${item.action}${item.recipient ? `. ${item.recipient}` : ""}`} onClick={onSelect}
         onKeyDown={(event) => {
@@ -63,7 +72,7 @@ export default function WorkActionRow({
       </button>
       <footer data-testid="work-card-footer" className="flex min-h-8 items-center justify-between border-t border-kit-slate-5 px-3 text-meta text-kit-slate-11">
         <span className="min-w-0 truncate">{item.object.label}</span>
-        {onOpen ? <button type="button" aria-label={`Open ${item.object.label}`} title={`Open ${item.object.label} · O`} onClick={onOpen}
+        {onOpen ? <button type="button" aria-label={`Go to ${OBJECT_DESTINATION[item.module]} ${item.object.label}`} title={`Go to ${OBJECT_DESTINATION[item.module]} ${item.object.label} · O`} onClick={onOpen}
           className="grid h-8 w-8 place-items-center rounded-control hover:bg-kit-slate-3 active:bg-kit-slate-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"><Icon name="open" size={14} /></button> : <Icon name="open" size={14} />}
       </footer>
     </article>

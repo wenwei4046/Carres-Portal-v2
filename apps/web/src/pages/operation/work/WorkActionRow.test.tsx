@@ -41,4 +41,13 @@ describe("WorkActionRow", () => {
     expect(screen.queryByText("Open module")).not.toBeInTheDocument();
     expect(screen.queryByText("Do it here")).not.toBeInTheDocument();
   });
+
+  it("names the icon destination and does not add a coloured broken edge", () => {
+    const open = vi.fn();
+    const { container } = render(<WorkActionRow item={{ ...item, broken: true } as OperationWorkItem} selected={false} onSelect={() => {}} onOpen={open} />);
+    const link = screen.getByRole("button", { name: "Go to Delivery Order DO-140926-0007" });
+    expect(container.querySelector("article")).not.toHaveClass("border-l-kit-red-9");
+    fireEvent.click(link);
+    expect(open).toHaveBeenCalled();
+  });
 });
