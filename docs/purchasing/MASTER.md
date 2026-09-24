@@ -1000,11 +1000,11 @@ summary. Action ownership uses structured avatar metadata.
   The selected document is visible before Issue PO, using the PO template and its
   explicit draft treatment in `docs/pdf/PO-PDF-STANDARD.md`. Navigating documents
   changes the draft. Previewing creates nothing; Issue PO remains the creation action.
-- **Review Purchase Orders desktop composition — owner approved 2026-09-24; APPROVED TARGET / NOT BUILT.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
+- **Review Purchase Orders desktop composition — owner approved 2026-09-24; BUILT (#1573), authenticated production verification pending.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
 - **Approved review sequence and scope.** Header: total PO count, goods quantity and an explicit whole-batch issue action. Work pane: current document selection → Supplier → Supplier Deliver To/address and Delivery Method → provisional PO Date and Settings-derived PO Delivery Date → source/items/quantity → actionable missing facts. Preview uses the same selected document and approved PO template. Switching documents updates its paper. Returning preserves selection; issuance is not sending.
 - **A complete draft before commitment.** Both lanes must carry server-resolved supplier/destination addresses, provisional dates and delivery method. The draft reserves no official number or Unit ID; successful issuance records the actual PO Date and revalidates the dates. Goods must arrive is an internal deadline, not a substitute for PO Delivery Date. Missing required document facts identify their owning Settings destination instead of silently disappearing. Unrendered/failed preview is not completed review. Do not invent addresses, prices, dates or identifiers.
 - **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
-- **Implementation slice, 2026-09-24 — LOCAL, release verification pending.** Shared review now paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`, so an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. The 1074px portal fixture retained side-by-side panes and enlarged paper scrolled independently; at 390px the panes stack without page overflow and the shared wrapping toolbar keeps the selection summary and all actions visible. Validation: 747 targeted tests passed across shared/API/web, including 189 full-page SO/MPR journey checks, typecheck, lint and production build passed; negative controls failed for a dropped PDF page and the old 11/11 split before restoration. The interrupted full local suite is not counted as a pass. Full PR CI caught 11 stale journey-fixture/copy assertions: the updated page suites model PDF readiness and wait before Issue, with a separate MPR unready-preview refusal check. Those 189 tests now pass; a fresh full PR CI remains the merge gate. This does not close the coverage-status discrepancy, the MPR create layout, any database migration, or any real issuance/receiving/sending lifecycle. Merge, CI and authenticated post-deploy readback are still owed.
+- **Implementation slice, 2026-09-24 — MERGED #1573 (`913ef0089`), release verification pending.** Shared review now paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`, so an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. The 1074px portal fixture retained side-by-side panes and enlarged paper scrolled independently; at 390px the panes stack without page overflow and the shared wrapping toolbar keeps the selection summary and all actions visible. Validation: 747 targeted tests passed across shared/API/web, including 189 full-page SO/MPR journey checks, typecheck, lint and production build passed; negative controls failed for a dropped PDF page and the old 11/11 split before restoration. Full CI run `35961742802` passed on `d97ab18f3`: 12,596 tests passed with 100 existing skips, plus migration guard, lint, typecheck, production build and secret-name bundle scan. This does not close the coverage-status discrepancy, the MPR create layout, any database migration, or any real issuance/receiving/sending lifecycle. Automatic deployment and authenticated post-deploy readback are still owed.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
   `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
@@ -1770,6 +1770,13 @@ preview at the governed readable desktop width; use the shared stacked layout
 below it. This overrides the former blanket ban on a Manual Purchase split
 preview for creation and returned-request editing only. Ordinary saved-object
 view and the Register retain their separately governed layouts.
+
+**Narrow action bar correction, 2026-09-24 — LOCAL; release verification pending.**
+At a 390px portal viewport the long existing stock-intent refusal pushed Cancel
+outside the content canvas. The footer now wraps its action pair and long button
+text. Browser measurements at 320px and 390px keep both actions within the main
+pane; at 1074px the original header actions remain visible and the footer stays
+hidden. No submission, approval, requester identity or stock-intent rule changes.
 
 The three sections, in the SAME reading order on the form and preview, are:
 
@@ -2665,6 +2672,15 @@ overdelivery, price change, cancellation and post-send destination change.
 
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
+
+**Receiving Session narrow layout, 2026-09-24 — LOCAL; release verification pending.**
+The existing Receiving Details rows now stack by the form's available width,
+including the file inputs; the existing pending quantity and action area wraps.
+A browser fixture measured a 246px form canvas with equal client/scroll widths,
+all six controls and both actions contained; a 1042px canvas keeps horizontal
+fields. The 62 existing Receiving page/save tests pass. No receipt was posted,
+no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
+Unit result or write authority changed. This does not implement the GRN PDF below.
 
 **GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
