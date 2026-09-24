@@ -17,6 +17,7 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
 import { attemptLegDocumentIssue } from "../../lib/delivery-order-issue";
 import { adminClient, userClient } from "../../lib/supabase";
+import { revokeLinksForOtherPartners } from "./delivery-links";
 import type { AppEnv } from "../../types";
 
 /**
@@ -685,10 +686,10 @@ deliveryArrangementsRouter.get("/:orderId", requireOperationOrPrincipal, async (
 async function currentPartners(
   sb: ReturnType<typeof adminClient>,
   scopes: DeliveryScopeRef[],
-): Promise<Map<string, { arrangementId: string | null; partnerId: string | null }>> {
+): Promise<Map<string, { arrangementId: string | null; partnerId: string | null; confirmedDate?: string | null; confirmedTime?: string | null }>> {
   const orderIds = [...new Set(scopes.map((s) => s.orderId))];
   const [{ data: arrangements }, { data: orders }] = await Promise.all([
-    sb.from("ops_delivery_arrangements").select("id, order_id, leg, partner_id").in("order_id", orderIds),
+    sb.from("ops_delivery_arrangements").select("id, order_id, leg, partner_id, confirmed_date, confirmed_time").in("order_id", orderIds),
     sb.from("orders").select("id, delivery_partner_id, ops_assigned_logistic").in("id", orderIds),
   ]);
   const byOrder = new Map(
@@ -696,18 +697,25 @@ async function currentPartners(
       (o) => [o.id, o.delivery_partner_id ?? o.ops_assigned_logistic ?? null],
     ),
   );
-  const out = new Map<string, { arrangementId: string | null; partnerId: string | null }>();
+  const out = new Map<string, { arrangementId: string | null; partnerId: string | null; confirmedDate?: string | null; confirmedTime?: string | null }>();
   const arrRows = (arrangements ?? []) as Array<{
     id: string;
     order_id: string;
     leg: number;
     partner_id: string | null;
+    confirmed_date?: string | null;
+    confirmed_time?: string | null;
   }>;
   for (const s of scopes) {
     const key = `${s.orderId}#${s.leg}`;
     const existing = arrRows.find((a) => a.order_id === s.orderId && a.leg === s.leg);
     if (existing) {
-      out.set(key, { arrangementId: existing.id, partnerId: existing.partner_id });
+      out.set(key, {
+        arrangementId: existing.id,
+        partnerId: existing.partner_id,
+        confirmedDate: existing.confirmed_date ?? null,
+        confirmedTime: existing.confirmed_time ?? null,
+      });
       continue;
     }
     /* NO ARRANGEMENT ROW YET. The whole-order scope inherits whatever Sales'
@@ -785,7 +793,7 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
     const { data: saved, error: upsertErr } = await sb
       .from("ops_delivery_arrangements")
       .upsert(
-        { order_id: s.orderId, leg: s.leg, partner_id: partnerId, updated_at: stamp, updated_by: userId },
+        { order_id: s.orderId, leg: s.leg, partner_id: partnerId, updated_at: stamp, updated_by: userId, updated_via: "operation" },
         { onConflict: "order_id,leg" },
       )
       .select("id")
@@ -806,12 +814,15 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
       reason_key: event === "changed" ? reason ?? null : null,
       note: note ?? null,
       recorded_by: userId,
+      source: "operation",
     });
     if (evErr) {
       const m = mapPgError(evErr);
       return c.json(m.body, m.status);
     }
     results.push({ orderId: s.orderId, leg: s.leg, event });
+    /* 0581 — the old company's external link dies with the change. */
+    if (event === "changed") await revokeLinksForOtherPartners(sb, s.orderId, s.leg, partnerId, userId);
   }
 
   return c.json({ assigned: results.length, partner: partner.name, results });
@@ -904,6 +915,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
         condo_registration: input.condoRegistration ?? null,
         updated_at: new Date().toISOString(),
         updated_by: userId,
+        updated_via: "operation",
       },
       { onConflict: "order_id,leg" },
     )
@@ -927,6 +939,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
       to_partner_id: nextPartner,
       reason_key: event === "changed" ? input.reason ?? null : null,
       recorded_by: userId,
+      source: "operation",
     });
     if (evErr) {
       const m = mapPgError(evErr);
@@ -982,6 +995,29 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     } catch {
       /* not issued yet — the facts persist */
     }
+  }
+
+  /* 0581 — the SCHEDULED date is a fact with its own history line, so a
+     partner's older `Requested another date` / `Cannot deliver` answer is
+     known to be superseded. Only a real change of date or time is a save. */
+  if (
+    input.confirmedDate &&
+    (input.confirmedDate !== (before.confirmedDate ?? null) || (input.confirmedTime ?? null) !== (before.confirmedTime ?? null))
+  ) {
+    await sb.from("ops_delivery_arrangement_events").insert({
+      arrangement_id: (saved as unknown as ArrangementRecord).id,
+      order_id: orderId,
+      leg,
+      event: "arrangement_saved",
+      source: "operation",
+      from_partner_id: nextPartner,
+      note: [input.confirmedDate, input.confirmedTime].filter(Boolean).join(" · "),
+      recorded_by: userId,
+    });
+  }
+  /* 0581 — a change of company kills the old company's link. */
+  if (before.partnerId !== nextPartner) {
+    await revokeLinksForOtherPartners(sb, orderId, leg, nextPartner, userId);
   }
 
   return c.json({ arrangement: shape(saved as unknown as ArrangementRecord), contact, deliveryOrder });

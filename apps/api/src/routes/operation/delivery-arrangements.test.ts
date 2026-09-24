@@ -76,7 +76,7 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
     const res = queue.shift() ?? { data: null, error: null };
     const chain: Record<string, unknown> = {};
     const self = () => chain;
-    for (const m of ["select", "eq", "in", "order", "limit", "maybeSingle", "single"]) {
+    for (const m of ["select", "eq", "in", "order", "limit", "maybeSingle", "single", "update", "is", "neq"]) {
       chain[m] = vi.fn().mockImplementation(self);
     }
     chain.insert = vi.fn().mockImplementation((rows: unknown) => {
