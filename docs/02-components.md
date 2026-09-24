@@ -194,10 +194,12 @@ action last, after a divider.
 
 **Purpose.** One meaning, one glyph.
 
-**Behaviour.** `name` is a union of 47 meanings — §5.3's 40 verbatim, plus the
+**Behaviour.** `name` is a union of 50 meanings — §5.3's 40 verbatim, plus the
 three made-to-order categories `mattress` · `bedframe` · `sofa` (Loo,
 2026-07-31, for the To Order rail's category level; Lucide `BedDouble` ·
-`Bed` · `Sofa`), `columnFilter`, `pillow`, `protector` and `panelToggle`. A name outside it does not compile — which is the
+`Bed` · `Sofa`), `columnFilter`, `pillow`, `protector`, `panelToggle`, and the
+Work left rail's `previous` (`ChevronLeft`) · `noDate` (`CalendarOff`) ·
+`modules` (`LayoutGrid`) (owner-approved UI, 2026-09-24). A name outside it does not compile — which is the
 enforcement, not a convention. Sizes 14 · 16 · 18. Stroke is Lucide's 2 and
 there is no prop to change it.
 

@@ -215,8 +215,10 @@ export function WorkModuleSection({
 
 /**
  * Below 768px the rail cannot stand beside the list (MASTER §5.5): the same
- * Date options sit above it as one wrapping row — no sideways scroll — and a
- * week's holiday is named under it. Module moves to the toolbar's Select.
+ * Date options sit above it — the week's badges on one line, then `Missed` and
+ * `No working date` in words (an icon never carries meaning alone) — wrapping,
+ * never scrolling sideways, with the week's holiday named under them. Module
+ * moves to the toolbar's Select.
  */
 export function WorkDayStrip({
   dates,
@@ -245,10 +247,6 @@ export function WorkDayStrip({
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-1">
-        <button type="button" aria-pressed={selected === "missed"} aria-label={`Missed${actions(dates.missed)}`} className={option(selected === "missed")} onClick={() => onSelect("missed")}>
-          <IconBox name="history" />
-          <Count value={dates.missed} />
-        </button>
         {dates.days.map((day) => (
           <button
             key={day.iso}
@@ -262,9 +260,17 @@ export function WorkDayStrip({
             <Count value={day.count} />
           </button>
         ))}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <button type="button" aria-pressed={selected === "missed"} aria-label={`Missed${actions(dates.missed)}`} className={`${option(selected === "missed")} pr-2`} onClick={() => onSelect("missed")}>
+          <IconBox name="history" />
+          Missed
+          <Count value={dates.missed} />
+        </button>
         {dates.noDate > 0 || selected === "no_date" ? (
-          <button type="button" aria-pressed={selected === "no_date"} aria-label={`No working date${actions(dates.noDate)}`} className={option(selected === "no_date")} onClick={() => onSelect("no_date")}>
+          <button type="button" aria-pressed={selected === "no_date"} aria-label={`No working date${actions(dates.noDate)}`} className={`${option(selected === "no_date")} pr-2`} onClick={() => onSelect("no_date")}>
             <IconBox name="noDate" />
+            No working date
             <Count value={dates.noDate} />
           </button>
         ) : null}

@@ -22,8 +22,11 @@ describe("WorkDayStrip (below 768px)", () => {
     const week = vi.fn();
     render(<WorkDayStrip dates={DATES} selected="2026-09-16" onSelect={pick} onWeek={week} />);
     const nav = screen.getByRole("navigation", { name: "Date" });
-    const row = within(nav).getByRole("button", { name: /^Missed/ }).parentElement as HTMLElement;
-    expect(row.className).toMatch(/flex-wrap/);
+    for (const button of within(nav).getAllByRole("button").filter((b) => b.hasAttribute("aria-pressed"))) {
+      expect((button.parentElement as HTMLElement).className).toMatch(/flex-wrap/);
+    }
+    // An icon never carries a meaning alone: Missed is written beside its glyph.
+    expect(within(nav).getByRole("button", { name: "Missed · 3 actions" })).toHaveTextContent("Missed3");
     expect(nav.innerHTML).not.toMatch(/overflow-x/);
     expect(within(nav).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day · 4 actions" })).toHaveAttribute("aria-pressed", "true");
     expect(within(nav).getByRole("button", { name: "Thu, 17 Sep · Today · 1 action" }).querySelector("[data-today]")).not.toBeNull();
