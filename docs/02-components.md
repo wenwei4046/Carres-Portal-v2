@@ -356,6 +356,30 @@ and evidence viewer promised for Supplier Claims.
 
 ---
 
+## SavedEvidenceViewer
+
+**Purpose.** The approved shared read-only saved-photo/video viewer (Purchasing MASTER
+§9.5). Local implementation 2026-09-24; production readback owed. Receiving's existing
+arrival-evidence controls are the first consumer; Claims/Stock/Service integrations
+remain separate work and must reuse this component.
+
+**Contract.** The owning authorised reader supplies stable file IDs, kind, signed URL
+(or null for an unreadable existing file), recorded source/event context and any proven
+Unit associations. The viewer never fetches a storage list, widens permissions, uploads,
+deletes, or rewrites evidence. Retry calls the owning reader again. Empty evidence has
+no opening control; a known file without a readable URL remains visible as a failure.
+
+**Behaviour.** Existing Modal viewer width, focus trap, Escape/Close, focus restoration
+and scroll lock; photo zoom, drag, Reset, Previous/Next; native video playback, seeking
+and fullscreen. Each file switch resets enlargement and keeps its own context. Loading,
+media failure and retry differ; a late retry cannot replace a newly selected file.
+The `/ui` example includes a clearly marked photo, an unreadable file and an eight-second
+synthetic H.264 video (`ui-evidence-example.mp4`, generated colour/motion test pattern,
+320×180 at 12fps; no recorded business or personal content). Receiving
+keeps arrival evidence at receipt scope; no Unit attribution is inferred.
+
+---
+
 # Built, not yet proven by a real page
 
 These exist in `components/kit/` and render on `/ui`. They are written up when a

@@ -2021,6 +2021,14 @@ One implementation, reused by Supplier Claims, Receiving, Stock and Service Case
 
 Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0546): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
+**Shared saved-evidence viewer — local implementation 2026-09-24; production proof owed.**
+`SavedEvidenceViewer` is admitted under Purchasing §9.5's approved contract and recorded
+in `02-components.md`, with a live `/ui` example. Existing Modal behavior owns focus,
+Escape and scroll lock. Source/event and any actual Unit associations stay with each file;
+permissions and refresh stay with the owning reader. Receiving is the first consumer.
+Claims' working reply record, Stock and Service adoption remain separate work; this kit
+addition does not claim those workflows delivered.
+
 ## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
 
 **The connector belongs to the TABLE, because only the table knows where the `Ready Stock` column

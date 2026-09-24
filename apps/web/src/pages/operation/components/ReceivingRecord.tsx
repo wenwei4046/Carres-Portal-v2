@@ -15,6 +15,7 @@ import {
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useOperationWarehouse,
+  fetchReceivingSessionDetail,
   useReceivingAmendMutation,
   useReceivingDuty,
   useReceivingSessionDetail,
@@ -24,6 +25,7 @@ import {
 import { renderGrnPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 import DropdownMenu from "@/components/kit/DropdownMenu";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import { DOC_BTN, DocSection as Section, Prop } from "./workspace-doc";
@@ -65,6 +67,7 @@ export default function ReceivingRecord({
   const q = useReceivingSessionDetail(sessionId);
   const dutyQ = useReceivingDuty();
   const [amending, setAmending] = useState(false);
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [draft, setDraft] = useState<AmendFormDraft | null>(null);
 
@@ -281,21 +284,23 @@ export default function ReceivingRecord({
                 <span className="text-body text-kit-slate-12">
                   {evidenceSentence(r.arrival_evidence ?? [])}
                 </span>
-                {/* Saved evidence can be RE-SEEN, not only counted (§9). */}
-                {(r.arrival_evidence_files ?? []).map((f, i) =>
-                  f.url ? (
-                    <a
-                      key={f.path}
-                      href={f.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-2 text-body text-kit-blue-11 hover:underline"
-                      data-testid="arrival-evidence-view"
-                    >
-                      {f.kind === "video" ? "Video" : "Photo"} {i + 1}
-                    </a>
-                  ) : null,
-                )}
+                {(r.arrival_evidence ?? []).map((f, i) => (
+                  <button key={f.path} type="button" onClick={() => setEvidenceId(f.path)}
+                    className="ml-2 text-body text-kit-blue-11 hover:underline"
+                    data-testid="arrival-evidence-view">
+                    {f.kind === "video" ? "Video" : "Photo"} {i + 1}
+                  </button>
+                ))}
+                <SavedEvidenceViewer activeId={evidenceId} onClose={() => setEvidenceId(null)}
+                  files={(r.arrival_evidence ?? []).map((f) => ({
+                    id: f.path, kind: f.kind,
+                    url: r.arrival_evidence_files?.find((saved) => saved.path === f.path)?.url ?? null,
+                    context: `${receivingDisplayNo(r)} · Arrival evidence`,
+                  }))}
+                  onRetry={async (id) => {
+                    const refreshed = await fetchReceivingSessionDetail(sessionId);
+                    return refreshed.receipt.arrival_evidence_files?.find((f) => f.path === id)?.url ?? null;
+                  }} />
               </Prop>
             )}
             {isGrn ? (

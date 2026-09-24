@@ -3763,12 +3763,12 @@ fits the shared 54px row; long problem text and accessibility needs may grow it.
   `Evidence could not be loaded` + `Try again`, never `Photos 0`. `Photos 0` means the record
   genuinely has none — and a kind with zero files prints no control at all rather than a dead one.
 
-**The saved-evidence viewer — ONE shared component, and it does not exist yet.**
+**The saved-evidence viewer — ONE shared component; local build 2026-09-24, production proof owed.**
 
 | Check | Measured answer |
 |---|---|
-| Does a shared saved-evidence viewer exist? | **No.** `apps/web/src/pages/operation/components/CaseEvidenceGallery.tsx` is a Service-Case list with an UPLOADER (append-only, no delete) and no zoom, drag, Previous/Next or overlay. `ClaimPhotoUploadField.tsx` is an upload field. `SupplierClaimPanel.tsx:35` prints `Evidence: {n} photos` as text. Source read on this branch, 2026-09-18 |
-| Consequence | **🟡 KIT COMPONENT REQUEST — the component must join the kit before this page is built** (Constitution §2: never draw one inline "just this once"). Its contract is below. It is `APPROVED TARGET / NOT BUILT` |
+| Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claims, Stock and Service adoption remain unbuilt; their existing uploaders are not substitute viewers |
+| Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Production readback is still owed |
 
 The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
 
@@ -3831,11 +3831,11 @@ only (no production walk):**
 Do not describe reply recording as available. A committed route is not a delivered capability, and
 neither is an approved design.
 
-**TWO APPROVED TARGETS, BOTH NOT BUILT, AND NEITHER MAY BE DELIVERED HALF-WAY.**
+**TWO APPROVED TARGETS; NEITHER MAY BE DELIVERED HALF-WAY.**
 
 | Target | State | The build's obligation |
 |---|---|---|
-| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **APPROVED TARGET / NOT BUILT** | It joins the kit before this page uses it. One implementation for Supplier Claims, Receiving, Stock and Service Case — never a page-local copy |
+| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **LOCAL KIT BUILD; production proof and Claims adoption owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
 **The reply-recording build reuses what exists; it does not grow a second system.**

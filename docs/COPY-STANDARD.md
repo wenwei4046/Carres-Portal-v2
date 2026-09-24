@@ -1985,6 +1985,7 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | A claim row's second-line Unit identity, more than one Unit | `{n} Units` | A disclosure link into THAT row's expansion, never a Unit ID and never a second panel. The actual IDs appear on the expanded rows |
 | Quantity-managed goods with no Unit ID | `Counted stock` | The same word §9.1 already uses. There is no Unit ID and there never will be; the genuine quantity still stands in `Qty` |
 | Evidence list that could not be read | `Evidence could not be loaded` + `Try again` | The read failed. Never shown as `Photos 0`, which claims the record holds nothing |
+| Shared saved-evidence viewer controls (Purchasing §9.5 approved contract) | `Photo {n}` · `Video {n}` · `Zoom out` · `Zoom in` · `Reset` · `Previous` · `Next` · `Close` · `Loading…` · `Try again` | Read-only; context prints the recorded source/event and proven Unit IDs. Video uses native playback controls, never local zoom |
 | One saved evidence file that could not be read | `Photo {n} could not be loaded` + `Try again` | A file the record HAS but the viewer could not read. A file the record never had is absent, not failed — the two never render alike |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
