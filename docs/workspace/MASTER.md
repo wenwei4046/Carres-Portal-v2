@@ -656,10 +656,15 @@ the same group and item grammar; zero matches is not the same as zero work.
   chosen the column is the Panel 2 list. Choosing a job replaces the column with that job's Panel 3
   detail and moves focus to `Back to work`; `Back to work` restores the list and returns focus to the
   same row (or the next visible row when it closed). Panel 1 stays visible throughout.
-- Below **768px**, show one panel at a time. The Date options sit above the list without any
-  sideways scroll: the week arrows and month, the week's calendar badges on one wrapping line, then
-  `Missed` and `No working date` written in words (an icon never carries meaning alone), then the
-  week's named holiday. Module and owner live in kit Select controls. Selecting an action replaces the list with
+- Below a **960px viewport** (owner correction, Jess 2026-09-24), the list and the detail share one
+  stage whatever the canvas width, and the Date filter is never a permanent panel: one 40px trigger
+  `📅 Date: {selection} {count} ⌄` sits directly above the list (`{selection}` is `Missed` · the
+  `fmtDate` date · `No working date` · `Missed · {focus date}` on first open · `All dates`;
+  `{count}` is the list's rows, hidden at zero). It opens the `Date` section — title, week arrows
+  and month, badges, `Missed`, `No working date` only while it has work — in a kit `Popover`.
+  Choosing `Missed`, a date or `No working date` closes it and updates the trigger; the week arrows
+  keep it open. No holiday line is printed outside the popover. Module and owner live in kit Select
+  controls. The desktop rail is unchanged at 960px and wider. Selecting an action replaces the list with
   full-width detail. Browser and visible `Back to work` restore week, day, module, owner, filters,
   selected occurrence and list scroll. No permanent drawer or sideways three-panel page exists.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's

@@ -221,8 +221,11 @@ export const WORK_MODULES: readonly OperationWorkModule[] = [
   "issue_tracker",
 ];
 
-/** Panels follow the Work area's own width, never the window's. */
-export function workLayoutFor(width: number): WorkLayout {
+/** Panels follow the Work area's own width, never the window's — except that
+ *  below a 960px viewport the list and the detail always share one stage and
+ *  the Date filter becomes a trigger (owner correction 2026-09-24). */
+export function workLayoutFor(width: number, viewport = Number.POSITIVE_INFINITY): WorkLayout {
+  if (viewport < 960) return "one";
   return width >= 1104 ? "three" : width >= 768 ? "two" : "one";
 }
 
