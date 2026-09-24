@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 0581_a_logistics_company_answers_through_its_own_link.sql
 -- WORKSPACE LOGISTICS CARD · owner rulings 2026-09-24 (docs/delivery/MASTER.md
--- §5.5 · docs/ERP-ARCHITECTURE.md §6.4 · docs/workspace/MASTER.md §5.6)
+-- §5.5 · docs/ERP-ARCHITECTURE.md §6.4 · docs/workspace/MASTER.md §5.9)
 -- =============================================================================
 --
 -- THE OWNER'S RULINGS THIS MIGRATION EXISTS FOR:

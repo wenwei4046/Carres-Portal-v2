@@ -1,6 +1,6 @@
 /**
  * THE PARTY CARDS — the Work right panel's `Logistics · Customer · Supplier`
- * (owner rulings 2026-09-24, docs/workspace/MASTER.md §5.6).
+ * (owner rulings 2026-09-24, docs/workspace/MASTER.md §5.9).
  *
  * Logistics is the one card with an approved specification and its own acts.
  * Customer and Supplier share its stable shell but carry ONLY facts their

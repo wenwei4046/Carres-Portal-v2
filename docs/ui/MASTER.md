@@ -867,6 +867,10 @@ developer who knows the schema is not the acceptance reader; a new operator is.
      scheduled job or database automation acted — never inferred from a missing id.
   5. An old record whose individual actor cannot be recovered — including one written by a
      shared role login — says **`Staff identity not recorded`**. A person is never invented.
+  6. **The one COMPANY actor — owner ruling 2026-09-24.** A logistics company with no portal
+     login that answers through its external link (Delivery §5.5) is recorded and displayed as
+     **`{company} via external link`** (`AL Logistics via external link · Wed, 16 Sep`). It is an
+     organisation, never a person, and no screen may print a person's name for it.
 - A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
   `Original order`; a later approved/applied Revision names the governed change. Selecting a
   Revision opens the complete read-only version and its document truth.

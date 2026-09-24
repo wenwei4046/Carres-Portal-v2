@@ -14,7 +14,7 @@ import type { AppEnv } from "../../types";
 
 /**
  * THE LOGISTICS CARD'S DELIVERY DOORS — owner rulings 2026-09-24
- * (docs/delivery/MASTER.md §5.5 · docs/workspace/MASTER.md §5.6).
+ * (docs/delivery/MASTER.md §5.5 · docs/workspace/MASTER.md §5.9).
  *
  * ```
  * GET  /:orderId/logistics-card?leg=   the facts the Work Logistics card reads

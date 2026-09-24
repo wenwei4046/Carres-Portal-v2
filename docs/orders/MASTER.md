@@ -1403,7 +1403,7 @@ DO2609-4827 · Delivery order issued
 ```
 
 Requirements are plain sentences, GitHub-checks style, with the met count:
-`Goods not ready (0 of 1)` · `No logistics chosen` · `Date + slot not confirmed` ·
+`Goods not ready (0 of 1)` · `Logistics not assigned` · `Scheduled delivery not recorded` ·
 `RM {amount} still to collect`. When the confirmed date lands on a refused day the gate adds
 `Date falls on a Sunday — pick another day` (Malaysian public holidays take the same pattern).
 
@@ -1868,9 +1868,9 @@ same breath; its replacement, `Customer date {date} · Delivery not arranged`, i
 the map, which separates the same two facts onto two nodes rather than two clauses:
 
 ```
-DELIVERY DATE node   Date + slot not confirmed · Customer requested: {date}
-                     /  Delivery appointment: {date} · {slot}
-DELIVERY ORDER gate  · Date + slot not confirmed        (a gate requirement)
+DELIVERY DATE node   Not scheduled yet · Requested delivery: {date}
+                     /  Scheduled delivery: {date} · {time, only when recorded}
+DELIVERY ORDER gate  · Scheduled delivery not recorded  (a gate requirement)
 ```
 
 **What survives unchanged is the RULE the wording existed to enforce:** the customer's promise and
@@ -5326,10 +5326,11 @@ due: **WITHIN THE DAY the Purchase Order is issued** (owner re-ruling 2026-08-16
 PO: **within the order day**. Logistics is assigned the moment purchase starts, not near the
 delivery.
 
-**`Call {logistics}` over `Confirm the delivery date`** (two structured Work lines, owner ruling
-2026-09-13; never joined with an em dash) — trigger: logistics assigned but the customer
-has not confirmed BOTH a date and a slot · completion: **a customer-confirmed date AND slot
-exist. A date logistics proposed is a fact, not a confirmation** · due: a settable number of
+**`Call {logistics}` over `Get the scheduled delivery date`** (two structured Work lines, owner
+rulings 2026-09-13 / 2026-09-24; never joined with an em dash) — trigger: logistics assigned but
+no Scheduled delivery date is recorded · completion: **a Scheduled delivery date exists; the time
+is OPTIONAL (owner ruling 2026-09-24). `Requested another date` from logistics is a fact, not a
+schedule** · due: a settable number of
 working days before the date (**1 today**) · the checklist adds driver name, driver phone,
 vehicle number and lift/registration requirements **for condominiums**.
 
@@ -5487,7 +5488,7 @@ approval — black and white in the system, never verbal.
 **A Delivery Order issues only when, for the trip's Sales Order:**
 
 ```
-✓ the customer has confirmed a delivery date AND a time slot
+✓ a Scheduled delivery date is recorded (the time is optional — owner ruling 2026-09-24)
 ✓ the date is not a Sunday and not a Malaysian public holiday
 ✓ every goods line is reserved to this order (accessories pass automatically)
 ✓ logistics chosen

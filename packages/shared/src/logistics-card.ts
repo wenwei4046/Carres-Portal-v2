@@ -1,6 +1,6 @@
 /**
  * THE LOGISTICS CARD — the Work right panel's Logistics party card.
- * Owner rulings 2026-09-24 (docs/workspace/MASTER.md §5.6 · docs/delivery/MASTER.md §5.5).
+ * Owner rulings 2026-09-24 (docs/workspace/MASTER.md §5.9 · docs/delivery/MASTER.md §5.5).
  *
  * ONE arithmetic for three things the card, the Work panel and the external
  * link page must agree on (Law D):

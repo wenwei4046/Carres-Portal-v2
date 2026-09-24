@@ -1,6 +1,6 @@
 /**
  * THE LOGISTICS PARTY CARD — the Work right panel (owner rulings 2026-09-24,
- * docs/workspace/MASTER.md §5.6).
+ * docs/workspace/MASTER.md §5.9).
  *
  * ```
  * COLLAPSED (≤ 5 facts)                         EXPANDED (in this order)
