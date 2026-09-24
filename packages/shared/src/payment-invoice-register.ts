@@ -276,7 +276,7 @@ export function soRemaining(
  *   → the booking overlay, only while its stage is `confirmed`
  *
  * A day without a time is still a confirmed DAY for the clock; `time` is null
- * and the listing says `No time agreed`, exactly as Delivery does.
+ * and the listing prints the date alone (time is optional, owner ruling 2026-09-24).
  */
 export function invoiceConfirmedDelivery(row: InvoiceRegisterRow): {
   dateIso: string | null;

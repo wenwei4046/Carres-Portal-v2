@@ -20,7 +20,7 @@
  *  6. The rail filters combine, every count is what clicking it produces,
  *     STATE is flat direct names, LOGISTICS lists only partners
  *     genuinely carrying matching rows, DELIVERY STATUS is the three fixed
- *     rungs, and `No logistics picked` is a WORK TO DO queue — never
+ *     rungs, and `Logistics not assigned` is a WORK TO DO queue — never
  *     duplicated under LOGISTICS.
  *  7. The Month's counts are the SAME queues the rail lists — an `Exceptions`
  *     number is exactly Overdue + Failed Delivery + Upload delivery proof.
@@ -804,7 +804,7 @@ describe("filterMonitorListRows", () => {
     expect(out).toHaveLength(SET.length);
   });
 
-  it("`No logistics picked` keeps every unassigned row across ALL dates — DO-less and dateless included", () => {
+  it("`Logistics not assigned` keeps every unassigned row across ALL dates — DO-less and dateless included", () => {
     const out = filterMonitorListRows(SET, { ...noFilters, view: "no_logistics" });
     expect(out.map((c) => c.scopeId).sort()).toEqual([
       "dateless",
@@ -817,7 +817,7 @@ describe("filterMonitorListRows", () => {
     expect(out.some((c) => c.scopeId === "nets")).toBe(false);
   });
 
-  it("a STATE pick combines with `No logistics picked` — Selangor · No logistics picked", () => {
+  it("a STATE pick combines with `Logistics not assigned` — Selangor · Logistics not assigned", () => {
     const out = filterMonitorListRows(SET, { ...noFilters, view: "no_logistics", region: "Selangor" });
     expect(out.map((c) => c.scopeId).sort()).toEqual([
       "dateless",
@@ -846,7 +846,7 @@ describe("filterMonitorListRows", () => {
     ).toEqual(["wh"]);
   });
 
-  it("the filters COMBINE — No confirmed date · No logistics picked", () => {
+  it("the filters COMBINE — No confirmed date · Logistics not assigned", () => {
     expect(
       filterMonitorListRows(SET, { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none" }).map(
         (c) => c.scopeId,
@@ -880,7 +880,7 @@ describe("groupCardsByDay", () => {
 /* ── 7 · The Month's counts are the rail's own queues ──────────────────── */
 
 describe("monthDayCounts", () => {
-  it("counts deliveries, exceptions (Overdue + Failed Delivery + Upload delivery proof) and No logistics picked per date", () => {
+  it("counts deliveries, exceptions (Overdue + Failed Delivery + Upload delivery proof) and Logistics not assigned per date", () => {
     const set = [
       datedCard({ scopeId: "a" }),
       datedCard({ scopeId: "b", statusKey: "failed", statusLabel: "Failed Delivery" }),
@@ -905,7 +905,7 @@ describe("monthDayCounts", () => {
 
   it("the cell's sentence says the same three facts in words — zero lines omitted", () => {
     expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 })).toBe(
-      "Fri, 4 Sep — 3 deliveries · 1 exception · 2 No logistics picked",
+      "Fri, 4 Sep — 3 deliveries · 1 exception · 2 Logistics not assigned",
     );
     expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, transfers: 0, exceptions: 0, noLogistics: 0 })).toBe(
       "Fri, 4 Sep — 1 delivery",
@@ -1096,7 +1096,7 @@ describe("buildMonitorRails", () => {
     expect(rails.regions.find((r) => r.key === "Sabah")!.count).toBe(0);
   });
 
-  it("LOGISTICS lists only partners genuinely carrying a matching row — never a duplicated No logistics picked row", () => {
+  it("LOGISTICS lists only partners genuinely carrying a matching row — never a duplicated Logistics not assigned row", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     const labels = rails.logistics.map((r) => r.label);
     // NETS carries one; AL and HOUZS carry nothing and are not listed.

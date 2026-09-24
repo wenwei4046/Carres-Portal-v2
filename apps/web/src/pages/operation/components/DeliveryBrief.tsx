@@ -853,10 +853,8 @@ export default function DeliveryBrief({
             label={MONITOR_COPY.confirmedDate}
             value={card.confirmedDate ? fmtDate(card.confirmedDate) : absentWord(MONITOR_COPY.notConfirmed)}
           />
-          <Fact
-            label={MONITOR_COPY.confirmedTime}
-            value={card.confirmedTime ?? absentWord(MONITOR_COPY.noTimeAgreed)}
-          />
+          {/* Time is optional (owner ruling 2026-09-24): printed only when recorded. */}
+          {card.confirmedTime ? <Fact label={MONITOR_COPY.confirmedTime} value={card.confirmedTime} /> : null}
         </div>
       )}
     </Panel>
@@ -945,7 +943,7 @@ export default function DeliveryBrief({
             <div className="break-words">{stop.from_loc || DW.notRecorded} → {stop.to_loc || DW.notRecorded}</div>
             <div>{booking?.partner_name ?? stop.partner_name ?? MONITOR_COPY.noLogistics}</div>
             <div>{date ? fmtDate(date) : MONITOR_COPY.notConfirmed}</div>
-            <div>{time || MONITOR_COPY.noTimeAgreed}</div>
+            {time ? <div>{time}</div> : null}
           </div>;
         })}
       </div> : null}

@@ -876,7 +876,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
   if (later && !input.replyProofPath) {
     return c.json(
       {
-        error: "Save confirmed delivery — upload the WhatsApp reply",
+        error: "Save scheduled delivery — upload the WhatsApp reply",
         code: "later_date_needs_reply_proof",
       },
       409,

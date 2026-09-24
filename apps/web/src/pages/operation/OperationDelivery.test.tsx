@@ -341,7 +341,7 @@ describe("the shape", () => {
     }
     for (const row of [
       "All delivery work",
-      "No logistics picked",
+      "Logistics not assigned",
       /* The queue is named after the JOB (owner ruling 2026-09-10). */
       "Call customer",
       /* ⭐ NOT a bare `Overdue` (owner ruling 2026-09-11): the contact strip
@@ -397,7 +397,7 @@ describe("the shape", () => {
         rows[i - 1]!.compareDocumentPosition(rows[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
-    expect(within(rail).getAllByText("No logistics picked")).toHaveLength(1);
+    expect(within(rail).getAllByText("Logistics not assigned")).toHaveLength(1);
     /* `Waiting for warehouse` is a DELIVERY STATUS value and never a queue. */
     expect(within(rail).queryByTestId("delivery-monitor-work-waiting_warehouse")).toBeNull();
   });
@@ -417,7 +417,7 @@ describe("the shape", () => {
     }
   });
 
-  it("LOGISTICS lists only governed partners genuinely carrying rows — no invented company, no duplicated No logistics picked row", () => {
+  it("LOGISTICS lists only governed partners genuinely carrying rows — no invented company, no duplicated Logistics not assigned row", () => {
     wrap(<OperationDelivery />);
     fireEvent.click(
       within(screen.getByTestId("delivery-monitor-logistics-select")).getByRole("combobox"),
@@ -514,14 +514,14 @@ describe("Day · Week · Month (owner correction 2026-09-07)", () => {
     expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
     const fourth = screen.getByTestId("delivery-monitor-month-day-2026-09-04");
     expect(fourth.getAttribute("aria-label")).toBe(
-      "Fri, 4 Sep — 2 deliveries · 1 exception · 2 No logistics picked",
+      "Fri, 4 Sep — 2 deliveries · 1 exception · 2 Logistics not assigned",
     );
     expect(within(fourth).getByText("Deliveries")).toBeTruthy();
     expect(within(fourth).getByText("Exceptions")).toBeTruthy();
     const fifth = screen.getByTestId("delivery-monitor-month-day-2026-09-05");
     expect(fifth.getAttribute("aria-label")).toBe("Fri, 5 Sep — 1 delivery".replace("Fri", "Sat"));
     expect(within(fifth).queryByText("Exceptions")).toBeNull();
-    expect(within(fifth).queryByText("No logistics picked")).toBeNull();
+    expect(within(fifth).queryByText("Logistics not assigned")).toBeNull();
     /* Sunday visible, not a choice. */
     expect((screen.getByTestId("delivery-monitor-month-day-2026-09-06") as HTMLButtonElement).disabled).toBe(true);
     /* The toolbar's month arrows replace the whole month. */
@@ -937,7 +937,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
   it("a legacy ?logistics=none URL still narrows and still prints its label", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&logistics=none");
     expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain(
-      "Call customer · No logistics picked",
+      "Call customer · Logistics not assigned",
     );
   });
 });
@@ -1008,7 +1008,7 @@ describe("Upload delivery proof (owner correction 2026-09-07)", () => {
 describe("bulk logistics assignment on the work list", () => {
   beforeEach(seedUnassigned);
 
-  it("Monitor → No logistics picked → header select-all → `3 selected · Clear · Assign logistics`", () => {
+  it("Monitor → Logistics not assigned → header select-all → `3 selected · Clear · Assign logistics`", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
     const checkboxes = screen.getAllByRole("checkbox");
     fireEvent.click(checkboxes[0]!);
@@ -1023,7 +1023,7 @@ describe("bulk logistics assignment on the work list", () => {
     expect(document.body.textContent).not.toMatch(/\bscopes?\b/i);
   });
 
-  it("`No logistics picked` holds every eligible row across all dates — no DO and no confirmed date included", () => {
+  it("`Logistics not assigned` holds every eligible row across all dates — no DO and no confirmed date included", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
     for (const so of ["SO-1401", "SO-1402", "SO-1403"]) expect(screen.getByText(so)).toBeTruthy();
     /* Every one of them is unassigned and dateless — the population the bulk

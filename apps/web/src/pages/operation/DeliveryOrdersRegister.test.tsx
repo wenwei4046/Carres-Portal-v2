@@ -717,7 +717,7 @@ describe("DeliveryOrdersRegister", () => {
       }),
     ]);
     expect(screen.getAllByText("No confirmed date").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("No logistics picked").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Logistics not assigned").length).toBeGreaterThan(0);
     /* Nothing recorded yet: nothing is due, and the cell says so. */
     expect(screen.getAllByText("Not delivered yet").length).toBeGreaterThan(0);
     expect(screen.getAllByText("No signed document yet").length).toBeGreaterThan(0);

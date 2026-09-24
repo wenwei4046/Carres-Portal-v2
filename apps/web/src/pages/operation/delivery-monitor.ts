@@ -101,7 +101,7 @@ export const MONITOR_COPY = {
   railLogistics: "Logistics",
   railStatus: "Delivery status",
   allDeliveryWork: "All delivery work",
-  noLogistics: "No logistics picked",
+  noLogistics: "Logistics not assigned",
   /**
    * ⭐ THE CONTACT-WORK QUEUE (owner ruling 2026-09-10).
    *
@@ -114,8 +114,6 @@ export const MONITOR_COPY = {
    */
   callCustomer: "Call customer",
   noConfirmedDate: "No confirmed date",
-  /** A day agreed with no window on it — the arrangement's own half-state. */
-  noTimeAgreed: "No time agreed",
   /**
    * ⭐ TWO DIFFERENT OVERDUE POPULATIONS, TWO DIFFERENT WORDS (owner ruling
    * 2026-09-11). The rail's `Overdue delivery` is a confirmed trip whose day
@@ -147,8 +145,8 @@ export const MONITOR_COPY = {
   /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
   editDelivery: "Edit Delivery",
   /* ── THE TWELVE-COLUMN REGISTER (owner ruling 2026-09-12, MASTER §8.3) ── */
-  confirmed: "Confirmed",
-  notConfirmed: "Not confirmed",
+  confirmed: "Scheduled",
+  notConfirmed: "Not scheduled",
   paid: "Paid",
   doNotDeliver: "Do not deliver",
   stillToCollect: (amount: string) => `${amount} still to collect`,
@@ -176,9 +174,9 @@ export const MONITOR_COPY = {
   buildingType: "Building type",
   lift: "Lift",
   access: "Access",
-  customerRequested: "Customer requested",
-  confirmedDate: "Confirmed delivery date",
-  confirmedTime: "Confirmed delivery time",
+  customerRequested: "Requested delivery",
+  confirmedDate: "Scheduled date",
+  confirmedTime: "Scheduled time (optional)",
   partner: "Logistics",
   driver: "Driver",
   driverPhone: "Driver phone",
@@ -211,12 +209,12 @@ export const MONITOR_COPY = {
   customerWord: "Customer",
   operationOnBehalfOf: (partner: string) => `Operation on behalf of ${partner}`,
   whatsappProof: "WhatsApp proof",
-  saveConfirmedDelivery: "Save confirmed delivery",
-  saveConfirmedDeliveryNeedsReply: "Save confirmed delivery — upload the WhatsApp reply",
+  saveConfirmedDelivery: "Save scheduled delivery",
+  saveConfirmedDeliveryNeedsReply: "Save scheduled delivery — upload the WhatsApp reply",
   cancel: "Cancel",
   notDeliveryDay: "Sunday and Malaysian public holidays are not delivery days",
   deliveryConfirmedDone: (date: string, slot: string | null) =>
-    slot ? `Delivery confirmed ${date} · ${slot}` : `Delivery confirmed ${date}`,
+    slot ? `Delivery scheduled ${date} · ${slot}` : `Delivery scheduled ${date}`,
   uploadReply: "Upload reply screenshot",
   replaceReply: "Replace screenshot",
   replyAttached: "Reply screenshot attached",
@@ -337,8 +335,8 @@ export const MONITOR_COLUMN = {
   logisticsPartner: "Logistics",
   /** The register's own heading for the partner column (§8.3 column 9). */
   logistics: "Logistics",
-  confirmedDelivery: "Confirmed Delivery",
-  confirmedTime: "Confirmed Time",
+  confirmedDelivery: "Scheduled delivery",
+  confirmedTime: "Scheduled time",
   doNumber: "DO No",
   location: "Delivery Location",
   /** The main goods on the truck — the model, its size and how many. */
@@ -877,7 +875,9 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
     const { readiness, items, extras } = goods;
     const contactDueIso = row.contactDueIso;
     /* The arrangement is COMPLETE only with a day AND a window on it. */
-    const booked = row.confirmedIso !== null && row.confirmedTime !== null;
+    /* Owner ruling 2026-09-24: the Scheduled date alone completes the
+       arrangement; the time is optional. */
+    const booked = row.confirmedIso !== null;
     /* ⭐ THE VAN HAS ALREADY BEEN (owner correction 2026-09-11, found in the
        rendered walk). Contact work is about arranging a delivery that has not
        happened. Once a RESULT is recorded — `Delivered`, or the one
@@ -1713,7 +1713,7 @@ export interface MonitorRails {
  *
  * LOGISTICS PARTNER: only the governed partners genuinely carrying a matching
  * row (governed roster order first, then others by name), and the operator's
- * own pick even at 0. `No logistics picked` lives in WORK TO DO as a primary
+ * own pick even at 0. `Logistics not assigned` lives in WORK TO DO as a primary
  * queue and is never duplicated here.
  *
  * DELIVERY STATUS: the three fixed rungs, live counts, zero printed.

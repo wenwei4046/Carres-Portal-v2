@@ -3532,7 +3532,7 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     // rule is that ONE filter in `liveScope` reaches every count, not that
     // Overdue was patched by hand.
     const grp = within(screen.getByTestId("filter-delivery"));
-    const noLogistics = grp.getByRole("button", { name: /No logistics picked/ });
+    const noLogistics = grp.getByRole("button", { name: /Logistics not assigned/ });
     expect(queueCount(noLogistics)).toBe(2);
   });
 
