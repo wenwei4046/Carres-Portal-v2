@@ -621,50 +621,23 @@ describe("operation Work response composition", () => {
     expect(clean.some((i) => i.ruleKey === "collect")).toBe(false);
   });
 
-  it("admits supplier reply work from the owning PO facts with PO Duty and the exact PO door", () => {
-    const person = { userId: "po-duty", name: "Yu Jun" };
-    const [item] = projectPurchaseOrderReplyWork({
+  it("does not admit a sent-but-unanswered PO as Work (supplier_reply retired 2026-09-24)", () => {
+    const items = projectPurchaseOrderReplyWork({
       pos: [{
         id: "PO-2041",
         supplier_id: "supplier-1",
         status: "open",
         version: 2,
         promises: [],
-        sends: [{
-          kind: "confirmed_sent",
-          channel: "whatsapp",
-          sent_at: "2026-09-03T17:00:00Z",
-          po_version: 2,
-        }],
+        sends: [{ kind: "confirmed_sent", channel: "whatsapp", sent_at: "2026-09-03T17:00:00Z", po_version: 2 }],
         purchase_order_lines: [{ qty: 4, received_qty: 0 }],
       }],
       suppliers: [{ id: "supplier-1", name: "Nice Future" }],
-      poDuty: {
-        dutyKey: "po_duty",
-        onDate: "2026-09-08",
-        normalOwner: person,
-        buddy: null,
-        activeCover: null,
-        actingPerson: person,
-        state: "primary",
-        assignmentId: "assignment-1",
-      },
+      poDuty: null,
       today: "2026-09-08",
     });
-
-    expect(item).toMatchObject({
-      id: "purchasing:PO-2041:purchasing.supplier_reply",
-      module: "purchasing",
-      object: { kind: "purchase_order", id: "PO-2041", label: "PO-2041" },
-      problem: "Supplier has not confirmed the PO date",
-      action: "Ask Nice Future to confirm the PO delivery date",
-      recipient: "Nice Future",
-      owner: { dutyKey: "po_duty", normal: person, acting: person },
-      timing: { actionOn: "2026-09-04", placement: "missed", missedAge: { state: "not_calculable" } },
-      destination: "/operation?tab=purchase-orders&po=PO-2041",
-    });
-    expect(item?.action).not.toContain("Yu Jun");
-    expect(item?.completionPredicate).toContain("exact current PO version");
+    // The PO waits for goods from the supplier; silence is not a task.
+    expect(items).toEqual([]);
   });
 
   /* ── THE ADVANCE ARRIVAL CHECK reaches shared Work (owner ruling

@@ -105,7 +105,12 @@ const po = (id: string, extra: Partial<Po> = {}): Po => ({
   ...extra,
 } as Po);
 const POS: Po[] = [
-  po("PO-2041"),                                                   // sent, no answer → supplier_reply
+  po("PO-2041"),                                                   // sent, no answer → waiting for goods, no Work
+  po("PO-2044", { promises: [{
+    kind: "tomorrow_delivery", answer: "confirmed", po_version: 2, about_date: "2026-09-05", new_date: "2026-09-05",
+    previous_date: null, reason: null, channel: "whatsapp", recipient: "Nice Future group", evidence: "PO-2044/reply.png",
+    reported_by: "Ah Hock", reported_at: "2026-09-04T02:00:00Z", recorded_by: "u-1", recorded_at: "2026-09-04T02:05:00Z",
+  }] } as unknown as Partial<Po>), // evidenced date passed with goods owing → supplier_date_passed
   po("PO-2042", { sends: [] }),                                    // never sent → nothing
   po("PO-2043", { purchase_order_lines: [{ qty: 4, received_qty: 4 }] }), // fully received → nothing
 ];
@@ -121,8 +126,8 @@ describe("the one-PO Work probe", () => {
     expect(shapeOf(probe)).toEqual(shapeOf(whole));
   });
 
-  it("the fixture exercises the reply rule", () => {
+  it("the fixture exercises the passed-date rule, and a silent sent PO is not Work", () => {
     const all = projectPurchaseOrderReplyWork({ pos: POS, suppliers: [], poDuty: null, today: "2026-09-08" });
-    expect(all.map((i) => i.id)).toEqual(["purchasing:PO-2041:purchasing.supplier_reply"]);
+    expect(all.map((i) => i.ruleKey)).toEqual(["purchasing.supplier_date_passed"]);
   });
 });
