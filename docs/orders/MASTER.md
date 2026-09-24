@@ -708,7 +708,9 @@ CUSTOMER                name · phone · email · demographics
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
                         → `Services`: Delivery owns the ONE service editor (owner correction 2026-09-24).
-                        Add, quantity, per-unit Size and Remove/Restore operate on the same draft addon rows.
+                        In Edit, omit the visible `Services` label above the service list (owner correction
+                        2026-09-24); retain its accessible group name. Add, quantity, per-unit Size and
+                        Remove/Restore operate on the same draft addon rows.
                         Catalogue names, selectable sizes and per-unit size summaries use the Sales Portal
                         contract; no local renaming or invented size category. Server-owned delivery/stair
                         charges are read-only. Items and PDF project the same quantity, configuration and
