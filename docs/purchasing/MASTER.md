@@ -2792,13 +2792,23 @@ The register, filters and exports now name `GRN Doc Date`; the record and amendm
 form use the same corrected supplier/date labels. Normal posted GRNs carry no `Valid`
 badge, while cancelled records retain their explicit status.
 
+**GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
+The existing renderer now prints the PO-family logo, legal identity and three address
+lines on every page, with the full GRN identity. Two information blocks separate
+supplier/source/instruction from document date and actual arrival facts. Unknown
+values print `Not recorded`. Order/Received columns always remain; zero-only
+Damaged/Wrong/Pending columns become one explicit zero-value line, while mixed
+columns retain quiet zeroes. Render tests cover real continuation pages, separate
+instruction/arrival positions and zero-only exception columns. Quantity arithmetic,
+posting evidence and the outstanding receiver/time/scope gaps are unchanged.
+
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
 posting evidence; resolve the authoritative receiver before claiming the complete GRN
 target. Actual arrival time remains a separate schema gap under §9.3; never derive it
-from the filing timestamp. The full approved letterhead, two-block composition,
-physical/cumulative quantity presentation and other GRN document requirements remain
-open; this linkage change does not claim the complete document redesign.
+from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
+other GRN document requirements remain open; the implemented composition and linkage
+do not claim the complete document target.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
