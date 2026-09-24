@@ -575,8 +575,10 @@ describe.skipIf(!URL)("card settlement: the import order does not change the mat
 /**
  * 0576, 0581: Approve day pays a day out from the card account its sales were
  * paid into, and refuses a day paid into no card account or into two. The
- * first three cases hold on 0576 and 0581 alike. The last one is 0581's: a card
+ * first three cases hold on 0576 and 0581 alike. The fourth is 0581's: a card
  * method pointed at another account after the sale does not move an old day.
+ * The last holds on 0576 and 0581 alike: a day before go-live, which the
+ * ledger never saw, still pays out from its payment method's account.
  */
 describe.skipIf(!URL)("Approve day pays from the card account the day's sales were posted to (real PostgreSQL, 0576, 0581)", () => {
   let db: pg.Client;
@@ -599,17 +601,17 @@ describe.skipIf(!URL)("Approve day pays from the card account the day's sales we
     }
   }
   // a card sale, posted to the ledger when its method has an account
-  async function sale(amount: number, code: string, method: string, post = true) {
+  async function sale(amount: number, code: string, method: string, post = true, on = D) {
     const id = (await q(
       "insert into order_payments (order_id, amount, paid_on, method, reference, recorded_by) values ($1, $2, $3::date, $4, $5, $6) returning id",
-      [T.order, amount, D, method, code, T.fin],
+      [T.order, amount, on, method, code, T.fin],
     )).rows[0].id as string;
     if (post) await q("select public._customer_payment_to_ledger($1)", [id]);
   }
   // one Public Bank machine's day, every sale matched by its approval code
-  async function cardDay(machine: string, rows: Array<{ amt: string; net: string; code: string }>) {
+  async function cardDay(machine: string, rows: Array<{ amt: string; net: string; code: string }>, on = D) {
     const content = pbbFile(rows.map((r, i) => ({
-      ...r, sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), mid: `9000000000${machine}`, tid: `900000${machine}`, trace: `000${machine}${i}`,
+      ...r, sett: ddmmyyyy(plus(on, 1)), trans: ddmmyyyy(on), mid: `9000000000${machine}`, tid: `900000${machine}`, trace: `000${machine}${i}`,
     })));
     const parsed = parseCardFile("PBB", content, `pbb-${machine}.csv`);
     if (!parsed.ok) throw new Error(parsed.message);
@@ -708,5 +710,20 @@ describe.skipIf(!URL)("Approve day pays from the card account the day's sales we
     expect(after.holding_codes).toEqual([A]);
     expect(await approve(day, B)).toMatchObject({ ok: false, detail: "from_not_day_holding" });
     expect(await approve(day, A)).toMatchObject({ ok: true });
+  });
+
+  it("0581: a card day before the ledger's go-live date, never posted, still pays out from its method's account", async () => {
+    // go-live moves to 3 days ago, inside this rolled-back transaction, so a
+    // day before it is still on the review
+    const goLive = (await q("update gl_config set go_live_on = timezone('Asia/Kuala_Lumpur', now())::date - 3 where id returning go_live_on::text as d")).rows[0].d as string;
+    const before = plus(goLive, -2);
+    await mapCard("card", A);
+    await sale(270, "B7C8D9", "card", true, before); // posts nothing: ruling L
+    const day = await cardDay("65", [{ amt: "270.00", net: "267.30", code: "B7C8D9" }], before);
+    expect(day.holding_codes).toEqual([A]);
+    const payOut = (from: string) =>
+      attempt("select public.card_settlement_payout_prepare($1, $2::date, $3, $4::date, $5, $6) as r", [day.acquirer, day.day_date, day.group_key, goLive, from, bank]);
+    expect(await payOut(B)).toMatchObject({ ok: false, detail: "from_not_day_holding" });
+    expect(await payOut(A)).toMatchObject({ ok: true });
   });
 });

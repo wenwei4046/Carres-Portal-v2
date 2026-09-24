@@ -6,9 +6,11 @@
 --      at another account, an old day would be asked to pay out of the new
 --      account, while its money sits in the old one. The day's account is now
 --      read from the ledger: the account each matched sale's customer payment
---      entry (0463) debited. A sale with no live entry (recorded before the
---      ledger's go-live date, or voided) adds no account, as an unmapped
---      method added none in 0576.
+--      entry (0463) debited. A sale dated before the ledger's go-live date was
+--      never posted (ruling L), so for that sale alone the account still comes
+--      from its payment method, as in 0576; the ledger has no answer for it.
+--      Any other sale with no live entry (a voided one) adds no account, as an
+--      unmapped method added none in 0576.
 --   2. One function, _card_settlement_day_holdings, gives the accounts for
 --      both the review (holding_codes) and Approve day, so the screen and the
 --      refusal cannot disagree.
@@ -22,25 +24,34 @@
 begin;
 
 -- the card accounts a card settlement day's matched sales were posted to: the
--- debit line of each sale's live customer payment entry (0463)
+-- debit line of each sale's live customer payment entry (0463), or, for a
+-- sale dated before go-live that was never posted, its payment method's account
 create or replace function public._card_settlement_day_holdings(p_acquirer text, p_day_date date, p_group_key text)
 returns text[]
 language sql
 stable
 set search_path = public, pg_temp
 as $fn$
-  select coalesce(array_agg(distinct gl.account_code order by gl.account_code), '{}')
-    from public.card_settlement_lines l
-    join public.order_payments p on p.id = l.payment_id
-    join public.gl_entries e
-      on e.source_type = 'CUSTOMER_PAYMENT'
-     and e.source_doc_no = coalesce(nullif(btrim(coalesce(p.receipt_no, '')), ''), p.id::text)
-     and e.posted and not e.reversed
-    join public.gl_entry_lines gl on gl.entry_id = e.id and gl.debit > 0
-   where l.acquirer = p_acquirer and l.day_date = p_day_date and l.group_key = p_group_key;
+  select coalesce(array_agg(distinct s.code order by s.code) filter (where s.code is not null), '{}')
+    from (select case
+                   -- posted: the account its entry debited
+                   when e.id is not null then gl.account_code
+                   -- dated before go-live, so never posted (ruling L, 0463)
+                   when p.voided_at is null and p.paid_on < c.go_live_on
+                     then public.gl_account_for_payment_method(p.method, p.source_channel)
+                 end as code
+            from public.card_settlement_lines l
+            join public.order_payments p on p.id = l.payment_id
+            left join public.gl_config c on c.id
+            left join public.gl_entries e
+              on e.source_type = 'CUSTOMER_PAYMENT'
+             and e.source_doc_no = coalesce(nullif(btrim(coalesce(p.receipt_no, '')), ''), p.id::text)
+             and e.posted and not e.reversed
+            left join public.gl_entry_lines gl on gl.entry_id = e.id and gl.debit > 0
+           where l.acquirer = p_acquirer and l.day_date = p_day_date and l.group_key = p_group_key) s;
 $fn$;
 comment on function public._card_settlement_day_holdings(text, date, text) is
-  '0581: the accounts a card settlement day''s matched sales were posted to, read from the debit line of each sale''s live CUSTOMER_PAYMENT entry, never from today''s payment method map. A sale with no live entry adds none. Used by card_settlement_review (holding_codes) and card_settlement_payout_prepare.';
+  '0581: the accounts a card settlement day''s matched sales were posted to, read from the debit line of each sale''s live CUSTOMER_PAYMENT entry, not from today''s payment method map. A sale dated before the ledger''s go-live date was never posted (ruling L), so its account comes from its payment method, as in 0576. Any other sale with no live entry adds none. Used by card_settlement_review (holding_codes) and card_settlement_payout_prepare.';
 revoke all on function public._card_settlement_day_holdings(text, date, text) from public, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.card_settlement_review()
@@ -202,7 +213,8 @@ begin
   end if;
 
   -- 0576, 0581: the day is paid out from the card account its sales were
-  -- posted to in the ledger, not the one the payment method maps to today.
+  -- posted to in the ledger, not the one the payment method maps to today
+  -- (a sale before go-live was never posted: its method's account is used).
   v_holding := public._card_settlement_day_holdings(p_acquirer, p_day_date, p_group_key);
   if cardinality(v_holding) = 0 then
     raise exception 'The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.'
