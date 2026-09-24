@@ -70,7 +70,7 @@ receipt posted, or stock mutated for this audit.
 | Shared PO review | #1573 deployed; authenticated SO read-only walk verified 3 actual drafts, 1074px split, 150% zoom, 390px stacking and Back selection. Missing supplier addresses are named. | §8.2 records proof and limits. MPR has no eligible Need PO request; no real issuance or sending is claimed. |
 | Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. Old section styling and requester identity remain open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
 | Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply capture still lacked governed readable evidence; old Supplier Delivery Date wording remained. | §9.3 object, evidence, date and revision walkthrough. Multi-receipt and revision writes remain unverified. |
-| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. | §9.4 GRN document review and receipt lifecycle; no posting performed. The #1574 production walk confirmed all six Receiving Details controls and both actions within the 390px portal; it also found supplier/PO header overlap, corrected by stacking the narrow header (production readback owed). |
+| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. #1574/#1577/#1578 production checks verified narrow controls/actions, separated supplier/PO header and truthful initial PO loading. | §9.4 GRN document review and receipt lifecycle; no posting performed. |
 | Claims / Returns | Claims still showed the former twelve-column composition; Returns showed an empty register. | §9.5–9.6 approved columns, source-linked workflows and evidence. Empty Returns data proves no execution lifecycle. |
 | Repair / showroom documents | Repair Orders, Display Requests, Consignment Orders, Consignment Returns and Sale Notices remained Coming soon. | §9.7–9.11 are not production-built by virtue of their approved blueprint. |
 | Master data | Supplied company CSV read; Carres Klang warehouse address and NETS company address are distinct authorities. | Apply only through an existing authorised update door, preserving IDs and history; no People record creation. No company update claimed yet. |
@@ -2683,7 +2683,7 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
-**Receiving Session narrow layout, 2026-09-24 — #1574 DEPLOYED; controls/actions production-verified, header correction built with production readback owed.**
+**Receiving Session narrow layout, 2026-09-24 — #1574 + #1577 DEPLOYED; controls, actions and header production-verified.**
 The existing Receiving Details rows now stack by the form's available width,
 including the file inputs; the existing pending quantity and action area wraps.
 A browser fixture measured a 246px form canvas with equal client/scroll widths,
@@ -2692,23 +2692,34 @@ fields. Authenticated production on PO-20260903-4354 confirmed the same 246px
 form width at a 390px portal viewport, all six controls and both actions within
 x=76–322, and horizontal fields at 1074px (930px form). Cancel returned to
 Received Qty 0 / Pending Delivery Qty 1 with no receiving activity. The screenshot
-also exposed supplier-name/PO-number overlap: the narrow header now stacks; local
-246px and 1042px form measurements confirm separated mobile facts and the retained
-desktop row. This header correction still owes its production readback. Downloaded
-#1574 assets proved the old root disappeared, the form container appeared and
-unchanged prefilled-results copy survived, against #1573’s own deployment URL.
+exposed supplier-name/PO-number overlap, corrected by #1577 (`55e67a59b`). Its
+CI `35966206963` passed 12,600 tests with 100 existing skips; deploy `35967312977`
+succeeded and all five canonical SHA endpoints converged. Authenticated production
+at 390px now places supplier/destination at y=97–115 and the PO number at y=123–155,
+both within x=76–322; at 1074px they remain a row on a 930px form. Cancel preserved
+Received Qty 0 / Pending Delivery Qty 1 and no activity. Downloaded #1574 assets
+proved the old root disappeared and the form container appeared against #1573’s
+own deployment URL; #1577 likewise replaced the old header class against the
+preceding `1d452e0c9` deployment. The unchanged prefilled-results sentence was the
+control in both comparisons.
 The 62 existing Receiving page/save tests pass. No receipt was posted,
 no file uploaded, and no accepted/damaged/wrong/extra arithmetic, evidence guard,
 Unit result or write authority changed. This does not implement the GRN PDF below.
 
-**Receiving PO loading state, 2026-09-24 — BUILT; production readback owed.**
+**Receiving PO loading state, 2026-09-24 — DEPLOYED + AUTHENTICATED READBACK #1578 (`5ce58beeb`).**
 The authenticated walk exposed a false `This purchase order could not be opened`
 while the initial PO list was still loading. Receiving now uses the same pending
 read guard already used by Warehouse Inbound: `Loading…` until the query settles,
 then the actual PO or the existing unavailable-object state. Three page tests
 separate pending, settled-missing and available data; the pending test failed on
 the old implementation, and all 65 Receiving page/save tests pass after the fix.
-No receiving result or write path changes.
+Full CI `35967863861` passed 12,603 tests with 100 existing skips; deploy
+`35968971121` succeeded and all five canonical SHA endpoints converged. A fresh
+authenticated load of PO-20260903-4354 visibly showed `Loading…`, then its real
+PO facts and Start Receiving, with Received Qty 0 / Pending Delivery Qty 1 and
+no activity. Downloaded assets against #1577’s own deployment proved the direct
+unavailable branch disappeared, the pending state appeared and the Back control
+survived. No receiving result or write path changed and no receipt was posted.
 
 **GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
