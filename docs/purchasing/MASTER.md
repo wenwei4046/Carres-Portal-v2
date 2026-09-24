@@ -3768,7 +3768,7 @@ fits the shared 54px row; long problem text and accessibility needs may grow it.
 | Check | Measured answer |
 |---|---|
 | Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claims, Stock and Service adoption remain unbuilt; their existing uploaders are not substitute viewers |
-| Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. Video uses native controls; no saved production video playback is claimed. Production readback is still owed |
+| Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Production readback is still owed |
 
 The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
 

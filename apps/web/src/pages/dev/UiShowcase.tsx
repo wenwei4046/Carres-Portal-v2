@@ -83,8 +83,9 @@ function SavedEvidenceSample() {
       files={[
         { id: "example", kind: "photo", url: "/carres-logo.png", context: "Example · Arrival evidence", unitCodes: ["U1-000-001"] },
         { id: "unreadable", kind: "photo", url: null, context: "Example · Arrival evidence" },
+        { id: "video", kind: "video", url: "/ui-evidence-example.mp4", context: "Example · Arrival evidence" },
       ]}
-      onRetry={async (id) => id === "example" ? "/carres-logo.png" : null} />
+      onRetry={async (id) => id === "example" ? "/carres-logo.png" : id === "video" ? "/ui-evidence-example.mp4" : null} />
   </>;
 }
 
