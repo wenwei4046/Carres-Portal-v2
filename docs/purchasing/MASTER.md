@@ -2827,7 +2827,7 @@ amendment was saved. The preceding own deployment was `27b143d5.carres-portal.pa
 (42c8bc9a); the new own deployment was `20cb17a6.carres-portal.pages.dev` (acdcde97).
 Their downloaded assets were compared alongside the authenticated rendered readback.
 
-**GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
+**GRN paper composition — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1588).**
 The existing renderer now prints the PO-family logo, legal identity and three address
 lines on every page, with the full GRN identity. Two information blocks separate
 supplier/source/instruction from document date and actual arrival facts. Unknown
@@ -2836,6 +2836,17 @@ Damaged/Wrong/Pending columns become one explicit zero-value line, while mixed
 columns retain quiet zeroes. Render tests cover real continuation pages, separate
 instruction/arrival positions and zero-only exception columns. Quantity arithmetic,
 posting evidence and the outstanding receiver/time/scope gaps are unchanged.
+
+CI `35984035995` and deployment `35985438938` passed; all five canonical surfaces
+reported `8d74724dd53dae3abb1509bce8762e8129c15c10`. The own Pages deployment was
+`124bde31.carres-portal.pages.dev`, compared with `282a960f.carres-portal.pages.dev`:
+GRN logo wiring appeared in the built assets while `Supplier DO No` remained unchanged.
+The authenticated `GRN-20260904-1064` preview showed the logo/legal header, separate
+Supplier and Receiving Details blocks, and Order 1 / Received 0 / Damaged 1 / Pending 1.
+The zero-only Wrong Item column became `Wrong Item Qty 0` beneath the table.
+Unit `U1-000-064` remained under SMOKE King Mattress; the AMENDED band and history
+remained visible. Local rendered tests cover continuation pages; this one-page live
+record does not independently prove pagination. No receipt or amendment was saved.
 
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
@@ -3165,12 +3176,16 @@ and Claim completion cannot close the Case.
 
 #### No calendar-created product claims
 
-**Application retirement — local implementation, 2026-09-24; deployment and database closure owed.**
+**Application retirement — DEPLOYED 2026-09-24 (#1588); database closure owed.**
 A passed ETA or routine partial delivery alone never opens a product Claim.
 The Worker daily schedule no longer calls `runSupplierClaimSweepCron`; the retained
 compatibility export performs no database access and returns zero. Contact-by and
 follow-up maintenance still run. Source caller inventory found no HTTP caller or
 other application scheduler; the dashboard test only checks that reads do not call it.
+Deployment `35985438938` verified the Worker at
+`8d74724dd53dae3abb1509bce8762e8129c15c10`; the cron compatibility and retained-duty
+checks passed locally and in full CI. No live cron was manually executed, so this
+proves delivered application removal, not retirement of every database caller.
 The committed database definitions remain in 0288, 0291 and 0519, with service-role
 execute permission. No production scheduler inventory or SQL change has been performed.
 
