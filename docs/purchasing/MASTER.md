@@ -66,7 +66,7 @@ receipt posted, or stock mutated for this audit.
 
 | Surface | Observed | Remaining work / verification |
 |---|---|---|
-| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice lacked its reason. Loading and named selection summary corrected by #1573; authenticated Back retained selection. | Explain disabled choices and reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
+| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice now explains its reason (#1589 authenticated readback). Loading and named selection summary corrected by #1573; authenticated Back retained selection. | Reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
 | Shared PO review | #1573 deployed; authenticated SO read-only walk verified 3 actual drafts, 1074px split, 150% zoom, 390px stacking and Back selection. Missing supplier addresses are named. | §8.2 records proof and limits. MPR has no eligible Need PO request; no real issuance or sending is claimed. |
 | Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. The form reuses the shared Block; the Sales Order blue title is a separate opt-in. Actual-person requester verification remains open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
 | Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply evidence still lacks the governed readable viewer; #1587 authenticated readback verified PO Doc Date and Supplier Confirmed Delivery Date. | §9.3 evidence and revision walkthrough. Multi-receipt and revision writes remain unverified. |
@@ -1061,7 +1061,7 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**Disabled selection explanation — local implementation, 2026-09-24; delivery proof owed.**
+**Disabled selection explanation — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1589).**
 The shared grid's optional refusal description names the same existing facts used by
 SO Batch eligibility/planning and Manual Purchase approval/remainder. It is attached
 to the disabled checkbox and reachable by keyboard through the existing kit tooltip;
@@ -1069,6 +1069,17 @@ the same facts remain visible on the row or in its expansion. The checked state,
 select-all, stock allocation and PO issue authority are unchanged. Open PR #1490's
 overlap was reviewed; only this still-missing behavior was ported against current main,
 with unique description IDs across grids and a keyboard-focusable trigger.
+
+CI `35986102965` and deployment `35987154529` passed; all five canonical endpoints
+reported `96528e114129fb11d051a59fe81413dcb1c6a4d0`. The own Pages deployment
+`29a1db37.carres-portal.pages.dev` added the refusal callback/trigger wiring compared
+with `124bde31.carres-portal.pages.dev`, with existing copy unchanged. Before deployment,
+the actual disabled SO checkboxes had no description. After deployment, SO-1358
+exposed `Already on a PO`, SO-1206 exposed `SKU not found`, and the pending Manual
+Purchase row exposed `Need approval`. Keyboard Tab/Shift+Tab returned focus to the
+SO-1358 reason and displayed its tooltip with zero checked rows. No stock was selected,
+request approved or PO issued. This closes refusal explanation only; exact SO lineage
+versus generic SKU PO coverage and the write lifecycle remain separate open boundaries.
 
 
 **Shared dictionary — APPROVED / NOT BUILT (Jess, 2026-09-18).** All four reviewed listings
