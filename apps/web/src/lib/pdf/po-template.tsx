@@ -216,7 +216,7 @@ export function unitRuns(codes: readonly string[]): Array<{ first: string; last:
 }
 
 /** One Unit ID, its last three digits bold — the running number a packer reads. */
-function UnitCode({ code }: { code: string }) {
+export function UnitCode({ code }: { code: string }) {
   if (!UNIT_RE.test(code)) return <Text>{code}</Text>;
   return (
     <Text>

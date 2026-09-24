@@ -54,7 +54,7 @@ it("prints each Unit beside its own item, preserving unresolved evidence separat
     const content = await (await doc.getPage(n)).getTextContent();
     words.push(...content.items.flatMap((item) => "str" in item ? [item.str] : []));
   }
-  const text = words.join(" ").replace(/\s+/g, " ");
+  const text = words.join(" ").replace(/\s+/g, " ").replace(/(U\d+-\d{3}-)\s+(\d{3})/g, "$1$2");
   expect(text.replace(/\s/g, "")).toContain("GOODSRECEIVEDNOTE");
   expect(text).toMatch(/King mattress.*U1-000-001.*U1-000-004.*Queen mattress.*U1-000-005.*TOTAL.*UNIT RESULTS.*U1-000-099/);
   for (const code of ["U1-000-001", "U1-000-004", "U1-000-005", "U1-000-099"])
@@ -63,6 +63,15 @@ it("prints each Unit beside its own item, preserving unresolved evidence separat
   expect(text).toContain("Goods Received Date");
   expect(text).toContain("Time not recorded");
   expect(text).not.toContain("Goods received on");
+  const content = await (await doc.getPage(1)).getTextContent();
+  const items = content.items.filter((item) => "str" in item);
+  const prefix = items.find((item) => item.str === "U1-000-");
+  const suffix = items.find((item) => item.str === "001");
+  const boldHeader = items.find((item) => item.str === "CARRES SDN. BHD.");
+  expect(prefix).toBeDefined();
+  expect(suffix).toBeDefined();
+  expect(suffix!.fontName).toBe(boldHeader!.fontName);
+  expect(suffix!.fontName).not.toBe(prefix!.fontName);
   await doc.destroy();
 });
 

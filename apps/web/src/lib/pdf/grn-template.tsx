@@ -26,6 +26,7 @@ import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/render
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY, niceDate } from "./letterhead";
 import type { GrnTemplateData } from "./types";
+import { UnitCode } from "./po-template";
 
 const INK = "#1A1714";
 const GREY = "#7A7268";
@@ -96,13 +97,14 @@ const styles = StyleSheet.create({
   // DOCUMENT-KIT.md §3 rule 5) — five quantity columns included.
   colQty: { width: QTY_W, textAlign: "center" },
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
-  rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
+  rowHair: { position: "relative", borderLeftWidth: 0.3, borderRightWidth: 0.3, borderBottomWidth: 0.3, borderColor: HAIR },
+  vline: { position: "absolute", top: 0, bottom: 0, width: 0.3, backgroundColor: HAIR },
   cellNo: { fontSize: 7, color: GREY, width: mm(6), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
-  desc: { flex: 1, paddingRight: mm(2) },
+  desc: { flex: 1, paddingLeft: mm(1.5), paddingRight: mm(2) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1.15 },
   descSku: { fontSize: 7, color: GREY, marginTop: mm(0.6), lineHeight: 1.15 },
   unitLine: { fontSize: 7.5, color: INK, marginTop: mm(0.5), paddingLeft: mm(2), lineHeight: 1.25 },
-  cellCat: { fontSize: 7, color: GREY, width: mm(20), lineHeight: 1.3 },
+  cellCat: { fontSize: 7, color: GREY, width: mm(20), paddingLeft: mm(1.5), lineHeight: 1.3 },
   cellQty: { fontSize: 7.5, width: QTY_W, textAlign: "center", lineHeight: 1 },
 
   // ── evidence + extra goods ──
@@ -168,6 +170,12 @@ export function GrnTemplate(data: GrnTemplateData) {
   ] as const;
   const visibleQuantities = quantities.filter((column) => column.required || lines.some((line) => line[column.key] > 0));
   const absentQuantities = quantities.filter((column) => !visibleQuantities.includes(column));
+  // Follow the actual visible columns; no stale rule survives a zero-only column.
+  const quantityWidth = visibleQuantities.reduce((sum, column) => sum + column.width, 0);
+  const categoryLeft = 186 - 4 - quantityWidth - 20;
+  const columnRules = [6, categoryLeft, ...visibleQuantities.map((_, index) =>
+    categoryLeft + 20 + visibleQuantities.slice(0, index).reduce((sum, column) => sum + column.width, 0))];
+
 
   const evidenceBits = [
     evidence && evidence.photos > 0
@@ -257,21 +265,22 @@ export function GrnTemplate(data: GrnTemplateData) {
         {/* ── items — the five governed quantity words per line ── */}
         <View style={styles.tableHead} minPresenceAhead={40}>
           <Text style={[styles.th, styles.colNo]}>#</Text>
-          <Text style={[styles.th, { flex: 1 }]}>Description</Text>
-          <Text style={[styles.th, styles.colCat]}>Category</Text>
+          <Text style={[styles.th, { flex: 1, paddingLeft: mm(1.5) }]}>Description</Text>
+          <Text style={[styles.th, styles.colCat, { paddingLeft: mm(1.5) }]}>Category</Text>
           {visibleQuantities.map((column) => (
             <Text key={column.key} style={[styles.th, styles.colQty, { width: mm(column.width) }]}>{column.label}</Text>
           ))}
         </View>
         {lines.map((l, i) => (
           <View key={`${l.sku}-${i}`} wrap={false} style={[styles.row, styles.rowHair]}>
+            {columnRules.map((left) => <View key={left} style={[styles.vline, { left: mm(left + 2) }]} />)}
             <Text style={styles.cellNo}>{i + 1}</Text>
             <View style={styles.desc}>
               <Text style={styles.descMain}>{l.description}</Text>
               <Text style={styles.descSku}>{l.sku}</Text>
               {(l.unit_results ?? []).map((u) => (
                 <Text key={u.unit_code} style={styles.unitLine}>
-                  {u.unit_code} — {u.outcome_label}
+                  <UnitCode code={u.unit_code} /> — {u.outcome_label}
                 </Text>
               ))}
             </View>
@@ -309,7 +318,7 @@ export function GrnTemplate(data: GrnTemplateData) {
             <Text style={styles.blockLabel}>Unit results</Text>
             {(unit_results ?? []).map((u) => (
               <Text key={u.unit_code} style={[styles.unitLine, { paddingLeft: 0 }]}>
-                · {u.unit_code} — {u.outcome_label}
+                · <UnitCode code={u.unit_code} /> — {u.outcome_label}
               </Text>
             ))}
           </View>
