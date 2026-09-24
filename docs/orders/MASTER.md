@@ -77,6 +77,12 @@ OWNER SCOPE  an authorised operator may find every order; owner may remain a fil
 ✗ payment collection accounting           ✗ service-case execution
 ```
 
+**Supplier-delay boundary — owner-approved 2026-09-24.** Purchasing owns the original PO Delivery
+Date, supplier answer, governed delay reason, WhatsApp evidence and revised expected arrival.
+Sales Orders reads the exact source-line impact and may open governed customer planning work; it
+never rewrites either the Purchasing facts or the customer's requested/confirmed delivery date from
+a supplier answer. Only the recorded customer outcome may change the customer plan.
+
 > ### ⚠️ AND THE NEXT ACTION IS A SUMMARY, NOT A POSSESSION (corrected on the draft, 2026-08-08)
 > The draft listed *"overall operational next action"* under OWNS. **It is not Orders'.**
 > `Issue PO` is Purchasing's act, `Call {logistics}` over `Confirm the delivery date` is Delivery's,
