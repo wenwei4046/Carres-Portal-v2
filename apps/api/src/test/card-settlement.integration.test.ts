@@ -49,7 +49,7 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
   }
   const P: Record<string, string> = {};
   // a recorded payment, posted to the ledger as the payment door does (0463):
-  // Approve day reads the card account from that posting (0581)
+  // Approve day reads the card account from that posting (0582)
   async function pay(key: string, amount: number, on: string, reference: string | null, method = "card") {
     const r = await q(
       "insert into order_payments (order_id, amount, paid_on, method, reference, recorded_by) values ($1, $2, $3::date, $4, $5, $6) returning id",
@@ -573,14 +573,14 @@ describe.skipIf(!URL)("card settlement: the import order does not change the mat
 });
 
 /**
- * 0576, 0581: Approve day pays a day out from the card account its sales were
+ * 0576, 0582: Approve day pays a day out from the card account its sales were
  * paid into, and refuses a day paid into no card account or into two. The
- * first three cases hold on 0576 and 0581 alike. The fourth is 0581's: a card
+ * first three cases hold on 0576 and 0582 alike. The fourth is 0582's: a card
  * method pointed at another account after the sale does not move an old day.
- * The last holds on 0576 and 0581 alike: a day before go-live, which the
+ * The last holds on 0576 and 0582 alike: a day before go-live, which the
  * ledger never saw, still pays out from its payment method's account.
  */
-describe.skipIf(!URL)("Approve day pays from the card account the day's sales were posted to (real PostgreSQL, 0576, 0581)", () => {
+describe.skipIf(!URL)("Approve day pays from the card account the day's sales were posted to (real PostgreSQL, 0576, 0582)", () => {
   let db: pg.Client;
   const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
   const T = { fin: uid("ad1"), boss: uid("ad2"), dealer: uid("ad3"), sales: uid("ad4"), order: uid("ad5") };
@@ -700,7 +700,7 @@ describe.skipIf(!URL)("Approve day pays from the card account the day's sales we
     expect(await approve(day, A)).toMatchObject({ ok: true });
   });
 
-  it("0581: pointing the card method at another account later does not move an old day", async () => {
+  it("0582: pointing the card method at another account later does not move an old day", async () => {
     await sale(260, "Y4Z5A6", "card");
     const day = await cardDay("64", [{ amt: "260.00", net: "257.40", code: "Y4Z5A6" }]);
     await mapCard("card", B);
@@ -712,7 +712,7 @@ describe.skipIf(!URL)("Approve day pays from the card account the day's sales we
     expect(await approve(day, A)).toMatchObject({ ok: true });
   });
 
-  it("0581: a card day before the ledger's go-live date, never posted, still pays out from its method's account", async () => {
+  it("0582: a card day before the ledger's go-live date, never posted, still pays out from its method's account", async () => {
     // go-live moves to 3 days ago, inside this rolled-back transaction, so a
     // day before it is still on the review
     const goLive = (await q("update gl_config set go_live_on = timezone('Asia/Kuala_Lumpur', now())::date - 3 where id returning go_live_on::text as d")).rows[0].d as string;

@@ -1,4 +1,4 @@
--- 0581 . Approve day reads the card account each sale was posted to
+-- 0582 . Approve day reads the card account each sale was posted to
 --
 -- Follow-up to 0576.
 --   1. 0576 worked out a day's card account from today's payment method map
@@ -51,7 +51,7 @@ as $fn$
            where l.acquirer = p_acquirer and l.day_date = p_day_date and l.group_key = p_group_key) s;
 $fn$;
 comment on function public._card_settlement_day_holdings(text, date, text) is
-  '0581: the accounts a card settlement day''s matched sales were posted to, read from the debit line of each sale''s live CUSTOMER_PAYMENT entry, not from today''s payment method map. A sale dated before the ledger''s go-live date was never posted (ruling L), so its account comes from its payment method, as in 0576. Any other sale with no live entry adds none. Used by card_settlement_review (holding_codes) and card_settlement_payout_prepare.';
+  '0582: the accounts a card settlement day''s matched sales were posted to, read from the debit line of each sale''s live CUSTOMER_PAYMENT entry, not from today''s payment method map. A sale dated before the ledger''s go-live date was never posted (ruling L), so its account comes from its payment method, as in 0576. Any other sale with no live entry adds none. Used by card_settlement_review (holding_codes) and card_settlement_payout_prepare.';
 revoke all on function public._card_settlement_day_holdings(text, date, text) from public, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.card_settlement_review()
@@ -76,7 +76,7 @@ begin
            sum(l.amount) as gross,
            case when l.acquirer = 'MAYBANK' then max(f.published_net) else sum(l.net_amount) end as net,
            sum(p.amount) as recorded,
-           -- 0581: the card accounts the day's matched payments were posted to
+           -- 0582: the card accounts the day's matched payments were posted to
            public._card_settlement_day_holdings(l.acquirer, l.day_date, l.group_key) as holding_codes,
            public._card_settlement_reference(l.acquirer, l.group_key, l.day_date) as reference
       from public.card_settlement_lines l
@@ -212,7 +212,7 @@ begin
       using errcode = '22023', detail = 'to_not_routed';
   end if;
 
-  -- 0576, 0581: the day is paid out from the card account its sales were
+  -- 0576, 0582: the day is paid out from the card account its sales were
   -- posted to in the ledger, not the one the payment method maps to today
   -- (a sale before go-live was never posted: its method's account is used).
   v_holding := public._card_settlement_day_holdings(p_acquirer, p_day_date, p_group_key);
@@ -273,8 +273,8 @@ revoke all on function public.card_settlement_payout_prepare(text, date, text, d
 grant execute on function public.card_settlement_payout_prepare(text, date, text, date, text, text, text, uuid) to authenticated;
 
 comment on function public.card_settlement_review() is
-  '0572, 0576, 0581: the card settlement days (per machine per day; per merchant for Maybank), each with its live payout from card_settlement_payouts, the card accounts its matched payments were posted to in the ledger (holding_codes, 0581), and any live card payout linked to no day from any card account on the day''s date; their rows with each open row''s suggestions, and the card payments a row can be matched to. Finance and principal. Read only.';
+  '0572, 0576, 0582: the card settlement days (per machine per day; per merchant for Maybank), each with its live payout from card_settlement_payouts, the card accounts its matched payments were posted to in the ledger (holding_codes, 0582), and any live card payout linked to no day from any card account on the day''s date; their rows with each open row''s suggestions, and the card payments a row can be matched to. Finance and principal. Read only.';
 comment on function public.card_settlement_payout_prepare(text, date, text, date, text, text, text, uuid) is
-  '0572, 0576, 0581: Approve day. Prepares the day''s one CARD_PAYOUT money move (0529, via gl_money_move_create) with the file''s net and fee and a fixed reference, and links it to the day. Refuses a day not fully matched, a day whose payments were posted to no card account or more than one (read from the ledger, 0581), a from account that is not the one they were posted to, a day whose payout is prepared or approved, a from account no card settlement route serves, a to account that is not that route''s bank, and an idempotency key that is not this day''s own live payout. The only door for a card payout from a card account. Posts nothing: the finance approver approves the move.';
+  '0572, 0576, 0582: Approve day. Prepares the day''s one CARD_PAYOUT money move (0529, via gl_money_move_create) with the file''s net and fee and a fixed reference, and links it to the day. Refuses a day not fully matched, a day whose payments were posted to no card account or more than one (read from the ledger, 0582), a from account that is not the one they were posted to, a day whose payout is prepared or approved, a from account no card settlement route serves, a to account that is not that route''s bank, and an idempotency key that is not this day''s own live payout. The only door for a card payout from a card account. Posts nothing: the finance approver approves the move.';
 
 commit;
