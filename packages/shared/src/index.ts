@@ -3184,6 +3184,7 @@ export * from "./schemas/loan-offer";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
+export * from "./work-lifecycle";
 export * from "./sales-order-work-source";
 export * from "./storage-obligation";
 export * from "./payment-collection-outcome";

@@ -41,6 +41,18 @@ import {
   type OrderActionKey,
 } from "@carres/shared";
 import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
+import {
+  WORK_CHANNELS,
+  WORK_CONTACT_KINDS,
+  workLifecycleOf,
+  workOccurrenceEventSchema,
+  workReplyDueOn,
+  type OperationWorkLifecycle,
+  type WorkChannel,
+  type WorkContactKind,
+  type WorkOccurrenceEvent,
+} from "@carres/shared";
+import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { userClient } from "../../lib/supabase";
@@ -1543,11 +1555,199 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   );
 }
 
+// ── THE WORK LIFECYCLE LEDGER (0581, owner rulings 2026-09-24) ──────────────
+//
+// To do · Waiting are DERIVED from `work_occurrence_events`; Completed is
+// written only by the owning module's completion fact (service role). The
+// read attaches each open occurrence's lifecycle; the two staff doors record a
+// send made outside the ERP (or a provider-ACCEPTED send) and a reply, always
+// against the CURRENT open occurrence and source version. Opening or copying a
+// message never reaches these doors.
+
+/** A refusal the ledger names (the 0581 doors' `detail`). */
+export class WorkLedgerRefusal extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
+export interface WorkLedgerWrite {
+  occurrenceId: string;
+  channel: WorkChannel;
+  contactKind: WorkContactKind | null;
+  contactId: string | null;
+  sourceVersion: string;
+  idempotencyKey: string;
+}
+
+export interface WorkLedger {
+  read(c: Context<AppEnv>, occurrenceIds: readonly string[]): Promise<WorkOccurrenceEvent[]>;
+  recordRequestSent(c: Context<AppEnv>, args: WorkLedgerWrite & { replyDueOn: string }): Promise<string>;
+  recordReplyReceived(c: Context<AppEnv>, args: WorkLedgerWrite): Promise<string>;
+}
+
+const LEDGER_CHUNK = 200;
+
+function refusalOf(error: { code?: string; details?: string | null; message: string }): WorkLedgerRefusal {
+  const detail = String(error.details ?? "").trim();
+  if (detail && !detail.includes(" ")) return new WorkLedgerRefusal(detail, error.message);
+  if (error.code === "23514" || error.code === "22023") return new WorkLedgerRefusal("invalid", error.message);
+  if (error.code === "42501") return new WorkLedgerRefusal("forbidden", error.message);
+  return new WorkLedgerRefusal("ledger_failed", error.message);
+}
+
+/** The Supabase ledger: reads under the caller's RLS, writes through 0581's doors. */
+export const supabaseWorkLedger: WorkLedger = {
+  async read(c, occurrenceIds) {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const rows: WorkOccurrenceEvent[] = [];
+    for (let i = 0; i < occurrenceIds.length; i += LEDGER_CHUNK) {
+      const ids = occurrenceIds.slice(i, i + LEDGER_CHUNK);
+      const { data, error } = await sb
+        .from("work_occurrence_events")
+        .select("id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version")
+        .in("occurrence_id", ids)
+        .order("at", { ascending: true });
+      if (error) throw new Error(`work ledger read failed: ${error.message}`);
+      for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+        rows.push(workOccurrenceEventSchema.parse({
+          id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
+          channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
+          replyDueOn: r.reply_due_on, resultReference: r.result_reference, sourceVersion: r.source_version,
+        }));
+      }
+    }
+    return rows;
+  },
+  async recordRequestSent(c, args) {
+    const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("work_record_request_sent", {
+      p_occurrence_id: args.occurrenceId,
+      p_channel: args.channel,
+      p_contact_kind: args.contactKind,
+      p_contact_id: args.contactId,
+      p_reply_due_on: args.replyDueOn,
+      p_source_version: args.sourceVersion,
+      p_idempotency_key: args.idempotencyKey,
+    });
+    if (error) throw refusalOf(error);
+    return String(data);
+  },
+  async recordReplyReceived(c, args) {
+    const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("work_record_reply_received", {
+      p_occurrence_id: args.occurrenceId,
+      p_channel: args.channel,
+      p_contact_kind: args.contactKind,
+      p_contact_id: args.contactId,
+      p_source_version: args.sourceVersion,
+      p_idempotency_key: args.idempotencyKey,
+    });
+    if (error) throw refusalOf(error);
+    return String(data);
+  },
+};
+
+/** Attach each open occurrence's To do / Waiting. */
+export function withWorkLifecycle(
+  response: OperationWorkResponse,
+  events: readonly WorkOccurrenceEvent[],
+): OperationWorkResponse {
+  const byOccurrence = new Map<string, WorkOccurrenceEvent[]>();
+  for (const e of events) {
+    const list = byOccurrence.get(e.occurrenceId) ?? [];
+    list.push(e);
+    byOccurrence.set(e.occurrenceId, list);
+  }
+  return {
+    ...response,
+    items: response.items.map((item) => ({
+      ...item,
+      lifecycle: workLifecycleOf(byOccurrence.get(item.id) ?? [], response.generatedOn),
+    })),
+  };
+}
+
+const workLedgerBodySchema = z.object({
+  channel: z.enum(WORK_CHANNELS),
+  contactKind: z.enum(WORK_CONTACT_KINDS).nullable().default(null),
+  contactId: z.string().uuid().nullable().default(null),
+  sourceVersion: z.string().min(1),
+  idempotencyKey: z.string().min(8).max(200),
+}).strict().refine((b) => (b.contactKind === null) === (b.contactId === null), {
+  message: "A contact is a kind and an id, or neither",
+});
+
+const REFUSAL_STATUS: Record<string, 403 | 409 | 422 | 502> = {
+  forbidden: 403,
+  work_occurrence_completed: 409,
+  work_occurrence_not_waiting: 409,
+  work_event_key_reused: 409,
+  reply_due_not_a_working_day: 422,
+  invalid: 422,
+};
+
 export function createOperationWorkRouter(
   loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
+  ledger: WorkLedger = supabaseWorkLedger,
 ): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
-  router.get("/", requireOperation, async (c) => c.json(await loader(c)));
+
+  const readWithLifecycle = async (c: Context<AppEnv>) => {
+    const response = await loader(c);
+    let events: WorkOccurrenceEvent[];
+    try {
+      events = await ledger.read(c, response.items.map((item) => item.id));
+    } catch {
+      // Never pretend every item is To do: a Waiting item shown as To do
+      // would send a second request to someone already asked.
+      throw new HTTPException(503, { message: "Work status could not be loaded. Try again." });
+    }
+    return { response: withWorkLifecycle(response, events), events };
+  };
+
+  router.get("/", requireOperation, async (c) => c.json((await readWithLifecycle(c)).response));
+
+  const door = (kind: "request_sent" | "reply_received") => async (c: Context<AppEnv>) => {
+    const occurrenceId = c.req.param("occurrenceId") ?? "";
+    const parsed = workLedgerBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) {
+      return c.json({ code: "invalid", message: parsed.error.issues[0]?.message ?? "Invalid request" }, 422);
+    }
+    const body = parsed.data;
+    const { response } = await readWithLifecycle(c);
+    const item = response.items.find((candidate) => candidate.id === occurrenceId);
+    if (!item) {
+      // Completed or never open: a completed occurrence is never reopened.
+      return c.json({ code: "work_occurrence_not_open", message: "This work is no longer open." }, 409);
+    }
+    if (item.sourceVersion !== body.sourceVersion) {
+      return c.json({ code: "work_stale", message: "This work changed. Refresh and try again." }, 409);
+    }
+    const write: WorkLedgerWrite = {
+      occurrenceId,
+      channel: body.channel,
+      contactKind: body.contactKind as WorkContactKind | null,
+      contactId: body.contactId,
+      sourceVersion: body.sourceVersion,
+      idempotencyKey: body.idempotencyKey,
+    };
+    let id: string;
+    try {
+      id = kind === "request_sent"
+        ? await ledger.recordRequestSent(c, { ...write, replyDueOn: workReplyDueOn(response.generatedOn, item.ruleKey) })
+        : await ledger.recordReplyReceived(c, write);
+    } catch (e) {
+      if (e instanceof WorkLedgerRefusal) {
+        return c.json({ code: e.code, message: e.message }, REFUSAL_STATUS[e.code] ?? 502);
+      }
+      throw e;
+    }
+    const events = await ledger.read(c, [occurrenceId]);
+    const lifecycle: OperationWorkLifecycle = workLifecycleOf(events, response.generatedOn);
+    return c.json({ id, occurrenceId, lifecycle }, 201);
+  };
+
+  router.post("/:occurrenceId/request-sent", requireOperation, door("request_sent"));
+  router.post("/:occurrenceId/reply-received", requireOperation, door("reply_received"));
   return router;
 }
 

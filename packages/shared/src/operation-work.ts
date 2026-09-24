@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { operationWorkLifecycleSchema } from "./work-lifecycle";
 import { WORK_RULES, type WorkItem } from "./work-engine";
 
 export const operationWorkModuleSchema = z.enum([
@@ -167,6 +168,10 @@ export const operationWorkItemSchema = z.object({
   tone: z.enum(["danger", "warning", "info", "success", "neutral"]),
   locked: z.boolean(),
   broken: z.boolean(),
+  /** To do · Waiting, derived from the 0581 ledger (work-lifecycle.ts). A
+   *  projector never sets it; the Work read attaches it. Absent reads as To do
+   *  (`workLifecycleOrToDo`). */
+  lifecycle: operationWorkLifecycleSchema.optional(),
 }).strict();
 
 export const operationWorkSourceHealthSchema = z.object({
