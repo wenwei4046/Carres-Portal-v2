@@ -29,6 +29,10 @@ copy, component, or business-rule system.
   mutation first succeeds and refreshes the Work feed; only when the same occurrence is absent does
   its exact Delivery receipt replace the old row, receive focus and move selection to the next open
   occurrence. If the occurrence remains open, no completion receipt is shown.
+- 2026-09-24 — Work keyboard entry follows the approved list-detail model: `Enter` on a row selects
+  it and focuses the first actionable control in its detail; `O` opens the owning object from a Work
+  row or non-editing detail surface. Search, input, textarea, select and contenteditable targets never
+  receive the shortcut. The object-door tooltip exposes `O` without adding another visible button.
 
 - 2026-09-24 — Work compact cards rank exact problem/fact first, action second, recipient third and
   keep the document number in a footer object door. Promise failures stay inside their lawful date

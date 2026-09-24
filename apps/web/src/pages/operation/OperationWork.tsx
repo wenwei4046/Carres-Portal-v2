@@ -118,6 +118,8 @@ export default function OperationWork() {
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
+  const [detailFocusId, setDetailFocusId] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
   const [completionReceipt, setCompletionReceipt] = useState<WorkCompletionReceipt | null>(null);
   const [pendingCompletion, setPendingCompletion] = useState<PendingCompletion | null>(null);
   const completionReceiptRef = useRef<HTMLDivElement>(null);
@@ -361,6 +363,15 @@ export default function OperationWork() {
 
   const selectedId = params.get("selected");
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  useLayoutEffect(() => {
+    if (!selected || detailFocusId !== selected.id || (layout !== "three" && activePanel !== "detail")) return;
+    const entry = detailRef.current?.querySelector<HTMLElement>("[data-work-entry]") ?? null;
+    const target = entry?.matches("button, input, textarea, select, [tabindex]:not([tabindex='-1'])")
+      ? entry
+      : entry?.querySelector<HTMLElement>("button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex='-1'])");
+    target?.focus();
+    setDetailFocusId(null);
+  }, [activePanel, detailFocusId, layout, selected]);
   const visibleIds = new Set(visible.map((item) => item.id));
   const displayMyGroups = useMemo(() => {
     const missed = visible.filter((item) => item.timingBucket === "overdue");
@@ -385,6 +396,12 @@ export default function OperationWork() {
   const openRow = (i: WorkRow) => {
     setCompletionReceipt(null);
     updateParam("selected", i.id);
+    if (layout !== "three") setActivePanel("detail");
+  };
+  const enterRow = (i: WorkRow) => {
+    setCompletionReceipt(null);
+    updateParam("selected", i.id);
+    setDetailFocusId(i.id);
     if (layout !== "three") setActivePanel("detail");
   };
 
@@ -619,6 +636,7 @@ export default function OperationWork() {
                       <WorkActionRow
                         item={i.source}
                         onSelect={() => openRow(i)}
+                        onEnter={() => enterRow(i)}
                         onOpen={() => navigate(i.destination)}
                         selected={selected?.id === i.id}
                         ownerContext={i.ownerState === "covered" ? `Covered for ${i.normalOwner?.name ?? "normal owner"}` : null}
@@ -671,6 +689,7 @@ export default function OperationWork() {
                     <WorkActionRow
                       item={i.source}
                       onSelect={() => openRow(i)}
+                      onEnter={() => enterRow(i)}
                       onOpen={() => navigate(i.destination)}
                       selected={selected?.id === i.id}
                       ownerContext={i.ownerState === "covered" ? `Covered by ${i.activeCover?.name ?? "cover"}` : null}
@@ -686,7 +705,7 @@ export default function OperationWork() {
         </div>
         </div>)}
         detail={selected ? (
-          <div>
+          <div ref={detailRef}>
             {layout !== "three" ? (
               <div className="border-b border-kit-slate-5 px-3 py-1.5">
                 <Button type="button" variant="ghost" onClick={() => setActivePanel("list")}>Back to work</Button>

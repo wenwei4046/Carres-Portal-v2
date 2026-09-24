@@ -20,6 +20,7 @@ export interface WorkActionRowProps {
   item: OperationWorkItem;
   selected: boolean;
   onSelect: () => void;
+  onEnter?: () => void;
   onOpen?: () => void;
   ownerContext?: string | null;
   className?: string;
@@ -30,6 +31,7 @@ export default function WorkActionRow({
   item,
   selected,
   onSelect,
+  onEnter,
   onOpen,
   ownerContext = null,
   className = "",
@@ -40,6 +42,15 @@ export default function WorkActionRow({
       className={`relative m-2 overflow-hidden rounded-control border border-kit-slate-5 bg-white ${selected ? "bg-kit-blue-2" : ""} ${item.broken ? "border-l-2 border-l-kit-red-9" : ""} ${className}`}
     >
       <button type="button" aria-pressed={selected} aria-label={`${item.object.label}. ${MODULE[item.module]}. ${timing}. ${item.problem}. ${item.action}${item.recipient ? `. ${item.recipient}` : ""}`} onClick={onSelect}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && onEnter) {
+            event.preventDefault();
+            onEnter();
+          } else if (event.key.toLowerCase() === "o" && onOpen && !event.altKey && !event.ctrlKey && !event.metaKey) {
+            event.preventDefault();
+            onOpen();
+          }
+        }}
         data-testid={`work-row-${item.object.label}-${item.ruleKey}`}
         className="block w-full px-3 py-2 text-left hover:bg-kit-slate-3 active:bg-kit-slate-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9">
         <span className="block text-meta font-semibold uppercase tracking-wide text-kit-slate-11">{MODULE[item.module]}</span>
@@ -52,7 +63,7 @@ export default function WorkActionRow({
       </button>
       <footer data-testid="work-card-footer" className="flex min-h-8 items-center justify-between border-t border-kit-slate-5 px-3 text-meta text-kit-slate-11">
         <span className="min-w-0 truncate">{item.object.label}</span>
-        {onOpen ? <button type="button" aria-label={`Open ${item.object.label}`} title={`Open ${item.object.label}`} onClick={onOpen}
+        {onOpen ? <button type="button" aria-label={`Open ${item.object.label}`} title={`Open ${item.object.label} · O`} onClick={onOpen}
           className="grid h-8 w-8 place-items-center rounded-control hover:bg-kit-slate-3 active:bg-kit-slate-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"><Icon name="open" size={14} /></button> : <Icon name="open" size={14} />}
       </footer>
     </article>

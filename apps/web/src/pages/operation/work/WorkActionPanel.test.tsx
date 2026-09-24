@@ -64,4 +64,20 @@ describe("WorkActionPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open DO-140926-0007" }));
     expect(open).toHaveBeenCalled();
   });
+
+  it("opens with O in the detail navigation but never while typing in a field", () => {
+    const open = vi.fn();
+    const view = render(
+      <WorkActionPanel
+        item={{ ...base, interaction: { mode: "embedded" } } as OperationWorkItem}
+        embedded={<textarea aria-label="Reason" />}
+        onOpen={open}
+      />,
+    );
+    fireEvent.keyDown(view.container.firstElementChild as HTMLElement, { key: "o" });
+    expect(open).toHaveBeenCalledOnce();
+    open.mockReset();
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Reason" }), { key: "o" });
+    expect(open).not.toHaveBeenCalled();
+  });
 });

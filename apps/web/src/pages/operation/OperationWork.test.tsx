@@ -301,6 +301,20 @@ describe("Operation Work — one server feed", () => {
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
   });
 
+  it("uses O only from Work navigation, never while the operator is typing", () => {
+    show();
+    const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
+    row.focus();
+    fireEvent.keyDown(row, { key: "o" });
+    expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
+
+    navigate.mockReset();
+    const search = screen.getByRole("searchbox", { name: "Search work…" });
+    search.focus();
+    fireEvent.keyDown(search, { key: "o" });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("keeps a Delivery item on its exact Delivery Order door", () => {
     workState.data!.items = [item({
       id: "delivery:DO-2041:deliver_today",
@@ -346,7 +360,10 @@ describe("Operation Work — one server feed", () => {
     });
     workState.data!.items = [proof, next];
     const view = show();
-    fireEvent.click(screen.getByTestId("work-row-DO-2041-check_delivery_proof"));
+    const proofRow = screen.getByTestId("work-row-DO-2041-check_delivery_proof");
+    proofRow.focus();
+    fireEvent.keyDown(proofRow, { key: "Enter" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Complete proof review" })).toHaveFocus());
     fireEvent.click(screen.getByRole("button", { name: "Complete proof review" }));
     expect(screen.queryByTestId("work-completion-receipt")).not.toBeInTheDocument();
 
