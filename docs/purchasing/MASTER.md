@@ -2868,7 +2868,7 @@ Unit `U1-000-064` remained under SMOKE King Mattress; the AMENDED band and histo
 remained visible. Local rendered tests cover continuation pages; this one-page live
 record does not independently prove pagination. No receipt or amendment was saved.
 
-**GRN table and Unit typography — local implementation, 2026-09-24; production proof owed.**
+**GRN table and Unit typography — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1591).**
 Item rows now use the Document Kit's boxed hairline grid. Full-height column rules
 follow the visible quantity columns, including when zero-only exception columns disappear.
 GRN reuses the existing PO `UnitCode` renderer for full identifiers with the final three
@@ -2878,6 +2878,19 @@ mixed-outcome and zero-only examples were visually checked. No quantities or Uni
 association rules changed. Consecutive Units reuse the PO range helper only within the
 same item and outcome; gaps and different outcomes start separate lines. The remaining
 facts below are not claimed complete by this typography change.
+
+CI `35989640338` passed and #1591 merged as `809c3d0d7353ee4254dc7da1c4e22088a083583c`.
+Its pending deploy was superseded by descendant `893b7f33d54ecd3c0ab51755d6d98d09f47407d2`;
+deployment `35991437389` passed and all five canonical surfaces reported that descendant.
+The own Pages deployment `89b4a69b.carres-portal.pages.dev` was compared with
+`ccff9ebc.carres-portal.pages.dev`: the new boxed-row rule appeared once versus zero,
+while `Supplier DO No` and `Wrong Item Qty` counts stayed unchanged. The authenticated
+`GRN-20260904-1064` preview and downloaded PDF showed full-height item rules and
+`U1-000-064` beneath SMOKE King Mattress; PDF font inspection confirmed `064` is bold
+and `U1-000-` regular. Order 1 / Received 0 / Damaged 1 / Pending 1 and the separate
+`Wrong Item Qty 0` line stayed correct. The AMENDED band and saved amendment history
+remained. This one-Unit live record does not prove consecutive-range grouping;
+that boundary is covered by local actual-PDF mixed-outcome tests. No receipt was changed.
 
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
@@ -3767,8 +3780,19 @@ fits the shared 54px row; long problem text and accessibility needs may grow it.
 
 | Check | Measured answer |
 |---|---|
-| Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claims, Stock and Service adoption remain unbuilt; their existing uploaders are not substitute viewers |
+| Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claim-record photo adoption is locally built (2026-09-24), with production proof owed; Stock/Service and the approved per-Unit Claim expansion remain unbuilt |
 | Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Production readback is still owed |
+
+**Claim-record photo adoption — local implementation, 2026-09-24; production proof owed.**
+The existing full-width record opens its saved photos in `SavedEvidenceViewer`, including
+known files whose signed URL is missing. Retry reuses the existing authenticated Claim
+photo reader and selects the same recorded path; an error keeps the record and viewer
+open. Claim number and recorded photo date remain visible. Held Units are not assigned
+to every photo: this legacy photo list carries no evidenced photo-to-Unit relationship.
+21 component/Claim tests cover unreadable-file recovery, same-path selection, reader
+failure, focus return and the absence of invented Unit attribution. This adopts the
+read-only kit only; it does not deliver supplier reply recording or the approved
+per-Unit expansion. Stock and Service consumers still require their own adoption.
 
 The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
 
@@ -3835,7 +3859,7 @@ neither is an approved design.
 
 | Target | State | The build's obligation |
 |---|---|---|
-| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **LOCAL KIT BUILD; production proof and Claims adoption owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
+| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **LOCAL KIT + CLAIM-RECORD PHOTO BUILD; production proof owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
 **The reply-recording build reuses what exists; it does not grow a second system.**
@@ -4101,7 +4125,7 @@ does not close any related customer Service Case.
 ### 9.6 Purchase Returns
 
 **Owner-confirmed UI — 2026-09-18. BUILT + DEPLOYED 2026-09-19; MIGRATION 0548 APPLIED
-2026-09-20; AUTHENTICATED PRODUCTION WALK OWED.**
+2026-09-20; AUTHENTICATED EMPTY-REGISTER READBACK 2026-09-24, RECORD LIFECYCLE STILL OWED.**
 The approval covered layout, labels and inspection interactions; sample parties, dates,
 quantities and document references are illustrative, not verified business data. It approved
 no new custody engine and no claim production verification, and the build added neither.
@@ -4169,7 +4193,17 @@ approved claim outcome — and `0548` carries that door in SQL
 (`purchasing_issue_purchase_return`, `operation`/`principal` only), but the confirmed UI was
 the REGISTER, not a creation screen, so the screen that calls it is a later scope with its own
 owner decision. The evidence viewer is not wired either: the entries carry the door and say
-why they are inactive. The authenticated production walk is owed, as it is for §9.1.
+why they are inactive. The populated-record and physical lifecycle walk remains owed.
+
+**Authenticated readback — 2026-09-24, existing register only.** On production
+`893b7f33d54ecd3c0ab51755d6d98d09f47407d2`, principal opened Purchase Returns from its
+existing route. Loading resolved to `No purchase returns.` and `0 returns · 0 Units`,
+not an error or fabricated records. The four governed rail groups and confirmed column
+order were present; Hide/Show filters and Search opened normally. At 390×844, document
+scroll width was 390px. The open 240px rail left too little table space; using the existing
+Hide filters control made the empty message and footer readable, and the desktop rail
+state was restored afterwards. This is not populated-row, pinning, evidence, permission,
+issue, pickup or supplier-receipt proof. No return, Unit or custody event was written.
 
 **Purpose / source:** return Carres-owned purchased goods only after an approved claim/outcome.
 No blank `+ New`. Keep the existing Claim → Purchasing authorisation → Stock physical pickup
