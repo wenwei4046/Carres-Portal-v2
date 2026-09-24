@@ -2669,8 +2669,13 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Stale proposal state/action | **Out of date — propose again** |
 | The customer's recorded basis for a commercial change (0564) | The screen words are governed by § "Customer agreement evidence — screen wording" below and are **PROPOSAL / NOT LAW**. There is no free-text evidence field and no tick box: a governed KIND always names a pointer outside the record. |
 | Add a catalogue service to the SO object draft (0564) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
-| The SO `Delivery` field naming the disposal services the order carries (same rows as Items, no money) | **Disposal** ⚠️ build wording 2026-09-23, owner confirmation owed |
-| In Edit, add a disposal service from `Delivery` (the same act as `Add service`) | **Add disposal** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| The SO `Delivery` field listing the order's services (same rows as Items, no money) | **Services** — the approved services-footer word above, reused |
+| In Edit, add a (disposal) service from `Delivery` (the same act as the Items door) | **Add service** — the page's existing action word, reused (its own confirmation is still owed, row above) |
+
+**PROPOSAL / NOT LAW (2026-09-24) — not screen copy.** `Disposal` as the Delivery field name and
+`Add disposal` as its action would name the lorry's take-away job more exactly than `Services` /
+`Add service`. Recorded here for owner review; until approved, the screen uses the two approved/existing
+words above. Falsifier: the owner approves or rejects them.
 | A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
 | Unknown promised date | **Delivery date to be confirmed** |

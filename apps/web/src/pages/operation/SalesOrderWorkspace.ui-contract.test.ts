@@ -1585,22 +1585,30 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
     expect(workspace).not.toContain('<span className="text-meta text-base-500">Balance due</span>');
   });
 
-  it("prints a service's Item Code upper case on the page AND the paper, from one function", () => {
-    expect(serviceCode).toContain("key.toUpperCase()");
-    expect(workspace).toContain("{serviceCodeWord(a.addon_key)}");
-    expect(pdfTemplate).toContain('{a.sku ? serviceCodeWord(a.sku) : "ADD-ON"}');
-    /* Display only — the stored key is what the draft still writes. */
+  it("prints a service's Item Code from its governed identity — catalogue Service SKU when linked, saved key otherwise", () => {
+    /* One rule, one function, both surfaces (verified 2026-09-24: 0172 links
+       `addons.key` → `addons.service_sku`; no other display mapping exists). */
+    expect(serviceCode).toContain("catalogServiceSku && catalogServiceSku.trim() ? catalogServiceSku.trim() : savedKey");
+    /* Nothing is upper-cased or rewritten. */
+    expect(serviceCode).not.toContain("toUpperCase");
+    expect(workspace).toContain("{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}");
+    expect(workspace).toContain("(key) => serviceCodeWord(key, addonSkuByKey.get(key))");
+    /* The paper prints what the payload sends; the API applies the same rule. */
+    expect(pdfTemplate).toContain('{a.sku ?? "ADD-ON"}');
+    /* The stored key is what the draft still writes. */
     expect(workspace).toContain("addon_key: hit.key");
   });
 
-  it("shows disposal in Delivery from the SAME service rows, adding through the ONE act", () => {
-    expect(workspace).toContain('data-testid="delivery-disposal"');
-    expect(workspace).toContain('onValueChange={addServiceToDraft}');
-    /* Both doors — Items' `Add service` and Delivery's `Add disposal` — call it. */
+  it("states the order's Services in Delivery from the SAME rows, adding through the ONE act, in approved words only", () => {
+    expect(workspace).toContain('data-testid="delivery-services"');
+    expect(workspace).toContain('<Fact label="Services" value={servicesWords(draft.addons, nameOfAddon)} own={false} />');
+    /* Both `Add service` doors call the one act. */
     expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(2);
-    /* It prints no money: the charge is stated once, in Items. */
-    expect(workspace).toContain('<Fact label="Disposal" value={servicesWords(disposals, nameOfAddon)} own={false} />');
-    expect(changeHelpers).toContain("export const isDisposalService");
+    /* The Delivery door offers the disposal family, known by its catalogue code. */
+    expect(changeHelpers).toContain('catalogServiceSku.startsWith("SVC-DISPOSE-")');
+    /* Unapproved words stay off the screen (recorded as a PROPOSAL in COPY). */
+    expect(workspace).not.toContain('label="Disposal"');
+    expect(workspace).not.toContain('label="Add disposal"');
   });
 
   it("draws Revisions and History through the same SO section Block — no off-scale p-5, no 20px title", () => {

@@ -693,11 +693,13 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-                        → `Disposal` (owner card 2026-09-23, BUILT): a labelled field reading the SAME
-                        `order_addons` rows Items prices — name, size, ×qty, NO money — and, in Edit,
-                        `Add disposal`, which is the same act as Items' `Add service` (one row, priced once
-                        in Items). Remove and quantity stay on the Items row. Shown only when the order
-                        carries a disposal or the page is in Edit
+                        → `Services` (owner card 2026-09-23, BUILT; words settled 2026-09-24): a labelled field
+                        reading the SAME `order_addons` rows Items prices — every service's name, ×qty, NO
+                        money — and, in Edit, the page's existing `Add service`, offering the disposal family
+                        (catalogue `SVC-DISPOSE-…`) and calling the same act as the Items door (one row,
+                        priced once in Items). Remove and quantity stay on the Items row. Shown when the
+                        order carries a service or the page is in Edit. `Disposal` / `Add disposal` are a
+                        PROPOSAL / NOT LAW (COPY-STANDARD) — not screen copy
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, BUILT 2026-09-23): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
@@ -719,9 +721,13 @@ PAYMENT                 the same money zone as the PDF, one arithmetic (owner ap
                         (`components/so-document-table.ts`): 11px/500 grey headers over a 1px line, 13px rows
                         with 8px cell padding divided by 1px lines beneath, amounts right-aligned with
                         tabular figures, only the closing total bold. Item Code and Approval code are ordinary
-                        13px values in the UI font — never monospace. A service's Item Code prints UPPER CASE
-                        on page and PDF from one function (`lib/service-code.ts`); the stored key is not
-                        rewritten, and the SO document payload now carries it (it printed `ADD-ON` before).
+                        13px values in the UI font — never monospace. A service's Item Code follows its
+                        governed identity, on page and PDF from one rule (`lib/service-code.ts`, the API
+                        mirrors it): a service LINKED in the catalogue prints the catalogue Service SKU
+                        (`addons.service_sku`, 0172 — `SVC-DISPOSE-MATTRESS`); an unlinked one (`DELIVERY`,
+                        `STAIR_CARRY`, bare by design per 0393) or a historical key prints exactly as saved.
+                        Nothing is upper-cased or rewritten; `order_addons.addon_key` stays the identity. The SO
+                        document payload now carries the code (it printed `ADD-ON` before).
                         Totals: a compact two-column block, every figure 13px; a 1px rule over `Total payable`
                         and over `Balance due`, which alone are weight 600
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
