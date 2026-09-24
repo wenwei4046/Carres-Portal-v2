@@ -1168,7 +1168,7 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
-- **Work left rail — BUILT 2026-09-24 (owner-approved UI, Jess 2026-09-24).** On `7e9da6459` the rail
+- **Work left rail — DEPLOYED 2026-09-24 (`26f718d4`, PR #1581; owner-approved UI, Jess 2026-09-24); signed-in Operation walk OWED.** On `7e9da6459` the rail
   was a `Working day` text list with an `All` row, printed `0 actions`, a holiday that could not be
   chosen, no `All modules` row, no week control and no `week` in the
   URL; at 768–1103px of Work canvas Panel 1 was dropped entirely and the date strip scrolled
@@ -1179,6 +1179,9 @@ honest Work for admitted modules.
   `OperationWork.left-rail.test.tsx` 12 red on main → 13/13 green under `TZ=Asia/Kuala_Lumpur`,
   plus model, strip and split-shell tests. Out of scope and unchanged: Panel 2 rows, Panel 3 detail,
   communication, templates and Delivery proof review.
+  Deploy run 35977633523: both Pages projects, both canonical hosts and the API Worker report
+  `26f718d4`, and the live ERP bundle carries the rail. The signed-in read of `/operation?tab=work`
+  at 1440 / 1180 / 820 / 390 is still owed: no verification browser holds a production session.
 - **Work truth hotfix HF-1 — DEPLOYED to production 2026-09-17 (`a48e5237`, PR #1400, includes YH's
   UTC-safe `workWeek`); authenticated production read OWED.** Measured on `a5776c50`: at UTC+8 the day
   strip read `Sun 13 Sept … Thu 17 Sept`, Malaysia Day was an ordinary `0` row, an empty day said
