@@ -4253,3 +4253,8 @@ Database sentences (shown as written):
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
 - `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
 - `<code> <name> decides how money may be recorded. A heading cannot go under it.`
+
+
+### Sales Order existing-reference revisions and delivery Activity
+
+SO revision records display `<existing reference>(n)` with no space; the current version appends ` · Current`. Preserve the saved base reference and historical issued documents. Parenthesized revisions are presentation, not a new allocated number. Delivery Activity names `confirmed_date` as **Confirmed date**, `confirmed_time_slot` as **Confirmed time**, and `confirmed_partner` as **Logistics**; stored events remain unchanged.

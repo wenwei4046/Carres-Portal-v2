@@ -65,6 +65,9 @@ const FIELD_LABEL: Record<string, string> = {
   balance_due_date: "Balance due date",
   called_customer: "Called customer",
   delivery_time_slot: "Delivery time slot",
+  confirmed_date: "Confirmed date",
+  confirmed_time_slot: "Confirmed time",
+  confirmed_partner: "Logistics",
   customer_request: "Customer request",
   carres_remark: "Carres remark",
   warehouse_remark: "Warehouse remark",
@@ -97,6 +100,7 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
 /** Fields whose value is a business DATE — printed the one ruled way, never
  *  as the stored `2026-08-28`. */
 const DATE_FIELDS = new Set([
+  "confirmed_date",
   "delivery_date",
   "logistic_eta",
   "stock_eta",

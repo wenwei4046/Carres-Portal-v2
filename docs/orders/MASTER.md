@@ -151,7 +151,7 @@ own independent daily pool of 10,000. Previously explicit formats are unchanged.
 
 | Family | Current implementation and remaining acceptance |
 |---|---|
-| Sales Order / Subscription Agreement | **APPROVED TARGET / NOT BUILT** for the new formats and revision presentation. Existing SO implementation is not proof of the new numbering target. |
+| Sales Order / Subscription Agreement | **APPROVED TARGET / NOT BUILT** for the new number formats. SO object revision records now attach `(n)` to the existing reference; current-page save/view messages use parentheses. This presentation correction does not implement new number allocation or certify every amendment surface. Existing SO implementation is not proof of the new numbering target. |
 | Purchase Order | **PARTIALLY DELIVERED.** New `PO` short-format allocation and independent daily prefix pools are implemented by `0574`. Purchasing MASTER §6.1 records PR #1551 (`e9bc40a0a`), production application and live formatter/pool checks; its authenticated new-PO issue-to-print walk remains owed. `SPO` numbering and the Outright/Subscription business partition remain **APPROVED TARGET / NOT BUILT**. This Orders reconciliation cites that owning evidence; it is not a new production verification. |
 | Delivery Order | **BUILT** by `0575`; Delivery MASTER §3.1 owns the implementation and verification evidence for `DO` / `SDO`. This does not establish completion of other document families. |
 | Other document formats in the table | **APPROVED TARGET / NOT BUILT** for the new formats. `0574` changes the shared pool key but switches the formatter only for `PO`; a per-prefix pool does not prove that each prefix's approved number shape or business partition has shipped. |
