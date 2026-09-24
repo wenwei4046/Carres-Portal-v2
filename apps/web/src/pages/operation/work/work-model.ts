@@ -2,6 +2,7 @@ import type { OperationWorkModule } from "@carres/shared";
 import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { isWorkingDay } from "@carres/shared/working-days";
 import { addDaysIso, weekStartIso } from "@/lib/excel-date-filter";
+import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
 import type { WorkLayout } from "./WorkSplitShell";
 
@@ -113,6 +114,112 @@ export function workFocusDay(today: string, dueIsos: readonly (string | null)[])
   }
   return today;
 }
+
+/**
+ * The Date choice (Work left rail, owner ruling 2026-09-24). Exactly one of
+ * `missed` · one calendar date (`YYYY-MM-DD`) · `no_date` is chosen. `focus` is
+ * the MASTER §5.1 opening list (Missed plus the focus day) and `all` is the
+ * whole open set, which the toolbar's timing filter still opens.
+ */
+export type WorkDayKey = "focus" | "missed" | "no_date" | "all" | string;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isWorkDate(key: string): boolean {
+  return ISO_DATE.test(key);
+}
+
+/** Whether a row belongs to the chosen Date. Pure: `today` is the feed's own
+ *  Malaysia date and `focusDay` its §5.1 focus day. */
+export function inWorkDay(item: WorkRow, day: WorkDayKey, today: string, focusDay: string): boolean {
+  if (day === "all") return true;
+  if (item.timingBucket === "overdue") return day === "missed" || day === "focus";
+  if (day === "missed") return false;
+  if (day === "no_date") return item.dueIso === null;
+  // The focus list also holds anything due between today and the focus day
+  // (work dated on today's holiday or Sunday), so opening on the next
+  // working day never hides it.
+  if (day === "focus") return item.dueIso !== null && item.dueIso >= today && item.dueIso <= focusDay;
+  return item.dueIso === day;
+}
+
+/** The Monday a `week` URL value names, or null when it names no date. */
+export function parseWorkWeek(value: string | null): string | null {
+  return value && ISO_DATE.test(value) ? weekStartIso(value) : null;
+}
+
+export interface WorkRailDay {
+  iso: string;
+  /** `Wed, 16 Sep` — the one `fmtDate` spelling. */
+  label: string;
+  /** The badge's two lines, cut from that same spelling: `16` and `WED`. */
+  dayNumber: string;
+  weekday: string;
+  holiday: string | null;
+  count: number;
+  today: boolean;
+}
+
+export interface WorkRailDates {
+  /** `Sep 2026` — the month holding the week's Thursday (ISO 8601). */
+  month: string;
+  previousWeek: string;
+  nextWeek: string;
+  missed: number;
+  days: WorkRailDay[];
+  noDate: number;
+}
+
+/**
+ * The Date section of one visible work week. Every date is a `YYYY-MM-DD`
+ * string moved by whole days, so no device clock or time zone can shift it;
+ * `today` is the feed's Malaysia date, never the browser's. A missed action
+ * counts once, under `Missed`, never again under its past weekday.
+ */
+export function workRailDates(items: readonly WorkRow[], today: string, week: string): WorkRailDates {
+  const monday = weekStartIso(week);
+  const dates = workWeek(monday, items.map((item) => item.dueIso));
+  return {
+    month: fmtMonth(addDaysIso(monday, 3)),
+    previousWeek: addDaysIso(monday, -7),
+    nextWeek: addDaysIso(monday, 7),
+    missed: items.filter((item) => item.timingBucket === "overdue").length,
+    days: dates.map((iso) => {
+      const label = fmtDate(iso);
+      const [weekday = "", rest = ""] = label.split(", ");
+      return {
+        iso,
+        label,
+        dayNumber: rest.split(" ")[0] ?? "",
+        weekday: weekday.toUpperCase(),
+        holiday: workHoliday(iso),
+        count: items.filter((item) => item.dueIso === iso && item.timingBucket !== "overdue").length,
+        today: iso === today,
+      };
+    }),
+    noDate: items.filter((item) => item.timingBucket === "no_date").length,
+  };
+}
+
+/** Module counts over the rows of the chosen Date — before the module choice,
+ *  so choosing one module never hides the others' real counts. */
+export function workModuleCounts(items: readonly WorkRow[]): Record<OperationWorkModule, number> {
+  const counts = Object.fromEntries(
+    WORK_MODULES.map((module) => [module, 0]),
+  ) as Record<OperationWorkModule, number>;
+  for (const item of items) counts[item.module] += 1;
+  return counts;
+}
+
+/** The admitted Work modules, in their governed order (MASTER §5.3). */
+export const WORK_MODULES: readonly OperationWorkModule[] = [
+  "orders",
+  "purchasing",
+  "receiving",
+  "delivery",
+  "payment",
+  "issue_tracker",
+];
 
 /** Panels follow the Work area's own width, never the window's. */
 export function workLayoutFor(width: number): WorkLayout {

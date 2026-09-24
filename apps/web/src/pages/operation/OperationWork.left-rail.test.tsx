@@ -286,7 +286,9 @@ describe("【WORK】 left rail · URL and keyboard", () => {
     workState.data = feed("2026-09-18", [item("2026-09-22", "delivery"), item("2026-09-22", "payment")]);
     show("/operation?tab=work&week=2026-09-21&day=2026-09-22&module=delivery");
     expect(day(/^Mon, 21 Sep/)).toBeInTheDocument();
-    expect(day(/^Tue, 22 Sep · 2 actions$/)).toHaveAttribute("aria-pressed", "true");
+    // The Date counts follow the chosen module; the Module counts do not.
+    expect(day(/^Tue, 22 Sep · 1 action$/)).toHaveAttribute("aria-pressed", "true");
+    expect(countOf(within(moduleSection()).getByRole("button", { name: /^All modules/ }))).toBe("2");
     expect(within(moduleSection()).getByRole("button", { name: /^Delivery/ })).toHaveAttribute("aria-pressed", "true");
     expect(listRows()).toHaveLength(1);
 

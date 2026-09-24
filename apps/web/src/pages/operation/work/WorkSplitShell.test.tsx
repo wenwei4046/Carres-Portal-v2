@@ -18,3 +18,17 @@ describe("WorkSplitShell", () => {
     expect(screen.getByText("Detail")).toBeInTheDocument();
   });
 });
+
+describe("WorkSplitShell · 768–1103px", () => {
+  it("keeps the rail beside one work column: the list, or the chosen job in its place", () => {
+    const first = render(<WorkSplitShell layout="two" activePanel="list" rail="Days" list="Actions" detail="Detail" />);
+    expect(screen.getByRole("complementary", { name: "Work filters" })).toHaveTextContent("Days");
+    expect(screen.getByText("Actions")).toBeInTheDocument();
+    expect(screen.queryByText("Detail")).not.toBeInTheDocument();
+    first.unmount();
+    render(<WorkSplitShell layout="two" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
+    expect(screen.getByText("Days")).toBeInTheDocument();
+    expect(screen.queryByText("Actions")).not.toBeInTheDocument();
+    expect(screen.getByText("Detail")).toBeInTheDocument();
+  });
+});
