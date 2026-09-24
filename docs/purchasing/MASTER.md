@@ -3776,12 +3776,28 @@ fits the shared 54px row; long problem text and accessibility needs may grow it.
   `Evidence could not be loaded` + `Try again`, never `Photos 0`. `Photos 0` means the record
   genuinely has none — and a kind with zero files prints no control at all rather than a dead one.
 
-**The saved-evidence viewer — ONE shared component; local build 2026-09-24, production proof owed.**
+**The saved-evidence viewer — ONE shared component; DEPLOYED + AUTHENTICATED RECEIVING READBACK, 2026-09-24 (#1593).**
 
 | Check | Measured answer |
 |---|---|
-| Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claim-record photo adoption is locally built (2026-09-24), with production proof owed; Stock/Service and the approved per-Unit Claim expansion remain unbuilt |
-| Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Production readback is still owed |
+| Does a shared saved-evidence viewer exist? | **Deployed kit:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claim-record photo adoption is locally built (2026-09-24), with production proof owed; Stock/Service and the approved per-Unit Claim expansion remain unbuilt |
+| Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Receiving production readback is recorded below; Claim adoption has its own boundary |
+
+CI `35992160117` and deployment `35993421790` passed for #1593; all five canonical
+surfaces reported `59c2137810d842a6a9ec1e22bc93e9d96f4cc18c`. Its own Pages deployment
+was `af9b0ddb.carres-portal.pages.dev`, compared with `89b4a69b.carres-portal.pages.dev`:
+`saved-evidence-viewer` appeared once versus zero while `Supplier DO No` stayed at eight.
+Authenticated `GRN-20260904-1064` retained its recorded `Photo 1` despite no readable
+file. Opening showed the GRN and Arrival evidence context, explicit failure and Try again.
+Retry showed Loading then the same failure without closing the GRN; Escape returned
+focus to Photo 1. No successful recovery of that unavailable stored file is claimed.
+
+The production `/ui#saved-evidence` example proved photo enlargement, drag (80px/40px
+at 1.5×), Reset, file navigation and separate unreadable-photo state. The generated
+8-second video initially failed to load, then Try again recovered it; native controls
+played/paused, sought to second 4 and entered/exited fullscreen. Close returned focus
+to View. This is synthetic video playback proof, not saved business-video proof.
+No permissions, evidence, receipt, claim or stock facts were changed.
 
 **Claim-record photo adoption — local implementation, 2026-09-24; production proof owed.**
 The existing full-width record opens its saved photos in `SavedEvidenceViewer`, including
@@ -3859,7 +3875,7 @@ neither is an approved design.
 
 | Target | State | The build's obligation |
 |---|---|---|
-| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **LOCAL KIT + CLAIM-RECORD PHOTO BUILD; production proof owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
+| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT; Claim-record adoption locally built, production proof owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
 **The reply-recording build reuses what exists; it does not grow a second system.**

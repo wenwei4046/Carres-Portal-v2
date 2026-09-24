@@ -359,7 +359,8 @@ and evidence viewer promised for Supplier Claims.
 ## SavedEvidenceViewer
 
 **Purpose.** The approved shared read-only saved-photo/video viewer (Purchasing MASTER
-§9.5). Local implementation 2026-09-24; production readback owed. Receiving's existing
+§9.5). Deployed in #1593, with authenticated Receiving and production example readback
+2026-09-24 (evidence in Purchasing MASTER §9.5). Receiving's existing
 arrival-evidence controls are the first consumer. Claim-record photos also adopt it
 locally (2026-09-24; production proof owed); Stock/Service and per-Unit Claim expansion
 integrations remain separate work and must reuse this component.
