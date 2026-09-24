@@ -5,7 +5,7 @@
  * document must equal what the whole Work feed says for that order.
  */
 import { describe, expect, it } from "vitest";
-import { projectSalesOrdersFromModuleFacts } from "./work";
+import { projectPurchaseOrderReplyWork, projectSalesOrdersFromModuleFacts } from "./work";
 
 type Row = Parameters<typeof projectSalesOrdersFromModuleFacts>[0]["orders"][number];
 
@@ -94,5 +94,35 @@ describe("the one-order Work probe", () => {
     expect(all).toEqual(expect.arrayContaining(["SO-1301:ask_delivery_date", "SO-1301:issue_po"]));
     expect(all.some((key) => key.endsWith(":delay_planning"))).toBe(true);
     expect(all.some((key) => key.startsWith("SO-1303:"))).toBe(false);
+  });
+});
+
+type Po = Parameters<typeof projectPurchaseOrderReplyWork>[0]["pos"][number];
+const po = (id: string, extra: Partial<Po> = {}): Po => ({
+  id, supplier_id: "supplier-1", status: "open", version: 2, promises: [],
+  sends: [{ kind: "confirmed_sent", channel: "whatsapp", sent_at: "2026-09-03T17:00:00Z", po_version: 2 }],
+  purchase_order_lines: [{ qty: 4, received_qty: 0 }],
+  ...extra,
+} as Po);
+const POS: Po[] = [
+  po("PO-2041"),                                                   // sent, no answer → supplier_reply
+  po("PO-2042", { sends: [] }),                                    // never sent → nothing
+  po("PO-2043", { purchase_order_lines: [{ qty: 4, received_qty: 4 }] }), // fully received → nothing
+];
+
+describe("the one-PO Work probe", () => {
+  it.each(POS.map((p) => [p.id, p] as const))("%s: the same occurrences, identity and Work date as the whole feed", (id, row) => {
+    const shapeOf = (items: ReturnType<typeof projectPurchaseOrderReplyWork>) =>
+      items.map((i) => ({ id: i.id, ruleKey: i.ruleKey, actionOn: i.timing.actionOn, label: i.object.label }));
+    const whole = projectPurchaseOrderReplyWork({
+      pos: POS, suppliers: [{ id: "supplier-1", name: "Nice Future" }], poDuty: null, today: "2026-09-08",
+    }).filter((i) => i.object.id === id);
+    const probe = projectPurchaseOrderReplyWork({ pos: [row], suppliers: [], poDuty: null, today: "2026-09-08" });
+    expect(shapeOf(probe)).toEqual(shapeOf(whole));
+  });
+
+  it("the fixture exercises the reply rule", () => {
+    const all = projectPurchaseOrderReplyWork({ pos: POS, suppliers: [], poDuty: null, today: "2026-09-08" });
+    expect(all.map((i) => i.id)).toEqual(["purchasing:PO-2041:purchasing.supplier_reply"]);
   });
 });

@@ -1,5 +1,4 @@
 import { Hono, type Context } from "hono";
-import { OPERATION_ORDER_WORK_SELECT, OPERATION_ORDER_WORK_STATUSES } from "../../lib/operation-order-select";
 import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
 import {
@@ -1780,7 +1779,8 @@ const REFUSAL_STATUS: Record<string, 403 | 409 | 422 | 502> = {
  * ⭐ ONE ORDER, ONE PROJECTOR (owner correction 2026-09-24). A completion
  * writer asks "is THIS order's occurrence of THIS rule open?" without reading
  * the whole Work feed: the same `projectSalesOrdersFromModuleFacts` over the
- * same row select, with the stock of this order's own SKUs and the same
+ * Operation order-list row (the list route narrowed by `orderId`, so every
+ * enrichment is the same), with the stock of this order's own SKUs and the same
  * Purchasing safety days. Owner and duty facts decide WHO, never WHETHER, so
  * they are not read here. Each occurrence is returned on its CURRENT
  * generation identity. `null` = not an order Work admits (another status).
@@ -1790,16 +1790,20 @@ export async function probeOrderWork(
   orderId: string,
   ledger: WorkLedger = supabaseWorkLedger,
 ): Promise<OperationWorkItem[] | null> {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/orders", operationOrdersRouter);
+  const { orders } = await readInternal<{ orders: SalesOrderModuleRow[] }>(
+    internal,
+    `/orders?orderId=${encodeURIComponent(orderId)}`,
+    c,
+  );
+  const order = orders.find((row) => row.id === orderId);
+  if (!order) return null;
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data: row, error } = await sb
-    .from("orders")
-    .select(OPERATION_ORDER_WORK_SELECT)
-    .eq("id", orderId)
-    .in("status", [...OPERATION_ORDER_WORK_STATUSES])
-    .maybeSingle();
-  if (error) throw new Error(`order read failed: ${error.message}`);
-  if (!row) return null;
-  const order = row as unknown as SalesOrderModuleRow;
   const skus = [...new Set((order.order_lines ?? []).map((line) => line.sku).filter(Boolean))];
   const [stock, settings] = await Promise.all([
     skus.length === 0
@@ -1820,6 +1824,35 @@ export async function probeOrderWork(
     today: todayIsoMYT(),
     safetyDays: settings.orderByBufferDays,
   });
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+/**
+ * ONE PURCHASE ORDER, ONE PROJECTOR: the same reply projector the Work feed
+ * runs, over the PO register row narrowed by `poId` (so promises, sends and
+ * lines are read exactly as the feed reads them). Supplier names and PO Duty
+ * decide the words and WHO, never WHETHER, so they are not read here.
+ */
+export async function probePurchaseOrderWork(
+  c: Context<AppEnv>,
+  poId: string,
+  ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/pos", operationPosRouter);
+  const { pos } = await readInternal<{ pos: PurchaseOrderWorkSource[] }>(
+    internal,
+    `/pos?status=all&poId=${encodeURIComponent(poId)}`,
+    c,
+  );
+  const po = pos.find((row) => row.id === poId);
+  if (!po) return null;
+  const items = projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today: todayIsoMYT() });
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }

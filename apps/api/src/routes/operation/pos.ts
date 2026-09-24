@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
@@ -125,6 +126,12 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     );
   }
   const { status, supplierId } = parsed.data;
+  // 0581 · ONE PO, THE SAME ROW: the Work completion probe reads exactly what
+  // this register reads (promises, sends, lines) for a single PO.
+  const onlyPoId = c.req.query("poId") ?? null;
+  if (onlyPoId !== null && (onlyPoId.trim() === "" || onlyPoId.length > 64)) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "poId must be a purchase order number" }, 422);
+  }
 
   const sb = userClient(c.env, c.var.auth.jwt);
   const pos: Array<Record<string, unknown>> = [];
@@ -158,6 +165,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 
     if (status !== "all") q = q.eq("status", status);
     if (supplierId) q = q.eq("supplier_id", supplierId);
+    if (onlyPoId) q = q.eq("id", onlyPoId);
 
     const { data, error } = await q
       .order("placed_at", { ascending: false })
@@ -2141,7 +2149,12 @@ function mapSupplierCallError(
 // Record the answer to the exact sent PO version with outside evidence.
 // The transaction preserves the original document date and projects only goods
 // arrival planning to the Sales lines explicitly linked to this PO.
-operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) => {
+// 0581 — the evidenced answer to the current PO version completes the PO's
+// supplier-reply Work. It observes only a body this door will accept, so an
+// incomplete answer is still refused before any database call.
+operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, supplierReplyWorkCompletion({
+  when: async (c) => recordSupplierReplyInput.safeParse(await c.req.json().catch(() => null)).success,
+}), async (c) => {
   const parsed = await parseJsonBody(c, recordSupplierReplyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);

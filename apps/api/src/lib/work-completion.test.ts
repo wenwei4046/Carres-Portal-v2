@@ -1,19 +1,21 @@
 /**
- * The Sales Orders Completed writer (0581 · owner rulings 2026-09-24): only a
- * Sales Orders write whose own completion fact now holds, on an occurrence
- * the ONE Work read showed as open just before, becomes `completed`.
+ * The shared Completed writer (0581 · owner rulings 2026-09-24), exercised
+ * through the Sales Orders spec: only a module write whose own completion
+ * fact now holds, on an occurrence the one-object probe showed open just
+ * before, becomes `completed`.
  */
 import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import type { AppEnv } from "../types";
+import { salesOrderCompletionResult, type SalesOrderCompletionFacts } from "./sales-order-work-completion";
 import {
-  salesOrderWorkCompletion,
-  withSalesOrderWorkCompletion,
+  workCompletion,
+  withWorkCompletion,
   type CompletedWrite,
-  type SalesOrderCompletionDeps,
-  type SalesOrderCompletionFacts,
-} from "./sales-order-work-completion";
+  type WorkCompletionDeps,
+  type WorkCompletionSpec,
+} from "./work-completion";
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
 const ORDER = "11111111-0000-4000-8000-000000000001";
@@ -67,7 +69,9 @@ function harness(opts: {
   const recorded: CompletedWrite[] = [];
   const logs: string[] = [];
   let call = 0;
-  const deps: SalesOrderCompletionDeps = {
+  const spec = (rules: readonly string[]): WorkCompletionSpec<SalesOrderCompletionFacts> => ({
+    owner: "Sales Orders",
+    rules,
     probe: async (_c, orderId) => {
       call += 1;
       reads.push(`${call === 1 ? "before" : "after"}:${orderId}`);
@@ -80,6 +84,9 @@ function harness(opts: {
       if (f instanceof Error) throw f;
       return f;
     },
+    result: salesOrderCompletionResult,
+  });
+  const deps: WorkCompletionDeps = {
     recordCompleted: async (_c, write) => {
       if (opts.recordFails) throw new Error("ledger down");
       recorded.push(write);
@@ -87,13 +94,13 @@ function harness(opts: {
     now: () => "2026-09-17T06:00:00.000Z",
     log: (message) => logs.push(message),
   };
-  return { deps, reads, recorded, logs };
+  return { deps, spec, reads, recorded, logs };
 }
 
 async function run(
-  deps: SalesOrderCompletionDeps,
+  h: ReturnType<typeof harness>,
   status = 200,
-  rules: readonly ("ask_delivery_date" | "delay_planning")[] = ["ask_delivery_date"],
+  rules: readonly string[] = ["ask_delivery_date"],
 ) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
@@ -101,7 +108,7 @@ async function run(
     await next();
   });
   app.post("/orders/:id/date", async (c) =>
-    withSalesOrderWorkCompletion(c, c.req.param("id"), rules, async () => c.json({ ok: status < 400 }, status as 200), deps),
+    withWorkCompletion(c, [{ spec: h.spec(rules), objectIds: [c.req.param("id")] }], async () => c.json({ ok: status < 400 }, status as 200), h.deps),
   );
   return app.request(`/orders/${ORDER}/date`, { method: "POST" });
 }
@@ -109,7 +116,7 @@ async function run(
 describe("the Sales Orders Completed writer", () => {
   it("an occurrence open before and gone after, with the date now recorded, is completed by the person who wrote it", async () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [] });
-    const response = await run(h.deps);
+    const response = await run(h);
     expect(response.status).toBe(200);
     // Only THIS order is read — twice, never the whole Work feed.
     expect(h.reads).toEqual([`before:${ORDER}`, `after:${ORDER}`]);
@@ -130,7 +137,7 @@ describe("the Sales Orders Completed writer", () => {
       before: [occurrence("ask_delivery_date")], after: [],
       facts: { deliveryDate: null, deliveryDateTbd: true, delayDecision: null, delayDecisionEta: null },
     });
-    await run(h.deps);
+    await run(h);
     expect(h.recorded[0]?.resultReference).toBe("orders.delivery_date_tbd");
   });
 
@@ -139,21 +146,21 @@ describe("the Sales Orders Completed writer", () => {
       before: [occurrence("delay_planning")], after: [],
       facts: { deliveryDate: "2026-09-30", deliveryDateTbd: false, delayDecision: "new_date", delayDecisionEta: "2026-10-05" },
     });
-    await run(h.deps, 200, ["delay_planning"]);
+    await run(h, 200, ["delay_planning"]);
     expect(h.recorded).toHaveLength(1);
     expect(h.recorded[0]).toMatchObject({ actionOn: "2026-09-16", resultReference: "ops_order_control.delay_decision=new_date@2026-10-05" });
   });
 
   it("a refused Sales Orders write records nothing and reads Work only once", async () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [] });
-    expect((await run(h.deps, 422)).status).toBe(422);
+    expect((await run(h, 422)).status).toBe(422);
     expect(h.recorded).toEqual([]);
     expect(h.reads).toEqual([`before:${ORDER}`]);
   });
 
   it("an occurrence still open after the write is not completed", async () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [occurrence("ask_delivery_date")] });
-    await run(h.deps);
+    await run(h);
     expect(h.recorded).toEqual([]);
   });
 
@@ -162,37 +169,37 @@ describe("the Sales Orders Completed writer", () => {
       before: [occurrence("ask_delivery_date")], after: [],
       facts: { deliveryDate: null, deliveryDateTbd: false, delayDecision: null, delayDecisionEta: null },
     });
-    await run(h.deps);
+    await run(h);
     expect(h.recorded).toEqual([]);
     expect(h.logs).toContain("work left without its completion fact: not recorded as completed");
   });
 
   it("work never shown as open is never completed (no second admission rule)", async () => {
     const h = harness({ before: [], after: [] });
-    await run(h.deps);
+    await run(h);
     expect(h.recorded).toEqual([]);
     expect(h.reads).toEqual([`before:${ORDER}`]);
   });
 
   it("an unreadable Work feed before or after records nothing, and the Sales Orders write still stands", async () => {
     const first = harness({ before: new Error("feed down"), after: [] });
-    expect((await run(first.deps)).status).toBe(200);
+    expect((await run(first)).status).toBe(200);
     expect(first.recorded).toEqual([]);
     expect(first.logs[0]).toMatch(/^work completion unknown/);
     const second = harness({ before: [occurrence("ask_delivery_date")], after: new Error("feed down") });
-    expect((await run(second.deps)).status).toBe(200);
+    expect((await run(second)).status).toBe(200);
     expect(second.recorded).toEqual([]);
   });
 
   it("unreadable facts record nothing", async () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [], facts: new Error("db down") });
-    expect((await run(h.deps)).status).toBe(200);
+    expect((await run(h)).status).toBe(200);
     expect(h.recorded).toEqual([]);
   });
 
   it("a ledger failure never undoes the write the operator already made", async () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [], recordFails: true });
-    const response = await run(h.deps);
+    const response = await run(h);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(h.logs).toContain("work completion could not be recorded");
@@ -203,7 +210,7 @@ describe("the Sales Orders Completed writer", () => {
       before: [occurrence("ask_delivery_date"), occurrence("delay_planning")], after: [],
       facts: { deliveryDate: "2026-10-01", deliveryDateTbd: false, delayDecision: "keep", delayDecisionEta: "2026-09-20" },
     });
-    await run(h.deps, 200, ["delay_planning"]);
+    await run(h, 200, ["delay_planning"]);
     expect(h.recorded.map((w) => w.occurrenceId)).toEqual([`orders:${ORDER}:delay_planning`]);
   });
 
@@ -213,7 +220,7 @@ describe("the Sales Orders Completed writer", () => {
       before: [current], after: [],
       facts: { deliveryDate: null, deliveryDateTbd: false, delayDecision: "keep", delayDecisionEta: "2026-09-20" },
     });
-    await run(h.deps, 200, ["delay_planning"]);
+    await run(h, 200, ["delay_planning"]);
     expect(h.recorded[0]).toMatchObject({
       occurrenceId: `orders:${ORDER}:delay_planning:g2`,
       idempotencyKey: `completed:orders:${ORDER}:delay_planning:g2`,
@@ -221,7 +228,7 @@ describe("the Sales Orders Completed writer", () => {
   });
 });
 
-describe("salesOrderWorkCompletion middleware", () => {
+describe("workCompletion middleware", () => {
   it("wraps the door without touching its handler, and skips both Work reads when the write cannot complete anything", async () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [] });
     const handler = vi.fn(async (c) => c.json({ saved: true }, 201));
@@ -233,7 +240,7 @@ describe("salesOrderWorkCompletion middleware", () => {
     let touches = true;
     app.post(
       "/orders/:id/save",
-      salesOrderWorkCompletion({ rules: ["ask_delivery_date"], orderId: (c) => c.req.param("id") ?? null, when: () => touches }, () => h.deps),
+      workCompletion({ targets: (c) => [{ spec: h.spec(["ask_delivery_date"]), objectIds: [c.req.param("id") ?? ""] }], when: () => touches }, () => h.deps),
       handler,
     );
     let response = await app.request(`/orders/${ORDER}/save`, { method: "POST" });
@@ -248,7 +255,7 @@ describe("salesOrderWorkCompletion middleware", () => {
       c.set("auth", { id: ME, role: "operation", jwt: "jwt" } as never);
       await next();
     });
-    app2.post("/orders/:id/save", salesOrderWorkCompletion({ rules: ["ask_delivery_date"], orderId: (c) => c.req.param("id") ?? null, when: () => touches }, () => skip.deps), handler);
+    app2.post("/orders/:id/save", workCompletion({ targets: (c) => [{ spec: skip.spec(["ask_delivery_date"]), objectIds: [c.req.param("id") ?? ""] }], when: () => touches }, () => skip.deps), handler);
     response = await app2.request(`/orders/${ORDER}/save`, { method: "POST" });
     expect(response.status).toBe(201);
     expect(skip.reads).toEqual([]);

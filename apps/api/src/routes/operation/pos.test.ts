@@ -641,6 +641,22 @@ describe("GET /api/operation/pos", () => {
     expect(eq).toHaveBeenCalledWith("supplier_id", supId);
   });
 
+  it("0581 · narrows to one PO for the Work completion probe, and refuses a blank one", async () => {
+    const { eq } = mockPosList([PO_ROW]);
+    const jwt = await makeJwt("operation");
+    const ok = await app.fetch(
+      new Request("http://t/api/operation/pos?status=all&poId=PO2609-4827", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("id", "PO2609-4827");
+    const bad = await app.fetch(
+      new Request("http://t/api/operation/pos?poId=%20", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(bad.status).toBe(422);
+  });
+
   it("returns 422 for invalid status", async () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(

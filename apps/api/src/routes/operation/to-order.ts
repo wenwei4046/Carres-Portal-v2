@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { soBatchIssueWorkCompletion } from "../../lib/purchasing-work-completion";
 import type { Context } from "hono";
 import { z } from "zod";
 import {
@@ -302,7 +303,9 @@ type BatchLineDecision = z.infer<
   typeof soBatchIssueInput
 >["documentDecisions"][number]["lineDecisions"][number];
 
-toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
+// 0581 — a purchase order now serving the order is Purchasing's completion
+// fact for that order's `issue_po`; the writer observes, never edits.
+toOrderRouter.post("/issue-batch", requireOperation, soBatchIssueWorkCompletion(), async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   let raw: unknown;
