@@ -114,7 +114,11 @@ function SupplierCard({ orderId }: { orderId: string }) {
 export default function WorkParties({ item }: { item: OperationWorkItem }) {
   const ref = orderRefOf(item);
   const orderId = useOrderIdFromRef(ref ?? {});
-  if (!ref || !orderId) return null;
+  const scope = useDeliveryScopeCard(orderId);
+  /* A party card speaks only about an order Delivery can actually read: an
+     order it cannot find draws nothing, never a guessed `Logistics not
+     assigned`. */
+  if (!ref || !orderId || (!scope.card && !scope.loading)) return null;
   return (
     <div className="flex flex-col gap-4" data-testid="work-parties">
       <LogisticsCard orderId={orderId} />

@@ -172,6 +172,9 @@ describe("expanded — the owner's order", () => {
 
 describe("the external link", () => {
   it("no link: only `Create link`", () => {
+    // Details already received, so the current action is not the contact
+    // step and the section itself carries the one `Create link`.
+    factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
     draw();
     fireEvent.click(screen.getByTestId("logistics-card-toggle"));
     const link = screen.getByTestId("logistics-card-link");

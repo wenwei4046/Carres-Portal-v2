@@ -82,6 +82,7 @@ describe("the one current action", () => {
     const today = logisticsCardModel(input({ todayIso: "2026-10-23" }));
     expect(today.currentAction).toMatchObject({ act: "Contact logistics today", timing: "today" });
     expect(today.rows[0].state).toBe("open");
+    expect(today.rows[0].fact).toBe("Details not received yet");
   });
 
   it("after the details are received, asks for the scheduled date; no answer past the check says so", () => {

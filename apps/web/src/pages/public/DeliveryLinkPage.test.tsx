@@ -68,7 +68,7 @@ describe("the external link page", () => {
     expect(screen.getByText("1 × King Mattress")).toBeTruthy();
     await waitFor(() => expect(calls.some((c) => c.path.endsWith("/opened"))).toBe(true));
     const radios = screen.getAllByRole("radio").map((r) => r.textContent);
-    expect(radios).toEqual(["Save scheduled delivery", "Ask for another date", "Cannot deliver"]);
+    expect(radios).toEqual(["Scheduled date", "Another date", "Cannot deliver"]);
     expect(document.body.textContent).not.toMatch(/SO-?\d/);
   });
 

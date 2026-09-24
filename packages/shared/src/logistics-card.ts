@@ -49,6 +49,7 @@ export const LOGISTICS_COPY = {
     overdueOrToday ? "Contact logistics today" : "Contact logistics",
   shareDetails: (partner: string) => `Share the delivery details with ${partner}`,
   detailsReceived: (partner: string) => `${partner} has the delivery details`,
+  detailsNotReceived: "Details not received yet",
   callPartner: (partner: string) => `Call ${partner}`,
   getScheduled: "Get the scheduled delivery date",
   noAnswer: "No answer",
@@ -222,7 +223,7 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
         : null,
     gaps: [],
   };
-  if (!t3Done && t3.state === "missed" && partner) t3.fact = LOGISTICS_COPY.noAnswer;
+  if (!t3Done && partner && (t3.state === "open" || t3.state === "missed")) t3.fact = LOGISTICS_COPY.detailsNotReceived;
 
   /* ── 2 working days before ── */
   const t2Done = Boolean(scheduled);
@@ -242,6 +243,8 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
     if (t2.state === "not_open") t2.state = "open";
   } else if (!t2Done && t2.state === "missed") {
     t2.fact = LOGISTICS_COPY.noAnswer;
+  } else if (!t2Done && t2.state === "open") {
+    t2.fact = LOGISTICS_COPY.notScheduled;
   }
 
   /* ── 1 working day before — exceptions only ── */
@@ -380,6 +383,8 @@ export const LINK_COPY = {
   goods: "Goods",
   pickup: "Pickup",
   saveScheduled: "Save scheduled delivery",
+  modeScheduled: "Scheduled date",
+  modeAnother: "Another date",
   scheduledDate: "Scheduled date",
   scheduledTime: "Scheduled time (optional)",
   askAnotherDate: "Ask for another date",

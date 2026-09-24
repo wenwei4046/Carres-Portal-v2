@@ -509,9 +509,15 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                 <p className="text-body text-kit-slate-11">
                   {facts?.lastRevokedAt ? PARTY_COPY.linkRevoked(spell(facts.lastRevokedAt.slice(0, 10))) : LINK_COPY.none}
                 </p>
-                <Button size="sm" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link-section">
-                  {LINK_COPY.createLink}
-                </Button>
+                {/* One act, one button: while the current action already offers
+                    `Create link`, this section states the fact and adds no twin. */}
+                {action?.door === "contact" ? null : (
+                  <span className="self-start">
+                    <Button size="sm" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link-section">
+                      {LINK_COPY.createLink}
+                    </Button>
+                  </span>
+                )}
               </>
             )}
           </section>
@@ -521,7 +527,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
             <SectionTitle>{PARTY_COPY.communication}</SectionTitle>
             {partnerName ? (
               <>
-                <pre className="whitespace-pre-wrap rounded-control border border-kit-slate-5 bg-kit-slate-2 p-2 font-sans text-body text-kit-slate-12" data-testid="logistics-card-message">
+                <pre className="whitespace-pre-wrap break-all rounded-control border border-kit-slate-5 bg-kit-slate-2 p-2 font-sans text-body text-kit-slate-12" data-testid="logistics-card-message">
                   {message}
                 </pre>
                 <div className="flex flex-wrap items-center gap-2">
@@ -555,7 +561,12 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                   <li key={`${h.at}-${i}`}>
                     <div className="text-body font-semibold text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
                     <div className="text-meta text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
-                    {h.detail ? <div className="text-label text-kit-slate-11">{h.detail}</div> : null}
+                    {h.detail ? (
+                      <div className="text-label text-kit-slate-11">
+                        {/* The API hands ISO days; the screen spells them (COPY: no ISO on screen). */}
+                        {h.detail.replace(/\d{4}-\d{2}-\d{2}/g, (iso) => spell(iso))}
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ol>

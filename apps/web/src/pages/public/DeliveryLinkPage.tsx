@@ -180,8 +180,8 @@ export default function DeliveryLinkPage() {
           <section aria-label="Your answer" className="flex flex-col gap-3 rounded-work border border-work-line bg-white px-4 py-3">
             <div role="radiogroup" aria-label="Your answer" className="flex flex-wrap gap-2">
               {([
-                ["schedule", LINK_COPY.saveScheduled],
-                ["another", LINK_COPY.askAnotherDate],
+                ["schedule", LINK_COPY.modeScheduled],
+                ["another", LINK_COPY.modeAnother],
                 ["cannot", LINK_COPY.cannotDeliver],
               ] as const).map(([key, label]) => (
                 <button
