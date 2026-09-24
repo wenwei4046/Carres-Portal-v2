@@ -695,49 +695,42 @@ the exact final destination map is the approved target in `docs/purchasing/MASTE
 
 # §5 · The right rail
 
-### MISSION
-Four quick-peek surfaces on the right of the ERP shell — **Team · Calendar · My Work · Activity** —
-answer **who · when · what I must do · what just happened** without leaving the current object.
-They are not duplicate modules and never become a second home for business truth.
+### MISSION — owner-approved direction, 2026-09-24
 
-### WHAT IS ON SCREEN TODAY
-`apps/web/src/pages/operation/components/rail/` — `CalendarPanel` · `TeamPanel` ·
-`TasksPanel` (`KeepPanel` is unmounted). The four rail slots are `TeamPanel` · `CalendarPanel` ·
-`TasksPanel` · `GlobalActivity`/`AnnotationTimeline`. *Measured 2026-08-15 by reading
-`OperationRightRail.tsx` and each panel line by line — the 2026-08-05 entry listed the
-directory only and said so.*
+**APPROVED TARGET / NOT BUILT.** The right rail has three quick-reference doors:
+**Calendar · Customers · Activity** (`Customers` is a proposed screen label pending COPY admission).
+Calendar provides date-based module summaries; selecting a summary opens its owning module at
+that date and scope. The customer door replaces the rail's My Work slot: search a customer list,
+select a customer, then read their related orders and recorded history with source links.
+Activity provides recent cross-module business changes within the signed-in person's existing
+permissions, including authorized colleagues' changes; it is not presence, a public log or an
+employee-only personal log. Modules remain writers and each object's History remains its ledger.
+
+Formal Work, My Work and Team Work remain at their existing Workspace destination. Removing the
+rail shortcut changes no owner, obligation, calculation, due date or completion rule. No Work
+badge remains on the replacement customer door. Team and Duty editing are not rail slots;
+Staff & Duties owns Duty assignment and cover.
+
+The owner approved these purposes and replacement, not the detailed layout, customer identity
+matching, new COPY labels, kit additions or implementation. Those remain a proposal in the one
+[discussion Card](../cards/SHARED-UI-calendar-work-activity-discussion.md). This PLAN ruling does
+not authorize application implementation or claim a complete customer history is already built.
+
+### WHAT IS ON SCREEN TODAY — measured source, 2026-09-24
+
+`OperationRightRail.tsx` still mounts Calendar, My Work (`TasksPanel`) and Activity. Customer search
+exists separately as POS name autocomplete; it is not a verified complete customer dossier.
+Current implementation differences from the above target are build gaps, not a competing design.
 
 ### FROZEN RULES
-- **No widget is an island.** Widgets interlink with each other AND with the LEFT panel; an
-  action anywhere cascades to the relevant widgets.
-- **The rail is quick peek, not navigation truth and not a second place to act.** A row may
-  deep-link to the authoritative object/action. The owning module remains the writer.
-  **ONE ruled exception: the duty edit door on Team** — duty identity has no other home
-  (`../purchasing/MASTER.md` §2.2 makes this panel the one home), so the only place it can be
-  corrected is the only place it is stated. It is not a precedent for a second writer.
-- **`My Work` in the rail is a preview of the formal `Work` destination.** The full destination
-  owns the `My Work · Team Work` views over one work set; the rail may not create another work set.
-  **It therefore wears the Work destination's own icon** (`portal-nav.ts`, `ListTodo`) in both
-  the collapsed strip and the expanded header — owner ruling 2026-08-15. A peek wearing a
-  different face than the door it previews reads as a different feature; the `Flag` it replaced
-  was borrowed from the Orders follow-up column, a different system. Asserted by
-  `OperationRightRail.ui-contract.test.ts`, which reads the icon out of the nav rather than
-  hard-coding it, so the two can never drift.
-- **Team** previews availability/coverage and per-person `{n} open · {n} overdue`, and
-  People/HR remains the owner. **The numbers come from the ONE work engine** — `useOpenWorkSet`,
-  literally the function the Work destination runs — so the rail and Team Work are structurally
-  incapable of printing two answers for one person. Rows deep-link to Team Work scoped to that
-  person (`?tab=work&scope=team&owner=…`); a link seeds the view, it never restricts it.
-  **Everyone appears, including a clear desk at `0 open`** — a rail that hides the people at
-  zero cannot answer *"is anyone free?"*, and a missing name reads as a missing person.
-- **Team states BOTH operational duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` resolve
-  through the ONE Shared Duty Resolver (`../ERP-ARCHITECTURE.md` Law F.1, owner ruling
-  2026-09-01 / 2026-09-03): **Workspace → Staff & Duties is the one Duty assignment door**,
-  People owns identity/eligibility only, and no
-  page reads a rota table or calculates a Duty for itself (the current `ops_po_duty` read is
-  legacy implementation evidence that must converge — `../purchasing/MASTER.md` §5.3).
-  `Not assigned` may appear ONLY when zero eligible staff exists, and must then say where to
-  fix it. This file does not restate the duty model.
+- The rail reads and links; a source module owns every change and completion.
+- Calendar summarizes authorized dated arrangements/deadlines from their owners; a module summary
+  opens the owning full destination with the same date, event type and permitted scope.
+- The customer door starts with a searchable list, then a selected customer's related orders and
+  recorded history. It never becomes a second Order Route, task list, customer editor or ledger.
+- Activity scope is explicit and permission-filtered. A filter can narrow access, never widen it.
+- Selecting a customer does not silently filter Calendar or Activity. Any contextual filter must be
+  deliberately selected and visible; removing it restores the prior permitted scope.
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
   `../ERP-ARCHITECTURE.md` Law F.1. Only `Workspace → Staff & Duties` edits Duty assignments and

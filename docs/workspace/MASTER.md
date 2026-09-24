@@ -892,31 +892,11 @@ they may not produce a second open item. A module action not listed here is excl
 
 ## 7 · Right Rail and Notifications
 
-The Right Rail's `My Work` slot is a glanceable doorway into main My Work. It is not another scope,
-feed or action surface:
-
-```text
-┌ My Work ─────────────────────┐
-│ 3 missed                     │
-│ 5 today                      │
-│                              │
-│ Open My Work                 │
-└──────────────────────────────┘
-```
-
-The slot reads the same authorised response and cache identity as main Work. It shows only non-zero
-`Missed` and `Today` counts plus `Open My Work`; it does not preview rows, Team workload, other
-weekdays or `No working date`. Selecting a count opens main My Work with the corresponding URL-visible filter and
-preserves the page the operator came from for Browser Back. `Open My Work` opens the unfiltered My
-Work default. The slot contains no independent calculation, Duty editor, cover chip, assignment or
-completion control.
-
-Loading retains the slot label and uses count placeholders, never zero. A healthy clear state says
-`No work due now` and retains `Open My Work`. A source failure says `My Work could not be refreshed`
-and retains the last-safe counts with their observation time where permitted; it never prints a
-clear state. Permission refusal hides counts and objects. On widths where the global Right Rail is
-not present, the shell's existing Work destination remains the only replacement door; no floating
-mini-queue or mobile drawer is created. Keyboard and accessible names state what each count opens.
+**OWNER-APPROVED TARGET / NOT BUILT — 2026-09-24.** Remove the Right Rail My Work slot
+and replace it with the customer-search/record door governed by UI MASTER §5. Formal Work,
+My Work and Team Work retain their current scope, counts, action projection and existing navigation.
+The customer door has no Work badge or task-completion control. The existing My Work rail code is
+implementation awaiting replacement, not a second current target. No mobile mini-queue is added.
 
 Notifications are event receipts—assigned, cover activated, became missed, unblocked, source failed
 or completed. Each receipt carries one durable event identity, the affected Work identity, recipient,
@@ -927,21 +907,17 @@ receipt. The Bell is not a second queue.
 
 Notification loading, true empty, delayed source and failed source are distinct. `No notifications`
 is allowed only after the complete authorised receipt source is healthy. A failed receipt source
-does not alter Right Rail or Work counts. Until durable transition receipts exist, the current Bell
+does not alter Work counts. Until durable transition receipts exist, the current Bell
 remains legacy debt and may not be presented as this contract.
 
 ### 7.1 · Right Rail and notification acceptance contract
 
-- Right Rail and My Work return the same `Missed` and `Today` identities and counts for the same
-  authorised person and observation;
-- every Rail count opens main My Work with one visible, removable URL filter and Browser Back
-  restores the originating page;
-- loading, healthy-clear, delayed/failed and permission-refused states cannot be mistaken for zero;
-- no Rail or Bell control can assign, cover, complete, dismiss Work or record a module result;
-- one Work transition produces at most one durable receipt for each governed recipient, and
-  read/dismiss cannot change the Work occurrence;
-- desktop keyboard/focus behavior and the narrow-screen absence of the Rail leave one obvious Work
-  destination without clipped counts or hover-only meaning.
+- The right rail follows UI MASTER §5's Calendar/customer/Activity target; it does not duplicate Work.
+- Formal Work remains directly reachable from existing Workspace navigation on desktop and narrow widths.
+- Removal of the rail shortcut changes no Work identity, count, owner, deadline or completion fact.
+- No rail or Bell control assigns, covers, completes or dismisses Work or records a module result.
+- One Work transition produces at most one durable receipt per governed recipient; read/dismiss
+  cannot change the Work occurrence. Notification errors remain distinct from a healthy empty state.
 
 ## 8 · Dashboard admission law
 
