@@ -3126,15 +3126,20 @@ and Claim completion cannot close the Case.
 
 #### No calendar-created product claims
 
-**Existing rule; implementation convergence REQUIRED, not yet built.** A passed ETA or routine
-partial delivery alone never opens a product Claim. Current source still calls
-`runSupplierClaimSweepCron` from `apps/api/src/index.ts`; its RPC
-`supplier_claim_sweep_overdue()` is defined in migration 0519. This is source evidence, not a live
-production scheduler or data-count verification.
+**Application retirement — local implementation, 2026-09-24; deployment and database closure owed.**
+A passed ETA or routine partial delivery alone never opens a product Claim.
+The Worker daily schedule no longer calls `runSupplierClaimSweepCron`; the retained
+compatibility export performs no database access and returns zero. Contact-by and
+follow-up maintenance still run. Source caller inventory found no HTTP caller or
+other application scheduler; the dashboard test only checks that reads do not call it.
+The committed database definitions remain in 0288, 0291 and 0519, with service-role
+execute permission. No production scheduler inventory or SQL change has been performed.
 
-The build must retire this automatic creation path, inventory every caller and scheduled trigger,
-and remove or disable the obsolete RPC safely in a new migration after dependency review. Do not
-edit applied migrations or stop unrelated daily jobs. Preserve PO balance and date follow-up in
+The remaining database closure must inventory live callers/schedules and disable the
+obsolete `supplier_claim_sweep_overdue()` safely through a new governed migration.
+No controlled database tool is exposed in this session, so neither migration numbering
+nor application has been fabricated; applied migration files are unchanged.
+Preserve PO balance and date follow-up in
 Purchase Orders and shared My Work: `Date passed` uses the governed evidenced supplier date,
 never a calculated ETA described as a supplier promise. Missing confirmation remains its own fact.
 Historical `Late delivery` claims remain searchable and keep their history; no new selectable
