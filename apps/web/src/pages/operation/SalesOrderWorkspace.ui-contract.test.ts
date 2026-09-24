@@ -1147,7 +1147,7 @@ describe("Sales Order object page — one form grammar", () => {
     expect(toLift, "the stairCarry div is not closed before the lift").not.toContain("</div>");
     /* Nothing moved on screen: the three fields keep the parent's own three
        tracks rather than collapsing into one cell. */
-    expect(workspace).toContain("sm:col-span-3 sm:grid-cols-3");
+    expect(workspace).toContain("sm:col-span-2 sm:grid-cols-2");
   });
 
   it("lets no stylesheet put the grey band back over the blue card title", () => {
@@ -1581,7 +1581,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   });
 
   it("states every money figure at 13px — no browser-default 16px, no heading size", () => {
-    expect(workspace).toContain('grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]');
+    expect(workspace).toContain('grid-cols-[1fr_auto] overflow-hidden rounded-control border border-kit-slate-5 text-body');
     expect(workspace).not.toContain('<span className="text-meta text-base-500">Balance due</span>');
   });
 

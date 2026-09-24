@@ -2102,7 +2102,12 @@ planned `proceed_date`.
     These saved details use three labelled read-only fields (`Method · Reference · Slip`),
     with the same FieldFrame, resting border, body text and insets as Delivery; narrow views
     stack the fields. Actual transactions retain the shared Items/Payment table. The totals
-    share the transaction amount column’s 8px right inset. Delivery Services uses the same
+    occupy a full-width bordered two-column summary with a divider under each row,
+    body-size text and 8px cell insets; Total payable and Balance due remain bold.
+    Delivery uses two equal field columns throughout (single column on narrow screens):
+    address lines, state/city, postcode/building, floor/lift, stair count/services.
+    Labels, control sizes and the 12px field gaps stay governed by the existing kit.
+    Delivery Services uses the same
     framed read-only presentation, one active service per line with its saved configuration
     and quantity, from the Items source; no additional charge or editor is created. Existing wording,
     missing-value labels and evidence notes stay unchanged; no transaction fields are inferred.
