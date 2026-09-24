@@ -4256,13 +4256,15 @@ export interface ReceivingSessionDetail {
   events: ReceivingEvent[];
 }
 
+/** One authorised detail reader, also used to renew saved-evidence URLs. */
+export function fetchReceivingSessionDetail(id: string) {
+  return apiFetch<ReceivingSessionDetail>(`/api/operation/warehouse-receipts/${id}`);
+}
+
 export function useReceivingSessionDetail(id: string | null) {
   return useQuery<ReceivingSessionDetail>({
     queryKey: qk.operation.receivingSession(id ?? ""),
-    queryFn: () =>
-      apiFetch<ReceivingSessionDetail>(
-        `/api/operation/warehouse-receipts/${id}`,
-      ),
+    queryFn: () => fetchReceivingSessionDetail(id!),
     enabled: !!id,
   });
 }
