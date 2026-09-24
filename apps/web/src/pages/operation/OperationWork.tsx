@@ -43,7 +43,6 @@ import {
   workFocusDay,
   workHoliday,
   workLayoutFor,
-  workSections,
   workWeek,
   type WorkWhen,
 } from "./work/work-model";
@@ -301,7 +300,23 @@ export default function OperationWork() {
   const selectedId = params.get("selected");
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   const visibleIds = new Set(visible.map((item) => item.id));
-  const displayMyGroups = workSections(visible);
+  const displayMyGroups = useMemo(() => {
+    const missed = visible.filter((item) => item.timingBucket === "overdue");
+    const dated = visible.filter((item) => item.timingBucket !== "overdue" && item.dueIso !== null);
+    const noDate = visible.filter((item) => item.dueIso === null);
+    const groups: { key: string; label: string; items: WorkRow[] }[] = [];
+    if (missed.length) groups.push({ key: "overdue", label: "Missed", items: missed });
+    const byDate = new Map<string, WorkRow[]>();
+    for (const item of dated) {
+      const key = item.dueIso as string;
+      byDate.set(key, [...(byDate.get(key) ?? []), item]);
+    }
+    for (const [date, items] of [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      groups.push({ key: `date-${date}`, label: fmtDate(date), items });
+    }
+    if (noDate.length) groups.push({ key: "no_date", label: "No working date", items: noDate });
+    return groups;
+  }, [visible]);
   const displayTeamGroups = visibleTeamGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
@@ -385,15 +400,6 @@ export default function OperationWork() {
       ) : null}
     </div>
   );
-  const selectedDayCount = dayChoices.find((choice) => choice.key === selectedDay)?.count ?? 0;
-  const listHeading = day === "focus"
-    ? `Missed ${missedCount} · ${fmtDate(focusDay)} ${selectedDayCount}`
-    : selectedDay === "missed"
-      ? `Missed ${missedCount}`
-      : /^\d{4}-\d{2}-\d{2}$/.test(selectedDay)
-        ? `${fmtDate(selectedDay)} ${selectedDayCount}`
-        : `No working date ${selectedDayCount}`;
-
   return (
     <PageShell
       variant="work"
@@ -469,9 +475,6 @@ export default function OperationWork() {
             onChange={(key) => updateParam("day", key)}
           />
         ) : null}
-        <div className="sticky top-0 z-10 flex h-11 items-center border-b border-kit-slate-5 bg-white px-4">
-          <h2 className="text-body font-semibold text-kit-slate-12">{listHeading}</h2>
-        </div>
         <div>
         {!loading && !error && unhealthySources.length > 0 ? (
           <div className="border-b border-kit-amber-6 bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
@@ -511,7 +514,7 @@ export default function OperationWork() {
             displayMyGroups.map((g) => (
               <section key={g.key} data-testid={`work-section-${g.key}`}>
                 <h2 className="flex min-h-9 items-center border-b border-kit-slate-5 px-4 text-label font-semibold uppercase tracking-wide text-kit-slate-11">
-                  {g.label}
+                  {g.label} <span className="ml-1 font-normal tabular-nums text-kit-slate-11">{g.items.length}</span>
                 </h2>
                 <div className="bg-white">
                   {g.items.map((i) => (

@@ -220,6 +220,17 @@ describe("Operation Work — one server feed", () => {
     expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
   });
 
+  it("uses separate Missed and dated group headings, never the retired combined heading", () => {
+    workState.data!.items = [
+      item({ id: "orders:late", timing: timing("2026-09-04", 1) }),
+      item({ id: "orders:today", ruleKey: "confirm_delivery_date", timing: timing("2026-09-07") }),
+    ];
+    show();
+    expect(screen.getByTestId("work-section-overdue")).toHaveTextContent("Missed 1");
+    expect(screen.getByTestId("work-section-date-2026-09-07")).toHaveTextContent("Mon, 7 Sep 1");
+    expect(screen.queryByText(/Missed 1 · Mon, 7 Sep 1/)).not.toBeInTheDocument();
+  });
+
   it("reads search and filters from the URL", () => {
     workState.data!.items = [
       item(),
