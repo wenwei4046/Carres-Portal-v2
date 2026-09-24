@@ -48,6 +48,9 @@ function leaf(i: number, over: Partial<PurchaseDemandRow>): PurchaseDemandRow {
     takenFromStock: 0, onPo: 0, fullyOnPo: false, poNumbers: [], toBuy: 2,
     goodsMustArrive: "2026-10-08", issueRef: { proposalKey: "s1::mattress", buildKey: `b${i}` },
     action: null, parts: [{ sku: "B1201S-K", qty: 2, unitCost: 100 }], supplierKind: "own_logistics",
+    // Fictional server projection, confined to this dev-only entry.
+    supplierAddress: "18 Example Factory Road, Selangor",
+    poDate: "2026-09-24", poDeliveryDate: "2026-10-02", poDeliveryWorkingDays: 7,
     ownerName: null, ownerDuty: null, ...over,
   } as PurchaseDemandRow;
 }
@@ -85,8 +88,8 @@ if (state !== "empty") {
 const payload: SoBatchPurchaseResponse = {
   today: "2026-09-16", rows, registerRows,
   destinations: [
-    { id: KLANG, name: "Carres Klang", isDefault: true, active: true },
-    { id: BULOH, name: "AL Sungai Buloh", isDefault: false, active: true },
+    { id: KLANG, name: "Carres Klang", address: "10 Example Warehouse Road, Klang", isDefault: true, active: true },
+    { id: BULOH, name: "AL Sungai Buloh", address: "20 Example Warehouse Road, Sungai Buloh", isDefault: false, active: true },
   ],
   defaultDestinationId: KLANG,
   currentPoDuty: { userId: "u-duty", name: "Yu Jun" }, actingPoDuty: null,

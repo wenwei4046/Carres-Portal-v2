@@ -325,6 +325,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
   );
   const userName = new Map(data.users.map((u) => [u.id, u.name ?? ""]));
   const supplierName = new Map(data.suppliers.map((s) => [s.id, s.name]));
+  const supplierKind = new Map(data.suppliers.map((s) => [s.id, s.kind]));
   const supplierAddress = new Map(
     data.suppliers.map((s) => [s.id, s.address ?? null]),
   );
@@ -503,6 +504,10 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
         /* The PO Delivery Date the issue door will stamp, as the SERVER
            projected it (`poDeliveryDate` on the line) — never computed here. */
         poDeliveryDate: l.po_delivery_date ?? null,
+        poDate: l.po_date ?? null,
+        poDeliveryWorkingDays: l.po_delivery_working_days ?? null,
+        deliveryMethod: l.supplier_id && supplierKind.get(l.supplier_id) === "factory_pickup"
+          ? "we_collect" : l.supplier_id && supplierKind.get(l.supplier_id) === "own_logistics" ? "supplier_delivers" : null,
         purpose: r.purpose,
         purposeLabel: purposeLabelOf(r.purpose),
         deliveryDate: (l.delivery_date ?? l.required_by ?? r.required_by) || null,

@@ -4751,6 +4751,8 @@ export interface PurchaseRequestLineRow {
    * absence rather than a guess.
    */
   po_delivery_date?: string | null;
+  po_date?: string | null;
+  po_delivery_working_days?: number | null;
   /** The CATALOG's category for this line's SKU (`product_models.category`,
    *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
    *  `null` when Catalog has no category for the SKU. */
