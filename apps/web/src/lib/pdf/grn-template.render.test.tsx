@@ -1,15 +1,19 @@
 // @vitest-environment node
 /** Prove item/Unit placement on the actual paper, not only its input object. */
-import { beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import { pdf } from "@react-pdf/renderer";
 import { GrnTemplate } from "./grn-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type { GrnTemplateData } from "./types";
 
-beforeAll(() => registerNotoSansSC());
+beforeAll(() => {
+  registerNotoSansSC();
+  vi.stubGlobal("__CARRES_LOGO_SRC__", new URL("../../../public/carres-logo.png", import.meta.url).pathname);
+});
+afterAll(() => vi.unstubAllGlobals());
 
-it("prints each Unit beside its own item, preserving unresolved evidence separately", async () => {
+const sample = (): GrnTemplateData => {
   const data: GrnTemplateData = {
     grn_no: "GRN-20260924-0042", grn_doc_date: "2026-09-24", status_label: "Valid",
     source: { po_number: "PO260924-0042", is_consignment: false },
@@ -29,6 +33,10 @@ it("prints each Unit beside its own item, preserving unresolved evidence separat
     unit_results: [{ unit_code: "U1-000-099", outcome_label: "Not received" }],
     duty: { holder_name: "Recorded holder", cover_name: null, actor_name: "Recorded actor", authority_label: null, posted_on: "2026-09-24" },
   };
+  return data;
+};
+
+async function render(data: GrnTemplateData) {
   const stream = await pdf(GrnTemplate(data)).toBuffer();
   const chunks: Buffer[] = [];
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
@@ -36,6 +44,11 @@ it("prints each Unit beside its own item, preserving unresolved evidence separat
   if (process.env.GRN_PREVIEW_PATH) fs.writeFileSync(process.env.GRN_PREVIEW_PATH, bytes);
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: false }).promise;
+  return doc;
+}
+
+it("prints each Unit beside its own item, preserving unresolved evidence separately", async () => {
+  const doc = await render(sample());
   const words: string[] = [];
   for (let n = 1; n <= doc.numPages; n++) {
     const content = await (await doc.getPage(n)).getTextContent();
@@ -50,5 +63,50 @@ it("prints each Unit beside its own item, preserving unresolved evidence separat
   expect(text).toContain("Goods Received Date");
   expect(text).toContain("Time not recorded");
   expect(text).not.toContain("Goods received on");
+  await doc.destroy();
+});
+
+
+it("repeats the complete letterhead on continuation pages and keeps instruction apart from arrival", async () => {
+  const data = sample();
+  data.deliver_to = "AL Sungai Buloh";
+  data.goods_arrived_at = "Carres Klang";
+  data.lines = Array.from({ length: 40 }, (_, index) => ({ ...data.lines[0], sku: `KING-${index}`, unit_results: [] }));
+  const doc = await render(data);
+  expect(doc.numPages).toBeGreaterThan(1);
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n);
+    const content = await page.getTextContent();
+    const text = content.items.flatMap((item) => "str" in item ? [item.str] : []).join(" ").replace(/\s+/g, " ");
+    expect(text).toContain("CARRES SDN. BHD.");
+    expect(text).toContain("GRN-20260924-0042");
+    expect(text).toContain("59200 Kuala Lumpur, Wilayah Persekutuan KL.");
+    expect(text).toContain(`Page ${n} of ${doc.numPages}`);
+    if (n === 1) {
+      expect(text).toContain("AL Sungai Buloh");
+      expect(text).toContain("Carres Klang");
+      const items = content.items.filter((item) => "str" in item);
+      const supplier = items.find((item) => item.str === "Supplier Deliver To");
+      const arrival = items.find((item) => item.str === "Goods arrived at");
+      expect(supplier).toBeDefined();
+      expect(arrival).toBeDefined();
+      expect(arrival!.transform[4]).toBeGreaterThan(supplier!.transform[4] + 150);
+    }
+  }
+  await doc.destroy();
+});
+
+it("keeps zero-only exception quantities out of the table while stating their absence", async () => {
+  const data = sample();
+  data.lines = [{ ...data.lines[1], unit_results: [] }];
+  data.unit_results = [];
+  const doc = await render(data);
+  const content = await (await doc.getPage(1)).getTextContent();
+  const text = content.items.flatMap((item) => "str" in item ? [item.str] : []).join(" ").replace(/\s+/g, " ");
+  const heading = text.slice(text.indexOf("DESCRIPTION"), text.indexOf("Queen mattress"));
+  expect(heading).toContain("ORDER QTY");
+  expect(heading).toContain("RECEIVED QTY");
+  expect(heading).not.toMatch(/DAMAGED|WRONG|PENDING/);
+  expect(text).toContain("Damaged Qty 0 · Wrong Item Qty 0 · Pending Delivery Qty 0");
   await doc.destroy();
 });

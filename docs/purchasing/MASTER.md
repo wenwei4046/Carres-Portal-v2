@@ -2792,13 +2792,23 @@ The register, filters and exports now name `GRN Doc Date`; the record and amendm
 form use the same corrected supplier/date labels. Normal posted GRNs carry no `Valid`
 badge, while cancelled records retain their explicit status.
 
+**GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
+The existing renderer now prints the PO-family logo, legal identity and three address
+lines on every page, with the full GRN identity. Two information blocks separate
+supplier/source/instruction from document date and actual arrival facts. Unknown
+values print `Not recorded`. Order/Received columns always remain; zero-only
+Damaged/Wrong/Pending columns become one explicit zero-value line, while mixed
+columns retain quiet zeroes. Render tests cover real continuation pages, separate
+instruction/arrival positions and zero-only exception columns. Quantity arithmetic,
+posting evidence and the outstanding receiver/time/scope gaps are unchanged.
+
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
 posting evidence; resolve the authoritative receiver before claiming the complete GRN
 target. Actual arrival time remains a separate schema gap under §9.3; never derive it
-from the filing timestamp. The full approved letterhead, two-block composition,
-physical/cumulative quantity presentation and other GRN document requirements remain
-open; this linkage change does not claim the complete document redesign.
+from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
+other GRN document requirements remain open; the implemented composition and linkage
+do not claim the complete document target.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
@@ -3116,15 +3126,20 @@ and Claim completion cannot close the Case.
 
 #### No calendar-created product claims
 
-**Existing rule; implementation convergence REQUIRED, not yet built.** A passed ETA or routine
-partial delivery alone never opens a product Claim. Current source still calls
-`runSupplierClaimSweepCron` from `apps/api/src/index.ts`; its RPC
-`supplier_claim_sweep_overdue()` is defined in migration 0519. This is source evidence, not a live
-production scheduler or data-count verification.
+**Application retirement — local implementation, 2026-09-24; deployment and database closure owed.**
+A passed ETA or routine partial delivery alone never opens a product Claim.
+The Worker daily schedule no longer calls `runSupplierClaimSweepCron`; the retained
+compatibility export performs no database access and returns zero. Contact-by and
+follow-up maintenance still run. Source caller inventory found no HTTP caller or
+other application scheduler; the dashboard test only checks that reads do not call it.
+The committed database definitions remain in 0288, 0291 and 0519, with service-role
+execute permission. No production scheduler inventory or SQL change has been performed.
 
-The build must retire this automatic creation path, inventory every caller and scheduled trigger,
-and remove or disable the obsolete RPC safely in a new migration after dependency review. Do not
-edit applied migrations or stop unrelated daily jobs. Preserve PO balance and date follow-up in
+The remaining database closure must inventory live callers/schedules and disable the
+obsolete `supplier_claim_sweep_overdue()` safely through a new governed migration.
+No controlled database tool is exposed in this session, so neither migration numbering
+nor application has been fabricated; applied migration files are unchanged.
+Preserve PO balance and date follow-up in
 Purchase Orders and shared My Work: `Date passed` uses the governed evidenced supplier date,
 never a calculated ETA described as a supplier promise. Missing confirmation remains its own fact.
 Historical `Late delivery` claims remain searchable and keep their history; no new selectable
