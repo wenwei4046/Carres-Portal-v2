@@ -48,12 +48,15 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     }
   }
   const P: Record<string, string> = {};
+  // a recorded payment, posted to the ledger as the payment door does (0463):
+  // Approve day reads the card account from that posting (0581)
   async function pay(key: string, amount: number, on: string, reference: string | null, method = "card") {
     const r = await q(
       "insert into order_payments (order_id, amount, paid_on, method, reference, recorded_by) values ($1, $2, $3::date, $4, $5, $6) returning id",
       [ORDER, amount, on, method, reference, U.finance],
     );
     P[key] = r.rows[0].id;
+    await q("select public._customer_payment_to_ledger($1)", [P[key]]);
   }
   function importFile(acquirer: CardAcquirer, name: string, content: string) {
     const parsed = parseCardFile(acquirer, content, name);
@@ -128,6 +131,7 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     await q("insert into salespersons (id, dealer_id, name) values ($1, $2, 'IT Salesperson')", [SALES, DEALER]);
     await q("insert into orders (id, dealer_id, salesperson_id, customer_name, customer_phone) values ($1, $2, $3, 'IT customer', '0100000000')", [ORDER, DEALER, SALES]);
 
+    await actAs(U.finance); // the ledger takes a posting from Finance
     await pay("exact", 100, D, "A1B2C3");
     await pay("typo", 250, D, "K7M8N0");
     await pay("sameAmountOtherCode", 75, D, "X0X0X0");
@@ -565,5 +569,144 @@ describe.skipIf(!URL)("card settlement: the import order does not change the mat
       "PBB 900000000071 / 90000071 275.00 -> open  | B2C3D5/code_near",
       "PBB 900000000071 / 90000071 333.00 -> Z9Z9Z9 approval_code | Z9Z9Z9/approval_code",
     ]);
+  });
+});
+
+/**
+ * 0576, 0581: Approve day pays a day out from the card account its sales were
+ * paid into, and refuses a day paid into no card account or into two. The
+ * first three cases hold on 0576 and 0581 alike. The last one is 0581's: a card
+ * method pointed at another account after the sale does not move an old day.
+ */
+describe.skipIf(!URL)("Approve day pays from the card account the day's sales were posted to (real PostgreSQL, 0576, 0581)", () => {
+  let db: pg.Client;
+  const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
+  const T = { fin: uid("ad1"), boss: uid("ad2"), dealer: uid("ad3"), sales: uid("ad4"), order: uid("ad5") };
+  let D = "";
+  let A = ""; // the first card account
+  let B = ""; // a second card account
+  let bank = "";
+  const actAs = (id: string) => q("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: id, role: "authenticated" })]);
+  async function attempt(sql: string, params: unknown[] = []): Promise<{ ok: true; value: unknown } | { ok: false; detail: string; message: string }> {
+    await q("savepoint s");
+    try {
+      const r = await q(sql, params);
+      await q("release savepoint s");
+      return { ok: true, value: r.rows[0] ? Object.values(r.rows[0])[0] : null };
+    } catch (e) {
+      await q("rollback to savepoint s");
+      return { ok: false, detail: (e as { detail?: string }).detail ?? "", message: (e as Error).message };
+    }
+  }
+  // a card sale, posted to the ledger when its method has an account
+  async function sale(amount: number, code: string, method: string, post = true) {
+    const id = (await q(
+      "insert into order_payments (order_id, amount, paid_on, method, reference, recorded_by) values ($1, $2, $3::date, $4, $5, $6) returning id",
+      [T.order, amount, D, method, code, T.fin],
+    )).rows[0].id as string;
+    if (post) await q("select public._customer_payment_to_ledger($1)", [id]);
+  }
+  // one Public Bank machine's day, every sale matched by its approval code
+  async function cardDay(machine: string, rows: Array<{ amt: string; net: string; code: string }>) {
+    const content = pbbFile(rows.map((r, i) => ({
+      ...r, sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), mid: `9000000000${machine}`, tid: `900000${machine}`, trace: `000${machine}${i}`,
+    })));
+    const parsed = parseCardFile("PBB", content, `pbb-${machine}.csv`);
+    if (!parsed.ok) throw new Error(parsed.message);
+    await q("select public.card_settlement_import('PBB', $1, $2, $3::jsonb, null)", [`pbb-${machine}.csv`, content, JSON.stringify(parsed.rows)]);
+    const review = (await q("select public.card_settlement_review() as r")).rows[0].r as CardSettlementReview;
+    const day = review.days.find((d) => d.group_key === `9000000000${machine} / 900000${machine}`)!;
+    expect([day.matched_count, day.row_count]).toEqual([rows.length, rows.length]);
+    return day;
+  }
+  const approve = (d: { acquirer: string; day_date: string; group_key: string }, from: string) =>
+    attempt("select public.card_settlement_payout_prepare($1, $2::date, $3, $2::date, $4, $5) as r", [d.acquirer, d.day_date, d.group_key, from, bank]);
+  const mapCard = async (method: string, account: string) => {
+    await actAs(T.boss); // only the principal points a payment method at an account
+    await q("select public.gl_map_payment_account($1, $2)", [method, account]);
+    await actAs(T.fin);
+  };
+
+  beforeAll(async () => {
+    if (!LOCAL) throw new Error("CARRES_TEST_DATABASE_URL must point at localhost");
+    db = new pg.Client({ connectionString: URL });
+    await db.connect();
+    await q("begin");
+    await q("update gl_config set go_live_on = coalesce(go_live_on, date '2026-01-01') where id");
+    D = (await q(`select greatest(timezone('Asia/Kuala_Lumpur', now())::date - 10, (select go_live_on from gl_config where id) + 7)::text as d`)).rows[0].d;
+    for (const [id, role] of [[T.fin, "finance"], [T.boss, "principal"]] as const) {
+      const email = `it-cs-day-${role}-${RUN}@carres.test`;
+      await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+      await q("insert into app_users (id, email, name, role, status) values ($1, $2, $3, $4, 'active')", [id, email, `IT day ${role}`, role]);
+    }
+    await q("insert into dealers (id, name) values ($1, 'IT Dealer day')", [T.dealer]);
+    await q("insert into salespersons (id, dealer_id, name) values ($1, $2, 'IT Salesperson day')", [T.sales, T.dealer]);
+    await q("insert into orders (id, dealer_id, salesperson_id, customer_name, customer_phone) values ($1, $2, $3, 'IT customer day', '0100000001')", [T.order, T.dealer, T.sales]);
+    const cards = (await q("select account_code from gl_money_accounts where money_kind = 'HOLDING' and gl_money_account_ok(account_code, 'in') order by 1 limit 2")).rows;
+    if (cards.length < 2) throw new Error("this test needs two card accounts in use");
+    [A, B] = [cards[0].account_code, cards[1].account_code];
+    bank = (await q("select account_code from gl_money_accounts where money_kind = 'BANK' and gl_money_account_ok(account_code, 'in') order by 1 limit 1")).rows[0].account_code;
+    // both card accounts pay out to the bank, so only the day's own account decides
+    for (const holding of [A, B]) {
+      await q(
+        "insert into card_settlement_routes (holding_code, channel, bank_code) values ($1, 'showroom', $2) on conflict (holding_code, channel) do update set bank_code = excluded.bank_code",
+        [holding, bank],
+      );
+    }
+    await mapCard("card", A);
+    await mapCard("credit_card", B);
+    await q("delete from gl_payment_account_map where method = 'debit_card'"); // a card method with no account
+  }, 30000);
+
+  afterAll(async () => {
+    if (!db) return;
+    await q("rollback").catch(() => undefined);
+    await db.end();
+  });
+
+  it("a day whose sales were paid into no card account is refused (day_no_holding)", async () => {
+    await sale(210, "K1L2M3", "debit_card", false);
+    const day = await cardDay("61", [{ amt: "210.00", net: "207.90", code: "K1L2M3" }]);
+    expect(day.holding_codes).toEqual([]);
+    expect(await approve(day, A)).toEqual({
+      ok: false, detail: "day_no_holding",
+      message: "The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.",
+    });
+  });
+
+  it("a day whose sales were paid into two card accounts is refused (day_many_holdings)", async () => {
+    await sale(220, "P4Q5R6", "card");
+    await sale(230, "S7T8U9", "credit_card");
+    const day = await cardDay("62", [{ amt: "220.00", net: "217.80", code: "P4Q5R6" }, { amt: "230.00", net: "227.70", code: "S7T8U9" }]);
+    expect([...day.holding_codes].sort()).toEqual([A, B]);
+    for (const from of [A, B]) {
+      expect(await approve(day, from)).toEqual({
+        ok: false, detail: "day_many_holdings",
+        message: "The sales on this day were paid into more than one card account, so one payout cannot cover them. Check the payment method of each sale.",
+      });
+    }
+  });
+
+  it("a day is paid out only from the card account its sales went into (from_not_day_holding)", async () => {
+    await sale(240, "V1W2X3", "card");
+    const day = await cardDay("63", [{ amt: "240.00", net: "237.60", code: "V1W2X3" }]);
+    expect(day.holding_codes).toEqual([A]);
+    expect(await approve(day, B)).toEqual({
+      ok: false, detail: "from_not_day_holding",
+      message: `Pay this day out from ${A}, the card account its sales were paid into.`,
+    });
+    expect(await approve(day, A)).toMatchObject({ ok: true });
+  });
+
+  it("0581: pointing the card method at another account later does not move an old day", async () => {
+    await sale(260, "Y4Z5A6", "card");
+    const day = await cardDay("64", [{ amt: "260.00", net: "257.40", code: "Y4Z5A6" }]);
+    await mapCard("card", B);
+    const after = ((await q("select public.card_settlement_review() as r")).rows[0].r as CardSettlementReview).days
+      .find((d) => d.group_key === day.group_key)!;
+    console.log("the day's card accounts after card was pointed at", B, ":", JSON.stringify(after.holding_codes));
+    expect(after.holding_codes).toEqual([A]);
+    expect(await approve(day, B)).toMatchObject({ ok: false, detail: "from_not_day_holding" });
+    expect(await approve(day, A)).toMatchObject({ ok: true });
   });
 });
