@@ -4114,7 +4114,7 @@ does not close any related customer Service Case.
 ### 9.6 Purchase Returns
 
 **Owner-confirmed UI — 2026-09-18. BUILT + DEPLOYED 2026-09-19; MIGRATION 0548 APPLIED
-2026-09-20; AUTHENTICATED PRODUCTION WALK OWED.**
+2026-09-20; AUTHENTICATED EMPTY-REGISTER READBACK 2026-09-24, RECORD LIFECYCLE STILL OWED.**
 The approval covered layout, labels and inspection interactions; sample parties, dates,
 quantities and document references are illustrative, not verified business data. It approved
 no new custody engine and no claim production verification, and the build added neither.
@@ -4182,7 +4182,17 @@ approved claim outcome — and `0548` carries that door in SQL
 (`purchasing_issue_purchase_return`, `operation`/`principal` only), but the confirmed UI was
 the REGISTER, not a creation screen, so the screen that calls it is a later scope with its own
 owner decision. The evidence viewer is not wired either: the entries carry the door and say
-why they are inactive. The authenticated production walk is owed, as it is for §9.1.
+why they are inactive. The populated-record and physical lifecycle walk remains owed.
+
+**Authenticated readback — 2026-09-24, existing register only.** On production
+`893b7f33d54ecd3c0ab51755d6d98d09f47407d2`, principal opened Purchase Returns from its
+existing route. Loading resolved to `No purchase returns.` and `0 returns · 0 Units`,
+not an error or fabricated records. The four governed rail groups and confirmed column
+order were present; Hide/Show filters and Search opened normally. At 390×844, document
+scroll width was 390px. The open 240px rail left too little table space; using the existing
+Hide filters control made the empty message and footer readable, and the desktop rail
+state was restored afterwards. This is not populated-row, pinning, evidence, permission,
+issue, pickup or supplier-receipt proof. No return, Unit or custody event was written.
 
 **Purpose / source:** return Carres-owned purchased goods only after an approved claim/outcome.
 No blank `+ New`. Keep the existing Claim → Purchasing authorisation → Stock physical pickup
