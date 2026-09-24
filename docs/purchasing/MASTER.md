@@ -2828,7 +2828,11 @@ posting evidence; resolve the authoritative receiver before claiming the complet
 target. Actual arrival time remains a separate schema gap under §9.3; never derive it
 from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
 other GRN document requirements remain open; the implemented composition and linkage
-do not claim the complete document target.
+do not claim the complete document target. The authenticated historical SMOKE item
+also printed `Other goods`: the receipt reader calls the shared
+`goodsCategoryWordOf` fallback. This is a measured category-convergence gap, not proof
+that the Catalog recorded that category; do not silently replace Catalog facts or
+infer a missing-row result from an unsuccessful read.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
