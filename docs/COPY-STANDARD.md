@@ -1454,6 +1454,8 @@ rule from the Sales Order entrance.
 | Review title | `Review Purchase Orders` |
 | Review batch action (approved 2026-09-24) | `Issue {n} PO` / `Issue {n} POs` — the whole atomic batch, including while viewing its first document. |
 | SO Batch selection | `{n} Sales Order(s) · {n} item(s) · {n} unit(s) · Issue {n} PO(s)` — counts name their objects; an empty selection has no summary. |
+| Actual PDF preview | `Zoom out` · `Zoom in` · `Fit width` · `Rendering preview…` · `Could not load the preview.` · `Try again`. |
+| Missing review facts | `Address not recorded. Check Suppliers.` · `Address not recorded. Check Purchasing Settings.` · `Not recorded. Check Suppliers.` · `Not available. Go back and reload.` · `Not available. Check production days in Purchasing Settings.` |
 | Provisional issue date | `PO Doc Date` · `Provisional. The date is recorded when issued.` |
 | ⭐ ONE SURFACE, TWO LANES (owner instruction 2026-09-23) | The same review checks an SO Batch document and a Manual Purchase document. Its `Source` column prints whichever source the line HAS: `SO-{n}` for a Sales Order line, the request's `MPR No` for a Manual Purchase line — one column, one meaning, never a second word for either. The requester's `Purchase requirement` prints under the item where one was recorded. `Back to buying` keeps its word on SO Batch; from Manual Purchase Request the way out reads `Manual Purchase Request`, the list it came from. |
 | Factory-pickup collection fact | `{partner} collects from {supplier} and delivers to {destination}.` |
