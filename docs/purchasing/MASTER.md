@@ -2868,7 +2868,7 @@ Unit `U1-000-064` remained under SMOKE King Mattress; the AMENDED band and histo
 remained visible. Local rendered tests cover continuation pages; this one-page live
 record does not independently prove pagination. No receipt or amendment was saved.
 
-**GRN table and Unit typography — local implementation, 2026-09-24; production proof owed.**
+**GRN table and Unit typography — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1591).**
 Item rows now use the Document Kit's boxed hairline grid. Full-height column rules
 follow the visible quantity columns, including when zero-only exception columns disappear.
 GRN reuses the existing PO `UnitCode` renderer for full identifiers with the final three
@@ -2878,6 +2878,19 @@ mixed-outcome and zero-only examples were visually checked. No quantities or Uni
 association rules changed. Consecutive Units reuse the PO range helper only within the
 same item and outcome; gaps and different outcomes start separate lines. The remaining
 facts below are not claimed complete by this typography change.
+
+CI `35989640338` passed and #1591 merged as `809c3d0d7353ee4254dc7da1c4e22088a083583c`.
+Its pending deploy was superseded by descendant `893b7f33d54ecd3c0ab51755d6d98d09f47407d2`;
+deployment `35991437389` passed and all five canonical surfaces reported that descendant.
+The own Pages deployment `89b4a69b.carres-portal.pages.dev` was compared with
+`ccff9ebc.carres-portal.pages.dev`: the new boxed-row rule appeared once versus zero,
+while `Supplier DO No` and `Wrong Item Qty` counts stayed unchanged. The authenticated
+`GRN-20260904-1064` preview and downloaded PDF showed full-height item rules and
+`U1-000-064` beneath SMOKE King Mattress; PDF font inspection confirmed `064` is bold
+and `U1-000-` regular. Order 1 / Received 0 / Damaged 1 / Pending 1 and the separate
+`Wrong Item Qty 0` line stayed correct. The AMENDED band and saved amendment history
+remained. This one-Unit live record does not prove consecutive-range grouping;
+that boundary is covered by local actual-PDF mixed-outcome tests. No receipt was changed.
 
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
