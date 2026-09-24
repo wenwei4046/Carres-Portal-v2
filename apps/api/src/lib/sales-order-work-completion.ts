@@ -14,22 +14,24 @@
  * `resolve_payment_exception` on Finance's, and `issue_delivery_order` is the
  * system's — their writers belong to those modules.)
  *
- * HOW A COMPLETION IS PROVEN — one arithmetic, no second admission rule:
- *   1. BEFORE the Sales Orders write, read the ONE Work feed (the page's own
- *      composition) and keep this order's open occurrences of those rules,
- *      with their Work date, document reference and source version.
+ * HOW A COMPLETION IS PROVEN — one arithmetic, no second admission rule, and
+ * only THIS order and THIS door's rules are ever read (owner correction
+ * 2026-09-24 — never the whole Work feed):
+ *   1. BEFORE the write, `probeOrderWork` runs the Work projector over this
+ *      one order and keeps its open occurrences of the door's rules, with
+ *      their current identity, Work date, document reference and version.
  *   2. The Sales Orders door performs ITS write. A refused write records
  *      nothing.
- *   3. AFTER it, read the feed again. An occurrence that was open and is now
+ *   3. AFTER it, the same probe again. An occurrence that was open and is now
  *      gone, AND whose Sales Orders completion fact now holds, is completed —
  *      by the person who performed the write, at that moment.
- * Anything unknown (a feed that cannot be read, a fact that cannot be read)
+ * Anything unknown (an order that cannot be read, a fact that cannot be read)
  * records NOTHING and says so in the log: a missing Completed row is honest,
  * a guessed one is not. A recorder failure never undoes the Sales Orders write
  * the operator already made.
  */
 import type { Context, MiddlewareHandler } from "hono";
-import type { OperationWorkResponse } from "@carres/shared";
+import type { OperationWorkItem } from "@carres/shared";
 import type { AppEnv } from "../types";
 import { adminClient } from "./supabase";
 
@@ -66,7 +68,9 @@ export interface CompletedWrite {
 }
 
 export interface SalesOrderCompletionDeps {
-  loadWork: (c: Context<AppEnv>) => Promise<OperationWorkResponse>;
+  /** This order's Work occurrences on their current identities (null = an
+   *  order Work does not admit). Never the whole feed. */
+  probe: (c: Context<AppEnv>, orderId: string) => Promise<OperationWorkItem[] | null>;
   readFacts: (c: Context<AppEnv>, orderId: string) => Promise<SalesOrderCompletionFacts>;
   recordCompleted: (c: Context<AppEnv>, write: CompletedWrite) => Promise<void>;
   now: () => string;
@@ -79,10 +83,10 @@ function isCompletionRule(key: string): key is SalesOrderCompletionRule {
 
 /** This order's open Sales Orders occurrences in one Work read. */
 export function openSalesOrderOccurrences(
-  response: OperationWorkResponse,
+  items: readonly OperationWorkItem[],
   orderId: string,
 ): SalesOrderOpenOccurrence[] {
-  return response.items
+  return items
     .filter((item) => item.module === "orders" && item.object.id === orderId && isCompletionRule(item.ruleKey))
     .map((item) => ({
       occurrenceId: item.id,
@@ -116,9 +120,9 @@ async function snapshot(
   stage: "before" | "after",
 ): Promise<SalesOrderOpenOccurrence[] | null> {
   try {
-    return openSalesOrderOccurrences(await deps.loadWork(c), orderId);
+    return openSalesOrderOccurrences((await deps.probe(c, orderId)) ?? [], orderId);
   } catch (error) {
-    deps.log("work completion unknown: the Work feed could not be read", {
+    deps.log("work completion unknown: the order's Work could not be read", {
       orderId, stage, error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -228,11 +232,11 @@ export async function recordWorkCompleted(c: Context<AppEnv>, write: CompletedWr
   if (error) throw new Error(`${error.details ?? error.code ?? ""} ${error.message}`.trim());
 }
 
-/** The production wiring. The Work read is loaded lazily: the Work route
+/** The production wiring. The probe is loaded lazily: the Work route
  *  imports the Sales Orders routers, so a static import here would be a cycle. */
 export function salesOrderCompletionDeps(): SalesOrderCompletionDeps {
   return {
-    loadWork: async (c) => (await (await import("../routes/operation/work")).readOperationWorkWithLedger(c)).response,
+    probe: async (c, orderId) => (await import("../routes/operation/work")).probeOrderWork(c, orderId),
     readFacts: readSalesOrderCompletionFacts,
     recordCompleted: recordWorkCompleted,
     now: () => new Date().toISOString(),

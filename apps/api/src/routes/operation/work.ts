@@ -1,4 +1,6 @@
 import { Hono, type Context } from "hono";
+import { OPERATION_ORDER_WORK_SELECT, OPERATION_ORDER_WORK_STATUSES } from "../../lib/operation-order-select";
+import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
 import {
   countWorkingDays,
@@ -1773,6 +1775,54 @@ const REFUSAL_STATUS: Record<string, 403 | 409 | 422 | 502> = {
   reply_due_not_a_working_day: 422,
   invalid: 422,
 };
+
+/**
+ * ⭐ ONE ORDER, ONE PROJECTOR (owner correction 2026-09-24). A completion
+ * writer asks "is THIS order's occurrence of THIS rule open?" without reading
+ * the whole Work feed: the same `projectSalesOrdersFromModuleFacts` over the
+ * same row select, with the stock of this order's own SKUs and the same
+ * Purchasing safety days. Owner and duty facts decide WHO, never WHETHER, so
+ * they are not read here. Each occurrence is returned on its CURRENT
+ * generation identity. `null` = not an order Work admits (another status).
+ */
+export async function probeOrderWork(
+  c: Context<AppEnv>,
+  orderId: string,
+  ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: row, error } = await sb
+    .from("orders")
+    .select(OPERATION_ORDER_WORK_SELECT)
+    .eq("id", orderId)
+    .in("status", [...OPERATION_ORDER_WORK_STATUSES])
+    .maybeSingle();
+  if (error) throw new Error(`order read failed: ${error.message}`);
+  if (!row) return null;
+  const order = row as unknown as SalesOrderModuleRow;
+  const skus = [...new Set((order.order_lines ?? []).map((line) => line.sku).filter(Boolean))];
+  const [stock, settings] = await Promise.all([
+    skus.length === 0
+      ? Promise.resolve({ data: [] as Array<{ sku: string; sellable: number | null }>, error: null })
+      : sb.from("stock_sku_availability").select("sku, sellable").in("sku", skus),
+    loadPurchasingSettings(sb),
+  ]);
+  if (stock.error) throw new Error(`stock read failed: ${stock.error.message}`);
+  const bySku = new Map<string, Array<{ sellable: number | null }>>();
+  for (const r of (stock.data ?? []) as Array<{ sku: string; sellable: number | null }>) {
+    bySku.set(r.sku, [...(bySku.get(r.sku) ?? []), r]);
+  }
+  const items = projectSalesOrdersFromModuleFacts({
+    orders: [order],
+    stock: skus.map((sku) => ({ sku, available: sellableOf(bySku.get(sku) ?? []) })),
+    staff: [],
+    dutyResolutions: {},
+    today: todayIsoMYT(),
+    safetyDays: settings.orderByBufferDays,
+  });
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
 
 /**
  * THE Work read with its ledger: the composed open set, each item on its

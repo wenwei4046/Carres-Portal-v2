@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
-import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
+import type { OperationWorkItem } from "@carres/shared";
 import type { AppEnv } from "../types";
 import {
   salesOrderWorkCompletion,
@@ -57,10 +57,6 @@ function occurrence(ruleKey: string, extra: Partial<OperationWorkItem> = {}): Op
   } as OperationWorkItem;
 }
 
-function feed(items: OperationWorkItem[]): OperationWorkResponse {
-  return { contractVersion: 2, complete: true, items, staff: [], generatedOn: "2026-09-17", closureReceipt: null, sources: [] } as unknown as OperationWorkResponse;
-}
-
 function harness(opts: {
   before: OperationWorkItem[] | Error;
   after: OperationWorkItem[] | Error;
@@ -72,12 +68,12 @@ function harness(opts: {
   const logs: string[] = [];
   let call = 0;
   const deps: SalesOrderCompletionDeps = {
-    loadWork: async () => {
+    probe: async (_c, orderId) => {
       call += 1;
-      reads.push(call === 1 ? "before" : "after");
+      reads.push(`${call === 1 ? "before" : "after"}:${orderId}`);
       const next = call === 1 ? opts.before : opts.after;
       if (next instanceof Error) throw next;
-      return feed(next);
+      return next;
     },
     readFacts: async () => {
       const f = opts.facts ?? { deliveryDate: "2026-10-01", deliveryDateTbd: false, delayDecision: null, delayDecisionEta: null };
@@ -115,6 +111,8 @@ describe("the Sales Orders Completed writer", () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [] });
     const response = await run(h.deps);
     expect(response.status).toBe(200);
+    // Only THIS order is read — twice, never the whole Work feed.
+    expect(h.reads).toEqual([`before:${ORDER}`, `after:${ORDER}`]);
     expect(h.recorded).toEqual([{
       occurrenceId: `orders:${ORDER}:ask_delivery_date`,
       actorId: ME,
@@ -150,7 +148,7 @@ describe("the Sales Orders Completed writer", () => {
     const h = harness({ before: [occurrence("ask_delivery_date")], after: [] });
     expect((await run(h.deps, 422)).status).toBe(422);
     expect(h.recorded).toEqual([]);
-    expect(h.reads).toEqual(["before"]);
+    expect(h.reads).toEqual([`before:${ORDER}`]);
   });
 
   it("an occurrence still open after the write is not completed", async () => {
@@ -173,7 +171,7 @@ describe("the Sales Orders Completed writer", () => {
     const h = harness({ before: [], after: [] });
     await run(h.deps);
     expect(h.recorded).toEqual([]);
-    expect(h.reads).toEqual(["before"]);
+    expect(h.reads).toEqual([`before:${ORDER}`]);
   });
 
   it("an unreadable Work feed before or after records nothing, and the Sales Orders write still stands", async () => {
