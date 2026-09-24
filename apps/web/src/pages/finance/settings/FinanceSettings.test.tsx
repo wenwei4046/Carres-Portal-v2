@@ -211,9 +211,17 @@ describe("Finance Settings — a money account's number, changed on its own form
       "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
     );
     expect(writes()).toEqual([]);
-    // A blank number cannot be sent at all.
+  });
+
+  it("a blank number keeps the account's own number: Save stays on and only the name is saved", async () => {
+    show();
+    const dialog = await openPublicBank();
+    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Public Bank Berhad" } });
     fireEvent.change(numberField(dialog), { target: { value: "  " } });
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(writes()).toEqual([{ key: "PATCH /1121", body: { name: "Public Bank Berhad", is_active: true } }]);
   });
 
   it("the same number keeps the money account's own save, and never calls the chart's door", async () => {
@@ -225,17 +233,59 @@ describe("Finance Settings — a money account's number, changed on its own form
     expect(writes()[0]).toEqual({ key: "PATCH /1121", body: { name: "Public Bank Berhad", is_active: true } });
   });
 
-  it("a new name and a new number: the money account's save first, at the old number, then the chart's door", async () => {
+  it("a new name and a new number: one request to the chart's door, which saves both in one go", async () => {
     show();
     const dialog = await openPublicBank();
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Public Bank Berhad" } });
     fireEvent.change(numberField(dialog), { target: { value: "310-2000" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(writes()).toEqual([{ key: CHART_DOOR, body: { name: "Public Bank Berhad", code: "310-2000" } }]);
+  });
+
+  it("a name the chart already has: refused at the foot, and nothing is saved", async () => {
+    net.refuseOn = { key: CHART_DOOR, message: "An account named Accrued expenses is already in the chart.", tag: "name_exists" };
+    show();
+    const dialog = await openPublicBank();
+    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Accrued expenses" } });
+    fireEvent.change(numberField(dialog), { target: { value: "310-2000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("An account named Accrued expenses is already in the chart.");
+    // The money account's own door, which checks names only against other
+    // money accounts, is never asked, so the clashing name is not saved.
+    expect(writes()).toEqual([{ key: CHART_DOOR, body: { name: "Accrued expenses", code: "310-2000" } }]);
+    expect(numberField(dialog)).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("Active changed with a new name and number: Active is saved under the old name first, then the chart's door takes the name and number", async () => {
+    net.rows = ROWS.map((r) => (r.code === "1121" ? { ...r, is_active: false } : r));
+    show();
+    const dialog = await openPublicBank();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Active" }));
+    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Public Bank Berhad" } });
+    fireEvent.change(numberField(dialog), { target: { value: "310-2000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(writes()).toEqual([
-      { key: "PATCH /1121", body: { name: "Public Bank Berhad", is_active: true } },
+      { key: "PATCH /1121", body: { name: "Public Bank", is_active: true } },
       { key: CHART_DOOR, body: { name: "Public Bank Berhad", code: "310-2000" } },
     ]);
+  });
+
+  it("a refusal that is not about the number goes to the foot, never under the Number field", async () => {
+    net.refuseOn = { key: CHART_DOOR, message: "That account is not in the chart.", tag: "account_missing" };
+    show();
+    const dialog = await openPublicBank();
+    fireEvent.change(numberField(dialog), { target: { value: "310-2000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("That account is not in the chart.");
+    expect(numberField(dialog)).not.toHaveAttribute("aria-invalid");
+    expect(numberField(dialog)).not.toHaveAccessibleDescription("That account is not in the chart.");
+
+    net.refuseOn = { key: CHART_DOOR, message: "Internal Server Error" };
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Internal Server Error");
+    expect(numberField(dialog)).not.toHaveAttribute("aria-invalid");
   });
 
   it("out of use refused while money is in it: the number is not touched", async () => {

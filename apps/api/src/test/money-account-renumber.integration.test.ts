@@ -141,6 +141,32 @@ describe.skipIf(!URL)("a money account renumbered from its own form (real Postgr
     expect((await q("select count(*)::int as n from gl_accounts where code = $1", [bank.code])).rows[0].n).toBe(1);
   });
 
+  it("a new name the chart already has is refused whole: neither the name nor the number is saved", async () => {
+    await actAs(U.finance);
+    // A name from outside the money-account list: the money account's own
+    // door would not see it, the chart's door does.
+    const taken = (await q(
+      `select a.name from gl_accounts a
+        where not exists (select 1 from gl_money_accounts m where m.account_code = a.code)
+        order by a.code limit 1`,
+    )).rows[0].name as string;
+    expect(await renumber(bank.code, taken, fresh)).toEqual({
+      ok: false, detail: "name_exists", message: `An account named ${taken} is already in the chart.`,
+    });
+    expect((await q("select code, name from gl_accounts where code in ($1, $2)", [bank.code, fresh])).rows).toEqual([
+      { code: bank.code, name: bank.name },
+    ]);
+  });
+
+  it("a new name and a new number in one call: both saved together, then put back", async () => {
+    await actAs(U.finance);
+    const renamed = `${bank.name} ${RUN}`.slice(0, 60);
+    expect(await renumber(bank.code, renamed, fresh)).toEqual({ ok: true, value: fresh });
+    expect((await q("select name from gl_accounts where code = $1", [fresh])).rows[0].name).toBe(renamed);
+    // Back to where it was, so the next case starts from the old number.
+    expect(await renumber(fresh, bank.name, bank.code)).toEqual({ ok: true, value: bank.code });
+  });
+
   it("renumbers, and the posted line, the approved money move and the payout bank carry the new number", async () => {
     await actAs(U.finance);
     expect(await renumber(bank.code, bank.name, fresh)).toEqual({ ok: true, value: fresh });
