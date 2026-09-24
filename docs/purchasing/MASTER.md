@@ -3799,14 +3799,22 @@ played/paused, sought to second 4 and entered/exited fullscreen. Close returned 
 to View. This is synthetic video playback proof, not saved business-video proof.
 No permissions, evidence, receipt, claim or stock facts were changed.
 
-**Fullscreen keyboard correction — local implementation 2026-09-24; production proof owed.**
+**Fullscreen keyboard correction — DEPLOYED + PRODUCTION READBACK, 2026-09-24 (#1595).**
 A further production check found native video controls retained focus after leaving
 fullscreen, so a subsequent Escape did not close the viewer. The shared viewer now
 returns focus to its media region on the next animation frame after fullscreen exit;
 this avoids the exiting Escape also dismissing the dialog. Local browser verification
 kept the viewer open after exit, then the next Escape closed it and returned focus to
 View. A regression test covers fullscreen exit, viewer focus, Escape and opener return.
-22 Claim/viewer tests passed. This correction is not yet production-verified.
+22 Claim/viewer tests passed. CI `35996235479` and deployment `35997526538` passed;
+all five canonical surfaces reported `637459451c94f8cb5d3fa4df552460f3001c161b`.
+The own Pages deployment `798c38b9.carres-portal.pages.dev`, compared with
+`647fe5fa.carres-portal.pages.dev`, added the two fullscreen-change listener references
+(one to three occurrences); the viewer and Supplier DO control strings stayed unchanged.
+On the production example, entering video fullscreen then using the native exit control
+kept the dialog open and focused its saved-evidence media region. The following Escape
+closed it and returned focus to View. This proves focus restoration after fullscreen exit;
+it does not assert that automated Escape can control the browser's native fullscreen layer.
 
 **Claim-record photo adoption — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1594).**
 The existing full-width record opens its saved photos in `SavedEvidenceViewer`, including
@@ -3829,6 +3837,8 @@ Retry returned the same truthful failure without closing the record. Escape clos
 viewer and focused Photo 1; original PO-SMOKE-B, GRN-20260904-1064 and held Unit
 U1-000-064 remained on the Claim, with no invented Unit attribution in the photo dialog.
 The saved file was unavailable, so successful stored-file recovery is not claimed.
+The existing `ClaimPhotoUploadField` admits JPG/PNG only; this adoption is explicitly
+for that photo reader, not proof of a Claim video-upload or video-association journey.
 No reply, evidence, claim, receipt or stock record was written.
 
 The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
