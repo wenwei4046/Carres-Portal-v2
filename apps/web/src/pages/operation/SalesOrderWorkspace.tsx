@@ -3439,11 +3439,8 @@ function SalesOrderWorkspaceBody() {
               2026-09-21): the address and the access conditions are one
               question, so `Delivery address` and `Delivery access` are retired
               as headings (COPY-STANDARD § Its section names). */}
-          {/* ⭐ FOUR TRACKS (YH, 2026-08-27). The two address lines take two
-              tracks each, so they still read as full-width pairs — and STATE ·
-              CITY · POSTCODE · BUILDING TYPE then land on ONE row instead of
-              two-and-a-bit. Same fields, same cascade, three rows fewer. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="address">
+          {/* Delivery uses the same two field tracks throughout, including access and services. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="address">
             {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
                 2026-08-26). `Address not given yet` is the answer to a MISSING
                 address; on an order that already carries one it is a permanent
@@ -3453,18 +3450,18 @@ function SalesOrderWorkspaceBody() {
                 read. The FIELD is untouched: `customer_address_unknown` still
                 round-trips, and the POS still asks the same question. */}
             {(addressIsBlank || draft.customer_address_unknown) && (
-              <div className="sm:col-span-4">
+              <div className="sm:col-span-2">
                 <Checkbox id="so-address-unknown" label="Address not given yet"
                   checked={draft.customer_address_unknown}
                   onCheckedChange={(v) => setField("customer_address_unknown", v)} />
               </div>
             )}
-            <div className="sm:col-span-2">
+            <div>
               <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
                 disabled={draft.customer_address_unknown}
                 onChange={(e) => setField("customer_address_line1", e.target.value)} />
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
                 disabled={draft.customer_address_unknown}
                 onChange={(e) => setField("customer_address_line2", e.target.value)} />
@@ -3530,7 +3527,7 @@ function SalesOrderWorkspaceBody() {
               same clamps, the same `stairCarry` POS-parity tag, the same
               working line, moved whole. */}
           {/* (same group — no second heading) */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
                   `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
                   registry field it stands for is "Delivery access (floor / lift /
@@ -3548,12 +3545,12 @@ function SalesOrderWorkspaceBody() {
                   the comment above that door and the same defect was live twelve
                   lines away.
                   A NESTED GRID, not a wrapper div: the three fields still sit on
-                  the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
-                  so nothing moves on screen — and they now read as the one topic
+                  the parent's two tracks (`sm:col-span-2 sm:grid-cols-2`),
+                  so the fields align with the address and read as the one topic
                   they are. */}
               <div
                 data-pos-field="stairCarry"
-                className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
+                className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2"
               >
                 {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
                     The POS has clamped this since the wizard was written; this door
@@ -3640,6 +3637,41 @@ function SalesOrderWorkspaceBody() {
                         : Math.max(0, Number(e.target.value) || 0),
                   )
                 } />
+          {/* ⭐ THE SERVICES READ WITH THE DELIVERY THEY RIDE ON (SO page
+              kit-sizes card, 2026-09-23; wording settled 2026-09-24). The lorry
+              that delivers is the lorry that carries upstairs and takes the old
+              mattress away, so Delivery states the order's services — but it is
+              NOT a second record: it reads the same `draft.addons` rows the Items
+              table prices, prints no money, and its `Add service` calls the same
+              `addServiceToDraft` as the Items door, offering the disposal
+              services (`SVC-DISPOSE-…`). Remove and quantity stay on the Items
+              row, the one place that shows the charge.
+              WORDS: only approved ones — `Services` (the approved services
+              footer, COPY § Sales Order amendment words) and the page's existing
+              `Add service`. `Disposal` / `Add disposal` are a recorded PROPOSAL,
+              not screen copy. No in-card heading (Delivery is ONE group, owner
+              ruling 2026-09-21) — a labelled field. */}
+          {(draft.addons.some((a) => !a.removed) || editing) && (
+            <div className="flex min-w-0 flex-col gap-3" data-testid="delivery-services">
+              <div>
+                <Fact label="Services" own={false} framed value={
+                  <div className="flex flex-col gap-1">
+                    {draft.addons.filter((a) => !a.removed).map((a) => (
+                      <div key={a.key}>
+                        {nameOfAddon(a.addon_key)}{configWords(a.attrs) ? ` · ${configWords(a.attrs)}` : ""} ×{a.qty}
+                      </div>
+                    ))}
+                    {!draft.addons.some((a) => !a.removed) && "None"}
+                  </div>
+                } />
+              </div>
+              {editing && disposalOptions.length > 0 && (
+                <Select id="so-add-delivery-service" label="Add service" value=""
+                  onValueChange={addServiceToDraft}
+                  options={disposalOptions.map((x) => ({ value: x.key, label: x.name }))} />
+              )}
+            </div>
+          )}
               </div>
           </div>
           {/* The three fields above, added up out loud — the POS's own sentence
@@ -3671,41 +3703,7 @@ function SalesOrderWorkspaceBody() {
               </span>
             </p>
           )}
-          {/* ⭐ THE SERVICES READ WITH THE DELIVERY THEY RIDE ON (SO page
-              kit-sizes card, 2026-09-23; wording settled 2026-09-24). The lorry
-              that delivers is the lorry that carries upstairs and takes the old
-              mattress away, so Delivery states the order's services — but it is
-              NOT a second record: it reads the same `draft.addons` rows the Items
-              table prices, prints no money, and its `Add service` calls the same
-              `addServiceToDraft` as the Items door, offering the disposal
-              services (`SVC-DISPOSE-…`). Remove and quantity stay on the Items
-              row, the one place that shows the charge.
-              WORDS: only approved ones — `Services` (the approved services
-              footer, COPY § Sales Order amendment words) and the page's existing
-              `Add service`. `Disposal` / `Add disposal` are a recorded PROPOSAL,
-              not screen copy. No in-card heading (Delivery is ONE group, owner
-              ruling 2026-09-21) — a labelled field. */}
-          {(draft.addons.some((a) => !a.removed) || editing) && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="delivery-services">
-              <div className={editing ? "sm:col-span-2" : "sm:col-span-3"}>
-                <Fact label="Services" own={false} framed value={
-                  <div className="flex flex-col gap-1">
-                    {draft.addons.filter((a) => !a.removed).map((a) => (
-                      <div key={a.key}>
-                        {nameOfAddon(a.addon_key)}{configWords(a.attrs) ? ` · ${configWords(a.attrs)}` : ""} ×{a.qty}
-                      </div>
-                    ))}
-                    {!draft.addons.some((a) => !a.removed) && "None"}
-                  </div>
-                } />
-              </div>
-              {editing && disposalOptions.length > 0 && (
-                <Select id="so-add-delivery-service" label="Add service" value=""
-                  onValueChange={addServiceToDraft}
-                  options={disposalOptions.map((x) => ({ value: x.key, label: x.name }))} />
-              )}
-            </div>
-          )}
+
       </Block>
       </fieldset>
 
@@ -3896,10 +3894,10 @@ function SalesOrderWorkspaceBody() {
             size. `Total payable` and `Balance due` are the two answers the
             reader came for, so they alone take weight 600, each under a 1px
             rule. No KPI treatment: nothing here is larger than a table cell.
-            No rule above the block — the ledger's last row already draws one,
-            and the section body's 12px gap spaces it. */}
-        <div className="flex justify-end px-2">
-          <div className="grid w-full grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]"
+            The full-width bordered two-column summary has one rule per row,
+            matching the ledger insets instead of floating in unused space. */}
+        <div className="w-full">
+          <div className="grid w-full grid-cols-[1fr_auto] overflow-hidden rounded-control border border-kit-slate-5 text-body [&>span]:px-2 [&>span]:py-2 [&>span:nth-child(n+3)]:border-t [&>span:nth-child(n+3)]:border-kit-slate-5"
             data-testid="payment-totals">
             <span className="pr-6 text-base-500">Goods</span>
             <span className="text-right tabular-nums text-base-900" data-testid="money-goods">
