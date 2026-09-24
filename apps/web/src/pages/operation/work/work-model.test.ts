@@ -41,19 +41,15 @@ function row(overrides: Partial<WorkRow> = {}): WorkRow {
 }
 
 describe("Work presentation model", () => {
-  it("keeps the locked section order and gives broken commitments one home", () => {
+  it("keeps promise failures in their lawful date group without a duplicate section", () => {
     const sections = workSections([
       row({ id: "no-date", timingBucket: "no_date", dueIso: null }),
       row({ id: "later", timingBucket: "later" }),
       row({ id: "broken", broken: true, timingBucket: "overdue", workingDaysLate: 2 }),
       row({ id: "late", timingBucket: "overdue", workingDaysLate: 1 }),
     ]);
-    expect(sections.map((section) => section.label)).toEqual([
-      "Broken commitments",
-      "Missed",
-      "Later",
-      "No working date",
-    ]);
+    expect(sections.map((section) => section.label)).toEqual(["Missed", "Later", "No working date"]);
+    expect(sections[0]?.items.map((item) => item.id)).toEqual(expect.arrayContaining(["broken", "late"]));
     expect(sections.flatMap((section) => section.items).filter((item) => item.id === "broken")).toHaveLength(1);
   });
 

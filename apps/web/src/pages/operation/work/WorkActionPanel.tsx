@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { OperationWorkItem, OperationWorkModule } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import DeliveryProofReviewWork from "../components/DeliveryProofReviewWork";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -26,48 +27,39 @@ function evidenceHeading(item: OperationWorkItem): string {
 
 /** The selected item is required, so a component-level empty state is not applicable. */
 export default function WorkActionPanel({ item, embedded, onOpen, className = "" }: WorkActionPanelProps) {
-  const action = `${item.action}${item.recipient ? ` · ${item.recipient}` : ""}`;
   const owningForm = item.interaction.mode === "embedded" && item.interaction.componentKey === "delivery.proof_review"
     ? <DeliveryProofReviewWork doNumber={item.object.id} />
     : null;
   return (
-    <div className={`min-h-full bg-white ${className}`}>
-      <header className="border-b border-kit-slate-5 px-6 py-4">
-        <p className="text-label font-medium text-kit-slate-11">{item.object.label} · {MODULE[item.module]}</p>
-        <h2 className="mt-1 text-title font-semibold text-kit-slate-12">{item.action}</h2>
+    <div className={`min-h-full bg-base-50 p-4 ${className}`}>
+      <header className="rounded-panel border border-kit-slate-5 bg-white px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-label font-semibold text-kit-blue-11">{MODULE[item.module]}</p>
+          <Button type="button" variant="ghost" onClick={onOpen} aria-label={`Open ${item.object.label}`}><Icon name="open" size={14} /><span>{item.object.label}</span></Button>
+        </div>
+        <h2 className="mt-2 text-title font-semibold text-kit-slate-12">{item.problem}</h2>
+        <p className="mt-1 text-body text-kit-slate-11">{item.action}{item.recipient ? ` · ${item.recipient}` : ""}</p>
       </header>
-      <div className="max-w-[760px] px-6 py-4">
-        <section aria-labelledby="work-current-fact">
-          <h3 id="work-current-fact" className="text-label font-semibold text-kit-slate-11">CURRENT FACT</h3>
-          <p className="mt-1 text-body text-kit-slate-12">{item.problem}</p>
-        </section>
-
-        <section aria-labelledby="work-action" className="mt-4">
-          <h3 id="work-action" className="text-label font-semibold text-kit-slate-11">ACTION</h3>
-          <p className="mt-1 text-body text-kit-slate-12">{action}</p>
-        </section>
-
-        <section aria-labelledby="work-required-result" className="mt-4">
-          <h3 id="work-required-result" className="text-label font-semibold text-kit-slate-11">REQUIRED RESULT</h3>
-          <p className="mt-1 text-body text-kit-slate-12">{item.requiredResult}</p>
-        </section>
-
+      <div className="max-w-[760px]">
         {item.interaction.mode === "embedded" ? (
-          <section aria-label="Do this work" className="mt-4 flex flex-col gap-3">
+          <section aria-label="Record result" className="mt-4 rounded-panel border border-kit-slate-5 bg-white p-4">
+            <h3 className="border-b border-kit-slate-5 pb-3 text-body font-semibold text-kit-blue-11">Record result</h3>
+            <div className="mt-3">
             {embedded ?? owningForm}
-            <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
+            </div>
+            <p className="mt-3 text-label text-kit-slate-11">{item.completionStatement}</p>
           </section>
         ) : item.interaction.mode === "read_only" ? (
-          <p className="mt-4 text-body text-kit-slate-11">{item.interaction.reason}</p>
-        ) : null}
+          <section className="mt-4 rounded-panel border border-kit-slate-5 bg-white p-4"><p className="text-body text-kit-slate-11">{item.interaction.reason}</p></section>
+        ) : (
+          <section aria-labelledby="work-next-step" className="mt-4 rounded-panel border border-kit-slate-5 bg-white p-4">
+            <h3 id="work-next-step" className="border-b border-kit-slate-5 pb-3 text-body font-semibold text-kit-blue-11">Next step</h3>
+            <p className="mt-3 text-body text-kit-slate-12">{item.action}</p>
+            <div className="mt-3"><Button type="button" variant="primary" onClick={onOpen}><Icon name="open" /><span>{item.object.label}</span></Button></div>
+          </section>
+        )}
 
-        <div className="mt-4">
-          <Button type="button" variant={item.interaction.mode === "embedded" ? "neutral" : "primary"} onClick={onOpen}>
-            Open {item.object.label}
-          </Button>
-        </div>
-
-        <details className="mt-4 border-t border-kit-slate-5 pt-3 text-label text-kit-slate-11">
+        <details className="mt-4 rounded-panel border border-kit-slate-5 bg-white p-4 text-label text-kit-slate-11">
           <summary className="cursor-pointer font-medium text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9">
             {evidenceHeading(item)}
           </summary>

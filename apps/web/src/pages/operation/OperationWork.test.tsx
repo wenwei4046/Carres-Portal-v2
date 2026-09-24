@@ -176,13 +176,13 @@ describe("Operation Work — one server feed", () => {
     expect(screen.queryByRole("button", { name: "Open Team Work" })).not.toBeInTheDocument();
   });
 
-  it("renders object, problem, then action without repeating the owner", () => {
+  it("renders fact then action, with the object in the footer and no repeated owner", () => {
     show();
     const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
-    expect(row).toHaveTextContent("SO-1318");
     expect(row).toHaveTextContent("No delivery date");
     expect(row).toHaveTextContent("Ask customer for a delivery date");
     expect(row).not.toHaveTextContent("Shasha");
+    expect(screen.getByTestId("work-card-footer")).toHaveTextContent("SO-1318");
   });
 
   it("routes covered work to the acting person's My Work but groups Team Work under normal owner", async () => {
@@ -208,14 +208,14 @@ describe("Operation Work — one server feed", () => {
       .toHaveTextContent("Covered by Yu Jun");
   });
 
-  it("uses the governed My Work section order and keeps No date separate", () => {
+  it("keeps promise failures inside Missed and keeps No date separate", () => {
     workState.data!.items = [
       item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
       item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
       item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
     ];
     show("/operation?tab=work&day=all");
-    expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-section-broken")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-section-overdue")).toBeInTheDocument();
     expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
   });
@@ -271,7 +271,8 @@ describe("Operation Work — one server feed", () => {
   it("selects work in the action panel before opening the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
-    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("Customer Delivery exists");
+    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("No delivery date");
+    expect(screen.getByRole("region", { name: "Selected work" })).not.toHaveTextContent("REQUIRED RESULT");
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Open SO-1318" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");

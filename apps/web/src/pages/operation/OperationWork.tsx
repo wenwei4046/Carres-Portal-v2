@@ -519,6 +519,7 @@ export default function OperationWork() {
                       key={i.id}
                       item={i.source}
                       onSelect={() => openRow(i)}
+                      onOpen={() => navigate(i.destination)}
                       selected={selected?.id === i.id}
                       ownerContext={i.ownerState === "covered" ? `Covered for ${i.normalOwner?.name ?? "normal owner"}` : null}
                     />
@@ -564,6 +565,7 @@ export default function OperationWork() {
                     key={i.id}
                     item={i.source}
                     onSelect={() => openRow(i)}
+                    onOpen={() => navigate(i.destination)}
                     selected={selected?.id === i.id}
                     ownerContext={i.ownerState === "covered" ? `Covered by ${i.activeCover?.name ?? "cover"}` : null}
                   />

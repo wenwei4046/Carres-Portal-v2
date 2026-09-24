@@ -21,6 +21,11 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-24 — Work compact cards rank exact problem/fact first, action second, recipient third and
+  keep the document number in a footer object door. Promise failures stay inside their lawful date
+  group and print the exact promise/failure rather than a generic badge. Selected detail uses the
+  confirmed Carres blue-title white Panel composition and never repeats CURRENT FACT/ACTION/RESULT.
+
 - 2026-09-23 — Workspace Work v4 is assembled from the governed flat `PageShell` Work variant,
   the shared `FilterRail` and one shared `Avatar` identity chip. Its responsive shape is measured
   from the Work canvas: 240/360/min-500 at three panels; the 240px rail plus list/detail replacement
@@ -49,7 +54,8 @@ copy, component, or business-rule system.
 - Shared staff identity chip — `apps/web/src/components/kit/Avatar.tsx`; one initials algorithm,
   full-name tooltip/focus label and the governed staff colour mapping.
 - Work shell primitives — `PageShell variant="work"`, `WorkSplitShell`, `WorkDayNav`,
-  `WorkActionRow` and `WorkActionPanel`. They own layout and presentation only; the server Work
+  `WorkActionRow` (`apps/web/src/pages/operation/work/WorkActionRow.tsx`) and `WorkActionPanel`
+  (`apps/web/src/pages/operation/work/WorkActionPanel.tsx`). They own layout and presentation only; the server Work
   contract owns assignment, dates, completion and source health.
 - Workspace Work authority and measured UI contract — `docs/workspace/MASTER.md` §§5–6.
 - Rejected/exploratory Workspace HTML and companion specification under `docs/prototypes/` must not

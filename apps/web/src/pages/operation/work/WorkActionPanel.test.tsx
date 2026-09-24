@@ -18,9 +18,18 @@ const base = {
 describe("WorkActionPanel", () => {
   it("shows operator-safe completion words and hosts the owning embedded form", () => {
     render(<WorkActionPanel item={{ ...base, interaction: { mode: "embedded" } } as OperationWorkItem} embedded={<div>Delivery owned form</div>} onOpen={() => {}} />);
-    expect(screen.getByText("Finish when: The proof review is recorded")).toBeInTheDocument();
+    expect(screen.getByText("The proof review is recorded")).toBeInTheDocument();
+    expect(screen.queryByText(/Finish when:/i)).not.toBeInTheDocument();
     expect(screen.queryByText("delivery_proof_reviews exists")).not.toBeInTheDocument();
     expect(screen.getByText("Delivery owned form")).toBeInTheDocument();
+  });
+
+  it("does not repeat the selected card as CURRENT FACT, ACTION and REQUIRED RESULT blocks", () => {
+    render(<WorkActionPanel item={{ ...base, interaction: { mode: "open_module", fallbackDestination: base.destination } } as OperationWorkItem} onOpen={() => {}} />);
+    expect(screen.queryByText("CURRENT FACT")).not.toBeInTheDocument();
+    expect(screen.queryByText("ACTION")).not.toBeInTheDocument();
+    expect(screen.queryByText("REQUIRED RESULT")).not.toBeInTheDocument();
+    expect(screen.getByText("Delivery proof needs review")).toBeInTheDocument();
   });
 
   it("resolves the admitted Delivery proof component without a Workspace copy of the form", () => {
