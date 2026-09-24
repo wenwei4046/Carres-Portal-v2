@@ -20,7 +20,9 @@
 --                   It moves the occurrence to Waiting and never completes it.
 --   reply_received  the answer came back. The occurrence returns to To do
 --                   unless the module's completion fact is already true.
---   completed       ONLY the owning module's completion fact produces it.
+--   completed       ONLY the owning module's completion fact produces it,
+--                   with the original Work date (`action_on`, for the Date
+--                   filter) and the document reference (`object_label`).
 --                   Terminal: nothing is recorded on a completed occurrence.
 --                   A recurring problem is a NEW occurrence identity.
 --   The state is DERIVED from the events plus the live open set; no row stores
@@ -54,6 +56,12 @@ create table if not exists public.work_occurrence_events (
   result_reference text check (result_reference is null or length(result_reference) >= 1),
   source_version   text not null check (length(source_version) >= 1),
   idempotency_key  text not null unique check (length(idempotency_key) >= 8),
+  -- Written ONLY with `completed` (owner ruling 2026-09-24): the original Work
+  -- date the Date filter counts it under (null = it had no working date), and
+  -- the document reference the Completed card names (`SO-1318`). Fixed facts
+  -- at completion; immutable with the rest of the history.
+  action_on        date,
+  object_label     text check (object_label is null or length(object_label) >= 1),
 
   -- A contact is a kind AND an id, or neither.
   constraint work_occurrence_events_contact_pair
@@ -67,11 +75,15 @@ create table if not exists public.work_occurrence_events (
   constraint work_occurrence_events_reply_shape
     check (event <> 'reply_received'
            or (reply_due_on is null and result_reference is null)),
-  -- A completion is the module's fact: it names its result, and no contact.
+  -- A completion is the module's fact: it names its result and its document,
+  -- and no contact.
   constraint work_occurrence_events_completed_shape
     check (event <> 'completed'
-           or (result_reference is not null and channel is null
-               and contact_kind is null and contact_id is null and reply_due_on is null))
+           or (result_reference is not null and object_label is not null and channel is null
+               and contact_kind is null and contact_id is null and reply_due_on is null)),
+  -- Only a completion carries the Work date and the document reference.
+  constraint work_occurrence_events_completion_facts_only
+    check (event = 'completed' or (action_on is null and object_label is null))
 );
 
 comment on table public.work_occurrence_events is
@@ -278,6 +290,8 @@ create or replace function public.work_record_completed(
   p_occurrence_id    text,
   p_actor_id         uuid,
   p_at               timestamptz,
+  p_action_on        date,
+  p_object_label     text,
   p_result_reference text,
   p_source_version   text,
   p_idempotency_key  text
@@ -301,13 +315,14 @@ begin
   perform public._work_refuse_if_completed(p_occurrence_id);
 
   insert into work_occurrence_events (
-    occurrence_id, event, actor_id, at, result_reference, source_version, idempotency_key
+    occurrence_id, event, actor_id, at, action_on, object_label,
+    result_reference, source_version, idempotency_key
   ) values (
     p_occurrence_id, 'completed', p_actor_id, coalesce(p_at, clock_timestamp()),
-    p_result_reference, p_source_version, p_idempotency_key
+    p_action_on, p_object_label, p_result_reference, p_source_version, p_idempotency_key
   ) returning id into v_id;
   return v_id;
 end;
 $fn$;
 
-revoke all on function public.work_record_completed(text, uuid, timestamptz, text, text, text) from public, anon, authenticated;
+revoke all on function public.work_record_completed(text, uuid, timestamptz, date, text, text, text, text) from public, anon, authenticated;

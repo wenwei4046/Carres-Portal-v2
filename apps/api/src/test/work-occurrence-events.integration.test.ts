@@ -60,7 +60,7 @@ describe.skipIf(!URL)("the Work lifecycle ledger (real PostgreSQL, 0581)", () =>
   const reply = (occ: string, key: string) =>
     attempt("select public.work_record_reply_received($1, 'whatsapp', 'customer', $2::uuid, 'v1', $3)", [occ, CUSTOMER, key]);
   const complete = (occ: string, key: string) =>
-    attempt("select public.work_record_completed($1, $2::uuid, now(), 'SO-1318 delivery date', 'v2', $3)", [occ, U.operation, key]);
+    attempt("select public.work_record_completed($1, $2::uuid, now(), date '2026-09-17', 'SO-1318', 'SO-1318 delivery date', 'v2', $3)", [occ, U.operation, key]);
 
   beforeAll(async () => {
     if (!LOCAL) throw new Error("CARRES_TEST_DATABASE_URL must point at localhost");
@@ -130,8 +130,28 @@ describe.skipIf(!URL)("the Work lifecycle ledger (real PostgreSQL, 0581)", () =>
     expect(await complete(OCC, `k-c2-${HEX}`)).toBe("work_occurrence_completed");
     await as(U.operation);
     expect(await send(OCC, `k-after-${HEX}`)).toBe("work_occurrence_completed");
-    const done = await q("select actor_id, result_reference, channel, contact_kind from work_occurrence_events where occurrence_id = $1 and event = 'completed'", [OCC]);
-    expect(done.rows).toEqual([{ actor_id: U.operation, result_reference: "SO-1318 delivery date", channel: null, contact_kind: null }]);
+    const done = await q("select actor_id, to_char(action_on, 'YYYY-MM-DD') as action_on, object_label, result_reference, channel, contact_kind from work_occurrence_events where occurrence_id = $1 and event = 'completed'", [OCC]);
+    expect(done.rows).toEqual([{ actor_id: U.operation, action_on: "2026-09-17", object_label: "SO-1318", result_reference: "SO-1318 delivery date", channel: null, contact_kind: null }]);
+  });
+
+  it("a completion must name its document; the Work date may be absent (No working date)", async () => {
+    await as("service_role");
+    const noLabel = `orders:it-${HEX}:no_label`;
+    expect(await attempt("select public.work_record_completed($1, null, now(), date '2026-09-17', null, 'r', 'v', $2)", [noLabel, `k-nl-${HEX}`])).toBe("23514");
+    const noDate = `orders:it-${HEX}:no_date`;
+    expect(await attempt("select public.work_record_completed($1, null, now(), null, 'SO-1319', 'r', 'v', $2)", [noDate, `k-nd-${HEX}`])).toBe("ok");
+  });
+
+  it("only a completion carries the Work date and the document reference", async () => {
+    await q("reset role");
+    const occ = `orders:it-${HEX}:facts_only`;
+    expect(await attempt("insert into work_occurrence_events (occurrence_id, event, actor_id, channel, reply_due_on, source_version, idempotency_key, object_label) values ($1, 'request_sent', $2::uuid, 'phone', current_date + 1, 'v', $3, 'SO-1')", [occ, U.operation, `k-fo-${HEX}`])).toBe("23514");
+    expect(await attempt("insert into work_occurrence_events (occurrence_id, event, actor_id, source_version, idempotency_key, action_on) values ($1, 'reply_received', $2::uuid, 'v', $3, current_date)", [occ, U.operation, `k-fo2-${HEX}`])).toBe("23514");
+  });
+
+  it("the completion facts are immutable with the history", async () => {
+    await q("reset role");
+    expect(await attempt("update work_occurrence_events set action_on = date '2026-01-01', object_label = 'SO-9' where occurrence_id = $1 and event = 'completed'", [OCC])).toBe("work_event_append_only");
   });
 
   it("is append-only for every role, and no client writes the table directly", async () => {

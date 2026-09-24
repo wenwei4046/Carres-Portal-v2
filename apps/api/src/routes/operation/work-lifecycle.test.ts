@@ -76,7 +76,7 @@ function memoryLedger(rows: WorkOccurrenceEvent[] = []) {
         occurrenceId: args.occurrenceId, event: "request_sent", actorId: ME,
         at: `2026-09-17T0${n}:00:00.000Z`, channel: args.channel,
         contactKind: args.contactKind, contactId: args.contactId, replyDueOn: args.replyDueOn,
-        resultReference: null, sourceVersion: args.sourceVersion,
+        resultReference: null, sourceVersion: args.sourceVersion, actionOn: null, objectLabel: null,
       };
       rows.push(row);
       return row.id;
@@ -91,7 +91,7 @@ function memoryLedger(rows: WorkOccurrenceEvent[] = []) {
         occurrenceId: args.occurrenceId, event: "reply_received", actorId: ME,
         at: `2026-09-17T0${n}:00:00.000Z`, channel: args.channel,
         contactKind: args.contactKind, contactId: args.contactId, replyDueOn: null,
-        resultReference: null, sourceVersion: args.sourceVersion,
+        resultReference: null, sourceVersion: args.sourceVersion, actionOn: null, objectLabel: null,
       };
       rows.push(row);
       return row.id;

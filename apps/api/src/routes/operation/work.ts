@@ -1605,7 +1605,7 @@ export const supabaseWorkLedger: WorkLedger = {
       const ids = occurrenceIds.slice(i, i + LEDGER_CHUNK);
       const { data, error } = await sb
         .from("work_occurrence_events")
-        .select("id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version")
+        .select("id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version, action_on, object_label")
         .in("occurrence_id", ids)
         .order("at", { ascending: true });
       if (error) throw new Error(`work ledger read failed: ${error.message}`);
@@ -1614,6 +1614,7 @@ export const supabaseWorkLedger: WorkLedger = {
           id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
           channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
           replyDueOn: r.reply_due_on, resultReference: r.result_reference, sourceVersion: r.source_version,
+          actionOn: r.action_on, objectLabel: r.object_label,
         }));
       }
     }

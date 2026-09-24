@@ -39,6 +39,10 @@ export const workOccurrenceEventSchema = z.object({
   replyDueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   resultReference: z.string().min(1).nullable(),
   sourceVersion: z.string().min(1),
+  /** `completed` only: the original Work date (null = No working date). */
+  actionOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  /** `completed` only: the document reference, `SO-1318`. */
+  objectLabel: z.string().min(1).nullable(),
 }).strict();
 
 export type WorkOccurrenceEvent = z.infer<typeof workOccurrenceEventSchema>;

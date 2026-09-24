@@ -21,6 +21,8 @@ function ev(event: WorkOccurrenceEvent["event"], at: string, extra: Partial<Work
     replyDueOn: event === "request_sent" ? "2026-09-18" : null,
     resultReference: event === "completed" ? "SO-1318 delivery date" : null,
     sourceVersion: "v1",
+    actionOn: event === "completed" ? "2026-09-17" : null,
+    objectLabel: event === "completed" ? "SO-1318" : null,
     ...extra,
   };
 }
