@@ -70,6 +70,7 @@ export default function OperationToOrder() {
     return groupSelectionsIntoDocuments(
       selections,
       new Map(data.rows.map((r) => [r.id, r])),
+      data.destinations,
     );
   }, [selections, data]);
 

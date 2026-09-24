@@ -50,6 +50,7 @@ import { Plus, Printer, Trash2, X } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
+import { paintPdfPages } from "@/lib/pdf/paint";
 import { toast } from "sonner";
 import {
   BUILDING_TYPE_OPTIONS,
@@ -376,6 +377,8 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
   useEffect(() => () => roRef.current?.(), []);
   useEffect(() => {
     let cancelled = false;
+    let loading: pdfjs.PDFDocumentLoadingTask | undefined;
+    let renderTask: pdfjs.RenderTask | undefined;
     if (!data) {
       paneRef.current?.replaceChildren();
       return;
@@ -385,7 +388,10 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
         const blob = await renderSalesOrderPdf(data);
         if (cancelled) return;
         setPdfError(null);
-        const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
+        const bytes = await blob.arrayBuffer();
+        if (cancelled) return;
+        loading = pdfjs.getDocument({ data: bytes });
+        const doc = await loading.promise;
         if (cancelled) return;
         const pane = paneRef.current;
         if (!pane) return;
@@ -395,41 +401,15 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
            wider than the space it had to sit in — the original clipping, and
            it was there at every width, not only narrow ones. */
         const width = Math.max(contentWidthOf(pane), MIN_PDF_WIDTH);
-        for (let n = 1; n <= doc.numPages; n++) {
-          const page = await doc.getPage(n);
-          if (cancelled) return;
-          const base = page.getViewport({ scale: 1 });
-          const scale = width / base.width;
-          const dpr = window.devicePixelRatio || 1;
-          const viewport = page.getViewport({ scale: scale * dpr });
-          const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = `${Math.round(viewport.width / dpr)}px`;
-          canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
-          canvas.style.display = "block";
-          canvas.style.margin = "0 auto 16px";
-          /* ⛔ NO `max-width: 100%`. Below `MIN_PDF_WIDTH` the page stops
-             SHRINKING — a sales order scaled to 200px is a grey smear, not a
-             document — so it must be allowed to be wider than a very narrow
-             pane and SCROLL there, which is the same rule the tables follow.
-             Capping it at 100% instead would silently squash the page back to
-             unreadable, and on a zero-width (hidden) pane collapse it to
-             nothing. The pane owns the scrolling; the page owns its size. */
-          canvas.style.boxShadow = "0 1px 4px rgba(0,0,0,0.18)";
-          /* A PDF page is paper — white by definition; this canvas is
-             imperative pdf.js output, not themed React markup. */
-          canvas.style.background = "white";
-          canvas.setAttribute("data-testid", `pdf-page-${n}`);
-          pane.appendChild(canvas);
-          await page.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
-        }
+        await paintPdfPages(doc, pane, width, () => cancelled, (task) => { renderTask = task; });
       } catch (e) {
         if (!cancelled) setPdfError(e instanceof ApiError ? e.message : String(e));
       }
     })();
     return () => {
       cancelled = true;
+      renderTask?.cancel();
+      void loading?.destroy().catch(() => {});
     };
   }, [data, paneEpoch, paneWidth]);
   /* No blob URL is minted here any more. The PANE paints bytes; PRINT owns its

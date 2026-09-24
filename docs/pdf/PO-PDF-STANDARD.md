@@ -40,6 +40,11 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   SOs and known supplier/destination facts are previewed; no PO number, issued
   version, issue date, Unit IDs or delivery promise is invented. Issue PO still
   creates the official document; the preview then switches to its print data.
+  The complete draft approved in Purchasing MASTER §8.2 (2026-09-24) may print
+  the server's provisional PO Doc Date, Settings working-day count, calculated
+  PO Delivery Date and Delivery Method. They are read facts, not an invented
+  issuance or supplier promise; the draft/no-send treatment remains. The issue
+  door revalidates and records the actual dates on successful issuance.
 
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.

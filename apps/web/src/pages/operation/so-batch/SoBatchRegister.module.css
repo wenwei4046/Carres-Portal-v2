@@ -17,16 +17,17 @@
 }
 .issue { container: so-batch-issue / inline-size; }
 .issueBody { display: flex; flex-direction: column; overflow-y: auto; }
-@container so-batch-issue (min-width: 1130px) {
+@container so-batch-issue (min-width: 768px) {
   .issue .issueBody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; }
 }
 
-@container so-batch-issue (min-width: 1130px) {
+@container so-batch-issue (min-width: 768px) {
   .issue .issueWork, .issue .issuePreview { min-height: 0; flex-shrink: 1; overflow-y: auto; }
   .issue .issueWork { border-bottom-width: 0; border-right-width: 1px; }
 }
 
 /* Keep Clear, the duty holder and Issue PO reachable on the narrow canvas. */
 @container so-batch (width < 640px) {
-  .canvas [data-testid="selection-bar"] > span:first-child { display: none; }
+  .canvas [data-testid="selection-bar"] { flex-wrap: wrap; }
+  .canvas [data-testid="selection-bar"] > span:first-child { flex-basis: 100%; white-space: normal; }
 }

@@ -335,6 +335,25 @@ loading; this component only draws.
 
 ---
 
+## PdfPreview
+
+**Purpose.** Display actual PDF pages inside a document review, using the shared
+`lib/pdf/paint.ts` renderer also used by Sales Order review. The component takes
+an already-rendered PDF URL; it does not fetch business facts or issue documents.
+
+**Behaviour.** Fit to pane width, Zoom in/out and Fit width; enlarged pages scroll
+inside their pane. Loading and decode/render errors are explicit, with Try again.
+A ready callback fires only after every page has painted. Source changes, resize,
+retry and unmount cancel old rendering and release its PDF worker resources.
+The caller owns the source URL and its lifetime. A failed preview is not a completed
+review. The live `/ui` example includes a real draft and a failed-preview sample.
+
+**Used by.** The shared SO Batch / Manual Purchase PO review. Purchasing MASTER §8.2
+owns its approved desktop composition and completion gate; this is not the image
+and evidence viewer promised for Supplier Claims.
+
+---
+
 # Built, not yet proven by a real page
 
 These exist in `components/kit/` and render on `/ui`. They are written up when a

@@ -6,8 +6,8 @@
  * responsive law (CARD-2026-08-22-purchasing-02 closure §10) at the approved
  * widths:
  *
- *   ≥ 1130px   50% decision work + 50% the official PDF
- *   < 1130px   stacked, work first, the document keeping a readable height
+ *   ≥ 768px   50% decision work + 50% the official PDF
+ *   < 768px   stacked, work first, the document keeping a readable height
  *
  * ── WHY A PREVIEW AND NOT THE LIVE SCREEN ───────────────────────────────────
  *
@@ -116,6 +116,7 @@ createRoot(document.getElementById("root")!).render(
         <SoBatchIssueWorkspace
           documents={DOCUMENTS}
           destinations={[KLANG, BULOH]}
+          onIssue={async () => ({ pos: [] })}
           onBack={() => {}}
           onDone={() => {}}
         />

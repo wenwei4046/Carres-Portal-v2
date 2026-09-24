@@ -232,6 +232,7 @@ export type Loaded = {
   stockQtyById: Map<string, number>;
   /** Every supplier's own name, off the same read the kinds come from. */
   supplierNames: Map<string, string>;
+  supplierAddresses?: Map<string, string | null>;
   /**
    * The Register's own facts. ADDITIVE — no existing caller reads them, and the
    * To Order response is byte-identical with or without them.
@@ -556,7 +557,7 @@ export async function loadToOrder(
     });
   }
 
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind");
+  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind, address");
   if (supErr) {
     const m = mapPgError(supErr);
     return { ok: false, status: m.status, body: m.body };
@@ -1103,6 +1104,7 @@ export async function loadToOrder(
       settings,
       stockWarehouse,
       stockQtyById,
+      supplierAddresses: new Map((supRows ?? []).map((s) => [s.id as string, (s.address as string | null) ?? null])),
       supplierNames: new Map(
         (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
       ),

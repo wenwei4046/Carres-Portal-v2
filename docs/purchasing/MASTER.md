@@ -60,6 +60,25 @@ Goods Receipt, independent stock-claim intake, the separate customer Service Cas
 Finance/AP authority. The 2026-09-14 boundary audit also reconciled the Constitution authority map,
 ERP Architecture, Service MASTER and claim wording in the Copy Standard.
 
+**Read-only implementation audit, 2026-09-24 (Operation account).** This is observed
+behaviour, not approval or lifecycle completion. No PO was issued, supplier message sent,
+receipt posted, or stock mutated for this audit.
+
+| Surface | Observed | Remaining work / verification |
+|---|---|---|
+| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice lacked its reason. Initial loading flashed missing destinations. Back from review retained selection. | Correct loading/selection presentation; reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
+| Shared PO review | Desktop stacked under the former cutoff; browser PDF could remain blank; dates, addresses and delivery method missing from review. | §8.2 complete draft, actual readable PDF and completion gate. No issuance proof from opening review. |
+| Manual Purchase | Internal draft and three sections exist; narrow create surface clipped controls and retained old section styling. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
+| Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply capture still lacked governed readable evidence; old Supplier Delivery Date wording remained. | §9.3 object, evidence, date and revision walkthrough. Multi-receipt and revision writes remain unverified. |
+| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. | §9.4 GRN document review and receipt lifecycle; no posting performed. Warehouse handoff separately measured clipped Receiving Details at 390px. |
+| Claims / Returns | Claims still showed the former twelve-column composition; Returns showed an empty register. | §9.5–9.6 approved columns, source-linked workflows and evidence. Empty Returns data proves no execution lifecycle. |
+| Repair / showroom documents | Repair Orders, Display Requests, Consignment Orders, Consignment Returns and Sale Notices remained Coming soon. | §9.7–9.11 are not production-built by virtue of their approved blueprint. |
+| Master data | Supplied company CSV read; Carres Klang warehouse address and NETS company address are distinct authorities. | Apply only through an existing authorised update door, preserving IDs and history; no People record creation. No company update claimed yet. |
+
+The governed Supabase `apply_migration` / SQL probe tools are unavailable in this BUILD
+session. Database-dependent work cannot be called applied or production-proven; do not replace
+the required migration path with a service credential or an unrelated write door.
+
 ### 2.2 Ruling — RESOLVED FROM AUTHORITY
 
 There are not two genuine Carres operating models.
@@ -985,6 +1004,8 @@ summary. Action ownership uses structured avatar metadata.
 - **Approved review sequence and scope.** Header: total PO count, goods quantity and an explicit whole-batch issue action. Work pane: current document selection → Supplier → Supplier Deliver To/address and Delivery Method → provisional PO Date and Settings-derived PO Delivery Date → source/items/quantity → actionable missing facts. Preview uses the same selected document and approved PO template. Switching documents updates its paper. Returning preserves selection; issuance is not sending.
 - **A complete draft before commitment.** Both lanes must carry server-resolved supplier/destination addresses, provisional dates and delivery method. The draft reserves no official number or Unit ID; successful issuance records the actual PO Date and revalidates the dates. Goods must arrive is an internal deadline, not a substitute for PO Delivery Date. Missing required document facts identify their owning Settings destination instead of silently disappearing. Unrendered/failed preview is not completed review. Do not invent addresses, prices, dates or identifiers.
 - **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
+- **Implementation slice, 2026-09-24 — LOCAL, release verification pending.** Shared review now paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`, so an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. The 1074px portal fixture retained side-by-side panes and enlarged paper scrolled independently; at 390px the panes stack without page overflow and the shared wrapping toolbar keeps the selection summary and all actions visible. Validation: 558 targeted tests passed across shared/API/web, typecheck, lint and production build passed; negative controls failed for a dropped PDF page and the old 11/11 split before restoration. The interrupted full local suite is not counted as a pass; full PR CI remains the merge gate. This does not close the coverage-status discrepancy, the MPR create layout, any database migration, or any real issuance/receiving/sending lifecycle. Merge, CI and authenticated post-deploy readback are still owed.
+
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
   `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
   (`PO sent to supplier`) are drawn by ONE component on every surface that chases a document. Two

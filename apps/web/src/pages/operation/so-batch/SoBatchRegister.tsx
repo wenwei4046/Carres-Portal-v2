@@ -1244,7 +1244,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               To dropdown and Split's Apply were already doing without ever
               reading the default. The warning that remains is the one that is
               still true. */}
-          {data.destinations.length === 0 ? (
+          {!isLoading && data.destinations.length === 0 ? (
             <p
               className="mb-2 rounded-control bg-kit-amber-3 px-3 py-2 text-meta text-kit-amber-11"
               data-testid="so-batch-no-destination"
@@ -1252,7 +1252,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               No Deliver To destinations are set, so nothing can be bought on
               this page. Set one in Purchasing → Settings.
             </p>
-          ) : !data.defaultDestinationId ? (
+          ) : !isLoading && !data.defaultDestinationId ? (
             /* Not a blocker — a heads-up. Buying works; it just opens on a
                destination nobody nominated, so say WHICH one before the
                operator discovers it on a purchase order. */
@@ -1281,6 +1281,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
           >
             <DataGrid<SoBatchOrderRow>
               appearance="reference"
+              wrapToolbar
               palette="slate"
               /* §6.8 — the MAIN header is pale blue on this reference; the
                  child tables in the expansion keep neutral slate, so two

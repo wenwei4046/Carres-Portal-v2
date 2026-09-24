@@ -301,6 +301,17 @@ describe("po-template prints the lineage and the issuer it is given", () => {
     expect(SRC.match(/fontWeight: 600 \}\]\}>\{(supplier|dest)\.name\}/g)).toHaveLength(2);
   });
 
+  it("prints supplied provisional draft dates while reserving no official number", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), draft: true, po_number: "DRAFT", version: 0,
+      issue_date: "2026-09-24", eta_date: "2026-10-05", delivery_working_days: 7, delivery_method: "supplier_delivers" }));
+    expect(text).toContain("PO Doc Date");
+    expect(text).toContain("24 Sep");
+    expect(text).toContain("PO 7-Day");
+    expect(text).toContain("Supplier delivers");
+    expect(text).toContain("Assigned when issued");
+    expect(text).not.toContain("V0");
+  });
+
   it("a draft prints DRAFT, invents no number, version, date or issuer", () => {
     const text = renderedText(PoTemplate({ ...twoLocationV2(), draft: true, po_number: "DRAFT", version: 0, issue_date: "", eta_date: null }));
     expect(text).toContain("Assigned when issued");
