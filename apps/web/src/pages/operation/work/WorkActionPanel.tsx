@@ -18,6 +18,7 @@ export interface WorkActionPanelProps {
   item: OperationWorkItem;
   embedded?: ReactNode;
   onOpen: () => void;
+  onCompleted?: (receipt: string) => void;
   className?: string;
 }
 
@@ -26,9 +27,9 @@ function evidenceHeading(item: OperationWorkItem): string {
 }
 
 /** The selected item is required, so a component-level empty state is not applicable. */
-export default function WorkActionPanel({ item, embedded, onOpen, className = "" }: WorkActionPanelProps) {
+export default function WorkActionPanel({ item, embedded, onOpen, onCompleted, className = "" }: WorkActionPanelProps) {
   const owningForm = item.interaction.mode === "embedded" && item.interaction.componentKey === "delivery.proof_review"
-    ? <DeliveryProofReviewWork doNumber={item.object.id} />
+    ? <DeliveryProofReviewWork doNumber={item.object.id} onSaved={onCompleted} />
     : null;
   return (
     <div className={`min-h-full bg-base-50 p-4 ${className}`}>

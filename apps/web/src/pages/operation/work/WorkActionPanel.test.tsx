@@ -4,7 +4,7 @@ import type { OperationWorkItem } from "@carres/shared";
 import WorkActionPanel from "./WorkActionPanel";
 
 vi.mock("../components/DeliveryProofReviewWork", () => ({
-  default: ({ doNumber }: { doNumber: string }) => <div>Delivery proof form for {doNumber}</div>,
+  default: ({ doNumber, onSaved }: { doNumber: string; onSaved?: (receipt: string) => void }) => <div>Delivery proof form for {doNumber}<button type="button" onClick={() => onSaved?.(`Delivery proof accepted · ${doNumber}`)}>Complete proof review</button></div>,
 }));
 
 const base = {
@@ -33,6 +33,7 @@ describe("WorkActionPanel", () => {
   });
 
   it("resolves the admitted Delivery proof component without a Workspace copy of the form", () => {
+    const completed = vi.fn();
     render(<WorkActionPanel item={{
       ...base,
       object: { ...base.object, id: "DO-140926-0007" },
@@ -49,8 +50,10 @@ describe("WorkActionPanel", () => {
         successReceipt: "Delivery proof review result, actor, time and source version",
         fallbackDestination: base.destination,
       },
-    } as OperationWorkItem} onOpen={() => {}} />);
+    } as OperationWorkItem} onOpen={() => {}} onCompleted={completed} />);
     expect(screen.getByText("Delivery proof form for DO-140926-0007")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Complete proof review" }));
+    expect(completed).toHaveBeenCalledWith("Delivery proof accepted · DO-140926-0007");
   });
 
   it("opens the owning object and gives read-only work no fake completion control", () => {

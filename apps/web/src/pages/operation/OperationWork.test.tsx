@@ -39,6 +39,11 @@ vi.mock("@/lib/auth", () => ({
       user: { id: authState.email.startsWith("yujun") ? YJ : SH, email: authState.email },
     }),
 }));
+vi.mock("./components/DeliveryProofReviewWork", () => ({
+  default: ({ doNumber, onSaved }: { doNumber: string; onSaved?: (receipt: string) => void }) => (
+    <button type="button" onClick={() => onSaved?.(`Delivery proof accepted · ${doNumber}`)}>Complete proof review</button>
+  ),
+}));
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -310,6 +315,48 @@ describe("Operation Work — one server feed", () => {
     fireEvent.click(screen.getByTestId("work-row-DO-2041-deliver_today"));
     fireEvent.click(screen.getByRole("button", { name: "Open DO-2041" }));
     expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
+  });
+
+  it("waits for refreshed source closure, leaves the receipt in the old row and selects the next item", async () => {
+    const proof = item({
+      id: "delivery:DO-2041:check_delivery_proof",
+      module: "delivery",
+      ruleKey: "check_delivery_proof",
+      object: { kind: "delivery_order", id: "DO-2041", label: "DO-2041" },
+      problem: "Delivery proof needs review",
+      action: "Check delivery proof",
+      destination: "/operation/delivery-orders/DO-2041",
+      interaction: {
+        mode: "embedded",
+        actionKey: "delivery.proof_review",
+        componentKey: "delivery.proof_review",
+        capability: "POST /api/operation/delivery-orders/:doNumber/proof-review",
+        inputContract: "ProofReviewInput",
+        evidenceContract: "Latest governed Delivery proof package",
+        idempotencyKey: "ProofReviewInput.idempotencyKey",
+        staleVersion: "ProofReviewInput.sourceVersion",
+        staleRefusal: "stale_proof_evidence",
+        successReceipt: "Delivery proof review result, actor, time and source version",
+        fallbackDestination: "/operation/delivery-orders/DO-2041",
+      },
+    });
+    const next = item({
+      id: "orders:order-2:ask_delivery_date",
+      object: { kind: "sales_order", id: "order-2", label: "SO-1319" },
+    });
+    workState.data!.items = [proof, next];
+    const view = show();
+    fireEvent.click(screen.getByTestId("work-row-DO-2041-check_delivery_proof"));
+    fireEvent.click(screen.getByRole("button", { name: "Complete proof review" }));
+    expect(screen.queryByTestId("work-completion-receipt")).not.toBeInTheDocument();
+
+    workState.data = { ...workState.data!, items: [next] };
+    view.rerender(<MemoryRouter initialEntries={["/operation?tab=work"]}><OperationWork /></MemoryRouter>);
+
+    const receipt = await screen.findByTestId("work-completion-receipt");
+    expect(receipt).toHaveTextContent("Delivery proof accepted · DO-2041");
+    expect(receipt).toHaveFocus();
+    expect(screen.getByTestId("work-row-SO-1319-ask_delivery_date")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps Payment collection on its exact Invoice door", () => {

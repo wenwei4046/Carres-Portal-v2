@@ -42,17 +42,22 @@ export default function DeliveryProofReviewForm({
   sourceVersion: string;
   allEvidenceReadable: boolean;
   onRetryEvidence?: () => void;
-  onSaved?: () => void;
+  onSaved?: (receipt: "Delivery proof accepted" | "More proof requested" | "Delivery proof rejected") => void;
 }) {
   const [decision, setDecision] = useState<ProofDecisionKey | null>(null);
   const [reason, setReason] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const review = useReviewDeliveryProof(doNumber, {
     onSuccess: () => {
+      const receipt = decision === "accepted"
+        ? "Delivery proof accepted"
+        : decision === "more_required"
+          ? "More proof requested"
+          : "Delivery proof rejected";
       setDecision(null);
       setReason("");
       setIdempotencyKey(crypto.randomUUID());
-      onSaved?.();
+      onSaved?.(receipt);
     },
   });
 

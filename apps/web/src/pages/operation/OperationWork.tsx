@@ -23,7 +23,7 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
@@ -54,6 +54,16 @@ import WorkDayNav from "./work/WorkDayNav";
 
 type ViewKey = "mine" | "team";
 
+type WorkCompletionReceipt = {
+  item: WorkRow;
+  text: string;
+  groupKey: string;
+  groupLabel: string;
+  index: number;
+};
+
+type PendingCompletion = WorkCompletionReceipt & { nextId: string | null };
+
 const MODULE_LABEL: Record<OperationWorkModule, string> = {
   orders: "Sales Orders",
   purchasing: "Purchasing",
@@ -69,6 +79,35 @@ function ownerGroupKey(i: WorkRow): string {
     (i.ownerName ? `person:${i.ownerName}` : `duty:${i.ownerDuty ?? "No owner yet"}`);
 }
 
+function myGroupOf(item: WorkRow): { key: string; label: string } {
+  if (item.timingBucket === "overdue") return { key: "overdue", label: "Missed" };
+  if (item.dueIso === null) return { key: "no_date", label: "No working date" };
+  return { key: `date-${item.dueIso}`, label: fmtDate(item.dueIso) };
+}
+
+function CompletionReceipt({
+  receipt,
+  focusRef,
+  onDismiss,
+}: {
+  receipt: WorkCompletionReceipt;
+  focusRef: RefObject<HTMLDivElement>;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      ref={focusRef}
+      tabIndex={-1}
+      role="status"
+      data-testid="work-completion-receipt"
+      className="flex min-h-16 items-center justify-between gap-3 border-b border-kit-slate-5 bg-kit-green-3 px-4 py-3 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9"
+    >
+      <span className="flex min-w-0 items-center gap-2"><Icon name="confirm" size={16} /><span>{receipt.text}</span></span>
+      <Button type="button" variant="ghost" size="sm" icon="close" aria-label="Dismiss completed work" onClick={onDismiss} />
+    </div>
+  );
+}
+
 export default function OperationWork() {
   const navigate = useNavigate();
   const role = useAuth((state) => state.role);
@@ -79,6 +118,13 @@ export default function OperationWork() {
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
+  const [completionReceipt, setCompletionReceipt] = useState<WorkCompletionReceipt | null>(null);
+  const [pendingCompletion, setPendingCompletion] = useState<PendingCompletion | null>(null);
+  const completionReceiptRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (completionReceipt) completionReceiptRef.current?.focus();
+  }, [completionReceipt]);
 
   // The Work AREA decides the panels, not the window: with the portal sidebar
   // open a 1280px window leaves ~950px, which cannot hold 1100px of panels.
@@ -103,6 +149,20 @@ export default function OperationWork() {
 
   // One identity, shared with the Right Rail (HF-3): the signed-in account id.
   const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, retry } = useOpenWorkSet();
+
+  useEffect(() => {
+    if (!pendingCompletion || allItems.some((item) => item.id === pendingCompletion.item.id)) return;
+    const { nextId, ...receipt } = pendingCompletion;
+    setCompletionReceipt(receipt);
+    setPendingCompletion(null);
+    setParams((before) => {
+      const nextParams = new URLSearchParams(before);
+      if (nextId && allItems.some((item) => item.id === nextId)) nextParams.set("selected", nextId);
+      else nextParams.delete("selected");
+      return nextParams;
+    }, { replace: true });
+    if (layout !== "three") setActivePanel("list");
+  }, [allItems, layout, pendingCompletion, setParams]);
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -323,9 +383,41 @@ export default function OperationWork() {
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
   const openRow = (i: WorkRow) => {
+    setCompletionReceipt(null);
     updateParam("selected", i.id);
     if (layout !== "three") setActivePanel("detail");
   };
+
+  const recordCompletion = (text: string) => {
+    if (!selected) return;
+    const group = activeView === "mine"
+      ? myGroupOf(selected)
+      : {
+          key: ownerGroupKey(selected),
+          label: selected.ownerName ?? selected.ownerDuty ?? "No owner yet",
+        };
+    const groupRows = activeView === "mine"
+      ? visible.filter((item) => myGroupOf(item).key === group.key)
+      : visible.filter((item) => ownerGroupKey(item) === group.key);
+    const index = Math.max(0, groupRows.findIndex((item) => item.id === selected.id));
+    const selectedIndex = visible.findIndex((item) => item.id === selected.id);
+    const next = visible[selectedIndex + 1] ?? visible[selectedIndex - 1] ?? null;
+    setPendingCompletion({ item: selected, text, groupKey: group.key, groupLabel: group.label, index, nextId: next?.id ?? null });
+  };
+
+  const receiptRow = completionReceipt ? (
+    <CompletionReceipt receipt={completionReceipt} focusRef={completionReceiptRef} onDismiss={() => setCompletionReceipt(null)} />
+  ) : null;
+  const myReceiptGroupMissing = completionReceipt !== null && !displayMyGroups.some((group) => group.key === completionReceipt.groupKey);
+  const teamReceiptGroupMissing = completionReceipt !== null && !displayTeamGroups.some((group) => group.key === completionReceipt.groupKey);
+  const orphanReceiptSection = completionReceipt ? (
+    <section data-testid={`work-section-${completionReceipt.groupKey}`}>
+      <h2 className="flex min-h-9 items-center border-b border-kit-slate-5 px-4 text-label font-semibold uppercase tracking-wide text-kit-slate-11">
+        {completionReceipt.groupLabel}
+      </h2>
+      <div className="bg-white">{receiptRow}</div>
+    </section>
+  ) : null;
 
   const toolbar = (
     <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -510,33 +602,41 @@ export default function OperationWork() {
             <div className="mt-3"><Button type="button" variant="neutral" onClick={retry}>Try again</Button></div>
           </div>
         ) : activeView === "mine" ? (
-          displayMyGroups.length === 0 ? (
+          displayMyGroups.length === 0 && !completionReceipt ? (
             emptyBody
           ) : (
-            displayMyGroups.map((g) => (
+            <>
+            {myReceiptGroupMissing ? orphanReceiptSection : null}
+            {displayMyGroups.map((g) => (
               <section key={g.key} data-testid={`work-section-${g.key}`}>
                 <h2 className="flex min-h-9 items-center border-b border-kit-slate-5 px-4 text-label font-semibold uppercase tracking-wide text-kit-slate-11">
                   {g.label} <span className="ml-1 font-normal tabular-nums text-kit-slate-11">{g.items.length}</span>
                 </h2>
                 <div className="bg-white">
-                  {g.items.map((i) => (
-                    <WorkActionRow
-                      key={i.id}
-                      item={i.source}
-                      onSelect={() => openRow(i)}
-                      onOpen={() => navigate(i.destination)}
-                      selected={selected?.id === i.id}
-                      ownerContext={i.ownerState === "covered" ? `Covered for ${i.normalOwner?.name ?? "normal owner"}` : null}
-                    />
+                  {g.items.map((i, index) => (
+                    <div key={i.id}>
+                      {completionReceipt?.groupKey === g.key && completionReceipt.index === index ? receiptRow : null}
+                      <WorkActionRow
+                        item={i.source}
+                        onSelect={() => openRow(i)}
+                        onOpen={() => navigate(i.destination)}
+                        selected={selected?.id === i.id}
+                        ownerContext={i.ownerState === "covered" ? `Covered for ${i.normalOwner?.name ?? "normal owner"}` : null}
+                      />
+                    </div>
                   ))}
+                  {completionReceipt?.groupKey === g.key && completionReceipt.index >= g.items.length ? receiptRow : null}
                 </div>
               </section>
-            ))
+            ))}
+            </>
           )
-        ) : displayTeamGroups.length === 0 ? (
+        ) : displayTeamGroups.length === 0 && !completionReceipt ? (
           emptyBody
         ) : (
-          displayTeamGroups.map((g) => (
+          <>
+          {teamReceiptGroupMissing ? orphanReceiptSection : null}
+          {displayTeamGroups.map((g) => (
             <section key={g.key} data-testid={`work-owner-group-${g.key}`}>
               <h2 className="flex min-h-11 items-center gap-2 border-b border-kit-slate-5 px-4">
                 {g.person ? (
@@ -565,19 +665,23 @@ export default function OperationWork() {
                 </p>
               )}
               <div className="bg-white">
-                {g.items.map((i) => (
-                  <WorkActionRow
-                    key={i.id}
-                    item={i.source}
-                    onSelect={() => openRow(i)}
-                    onOpen={() => navigate(i.destination)}
-                    selected={selected?.id === i.id}
-                    ownerContext={i.ownerState === "covered" ? `Covered by ${i.activeCover?.name ?? "cover"}` : null}
-                  />
+                {g.items.map((i, index) => (
+                  <div key={i.id}>
+                    {completionReceipt?.groupKey === g.key && completionReceipt.index === index ? receiptRow : null}
+                    <WorkActionRow
+                      item={i.source}
+                      onSelect={() => openRow(i)}
+                      onOpen={() => navigate(i.destination)}
+                      selected={selected?.id === i.id}
+                      ownerContext={i.ownerState === "covered" ? `Covered by ${i.activeCover?.name ?? "cover"}` : null}
+                    />
+                  </div>
                 ))}
+                {completionReceipt?.groupKey === g.key && completionReceipt.index >= g.items.length ? receiptRow : null}
               </div>
             </section>
-          ))
+          ))}
+          </>
         )}
         </div>
         </div>)}
@@ -588,7 +692,7 @@ export default function OperationWork() {
                 <Button type="button" variant="ghost" onClick={() => setActivePanel("list")}>Back to work</Button>
               </div>
             ) : null}
-            <WorkActionPanel item={selected.source} onOpen={() => navigate(selected.destination)} />
+            <WorkActionPanel item={selected.source} onOpen={() => navigate(selected.destination)} onCompleted={recordCompletion} />
           </div>
         ) : (
           <div aria-hidden="true" className="min-h-full bg-white" />

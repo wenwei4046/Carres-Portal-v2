@@ -25,6 +25,10 @@ copy, component, or business-rule system.
   source, with an in-page governed picture viewer, arrow-key navigation, trigger-focus return and
   a real image retry. Acceptance stays unavailable until every photo in the latest proof is readable;
   request-more and reject remain available so an unreadable submission can still be resolved.
+- 2026-09-24 — An embedded Work completion never removes its card optimistically. The owning
+  mutation first succeeds and refreshes the Work feed; only when the same occurrence is absent does
+  its exact Delivery receipt replace the old row, receive focus and move selection to the next open
+  occurrence. If the occurrence remains open, no completion receipt is shown.
 
 - 2026-09-24 — Work compact cards rank exact problem/fact first, action second, recipient third and
   keep the document number in a footer object door. Promise failures stay inside their lawful date

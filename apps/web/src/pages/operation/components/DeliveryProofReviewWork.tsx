@@ -9,7 +9,13 @@ import Modal from "@/components/kit/Modal";
 import Button from "@/components/kit/Button";
 import DeliveryProofReviewForm from "./DeliveryProofReviewForm";
 
-export default function DeliveryProofReviewWork({ doNumber }: { doNumber: string }) {
+export default function DeliveryProofReviewWork({
+  doNumber,
+  onSaved,
+}: {
+  doNumber: string;
+  onSaved?: (receipt: string) => void;
+}) {
   const detail = useDeliveryOrder(doNumber);
   const [readable, setReadable] = useState<Record<string, boolean>>({});
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -101,6 +107,7 @@ export default function DeliveryProofReviewWork({ doNumber }: { doNumber: string
         sourceVersion={model.sourceVersion}
         allEvidenceReadable={allEvidenceReadable}
         onRetryEvidence={retryEvidence}
+        onSaved={(receipt) => onSaved?.(`${receipt} · ${doNumber}`)}
       />
       <Modal
         open={viewedPhoto !== null}
