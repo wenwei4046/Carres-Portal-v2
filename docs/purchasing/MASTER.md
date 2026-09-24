@@ -2787,7 +2787,7 @@ the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabr
 PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
 the sample correction does not forbid a real destination exception.
 
-**Item/Unit document linkage — local implementation, 2026-09-24; delivery proof owed.**
+**Item/Unit document linkage — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1584).**
 The detail reader now resolves each recorded stock-item identity through its existing
 `ops_stock_items.po_line_id`, matching the register's source relationship. Only a line
 actually in this receipt may bind a Unit; matching SKU text never establishes lineage.
@@ -2801,6 +2801,16 @@ uses `Supplier Deliver To`, `Goods Received Date` and the date-only `Time not re
 The register, filters and exports now name `GRN Doc Date`; the record and amendment
 form use the same corrected supplier/date labels. Normal posted GRNs carry no `Valid`
 badge, while cancelled records retain their explicit status.
+
+CI `35982087566` passed; merged SHA `acdcde97f0d63124ca9b3f2515486265f7c01e96`
+was deployed by `35983102329` and all five canonical surfaces reported that exact SHA.
+Authenticated readback of GRN-20260904-1064 showed U1-000-064 below its SMOKE King
+Mattress on the rendered official PDF, with the amended marking/history preserved.
+The record showed accepted 0, damaged 1 and pending 1; the corrected labels and
+`Time not recorded` were visible, with no ordinary Valid badge. No receipt or
+amendment was saved. The preceding own deployment was `27b143d5.carres-portal.pages.dev`
+(42c8bc9a); the new own deployment was `20cb17a6.carres-portal.pages.dev` (acdcde97).
+Their downloaded assets were compared alongside the authenticated rendered readback.
 
 **GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
 The existing renderer now prints the PO-family logo, legal identity and three address
