@@ -1,15 +1,16 @@
 // design-standard: not-a-list-page — full-width Claim object content.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   carresExecutionLabel, customerResolutionLabel, heldUnitsLine,
   supplierClaimRequestLabel, supplierClaimResponseLabel, supplierClaimTypeLabel,
 } from "@carres/shared";
-import { useOperationSupplierClaimPhotos, type SupplierClaimListRow } from "@/lib/queries";
+import { fetchOperationSupplierClaimPhotos, useOperationSupplierClaimPhotos, type SupplierClaimListRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { SectionCard } from "@/components/SectionPanel";
 import SectionHeader from "@/components/kit/SectionHeader";
 import Button from "@/components/kit/Button";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import { RecordRanks } from "../SalesOrderLedger";
 
 const absent = "Not recorded";
@@ -44,6 +45,7 @@ export function SupplierClaimInspector({ claim, onOpen }: { claim: SupplierClaim
  */
 export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimListRow }) {
   const photos = useOperationSupplierClaimPhotos(claim.photo_count ? claim.id : null);
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const history = [
     { title: "Reported", date: claim.reported_at, actor: claim.reported_by_name, detail: claim.note },
     { title: "What we asked", date: claim.requested_at, actor: null, detail: claim.requested_action ? supplierClaimRequestLabel(claim.requested_action) : null },
@@ -73,9 +75,19 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
       {!claim.photo_count ? <p>No photos recorded.</p> : photos.isError ? <div role="alert"><p>Evidence could not be loaded.</p><Button variant="neutral" onClick={() => void photos.refetch()}>Try again</Button></div>
         : photos.isLoading ? <p>Loading evidence…</p>
         : <div className="flex flex-wrap gap-3">{photos.data?.photos.map((photo, index) => <div key={photo.path} className="space-y-1">
-          {photo.url ? <a href={photo.url} target="_blank" rel="noreferrer" className="text-kit-blue-11 underline">Photo {index + 1}</a> : <span>Photo {index + 1}: unavailable</span>}
+          <button type="button" onClick={() => setEvidenceId(photo.path)} className="text-kit-blue-11 underline">Photo {index + 1}</button>
           {photo.at && <p className="text-label text-base-600">{fmtDate(photo.at)}</p>}
         </div>)}{!photos.data?.photos.length && <p>Evidence is not available.</p>}</div>}
+      <SavedEvidenceViewer activeId={evidenceId} onClose={() => setEvidenceId(null)}
+        files={(photos.data?.photos ?? []).map((photo) => ({
+          id: photo.path, kind: "photo" as const, url: photo.url,
+          context: `${claim.claim_no} · Evidence${photo.at ? ` · ${fmtDate(photo.at)}` : ""}`,
+          // Held Units are claim scope, not evidence of a photo-to-Unit association.
+        }))}
+        onRetry={async (id) => {
+          const refreshed = await fetchOperationSupplierClaimPhotos(claim.id);
+          return refreshed.photos.find((photo) => photo.path === id)?.url ?? null;
+        }} />
     </ClaimSection>
     <ClaimSection title="Supplier Response">
       <p>What we asked: {claim.requested_action ? supplierClaimRequestLabel(claim.requested_action) : absent}</p>

@@ -360,8 +360,9 @@ and evidence viewer promised for Supplier Claims.
 
 **Purpose.** The approved shared read-only saved-photo/video viewer (Purchasing MASTER
 §9.5). Local implementation 2026-09-24; production readback owed. Receiving's existing
-arrival-evidence controls are the first consumer; Claims/Stock/Service integrations
-remain separate work and must reuse this component.
+arrival-evidence controls are the first consumer. Claim-record photos also adopt it
+locally (2026-09-24; production proof owed); Stock/Service and per-Unit Claim expansion
+integrations remain separate work and must reuse this component.
 
 **Contract.** The owning authorised reader supplies stable file IDs, kind, signed URL
 (or null for an unreadable existing file), recorded source/event context and any proven

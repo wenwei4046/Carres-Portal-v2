@@ -3780,8 +3780,19 @@ fits the shared 54px row; long problem text and accessibility needs may grow it.
 
 | Check | Measured answer |
 |---|---|
-| Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claims, Stock and Service adoption remain unbuilt; their existing uploaders are not substitute viewers |
+| Does a shared saved-evidence viewer exist? | **Local build:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claim-record photo adoption is locally built (2026-09-24), with production proof owed; Stock/Service and the approved per-Unit Claim expansion remain unbuilt |
 | Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Production readback is still owed |
+
+**Claim-record photo adoption — local implementation, 2026-09-24; production proof owed.**
+The existing full-width record opens its saved photos in `SavedEvidenceViewer`, including
+known files whose signed URL is missing. Retry reuses the existing authenticated Claim
+photo reader and selects the same recorded path; an error keeps the record and viewer
+open. Claim number and recorded photo date remain visible. Held Units are not assigned
+to every photo: this legacy photo list carries no evidenced photo-to-Unit relationship.
+21 component/Claim tests cover unreadable-file recovery, same-path selection, reader
+failure, focus return and the absence of invented Unit attribution. This adopts the
+read-only kit only; it does not deliver supplier reply recording or the approved
+per-Unit expansion. Stock and Service consumers still require their own adoption.
 
 The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
 
@@ -3848,7 +3859,7 @@ neither is an approved design.
 
 | Target | State | The build's obligation |
 |---|---|---|
-| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **LOCAL KIT BUILD; production proof and Claims adoption owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
+| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **LOCAL KIT + CLAIM-RECORD PHOTO BUILD; production proof owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
 **The reply-recording build reuses what exists; it does not grow a second system.**
