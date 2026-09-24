@@ -3185,6 +3185,7 @@ export * from "./schemas/loan-offer";
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
 export * from "./work-lifecycle";
+export * from "./po-windows";
 export * from "./sales-order-work-source";
 export * from "./storage-obligation";
 export * from "./payment-collection-outcome";
@@ -3194,7 +3195,7 @@ export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 
-export { recordSupplierReplyInput } from "./schemas/operation";
+export { recordArrivalConfirmationInput, recordSupplierReplyInput } from "./schemas/operation";
 
 export {
   purchaseOrderReplyWorkItems,

@@ -271,13 +271,15 @@ describe("the listing's short spellings", () => {
     expect(PO_WORK_STATE_LABEL.waiting).toBe("Waiting for Goods");
   });
 
-  it("the delay-reason dropdown is Jess's six, and Remarks is NOT one of them", () => {
+  it("the delay-reason dropdown is the eight governed reasons (owner ruling 2026-09-24), and Remarks is NOT one of them", () => {
     expect([...PO_DELAY_REASONS]).toEqual([
-      "Production Delay",
-      "Material Shortage",
-      "Transport Delay",
-      "Waiting Customer Confirmation",
-      "Factory Closed",
+      "Production delay",
+      "Material unavailable",
+      "Capacity / scheduling delay",
+      "Quality issue / remake",
+      "Transport delay",
+      "Supplier closed / holiday",
+      "Partial quantity ready",
       "Other",
     ]);
   });

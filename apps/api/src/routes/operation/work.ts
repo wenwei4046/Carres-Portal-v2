@@ -48,6 +48,7 @@ import {
   workLifecycleOf,
   workOccurrenceEventSchema,
   workOccurrenceGenerationId,
+  effectivePoArrivalOf,
   parseWorkOccurrenceId,
   type OperationWorkCompleted,
   workReplyDueOn,
@@ -367,6 +368,15 @@ interface ManualPurchaseRegisterSource {
  *  internal `/pos` read — no new query, no second arithmetic. */
 interface PurchaseOrderArrivalSource extends PurchaseOrderWorkSource {
   tomorrow_answer_about_date?: string | null;
+  official_delivery_date?: string | null;
+  destination_id?: string | null;
+  /** 0582 · the day-before check's evidence. */
+  arrival_confirmations?: Array<{
+    po_version: number;
+    for_date: string;
+    destination_id: string;
+    kind: "supplier_do" | "supplier_confirmation";
+  }>;
 }
 
 interface PurchaseOrderWorkSource {
@@ -465,13 +475,30 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
   const holidays = myHolidaySet();
   return input.pos.flatMap((po) => {
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
+    /* Owner ruling 2026-09-24 (Purchasing MASTER §5.7): the check opens one
+       Office working day before the EFFECTIVE arrival — the latest evidenced
+       answer on the current version, else the original PO Delivery Date —
+       never our own planning estimate. It closes only on the Supplier DO or an
+       evidenced confirmation for THAT date and the PO's own Warehouse. The
+       open/late arithmetic stays `tomorrowDeliveryCallOf`'s (Law D). */
+    const version = po.version ?? 1;
+    const effective = effectivePoArrivalOf({
+      version,
+      officialDeliveryDate: po.official_delivery_date ?? null,
+      etaDate: po.eta_date ?? null,
+      promises: (po.promises ?? []) as never,
+    });
+    const confirmedFor = effective && (po.arrival_confirmations ?? []).some((c) =>
+      c.po_version === version && c.for_date === effective && !!po.destination_id && c.destination_id === po.destination_id)
+      ? effective
+      : null;
     const items = purchaseOrderArrivalCheckWorkItems({
       id: po.id,
       supplierId: po.supplier_id,
       supplierName,
       status: po.status,
-      etaDateIso: po.eta_date ?? null,
-      tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
+      etaDateIso: effective,
+      tomorrowAnswerAboutDateIso: confirmedFor,
       lines: po.purchase_order_lines.map((line) => ({
         qty: line.qty,
         receivedQty: line.received_qty,
@@ -481,9 +508,12 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
       object: { kind: "purchase_order", id: po.id, label: po.id },
       problem: "The goods are expected and the supplier has not confirmed the day",
       recipient: supplierName,
-      requiredResult: "Supplier answer recorded about this arrival date",
+      requiredResult: "Supplier DO or evidenced confirmation for this date and Warehouse recorded",
       destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
       today: input.today,
+      // One occurrence per effective date: a delay retires this date's check
+      // and derives a new one for the new date.
+      occurrenceKey: effective,
     }));
   });
 }
@@ -1858,7 +1888,11 @@ export async function probePurchaseOrderWork(
   );
   const po = pos.find((row) => row.id === poId);
   if (!po) return null;
-  const items = projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today: todayIsoMYT() });
+  const today = todayIsoMYT();
+  const items = [
+    ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today }),
+    ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today }),
+  ];
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }

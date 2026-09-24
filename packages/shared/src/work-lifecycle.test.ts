@@ -98,8 +98,12 @@ describe("workOccurrenceGenerationId + parseWorkOccurrenceId", () => {
     const base = operationWorkStableId("orders", "ord:1", "delay_planning");
     expect(workOccurrenceGenerationId(base, 1)).toBe(base);
     expect(workOccurrenceGenerationId(base, 3)).toBe(`${base}:g3`);
-    expect(parseWorkOccurrenceId(base)).toEqual({ module: "orders", objectId: "ord:1", ruleKey: "delay_planning", generation: 1 });
-    expect(parseWorkOccurrenceId(`${base}:g3`)).toEqual({ module: "orders", objectId: "ord:1", ruleKey: "delay_planning", generation: 3 });
+    expect(parseWorkOccurrenceId(base)).toEqual({ module: "orders", objectId: "ord:1", ruleKey: "delay_planning", occurrenceKey: null, generation: 1 });
+    expect(parseWorkOccurrenceId(`${base}:g3`)).toEqual({ module: "orders", objectId: "ord:1", ruleKey: "delay_planning", occurrenceKey: null, generation: 3 });
+    const dated = operationWorkStableId("purchasing", "PO-1", "purchasing.confirm_tomorrows_delivery", "2026-10-20");
+    expect(dated).toBe("purchasing:PO-1:purchasing.confirm_tomorrows_delivery:@2026-10-20");
+    expect(parseWorkOccurrenceId(`${dated}:g2`)).toEqual({ module: "purchasing", objectId: "PO-1", ruleKey: "purchasing.confirm_tomorrows_delivery", occurrenceKey: "2026-10-20", generation: 2 });
+    expect(parseWorkOccurrenceId(`${base}:g2:@x`)).toBeNull();
     expect(parseWorkOccurrenceId(`${base}:g1`)).toBeNull();
     expect(parseWorkOccurrenceId("claims:x:y")).toBeNull();
   });

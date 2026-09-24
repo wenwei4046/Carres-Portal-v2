@@ -277,8 +277,8 @@ end;
 $fn$;
 
 -- The ONE reply door (Law C): the same classification as 0432, now with the
--- screenshot set. A delay without a screenshot, reason or date is refused
--- whole; other answers may carry screenshots beside their evidence file.
+-- screenshot set — the evidence file plus any further screenshots. A delay
+-- without a screenshot, a governed reason or a date is refused whole.
 create or replace function public.purchasing_record_supplier_reply(p_po_id text,p_reply jsonb)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $fn$
 declare v_po public.purchase_orders; v_role public.app_role; v_date date; v_id uuid;
@@ -304,9 +304,17 @@ begin
     when v_date < v_po.official_delivery_date then 'earlier'
     else 'delayed' end;
   v_reason := nullif(btrim(coalesce(p_reply->>'reason','')),'');
-  select coalesce(array_agg(btrim(x)), '{}') into v_shots
-    from jsonb_array_elements_text(coalesce(p_reply->'screenshots','[]'::jsonb)) x
-   where nullif(btrim(x),'') is not null;
+  -- The screenshot set: the reply's evidence file (the WhatsApp screenshot the
+  -- existing form uploads) first, then any further screenshots.
+  v_evidence := nullif(btrim(coalesce(p_reply->>'evidence','')),'');
+  select coalesce(array_agg(x order by ord), '{}') into v_shots
+    from (select distinct on (x) x, ord
+            from (select v_evidence as x, 0 as ord
+                  union all
+                  select btrim(e.value), e.ordinality
+                    from jsonb_array_elements_text(coalesce(p_reply->'screenshots','[]'::jsonb)) with ordinality e(value, ordinality)) all_shots
+           where nullif(x,'') is not null
+           order by x, ord) distinct_shots;
   if v_answer = 'delayed' then
     if not (coalesce(v_reason,'') = any (public.purchasing_supplier_delay_reasons())) then
       raise exception 'Choose why the supplier moved the date.' using errcode='22023',detail='reason_required';
@@ -326,9 +334,8 @@ begin
       raise exception 'A screenshot was not uploaded for this PO.' using errcode='22023',detail='screenshot_not_found';
     end if;
   end loop;
-  -- The single evidence file 0428 requires is the first screenshot when the
-  -- caller sent screenshots and no separate evidence file.
-  v_evidence := coalesce(nullif(btrim(coalesce(p_reply->>'evidence','')),''), v_shots[1]);
+  -- The single evidence file 0428 requires is the first screenshot.
+  v_evidence := coalesce(v_evidence, v_shots[1]);
   select coalesce(new_date, about_date) into v_previous
     from public.po_supplier_promises where po_id=p_po_id and kind='tomorrow_delivery'
       and po_version=coalesce(v_po.version,1) order by recorded_at desc,id desc limit 1;

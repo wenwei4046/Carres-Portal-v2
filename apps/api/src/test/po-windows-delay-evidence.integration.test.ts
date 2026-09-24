@@ -135,9 +135,11 @@ describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before ch
     expect(await reply({ supplierDate: "2026-10-20", reason: "Production Delay", screenshots: [`${PO}/delay-1.png`] })).toBe("reason_required");
     expect(await reply({ supplierDate: "2026-10-20", reason: "Other", screenshots: [`${PO}/delay-1.png`] })).toBe("other_note_required");
     expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", screenshots: [] })).toBe("screenshot_required");
+    // The existing form's single evidence file is a screenshot too — but it must be uploaded for THIS PO.
+    expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", evidence: `${PO}/missing.png` })).toBe("screenshot_not_found");
     expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", screenshots: [`${PO}/missing.png`] })).toBe("screenshot_not_found");
     expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", poVersion: 2, screenshots: [`${PO}/delay-1.png`] })).toBe("stale_po_version");
-    expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", screenshots: [`${PO}/delay-1.png`, `${PO}/delay-2.png`] })).toBe("ok");
+    expect(await reply({ supplierDate: "2026-10-20", reason: "Transport delay", evidence: `${PO}/delay-1.png`, screenshots: [`${PO}/delay-2.png`, `${PO}/delay-1.png`] })).toBe("ok");
     await q("reset role");
     const answer = (await q("select id, answer, reason, to_char(new_date,'YYYY-MM-DD') d, evidence from po_supplier_promises where po_id = $1", [PO])).rows;
     expect(answer).toEqual([expect.objectContaining({ answer: "delayed", reason: "Transport delay", d: "2026-10-20", evidence: `${PO}/delay-1.png` })]);

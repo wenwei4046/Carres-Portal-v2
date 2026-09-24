@@ -9,9 +9,11 @@ import type { OperationWorkItem } from "@carres/shared";
 import type { AppEnv } from "../types";
 import { withWorkCompletion, type CompletedWrite, type WorkCompletionDeps, type WorkCompletionSpec } from "./work-completion";
 import {
+  arrivalConfirmationResult,
   issuePoResult,
   orderIdsOfSoBatchSelections,
   supplierReplyResult,
+  type ArrivalConfirmationFacts,
   type IssuePoFacts,
   type SupplierReplyFacts,
 } from "./purchasing-work-completion";
@@ -37,11 +39,20 @@ describe("Purchasing completion facts", () => {
     expect(issuePoResult("delay_planning", { purchaseOrderIds: ["PO2609-1"] })).toBeNull();
   });
 
-  it("a supplier reply holds only for an evidenced answer to the current version", () => {
-    expect(supplierReplyResult("purchasing.supplier_reply", { answerId: "ans-1", poVersion: 2 })).toBe("po_supplier_promises=ans-1@v2");
-    expect(supplierReplyResult("purchasing.supplier_date_passed", { answerId: "ans-1", poVersion: 2 })).toBe("po_supplier_promises=ans-1@v2");
-    expect(supplierReplyResult("purchasing.supplier_reply", { answerId: null, poVersion: 2 })).toBeNull();
-    expect(supplierReplyResult("issue_po", { answerId: "ans-1", poVersion: 2 })).toBeNull();
+  it("a passed supplier date closes only on a governed answer to the current version — with its screenshot", () => {
+    expect(supplierReplyResult("purchasing.supplier_date_passed", { answerId: "ans-1", poVersion: 2, screenshotCount: 1 })).toBe("po_supplier_promises=ans-1@v2");
+    expect(supplierReplyResult("purchasing.supplier_date_passed", { answerId: "ans-1", poVersion: 2, screenshotCount: 0 })).toBeNull();
+    expect(supplierReplyResult("purchasing.supplier_date_passed", { answerId: null, poVersion: 2, screenshotCount: 0 })).toBeNull();
+    // Waiting for an immediate answer after sending is RETIRED — it completes nothing.
+    expect(supplierReplyResult("purchasing.supplier_reply", { answerId: "ans-1", poVersion: 2, screenshotCount: 1 })).toBeNull();
+    expect(supplierReplyResult("issue_po", { answerId: "ans-1", poVersion: 2, screenshotCount: 1 })).toBeNull();
+  });
+
+  it("the day-before check closes on the Supplier DO or an evidenced confirmation, and names which", () => {
+    const facts: ArrivalConfirmationFacts = { confirmation: { id: "cf-1", kind: "supplier_do", forDate: "2026-10-20" }, poVersion: 2 };
+    expect(arrivalConfirmationResult("purchasing.confirm_tomorrows_delivery", facts)).toBe("po_arrival_confirmations=cf-1:supplier_do@2026-10-20·v2");
+    expect(arrivalConfirmationResult("purchasing.confirm_tomorrows_delivery", { confirmation: null, poVersion: 2 })).toBeNull();
+    expect(arrivalConfirmationResult("purchasing.supplier_date_passed", facts)).toBeNull();
   });
 
   it("SO Batch names the orders it buys for; anything else names none", () => {
@@ -114,20 +125,20 @@ describe("the supplier's answer completes the PO's reply Work, on its current ge
     let call = 0;
     const spec: WorkCompletionSpec<SupplierReplyFacts> = {
       owner: "Purchasing",
-      rules: ["purchasing.supplier_reply", "purchasing.supplier_date_passed"],
+      rules: ["purchasing.supplier_date_passed"],
       probe: async (_c, id) => {
         call += 1;
         return call === 1
-          ? [{ ...item(id, "purchasing.supplier_reply", id, "2026-09-23"), id: `purchasing:${id}:purchasing.supplier_reply:g2` }]
+          ? [{ ...item(id, "purchasing.supplier_date_passed", id, "2026-09-23"), id: `purchasing:${id}:purchasing.supplier_date_passed:g2` }]
           : [];
       },
-      readFacts: async () => ({ answerId: "ans-9", poVersion: 3 }),
+      readFacts: async () => ({ answerId: "ans-9", poVersion: 3, screenshotCount: 2 }),
       result: supplierReplyResult,
     };
     const { recorded } = await run(spec, ["PO2609-4827"]);
     expect(recorded).toEqual([expect.objectContaining({
-      occurrenceId: "purchasing:PO2609-4827:purchasing.supplier_reply:g2",
-      idempotencyKey: "completed:purchasing:PO2609-4827:purchasing.supplier_reply:g2",
+      occurrenceId: "purchasing:PO2609-4827:purchasing.supplier_date_passed:g2",
+      idempotencyKey: "completed:purchasing:PO2609-4827:purchasing.supplier_date_passed:g2",
       objectLabel: "PO2609-4827",
       resultReference: "po_supplier_promises=ans-9@v3",
     })]);

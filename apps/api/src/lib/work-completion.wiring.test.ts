@@ -22,7 +22,9 @@ vi.mock("./purchasing-work-completion", async (importOriginal) => {
     ...actual,
     soBatchIssueWorkCompletion: () => async (c: { json: (b: unknown) => Response }) => c.json({ wired: ["issue_po"] }),
     supplierReplyWorkCompletion: () => async (c: { json: (b: unknown) => Response }) =>
-      c.json({ wired: ["purchasing.supplier_reply", "purchasing.supplier_date_passed"] }),
+      c.json({ wired: ["purchasing.supplier_date_passed"] }),
+    arrivalConfirmationWorkCompletion: () => async (c: { json: (b: unknown) => Response }) =>
+      c.json({ wired: ["purchasing.confirm_tomorrows_delivery"] }),
   };
 });
 
@@ -54,9 +56,13 @@ describe("the Purchasing doors that complete Work", () => {
   it("the SO Batch issue completes issue_po", async () => {
     expect(await post(mount("operation"), "/api/operation/to-order/issue-batch")).toEqual({ wired: ["issue_po"] });
   });
-  it("the recorded supplier answer completes the PO's reply Work", async () => {
+  it("the recorded supplier answer completes only the passed-date follow-up", async () => {
     expect(await post(mount("operation"), "/api/operation/pos/PO2609-4827/tomorrow-delivery"))
-      .toEqual({ wired: ["purchasing.supplier_reply", "purchasing.supplier_date_passed"] });
+      .toEqual({ wired: ["purchasing.supplier_date_passed"] });
+  });
+  it("the Supplier DO / evidenced confirmation completes the day-before check", async () => {
+    expect(await post(mount("operation"), "/api/operation/pos/PO2609-4827/arrival-confirmation"))
+      .toEqual({ wired: ["purchasing.confirm_tomorrows_delivery"] });
   });
 });
 

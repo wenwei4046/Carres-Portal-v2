@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
+import { arrivalConfirmationWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
@@ -14,6 +14,7 @@ import {
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierReplyInput,
+  recordArrivalConfirmationInput,
   confirmPoSentInput,
   recordSendInput,
   revisePoInput,
@@ -337,6 +338,28 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // history lives beside the field, never down in Activity). Same bounded
   // read — no extra round-trip.
   const promisesByPo = new Map<string, Record<string, unknown>[]>();
+  // 0582 · the day-before check's evidence (Supplier DO or evidenced
+  // confirmation for an exact date and the PO's own Warehouse). Strict: a
+  // failed read fails the register rather than reopening confirmed checks.
+  const arrivalConfirmationsByPo = new Map<string, Record<string, unknown>[]>();
+  if (poIds.length > 0) {
+    const confirmations = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("po_arrival_confirmations")
+        .select("id, po_id, po_version, for_date, destination_id, kind, supplier_do_no, recorded_at")
+        .in("po_id", ids)
+        .order("recorded_at", { ascending: false }),
+    );
+    if (confirmations.error) {
+      const m = mapPgError(confirmations.error);
+      return c.json(m.body, m.status);
+    }
+    for (const row of confirmations.data) {
+      const pid = row.po_id as string;
+      arrivalConfirmationsByPo.set(pid, [...(arrivalConfirmationsByPo.get(pid) ?? []), row]);
+    }
+  }
   if (poIds.length > 0) {
     const promiseResult = await readEveryChunked<Record<string, unknown>, string>(
       poIds,
@@ -784,6 +807,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       orders: ordersOf(row),
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       promises: promisesByPo.get(row.id as string) ?? [],
+      arrival_confirmations: arrivalConfirmationsByPo.get(row.id as string) ?? [],
       sends: sendsByPo.get(row.id as string) ?? [],
       grns: grnsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => {
@@ -2115,6 +2139,15 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   reason_required: "reason_required",
   nothing_changed: "nothing_changed",
   sent_po_needs_revision: "sent_po_needs_revision",
+  // 0582 · the delay and day-before evidence refusals.
+  other_note_required: "other_note_required",
+  screenshot_required: "screenshot_required",
+  screenshot_not_found: "screenshot_not_found",
+  arrival_date_mismatch: "arrival_date_mismatch",
+  wrong_warehouse: "wrong_warehouse",
+  evidence_required: "evidence_required",
+  evidence_not_found: "evidence_not_found",
+  reported_at_invalid: "reported_at_invalid",
 };
 
 function mapSupplierCallError(
@@ -2161,6 +2194,24 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, supplierRepl
   const { data, error } = await sb.rpc("purchasing_record_supplier_reply", {
     p_po_id: c.req.param("id"),
     p_reply: parsed.data,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/arrival-confirmation (0582) -----
+// The day-before check's evidence: the Supplier DO, or the supplier's evidenced
+// confirmation, for the exact effective arrival and the PO's own Warehouse. It
+// is NOT a receipt — only Receiving and its GRN prove the goods arrived.
+operationPosRouter.post("/:id/arrival-confirmation", requireOperation, arrivalConfirmationWorkCompletion({
+  when: async (c) => recordArrivalConfirmationInput.safeParse(await c.req.json().catch(() => null)).success,
+}), async (c) => {
+  const parsed = await parseJsonBody(c, recordArrivalConfirmationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_arrival_confirmation", {
+    p_po_id: c.req.param("id"),
+    p: parsed.data,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
