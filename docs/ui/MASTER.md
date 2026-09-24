@@ -2026,12 +2026,13 @@ Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migrat
 in `02-components.md`, with a live `/ui` example. Existing Modal behavior owns focus,
 Escape and scroll lock. Source/event and any actual Unit associations stay with each file;
 permissions and refresh stay with the owning reader. Receiving is the first consumer;
-Claim-record photo adoption is locally built with production proof owed. Claims' working
+Claim-record photos are deployed with authenticated readback (#1594). Claims' working
 reply record and per-Unit expansion, Stock and Service adoption remain separate work; this kit
 addition does not claim those workflows delivered.
 Purchasing §9.5 records all-five-surface SHA proof, authenticated GRN failure/retry/focus
 readback and production example photo/video controls; synthetic media is not business proof.
-The fullscreen-exit focus correction is locally verified; its production proof is still owed.
+The fullscreen-exit focus correction is production-verified (#1595): native fullscreen
+exit restores viewer focus; the following Escape closes it and returns to the opener.
 
 ## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
 

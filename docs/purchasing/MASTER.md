@@ -3780,7 +3780,7 @@ fits the shared 54px row; long problem text and accessibility needs may grow it.
 
 | Check | Measured answer |
 |---|---|
-| Does a shared saved-evidence viewer exist? | **Deployed kit:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claim-record photo adoption is locally built (2026-09-24), with production proof owed; Stock/Service and the approved per-Unit Claim expansion remain unbuilt |
+| Does a shared saved-evidence viewer exist? | **Deployed kit:** `components/kit/SavedEvidenceViewer.tsx`, registered in `02-components.md` and `/ui`. Receiving is the first consumer. Claim-record photo adoption is deployed with authenticated readback (2026-09-24, #1594); Stock/Service and the approved per-Unit Claim expansion remain unbuilt |
 | Validation boundary | Component/Receiving/kit-source tests passed; browser photos support zoom, bounded drag, reset and preserved source/Unit context. At 390px the dialog and retry actions fit; opening/closing at the same position returned focus to View and preserved scrollY 1244. A generated eight-second video was played/paused, sought to second 4 and entered/exited fullscreen in a fresh browser tab; no saved production video playback is claimed. Receiving production readback is recorded below; Claim adoption has its own boundary |
 
 CI `35992160117` and deployment `35993421790` passed for #1593; all five canonical
@@ -3799,16 +3799,24 @@ played/paused, sought to second 4 and entered/exited fullscreen. Close returned 
 to View. This is synthetic video playback proof, not saved business-video proof.
 No permissions, evidence, receipt, claim or stock facts were changed.
 
-**Fullscreen keyboard correction — local implementation 2026-09-24; production proof owed.**
+**Fullscreen keyboard correction — DEPLOYED + PRODUCTION READBACK, 2026-09-24 (#1595).**
 A further production check found native video controls retained focus after leaving
 fullscreen, so a subsequent Escape did not close the viewer. The shared viewer now
 returns focus to its media region on the next animation frame after fullscreen exit;
 this avoids the exiting Escape also dismissing the dialog. Local browser verification
 kept the viewer open after exit, then the next Escape closed it and returned focus to
 View. A regression test covers fullscreen exit, viewer focus, Escape and opener return.
-22 Claim/viewer tests passed. This correction is not yet production-verified.
+22 Claim/viewer tests passed. CI `35996235479` and deployment `35997526538` passed;
+all five canonical surfaces reported `637459451c94f8cb5d3fa4df552460f3001c161b`.
+The own Pages deployment `798c38b9.carres-portal.pages.dev`, compared with
+`647fe5fa.carres-portal.pages.dev`, added the two fullscreen-change listener references
+(one to three occurrences); the viewer and Supplier DO control strings stayed unchanged.
+On the production example, entering video fullscreen then using the native exit control
+kept the dialog open and focused its saved-evidence media region. The following Escape
+closed it and returned focus to View. This proves focus restoration after fullscreen exit;
+it does not assert that automated Escape can control the browser's native fullscreen layer.
 
-**Claim-record photo adoption — local implementation, 2026-09-24; production proof owed.**
+**Claim-record photo adoption — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1594).**
 The existing full-width record opens its saved photos in `SavedEvidenceViewer`, including
 known files whose signed URL is missing. Retry reuses the existing authenticated Claim
 photo reader and selects the same recorded path; an error keeps the record and viewer
@@ -3818,6 +3826,20 @@ to every photo: this legacy photo list carries no evidenced photo-to-Unit relati
 failure, focus return and the absence of invented Unit attribution. This adopts the
 read-only kit only; it does not deliver supplier reply recording or the approved
 per-Unit expansion. Stock and Service consumers still require their own adoption.
+
+CI `35994110721` and deployment `35995368126` passed; all five canonical surfaces
+reported `669a6001e2de810e0b0e1b1a066f2507a008878f`. The own Pages deployment
+`647fe5fa.carres-portal.pages.dev` was compared with `af9b0ddb.carres-portal.pages.dev`:
+the old `: unavailable` fragment changed from one to zero, Claim ` · Evidence` context
+from zero to one, and `Supplier DO No` stayed at eight. Authenticated `SC-1019`
+opened Photo 1 with `SC-1019 · Evidence · Fri, 4 Sep`, explicit failure and Try again.
+Retry returned the same truthful failure without closing the record. Escape closed the
+viewer and focused Photo 1; original PO-SMOKE-B, GRN-20260904-1064 and held Unit
+U1-000-064 remained on the Claim, with no invented Unit attribution in the photo dialog.
+The saved file was unavailable, so successful stored-file recovery is not claimed.
+The existing `ClaimPhotoUploadField` admits JPG/PNG only; this adoption is explicitly
+for that photo reader, not proof of a Claim video-upload or video-association journey.
+No reply, evidence, claim, receipt or stock record was written.
 
 The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
 
@@ -3884,7 +3906,7 @@ neither is an approved design.
 
 | Target | State | The build's obligation |
 |---|---|---|
-| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT; Claim-record adoption locally built, production proof owed** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
+| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT + CLAIM-RECORD PHOTOS; authenticated readback recorded** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
 **The reply-recording build reuses what exists; it does not grow a second system.**
