@@ -4,6 +4,8 @@
 
 One discussion Card, no build sequence or implementation authorization. Review attachment: [viewable layouts](../ui-reference/shared-panels-review.html). All examples are fictional. This Card is research and a complete design recommendation, not replacement law. No application files, business records, permissions or production deployment were changed.
 
+**Numbering authority (approved target, not implementation evidence):** Current `origin/main` Orders MASTER §0.1, “Complete document numbering table”, governs fictional examples: Outright `SO2609-4827(1)` (four digits), Subscription `SUB2609-48271(1)` (five digits), revision attached without a space. Preserve historical references such as `SO-1365`. Panels consume the saved source reference; never reconstruct `SO-{integer}` or infer a reference from the event date. The SO generator remains unbuilt in the source audit; this review changes no numbering implementation.
+
 ## 1. Owner review in one minute
 
 **Recommendation:** retain three small, read-only doors with different jobs: **Calendar = dated operations; My Work = my Missed/Today counts; Activity = recent changes across permitted Sales Orders.** Every record opens its real owner. Make scope and data health visible before counts. Keep individual order **History** inside the order.
