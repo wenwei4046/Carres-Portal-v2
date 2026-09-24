@@ -899,8 +899,41 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     expect(body.lines).toHaveLength(1);
     expect(body.addons).toHaveLength(1);
     /* The service carries its own code for the Item Code cell — without it
-       the paper printed the `ADD-ON` placeholder (owner review 2026-08-09). */
+       the paper printed the `ADD-ON` placeholder (owner review 2026-08-09).
+       No catalogue link here, so the saved key prints exactly as saved. */
     expect(body.addons[0].sku).toBe("stair_carry");
+  });
+
+  it("prints a LINKED service's catalogue Service SKU, and an unlinked one's saved key untouched", async () => {
+    const row = makeJoinedRow();
+    row.order_addons = [
+      { addon_key: "dispose-mattress", qty: 1, unit_price: "80" },
+      { addon_key: "DELIVERY", qty: 1, unit_price: "250" },
+    ];
+    const sb = buildSb({
+      one: row,
+      byTable: {
+        addons: [
+          { key: "dispose-mattress", name: "Dispose old mattress", service_sku: "SVC-DISPOSE-MATTRESS" },
+          { key: "DELIVERY", name: "Delivery fee", service_sku: null },
+        ],
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const codes = Object.fromEntries(body.addons.map((a: any) => [a.label, a.sku]));
+    expect(codes["Dispose old mattress"]).toBe("SVC-DISPOSE-MATTRESS");
+    expect(codes["Delivery fee"]).toBe("DELIVERY");
   });
 
   it("admits operation (revised 2026-05-12 — they need it on handover)", async () => {

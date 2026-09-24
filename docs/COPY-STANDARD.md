@@ -2669,8 +2669,13 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Stale proposal state/action | **Out of date — propose again** |
 | The customer's recorded basis for a commercial change (0564) | The screen words are governed by § "Customer agreement evidence — screen wording" below and are **PROPOSAL / NOT LAW**. There is no free-text evidence field and no tick box: a governed KIND always names a pointer outside the record. |
 | Add a catalogue service to the SO object draft (0564) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
-| The SO `Delivery` field naming the disposal services the order carries (same rows as Items, no money) | **Disposal** ⚠️ build wording 2026-09-23, owner confirmation owed |
-| In Edit, add a disposal service from `Delivery` (the same act as `Add service`) | **Add disposal** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| The SO `Delivery` field listing the order's services (same rows as Items, no money) | **Services** — the approved services-footer word above, reused |
+| In Edit, add a (disposal) service from `Delivery` (the same act as the Items door) | **Add service** — the page's existing action word, reused (its own confirmation is still owed, row above) |
+
+**PROPOSAL / NOT LAW (2026-09-24) — not screen copy.** `Disposal` as the Delivery field name and
+`Add disposal` as its action would name the lorry's take-away job more exactly than `Services` /
+`Add service`. Recorded here for owner review; until approved, the screen uses the two approved/existing
+words above. Falsifier: the owner approves or rejects them.
 | A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
 | Unknown promised date | **Delivery date to be confirmed** |
@@ -3941,7 +3946,7 @@ Money moves gain two kinds (0537). Nothing below is approved yet.
 | `Choose a bank transfer, a card payout, a bank charge or a bank credit.` | Refusal when no kind is chosen, replacing `Choose a bank transfer or a card payout.` |
 | `A bank charge is taken from a bank account in use.` · `A bank charge goes to {code} {name}.` · `A bank credit comes from {code} {name}.` · `A bank credit goes into a bank account in use.` | Database refusals for the wrong account on each side. Since 0570 the account is named from its role, so a renumbered chart prints its own number. |
 
-## PROPOSAL — PENDING APPROVAL (card-routing)
+## APPROVED by YH on 24 Sep 2026, with the four changes (card-routing)
 
 New words on Finance Settings, Money moves and Settings → Payment (migration 0541):
 
@@ -4068,10 +4073,19 @@ Payables, 18 Sep 2026. Words new to this standard:
   `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
   not yet signed. A draft voucher has no number and no PDF.
 
-### PROPOSAL — PENDING APPROVAL (card-settlement, migration 0572, PR 1538)
+### APPROVED by YH on 24 Sep 2026, with the four changes (card-settlement, migration 0572, PR 1538)
 
-**PROPOSAL / NOT LAW.** Page: Finance → `Card settlement` (`/finance/card-settlement`). None of
-these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; everything else is ASCII.
+**APPROVED by YH on 24 Sep 2026.** Page: Finance → `Card settlement` (`/finance/card-settlement`).
+`·` is U+00B7, `…` is U+2026, `—` is U+2014; everything else is ASCII. The approval came with four
+changes, already written into the list below (built in migration 0576 and the web):
+
+1. The expand row says `Machine {id}`, not `Terminal {id}`: the column is called Machine.
+2. The payout reference names the card company as the screen does and the day as D Mon YYYY:
+   `Card settlement Public Bank {machine} 1 Sep 2026`. A payout prepared with the old reference
+   is still that day's payout: a day's payout is found by its link, never by its reference.
+3. The two refund refusals end `Carres cannot import it yet. Give the file to IT.`
+4. The red expand line says `has no card settlement day`, and the Money moves `Paid from` hint
+   is shorter.
 
 - Nav and header: `Card settlement` · tab title `Card settlement — Carres`
 - Columns: `Card company` · `Paid out` · `Sale date` (GHL only) · `Machine` · `Sales` · `Matched` ·
@@ -4085,7 +4099,7 @@ these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; every
 - Empty: `No card settlement file yet. Choose the card company and press Import file.`
 - Expand title: `Check the sales`
 - Row: `Row {n} · {date} · {RM} · Approval code {code}` (`not printed` when blank; left out for
-  GHL) `· Terminal {id} · Card {masked}`
+  GHL) `· Machine {id} · Card {masked}`
 - Matched: `Matched by approval code` · `Matched by amount and date` · `Suggestion approved` ·
   `Adjusted by hand`
 - Suggestions: `Same approval code and amount` · `Same approval code, another amount` ·
@@ -4109,9 +4123,9 @@ these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; every
   `Choose Public Bank, GHL or Maybank.` · `The file has no name.` · `The file has no sales.` ·
   `This file was imported before.` ·
   `This is not a {Public Bank|GHL|Maybank} settlement file. Check the card company and the file.` ·
-  `Row {n} is a refund, void or chargeback. Carres does not import these until their sign is confirmed on a real one.` ·
+  `Row {n} is a refund, void or chargeback. Carres cannot import it yet. Give the file to IT.` ·
   `Row {n} could not be read. Import the file as it came from the card company.` ·
-  `This file has refunds or adjustments. Carres does not import these until their sign is confirmed on a real one.` ·
+  `This file has refunds or adjustments. Carres cannot import it yet. Give the file to IT.` ·
   `The file's totals do not add up. Import the file as it came from the card company.` ·
   `That settlement row is not there.` · `Choose a card payment that is not voided.` ·
   `That payment is already matched to another row.` · `The file name is too long.` ·
@@ -4120,17 +4134,18 @@ these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; every
   `The payout for this day is already prepared.` ·
   `The payout for this day is already prepared. Cancel that money move before you change a match.` ·
   `Row {n} is for a day whose payout is already prepared. Cancel that money move first.`
-- Payout reference: `Card settlement {PBB|GHL|MAYBANK} {machine} {YYYY-MM-DD}`
-- Added in the PR 1538 fix (PROPOSAL — PENDING APPROVAL, 23 Sep 2026):
+- Payout reference: `Card settlement {Public Bank|GHL|Maybank} {machine} {D Mon YYYY}`, for example
+  `Card settlement Public Bank 900000000001 / 90000001 1 Sep 2026`
+- Added in the PR 1538 fix (23 Sep 2026):
   - Import toast tail: `· {n} opened again to check` (after `{m} matched`, only when an
     automatic match was taken off because another file made it uncertain)
-  - Expand line (red, one per payout): `Card payout {move no} of {RM} from {code} on {date} is not
-    linked to any card settlement day. Check it is not this day's money before you approve the day.`
-  - Money moves → Card payout, `Paid from` hint: `A card account that has a payout bank in Finance
-    Settings is paid out on Card settlement.`
+  - Expand line (red, one per payout): `Card payout {move no} of {RM} from {code} on {date} has no
+    card settlement day. Check it is not this day's money before you approve the day.`
+  - Money moves → Card payout, `Paid from` hint: `A card account with a payout bank is paid out on
+    Card settlement.`
   - Refusals (database): `A card payout from this card account is prepared on Card settlement.
     Approve the day there.` · `This form was used before. Close it and press Approve day again.`
-- Added in the PR 1538 round 3 fix (PROPOSAL — PENDING APPROVAL, 23 Sep 2026):
+- Added in the PR 1538 round 3 fix (23 Sep 2026):
   - Approve day's card payout form offers only a card account that has a payout bank in Finance
     Settings and that account's payout bank, each chosen already when it is the only one. `Paid from`
     hint when none has: `No card account has a payout bank in Finance Settings yet. Set one there first.`

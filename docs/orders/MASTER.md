@@ -142,10 +142,24 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row except Delivery Order (BUILT by `0575`, Delivery MASTER §3.1) is APPROVED
-TARGET / NOT BUILT. Rows that were `…` are now approved as **original document date (YYMMDD) +
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** The formats below are
+approved targets; delivery status differs by family and by business. Rows that were `…` are now approved as **original document date (YYMMDD) +
 four random digits** (leading zeros allowed), Subscription with the `S` prefix, each prefix with its
 own independent daily pool of 10,000. Previously explicit formats are unchanged.
+
+**Implementation status — reconciled 2026-09-24 against the owning MASTERs and committed migrations:**
+
+| Family | Current implementation and remaining acceptance |
+|---|---|
+| Sales Order / Subscription Agreement | **APPROVED TARGET / NOT BUILT** for the new formats and revision presentation. Existing SO implementation is not proof of the new numbering target. |
+| Purchase Order | **PARTIALLY DELIVERED.** New `PO` short-format allocation and independent daily prefix pools are implemented by `0574`. Purchasing MASTER §6.1 records PR #1551 (`e9bc40a0a`), production application and live formatter/pool checks; its authenticated new-PO issue-to-print walk remains owed. `SPO` numbering and the Outright/Subscription business partition remain **APPROVED TARGET / NOT BUILT**. This Orders reconciliation cites that owning evidence; it is not a new production verification. |
+| Delivery Order | **BUILT** by `0575`; Delivery MASTER §3.1 owns the implementation and verification evidence for `DO` / `SDO`. This does not establish completion of other document families. |
+| Other document formats in the table | **APPROVED TARGET / NOT BUILT** for the new formats. `0574` changes the shared pool key but switches the formatter only for `PO`; a per-prefix pool does not prove that each prefix's approved number shape or business partition has shipped. |
+| Physical Unit ID | **KEEP EXISTING**, one shared sequential series; no new format or Subscription prefix is required. |
+
+Existing saved numbers, issued documents and historical references remain unchanged. A built
+allocator, a deployed revision and an authenticated document walk are separate evidence; do not
+promote the whole table to built from any one of them.
 
 | Document | Outright | Subscription |
 |---|---|---|
@@ -693,11 +707,13 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-                        → `Disposal` (owner card 2026-09-23, BUILT): a labelled field reading the SAME
-                        `order_addons` rows Items prices — name, size, ×qty, NO money — and, in Edit,
-                        `Add disposal`, which is the same act as Items' `Add service` (one row, priced once
-                        in Items). Remove and quantity stay on the Items row. Shown only when the order
-                        carries a disposal or the page is in Edit
+                        → `Services` (owner card 2026-09-23, BUILT; words settled 2026-09-24): a labelled field
+                        reading the SAME `order_addons` rows Items prices — every service's name, ×qty, NO
+                        money — and, in Edit, the page's existing `Add service`, offering the disposal family
+                        (catalogue `SVC-DISPOSE-…`) and calling the same act as the Items door (one row,
+                        priced once in Items). Remove and quantity stay on the Items row. Shown when the
+                        order carries a service or the page is in Edit. `Disposal` / `Add disposal` are a
+                        PROPOSAL / NOT LAW (COPY-STANDARD) — not screen copy
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, BUILT 2026-09-23): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
@@ -719,9 +735,13 @@ PAYMENT                 the same money zone as the PDF, one arithmetic (owner ap
                         (`components/so-document-table.ts`): 11px/500 grey headers over a 1px line, 13px rows
                         with 8px cell padding divided by 1px lines beneath, amounts right-aligned with
                         tabular figures, only the closing total bold. Item Code and Approval code are ordinary
-                        13px values in the UI font — never monospace. A service's Item Code prints UPPER CASE
-                        on page and PDF from one function (`lib/service-code.ts`); the stored key is not
-                        rewritten, and the SO document payload now carries it (it printed `ADD-ON` before).
+                        13px values in the UI font — never monospace. A service's Item Code follows its
+                        governed identity, on page and PDF from one rule (`lib/service-code.ts`, the API
+                        mirrors it): a service LINKED in the catalogue prints the catalogue Service SKU
+                        (`addons.service_sku`, 0172 — `SVC-DISPOSE-MATTRESS`); an unlinked one (`DELIVERY`,
+                        `STAIR_CARRY`, bare by design per 0393) or a historical key prints exactly as saved.
+                        Nothing is upper-cased or rewritten; `order_addons.addon_key` stays the identity. The SO
+                        document payload now carries the code (it printed `ADD-ON` before).
                         Totals: a compact two-column block, every figure 13px; a 1px rule over `Total payable`
                         and over `Balance due`, which alone are weight 600
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists

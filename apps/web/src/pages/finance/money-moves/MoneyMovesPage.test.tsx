@@ -117,7 +117,7 @@ describe("Money moves", () => {
     const form = await screen.findByTestId("money-move-form");
     fireEvent.keyDown(within(form).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("option", { name: "Card payout" }));
-    expect(await within(form).findByText("A card account that has a payout bank in Finance Settings is paid out on Card settlement.")).toBeInTheDocument();
+    expect(await within(form).findByText("A card account with a payout bank is paid out on Card settlement.")).toBeInTheDocument();
     fireEvent.keyDown(within(form).getByRole("combobox", { name: /Paid from/ }), { key: "Enter" });
     const options = await screen.findAllByRole("option");
     expect(options.map((o) => o.textContent)).toEqual(["1130 · Other card"]);

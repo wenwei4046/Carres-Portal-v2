@@ -981,12 +981,10 @@ summary. Action ownership uses structured avatar metadata.
   The selected document is visible before Issue PO, using the PO template and its
   explicit draft treatment in `docs/pdf/PO-PDF-STANDARD.md`. Navigating documents
   changes the draft. Previewing creates nothing; Issue PO remains the creation action.
-- **THE 50/50 BINDS FROM 1130px** (measured: two 565px halves is the narrowest a readable A4 preview
-  and a full decision column both fit). Narrower, the surface STACKS — decision work first, the
-  document below it keeping a readable height — and the surface scrolls. Nothing is compressed:
-  walked at 1129px on 2026-08-24, a one-column grid squeezed the decision pane to 208px and clipped
-  the cost block, the blocker and both buttons with no scrollbar, because the row reported that it
-  fitted.
+- **Review Purchase Orders desktop composition — owner approved 2026-09-24; APPROVED TARGET / NOT BUILT.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
+- **Approved review sequence and scope.** Header: total PO count, goods quantity and an explicit whole-batch issue action. Work pane: current document selection → Supplier → Supplier Deliver To/address and Delivery Method → provisional PO Date and Settings-derived PO Delivery Date → source/items/quantity → actionable missing facts. Preview uses the same selected document and approved PO template. Switching documents updates its paper. Returning preserves selection; issuance is not sending.
+- **A complete draft before commitment.** Both lanes must carry server-resolved supplier/destination addresses, provisional dates and delivery method. The draft reserves no official number or Unit ID; successful issuance records the actual PO Date and revalidates the dates. Goods must arrive is an internal deadline, not a substitute for PO Delivery Date. Missing required document facts identify their owning Settings destination instead of silently disappearing. Unrendered/failed preview is not completed review. Do not invent addresses, prices, dates or identifiers.
+- **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
   `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
   (`PO sent to supplier`) are drawn by ONE component on every surface that chases a document. Two
@@ -1102,7 +1100,7 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   inspection (Search, menus); it never leaves the Issue workspace.
 
 Approved review A1–A15 also requires canvas-based rail overlay below 896px, 40px touch rows
-below 768px canvas, issue halves only at 1130px surface width, truthful no-match and true-empty
+below 768px canvas, issue layout governed by §8.2, truthful no-match and true-empty
 states, clearable SO deep-link Search over the full Register, singular footer, unified
 `Production days not set`, kit panel-toggle icons and 32px Buttons, explicit issue-permission
 copy, two-line headers, token-based blocker panel and the retired Purchase Demands redirect.
@@ -1478,7 +1476,7 @@ An all-stock SO must be savable without creating a PO. Read-only Purchase order 
 
 Shared appearance and connector geometry are governed only by UI MASTER §6.8–6.9; words by COPY.
 The HTML quantity dialog is NOT approved as the Issue PO workspace. §8.2 still governs formal draft
-review (50/50 from 1130px, stacked below); that preview remains unfinished in this design review.
+review (approved desktop split in §8.2); that preview remains unfinished in this design review.
 
 **THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
 
@@ -1913,10 +1911,11 @@ with Unit IDs born under them — and no document was ever shown.
   Purpose × MPR Delivery Date`) through the shared
   `manualPurchaseIssueDocuments`, which is also what the toolbar's
   `Issue {n} PO(s)` counts — one arithmetic, two readers (Law D).
-- The draft uses the PO template and creates NOTHING: no PO number, no version,
-  no issue date, no Unit IDs, and no delivery date (that one is computed on the
-  server at issue). It carries the governed `This is a preview. Issue PO creates
-  the number.`
+- The draft uses the PO template and creates no official PO number, revision,
+  persisted issue date or Unit IDs. It SHOWS the server-resolved provisional PO
+  Date and Settings-derived PO Delivery Date; issuance records and revalidates
+  the actual facts. It carries the governed `This is a preview. Issue PO creates
+  the number.` See §8.2 for the approved complete review target.
 - `Cancel` leaves with nothing created and the selection intact. A refusal is
   printed on the review surface in the server's own two lines, because the door
   is atomic and the operator is standing there.

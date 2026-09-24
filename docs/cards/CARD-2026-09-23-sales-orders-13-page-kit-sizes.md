@@ -44,14 +44,20 @@ under `titleTone="sales-order"`; those pages do not move.
 4. Money totals: one 13px size, weight 600 on `Total payable` / `Balance due`, 1px rule over each,
    unbroken across both columns; full width on phones, `min-w-240` from `sm`.
 5. `sales-order-detail-theme.css` no longer resizes kit controls to 28px.
-6. Service Item Code upper case on page AND PDF from `lib/service-code.ts`; stored key unchanged.
-   Found on the way: the SO document payload never sent a service code, so the issued PDF
-   printed the `ADD-ON` placeholder (a defect by the 2026-08-09 owner review) — now sent.
-7. `Delivery` → `Disposal` field on the same `order_addons` rows, no money; `Add disposal` in
-   Edit calls the same `addServiceToDraft` as `Add service`. Walked: adding one raised the Items
-   total once (RM 4,290.00 → RM 4,370.00), Items total = `Total payable`.
+6. Service Item Code follows the governed identity (settled 2026-09-24, below): catalogue Service SKU
+   when linked, saved key otherwise, on page AND PDF. Found on the way: the SO document payload never
+   sent a service code, so the issued PDF printed the `ADD-ON` placeholder (a defect by the 2026-08-09
+   owner review) — now sent.
+7. `Delivery` → `Services` field on the same `order_addons` rows, no money; in Edit, `Add service`
+   offering the disposal family calls the same `addServiceToDraft` as the Items door. Walked: adding
+   one raised the Items total once (RM 4,290.00 → RM 4,370.00), Items total = `Total payable`.
 8. Stale guidance: `/ui` and five source headers pointed at the retired `docs/UI-KIT.md`; two
    doc links resolved outside `docs/`. Repointed to the successors.
+
+9. Follow-up (2026-09-24): the `Revisions` and `History` tabs drew their card at `p-5` (20px, off the
+   spacing scale) under a 20px `text-title`; they now render through the same SO `Block` (15px blue
+   title over a 1px rule, 12/16px padding). The acceptance record's stale "label 12px" line was
+   overwritten.
 
 ## Tests
 
@@ -61,12 +67,7 @@ carries the service code; control run: red.
 
 ## Challenge (Law 4)
 
-- 🟡 `Disposal` / `Add disposal` are build wording (COPY-STANDARD, owner confirmation owed).
-- 🟡 A disposal is recognised by key/name (`dispos`) because the `addons` catalogue has no service
-  category. Falsifier: the catalogue gains a category — read it instead.
-- 🟡 Whether a service's Item Code should be the catalogue `SVC-…` SKU rather than the stored key is
-  not ruled; this card prints the stored key, identical on page and paper.
-- 🟡 About 30 kit component comments still cite `UI-KIT §n` section numbers of the retired doc;
+- 🟡 Non-blocking technical debt: about 30 kit component comments still cite `UI-KIT §n` section numbers of the retired doc;
   only the pointers that send a reader to a missing FILE were repointed.
 
 ## Production evidence — 2026-09-24, signed-in read of SO-1365 (820px), no write
@@ -84,3 +85,35 @@ carries the service code; control run: red.
 | SO PDF (Print) | ITEM CODE prints `DISPOSE-SOFA` · `DISPOSE-MATTRESS` (was `ADD-ON`); totals tally with the page |
 
 Not exercised on production: `Add disposal` (it writes a draft; walked in the shell harness instead).
+
+## Follow-up 2 — service identity and wording, settled 2026-09-24 (owner instruction: use governed authority, no owner round)
+
+**Verified.**
+- Catalogue (production, read-only SQL): `addons.key` → `addons.service_sku` is linked for the four
+  disposal services (`dispose-mattress` → `SVC-DISPOSE-MATTRESS`, `dispose-sofa` → `SVC-DISPOSE-SOFA`,
+  `dispose-old-sofa-big-sofa` → `SVC-DISPOSE-OLD-SOFA-BIG-SOFA`, `dispose-bedframe` → `SVC-DISPOSE-BEDFRAME`);
+  `DELIVERY`, `DELIVERY_ADD`, `DELIVERY_CROSS`, `STAIR_CARRY` are unlinked — bare by design (0393).
+  Every saved `order_addons.addon_key` has a catalogue row (0 orphans).
+- Saved identity: `order_addons.addon_key` = `addons.key` (0172 link column; Catalogue admin is the only
+  surface that displayed `service_sku`). No SO page / PDF / Register display mapping existed.
+- Wording: COPY approves `Services` (the services footer, owner 2026-09-22) and `Add item`; `Add service`
+  is existing build wording (confirmation owed); `Disposal` / `Add disposal` were unapproved. The POS says
+  `Add-ons` (dealer surface) — not a Sales Order word.
+
+**Chosen.**
+- Item Code = catalogue Service SKU when linked, else the saved key exactly as stored; nothing is
+  upper-cased (the 2026-09-23 upper-casing is withdrawn). One rule in `lib/service-code.ts` and the
+  document payload. Production shape: `SVC-DISPOSE-MATTRESS` · `DELIVERY` · `STAIR_CARRY`.
+- Disposal is recognised by the catalogue code family `SVC-DISPOSE-…`, not a name match.
+- Delivery field `Services` (every service on the order — a subset under that word would read as "no
+  delivery fee"); its Edit door is the existing `Add service`, offering the disposal family.
+  `Disposal` / `Add disposal` → PROPOSAL / NOT LAW in COPY.
+
+**Tests.** Contracts rewritten for the rule; API test covers a linked and an unlinked service. Control
+run against the upper-case build: 2 contracts + 1 API test red.
+
+**Production (2026-09-24, PR #1562 squash `81b7a018`, all five surfaces converged; signed-in read of
+SO-1365, no write).** Page Item Code `SVC-DISPOSE-SOFA` · `SVC-DISPOSE-MATTRESS`; Delivery reads
+`Services — Dispose old sofa (small size) · Dispose old mattress`; Items total = `Total payable` =
+RM 1,529.00. The SO document payload the PDF prints from (`/api/orders/:id/sales-order-data`, 200)
+sends the same two codes, total 1,529, paid 765, balance 764 — page and paper tally.

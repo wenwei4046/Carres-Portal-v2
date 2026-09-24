@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
@@ -257,6 +259,21 @@ describe("GET /entries", () => {
     // 0540's view derives the department of an invoice or a payment; embedding
     // it as a computed relationship is what made this read never return.
     expect(String(ops(entries, "select")[0]![1])).not.toContain("gl_entry_departments");
+  });
+
+  // The Journal with ?dept= answered 500 on live: the view's customer payment
+  // match cast every receipt number to uuid once the planner used the payment
+  // id index ("invalid input syntax for type uuid"). The cast must sit behind a
+  // CASE, the only order Postgres promises to keep.
+  it("the newest gl_line_departments casts source_doc_no to uuid only behind a CASE", () => {
+    const dir = path.resolve(__dirname, "../../../../../supabase/migrations");
+    const newest = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()
+      .map((f) => fs.readFileSync(path.join(dir, f), "utf8"))
+      .filter((sql) => sql.includes("create or replace view public.gl_line_departments"))
+      .at(-1)!;
+    const view = newest.slice(newest.indexOf("create or replace view public.gl_line_departments")).split(";")[0]!;
+    expect(view).toContain("source_doc_no::uuid");
+    expect(view).not.toMatch(/(?<!then )e\.source_doc_no::uuid/);
   });
 
   it("answers a department with no entries as empty, never as an error", async () => {
