@@ -1018,6 +1018,50 @@ procurement as the primary Diglant supply model, assign legacy nationwide partne
 copy old rent-to-own terms, or promote unfinished proposals because another task mentioned them.
 Use current shared repository authority; pending branch-only changes must be identified as such.
 
+## §6.4 · The chase carries the answer door — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT)
+
+One rule for every module that reminds or chases an outside party — Logistics Partner, supplier,
+and later the customer. The prepared remind/chase message carries one link to that party's own
+scoped Portal surface, opened at exactly the rows the message names. The party's personal login
+answers there, and the answer is written to the **owning module's existing record**:
+
+```
+Logistics Partner  →  Delivery arrangement (contacted, confirmed date/time, ETA, Cannot Deliver)
+Supplier           →  Purchasing PO promise / delay evidence (Purchasing §§5.6.1, 5.7)
+Customer (later)   →  Delivery customer contact / Payment promise, per their MASTERs
+```
+
+Work (Workspace) raises the remind/chase and closes it only from that owning record. No module
+keeps a second chase or acknowledgement ledger (Law A, Law C). The WhatsApp group or chat stays
+the channel; an answer given only there still needs the recorded answer plus its uploaded proof.
+Sending the link is not an answer; silence leaves the row unconfirmed and chaseable. Each party's
+rollout — issuing production logins and telling that party to use them — is an external cutover
+needing its own owner authorisation. **NETS is first**; suppliers follow on the same rule.
+
+## §6.5 · Outstation release — owner rulings 2026-09-24 (APPROVED TARGET / NOT BUILT)
+
+Why: once goods leave Carres Klang for an outstation leg, a customer delay creates partner storage
+charges and return cost. An **outstation order** is one whose delivery has a first leg out of
+Carres Klang to another partner or warehouse (Singapore, Johor/Melaka via JB, AL/HOUZS, East
+Malaysia) or whose Logistics Partner is not the Klang Valley default.
+
+```
+1. Customer confirms first   Operation sends the prepared WhatsApp and stores the customer's
+                             reply proof BEFORE the first leg leaves Carres Klang. No
+                             confirmation → the first leg is not handed over.
+                             The message states the delivery date, the balance, the payment
+                             link, and that a delay asked after the goods leave carries a
+                             storage charge.
+2. Money earlier             Payment must be complete 3 working days before Confirmed Delivery
+                             (the customer's delivery date — owner chose this anchor), not
+                             Klang Valley's 2.
+```
+
+Owners: Delivery owns the confirmation contact and the first-leg handover refusal (Delivery
+§14.1); Payment owns the one collection clock and its outstation timing row (Payment "Collection
+timing"); Sales Orders' DO gate reads that one clock unchanged. **PROPOSAL / NOT LAW:** no COD
+approval for outstation orders. Falsifier: the owner approves an outstation COD case.
+
 ---
 
 # §7 · What Orders V1 leaves behind

@@ -253,6 +253,11 @@ Start asking the customer to pay   {n} working days before Confirmed Delivery   
 Payment must be complete           {m} working days before Confirmed Delivery   (ruled default 2)
 ```
 
+**Outstation row — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; `../ERP-ARCHITECTURE.md`
+§6.5):** an outstation order's `Payment must be complete` is **3 working days before Confirmed
+Delivery** (the customer's delivery date). Its ask day follows the same n > m rule; the default
+ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
+
 Editable by authorised Manager permission; asking must start earlier than the deadline (n > m).
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an

@@ -1635,6 +1635,11 @@ is absence, never an invented row.
 The same feed admits a Warehouse login only when its token is bound to a Warehouse and keeps only
 that Warehouse's Units. The Logistics boundary is the same projection narrowed by
 authenticated assignment: a Partner sees only its assigned rows and only the admitted fields.
+
+**THE CHASE CARRIES THE ANSWER DOOR — owner ruling 2026-09-24, cross-module law in
+`../ERP-ARCHITECTURE.md` §6.4.** For Delivery: every remind/chase message to a Logistics Partner
+links to that Partner's Logistics Work at the named rows, and the Partner's answers are this
+MASTER's existing arrangement writes. NETS is the first Partner.
 Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence
 and before confirmed arrival; Stock owns the custody word and Delivery never writes it. **DO No**
 means an outbound customer Delivery Order; inbound receiving stays under its PO/CO source.
@@ -1642,6 +1647,12 @@ means an outbound customer Delivery Order; inbound receiving stays under its PO/
 ## 14 · Journeys, Loan, current versus intentional future
 
 ### 14.1 · Journeys
+
+**Outstation release — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; cross-module law
+`../ERP-ARCHITECTURE.md` §6.5).** Before an outstation first leg leaves Carres Klang, Operation
+sends the prepared customer WhatsApp (delivery date, balance, payment link, storage charge on a
+later delay) and records the customer's reply with proof. Without that confirmation Delivery
+refuses the first-leg handover. The payment deadline is Payment's outstation timing row.
 
 **Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
 leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own
