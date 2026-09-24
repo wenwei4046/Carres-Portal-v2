@@ -76,7 +76,7 @@ export async function scopePartner(
   const query = sb.from("delivery_partners").select("id, name, kv_default");
   const { data: partner, error } = UUID.test(ref)
     ? await query.eq("id", ref).maybeSingle()
-    : await query.ilike("name", ref.trim()).maybeSingle();
+    : await query.ilike("name", ref.trim().replace(/[%_\\]/g, "\\$&")).maybeSingle();
   if (error) throw error;
   if (!partner) return null;
   const p = partner as { id: string; name: string; kv_default: boolean | null };
@@ -265,8 +265,14 @@ deliveryLinksRouter.get("/:orderId/logistics-card", requireOperationOrPrincipal,
       .filter((k) => k.contacted_person === "partner" && (!partner || !k.on_behalf_of_partner_id || k.on_behalf_of_partner_id === partner.id))
       .map((k) => k.contacted_at);
     const opened = linkRows.filter((l) => l.partner_id === partner?.id && l.first_opened_at).map((l) => l.first_opened_at as string);
+    /* A PORTAL company sees its assigned deliveries at once; an auto-assigned
+       whole-order scope (NETS, Klang Valley) may carry no assignment event, so
+       the earliest recorded fact of the scope stands in, else the read time. */
+    const portalSince = partner?.hasPortal
+      ? assignedAt ?? eventRows.map((e) => e.recorded_at).sort()[0] ?? new Date().toISOString()
+      : null;
     const candidates = [
-      ...(partner?.hasPortal && assignedAt ? [assignedAt] : []),
+      ...(portalSince ? [portalSince] : []),
       ...opened,
       ...partnerAnswers,
       ...partnerContacts,

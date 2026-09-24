@@ -163,4 +163,20 @@ describe("the card's facts", () => {
     expect(facts.history[0].who).toBe("AL Logistics via external link");
     expect(facts.history[0].detail).toBe("2026-10-29 · We are full on that date");
   });
+  it("a portal company has the details from its assignment, even with no event recorded", async () => {
+    mockSb({
+      ops_delivery_arrangements: [{ data: null }],
+      orders: [{ data: { delivery_partner_id: NETS, ops_assigned_logistic: null } }, { data: { id: ORDER, so: 1362 } }],
+      delivery_partners: [{ data: { id: NETS, name: "NETS Logistics", kv_default: true } }],
+      app_users: [{ data: [{ id: "u1" }] }],
+      ops_delivery_partner_links: [{ data: [] }],
+      ops_delivery_arrangement_events: [{ data: [] }],
+      ops_delivery_contacts: [{ data: [] }],
+    });
+    const res = await call("/logistics-card", "operation");
+    const facts = (await res.json()) as { partner: { hasPortal: boolean }; detailsReceivedAt: string | null };
+    expect(facts.partner.hasPortal).toBe(true);
+    expect(facts.detailsReceivedAt).not.toBeNull();
+  });
 });
+
