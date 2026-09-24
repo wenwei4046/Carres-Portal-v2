@@ -66,11 +66,11 @@ receipt posted, or stock mutated for this audit.
 
 | Surface | Observed | Remaining work / verification |
 |---|---|---|
-| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice lacked its reason. Loading and named selection summary corrected by #1573; authenticated Back retained selection. | Explain disabled choices and reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
+| SO Batch | 31 Sales Orders; 4 To buy / 27 No purchase needed. A covered SKU showed both Need PO and Already on a PO; disabled choice now explains its reason (#1589 authenticated readback). Loading and named selection summary corrected by #1573; authenticated Back retained selection. | Reconcile exact source coverage versus generic PO pool without inventing allocation. Stock-write acceptance remains separate. |
 | Shared PO review | #1573 deployed; authenticated SO read-only walk verified 3 actual drafts, 1074px split, 150% zoom, 390px stacking and Back selection. Missing supplier addresses are named. | §8.2 records proof and limits. MPR has no eligible Need PO request; no real issuance or sending is claimed. |
-| Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. Old section styling and requester identity remain open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
-| Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply capture still lacked governed readable evidence; old Supplier Delivery Date wording remained. | §9.3 object, evidence, date and revision walkthrough. Multi-receipt and revision writes remain unverified. |
-| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. #1574/#1577/#1578 production checks verified narrow controls/actions, separated supplier/PO header and truthful initial PO loading. | §9.4 GRN document review and receipt lifecycle; no posting performed. |
+| Manual Purchase | Internal draft and three sections exist; #1574 production walk confirmed narrow actions remain visible. The form reuses the shared Block; the Sales Order blue title is a separate opt-in. Actual-person requester verification remains open. | §9.2 responsive composition and actual-requester check. Approval and five-fact PO partition remain authoritative. |
+| Purchase Orders | 63 orders; eleven-column register present. PO-20260903-4354 opened with source SO-1319 and Unit U1-000-002. Reply evidence still lacks the governed readable viewer; #1587 authenticated readback verified PO Doc Date and Supplier Confirmed Delivery Date. | §9.3 evidence and revision walkthrough. Multi-receipt and revision writes remain unverified. |
+| Receiving | Fifteen-column register and real receipts visible; accepted quantity and damage were separate facts. #1574/#1577/#1578 verified controls/header/loading; #1584/#1587/#1588 verified item-linked Units, narrow item names and partial GRN paper composition. | §9.4 remaining document facts and receipt lifecycle; no posting performed. |
 | Claims / Returns | Claims still showed the former twelve-column composition; Returns showed an empty register. | §9.5–9.6 approved columns, source-linked workflows and evidence. Empty Returns data proves no execution lifecycle. |
 | Repair / showroom documents | Repair Orders, Display Requests, Consignment Orders, Consignment Returns and Sale Notices remained Coming soon. | §9.7–9.11 are not production-built by virtue of their approved blueprint. |
 | Master data | Supplied company CSV read; Carres Klang warehouse address and NETS company address are distinct authorities. | Apply only through an existing authorised update door, preserving IDs and history; no People record creation. No company update claimed yet. |
@@ -1061,7 +1061,7 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**Disabled selection explanation — local implementation, 2026-09-24; delivery proof owed.**
+**Disabled selection explanation — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1589).**
 The shared grid's optional refusal description names the same existing facts used by
 SO Batch eligibility/planning and Manual Purchase approval/remainder. It is attached
 to the disabled checkbox and reachable by keyboard through the existing kit tooltip;
@@ -1069,6 +1069,17 @@ the same facts remain visible on the row or in its expansion. The checked state,
 select-all, stock allocation and PO issue authority are unchanged. Open PR #1490's
 overlap was reviewed; only this still-missing behavior was ported against current main,
 with unique description IDs across grids and a keyboard-focusable trigger.
+
+CI `35986102965` and deployment `35987154529` passed; all five canonical endpoints
+reported `96528e114129fb11d051a59fe81413dcb1c6a4d0`. The own Pages deployment
+`29a1db37.carres-portal.pages.dev` added the refusal callback/trigger wiring compared
+with `124bde31.carres-portal.pages.dev`, with existing copy unchanged. Before deployment,
+the actual disabled SO checkboxes had no description. After deployment, SO-1358
+exposed `Already on a PO`, SO-1206 exposed `SKU not found`, and the pending Manual
+Purchase row exposed `Need approval`. Keyboard Tab/Shift+Tab returned focus to the
+SO-1358 reason and displayed its tooltip with zero checked rows. No stock was selected,
+request approved or PO issued. This closes refusal explanation only; exact SO lineage
+versus generic SKU PO coverage and the write lifecycle remain separate open boundaries.
 
 
 **Shared dictionary — APPROVED / NOT BUILT (Jess, 2026-09-18).** All four reviewed listings
@@ -1793,6 +1804,15 @@ the original header actions remain visible and the footer stays hidden. The
 unsent draft was cancelled. CI `35963457606` passed (12,596 tests, 100 existing
 skips); deploy `35964281215` succeeded and all five canonical SHA endpoints
 converged. No submission, approval, requester identity or stock-intent rule changes.
+
+**Read-only requester check, 2026-09-24.** The live register had four requests:
+one in Need approval and none in Need PO. The missing historical requester displayed
+`Staff identity not recorded`. The current principal account's unsent create form and
+preview both displayed `principal`, resolved from the existing Staff list in
+`OperationManualPurchase.tsx`; this is not proof of a named operational employee's
+saved-request lifecycle. The empty draft was cancelled. The form already uses the
+shared `Block`; its default shared title treatment is not evidence of an unimplemented
+composition merely because Sales Order uses its separate blue-title opt-in.
 
 The three sections, in the SAME reading order on the form and preview, are:
 
@@ -2762,7 +2782,7 @@ no activity. Downloaded assets against #1577’s own deployment proved the direc
 unavailable branch disappeared, the pending state appeared and the Back control
 survived. No receiving result or write path changed and no receipt was posted.
 
-**GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
+**GRN document composition — owner approved 2026-09-23; PARTIALLY DELIVERED, COMPLETE TARGET NOT VERIFIED.**
 Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
 do not redesign the receipt as a PO or use it as Manual Purchase's PO preview. The right
 header identifies `GRN No` and `GOODS RECEIVED NOTE`. Preserve the two information blocks:
@@ -2827,7 +2847,7 @@ amendment was saved. The preceding own deployment was `27b143d5.carres-portal.pa
 (42c8bc9a); the new own deployment was `20cb17a6.carres-portal.pages.dev` (acdcde97).
 Their downloaded assets were compared alongside the authenticated rendered readback.
 
-**GRN paper composition — local implementation, 2026-09-24; delivery proof owed.**
+**GRN paper composition — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1588).**
 The existing renderer now prints the PO-family logo, legal identity and three address
 lines on every page, with the full GRN identity. Two information blocks separate
 supplier/source/instruction from document date and actual arrival facts. Unknown
@@ -2836,6 +2856,17 @@ Damaged/Wrong/Pending columns become one explicit zero-value line, while mixed
 columns retain quiet zeroes. Render tests cover real continuation pages, separate
 instruction/arrival positions and zero-only exception columns. Quantity arithmetic,
 posting evidence and the outstanding receiver/time/scope gaps are unchanged.
+
+CI `35984035995` and deployment `35985438938` passed; all five canonical surfaces
+reported `8d74724dd53dae3abb1509bce8762e8129c15c10`. The own Pages deployment was
+`124bde31.carres-portal.pages.dev`, compared with `282a960f.carres-portal.pages.dev`:
+GRN logo wiring appeared in the built assets while `Supplier DO No` remained unchanged.
+The authenticated `GRN-20260904-1064` preview showed the logo/legal header, separate
+Supplier and Receiving Details blocks, and Order 1 / Received 0 / Damaged 1 / Pending 1.
+The zero-only Wrong Item column became `Wrong Item Qty 0` beneath the table.
+Unit `U1-000-064` remained under SMOKE King Mattress; the AMENDED band and history
+remained visible. Local rendered tests cover continuation pages; this one-page live
+record does not independently prove pagination. No receipt or amendment was saved.
 
 **Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
 evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
@@ -3165,12 +3196,16 @@ and Claim completion cannot close the Case.
 
 #### No calendar-created product claims
 
-**Application retirement — local implementation, 2026-09-24; deployment and database closure owed.**
+**Application retirement — DEPLOYED 2026-09-24 (#1588); database closure owed.**
 A passed ETA or routine partial delivery alone never opens a product Claim.
 The Worker daily schedule no longer calls `runSupplierClaimSweepCron`; the retained
 compatibility export performs no database access and returns zero. Contact-by and
 follow-up maintenance still run. Source caller inventory found no HTTP caller or
 other application scheduler; the dashboard test only checks that reads do not call it.
+Deployment `35985438938` verified the Worker at
+`8d74724dd53dae3abb1509bce8762e8129c15c10`; the cron compatibility and retained-duty
+checks passed locally and in full CI. No live cron was manually executed, so this
+proves delivered application removal, not retirement of every database caller.
 The committed database definitions remain in 0288, 0291 and 0519, with service-role
 execute permission. No production scheduler inventory or SQL change has been performed.
 
