@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyRailSelection,
@@ -79,6 +79,11 @@ export default function WarehouseStockRegister() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const selectedUnit = params.get("unit");
+  useEffect(() => {
+    // Unit Detail owns the title while open. Its unmount cleanup must not
+    // replace Inventory's title when the still-mounted register returns.
+    if (!selectedUnit) document.title = "Inventory · Warehouse — Carres";
+  }, [selectedUnit]);
   const unitHref = (code: string) => {
     const next = new URLSearchParams(params);
     next.set("tab", "stock-onhand");
@@ -413,22 +418,23 @@ export default function WarehouseStockRegister() {
   const filtered = isRailFiltered({ ...sel, query: search }) || !!holder || view !== "all";
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col">
-      {selectedUnit && <WarehouseUnitDetail unitCode={selectedUnit} onBack={() => {
+    <div className="relative flex h-full min-h-0 flex-1 flex-col">
+      {selectedUnit && <div className="absolute inset-0 flex min-h-0 flex-col"><WarehouseUnitDetail unitCode={selectedUnit} onBack={() => {
         const next = new URLSearchParams(params);
         next.delete("unit");
         setParams(next);
-      }} />}
+      }} /></div>}
       {/* Keep the grid mounted: its search, column filters and viewport belong
-          to this visit, including browser Back from the selected Unit. */}
-      <div hidden={!!selectedUnit} className={selectedUnit ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
-      {!selectedUnit && <ModuleHeader
+          to this visit, including browser Back from the selected Unit. Visibility
+          preserves the virtualizer viewport; display:none would reset it. */}
+      <div aria-hidden={!!selectedUnit} style={{ visibility: selectedUnit ? "hidden" : undefined }} className="flex min-h-0 flex-1 flex-col">
+      <ModuleHeader
         testId="stock-register-destination-header"
         word="Inventory"
         docTitle="Inventory · Warehouse — Carres"
         right={<Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">Request Transfer</Link>}
         destinationHeader
-      />}
+      />
       <div className="flex min-h-0 flex-1" data-testid="stock-register">
         {railOpen ? <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
           <FilterRailGroup title="Stock" icon="order">

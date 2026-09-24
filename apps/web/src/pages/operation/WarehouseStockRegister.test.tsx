@@ -355,6 +355,7 @@ it("returns from a Unit without losing the register, search, rail or scroll", as
   expect(screen.getByTestId("grid-scroll")).toBe(grid);
   expect(grid).toBeVisible();
   expect(grid.scrollTop).toBe(180);
+  expect(document.title).toBe("Inventory · Warehouse — Carres");
   expect(search).toHaveValue("aaa111111");
   expect(screen.getByTestId("rail-ready")).toHaveAttribute("aria-pressed", "true");
 });

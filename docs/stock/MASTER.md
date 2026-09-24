@@ -582,7 +582,7 @@ posted, Inbound updates from that authority:
 - not yet received → remains in Inbound;
 - the supplier/PO consequence routes to Purchasing; Warehouse does not guess a replacement date.
 
-**Receiving confirmation — owner approved 2026-09-16; built, production verification pending.** Prefilled
+**Receiving confirmation — owner approved 2026-09-16; built; verification recorded below.** Prefilled
 outcomes or quantities are proposed input, never evidence that physical verification is complete.
 The working form must make their unconfirmed nature clear and require explicit confirmation of
 the actual Unit results or quantity before saving. Its live summary must not read as a completed
@@ -710,7 +710,7 @@ The default includes outstanding loading, missing evidence and unmatched driver 
 Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
 filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
-**Completion and return — owner approved 2026-09-16; built, production verification pending.** Once all
+**Completion and return — owner approved 2026-09-16; built; verification recorded below.** Once all
 required Units are loaded, make outstanding driver confirmation and the owning Delivery Order
 door clear instead of continuing to emphasise scanning as the next act. Warehouse never confirms
 on the driver's behalf. Return from a Unit or work surface must reach the correct source register
@@ -1720,7 +1720,7 @@ are separate milestones. No Warehouse surface is frozen into the UI Kit by this 
 | Stock Count / Difference / approved Adjustment | Approved business design in §6 and §12.5 | Not built as a complete stocktake engine. WarehouseCountModal records truck/loading counts and is not a stocktake |
 | Month-end / Finance handoff | Approved business design in §9 and §12.10 | Complete versioned confirmation and Finance acknowledgement are not claimed shipped |
 | Duty / permission / external operations | Existing personal-role guards and RLS remain authoritative | No new external rights, service-role browser access, shared credentials or second stock writer |
-| Operator-flow review, 2026-09-16 | Owner approved clearer receiving confirmation, governed in-context problem reporting, correct register return and post-loading direction | Receiving now identifies prefilled outcomes as proposed, requires confirmation of the exact draft and invalidates it on edits. Inventory keeps its register mounted through Unit Detail and returns to Inventory; Loading separates loaded from driver-confirmed, opens the owning DO and retains scan errors for correction. Targeted component tests and local rendered checks cover these changes; production verification pending. The governed problem-report engine/entrances remain NOT BUILT: existing condition/repair writers do not atomically persist an observation, evidence, protective control and shared Work. This approval does not freeze the UI Kit. |
+| Operator-flow review, 2026-09-16 | Owner approved clearer receiving confirmation, governed in-context problem reporting, correct register return and post-loading direction | Receiving now identifies prefilled outcomes as proposed, requires confirmation of the exact draft and invalidates it on edits. Inventory keeps its register mounted through Unit Detail and returns to Inventory; Loading separates loaded from driver-confirmed, opens the owning DO and retains scan errors for correction. Targeted component tests cover these changes. A rendered 100-row virtual-list check preserves scrollTop 3600 and viewport height 577 through Unit Detail; the register retains its layout while visually hidden, and its title is restored on return. Local receiving checks prove confirmation invalidation after editing an outcome. Mobile rendering remains unverified. Release evidence is maintained with [PR #1386](https://github.com/wenwei4046/Carres-Portal-v2/pull/1386), including its Inventory return correction. The governed problem-report engine/entrances remain NOT BUILT: existing condition/repair writers do not atomically persist an observation, evidence, protective control and shared Work. This approval does not freeze the UI Kit. |
 
 ### 13.1 · Required read and failure behavior
 
