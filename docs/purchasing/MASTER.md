@@ -2761,15 +2761,28 @@ the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabr
 PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
 the sample correction does not forbid a real destination exception.
 
-**Measured implementation boundary, 2026-09-24.** `ReceivingSessionDetail` currently
-carries posting actor/duty evidence, but no distinct evidenced physical receiver.
-Its `unit_results` carry stock-item identity and outcome without the source PO
-line identity; `grnTemplateDataOf` consequently feeds a separate Unit-results list
-to the PDF. The approved item/Unit grouping and physical-receiver fact are not
-implemented by restyling that paper. Preserve posting evidence as posting evidence;
-resolve the authoritative receiver and Unit-to-line projection before claiming the
-complete GRN target. Actual arrival time also remains a separate schema gap under
-§9.3; never derive it from the filing timestamp.
+**Item/Unit document linkage — local implementation, 2026-09-24; delivery proof owed.**
+The detail reader now resolves each recorded stock-item identity through its existing
+`ops_stock_items.po_line_id`, matching the register's source relationship. Only a line
+actually in this receipt may bind a Unit; matching SKU text never establishes lineage.
+Quantity-managed technical identities are suppressed. The shared GRN data builder puts
+bound outcomes below their item, once; unresolved historical outcomes remain in the
+separate Unit-results section rather than being invented or lost. Failed Unit, source
+PO, event or stock-identity reads refuse the document instead of pretending the evidence
+is empty. API and builder tests cover failures, unknown lineage and repeated SKUs; an
+actual rendered PDF checks item/Unit order and preserves the unmatched result. The PDF
+uses `Supplier Deliver To`, `Goods Received Date` and the date-only `Time not recorded`.
+The register, filters and exports now name `GRN Doc Date`; the record and amendment
+form use the same corrected supplier/date labels. Normal posted GRNs carry no `Valid`
+badge, while cancelled records retain their explicit status.
+
+**Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
+evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
+posting evidence; resolve the authoritative receiver before claiming the complete GRN
+target. Actual arrival time remains a separate schema gap under §9.3; never derive it
+from the filing timestamp. The full approved letterhead, two-block composition,
+physical/cumulative quantity presentation and other GRN document requirements remain
+open; this linkage change does not claim the complete document redesign.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval

@@ -36,7 +36,7 @@ import ReceivingRecord from "./components/ReceivingRecord";
  *   · document status words are `Valid` / `Cancelled` — never `Posted` /
  *     `Voided` on a normal user's screen,
  *   · the corrected location/date words — `Deliver To` · `Goods arrived at`
- *     · `Goods received on`; `Actual Site` and `Goods Received At` retired,
+ *     · `Goods Received Date`; `Actual Site` and `Goods Received At` retired,
  *   · the GRN object is 50/50: Receiving Record left, the REAL A4 GRN
  *     preview right with Print/Download; Void hides in `More ▾`; Amend
  *     takes the left half while the preview stays live,
@@ -122,7 +122,7 @@ vi.mock("@/lib/queries", async () => {
             (r.actual_site_name as string | null) ??
             (r.warehouse_name as string | null) ??
             null,
-          /* `GRN date` is the CREATION stamp — the posting — read here
+          /* `GRN Doc Date` is the CREATION stamp — the posting — read here
              exactly as the Worker reads it. */
           grnDateIso: ((r.posted_at as string | null) ?? "").slice(0, 10) || null,
           damaged: (r.lines as Array<{ damaged_qty: number }>).some(
@@ -580,7 +580,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     const inRail = within(rail);
     // The six groups the owner ruled, in order (§9.4, 2026-09-17).
     for (const heading of [
-      "GRN date",
+      "GRN Doc Date",
       "Received with",
       "Category",
       "Goods arrived at",
@@ -682,7 +682,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
        read off the header's own text rather than as separate elements. */
     const headerText = (headerEl.textContent ?? "").replace(/\s+/g, " ");
     for (const word of [
-      "GRN Date",
+      "GRN Doc Date",
       "GRN No",
       // The four-way source reference, on its two approved lines.
       "SO No / MPR No",
@@ -707,6 +707,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     for (const retired of [
       "Supplier Delivery Date",
       "Goods received on",
+      "GRN Date",
       "Product",
       "PO/CO No",
       "Actual Site",
@@ -755,7 +756,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     );
   });
 
-  it("the GRN date group lists weeks, months and Choose dates — and a week's arrow only OPENS it", async () => {
+  it("the GRN Doc Date group lists weeks, months and Choose dates — and a week's arrow only OPENS it", async () => {
     renderPage();
     const rail = within(screen.getByTestId("receiving-rail"));
     // Two weeks, each counting the GRNs CREATED in it — 31 Aug – 6 Sep holds
@@ -818,9 +819,9 @@ describe("OperationReceiving — the formal GRN Register", () => {
     await rail.findByTestId("rail-grn-range");
     /* The shared `DateField` — day-first whatever the machine's locale, so
        the rail cannot show one spelling of a date and the table another. */
-    const from = rail.getByLabelText("GRN date from");
+    const from = rail.getByLabelText("GRN Doc Date from");
     fireEvent.change(from, { target: { value: "01/08/2026" } });
-    fireEvent.change(rail.getByLabelText("GRN date to"), {
+    fireEvent.change(rail.getByLabelText("GRN Doc Date to"), {
       target: { value: "31/08/2026" },
     });
     await waitFor(() =>
@@ -1013,7 +1014,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(screen.queryByText(/Nothing received/i)).not.toBeInTheDocument();
   });
 
-  it("leads with GRN Date then GRN No — the pinned pair the engine guarantees", () => {
+  it("leads with GRN Doc Date then GRN No — the pinned pair the engine guarantees", () => {
     renderPage();
     const headerCells = within(screen.getByTestId("grid-header"))
       .getAllByRole("columnheader")
@@ -1022,7 +1023,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
        whatever a saved layout says, neither can be hidden, and below a 768px
        canvas the identity pins alone. The disclosure gutter comes first. */
     const named = headerCells.filter((t) => t.length > 0);
-    expect(named[0]).toContain("GRN Date");
+    expect(named[0]).toContain("GRN Doc Date");
     expect(named[1]).toContain("GRN No");
   });
 
@@ -1194,7 +1195,7 @@ describe("ReceivingWorkspace — the pre-start object", () => {
     expect(screen.getByTestId("summary-wrong-qty")).toHaveTextContent("0");
     expect(screen.getByTestId("summary-pending-qty")).toHaveTextContent("4");
     // The governed spelling — `Deliver To`, never `Delivery To`.
-    expect(screen.getByText("Deliver To")).toBeInTheDocument();
+    expect(screen.getByText("Supplier Deliver To")).toBeInTheDocument();
     expect(screen.queryByText("Delivery To")).not.toBeInTheDocument();
   });
 
@@ -1392,15 +1393,13 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     expect(
       screen.getByRole("heading", { name: "GRN-20260901-1234" }),
     ).toBeInTheDocument();
-    // The document status word — never `Posted`.
-    expect(screen.getByTestId("receiving-record-state")).toHaveTextContent(
-      "Valid",
-    );
+    // Normal GRNs have no status badge; only cancellation is exceptional.
+    expect(screen.queryByTestId("receiving-record-state")).not.toBeInTheDocument();
     // The three facts, corrected words: `Deliver To` · `Goods arrived at`
-    // (no override = the instructed warehouse itself) · `Goods received on`.
-    expect(screen.getByText("Deliver To")).toBeInTheDocument();
+    // (no override = the instructed warehouse itself) · `Goods Received Date`.
+    expect(screen.getByText("Supplier Deliver To")).toBeInTheDocument();
     expect(screen.getByText("Goods arrived at")).toBeInTheDocument();
-    expect(screen.getByText("Goods received on")).toBeInTheDocument();
+    expect(screen.getByText("Goods Received Date")).toBeInTheDocument();
     expect(screen.queryByText("Actual Site")).not.toBeInTheDocument();
     expect(screen.queryByText("Goods Received At")).not.toBeInTheDocument();
     // The duty-evidence trio — never one overwritten name.
@@ -1650,7 +1649,7 @@ describe("Receiving speaks the corrected location/date words — source scan", (
   ];
   const RETIRED: Array<[RegExp, string]> = [
     [/Actual Site/, "Actual Site → Goods arrived at"],
-    [/Goods Received At/, "Goods Received At → Goods received on"],
+    [/Goods Received At/, "Goods Received At → Goods Received Date"],
     [/Delivery Location/, "reserved for the customer's delivery address"],
   ];
 
@@ -1675,7 +1674,7 @@ describe("Receiving speaks the corrected location/date words — source scan", (
    THE PINNED PAIR ONLY PINS IF THE GRID CAN SHRINK — measured 2026-09-19.
 
    `leadingColumns` was correct and the widths were correct, yet on the live
-   page GRN Date and GRN No did not pin at all: scrolling right drove GRN Date
+   page GRN Doc Date and GRN No did not pin at all: scrolling right drove GRN Doc Date
    to left −1022, clean off the screen. The cause was not in the engine. The
    register column is a flex child beside the rail, and a flex item defaults to
    `min-width:auto`, so without `min-w-0` it refused to shrink below the

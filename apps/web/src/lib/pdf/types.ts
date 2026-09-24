@@ -299,6 +299,7 @@ export type GrnTemplateData = {
     damaged_qty: number;
     wrong_item_qty: number;
     pending_delivery_qty: number;
+    unit_results?: Array<{ unit_code: string; outcome_label: string }>;
   }>;
   /** Exact-Unit outcomes, when governed Units exist — the scan record is
    *  part of the paper. */

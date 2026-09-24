@@ -198,19 +198,17 @@ export default function ReceivingRecord({
             {r.supplier_name ?? ""} · <span className="font-mono">{r.po_id}</span>
           </div>
         </div>
-        <span
+        {r.status !== "posted" && <span
           data-testid="receiving-record-state"
           className={[
             "shrink-0 rounded-full px-2.5 py-0.5 text-label font-medium",
-            r.status === "posted"
-              ? "bg-kit-green-3 text-kit-green-11"
-              : r.status === "voided"
-                ? "bg-kit-slate-3 text-kit-slate-11"
-                : "bg-kit-amber-3 text-kit-amber-11",
+            r.status === "voided"
+              ? "bg-kit-slate-3 text-kit-slate-11"
+              : "bg-kit-amber-3 text-kit-amber-11",
           ].join(" ")}
         >
           {warehouseReceiptStatusLabel(r.status)}
-        </span>
+        </span>}
       </div>
 
       {r.status === "voided" && (
@@ -238,13 +236,14 @@ export default function ReceivingRecord({
               <span className="font-mono">{r.po_id}</span>
             </Prop>
             <Prop label="Supplier">{r.supplier_name ?? ""}</Prop>
-            <Prop label="Deliver To">{r.warehouse_name ?? ""}</Prop>
+            <Prop label="Supplier Deliver To">{r.warehouse_name ?? ""}</Prop>
             <Prop label="Goods arrived at">
               {r.actual_site_name ?? r.warehouse_name ?? ""}
             </Prop>
-            <Prop label="Goods received on">
+            <Prop label="Goods Received Date">
               <span className="tabular-nums">
                 {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
+                {r.goods_received_at && /^\d{4}-\d{2}-\d{2}$/.test(r.goods_received_at) ? " · Time not recorded" : ""}
               </span>
             </Prop>
             {r.submitted_from === "warehouse" && r.submitted_at ? (
@@ -263,7 +262,7 @@ export default function ReceivingRecord({
                 </span>
               </Prop>
             ) : null}
-            <Prop label="Supplier DO No.">
+            <Prop label="Supplier DO No">
               <span className="font-mono">{r.do_number}</span>
               {r.do_file_url ? (
                 <a
@@ -904,7 +903,7 @@ function AmendPanel({
       {/* Original → Corrected, per fact. */}
       <div className="mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
-          Goods received on
+          Goods Received Date
         </span>
         <span className="tabular-nums text-kit-slate-9">
           {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : "—"}
@@ -914,7 +913,7 @@ function AmendPanel({
           type="date"
           value={draft.goodsReceivedAt}
           onChange={(e) => set({ goodsReceivedAt: e.target.value })}
-          aria-label="Goods received on"
+          aria-label="Goods Received Date"
           data-testid="amend-received-at"
           className={FIELD}
         />
@@ -948,7 +947,7 @@ function AmendPanel({
       </div>
       <div className="mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
-          Supplier DO No.
+          Supplier DO No
         </span>
         <span className="font-mono text-kit-slate-9">{receipt.do_number}</span>
         <span className="text-kit-slate-9">→</span>
@@ -956,7 +955,7 @@ function AmendPanel({
           type="text"
           value={draft.doNumber}
           onChange={(e) => set({ doNumber: e.target.value })}
-          aria-label="Supplier DO No."
+          aria-label="Supplier DO No"
           data-testid="amend-do-number"
           className={`${FIELD} flex-1`}
         />

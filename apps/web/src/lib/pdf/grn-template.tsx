@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   desc: { flex: 1, paddingRight: mm(2) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1.15 },
   descSku: { fontSize: 7, color: GREY, marginTop: mm(0.6), lineHeight: 1.15 },
-  unitLine: { fontSize: 6.8, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2), lineHeight: 1.25 },
+  unitLine: { fontSize: 7.5, color: INK, marginTop: mm(0.5), paddingLeft: mm(2), lineHeight: 1.25 },
   cellCat: { fontSize: 7, color: GREY, width: mm(20), lineHeight: 1.3 },
   cellQty: { fontSize: 7.5, width: QTY_W, textAlign: "center", lineHeight: 1 },
 
@@ -154,9 +154,9 @@ export function GrnTemplate(data: GrnTemplateData) {
     // No full stop: every other number label in the family is bare
     // (`PO No` · `DO No` · `SO No` · `GRN Doc Date`).
     ["Supplier DO No", supplier_do_no],
-    ["Deliver To", deliver_to],
+    ["Supplier Deliver To", deliver_to],
     ["Goods arrived at", goods_arrived_at],
-    ["Goods received on", niceDate(goods_received_on)],
+    ["Goods Received Date", goods_received_on ? `${niceDate(goods_received_on)}${/^\d{4}-\d{2}-\d{2}$/.test(goods_received_on) ? " · Time not recorded" : ""}` : null],
   ];
 
   const totals = lines.reduce(
@@ -288,6 +288,11 @@ export function GrnTemplate(data: GrnTemplateData) {
             <View style={styles.desc}>
               <Text style={styles.descMain}>{l.description}</Text>
               <Text style={styles.descSku}>{l.sku}</Text>
+              {(l.unit_results ?? []).map((u) => (
+                <Text key={u.unit_code} style={styles.unitLine}>
+                  {u.unit_code} — {u.outcome_label}
+                </Text>
+              ))}
             </View>
             <Text style={styles.cellCat}>{l.category}</Text>
             <Text style={styles.cellQty}>{l.order_qty}</Text>
