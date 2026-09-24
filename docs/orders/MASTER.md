@@ -142,10 +142,24 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row except Delivery Order (BUILT by `0575`, Delivery MASTER §3.1) is APPROVED
-TARGET / NOT BUILT. Rows that were `…` are now approved as **original document date (YYMMDD) +
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** The formats below are
+approved targets; delivery status differs by family and by business. Rows that were `…` are now approved as **original document date (YYMMDD) +
 four random digits** (leading zeros allowed), Subscription with the `S` prefix, each prefix with its
 own independent daily pool of 10,000. Previously explicit formats are unchanged.
+
+**Implementation status — reconciled 2026-09-24 against the owning MASTERs and committed migrations:**
+
+| Family | Current implementation and remaining acceptance |
+|---|---|
+| Sales Order / Subscription Agreement | **APPROVED TARGET / NOT BUILT** for the new formats and revision presentation. Existing SO implementation is not proof of the new numbering target. |
+| Purchase Order | **PARTIALLY DELIVERED.** New `PO` short-format allocation and independent daily prefix pools are implemented by `0574`. Purchasing MASTER §6.1 records PR #1551 (`e9bc40a0a`), production application and live formatter/pool checks; its authenticated new-PO issue-to-print walk remains owed. `SPO` numbering and the Outright/Subscription business partition remain **APPROVED TARGET / NOT BUILT**. This Orders reconciliation cites that owning evidence; it is not a new production verification. |
+| Delivery Order | **BUILT** by `0575`; Delivery MASTER §3.1 owns the implementation and verification evidence for `DO` / `SDO`. This does not establish completion of other document families. |
+| Other document formats in the table | **APPROVED TARGET / NOT BUILT** for the new formats. `0574` changes the shared pool key but switches the formatter only for `PO`; a per-prefix pool does not prove that each prefix's approved number shape or business partition has shipped. |
+| Physical Unit ID | **KEEP EXISTING**, one shared sequential series; no new format or Subscription prefix is required. |
+
+Existing saved numbers, issued documents and historical references remain unchanged. A built
+allocator, a deployed revision and an authenticated document walk are separate evidence; do not
+promote the whole table to built from any one of them.
 
 | Document | Outright | Subscription |
 |---|---|---|
