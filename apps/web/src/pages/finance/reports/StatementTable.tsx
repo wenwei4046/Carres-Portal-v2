@@ -14,7 +14,7 @@ import Button from "@/components/kit/Button";
 import DataTable, { type Column, type GroupRowCell } from "@/components/kit/DataTable";
 import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
-import type { StatementLine, StatementSection } from "./report-queries";
+import type { StatementGroup, StatementLine, StatementSection } from "./report-queries";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -59,41 +59,53 @@ export const paidBeforeInvoiceNote = (line: Pick<StatementLine, "reclassified" |
 };
 
 export type StatementRow =
-  | { id: string; section: string; kind: "group"; name: string; amount: number }
+  | { id: string; section: string; kind: "group"; name: string; amount: number; depth: number }
   | {
       id: string; section: string; kind: "line"; code: string; name: string | null; amount: number;
-      nested: boolean; reclassified: number | null; reclassifiedFor: StatementLine["reclassifiedFor"];
+      nested: boolean; depth: number; reclassified: number | null; reclassifiedFor: StatementLine["reclassifiedFor"];
     }
   | { id: string; section: string; kind: "unclosed"; amount: number }
   | { id: string; section: string; kind: "nothing" };
 
 /**
- * The rows the table prints, in the served order. An account at RM 0.00 is
- * left out, as the Trial Balance does. A section where every account is at
- * RM 0.00 keeps its band and gets one line saying so (`No income in this
- * period.`). So even when every section is at zero, the bands stay, and so
- * does the bottom strip under them.
+ * The rows the table prints. A header line comes first, then its own
+ * accounts, then the headers under it, each with its own subtotal, down to
+ * any depth (0579). An account at RM 0.00 is left out, as the Trial Balance
+ * does, and so is a header with nothing but RM 0.00 under it. A section where
+ * every account is at RM 0.00 keeps its band and gets one line saying so
+ * (`No income in this period.`). So even when every section is at zero, the
+ * bands stay, and so does the bottom strip under them.
  */
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
   for (const s of sections) {
-    const groups = s.groups
-      .map((g) => ({ g, lines: g.lines.filter((l) => !isZeroMoney(l.amount)) }))
-      .filter((x) => x.lines.length > 0);
-    // A header line only earns its place when there is more than one.
-    const headed = groups.length > 1;
+    const codes = new Set(s.groups.map((g) => g.code));
+    const children = new Map<string | null, StatementGroup[]>();
+    for (const g of s.groups) {
+      const parent = g.parentCode !== null && codes.has(g.parentCode) ? g.parentCode : null;
+      children.set(parent, [...(children.get(parent) ?? []), g]);
+    }
+    const shown = (g: StatementGroup): boolean =>
+      g.lines.some((l) => !isZeroMoney(l.amount)) || (children.get(g.code) ?? []).some(shown);
+    const roots = (children.get(null) ?? []).filter(shown);
+    // A header line only earns its place when there is more than one header,
+    // or when a header holds headers.
+    const headed = roots.length > 1 || s.groups.some((g) => g.parentCode !== null && codes.has(g.parentCode) && shown(g));
     const before = out.length;
-    for (const { g, lines } of groups) {
+    const emit = (g: StatementGroup, depth: number) => {
       if (headed) {
-        out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal });
+        out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal, depth });
       }
-      for (const l of lines) {
+      for (const l of g.lines.filter((x) => !isZeroMoney(x.amount))) {
         out.push({
           id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
-          amount: l.amount, nested: headed, reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
+          amount: l.amount, nested: headed, depth: headed ? depth + 1 : depth,
+          reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
         });
       }
-    }
+      for (const c of (children.get(g.code) ?? []).filter(shown)) emit(c, depth + 1);
+    };
+    for (const g of roots) emit(g, 1);
     if (s.unclosedResult !== null && !isZeroMoney(s.unclosedResult)) {
       out.push({ id: `${s.kind}:unclosed`, section: s.kind, kind: "unclosed", amount: s.unclosedResult });
     }
@@ -101,6 +113,10 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
   }
   return out;
 }
+
+/** Left padding by depth: a header at depth 1 sits flush, each level in one step. */
+const INDENT = ["", "", "pl-4", "pl-8", "pl-12"] as const;
+const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
 
 export default function StatementTable({
   label,
@@ -140,13 +156,13 @@ export default function StatementTable({
       cell: (r) => {
         switch (r.kind) {
           case "group":
-            return <span className="font-semibold">{r.name}</span>;
+            return <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>;
           case "line": {
             // The account link, then (only when there is a note) a mark that
             // shows the note on hover or keyboard focus. A long name cuts off
             // with "…"; the mark never does.
             const note = lineNote?.(r) ?? null;
-            return <span className={`flex items-center ${r.nested ? "pl-4" : ""}`}>
+            return <span className={`flex items-center ${indent(r.depth)}`}>
               <Link className="min-w-0 truncate underline underline-offset-2" to={accountHref(r.code)}>
                 {r.code} {r.name ?? "Account name not available"}
               </Link>
