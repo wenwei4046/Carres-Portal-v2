@@ -25,7 +25,7 @@ export default function SearchInput({
   placeholder?: string;
   /** The top-strip shape — fully rounded, the Orders page's own search. */
   pill?: boolean;
-  /** A workspace toolbar control — 36px, 40px below 600px. */
+  /** A workspace toolbar control — 36px, 40px below 960px. */
   toolbar?: boolean;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "style" | "type" | "id">) {
   return (

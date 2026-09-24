@@ -647,15 +647,18 @@ the same group and item grammar; zero matches is not the same as zero work.
   on the right, 72px tall with 24px sides from 960px wide; below 960px 24/30/600, 12/16/400, 64px,
   16px sides. No breadcrumb row, no second title, KPI band or card header.
 - **Toolbar** — ONE white section (`rounded-work`), 12px padding (10px below 600px), 8px between
-  controls. Every control is 36px (40px below 600px), 14/20/400 (`text-control`), 12px sides,
+  controls. Every control is 36px (40px below 960px), 14/20/400 (`text-control`), 12px sides,
   `rounded-control`; the active `My Work`/`Team Work` segment is 600. Search is 240px from 960px
   and fills its row below. From 960px the toolbar is one row (`Filters` · `My Work · Team Work` ·
   Search · Owner · `Covered` · `Clear all`). **Below 960px it is exactly two rows** — `Date · Module ·
   My Work/Team Work`, then `Search · Owner · Covered` — **and below 600px exactly four**: `Date ·
-  Module` / `My Work · Team Work` / Search / `Owner · Covered`; rows are 40px apart by 8px. Freshness
-  is a read fact, not a manual business action.
+  Module` / `My Work · Team Work` / Search / `Owner · Covered`; rows are 40px apart by 8px. The ruling's
+  table put the 36/40px switch at 600px, but its 743px acceptance requires 40px rows; the
+  acceptance is the more specific line, so controls (and the 12px canvas padding) switch at
+  960px with the header, and only the toolbar's own 12/10px padding and the four-row split switch
+  at 600px. Freshness is a read fact, not a manual business action.
 - **THE WORK SHELL — owner correction 2026-09-24, APPROVED / BUILT.** The workspace is an UNFRAMED
-  grid on the light-grey canvas with 16px padding (12px below 600px): no frame, fill, radius or
+  grid on the light-grey canvas with 16px padding (12px below 960px): no frame, fill, radius or
   shadow around it. The toolbar is one white section; 16px below it the columns sit 16px apart.
   Every white surface is its own section: 1px `work-line` (`#ccd7e5`) edge, 9px `rounded-work`
   radius, no shadow, no coloured corner. Breakpoints read the Work page's own width:
@@ -842,7 +845,7 @@ Scheduled delivery · 27 Oct                        ← only when scheduled; tim
 **Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
 redesigned):** party heading 15/20/600 · current action 14/20/600 · secondary fact 12/16/400 ·
 section label 11/14/600 uppercase · check row 13/18/400 · history row 12/16/400 · button 13/18/500,
-at least 36px tall (40px below 600px). Customer and Supplier headings use the same 15/20/600.
+at least 36px tall (40px below 960px). Customer and Supplier headings use the same 15/20/600.
 
 `Logistics not assigned` replaces the heading when no company carries the delivery. Requested
 date, PO, GRN, DO, money-in-general and the check rows never sit on the collapsed card.

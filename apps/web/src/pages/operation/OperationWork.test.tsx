@@ -247,14 +247,14 @@ describe("Operation Work — one server feed", () => {
         screen.getByRole("searchbox"),
         screen.getByRole("button", { name: "Covered" }),
       ]) {
-        // 40px below 600px, 36px from 600px; 14/20 type.
+        // 40px below 960px, 36px from 960px; 14/20 type.
         expect(control.className).toContain("h-10");
-        expect(control.className).toContain("min-[600px]:h-9");
+        expect(control.className).toContain("min-[960px]:h-9");
         expect(control.className).toContain("text-control");
       }
       // The segmented control's 1px border sits inside the 36px (40px).
       expect(screen.getByTestId("work-view-mine").className).toContain("h-[38px]");
-      expect(screen.getByTestId("work-view-mine").className).toContain("min-[600px]:h-[34px]");
+      expect(screen.getByTestId("work-view-mine").className).toContain("min-[960px]:h-[34px]");
       expect(screen.getByTestId("work-view-mine").className).toContain("font-semibold");
       expect(screen.getByTestId("work-view-switch").className).toContain("max-[599px]:basis-full");
     } finally {
@@ -262,7 +262,7 @@ describe("Operation Work — one server feed", () => {
     }
   });
 
-  it("from 960px the toolbar is one row, search 240px, controls 36px (40px below 600px)", () => {
+  it("from 960px the toolbar is one row, search 240px, controls 36px (40px below 960px)", () => {
     const savedWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     try {
@@ -271,7 +271,7 @@ describe("Operation Work — one server feed", () => {
       expect(toolbar.className).toContain("flex-wrap");
       for (const row of within(toolbar).getAllByTestId(/^work-toolbar-row-/)) expect(row.className).toBe("contents");
       expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-60");
-      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[600px]:h-9");
+      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[960px]:h-9");
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
     }

@@ -37,11 +37,11 @@ const VARIANT: Record<Variant, string> = {
 /** 32px is the live control height every form row already aligns to; 24px is
  *  the dense band. Both are heights, not spacing — Q1 does not reach them.
  *  `touch` is the Work party-card button (owner density ruling 2026-09-25):
- *  36px from 600px, 40px below, where a finger presses it. */
+ *  36px from 960px, 40px below, where a finger presses it. */
 const SIZE: Record<Size, string> = {
   md: "h-8 px-3 gap-2",
   sm: "h-6 px-2 gap-1",
-  touch: "h-10 px-3 gap-1.5 min-[600px]:h-9",
+  touch: "h-10 px-3 gap-1.5 min-[960px]:h-9",
 };
 
 const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14, touch: 14 };

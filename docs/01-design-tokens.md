@@ -52,7 +52,7 @@ is the owner's Work toolbar ruling of 2026-09-25.
 | body | `text-body` | 13 | 400 | 18 | default — table rows, prose, buttons |
 | meta | `text-meta` | 12 | 400 | 16 | secondary info, captions, timestamps |
 | label | `text-label` | 11 | 500 | 14 | field labels, micro-labels, pill text |
-| control | `text-control` | 14 | 400 | 20 | workspace toolbar controls (Work) — 36px tall, 40px below 600px |
+| control | `text-control` | 14 | 400 | 20 | workspace toolbar controls (Work) — 36px tall, 40px below 960px |
 
 **Weights: 400 · 500 · 600. There is no 700.** Frozen by Jess 2026-07-28 —
 600 and 700 were doing the same job at every size. A kit file writing
