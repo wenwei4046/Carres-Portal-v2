@@ -196,46 +196,41 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   row's place never move. The main row stays 72px; the details below it grow freely. Shared Work's
   `?invoice=` opens that order's row the same way on `All unpaid orders`; only money no longer on
   the Monitor (already paid) opens the full-page workspace.
-- **The rail is the Monday–Friday follow-up plan (owner ruling 2026-09-16 — this replaces the
-  seven rail filters and the summary sentences completely).** It answers *what do I do today, and
-  this week*:
+- **THE RAIL IS THE STATUS RAIL — owner ruling 2026-09-25 (Payment Blueprint segment 2; this
+  overwrites the 2026-09-16 Monday–Friday follow-up plan completely).** The collection desk asks
+  *which orders need my hands now*; the week view (`what day`) belongs to Work's own Date rail with
+  Module = Payment, so the two never repeat each other. One row per status, every status shown, a
+  count of ORDERS on each, in four groups:
 
   ```text
-  ‹  Mon, 14 Sep – Fri, 18 Sep  ›          previous / next week · `This week` when elsewhere
-  Mon, 14 Sep                              No follow-up planned
-  Tue, 15 Sep  [Today]                     Ask 3 customers to pay
-                                           Check 2 promised payments
-                                           Includes 2 not done since Thu, 10 Sep
-  Wed, 16 Sep                              Public holiday · Malaysia Day
-  ──────────────
-  All unpaid orders                  42
+  Status
+  今天要动手 (Needs action)     Missed (red) · Ask customer today · Payment due today ·
+                                Customer promised to pay today · Storage Invoice not paid*
+  不用动，在等 (Waiting)        Payment due later · No delivery date · Waiting for goods
+  别人的事 (Someone else's)     Finance hold · Needs review
+  完成 (Done)                   Paid orders
+  ──────────────────────────
+  All unpaid orders
   ```
 
-  - **One source: the shared Work Engine.** A day's lines are the collection Work items the engine
-    already raised — `payment.collect_customer_balance` → `Ask {n} customer(s) to pay`,
-    `payment.missed_promise` → `Check {n} promised payment(s)`, `payment.send_storage_invoice` →
-    `Collect {n} storage payment(s)` — placed on the item's own due day. The engine's admission
-    (催钱前先看货), company calendar, the owner's working day and today's cover therefore apply
-    unchanged. The rail creates no work, stores no schedule and has no manual planning. A count is
-    ORDERS: one order with two invoices under one rule is one customer.
-  - **Picking a day narrows the listing beside it to that day's orders** (`?day=YYYY-MM-DD`); the
-    count and the listing are one set by construction — an item that resolves to no Monitor row is
-    not counted. The default is the plan day. `All unpaid orders` (`?day=all`) keeps every unpaid SO
-    reachable, including orders the engine has not placed (waiting for goods, no delivery date).
-  - **The plan day and Today.** The plan day is today when Operation works today (Mon–Fri, not a
-    public holiday), else the next such day. Only a working today wears the blue ring and the word
-    `Today`; another date, a weekend or a public holiday never does. The picked day is the blue
-    fill; the two never compete (UI MASTER). A public holiday is named on its card.
-  - **Unfinished earlier work** stays open on the plan day, counted once, with its original day
-    (`Includes {n} not done since {day}`); its own past day never re-counts it and says
-    `{n} not done · counted under Today` (or the plan day's date), and still lists those orders when
-    picked. No due date is ever changed.
-  - An empty day says `No follow-up planned`; an unanswered feed says `Reading the collection desk…`
-    (never a quiet week); a failed feed says `The follow-up plan could not be loaded.` with `Try
-    again`. A role that cannot read the Work feed (Finance) sees `The follow-up plan is
-    Operation's.` and lands on `All unpaid orders`.
-  - Every line wraps inside the 240px rail — no truncation, clipping or sideways scroll. The rail
-    keeps the governed collapse; collapsed, the sheet header repeats the picked day and its lines.
+  - Picking a row narrows the listing to those Sales Orders (`?status=`); the count and the listing
+    are one set by construction. Default = `Missed` when it is above 0, else `Ask customer today`,
+    else `All unpaid orders`. A count is ORDERS; every row prints its number, `0` included.
+  - `Missed` = `Payment should have been received` (the deadline, or the customer's promised day,
+    has passed with money still owed). `Payment due later` = a clock exists but the ask day has not
+    come. `Waiting for goods` = `Arrival not confirmed` (催钱前先看货). `Finance hold` and `Needs
+    review` are other people's work shown so the desk is complete; they carry no Operation action.
+    `Paid orders` = `Balance due` RM 0 — the row that gives a paid Sales Order its home: the listing
+    prints `Paid` in `Payment timing` and its expansion holds the Documents (Receipts · Invoice ·
+    Statement) and Communication History. *`Storage Invoice not paid` stands until the Storage
+    segment settles whether storage folds into `Balance due`.
+  - The group headings are the four English words above in the rail's governed group style (UI
+    MASTER §6.7 rail style C); the Chinese here is the explanation, never on screen.
+  - The rail keeps the governed collapse (below 1100px a 44px strip with `Show filters`; a drawer on
+    a phone); collapsed, the sheet header repeats the picked status and its count. A role that
+    cannot read the Work feed (Finance) sees the same statuses computed from Payment's own read and
+    no owner avatars; an unanswered read prints no numbers (`Reading the collection desk…`); a failed
+    read says `The collection desk could not be loaded.` with `Try again`.
 - Completed payment work leaves the Monitor; historical money remains in Payment Records. A
   scoped `?order=` for a paid SO says `SO-{n} needs no payment right now. Its money is in
   Payment Records.`
