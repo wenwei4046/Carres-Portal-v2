@@ -249,7 +249,9 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
   creates no document row (its number is owned in the pool).
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
-  facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·
+  facts decide `Created · Out for delivery · Delivered · Partially Delivered · Failed Delivery (each
+  + its ONE reason; owner ruling 2026-09-25 — the umbrella `Delivery exception` is retired, `Exception`
+  is a banned word and the result itself says what happened) ·
   Cancelled`. **This is the DOCUMENT's own vocabulary and it stays as it is.** **`Arrived`
   (BUILT 2026-09-13, Card 20):** an intermediate Journey leg's document — a leg before the
   last — whose `delivered` result (0491/0496) is the goods reaching the named partner warehouse
@@ -258,7 +260,7 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
   on the document = the §4 chain's `Received by logistics` fact with no result recorded yet; it is
   never derived from the calendar. The document ladder and the Monitor status dictionary in §8.4
   never borrow each other's words.
-- **A failed document keeps its Delivery exception and reason FOREVER**; it is never rewritten as
+- **A failed document keeps its `Failed Delivery` / `Partially Delivered` and reason FOREVER**; it is never rewritten as
   Delivered. When a new date is booked the system issues a NEW DO; the old one stays as history.
 - **Staff can never delete or void a DO.** The ONE void door (`delivery_order_void`) accepts only
   `order_cancelled` or `rescheduled` and records reason, actor and time. The booking-confirm door
@@ -481,7 +483,8 @@ Employee results are **`Delivered`** · **`Partially Delivered`** · **`Failed D
 
 `Delivered` requires actual time, receiver, delivered goods and the governed evidence. Missing
 evidence creates the `Upload delivery proof` work, whose row names `Upload delivery photo` and/or
-`Upload signed Delivery Order`; completing or reviewing proof never renames the result.
+`Upload signed DO` (owner ruling 2026-09-25; the paper's full name stays `Signed Delivery Order` in
+prose and on the document); completing or reviewing proof never renames the result.
 
 For each exact delivered Unit, Delivery emits one idempotent success fact. If Stock says that Unit
 was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
@@ -639,8 +642,8 @@ DELIVERY STATUS narrowing.
 **The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
 counts computed over the rows the other groups already narrowed (Law D):
 
-- **`WORK TO DO`**, rows in this order: `All delivery work` · `Logistics not assigned` · `Call
-  customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
+- **`WORK TO DO`**, rows in this order: `All delivery work` · `Logistics not assigned` · `Get
+  delivery date` (owner ruling 2026-09-25; `Call customer` retired) · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
   proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
   2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
   to `Work to do` and is not drawn on the schedule tab.
@@ -664,15 +667,15 @@ calendar word or a WORK TO DO queue), plus `?date=`, `?region=`, `?logistics=`, 
 filter drawer and the work list becomes one card per delivery carrying the same facts — the same
 two status lines from the same arithmetic (owner ruling 2026-09-25: a card never prints a queue
 word such as `No confirmed date` where the register prints `Not scheduled`, and never a bare date
-without its act).
+without its act); its one button is `See delivery details`.
 
-**`Call customer` and the contact week.** Under `Call customer`, and under no other queue, a
+**`Get delivery date` and the contact week.** Under `Get delivery date`, and under no other queue, a
 Monday-to-Saturday strip lists the six operating days with the count of contact deadlines due on
 each, its own arrows, and the caption `Contact deadlines — not supplier or delivery dates`. An
 `Overdue contact` chip beside the six days answers across every date. `Overdue delivery` (the rail
 queue: a confirmed trip whose day has passed with no result) and `Overdue contact` (a conversation
-that missed its deadline) are two populations and never share one bare `Overdue` count. `Call
-customer` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
+that missed its deadline) are two populations and never share one bare `Overdue` count. `Get
+delivery date` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
 
 **The calendar writes nothing.** The four view words are governed and a layout NEVER wears a word
 it does not honour (owner ruling 2026-09-14):
@@ -702,8 +705,10 @@ it already sits in, and it is a text line, never a pill that can truncate. A tra
 visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
 never the customer's town**. Never a phone, money detail, employee name, driver, vehicle,
 expected arrival or upload time. An unconfirmed delivery never enters a date cell. A fully empty
-range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
-`{n} deliveries need a confirmed date.` count and its door.
+range shows one spanning state in two lines (owner ruling 2026-09-25): `No delivery scheduled this
+week.` (`… on {day}.` in Day view, `… this month.` in Month) and, beneath it, the real count as
+the door itself — `{n} orders still need a delivery date.` in link blue, opening the `Get
+delivery date` queue; no `Open …` button and no second verb.
 
 **Compact calendar — deployed and observed (2026-09-14).**
 The owner-approved compact composition is implemented in the shared `ScheduleCard`:
@@ -711,8 +716,11 @@ DO number when present, SO number on its own line, no legacy reference or custom
 the face; every physical product line has its own category icon and quantity, with its full
 name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
 appears only for an explicit assignment. A real journey uses its actual From and To; no fixed
-transit stop is inferred. The one footer is `Open DO` or the existing `Edit Delivery` door.
-An unissued DO is omitted from the calendar card; the register's absence is the owner's `DO`.
+transit stop is inferred. **The card's doors (owner ruling 2026-09-25):** the DO number at the top
+of the card is the door to the Delivery Order — no `Open DO` footer; a card without a DO carries
+one footer link, `See delivery details`, which reveals and expands the Monitor row (`Edit Delivery`
+and `Show delivery brief` are retired). An unissued DO is omitted from the calendar card; the
+register's absence is the owner's `DO`.
 
 Receipt marks currently require exact `reserved_order_line_id` bindings in reserved/sold
 stock records. Same-SKU pooling cannot light two product lines green. Missing, invalid or
@@ -839,12 +847,21 @@ Delivery Orders register offers from the same menu.
 the contact deadline as a glyph and a day:
 
 ```
-Call customer                 nothing has been scheduled yet
+Get delivery date from NETS   nothing has been scheduled yet; NETS contacts the customer
 [call] Fri, 18 Sep
 
-Call customer                 the deadline has passed
+Get delivery date from NETS   the deadline has passed
 [late] Fri, 18 Sep            red, and it keeps the day it missed
+
+Get delivery date from customer   the one Carres-contacts case (Workspace §5.10 exceptions)
 ```
+
+**WHO + ACTION + OBJECT — owner ruling 2026-09-25.** Every status line says who does what to
+what, in at most six words: `Get delivery date from NETS` · `Ask NETS for the result` ·
+`Collected by NETS` · `Driver and vehicle not recorded`. This overwrites the 2026-09-14 "the
+party leaves the sentence" half below: the company is named again, because `Call customer` did
+not say what to get or from whom. `Open` / `Show` never label an act; a door is the number or the
+sentence itself.
 
 The glyphs are the kit's own (`components/kit/Icon`: `call` and `late`) at the row size. No glyph
 replaces the action text and the action text never becomes an icon. **The party leaves the
@@ -861,9 +878,9 @@ not move` once it has passed, are the cell's `title` and its accessible name, an
 Search matches and what the Excel export prints. A row whose customer named no day owes no
 deadline and shows none: a step with no anchor can never be late.
 
-**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS, so
-the two contact rungs — which now print one sentence — are ONE option, and the pick narrows by
-the label rather than by the internal key.
+**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS; the
+two contact rungs print two sentences since 2026-09-25 (`… from {partner}` · `… from customer`)
+and are two options, and a pick narrows by the label rather than by the internal key.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
@@ -1188,10 +1205,10 @@ line sits beside it and says otherwise.
 ```
 LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
   customer leg          transfer leg             Ready
-  Scheduled             Transfer scheduled       Stock risk
+  Scheduled             Transfer scheduled       Goods not ready
   Collected by {p}      Collected for transfer   Hold delivery
-  On the way to         In transit to {stop}     Logistics details incomplete
-    customer                                     DO not released
+  On the way to         In transit to {stop}     Driver and vehicle not recorded
+    customer
   Delivered to          Arrived at {stop}
     customer
   Failed Delivery       Transfer failed
@@ -1199,8 +1216,11 @@ LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
 
 **The two ladders share no word,** so `Delivered to customer` can never be reached by a warehouse
 leg and `Arrived at {stop}` never claims a customer received anything. Readiness precedence when
-more than one applies: `Hold delivery` → `Stock risk` → `Logistics details incomplete` →
-`DO not released` → `Ready`; money first, because a trip that may not legally go is the harder stop.
+more than one applies: `Hold delivery` → `Goods not ready` → `Driver and vehicle not recorded` →
+`Ready`; money first, because a trip that may not legally go is the harder stop. `Stock risk`,
+`Logistics details incomplete` and `DO not released` are retired (owner ruling 2026-09-25): the
+first two did not say what was missing, and the third named a consequence whose cause the line
+already prints — a card with no DO number shows the reason, never the absence.
 
 **`Arrived at customer` does not exist and may not be added by inference (owner ruling 2026-09-14).**
 Carres records no arrival-at-customer event: `delivery_attempts` holds `delivered` / `partial` /
@@ -1227,8 +1247,8 @@ and is not restored. `Booked` stays banned.
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
 | no partner on the scope | `Assign logistics` | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, no contact record, the partner contacts the customer | `Call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, no contact record, Carres contacts the customer | `Call customer` — the same act, a different owner | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, the partner contacts the customer | `Get delivery date from {partner}` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, Carres contacts the customer | `Get delivery date from customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
 | scheduled date recorded (time optional) — a CUSTOMER leg | `Scheduled` | green | the time, when recorded |
 | scheduled date recorded (time optional) — a TRANSFER leg | `Transfer scheduled` | none | the time, when recorded |
@@ -1324,7 +1344,7 @@ The four panels and their inline doors are unchanged. Six corrections bind:
 5. **`Access not recorded` is an actionable alert,** printed in the orange problem treatment with
    the row's `SO No` door — never the neutral grey absence word.
 6. **Logistics completeness is stated once.** When a delivery is confirmed and driver, vehicle
-   plate, pickup or ETA is missing, Panel 3 prints **`Logistics details incomplete`** above the
+   plate, pickup or ETA is missing, Panel 3 prints **`Driver and vehicle not recorded`** above the
    facts. The individual `Not recorded` lines remain; the verdict is what stops the operator
    having to notice five absences. The emergency contact prints **name, relationship and phone**
    as three distinct facts.
@@ -1388,8 +1408,7 @@ expansion's governed write state.
 ### 8.7 · The Delivery Orders register — production-verified 2026-09-11
 
 `/operation/delivery-orders` is the shared Register engine top to bottom: row checkboxes, header
-select-all over the visible filtered rows, the in-place same-height selection toolbar, ▸ expansion
-showing THIS TRIP's goods lines read-only (the one `trip_groups` derivation), sticky `DO No`
+select-all over the visible filtered rows, the in-place same-height selection toolbar, ▸ expansion opening the DELIVERY ORDER BRIEF (owner ruling 2026-09-26, below), sticky `DO No`
 identity, search, governed per-column filters, Export, Columns and the fixed 32px footer.
 
 **Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
@@ -1399,9 +1418,13 @@ identity, search, governed per-column filters, Export, Columns and the fixed 32p
   Location` · `Driver submission`. Off by default: `Goods` · `Created`. `Requested Delivery Date`
   opens no editor here; `SO No` opens the Sales Order and `DO No` the Delivery Order. `Assign
   logistics` never appears on this register.
-- **One `Status` column with the document ladder** (§3.1); line 2 of a `Delivery exception`
-  carries the recorded result and its reason (`Partially Delivered · {reason}`); `Cancelled`
-  keeps its void reason. Search, filter and export print the same spelling as the cell.
+- **One `Status` column with the document ladder** (§3.1): line 1 `Created` · `Out for delivery` ·
+  `Arrived` · `Delivered` · `Partially Delivered` · `Failed Delivery` · `Cancelled`; line 2 the ONE
+  reason (`Customer unreachable`, `Sofa not ready`, `Rescheduled`). The umbrella `Delivery
+  exception` is retired (owner ruling 2026-09-25). Search, filter and export print the same
+  spelling as the cell. **Date first (owner ruling 2026-09-17, re-confirmed 2026-09-25):** `DO Date ·
+  DO No` lead and pin (both at ≥768px, `DO No` alone below); the heading is `DO Date`, never `DO
+  date`; the row is 40px (UI §6.0), adopted in this page's build.
 - **`Driver submission`**: `Photos {n}` opens the gallery, `Videos {n}` the player, `Signed
   Delivery Order` the paper, each a door; a kind with no files offers no button; an unknown ledger
   prints `Not recorded`; every viewer states that an upload is evidence of an upload. The media
@@ -1415,6 +1438,32 @@ identity, search, governed per-column filters, Export, Columns and the fixed 32p
   only:` strip lists every live condition. Below 1100px the rail starts collapsed.
 - **Selection:** `{N} delivery orders selected · Clear · Print {N} delivery orders` plus the
   shared selected-row Excel export.
+
+**THE DELIVERY ORDER BRIEF — owner ruling 2026-09-26, APPROVED TARGET / NOT BUILT.** The row's ▸
+opens the document's own brief IN PLACE, on the Monitor grammar (§8.5–8.6): the operator records the
+result, uploads the signed DO, confirms the receipt and reviews the proof without leaving the
+register, its queue or its narrowings, and the row moves queues by itself. The brief is TWO
+COLUMNS at a canvas ≥1024px — left, what happened; right, whose document this is — and one column
+below it (right block first):
+
+```
+LEFT · what happened (scrolls with the row)         RIGHT · whose document (facts, read-only)
+  Delivery history      Record delivery result        Status     Delivered · Partially Delivered · …
+  Warehouse handover    Confirm logistics receipt     Proof      Not reviewed yet · Proof Accepted …
+  Evidence              Upload signed DO ·            Hold       Paid · Hold delivery · RM x unpaid
+                        Proof review · Save review    Customer   name · phone · address · building
+  Exceptions            (facts and Work lines)        Logistics  company · driver · vehicle
+                                                      Scheduled  day · time · ETA · Warehouse
+                                                      Related    SO-{n} · Order Route · Payments ·
+                                                                 Unit … · Case … · sibling DO
+```
+
+The left column carries the acts in each panel's right slot (the Monitor's one-control rule); the
+right column carries no control — every fact there is Delivery's own record or a read of Sales,
+Stock or Payment, and every door is the record's number or name. The goods lines (`trip_groups`)
+sit at the top of the left column, read-only. The register's WORK TO DO queues put no extra button
+on the row any more: the queue reveals the row and the act is in the brief. The `DO No` still opens
+the full Delivery Order object (§9) — for `Print` and for links from outside the register.
 
 ### 8.8 · The arrangement record and partner writes
 
@@ -1507,8 +1556,17 @@ the two documents cannot drift.
 The DO object uses the existing Carres Object Detail Template and only its governed section and
 navigation mechanism. Object Header: `← Delivery Orders | DO-180826-3035 · SO-1322 · {customer}`
 with `Print` and the global utilities. No tab strip is created for the sections below; they are
-one governed scroll of kit `Panel` sections, in this order, each with its own header control only
-where an act exists:
+kit `Panel` sections in this order, each with its own header control only where an act exists.
+**Two columns at ≥1024px (owner ruling 2026-09-26: screens are wide, not tall):** the left column
+scrolls and holds the document and what happened (`Delivery Order` · `Delivery history` ·
+`Warehouse handover` · `Evidence` · `Exceptions` · `History`); the right column is fixed, about
+420px (the token side-panel width), and holds whose document this is — `Status` · `Proof` · `Hold`
+· customer and address · logistics, driver, vehicle, scheduled day, time, ETA, Warehouse ·
+`Related records` — all read-only, each door the record's number or name. Below 1024px the right
+block prints first and the page is one scroll. The register's in-row brief (§8.7) is the same
+composition without the document; this page exists for `Print` and for links from Work and other
+modules. The pattern is Shopify's order page and Linear's issue page — facts fixed on the right,
+events on the left — on Carres tokens and panels:
 
 ```
 Delivery Order        customer, address, Warehouse, partner, arrangement, goods scope, site
@@ -1521,7 +1579,10 @@ Warehouse handover    the recorded chain with recorder, role, company and proof;
 Evidence              every file bound to the event it proves; the proof-review acts (§6.1)
 Exceptions            open and historical problems with owner and next act
 History               the append-only audit of every object change and proxy record
-Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs
+Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs — each
+                      door is the record's own number or name (`SO-1322` · `Order Route` · `Payments` ·
+                      `Unit id-dtd627907` · `Case SC-1031` · `DO2609-0002`), never `Open … →` (owner
+                      ruling 2026-09-25)
 ```
 
 **BUILT 2026-09-13 (Card 16):** `DeliveryOrderPage.tsx` is the seven sections above in order on
@@ -1568,7 +1629,7 @@ appears in any line. The row's status word carries the fact.
 | confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
 | confirmed day passed, no result | `Ask NETS` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
 | delivered, photo missing | `Upload the delivery photo` | `Attach the photo from NETS` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | photo on the ledger |
-| delivered, signed DO missing | `Upload the signed Delivery Order` | `Attach the paper the customer signed` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | signed file on record |
+| delivered, signed DO missing | `Upload the signed DO` | `Attach the paper the customer signed` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | signed file on record |
 | delivered, proof not reviewed | `Check the delivery proof` | `Accept it, ask for more, or reject it` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | review recorded |
 | Failed Delivery recorded | the §7 next action, for example `Call the customer` | `Confirm a new delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | the named next fact |
 | Cannot Deliver reported by the partner | `Decide the next step for this delivery` | `Keep NETS with a new date, correct the details, or change logistics` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | arrangement event recorded |
@@ -1832,6 +1893,8 @@ only when a real vehicle-level fact exists.
 | Paid in full · Payment pending · Needs attention, on Monitor | `Paid` · `Hold delivery` over `RM {amount} unpaid` · a specific fact word |
 | Do not deliver · still to collect · Finance is holding this delivery · Payment blocked · Money in full | `Hold delivery` over `RM {amount} unpaid` or `Finance hold · {reason}`; the gate's met word is `Paid` (owner ruling 2026-09-25, §3) |
 | Open Sales Order to change, inside the brief | `View Sales Order` (read-only, in place); the row's `SO No` opens the order to change |
+| Delivery exception · DO date · `Open {record} →` · `No delivery result recorded yet — evidence binds to the delivery it proves.` · `No signed document yet` · `No delivery photo yet` · `Upload signed Delivery Order` (queue and button) · the long register empty sentence | `Partially Delivered` / `Failed Delivery` on line 1 · `DO Date` · the record's number or name · `No delivery result yet.` · `No signed DO yet` · `No photo yet` · `Upload signed DO` · `No delivery orders yet.` over `The system issues one when goods, logistics, date and money are ready.` (owner ruling 2026-09-25, segment 3) |
+| Call customer · Stock risk · Logistics details incomplete · DO not released · Open DO · Show delivery brief · `{n} deliveries need a confirmed date.` · Open No confirmed date | `Get delivery date from {partner}` / `… from customer` · `Goods not ready` · `Driver and vehicle not recorded` · (nothing — the reason prints) · the DO number · `See delivery details` · `No delivery scheduled this week.` over the link `{n} orders still need a delivery date.` (owner ruling 2026-09-25) |
 | Ready at Carres Klang Warehouse | `Ready` in Status and `Carres Klang` in Location |
 | Edit Delivery · Save Delivery | `Update date and time` · `Save scheduled delivery`; the other panel acts by their own names |
 | `Call {partner} — confirm delivery date` | `Call NETS` over `Confirm the delivery date` |
@@ -1864,6 +1927,7 @@ their absence as a design blind spot:
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
 | **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; `Order details incomplete` still prints the deadline on line two; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
+| the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
 ### 15.2 · Whole-domain closure

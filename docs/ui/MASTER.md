@@ -519,7 +519,14 @@ panel owns a Delivery write, the `Panel`'s one right-slot control (`Update date 
 `Assign logistics` / `Change logistics`) flips that panel's own body into a focused edit state
 with its named Save (`Save scheduled delivery`); the operator stays on the same row, queue and
 narrowings. No overflow menu and no separate dialog is invented for these acts, and no other
-register may copy this without its own owner ruling. Sales facts inside the brief stay read-only:
+register may copy this without its own owner ruling. **The Delivery Orders register has that ruling
+(owner, 2026-09-26):** its ▸ opens the Delivery Order brief in place — two columns at ≥1024px, acts
+on the left in each panel's right slot, read-only facts on the right — so a result, a signed DO, a
+receipt and a proof review are recorded without leaving the register (`../delivery/MASTER.md` §8.7).
+**Two-column object composition (same ruling):** an object whose job is *look at facts, read what
+happened* — the Delivery Order — lays its fixed facts in a ~420px right column and its events in a
+scrolling left column at ≥1024px (Shopify order page · Linear issue page · GitHub PR), one column
+below; a Sales Order keeps its tabs and a PO its 50/50 edit split. Sales facts inside the brief stay read-only:
 the first panel's control `View Sales Order` unfolds the governed Sales Order document in place
 (owner ruling 2026-09-25 — INSPECT stays INSPECT, no fourth surface), and the row's `SO No` is the
 door to change them. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
@@ -865,8 +872,8 @@ Current implementation differences from the above target are build gaps, not a c
   second action. It is a status word, not an action sentence.
   **THE DELIVERY SCHEDULE CARD CARRIES TWO FACTS ON TWO LINES — owner ruling 2026-09-14
   (`../delivery/MASTER.md` §8.2 · §8.4):** line 1 the journey progress, line 2 the readiness or
-  blocker (`Ready` · `Stock risk` · `Hold delivery` · `Logistics details incomplete` ·
-  `DO not released`). The two never merge into one status, because a progress rung and a
+  blocker (`Ready` · `Goods not ready` · `Hold delivery` · `Driver and vehicle not recorded`;
+  owner ruling 2026-09-25). The two never merge into one status, because a progress rung and a
   readiness fact answer different questions and come from different arithmetics. Every card also
   wears a TYPE label (`DELIVERY` · `TRANSFER`) whose two populations are never summed into one
   total. No other surface adopts this grammar without its own owner ruling.
