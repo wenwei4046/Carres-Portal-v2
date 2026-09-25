@@ -52,7 +52,9 @@ describe.skipIf(!URL)("1230 Advances to suppliers is written only by the Advance
   let expense = "";
   let onDate = "";
   let supplierId = "";
-  const line = (code: string) => JSON.stringify([{ account_code: code, description: "IT line", amount: 10 }]);
+  // Every voucher line names its department (0540); Office takes any expense.
+  const line = (code: string) =>
+    JSON.stringify([{ account_code: code, description: "IT line", amount: 10, department_type: "OFFICE" }]);
   const saveDirect = (code: string) =>
     attempt(
       `select public.payment_voucher_save_draft(null, 'DIRECT', null, $1, $2::date, $3, $4::jsonb) as id`,

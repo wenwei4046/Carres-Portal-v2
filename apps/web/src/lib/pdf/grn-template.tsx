@@ -22,10 +22,11 @@
  *   the actual actor — three facts, never one overwritten name.
  */
 
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY, niceDate } from "./letterhead";
 import type { GrnTemplateData } from "./types";
+import { UnitCode, unitRuns } from "./po-template";
 
 const INK = "#1A1714";
 const GREY = "#7A7268";
@@ -35,10 +36,10 @@ const BAR_BG = INK;
 const mm = (v: number) => v * 2.83465;
 
 const MARGIN = mm(12);
-const HEADER_H = mm(20);
+const HEADER_H = mm(26);
 const FOOTER_H = mm(8);
 
-const QTY_W = mm(13);
+const QTY_W = mm(18);
 
 const styles = StyleSheet.create({
   page: {
@@ -53,6 +54,8 @@ const styles = StyleSheet.create({
   // ── header (fixed) — SO-PDF-STANDARD §3 ──
   header: { position: "absolute", top: MARGIN, left: MARGIN, right: MARGIN },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerLeft: { flex: 1, paddingRight: mm(4), flexDirection: "row", alignItems: "center" },
+  headerLogo: { width: mm(13), height: mm(13), objectFit: "contain", marginRight: mm(4) },
   companyName: { fontSize: 14, fontWeight: 700 },
   ssmInline: { fontSize: 8, color: GREY, marginLeft: mm(2.5) },
   legalLine: { fontSize: 8, lineHeight: 1.42 },
@@ -76,7 +79,7 @@ const styles = StyleSheet.create({
   cards: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), minHeight: mm(26) },
   blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1 },
   pairRow: { flexDirection: "row" },
-  pairLabel: { fontSize: 8, color: GREY, width: mm(30), lineHeight: 1.42 },
+  pairLabel: { fontSize: 8, color: GREY, width: mm(35), lineHeight: 1.42 },
   pairValue: { fontSize: 8, flex: 1, lineHeight: 1.42 },
 
   // ── items table — the five quantity words ──
@@ -87,20 +90,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: mm(2),
     marginTop: mm(2.5),
   },
-  th: { fontSize: 6.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
+  th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(6) },
   colCat: { width: mm(20) },
   // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
   // DOCUMENT-KIT.md §3 rule 5) — five quantity columns included.
   colQty: { width: QTY_W, textAlign: "center" },
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
-  rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
+  rowHair: { position: "relative", borderLeftWidth: 0.3, borderRightWidth: 0.3, borderBottomWidth: 0.3, borderColor: HAIR },
+  vline: { position: "absolute", top: 0, bottom: 0, width: 0.3, backgroundColor: HAIR },
   cellNo: { fontSize: 7, color: GREY, width: mm(6), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
-  desc: { flex: 1, paddingRight: mm(2) },
+  desc: { flex: 1, paddingLeft: mm(1.5), paddingRight: mm(2) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1.15 },
   descSku: { fontSize: 7, color: GREY, marginTop: mm(0.6), lineHeight: 1.15 },
-  unitLine: { fontSize: 6.8, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2), lineHeight: 1.25 },
-  cellCat: { fontSize: 7, color: GREY, width: mm(20), lineHeight: 1.3 },
+  unitLine: { fontSize: 7.5, color: INK, marginTop: mm(0.5), paddingLeft: mm(2), lineHeight: 1.25 },
+  cellCat: { fontSize: 7, color: GREY, width: mm(20), paddingLeft: mm(1.5), lineHeight: 1.3 },
   cellQty: { fontSize: 7.5, width: QTY_W, textAlign: "center", lineHeight: 1 },
 
   // ── evidence + extra goods ──
@@ -125,7 +129,19 @@ const styles = StyleSheet.create({
   footerPage: { fontSize: 7.5, color: GREY, width: mm(45), textAlign: "right" },
 });
 
+function outcomeRuns(results: NonNullable<GrnTemplateData["unit_results"]>) {
+  const groups = new Map<string, string[]>();
+  for (const result of results) {
+    const codes = groups.get(result.outcome_label) ?? [];
+    codes.push(result.unit_code);
+    groups.set(result.outcome_label, codes);
+  }
+  return [...groups].flatMap(([outcome, codes]) =>
+    unitRuns(codes).map((run) => ({ ...run, outcome })));
+}
+
 export function GrnTemplate(data: GrnTemplateData) {
+  const logoSrc = (globalThis as { __CARRES_LOGO_SRC__?: string }).__CARRES_LOGO_SRC__ ?? "/carres-logo.png";
   const {
     grn_no,
     grn_doc_date,
@@ -144,31 +160,33 @@ export function GrnTemplate(data: GrnTemplateData) {
     cancelled,
   } = data;
 
-  const detailRows: Array<[string, string | null]> = [
-    // This document's OWN date leads, as `SO Doc Date` and `PO Doc Date` do on
-    // their papers (DOCUMENT-KIT.md §4). `Goods received on` further down is a
-    // different question — when the goods physically arrived.
-    ["GRN Doc Date", niceDate(grn_doc_date)],
-    [source.is_consignment ? "CO No" : "PO No", source.po_number],
+  const supplierRows: Array<[string, string | null]> = [
     ["Supplier", supplier.name],
-    // No full stop: every other number label in the family is bare
-    // (`PO No` · `DO No` · `SO No` · `GRN Doc Date`).
     ["Supplier DO No", supplier_do_no],
-    ["Deliver To", deliver_to],
+    [source.is_consignment ? "CO No" : "PO No", source.po_number],
+    ["Supplier Deliver To", deliver_to],
+  ];
+  const receiptRows: Array<[string, string | null]> = [
+    ["GRN Doc Date", niceDate(grn_doc_date)],
     ["Goods arrived at", goods_arrived_at],
-    ["Goods received on", niceDate(goods_received_on)],
+    ["Goods Received Date", goods_received_on ? `${niceDate(goods_received_on)}${/^\d{4}-\d{2}-\d{2}$/.test(goods_received_on) ? " · Time not recorded" : ""}` : null],
   ];
 
-  const totals = lines.reduce(
-    (t, l) => ({
-      order: t.order + l.order_qty,
-      received: t.received + l.received_qty,
-      damaged: t.damaged + l.damaged_qty,
-      wrong: t.wrong + l.wrong_item_qty,
-      pending: t.pending + l.pending_delivery_qty,
-    }),
-    { order: 0, received: 0, damaged: 0, wrong: 0, pending: 0 },
-  );
+  const quantities = [
+    { key: "order_qty", label: "Order Qty", width: 16, required: true },
+    { key: "received_qty", label: "Received Qty", width: 18, required: true },
+    { key: "damaged_qty", label: "Damaged Qty", width: 18, required: false },
+    { key: "wrong_item_qty", label: "Wrong Item Qty", width: 18, required: false },
+    { key: "pending_delivery_qty", label: "Pending Delivery Qty", width: 25, required: false },
+  ] as const;
+  const visibleQuantities = quantities.filter((column) => column.required || lines.some((line) => line[column.key] > 0));
+  const absentQuantities = quantities.filter((column) => !visibleQuantities.includes(column));
+  // Follow the actual visible columns; no stale rule survives a zero-only column.
+  const quantityWidth = visibleQuantities.reduce((sum, column) => sum + column.width, 0);
+  const categoryLeft = 186 - 4 - quantityWidth - 20;
+  const columnRules = [6, categoryLeft, ...visibleQuantities.map((_, index) =>
+    categoryLeft + 20 + visibleQuantities.slice(0, index).reduce((sum, column) => sum + column.width, 0))];
+
 
   const evidenceBits = [
     evidence && evidence.photos > 0
@@ -185,46 +203,28 @@ export function GrnTemplate(data: GrnTemplateData) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* ── header — full identity page 1, one-liner after (SO §3) ── */}
-        <View
-          style={styles.header}
-          fixed
-          render={({ pageNumber }) =>
-            pageNumber === 1 ? (
-              <View>
-                <View style={styles.headerRow}>
-                  <View style={{ flex: 1, paddingRight: mm(10) }}>
-                    <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-                      <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
-                      <Text style={styles.ssmInline}>SSM {CARRES_COMPANY.regNo}</Text>
-                    </View>
-                    <Text style={[styles.legalLine, { marginTop: mm(1.8) }]}>
-                      {CARRES_COMPANY.addressLines[0]}
-                    </Text>
-                    <Text style={styles.legalLine}>
-                      {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
-                    </Text>
-                  </View>
-                  <View style={styles.docBlock}>
-                    <Text style={styles.docNumber}>{grn_no}</Text>
-                    <Text style={styles.docTitle}>GOODS RECEIVED NOTE</Text>
-                  </View>
+        {/* The family letterhead repeats in full on every page. */}
+        <View style={styles.header} fixed>
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <Image src={logoSrc} style={styles.headerLogo} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                  <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
+                  <Text style={styles.ssmInline}>SSM {CARRES_COMPANY.regNo}</Text>
                 </View>
-                <View style={styles.headerRule} />
+                <Text style={[styles.legalLine, { marginTop: mm(1.8) }]}>{CARRES_COMPANY.addressLines[0]}</Text>
+                <Text style={styles.legalLine}>{CARRES_COMPANY.addressLines[1]}</Text>
+                <Text style={styles.legalLine}>{CARRES_COMPANY.addressLines[2]}</Text>
               </View>
-            ) : (
-              <View>
-                <View style={[styles.headerRow, { alignItems: "flex-end" }]}>
-                  <Text style={styles.legalLine}>
-                    {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
-                  </Text>
-                  <Text style={{ fontSize: 9, fontWeight: 700 }}>GOODS RECEIVED NOTE · {grn_no}</Text>
-                </View>
-                <View style={styles.headerRule} />
-              </View>
-            )
-          }
-        />
+            </View>
+            <View style={styles.docBlock}>
+              <Text style={styles.docNumber}>{grn_no}</Text>
+              <Text style={styles.docTitle}>GOODS RECEIVED NOTE</Text>
+            </View>
+          </View>
+          <View style={styles.headerRule} />
+        </View>
 
         {/* ── cancellation / amendment marking — on the paper itself ── */}
         {cancelled ? (
@@ -254,47 +254,51 @@ export function GrnTemplate(data: GrnTemplateData) {
           </View>
         ) : null}
 
-        {/* ── RECEIVING DETAILS — the three facts, never merged ── */}
-        <View style={styles.cards}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.blockLabel}>Receiving Details</Text>
-            <View style={{ marginTop: mm(1.5) }}>
-              {detailRows.map(([label, value]) =>
-                value ? (
+        {/* Supplier instruction and actual receipt remain separate blocks. */}
+        <View style={styles.cards} wrap={false}>
+          {[supplierRows, receiptRows].map((rows, index) => (
+            <View key={index} style={{ flex: 1, paddingRight: index === 0 ? mm(4) : 0 }}>
+              <Text style={styles.blockLabel}>{index === 0 ? "Supplier" : "Receiving Details"}</Text>
+              <View style={{ marginTop: mm(1.5) }}>
+                {rows.map(([label, value]) => (
                   <View key={label} style={styles.pairRow}>
                     <Text style={styles.pairLabel}>{label}</Text>
-                    <Text style={styles.pairValue}>:  {value}</Text>
+                    <Text style={[styles.pairValue, label === "Supplier" ? { fontWeight: 600 } : {}]}>
+                      :  {value || "Not recorded"}
+                    </Text>
                   </View>
-                ) : null,
-              )}
+                ))}
+              </View>
             </View>
-          </View>
+          ))}
         </View>
 
         {/* ── items — the five governed quantity words per line ── */}
         <View style={styles.tableHead} minPresenceAhead={40}>
           <Text style={[styles.th, styles.colNo]}>#</Text>
-          <Text style={[styles.th, { flex: 1 }]}>Description</Text>
-          <Text style={[styles.th, styles.colCat]}>Category</Text>
-          <Text style={[styles.th, styles.colQty]}>Order Qty</Text>
-          <Text style={[styles.th, styles.colQty]}>Received Qty</Text>
-          <Text style={[styles.th, styles.colQty]}>Damaged Qty</Text>
-          <Text style={[styles.th, styles.colQty]}>Wrong Item Qty</Text>
-          <Text style={[styles.th, styles.colQty]}>Pending Delivery Qty</Text>
+          <Text style={[styles.th, { flex: 1, paddingLeft: mm(1.5) }]}>Description</Text>
+          <Text style={[styles.th, styles.colCat, { paddingLeft: mm(1.5) }]}>Category</Text>
+          {visibleQuantities.map((column) => (
+            <Text key={column.key} style={[styles.th, styles.colQty, { width: mm(column.width) }]}>{column.label}</Text>
+          ))}
         </View>
         {lines.map((l, i) => (
           <View key={`${l.sku}-${i}`} wrap={false} style={[styles.row, styles.rowHair]}>
+            {columnRules.map((left) => <View key={left} style={[styles.vline, { left: mm(left + 2) }]} />)}
             <Text style={styles.cellNo}>{i + 1}</Text>
             <View style={styles.desc}>
               <Text style={styles.descMain}>{l.description}</Text>
               <Text style={styles.descSku}>{l.sku}</Text>
+              {outcomeRuns(l.unit_results ?? []).map((u) => (
+                <Text key={`${u.first}-${u.outcome}`} style={styles.unitLine}>
+                  <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
+                </Text>
+              ))}
             </View>
             <Text style={styles.cellCat}>{l.category}</Text>
-            <Text style={styles.cellQty}>{l.order_qty}</Text>
-            <Text style={styles.cellQty}>{l.received_qty}</Text>
-            <Text style={styles.cellQty}>{l.damaged_qty}</Text>
-            <Text style={styles.cellQty}>{l.wrong_item_qty}</Text>
-            <Text style={styles.cellQty}>{l.pending_delivery_qty}</Text>
+            {visibleQuantities.map((column) => (
+              <Text key={column.key} style={[styles.cellQty, { width: mm(column.width), color: l[column.key] === 0 ? "#B8B1A7" : INK }]}>{l[column.key]}</Text>
+            ))}
           </View>
         ))}
         <View
@@ -306,21 +310,26 @@ export function GrnTemplate(data: GrnTemplateData) {
             <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
           </View>
           <Text style={styles.cellCat}> </Text>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totals.order}</Text>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totals.received}</Text>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totals.damaged}</Text>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totals.wrong}</Text>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totals.pending}</Text>
+          {visibleQuantities.map((column) => (
+            <Text key={column.key} style={[styles.cellQty, { width: mm(column.width), fontWeight: 700 }]}>
+              {lines.reduce((total, line) => total + line[column.key], 0)}
+            </Text>
+          ))}
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
+        {absentQuantities.length > 0 ? (
+          <View style={styles.noteBlock} wrap={false}>
+            <Text style={styles.noteText}>{absentQuantities.map((column) => `${column.label} 0`).join(" · ")}</Text>
+          </View>
+        ) : null}
 
         {/* ── exact-Unit outcomes — the scan record is part of the paper ── */}
         {(unit_results ?? []).length > 0 ? (
           <View style={styles.noteBlock} wrap={false}>
             <Text style={styles.blockLabel}>Unit results</Text>
-            {(unit_results ?? []).map((u) => (
-              <Text key={u.unit_code} style={[styles.unitLine, { paddingLeft: 0 }]}>
-                · {u.unit_code} — {u.outcome_label}
+            {outcomeRuns(unit_results ?? []).map((u) => (
+              <Text key={`${u.first}-${u.outcome}`} style={[styles.unitLine, { paddingLeft: 0 }]}>
+                · <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
               </Text>
             ))}
           </View>

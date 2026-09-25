@@ -890,6 +890,7 @@ export const soBatchPurchaseResponseSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string(),
+      address: z.string().nullable().optional(),
       isDefault: z.boolean(),
       active: z.boolean(),
     }),
@@ -928,6 +929,7 @@ export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSche
 export interface PurchasingDestination {
   id: string;
   name: string;
+  address?: string | null;
   isDefault: boolean;
   active: boolean;
 }
@@ -935,6 +937,7 @@ export interface PurchasingDestination {
 export const purchasingDestinationSchema = z.object({
   id: z.string(),
   name: z.string(),
+  address: z.string().nullable().optional(),
   isDefault: z.boolean(),
   active: z.boolean(),
 });
@@ -1282,6 +1285,9 @@ export interface SoBatchDocument {
   /** The PO Delivery Date this document will be born with — `PO Date + n
    *  Settings working days`, computed by the server (`poDeliveryDateOf`). */
   poDeliveryDate?: string | null;
+  poDate?: string | null;
+  poDeliveryWorkingDays?: number | null;
+  deliveryMethod?: "we_collect" | "supplier_delivers" | null;
 }
 
 /**
@@ -1294,6 +1300,7 @@ export interface SoBatchDocument {
 export function groupSelectionsIntoDocuments(
   selections: readonly SoBatchSelection[],
   rowsById: ReadonlyMap<string, PurchaseDemandRow>,
+  destinations: readonly PurchasingDestination[] = [],
 ): SoBatchDocument[] {
   const docs = new Map<string, SoBatchDocument>();
   for (const selection of selections) {
@@ -1315,7 +1322,14 @@ export function groupSelectionsIntoDocuments(
           key,
           supplierId: row.supplierId,
           supplierName: row.supplier,
+          supplierAddress: row.supplierAddress ?? null,
+          poDate: row.poDate ?? null,
+          poDeliveryDate: row.poDeliveryDate ?? null,
+          poDeliveryWorkingDays: row.poDeliveryWorkingDays ?? null,
           destinationId: a.destinationId,
+          destinationName: destinations.find((d) => d.id === a.destinationId)?.name ?? null,
+          destinationAddress: destinations.find((d) => d.id === a.destinationId)?.address ?? null,
+          deliveryMethod: row.supplierKind === "factory_pickup" ? "we_collect" : row.supplierKind === "own_logistics" ? "supplier_delivers" : null,
           category: row.category,
           orderId:
             row.category != null && isOnePoPerOrder(row.category) ? row.orderId : null,
@@ -1337,7 +1351,9 @@ export function groupSelectionsIntoDocuments(
         qty: a.qty,
         goodsMustArrive: row.goodsMustArrive,
         issueRef: row.issueRef,
-        parts: row.parts,
+        parts: row.parts.map((part) => ({
+          ...part, qty: poDocumentPartQuantity(row.parts.length, a.qty, part.qty),
+        })),
       });
     }
   }
@@ -1360,13 +1376,18 @@ export function soBatchSelectionSummary(
 ): SoBatchSelectionSummary {
   const documents = groupSelectionsIntoDocuments(selections, rowsById);
   const lines = new Set(documents.flatMap((d) => d.lines.map((l) => l.demandId))).size;
-  const units = documents.reduce((s, d) => s + d.qty, 0);
+  const orders = new Set(documents.flatMap((d) => d.lines.map((line) => line.orderId))).size;
+  const items = new Set(documents.flatMap((d) => d.lines.flatMap((line) => {
+    const ids = rowsById.get(line.demandId)?.lineIds;
+    return ids?.length ? ids : [line.demandId];
+  }))).size;
+  const units = documents.reduce((sum, document) => sum + document.lines.reduce((qty, line) => qty + line.parts.reduce((n, part) => n + part.qty, 0), 0), 0);
   if (lines === 0) return { lines: 0, units: 0, documents: 0, text: "" };
   return {
     lines,
     units,
     documents: documents.length,
-    text: `${lines} selected · ${units} ${units === 1 ? "unit" : "units"} · Issue ${
+    text: `${orders} ${orders === 1 ? "Sales Order" : "Sales Orders"} · ${items} ${items === 1 ? "item" : "items"} · ${units} ${units === 1 ? "unit" : "units"} · Issue ${
       documents.length
     } ${documents.length === 1 ? "PO" : "POs"}`,
   };
@@ -1450,6 +1471,10 @@ export type PoDocumentLines =
  * could ask for one, and there is no honest way to cut two modules in half.
  * It is refused by name rather than guessed at.
  */
+function poDocumentPartQuantity(partCount: number, allocatedQty: number, partQty: number): number {
+  return partCount === 1 ? allocatedQty : partQty;
+}
+
 export function composeDocumentLines(
   allocations: readonly PoDocumentAllocation[],
 ): PoDocumentLines {
@@ -1465,7 +1490,7 @@ export function composeDocumentLines(
     for (const l of buildLines) {
       /* One line: the allocation IS the quantity. A set: the line's own,
          because the whole set is on this document. */
-      const qty = buildLines.length === 1 ? a.qty : l.qty;
+      const qty = poDocumentPartQuantity(buildLines.length, a.qty, l.qty);
       if (qty <= 0) continue;
       let hit = bySku.get(l.sku);
       if (!hit) {
@@ -1566,6 +1591,20 @@ export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly Pu
     absence,
     rank: 1,
   };
+}
+
+/** Explain the same eligibility facts that the checkbox and planning cell read. */
+export function soBatchOrderUnselectableReason(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): string | null {
+  if (order.status === "ordered") return null;
+  if (leaves.some((row) => isSelectableForOrder(row, order.status))) return null;
+  const blocked = [...new Set(leaves.filter((row) => !isPurchaseDemandTimingState(row.state)).map((row) => stateWords[row.state]))];
+  if (blocked.length > 0) return blocked.join(" · ");
+  const plan = soBatchOrderPlanning(order, leaves);
+  return plan.absence ? soBatchOrderByAbsenceWord(plan.absence) : null;
 }
 
 /** Why a `To buy` order has no Order By (S1). */

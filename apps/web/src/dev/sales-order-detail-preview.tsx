@@ -125,8 +125,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ salespersons: [{ id: "s1", name: "Bernard" }] });
   if (url.includes("/api/catalog"))
     return json({ skus: [], models: [], addons: [
-      { key: "DELIVERY", name: "Delivery fee", price: 250 },
-      { key: "STAIR_CARRY", name: "Stair carry", price: 100 },
+      { key: "DELIVERY", name: "Delivery fee", price: 250, active: true },
+      { key: "STAIR_CARRY", name: "Stair carry", price: 100, active: true },
+      { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true, serviceSku: "SVC-DISPOSE-MATTRESS", sizeOptions: ["King", "Queen", "Super Single", "Single"] },
     ], entryConfig: { formFields: null } });
   if (url.includes("order-entry-config")) return json({ entryConfig: { formFields: null } });
   if (url.match(/\/api\/operation\/orders\/[0-9a-f-]+$/))

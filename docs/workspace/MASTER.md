@@ -357,26 +357,26 @@ the reference review surface is https://claude.ai/artifact/HcREkf3UTPj35gYj339mC
 records, people, dates and simulated saves remain fixtures and are not authority.
 
 ```text
-┌ WORKING DAY ─────────┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
-│ Missed      {count}  │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
-│ Mon, {date} {count}  │▌{object} · {module}         │ {recipient, when applicable} │
-│ Tue, {date} {count}  │▌{fact}                      │                              │
-│ {holiday name}       │▌{action} · {contact} {when} │ CURRENT FACT                 │
-│ Thu, {date} {count}  │ MISSED                      │ {fact or problem}            │
-│ Fri, {date} {count}  │ {object} · {module}         │                              │
-│ Sat, {date} {count}  │ {fact}                      │ ACTION                       │
-│ No working date      │ {action} · {contact} {when} │ {specific action}            │
-│             {count}  │ Blocked by {dependency}     │                              │
-│                      │ THU, {date}                 │ COMMUNICATION (when admitted)│
-│ MODULE               │ {object} · {module}         │ [Open WhatsApp group]        │
-│ All modules  {count} │ {fact}                      │ [Copy message]               │
-│ Sales Orders {count} │ {action} · {contact} {when} │                              │
-│ Purchasing   {count} │                             │ REQUIRED RESULT · FINISH WHEN│
-│ Receiving    {count} │                             │ {module action when admitted}│
-│ Delivery     {count} │                             │                              │
-│ Payment      {count} │                             │ [Open {object}]              │
-│ Issue Tracker{count} │                             │                              │
-└──────────────────────┴─────────────────────────────┴──────────────────────────────┘
+┌ 📅 Date   ‹ Sep 2026 › ┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
+│ ⟲ Missed     {count}   │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
+│ [14 MON]               │▌{object} · {module}         │ {recipient, when applicable} │
+│ [15 TUE]     {count}   │▌{fact}                      │                              │
+│ [16 WED] {holiday}  {n}│▌{action} · {contact} {when} │ CURRENT FACT                 │
+│ [17 THU] ← solid blue  │ MISSED                      │ {fact or problem}            │
+│ [18 FRI]     {count}   │ {object} · {module}         │                              │
+│ [19 SAT] when admitted │ {fact}                      │ ACTION                       │
+│ ⊘ No working date {n}  │ {action} · {contact} {when} │ {specific action}            │
+│   (only while n > 0)   │ Blocked by {dependency}     │                              │
+│                        │ THU, {date}                 │ COMMUNICATION (when admitted)│
+│ ▦ Module               │ {object} · {module}         │ [Open WhatsApp group]        │
+│ All modules  {count}   │ {fact}                      │ [Copy message]               │
+│ Sales Orders {count}   │ {action} · {contact} {when} │                              │
+│ Purchasing   {count}   │                             │ REQUIRED RESULT · FINISH WHEN│
+│ Receiving    {count}   │                             │ {module action when admitted}│
+│ Delivery     {count}   │                             │                              │
+│ Payment      {count}   │                             │ [Open {object}]              │
+│ Issue Tracker{count}   │                             │                              │
+└────────────────────────┴─────────────────────────────┴──────────────────────────────┘
 ▌ = thin red row edge of a broken commitment (no row badge)
 ```
 
@@ -397,14 +397,37 @@ the source calendar, while an authorised holiday operation remains on the holida
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
 today.
 
-Panel 1 has two groups with two different count scopes:
+**Panel 1 — the left rail. OWNER APPROVED UI, Jess 2026-09-24; BUILT 2026-09-24.** Two white
+sections on the light-grey canvas, each headed by a blue icon + blue title over an inset divider; no
+shadow and no decorative colour corner. Every row is a real button with a complete accessible name
+and a visible keyboard focus ring. A zero count is never printed. The sections carry two different
+count scopes:
 
-- **`WORKING DAY`** counts the whole selected week, one row per day: `Missed`, the governed
-  weekdays, Saturday only when an admitted action remains there, and `No working date`. A public
-  holiday row is named and carries no ordinary work.
-- **`MODULE`** opens with `All modules`, then each admitted module. It counts only the occurrences
-  currently in the Panel 2 list (on first open: `Missed` plus the selected day). `All modules` always
-  equals the number of Panel 2 rows, and the module rows sum to `All modules`.
+- **`Date`** (calendar icon). The header's right side holds `Previous week` · the week's month and
+  year (`Sep 2026`, the month holding the week's Thursday) · `Next week`; the arrows move the
+  visible week by one work week and change neither the chosen Date, the module nor any filter. The
+  options are `Missed` first, then the governed weekdays of the visible week (Saturday only when an
+  admitted action remains there), then `No working date` only while it has work. Each date is one
+  34 × 34px calendar badge holding the day number over the uppercase weekday, both cut from the one
+  `fmtDate` spelling and moved by whole `YYYY-MM-DD` days — never through `toISOString()` of a local
+  clock. **Today** is the solid-blue badge with white text and is never written on screen (the
+  accessible name carries `· Today`); the **chosen** option is the pale-blue full row. The two
+  states are independent. A public holiday is named beside its badge (`Malaysia Day`) and is a
+  date like any other: it can be chosen and it counts the work dated on it. `Missed`, one date and
+  `No working date` are one mutually exclusive choice. Date counts cover the week's open set after
+  scope, search, the other filters and the chosen module; a missed occurrence counts once, under
+  `Missed`, never again under its past weekday.
+- **`Module`** (modules icon) opens with `All modules`, then each admitted module as a name and a
+  right-aligned count only — no per-row icon. It counts the occurrences of the chosen Date — the
+  Panel 2 list before the module choice — so choosing one module never reduces another module's
+  count; `All modules` equals the Date list and the module rows sum to it. Date and Module choices
+  combine.
+
+The URL carries the visible week (`week`, its Monday), the Date choice (`day` = `missed` ·
+`YYYY-MM-DD` · `no_date`) and the module (`module`); opening that URL restores all three. Without
+`week`, the rail shows the week of the chosen date, else the week of the focus day. The opening
+focus list (no `day`) highlights the focus day's row. `day=all`, reached from the toolbar's timing
+filter or a Dashboard link, lists every open action and highlights no Date option.
 
 The Panel 2 heading is `Missed {n} · {weekday, date} {n}` on first open; when a single day is
 selected it is `{weekday, date} {n}`. Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
@@ -619,39 +642,72 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 ### 5.5 · Responsive and accessibility contract
 
-- Work uses the existing 50px Page Header. At three-panel and 768–1103px widths it has one 45px
-  Work Toolbar whose controls may wrap into a second 45px row when the canvas is narrow; below 768px
-  they use the single-panel control stack. It creates no second title, breadcrumb, KPI band or card
-  header. The controls contain `My Work · Team Work`, Search, applied filters, `Clear all` when
-  narrowed and the toolbar `Filters` door; freshness is a read fact, not a manual business action.
-- Breakpoints use the available Work canvas after the global shell, not the browser width. At
-  **1104px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
-  360px; Panel 3 takes the remainder and never falls below 500px. The full composition may use up
-  to the governed 1280px content width. Straight 1px `slate-5` dividers separate panels; the shell
-  has no card radius, shadow or gutters between panels.
-- From **768px through 1103px** of Work canvas, show Panel 1 plus one work column. With no job
-  chosen the column is the Panel 2 list. Choosing a job replaces the column with that job's Panel 3
-  detail and moves focus to `Back to work`; `Back to work` restores the list and returns focus to the
-  same row (or the next visible row when it closed). Panel 1 stays visible throughout.
-- Below **768px**, show one panel at a time. Working day is a horizontally scrollable selector above
-  the list and module/owner live in kit Select controls. Selecting an action replaces the list with
-  full-width detail. Browser and visible `Back to work` restore week, day, module, owner, filters,
-  selected occurrence and list scroll. No permanent drawer or sideways three-panel page exists.
+- **THE WORK DENSITY — owner ruling 2026-09-25, APPROVED / BUILT. Exact values, not a direction.**
+  Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
+  on the right, 72px tall with 24px sides from 960px wide; below 960px 24/30/600, 12/16/400, 64px,
+  16px sides. No breadcrumb row, no second title, KPI band or card header.
+- **Toolbar** — ONE white section (`rounded-work`), 12px padding (10px below 600px), 8px between
+  controls. Every control is 36px (40px below 960px), 14/20/400 (`text-control`), 12px sides,
+  `rounded-control`; the active `My Work`/`Team Work` segment is 600. Search is 240px from 960px
+  and fills its row below. From 960px the toolbar is one row (`Filters` · `My Work · Team Work` ·
+  Search · Owner · `Covered` · `Clear all`). **Below 960px it is exactly two rows** — `Date · Module ·
+  My Work/Team Work`, then `Search · Owner · Covered` — **and below 600px exactly four**: `Date ·
+  Module` / `My Work · Team Work` / Search / `Owner · Covered`; rows are 40px apart by 8px. The ruling's
+  table put the 36/40px switch at 600px, but its 743px acceptance requires 40px rows; the
+  acceptance is the more specific line, so controls (and the 12px canvas padding) switch at
+  960px with the header, and only the toolbar's own 12/10px padding and the four-row split switch
+  at 600px. Freshness is a read fact, not a manual business action.
+- **THE WORK SHELL — owner correction 2026-09-24, APPROVED / BUILT.** The workspace is an UNFRAMED
+  grid on the light-grey canvas with 16px padding (12px below 960px): no frame, fill, radius or
+  shadow around it. The toolbar is one white section; 16px below it the columns sit 16px apart.
+  Every white surface is its own section: 1px `work-line` (`#ccd7e5`) edge, 9px `rounded-work`
+  radius, no shadow, no coloured corner. Breakpoints read the Work page's own width:
+  **≥1280px** three columns `240px · 420px · remainder (≥480px)` — Date and Module as two separate
+  rail sections, the list, the detail; **960–1279px** the rail collapses behind the toolbar
+  `Filters` control and the list is exactly 400px (it never collapses); **<960px** Date and Module
+  open from compact toolbar controls and the list (100% wide) and the detail share ONE stage with
+  `Back to work`.
+- **The list column** — the heading (the chosen Date, 16/22/600, with `{n} actions to do` 13/18/500
+  on the same 24px line; at 390px it may wrap once, never grow), 8px, the 36px `To do · Waiting ·
+  Completed` tabs (`?list=`; 3px padding, 2px between tabs, tab 13/18/600 with its count 13/18/500,
+  tab radius 5px, bar 7px), 8px, then the work cards 8px apart, drawn 50 at a time as the list end
+  scrolls into view; a failed refresh keeps the last good list with one retry row. Team Work groups
+  under ONE 32px owner line — `[SH] Shasha  49 actions to do · 88 missed`: 32px avatar with 12/16/600
+  initials, 8px, owner name 15/20/600, count 12/16/400, missed 12/16/500; 8px to its first card,
+  16px from its last card to the next owner.
+- **THE WORK CARD — 104px, never taller.** Full list width; grid `60px / remainder`; `rounded-work`,
+  1px edge, no shadow. **Date rail** 60px: 6px sides, 8px top/bottom; a 44px weekday/date block
+  (weekday 11/14/600 uppercase, date 22/24/600), 4px, then ONE status badge 9/11/600, 6px × 2px
+  padding, at most 17px tall — `Missed`, `Today` or `No date`, never `Upcoming`. **Content** 12px
+  sides, 8px top: a 14px module icon with the module 10/14/600 (0.06em) and `· {recipient}`
+  11/14/500; 2px; the problem 15/20/600 on ONE line; the action 12/16/500 on ONE line. **Footer**
+  28px with a 1px top edge, 12px left / 8px right: the document number (and cover fact) 11/16/400,
+  and the 32×32 open button with a 14px icon — it may overhang the footer by 2px; the card never
+  grows for it. The loading skeleton is the same 104px / 60px geometry. In a 704px list viewport
+  six cards show whole (6 × 104 + 5 × 8 = 664px). At 743px the card keeps exactly this geometry.
+- The detail column stacks independent white sections: the selected action's header, its action
+  section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order — in that order,
+  Logistics · Customer · Supplier.
+- **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 960px, exact values:**
+  12px canvas padding; sections 8px apart; `Back to work` a 40px row; the header card (12px
+  padding, height follows content) carries the object line, the problem 16/22/600 and the action
+  line 13/18; the task card (12px padding) puts its result line and the 32px `Open {object}`
+  button (13px) on ONE row, then the 36px `Owner, timing and source` disclosure (12px). Party cards:
+  12px sides, heading 15/20/600, current action 13/18/600, supporting/status text 12/16,
+  `Checks n of 3` 12px, a 40×40 chevron; Customer and Supplier collapse to exactly 72px; Logistics
+  is at least 72px and grows only for its approved scheduled/exception facts (its five-fact
+  collapsed law is unchanged); expanded bodies use 10px vertical padding and 8px between sections;
+  radius stays `rounded-work`. The same compact detail applies at 820px and 390px. From 960px the
+  previous detail geometry holds (16px gaps, 24/16px card padding, 14/20 current action).
+- **One header row.** Work's header carries the top-bar icons (`Jump to…` · alerts · help ·
+  settings) itself, so the slim 44px GlobalTopBar is not drawn on Work — the same law every page
+  with its own Destination Header follows. When the row is too narrow (390px) the count wraps under
+  the title inside the 64px row; the title never truncates. Acceptance at 743×704: two toolbar rows,
+  and the detail title, task card, Logistics, Customer and Supplier headings all visible without
+  scrolling.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
-- Panel 1 uses the existing `FilterRail` geometry: 12px outer padding, its governed 20px component
-  group gap (an existing kit exception, not a new page spacing token), and 8px heading-to-
-  row gap and 36px minimum rows. Selected rows use `blue-3` plus the straight 2px `blue-9` inset
-  marker; hover is `slate-3`. Counts are neutral, right-aligned and tabular. Long governed labels
-  wrap; the rail never truncates them.
-- Panel 2 has a 44px heading and selectable action rows with 1px `slate-5` dividers. A row is at
-  least 64px and grows for long text; it never truncates. Its lines are object · module, then
-  fact/problem, then action with contact and timing (§5.2); `Blocked by {dependency}` wraps below
-  when true. A broken-commitment row adds only the thin red edge. Selection uses the same
-  `blue-3` + 2px inset marker; hover remains grey. Work items are rows, never individual Cards.
-  An admitted embedded row alone may carry the neutral `Do it here`; ordinary module-door and
-  read-only rows carry no repeated mode badge.
 - Panel 3 has 24px horizontal / 16px vertical heading padding and a left-aligned detail body no wider
   than 760px. `open_module` and `read_only` retain the full structured brief. `embedded` is compact:
   object/module header; one current-fact line; module-owned form with `Finish when: {statement}` as
@@ -687,8 +743,9 @@ The implementation reuses `PageShell`, `Tabs`, `SearchInput`, `Select`, `Button`
 Status text that must wrap does not use the truncating `StatusPill`. A shared `Avatar` must first
 govern one initials algorithm plus full-name hover/focus/tap behaviour; Work may not choose among
 page-local avatar recipes. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
-(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (structured detail and
-host for an admitted owning-module component). None calculates business dates, ownership, severity, completion or source health. They are
+(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (the §5.10 summary and
+host for an admitted owning-module component), and the §5.10 right-panel pieces `PartyCardShell`,
+`CustomerCard`, `SupplierCard`, `LogisticsCard`, `WorkOrderRoute` and `WorkOwnerSource`. None calculates business dates, ownership, severity, completion or source health. They are
 not promoted into the global kit until a separately governed second use exists.
 
 ### 5.6 · Priority, due and SLA law
@@ -756,8 +813,8 @@ Work is ready for owner acceptance only when all are demonstrable:
   due/late fact and exact owning door without repeating owner/object in sentence prose;
 - first open shows `Missed` followed by the actual current or next eligible governed weekday/date,
   names a public holiday and never duplicates an occurrence or hides the complete working week;
-- `WORKING DAY` counts the whole week; `All modules` equals the Panel 2 row count and the module rows
-  sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
+- the `Date` section counts the visible week and prints no zero; `All modules` equals the Panel 2 row
+  count before the module choice and the module rows sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
 - Panel 2 orders `BROKEN COMMITMENT` → `MISSED` → selected day; a broken commitment has a red group
   heading and red row edge with no badge and still counts once under its own working day; a blocked
   job stays in its own group with `Blocked by {dependency}`;
@@ -779,6 +836,391 @@ Work is ready for owner acceptance only when all are demonstrable:
   layouts record both portal-sidebar state and actual Work-canvas width and preserve the complete action;
 - later holder/cover changes cannot rewrite completed actor evidence. Site-queue race acceptance is
   deferred with Warehouse Outbound and is not a Work v1 acceptance condition.
+
+### 5.9 · Party cards — Logistics · Customer · Supplier (owner rulings 2026-09-24, Logistics BUILT; Customer/Supplier shell only)
+
+When the selected work names exactly ONE Sales Order (a `sales_order` / `delivery_scope` object,
+a Delivery Order, or an `SO-{n}` label), the detail column adds one white section per outside
+party: **Logistics** (the one card with an approved specification and its own acts), **Customer**
+and **Supplier** (the same stable shell, existing facts only, one door to their owner, no new SOP).
+A work item that names several orders, or an order Delivery cannot read, draws no party card —
+never a guessed `Logistics not assigned`. Loan appears only when a loan record exists (not built).
+
+**THE CARD OWNS NO FACT.** Every write goes through a Delivery-owned component or door; the one
+arithmetic is `logisticsCardModel` (`packages/shared/src/logistics-card.ts`); the order's Delivery
+facts come from the Monitor card's own builder (`delivery-scope-card.ts`), the rest from Delivery's
+`GET …/delivery-arrangements/:orderId/logistics-card`.
+
+#### Collapsed — at most five facts
+
+```
+Logistics · AL Logistics                         Checks 1 of 3   ▾   ← heading 15/20/600
+Call AL Logistics                                  ← the ONE current action (14/20/600)
+Get the scheduled delivery date · due 24 Oct       ← result · due (12/16/400; red once missed)
+Scheduled delivery · 27 Oct                        ← only when scheduled; time only when recorded
+⚠ RM 1,250.00 still to collect                     ← ONE exception, only when it affects delivery
+```
+
+**Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
+redesigned):** party heading 15/20/600 · current action 14/20/600 (13/18/600 below 960px) · secondary fact 12/16/400 ·
+section label 11/14/600 uppercase · check row 13/18/400 · history row 12/16/400 · button 13/18/500,
+at least 36px tall (40px below 960px). Customer and Supplier headings use the same 15/20/600.
+
+`Logistics not assigned` replaces the heading when no company carries the delivery. Requested
+date, PO, GRN, DO, money-in-general and the check rows never sit on the collapsed card.
+Exception precedence: `Cannot deliver` → Finance hold → money owed → the first day-before gap.
+
+#### Expanded — in this order
+
+1. **Current action** — the act, its result and due date; the Delivery-owned door opens IN PLACE:
+   `Assign logistics` / `Change logistics` (Delivery's `LogisticsDetailsEdit`), `Record scheduled
+   delivery` (Delivery's `DeliveryDatesEdit`), `Create link` or `Copy message` for the contact step;
+   `Open in Delivery` beside it. Work draws no form of its own.
+2. **Checks** — the three fixed rows (below).
+3. **Scheduled delivery** — `Requested delivery` · `Scheduled delivery` (`Not scheduled yet`) ·
+   `Delivered` once recorded. Words, not identical calendar icons, tell the three dates apart.
+4. **Assignment** — the company, and whether it answers in its own portal or through the external
+   link; `Change logistics`.
+5. **Stock route** — read-only summary (below) with `Open Purchasing`.
+6. **External link** — the link state table (below).
+7. **Communication** — the prepared message (customer reference first, never the SO number; the
+   current link inserted), `Copy message`, `Open WhatsApp group`, and the reminder that copying or
+   opening WhatsApp confirms nothing.
+8. **Evidence and recent history** — three-rank lines; a link actor reads `{company} via external link`.
+
+#### The three checks
+
+Anchor: the **Scheduled delivery** date when recorded, else the **Requested delivery** date,
+counted back on the Delivery week (Mon–Sat + Malaysian public holidays). Screen labels only —
+internal keys `t3 · t2 · t1`.
+
+| Check | Done when (a stored fact) | Not due | Due / missed | The action |
+|---|---|---|---|---|
+| `3 working days before · {date}` | a company is assigned AND it has the details: a portal company is assigned, the link page rendered, the company answered, or Operation recorded its reply | `Opens {date}` | `Details not received yet` (red once missed) | `Assign logistics` from the day the PO is issued (never red until this date) · then `Contact logistics` → `Contact logistics today` on/after the date |
+| `2 working days before · {date}` | a Scheduled delivery date is recorded (time optional) | `Opens {date}` | `Not scheduled yet` · `No answer` once missed · `Requested another date · {date}` · `Cannot deliver · {reason}` | `Call {company}` / `Get the scheduled delivery date` · `Call the customer` / `Agree {date} …` · `Decide the next step for this delivery` |
+| `1 working day before · {date}` | on its date, NOTHING is missing — then it shows `Nothing missing` and creates no call | `Opens {date}` | one line per gap: DO gate (`Goods not ready`, `Delivery Order not issued yet`), pickup/handover (`Not received at {site} yet`, `Driver and vehicle not recorded`, `Condo registration not recorded`), money (`RM {amount} still to collect`, `Finance is holding this delivery`) | only a gap that logistics can close carries an act (`Ask {company}` / `Record the driver and vehicle`); Payment, Finance and Warehouse gaps are facts with their owner's door |
+
+A check whose date was already behind the day the order proceeded is `Passed before this delivery
+started` (Q3: no impossible past step); the nearest still-possible check carries the action. A done
+or missed check keeps the date it had.
+
+**Reschedule example** (requested Tue 27 Oct): checks Fri 23 · Sat 24 · Mon 26. AL saves Scheduled
+Tue 27 on Thu 22 → the first two are done, their dates kept. On Sat 24 AL moves it to Thu 29 → the
+two done checks still read 23 and 24 Oct; `1 working day before` moves to Wed 28; the collapsed card
+reads `Scheduled delivery · 29 Oct`. Had the 2-day check been missed on Sat 24, it would keep
+`2 working days before · 24 Oct` in red with `No answer`.
+
+#### The three stock routes (Purchasing / Stock own them; Work reads them)
+
+| Route | Derived from | Event chain | Logistics responsible from |
+|---|---|---|---|
+| `Pickup from Carres Klang Warehouse` | `Supplier Deliver To` → a Site of kind `own`, or Units reserved at an own Site | PO → supplier delivers + Supplier DO → GRN at Carres Klang (Goods Received Date) → pick · check · pack → Outbound `Warehouse loaded` + `Driver collected` | `Driver collected` |
+| `Pickup from supplier` | **NOT DERIVABLE YET** — no Purchasing fact records "logistics collects for the customer" | PO → supplier prepares + Supplier DO → `Collected from supplier` (APPROVED TARGET / NOT BUILT) — no GRN | `Collected from supplier` |
+| `Supplier sends directly to logistics` | `Supplier Deliver To` → a Site of kind `operation_partner` (AL Sungai Buloh, HOUZS Balakong — 0509) | PO → supplier delivers + Supplier DO → that Site's Inbound receipt/GRN → the Site's own outbound to the customer | the Site's receipt |
+| `Supplier delivers to the customer` (Ohana) | a destination with no Site | a separate route, outside the three; not solved by this card | — |
+
+#### External link states
+
+| State | Shown | Acts |
+|---|---|---|
+| Portal company (NETS) | `{company} answers in its own portal.` | none |
+| No company | `Assign logistics first.` | none |
+| No link yet / revoked | `No link yet` · `Link revoked · {date}` | `Create link` (one button per card: the contact step's action carries it) |
+| Active | the link · `Created {date} · {name}` · `Opened by {company} via external link · {date}` / `Not opened yet` | `Copy link` · `Revoke link` |
+| Company changed | the old link is revoked automatically (`logistics_changed`) | `Create link` for the new company |
+
+#### Source of truth
+
+| Fact | Owner | Work's treatment |
+|---|---|---|
+| Company, Scheduled date/time, driver, vehicle, condo registration, answers, link | Delivery (`ops_delivery_arrangements`, `…_events`, `ops_delivery_partner_links`) | read; written only through Delivery's components/doors |
+| Requested delivery, customer, address, building | Sales Orders | read-only |
+| Stock route, PO, Supplier Deliver To, PO Delivery Date | Purchasing | read-only; `Open Purchasing` |
+| GRN / Goods Received Date, Unit Site | Receiving / Stock | read-only |
+| Money owed, Finance hold | Payment / Finance | fact only, from its clock (2 working days KV, 3 outstation) |
+| DO | Delivery (system-issued) | fact only |
+| Checks, current action, exception | derived — never stored | `logisticsCardModel` |
+
+#### 390px order
+
+The collapsed card first (company · action · checks · scheduled · exception), then Customer and
+Supplier collapsed. Expanded, the eight sections stack in the order above in one column; buttons
+keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll (measured 0px at
+1440 · 1180 · 820 · 390, `docs/evidence/workspace-work/logistics-2026-09-25/`).
+
+#### Gaps for later architecture work (not built)
+
+1. `Collected from supplier` — a Stock custody event (PO/source lines · supplier · company · date and
+   time · qty · Supplier DO or collection evidence · source · actor), the Purchasing fact that
+   selects the route, and the DO gate reading it instead of a reservation.
+2. Receiving at a partner Site — who records AL/HOUZS receipts (the partner, through the link or a
+   login, or Operation on its behalf) and the Site receiving authority (Stock MASTER open item);
+   non-Site partners (TT, TEOW, EU, SSY) need location ownership before any receipt exists.
+3. Which delivery requirement makes a time mandatory (building types) — its own missing item.
+4. The Delivery Order download through the link — the governed DO prints `SO No`, which the link may
+   not show; decide the paper or the rule.
+5. The legacy Orders booking door (`ops_order_control`, `/operation/old-orders` →
+   `/:id/booking/confirm`) still requires a time slot for leg 0 and writes only
+   `ops_order_control.confirmed_date`. Since 2026-09-25 the Work feed reads Delivery's arrangement,
+   so a booking made through that door does not close `confirm_delivery_date`. Retire the door or
+   make it write the leg-0 arrangement; converge the whole-order DO issue onto the arrangement.
+6. Closed 2026-09-25 (owner decision): the Work feed's `confirm_delivery_date` reads Delivery's
+   arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
+   check through the one `logisticsCheckDueIso`.
+7. The Ohana supplier-to-customer route.
+8. **Two contact days — owner ruling 2026-09-25 (Jess: keep both).** They are two different facts,
+   never merged and never printed with the same words:
+   - **`3 working days before`** the promised date (Orders Card 3 `T−3`, the `chase` lead
+     `logistics_call_working_days`) is the day the customer is **contacted** — the Delivery work list,
+     Monitor and the Orders booking brief show it as the contact day.
+   - **`2 working days before`** (the Logistics card's check, `logisticsCheckDueIso("t2")`) is the
+     deadline by which the **Scheduled delivery must be recorded** — Work's `confirm_delivery_date`,
+     the Route's `Contact` point and the Logistics card show it as that deadline.
+   A surface that shows either day names which one it is; neither is relabelled as the other.
+
+### 5.10 · Complete Work right panel — owner-approved target 2026-09-25 / NOT BUILT
+
+This section is the canonical continuation of §5.9. It freezes the complete selected-mission
+composition so a later chat reads it from the repository rather than reconstructing it from chat.
+The deployed left Date/Module rail, middle To do/Waiting/Completed cards, density contract in §5.5
+and Logistics behaviour in §5.9 are preserved. The build scope is the missing Customer card,
+multi-supplier Supplier card, compact Order Route and their shared communication/state behaviour.
+
+#### One fixed top-to-bottom composition
+
+1. **Selected work summary** — the problem, the one immediate action and the owning record door.
+2. **Order Route** — one compact horizontal mission-health line; it is not a wizard or sequence.
+3. **Logistics card** — §5.9's deployed component and eight-section expansion, unchanged.
+4. **Customer card** — mission-relevant dates, contact checkpoint and structured answer only.
+5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
+6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
+
+The same sentence never appears in all three layers. The summary says what is wrong and what to do;
+the Route says which mission obligation needs attention; the party card says who must answer and
+exposes the owning action. Only one party card expands at a time, and it remains expanded after a
+save or refresh. On a screen below 960px `Back to work` restores the same list position and filters.
+
+#### Order Route — one line, concurrent facts
+
+The default points are **Proceed · PO · GRN · Contact · Delivery**. **Loan** appears between Proceed
+and PO only when a real loan record exists. The route does not force the modules into Step 1/2/3:
+PO, customer, payment and logistics work may progress concurrently. Payment and Logistics render as
+contextual exceptions beneath the applicable point rather than two extra permanent circles.
+
+Each point derives `{label, date_or_range, summary, state, source_module, details, source_link}` from
+its owning module. Nothing is stored as a Workspace route status. States are `complete · current ·
+attention · urgent · future · unavailable`: complete uses neutral dark/check, current blue,
+attention amber, urgent/missed red and future/unavailable grey. Normally only one point is blue.
+
+- **Proceed** — the recorded order-to-proceed fact/date.
+- **Loan** — optional; current loan fact/date only, never hidden under Payment.
+- **PO** — `{issued} of {total}` and the applicable supplier date or date range.
+- **GRN** — Warehouse receipt progress/date. There is no duplicate `Stock received` point.
+- **Contact** — the customer/logistics contact checkpoint protecting delivery.
+- **Delivery** — the final mission deadline: `Scheduled delivery · {date}`, then `Delivered · {date}`.
+
+Dates use `27 Oct`, a range `18–20 Oct`, and a compact progress line such as `2 of 3 confirmed`.
+Do not add `1 pending` when that progress already communicates the same fact. Clicking a point
+reveals a compact detail row below the route and the owning-module door; it does not create a second
+large timeline. On narrow screens the same line scrolls horizontally, auto-reveals the current
+point and never wraps into two route rows.
+
+#### Customer card
+
+**Operating boundary — owner correction 2026-09-25.** The assigned Logistics company contacts the
+customer and agrees the delivery date. This card is not a routine Carres customer-calling queue and
+it does not give Operation a second scheduling workflow. Operation may record the partner's facts on
+its behalf under Delivery §2, but the provenance remains the Logistics company. Carres contacts the
+customer only when a source exception requires Carres judgement or correction:
+
+1. Sales Orders already knows the goods will be late (`delay_planning`) and Carres must notify the
+   customer through the Sales Order door;
+2. Logistics records `Requested Another Date` and Carres must decide the next arrangement in
+   Delivery;
+3. Logistics records `Customer Refused Delivery` and Carres must decide the next step in Delivery;
+4. Logistics records `Contact Details Incorrect` and Carres must correct the phone number in the
+   Sales Order.
+
+This overwrites the earlier §5.10 wording that made `Contact due today`, `Waiting for customer`,
+`Accepted date` and a routine Carres `WhatsApp`/`Email` date-agreement checklist appear on every
+mission. Those are not default Carres work. Outstation release remains the explicit separate
+ERP-ARCHITECTURE §6.5 exception and keeps its governed proof/message rule.
+
+Collapsed height is exactly **72px**. It prints `Customer · {name}` and one source-derived line:
+`{company} contacts the customer · by {date}` before the partner's deadline; `Scheduled {date}`
+after the arrangement; or the highest-material exception `Customer requested another date ·
+{date}` · `Customer refused delivery` · `Phone number is wrong` ·
+`Delivery delayed · customer notice required`. Phone, email, owner and history do not appear
+collapsed. Normal partner contact has no Carres button.
+
+Expanded order:
+
+1. **Current action** — absent during normal partner scheduling. For the four exceptions above,
+   show only the source-owned Carres action and door: `Tell the customer the new date` → Sales
+   Order; `Decide the next step for this delivery` → Delivery; `Correct the phone number` → Sales
+   Order.
+2. **Delivery** — `Requested delivery` · `Scheduled delivery` · `Delivered`.
+3. **Partner contact** — company, contact deadline and latest Delivery-owned result/evidence. It is
+   read-only in Work except for the existing Delivery door that records the company's reply on its
+   behalf.
+4. **Exception** — only when one of the four governed exceptions exists; exact source fact, required
+   Carres result and owning door.
+5. **Evidence and communication history** — Delivery/Sales Orders source event, actor and time.
+
+Completion is always the responsible source fact: Scheduled delivery for normal partner
+arrangement; the recorded delay/customer-notice consequence for a known late order; Delivery's
+decision for a requested date/refusal; or the corrected Sales Order phone number. Copying or opening
+WhatsApp never completes anything. Facts remain owned by Sales Orders (customer/requested date,
+delay planning and phone), Delivery (partner contact result, scheduled/delivered and arrangement
+decision), and their source communication evidence.
+
+#### Supplier card
+
+One mission has one Supplier card even when it has several suppliers. Collapsed height is exactly
+**72px**. It prints only group progress plus the highest-material exception, for example
+`2 of 3 POs issued` · `2 of 3 dates ready · 1 delayed` · `2 of 3 received · 1 arriving 27 Oct` ·
+`No purchase order for this Sales Order`. It does not print owner, supplier names or PO numbers
+unless one is required to identify the exception.
+
+Expanded, show one compact row per supplier/PO with applicable facts only:
+
+- supplier and state: `PO not issued · Expected · Confirmation needed · Delayed · Arriving today ·
+  Received · Short received`;
+- original `PO Delivery Date`, preserved forever;
+- `Expected arrival` — the supplier's newest promised date (owner decision 2026-09-25; never
+  `Latest date`), Purchasing's `effectiveArrivalOf` over the `tomorrow_delivery` answers;
+- governed delay reason and required WhatsApp evidence;
+- warehouse destination;
+- Supplier DO or exact-date/warehouse arrival confirmation;
+- GRN date and received quantity from Warehouse, never a supplier claim;
+- `Open PO`, `View evidence`, `View DO` or `Open GRN` owning doors as applicable.
+
+Per-supplier checks are PO issued · delivery date known · pre-arrival confirmation · GRN received,
+summarised as `{n} of 4 complete`, with detailed rows only on expansion. `Record supplier delay`
+requires a new date, governed reason and WhatsApp screenshot; it appends evidence, preserves the
+original date and updates Purchasing, Work and Route from the same source facts. One Office working
+day before arrival, missing Supplier DO/confirmation yields `Confirmation needed today`; a sent
+request yields `Waiting for supplier`; a passed arrival without receipt yields
+`Arrival missed · Follow up supplier`.
+
+**Every goods need of the Sales Order counts — owner decision 2026-09-25.** Goods served from stock
+(order lines no PO of this order carries) get their own row `From stock · {ready} of {total} ready ·
+{Site}` (Delivery's readiness per line; Stock's Site for the reserved Units). Their short pieces are
+goods that need a PO: with no PO for the order the collapsed line reads `No purchase order for this
+Sales Order · {n} items need one` and the card's door is the Sales Order (its `issue_po` act). The
+Route's `PO` point reads `From stock` only when no goods still need a PO. Evidence: production SO-1222
+showed Logistics `Goods not ready · 0 of 5 · 5 short` beside a bare `No purchase order for this Sales
+Order`. In a mixed order (some lines on a PO, others short with none) the collapsed line keeps the
+PO progress and names the unbought goods as its top exception: `{n} items need a PO`.
+
+#### Shared communication and Work states
+
+Applicable expanded cards show the valid source-owned channels, latest event and `View history`.
+The preview selects a governed template and inserts only module-owned facts. Staff may `Copy message`
+or open WhatsApp/email; opening a channel is not sent evidence. On return, `Record as sent` stores
+party, recipient, channel, template, source object, actor/time and reply due date. The transitions are:
+
+`To do → recorded sent → Waiting` · `Waiting → reply → To do or source-fact Completed` ·
+`Waiting → reply due passes → To do (`No answer · Follow up today`)`.
+
+Evidence belongs to the source communication event: WhatsApp screenshot, email record, Supplier DO,
+external-link answer or governed phone outcome. Customer messages use the customer/order reference;
+Supplier uses the PO reference; Logistics uses CR/TCF and never exposes internal SO number through
+the external link. Missing contact data prints the reason plus `Open {party} record`, not an
+unexplained disabled button. This shared mechanism does not authorise a routine Carres customer
+scheduling message: Customer communication appears only for §5.10's four Carres exceptions or the
+separate governed outstation-release rule.
+
+#### Payment, Warehouse, loan and after-sales boundaries
+
+Payment is a Route/party exception only when it materially affects delivery; it is not another
+calendar card. Use the Payment MASTER's governed collection/approval action and do not invent
+`Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
+Purchasing; GRN/received quantity belongs to Warehouse. Loan is its optional independent point.
+After-sales starts a separate mission after delivery unless its own MASTER explicitly connects it.
+
+#### Exact responsive and state contract
+
+- ≥1280px: `240px rail · 420px list · remainder detail`; detail padding 16px, section gap 8px.
+- 960–1279px: 400px list plus detail; filters are behind the toolbar control.
+- <960px: list/detail share one stage; detail padding 12px; `Back to work` first.
+- Route is 88px and one horizontally scrollable line. Collapsed party card is exactly 72px.
+- Summary title 16/22/600; supporting 13/18; party heading 15/20/600; state 12/16;
+  expanded-section padding 10px; action buttons 36px; every touch target at least 40×40px.
+- At 743×704, Back, summary, Route and all three collapsed party headings are visible before any
+  party expansion. At 390px facts keep the same order, `27 Oct` never splits and the page never
+  scrolls sideways.
+
+No selection shows one `Select a work item` empty state and no fake route/cards. A missing Sales
+Order shows `Order details unavailable` and no guessed party state. A refresh failure keeps the last
+good mission with `Some information could not be refreshed. Try again.` Partial facts remain visible
+with the exact missing source named. Permission refusal reveals no restricted party/payment data.
+Skeletons use the final summary/88px Route/three 72px card geometry. Focus follows visual order;
+Enter/Space opens a card, Escape collapses it, focus returns correctly, and text/icons—not colour
+alone—announce every status.
+
+#### Source facts and completions resolved for the build (2026-09-25)
+
+These close the questions §5.10 leaves to the owning modules; they change no approved word or layer.
+
+- **Who contacts the customer** is the assigned Logistics company (owner correction 2026-09-25,
+  §5.10 Customer card). There is no Carres calling mode: Delivery's `customer_contact_by` (0488)
+  informs the Monitor ladder only and never gives Work a routine Carres contact act.
+- **The contact checkpoint is not a second clock.** The Route's `Contact` point and the Customer card
+  read the Logistics card's `2 working days before` check (§5.9); on the Customer card it is the
+  partner's deadline (`{company} contacts the customer · by {date}`), never a Carres task.
+- **Customer exceptions are read from their owners** (`customerCardModel`): a known delay = the Sales
+  Order action engine has `delay_planning` or `arrange_new_delivery_date` open (read from the one Work
+  feed); `Requested Another Date` = Logistics' own answer (0581 link/portal) or a Delivery contact
+  record; `Customer Refused Delivery` and `Contact Details Incorrect` = the latest Delivery contact
+  record (0487). Each act opens its owner's door and writes nothing in Work. `Waiting` is not
+  derived for the customer; the Waiting tab lists only a source-recorded waiting state (§5.2.1
+  `communication.replyState`) and is empty until a module records one.
+- **Payment exception line** beneath the Route: `Payment · RM {amount} to collect by {date}` (amber
+  once the deadline is reached) or `Payment · Finance is holding this delivery`; the deadline is
+  `paymentDeadlineOf` — the one the Logistics day-before check reads (2 working days before the
+  delivery date, 3 outstation; the effective-dated Payment rule row is not readable by Operation —
+  gap).
+- **Supplier facts** come from Purchasing through `GET /api/operation/pos/for-order/:orderId`: the PO,
+  whether it reached the supplier, the immutable PO Delivery Date, the latest supplier reply
+  (answer, reason, evidence), `effectiveArrivalOf`, the Supplier DO (`do_number`, `do_uploaded_at`),
+  Deliver To and the Warehouse GRN date. `Confirmation needed` opens one Office working day before the
+  latest date. `Record supplier delay` opens the PO in Purchasing (`open_module`) until the reply rule
+  is admitted as an embedded action (§5.1); the 2026-09-24 eight-reason list and multi-screenshot
+  evidence are Purchasing's APPROVED TARGET / NOT BUILT (the stored list is 0432's six).
+- **Loan** reads the Sales Order's loan offer (`ops_loan_offers`: offered · accepted · declined) and
+  the loan Unit (`ops_sofa_loans`: lent out · returned). A loan is a loaner Unit, not financing.
+- **Logistics collapsed stays as deployed** (§5.9, up to five facts); `exactly 72px` binds the
+  Customer and Supplier cards, and the 743×704 acceptance requires all three headings visible.
+- **The Route line is 88px; each exception line beneath it (payment, `Logistics not assigned`,
+  `Logistics · Cannot deliver`) adds one 16px row.** A failed Purchasing read keeps the route:
+  `PO` and `GRN` read `Unavailable` with `Try again`. The supplier pre-arrival confirmation is
+  Purchasing's `tomorrowDeliveryCallOf` (anchored on the PO's expected arrival, closed by an answer
+  about that exact date) or a Supplier DO; only the `tomorrow_delivery` answer feeds the latest date;
+  a short receipt is not received.
+- **Permission state:** `You cannot view this record` · `Ask an authorised operation user for access.`
+- **One visible blue.** The blue goes to the most urgent party act (missed → due today → the selected
+  work's party → future). With every card collapsed, the summary carries it as one button (the act's
+  words) that opens that card; once a card with an act is open, the blue sits in that card instead.
+  An admitted embedded action is always the blue and the summary then carries none.
+- **An order outside the Operation list** (the read returns the latest 500) draws no route or cards;
+  only a FAILED read prints `Order details unavailable` (gap: a per-order read).
+- **Not built by this card:** outstation customer confirmation before the first leg (ERP-ARCH §6.5) ·
+  customer chase answer link (§6.4) · supplier reply embedded in Work · closure receipts for
+  `Completed` · the Ohana supplier-to-customer route.
+
+#### Build and acceptance contract
+
+Build order: persist this authority → shared party shell → Customer → Supplier aggregation → Route
+projection → communication events → responsive/error/accessibility states. Preserve §5.9 Logistics,
+§5.5 left/middle shell and the deployed density fix. Representative fixtures must cover: no PO;
+one supplier; three suppliers with missing PO, delay and partial GRN; logistics unassigned/assigned
+unscheduled; customer waiting/no answer/rescheduled; payment exception; loan; delivered; missing
+contact; partial failure; permission refusal.
+
+Acceptance measures 1440, 1180, 820, 743 and 390: no horizontal page scroll, 72px collapsed cards,
+one-line Route, one primary blue action, unwrapped `27 Oct`, correct keyboard/screen-reader behaviour,
+no console error, and no regression to Logistics, left rail, middle cards or list restoration.
 
 ## 6 · Module admission gate
 
@@ -856,11 +1298,11 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Sales Orders · `issue_po` | Demand is uncovered · obtain PO coverage | PO Duty | Purchasing Order By date | PO covers demand · supplier-confirmation work may open |
 | Sales Orders · `delay_planning` | Supplier date breaks the customer commitment · record the customer-plan decision for that exact date | Responsible Delivery Operation for the customer commitment | 2 Office working days from detection | Decision and decided ETA recorded · Delivery opens the governed next booking act when required |
 | Purchasing · `manual_purchase.approve` | Manual Purchase awaits a decision · approval/refusal recorded | Purchasing Approver | Request Order By date, Office calendar | Decision stored · approved demand may require PO issue |
-| Purchasing · `manual_purchase.issue_po` | Approved demand/current PO version has not reached supplier · sent evidence | PO Duty | Request Order By date, Office calendar | Current version has confirmed-send evidence · supplier-reply clock opens |
-| Purchasing · `purchasing.confirm_ready_date` | Open PO has no standing ready/arrival promise · supplier promise recorded | PO Duty | Customer date − buffer − production calendars | Standing supplier promise exists |
-| Purchasing · `purchasing.supplier_reply` | Sent current PO version has no supplier answer · evidenced answer | PO Duty | First confirmed-send day, moved to next Office working day if closed | Answer for exact version exists |
+| Purchasing · `manual_purchase.issue_po` | Approved demand/current PO version has not reached supplier · sent evidence | PO Duty | Request Order By date, Office calendar | Current version has confirmed-send evidence · normal state becomes Waiting for goods; no immediate reply task |
+| Purchasing · `purchasing.confirm_ready_date` | Open PO has no standing ready/arrival promise · supplier promise recorded | PO Duty | Customer date − buffer − production calendars | Standing supplier promise exists; the calculated PO Delivery Date alone is not confirmation |
+| Purchasing · `purchasing.supplier_reply` | **Retired 2026-09-24:** absence of an immediate answer after sending is not work | — | — | Early exception is recorded in Purchasing when reported; otherwise the exact-date day-before rule governs |
 | Purchasing · `purchasing.supplier_date_passed` | Supplier date passed with goods owing · new evidenced arrival answer | PO Duty | Supplier date, closure-adjusted | New governed supplier answer/date exists |
-| Purchasing · `purchasing.confirm_tomorrows_delivery` | Arrival is tomorrow · confirmation about that date | PO Duty | Office working day before arrival | Tomorrow-delivery promise exists |
+| Purchasing · `purchasing.confirm_tomorrows_delivery` | Effective arrival is tomorrow · obtain Supplier DO or evidenced confirmation for that exact date and named Warehouse | PO Duty | One Office working day before effective arrival | Matching Supplier DO or evidenced tomorrow-delivery confirmation exists; a later delay records required reason/new date/WhatsApp evidence in Purchasing and derives a new date-specific occurrence |
 | Purchasing · `purchasing.confirm_balance_delivery_date` | Short receipt left goods owing · balance promise | PO Duty | Opens with short receipt; Calls calendar owns filing | Balance promise for line exists |
 | Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival | GRN Duty | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
 | Warehouse · `warehouse.outbound_handover` | **Not admitted:** dated pickup has Units not handed over · exact receiver/proof result | Requires governed personal NETS operator or admitted Site queue; neither is currently built | Scheduled Site handover date on Warehouse calendar | Every required Unit has accepted handover evidence · admission waits for governed owner/acceptance |
@@ -1118,13 +1560,27 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
+- **Work left rail — DEPLOYED 2026-09-24 (`26f718d4`, PR #1581; owner-approved UI, Jess 2026-09-24); signed-in Operation walk OWED.** On `7e9da6459` the rail
+  was a `Working day` text list with an `All` row, printed `0 actions`, a holiday that could not be
+  chosen, no `All modules` row, no week control and no `week` in the
+  URL; at 768–1103px of Work canvas Panel 1 was dropped entirely and the date strip scrolled
+  sideways. Now §5.1's `Date` and `Module` sections render through `WorkDayNav.tsx` over
+  `workRailDates` / `workModuleCounts` / `inWorkDay` in `work-model.ts`; 768–1103px keeps the rail
+  beside one work column (`Back to work` returns); below 768px the Date options wrap. Kit Icon gained
+  `previous` (ChevronLeft), `noDate` (CalendarOff) and `modules` (LayoutGrid). Proof:
+  `OperationWork.left-rail.test.tsx` 12 red on main → 13/13 green under `TZ=Asia/Kuala_Lumpur`,
+  plus model, strip and split-shell tests. Out of scope and unchanged: Panel 2 rows, Panel 3 detail,
+  communication, templates and Delivery proof review.
+  Deploy run 35977633523: both Pages projects, both canonical hosts and the API Worker report
+  `26f718d4`, and the live ERP bundle carries the rail. The signed-in read of `/operation?tab=work`
+  at 1440 / 1180 / 820 / 390 is still owed: no verification browser holds a production session.
 - **Work truth hotfix HF-1 — DEPLOYED to production 2026-09-17 (`a48e5237`, PR #1400, includes YH's
   UTC-safe `workWeek`); authenticated production read OWED.** Measured on `a5776c50`: at UTC+8 the day
   strip read `Sun 13 Sept … Thu 17 Sept`, Malaysia Day was an ordinary `0` row, an empty day said
   `Nothing assigned to you` while Friday held work, one module filter zeroed every other module, and
   the panel count followed `window.innerWidth` (three panels in a ~950px Work area). Now: every day
-  label is `fmtDate`; holidays come from the shared `my-holidays.ts` as `Public holiday · {name}` with
-  no count and no button; the focus day is today when it is a working day, else the next working day
+  label is `fmtDate`; holidays come from the shared `my-holidays.ts` (named in the rail; since the 2026-09-24 left rail a
+  holiday is a choosable date with its own count); the focus day is today when it is a working day, else the next working day
   (Saturday only when something is due that Saturday), and the focus list also keeps work dated
   between today and that day; empty states run failed source → no filter match → `No work on
   {weekday, date}` with `Open Missed` / `Open {weekday, date}` → true empty; module counts ignore only

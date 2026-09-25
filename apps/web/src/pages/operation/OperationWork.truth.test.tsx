@@ -17,6 +17,10 @@ let workState: {
 };
 const refetch = vi.fn();
 
+/* The party cards read Delivery through their own queries; their behaviour is
+   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
+vi.mock("./work/WorkParties", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return { ...actual, useOperationWork: () => ({ ...workState, refetch }) };
@@ -127,7 +131,7 @@ function show(url = "/operation?tab=work") {
   );
 }
 
-const dayNav = () => screen.getByRole("navigation", { name: "Working day" });
+const dayNav = () => screen.getByRole("region", { name: "Date" });
 
 const savedTz = process.env.TZ;
 const savedWidth = window.innerWidth;
@@ -142,7 +146,7 @@ afterAll(() => {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-09-17T02:00:00.000Z"));
-  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
   workState = { data: feed("2026-09-17", []), isLoading: false, isError: false };
 });
 afterEach(() => {
@@ -158,13 +162,11 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
 
   it("1 · a Thursday shows the week Mon, 14 Sep … Fri, 18 Sep through fmtDate", () => {
     show();
-    const nav = dayNav();
-    expect(nav).toHaveTextContent("Mon, 14 Sep");
-    expect(nav).toHaveTextContent("Tue, 15 Sep");
-    expect(nav).toHaveTextContent("Thu, 17 Sep");
-    expect(nav).toHaveTextContent("Fri, 18 Sep");
-    expect(nav).not.toHaveTextContent("Sun 13 Sept");
-    expect(nav).not.toHaveTextContent("Sept");
+    const names = within(dayNav()).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    for (const label of ["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep"]) {
+      expect(names.some((name) => name.startsWith(label))).toBe(true);
+    }
+    expect(names.join("|")).not.toMatch(/Sun|Sept/);
   });
 
   it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep", () => {
@@ -173,14 +175,11 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(within(dayNav()).getByRole("button", { name: "Fri, 18 Sep · 1 action" })).toBeInTheDocument();
   });
 
-  it("3 · Wed, 16 Sep reads Public holiday · Malaysia Day, with no count and no button", () => {
+  it("3 · Wed, 16 Sep names Malaysia Day beside its badge and prints no zero (rail ruling 2026-09-24)", () => {
     show();
-    const holiday = within(dayNav()).getByText(/Public holiday · Malaysia Day/);
-    expect(holiday.closest("button")).toBeNull();
-    const row = holiday.closest("[data-holiday]");
-    expect(row).not.toBeNull();
-    expect(row).toHaveTextContent("Wed, 16 Sep");
-    expect(row).not.toHaveTextContent("0");
+    const row = within(dayNav()).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day" });
+    expect(row).toHaveTextContent("Malaysia Day");
+    expect(row.querySelector("[data-rail-count]")).toBeNull();
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
@@ -194,7 +193,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
 
   it("5 · Saturday appears only when something is due Sat, 19 Sep", () => {
     const first = show();
-    expect(dayNav()).not.toHaveTextContent("Sat, 19 Sep");
+    expect(within(dayNav()).queryByRole("button", { name: /^Sat, 19 Sep/ })).toBeNull();
     first.unmount();
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
     show();
@@ -219,15 +218,15 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
       inModule("delivery", "2026-09-17"),
     ]);
     const first = show("/operation?tab=work&module=payment");
-    const rail = screen.getByRole("complementary", { name: "Work filters" });
-    expect(within(rail).getByRole("button", { name: /^Delivery/ })).toHaveTextContent(/2$/);
-    expect(within(rail).getByRole("button", { name: /^Payment/ })).toHaveTextContent(/1$/);
+    const rail = screen.getByRole("region", { name: "Module" });
+    expect(within(rail).getByRole("button", { name: "Delivery · 2 actions" })).toHaveTextContent(/2$/);
+    expect(within(rail).getByRole("button", { name: "Payment · 1 action" })).toHaveTextContent(/1$/);
     first.unmount();
 
     show();
-    const allRail = screen.getByRole("complementary", { name: "Work filters" });
+    const allRail = screen.getByRole("region", { name: "Module" });
     const moduleSum = ["Sales Orders", "Purchasing", "Receiving", "Delivery", "Payment", "Issue Tracker"]
-      .map((label) => Number(within(allRail).getByRole("button", { name: new RegExp(`^${label}`) }).textContent?.match(/(\d+)$/)?.[1]))
+      .map((label) => Number(within(allRail).getByRole("button", { name: new RegExp(`^${label}`) }).querySelector("[data-rail-count]")?.textContent ?? 0))
       .reduce((sum, n) => sum + n, 0);
     const rows = within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ }).length;
     expect(rows).toBe(3);
@@ -251,20 +250,25 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
-  it("9 · a 950px Work area inside a 1280px window uses two panels", () => {
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  it("9 · a 1180px page collapses only the rail; Filters reopens it beside the list", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      width: 950, height: 800, top: 0, left: 0, right: 950, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
+      width: 1180, height: 800, top: 0, left: 0, right: 1180, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect);
     show();
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
+    expect(screen.queryByRole("complementary", { name: "Work filters" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("work-filters-toggle"));
+    expect(screen.getByRole("complementary", { name: "Work filters" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
   });
 
-  it("10 · choosing All lists every open action, the same number All counts", () => {
+  it("10 · a link that opens every open action (`day=all`) still lists them all", () => {
     workState.data = feed("2026-09-17", [item("2026-09-17"), item("2026-09-18"), item(null)]);
-    show();
+    const first = show();
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(1);
-    fireEvent.click(within(dayNav()).getByRole("button", { name: "All · 3 actions" }));
+    first.unmount();
+    show("/operation?tab=work&day=all");
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(3);
   });
 
@@ -274,7 +278,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     workState.data = feed("2026-09-17", [missed]);
     show();
     const list = screen.getByTestId("work-list");
-    expect(list).toHaveTextContent("Required Wed, 5 Aug");
+    const card = list.querySelector("[data-work-card]") as HTMLElement;
+    expect(card.getAttribute("aria-label")).toContain("Wednesday, 5 August 2026 · Missed");
     expect(list).not.toHaveTextContent("working days missed");
   });
 });

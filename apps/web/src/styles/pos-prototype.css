@@ -4516,3 +4516,469 @@ button.step-pill:disabled { cursor: default; color: inherit; }
   transition: 120ms ease;
 }
 .os-stripe__void:hover { color: var(--c-orange); }
+
+/* ========= Responsive catalog shell: phone ========= */
+@media (max-width: 767px) {
+  /* Day 4 — the desktop top bar stays byte-for-byte in the DOM and is only
+     swapped out at the phone breakpoint. */
+  .pos-topbar--desktop {
+    display: none;
+  }
+
+  .pos-mobile-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-rows: 48px 44px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
+    overflow-x: hidden;
+    padding-top: env(safe-area-inset-top);
+    background: var(--pos-panel, #fff);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .pos-mobile-topbar.is-complete {
+    grid-template-rows: 48px;
+  }
+
+  .pos-mobile-topbar__main {
+    display: grid;
+    grid-template-columns: 44px auto minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 8px;
+  }
+
+  .pos-mobile-topbar__icon,
+  .pos-mobile-topbar__avatar {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  .pos-mobile-topbar__icon:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .pos-mobile-topbar__wordmark {
+    min-height: 44px;
+    font-size: 19px;
+    letter-spacing: 0.055em;
+  }
+
+  .pos-mobile-topbar__context {
+    display: block;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+    padding-left: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .pos-mobile-topbar__avatar .pos-staff-chip__avatar {
+    flex-shrink: 0;
+  }
+
+  .pos-mobile-topbar__steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0 8px;
+    border-top: 1px solid var(--line);
+    background: var(--pos-panel, #fff);
+  }
+
+  .pos-mobile-topbar__step {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--fg-muted);
+    font-family: var(--font-button);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .pos-mobile-topbar__step-pill {
+    width: 100%;
+    height: 32px;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .pos-mobile-topbar__step.is-active .pos-mobile-topbar__step-pill {
+    background: var(--c-ink);
+    color: var(--c-cream);
+  }
+
+  .pos-mobile-topbar__step-number {
+    opacity: 0.55;
+  }
+
+  .pos-mobile-topbar__step:disabled {
+    cursor: default;
+  }
+
+  .pos-mobile-topbar__wordmark:focus-visible,
+  .pos-mobile-topbar__avatar:focus-visible,
+  .pos-mobile-topbar__step:focus-visible {
+    outline: 2px solid var(--c-burnt);
+    outline-offset: -2px;
+  }
+
+  .catalog {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .cat-side {
+    display: none;
+  }
+
+  .cat-main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .cat-toolbar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .cat-toolbar .cat-search {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .cat-toolbar .cat-select {
+    flex: 1 1 auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .cat-toolbar__count {
+    margin-left: auto;
+  }
+
+  .cat-grid-wrap {
+    flex: none;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    padding: 12px 12px calc(120px + env(safe-area-inset-bottom));
+  }
+
+  .cat-section,
+  .prod-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .cat-section + .cat-section {
+    margin-top: 20px;
+  }
+
+  .cat-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .prod-card__body {
+    padding: 8px;
+  }
+
+  .prod-card__name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .prod-card__series,
+  .prod-card__detail {
+    font-size: 11px;
+  }
+
+  .prod-card__detail {
+    display: -webkit-box;
+    min-height: 2.9em;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .prod-card__sku {
+    font-size: 10px;
+    opacity: 0.6;
+  }
+
+  .prod-card__price {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .prod-card__badge {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .prod-card__add {
+    right: 8px;
+    bottom: 8px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .prod-card__add::before {
+    position: absolute;
+    inset: -6px;
+    content: "";
+  }
+
+  .cart-fab {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ========= Compact tablet top bar: portrait + iPad landscape ========= */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .pos-topbar--desktop {
+    display: none;
+  }
+
+  .pos-tablet-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-rows: 48px 44px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
+    overflow-x: hidden;
+    background: var(--pos-panel, #fff);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .pos-tablet-topbar.is-complete {
+    grid-template-rows: 48px;
+  }
+
+  .pos-tablet-topbar__main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 12px;
+  }
+
+  .pos-tablet-topbar__icon,
+  .pos-tablet-topbar__cart,
+  .pos-tablet-topbar__avatar {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  .pos-tablet-topbar__icon:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  /* Both tablet ranges keep their permanent category sidebar, so the future
+     phone drawer trigger has no job here. */
+  .pos-tablet-topbar__icon {
+    display: none;
+  }
+
+  .pos-tablet-topbar__wordmark {
+    min-height: 44px;
+    flex-shrink: 0;
+    font-size: 21px;
+    letter-spacing: 0.06em;
+  }
+
+  .pos-tablet-topbar__context {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+    padding-left: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pos-tablet-topbar__cart-badge {
+    position: absolute;
+    top: 3px;
+    right: 1px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--c-orange);
+    color: var(--c-cream);
+    font-family: var(--font-button);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pos-tablet-topbar__avatar .pos-staff-chip__avatar {
+    flex-shrink: 0;
+  }
+
+  .pos-tablet-topbar__steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0 12px;
+    border-top: 1px solid var(--line);
+    background: var(--pos-panel, #fff);
+  }
+
+  .pos-tablet-topbar__step {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--fg-muted);
+    font-family: var(--font-button);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .pos-tablet-topbar__step-pill {
+    width: 100%;
+    max-width: 180px;
+    height: 32px;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .pos-tablet-topbar__step.is-active .pos-tablet-topbar__step-pill {
+    background: var(--c-ink);
+    color: var(--c-cream);
+  }
+
+  .pos-tablet-topbar__step-number {
+    opacity: 0.55;
+  }
+
+  .pos-tablet-topbar__step:disabled {
+    cursor: default;
+  }
+
+  .pos-tablet-topbar__wordmark:focus-visible,
+  .pos-tablet-topbar__cart:focus-visible,
+  .pos-tablet-topbar__avatar:focus-visible,
+  .pos-tablet-topbar__step:focus-visible {
+    outline: 2px solid var(--c-burnt);
+    outline-offset: -2px;
+  }
+}
+
+/* ========= Responsive catalog shell: tablet portrait ========= */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .catalog {
+    grid-template-columns: 180px minmax(0, 1fr);
+    overflow-x: hidden;
+  }
+
+  .cat-side {
+    padding: 16px 10px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .cat-main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .cat-toolbar {
+    padding: 12px 16px;
+  }
+
+  .cat-grid-wrap {
+    min-width: 0;
+    overflow-x: hidden;
+    padding: 16px 16px calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .cat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+}
+
+/* ========= Responsive catalog shell: iPad landscape ========= */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .cat-grid-wrap {
+    padding: 20px 20px 24px;
+  }
+}

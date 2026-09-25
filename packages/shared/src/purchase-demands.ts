@@ -316,6 +316,10 @@ export interface PurchaseDemandRow {
    * Whether this supplier's goods are collected from the factory. The
    * collector is resolved from Purchasing Settings, never chosen per PO.
    */
+  supplierAddress?: string | null;
+  poDate?: string | null;
+  poDeliveryDate?: string | null;
+  poDeliveryWorkingDays?: number | null;
   supplierKind: "own_logistics" | "factory_pickup" | null;
   /** The governed factory-collection rule from Purchasing Settings. */
   supplierCollection?: {
@@ -891,6 +895,10 @@ export const purchaseDemandRowSchema = z.object({
     .nullable(),
   action: soBatchPurchaseActionSchema.nullable(),
   parts: z.array(z.object({ sku: z.string(), qty: z.number(), unitCost: z.number().nullable() })),
+  supplierAddress: z.string().nullable().optional(),
+  poDate: z.string().nullable().optional(),
+  poDeliveryDate: z.string().nullable().optional(),
+  poDeliveryWorkingDays: z.number().nullable().optional(),
   supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
   supplierCollection: z
     .object({

@@ -161,6 +161,8 @@ function withDatePlan(
          `Review Purchase Orders` shows the date the document will carry. The
          browser computes no date; a supplier × category with no recorded
          production number answers null and the draft prints the absence. */
+      po_date: todayIsoMYT(),
+      po_delivery_working_days: production,
       po_delivery_date:
         settings != null
           ? poDeliveryDateOf(settings, {

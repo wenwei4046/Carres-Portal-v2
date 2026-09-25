@@ -48,6 +48,9 @@ export interface ManualPurchaseIssueWall {
   deliveryDate: string | null;
   /** The PO Delivery Date the server would stamp — read, never computed here. */
   poDeliveryDate?: string | null;
+  poDate?: string | null;
+  poDeliveryWorkingDays?: number | null;
+  deliveryMethod?: "we_collect" | "supplier_delivers" | null;
   sku: string;
   item: string;
   note?: string | null;
@@ -105,6 +108,9 @@ export function manualPurchaseReviewDocuments(
       destinationName: first.destinationName,
       destinationAddress: first.destinationAddress ?? null,
       poDeliveryDate: first.poDeliveryDate ?? null,
+      poDate: first.poDate ?? null,
+      poDeliveryWorkingDays: first.poDeliveryWorkingDays ?? null,
+      deliveryMethod: first.deliveryMethod ?? null,
       category: (first.category ?? null) as ProductCategory | null,
       /* A Manual Purchase serves no customer order, so the sofa
          one-PO-per-order rule has nothing to key on. */

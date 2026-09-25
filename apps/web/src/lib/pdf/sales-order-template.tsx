@@ -35,7 +35,6 @@ import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 // document family keeps ONE date and money format. Take theirs, keep ours.
 import { CARRES_COMPANY, formatMoney, moneyDigits } from "./letterhead";
 import { ORDER_TERMS } from "../order-terms";
-import { serviceCodeWord } from "../service-code";
 import type { SalesOrderTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -591,7 +590,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <View key={`addon-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
             <ColumnRules />
             <View style={styles.bNo}><Text style={styles.cellNo}>{lines.length + idx + 1}</Text></View>
-            <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}>{a.sku ? serviceCodeWord(a.sku) : "ADD-ON"}</Text></View>
+            <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}>{(a.sku ?? "ADD-ON").split("-").join("-\u200b")}</Text></View>
             <View style={[styles.desc, styles.gridV]}>
               <Text style={styles.descMain}>{a.label}</Text>
               {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
@@ -963,10 +962,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <Text style={styles.totalsValue}>{money(serviceAmount)}</Text>
               </View>
             )}
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Tax</Text>
-              <Text style={styles.totalsValue}>{dash}</Text>
-            </View>
             <View style={styles.totalsRow}>
               <Text style={styles.totalsLabel}>Total payable</Text>
               <Text style={styles.totalsValue}>{money(total)}</Text>

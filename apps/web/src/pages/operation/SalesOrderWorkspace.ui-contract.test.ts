@@ -80,7 +80,8 @@ describe("Sales Order object template contract", () => {
        the same function the server runs on commit (Law D). */
     expect(workspace).toContain("salesOrderCommitWord");
     expect(workspace).toContain("classifySalesOrderChange");
-    expect(workspace).toContain("{changeReason.trim() ? commitWord : `${commitWord} — say why`}");
+    expect(workspace).toContain('data-testid="workspace-confirm-save"');
+    expect(workspace).toContain('<Modal open={reviewOpen}');
     expect(workspace).toContain('data-testid="change-count"');
     /* The old always-editable page's save bar is retired with the mode. */
     expect(workspace).not.toContain('data-testid="save-bar"');
@@ -193,7 +194,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("const seed = `${orderId}:rev:${viewRev}`");
     expect(workspace).toContain('disabled={mode === "oldrev"}');
     expect(workspace).toContain("<fieldset");
-    expect(workspace).toContain("Viewing Rev {viewedRevision.revision} · read-only");
+    expect(workspace).toContain("Viewing ({viewedRevision.revision}) · read-only");
     /* 0562 — the editable cards carry their own lock so a saved order reads
        until `Edit`; the outer fieldset still locks a historical version whole. */
     expect(workspace).toContain('<fieldset disabled={formLocked} className="contents">');
@@ -998,7 +999,7 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
     /* ⭐ THE SO PAGE FIELD STANDARD (2026-09-22): a grey box means editable, and
        the three exceptions print as plain text. */
-    expect(workspace).toContain('data-kit={own ? "readonly-field" : "plain-fact"}');
+    expect(workspace).toContain('data-kit={framed ? "readonly-field" : "plain-fact"}');
     expect(workspace).toContain('<Fact own={false} label="SO Doc Date"');
     expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
     /* Announced as what it is drawn as. A box that looks typable and reads to
@@ -1147,7 +1148,7 @@ describe("Sales Order object page — one form grammar", () => {
     expect(toLift, "the stairCarry div is not closed before the lift").not.toContain("</div>");
     /* Nothing moved on screen: the three fields keep the parent's own three
        tracks rather than collapsing into one cell. */
-    expect(workspace).toContain("sm:col-span-3 sm:grid-cols-3");
+    expect(workspace).toContain("sm:col-span-2 sm:grid-cols-2");
   });
 
   it("lets no stylesheet put the grey band back over the blue card title", () => {
@@ -1197,7 +1198,7 @@ describe("Sales Order object page — one form grammar", () => {
     /* The row writers are gated on the lock, not merely disabled by CSS. */
     expect(workspace).toContain("{!formLocked && canConfig && !protectedLine(l) && (");
     expect(workspace).toContain("{formLocked || protectedLine(l) ? null : l.removed ? (");
-    expect(workspace).toContain("{!stamped && !formLocked && (");
+    expect(workspace).toContain("{!owned && <Button");
   });
 
   it("reads SO info in the RULED order, and in the same order as the paper beside it", () => {
@@ -1508,10 +1509,9 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).not.toContain("<ServiceRowActions");
     expect(workspace).toContain('data-testid={`edit-service-${a.addon_key}`}');
     expect(workspace).toContain("nameOfAddon(a.addon_key)");
-    expect(workspace).toContain('aria-label={`Remove ${nameOfAddon(a.addon_key)}`}');
-    expect(workspace).toContain('aria-label={`Restore ${nameOfAddon(a.addon_key)}`}');
+    expect(workspace).toContain('data-testid={`delivery-service-${a.addon_key}`}');
     /* A per-trip charge and the stamped stair carry keep their quantity. */
-    expect(workspace).toContain("const fixedQtyService = (key: string) =>");
+    expect(workspace).toContain("const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key)");
     expect(workspace).toContain("STAIR_CARRY_ADDON_KEY");
   });
 
@@ -1581,26 +1581,35 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   });
 
   it("states every money figure at 13px — no browser-default 16px, no heading size", () => {
-    expect(workspace).toContain('grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]');
+    expect(workspace).toContain('grid-cols-[1fr_auto] overflow-hidden rounded-control border border-kit-slate-5 text-body');
     expect(workspace).not.toContain('<span className="text-meta text-base-500">Balance due</span>');
   });
 
-  it("prints a service's Item Code upper case on the page AND the paper, from one function", () => {
-    expect(serviceCode).toContain("key.toUpperCase()");
-    expect(workspace).toContain("{serviceCodeWord(a.addon_key)}");
-    expect(pdfTemplate).toContain('{a.sku ? serviceCodeWord(a.sku) : "ADD-ON"}');
-    /* Display only — the stored key is what the draft still writes. */
+  it("prints a service's Item Code from its governed identity — catalogue Service SKU when linked, saved key otherwise", () => {
+    /* One rule, one function, both surfaces (verified 2026-09-24: 0172 links
+       `addons.key` → `addons.service_sku`; no other display mapping exists). */
+    expect(serviceCode).toContain("catalogServiceSku && catalogServiceSku.trim() ? catalogServiceSku.trim() : savedKey");
+    /* Nothing is upper-cased or rewritten. */
+    expect(serviceCode).not.toContain("toUpperCase");
+    expect(workspace).toContain("{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}");
+    expect(workspace).toContain("(key) => serviceCodeWord(key, addonSkuByKey.get(key))");
+    /* The paper prints what the payload sends; the API applies the same rule. */
+    expect(pdfTemplate).toContain('(a.sku ?? "ADD-ON").split("-")');
+    /* The stored key is what the draft still writes. */
     expect(workspace).toContain("addon_key: hit.key");
   });
 
-  it("shows disposal in Delivery from the SAME service rows, adding through the ONE act", () => {
-    expect(workspace).toContain('data-testid="delivery-disposal"');
-    expect(workspace).toContain('onValueChange={addServiceToDraft}');
-    /* Both doors — Items' `Add service` and Delivery's `Add disposal` — call it. */
-    expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(2);
-    /* It prints no money: the charge is stated once, in Items. */
-    expect(workspace).toContain('<Fact label="Disposal" value={servicesWords(disposals, nameOfAddon)} own={false} />');
-    expect(changeHelpers).toContain("export const isDisposalService");
+  it("states the order's Services in Delivery from the SAME rows, adding through the ONE act, in approved words only", () => {
+    expect(workspace).toContain('data-testid="delivery-services"');
+    expect(workspace).toContain('<Fact label="Services" own={false} framed value={');
+    /* Delivery owns the only service input; Items only projects its charge. */
+    expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(1);
+    expect(workspace).not.toContain('id="so-add-service"');
+    /* The Delivery door offers the disposal family, known by its catalogue code. */
+    expect(changeHelpers).toContain('catalogServiceSku.startsWith("SVC-DISPOSE-")');
+    /* Unapproved words stay off the screen (recorded as a PROPOSAL in COPY). */
+    expect(workspace).not.toContain('label="Disposal"');
+    expect(workspace).not.toContain('label="Add disposal"');
   });
 
   it("draws Revisions and History through the same SO section Block — no off-scale p-5, no 20px title", () => {

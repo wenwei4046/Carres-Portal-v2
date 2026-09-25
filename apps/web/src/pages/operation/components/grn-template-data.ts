@@ -62,6 +62,17 @@ export function grnTemplateDataOf(
     (detail.po?.purchase_order_lines ?? []).map((pl) => [pl.id, pl]),
   );
 
+  const unitResults = (r.unit_results ?? []).map((u) => ({
+    lineId: u.po_line_id,
+    unit_code: u.unit_code,
+    outcome_label: [
+      RECEIVING_UNIT_OUTCOME_LABEL[u.outcome],
+      u.issue_kind === "wrong_item" ? "wrong item" : null,
+      u.issue_kind === "damaged" ? "damaged" : null,
+    ].filter(Boolean).join(" · "),
+  }));
+  const printedLineIds = new Set(docLines.map((line) => line.id));
+
   const lines = docLines.map((l) => {
     const pl = poLineById.get(l.id);
     const receivedNow = draft?.lines?.[l.id] ?? l.received_now;
@@ -71,6 +82,8 @@ export function grnTemplateDataOf(
     const orderQty = pl?.qty ?? 0;
     const cumulativeReceived = (pl?.received_qty ?? 0) + delta;
     return {
+      unit_results: unitResults.filter((u) => u.lineId === l.id)
+        .map(({ unit_code, outcome_label }) => ({ unit_code, outcome_label })),
       sku: l.sku,
       description: info[l.sku]?.description ?? l.sku,
       // Server-resolved word first; the same shared ladder covers version
@@ -124,16 +137,11 @@ export function grnTemplateDataOf(
       draft?.goodsArrivedAt ?? r.actual_site_name ?? r.warehouse_name ?? "",
     goods_received_on: draft?.goodsReceivedAt ?? r.goods_received_at ?? null,
     lines,
-    unit_results: (r.unit_results ?? []).map((u) => ({
-      unit_code: u.unit_code,
-      outcome_label: [
-        RECEIVING_UNIT_OUTCOME_LABEL[u.outcome],
-        u.issue_kind === "wrong_item" ? "wrong item" : null,
-        u.issue_kind === "damaged" ? "damaged" : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-    })),
+    // Preserve unmatched historical evidence; never guess a line from a SKU
+    // or attach an unreceived line's Units to another item on this receipt.
+    unit_results: unitResults
+      .filter((u) => !u.lineId || !printedLineIds.has(u.lineId))
+      .map(({ unit_code, outcome_label }) => ({ unit_code, outcome_label })),
     extra_lines: r.extra_lines ?? [],
     evidence,
     duty: {

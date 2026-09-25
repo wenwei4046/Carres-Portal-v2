@@ -120,7 +120,7 @@ export const DW = {
    */
   overdue: "Overdue",
   /** No Logistics Partner on the scope yet — a fact, never `Unassigned`. */
-  noLogistics: "No logistics picked",
+  noLogistics: "Logistics not assigned",
   /**
    * `DO No`'s absence, and ONLY `DO No`'s.
    *
@@ -137,7 +137,7 @@ export const DW = {
   /** The portal's established absence FORM — `No <the exact thing>`, as in
    *  `No delivery date` and `No delivery order yet`. Flagged in the card as a
    *  new absence for Jess to confirm, never as pre-approved vocabulary. */
-  noTime: "No time agreed",
+  noTime: "Not recorded",
   noGoods: "No items on this order",
   /** Why an order is NOT delivery work yet — Sales owns each of these. */
   blockerNoLocation: "No delivery address",
@@ -315,12 +315,11 @@ export function legWorkStatusOf(
       /* A leg nobody has moved yet is exactly the rungs the whole-order scope
          uses: a day and a window agreed, a partner still to contact the
          customer, or no partner at all. */
-      if (confirmedIso && confirmedTime) return say("confirmed", confirmedTime);
+      /* A scheduled date completes the leg's arrangement; the time is
+         optional (owner ruling 2026-09-24). */
+      if (confirmedIso) return say("confirmed", confirmedTime);
       if (!partnerName) return say("assign_logistics");
-      /* ONE vocabulary across the workspace (owner ruling 2026-09-14): a leg
-         whose day is agreed and whose window is not asks for the TIME, in
-         the same words the whole-order scope uses. */
-      return say(confirmedIso ? "confirm_time" : "partner_must_contact");
+      return say("partner_must_contact");
   }
 }
 

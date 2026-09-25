@@ -6,6 +6,30 @@
  * rows the review and the waiting request both print.
  */
 import { GOODS_CATEGORY_WORDS, fmtMoney, goodsCategoryWordOf } from "@carres/shared";
+import { addonSizeOptions, disposalUnitSizes, composeDisposalSizeSummary, type DraftAddon as PosAddon } from "../dealer/new-order/draft";
+
+/** Adapt the office draft to the POS's existing per-unit size contract. */
+export function serviceSizeDraft(a: EditAddon, sizeOptions?: string[] | null): PosAddon {
+  return { key: a.addon_key, name: a.addon_key, qty: a.qty, unitPrice: a.unit_price,
+    sizeOptions: sizeOptions ?? undefined,
+    attrs: { size: typeof a.attrs?.size === "string" ? a.attrs.size : undefined,
+      sizes: Array.isArray(a.attrs?.sizes) ? a.attrs.sizes.map((s) => typeof s === "string" ? s : "") : undefined } };
+}
+
+export function resizeService(a: EditAddon, qty: number, sizeOptions?: string[] | null): Partial<EditAddon> {
+  const nextQty = Math.max(1, Math.floor(Number.isFinite(qty) ? qty : 1));
+  const pos = serviceSizeDraft(a, sizeOptions);
+  if (!addonSizeOptions(pos).length) return { qty: nextQty };
+  const sizes = disposalUnitSizes({ ...pos, qty: nextQty });
+  return { qty: nextQty, attrs: { ...a.attrs, sizes, size: composeDisposalSizeSummary(sizes) } };
+}
+
+export function sizeServiceUnit(a: EditAddon, index: number, size: string): Partial<EditAddon> {
+  const sizes = disposalUnitSizes(serviceSizeDraft(a));
+  if (index < 0 || index >= sizes.length) return {};
+  sizes[index] = size;
+  return { attrs: { ...a.attrs, sizes, size: composeDisposalSizeSummary(sizes) } };
+}
 
 export interface EditLine {
   key: string;
@@ -56,20 +80,23 @@ export function qtyWords(
 }
 
 /**
- * A disposal service — the old mattress or bedframe the lorry takes away. The
- * `addons` catalogue carries no category, so a disposal is known by its key or
- * its catalogue name (`dispose-mattress` · `Dispose old mattress`). Falsifier:
- * the catalogue gains a service category — then read that instead.
+ * A disposal service — the old mattress, sofa or bed frame the lorry takes
+ * away — known by the catalogue's own Service SKU family `SVC-DISPOSE-…`
+ * (0172; production 2026-09-24: mattress · sofa · big sofa · bed frame). Not a
+ * name match. Falsifier: the catalogue gains a service category — read that.
  */
-export const isDisposalService = (key: string, name: string): boolean =>
-  /dispos/i.test(key) || /dispos/i.test(name);
+export const isDisposalService = (catalogServiceSku: string | null | undefined): boolean =>
+  typeof catalogServiceSku === "string" && catalogServiceSku.startsWith("SVC-DISPOSE-");
 
 /** `Dispose old mattress ×2 · Delivery fee` — name, and quantity when above 1. */
 export function servicesWords(
-  addons: Array<Pick<EditAddon, "addon_key" | "qty" | "removed">>,
+  addons: Array<Pick<EditAddon, "addon_key" | "qty" | "removed" | "attrs">>,
   nameOf: (key: string) => string,
 ): string {
-  const parts = live(addons).map((a) => (a.qty > 1 ? `${nameOf(a.addon_key)} ×${a.qty}` : nameOf(a.addon_key)));
+  const parts = live(addons).map((a) => {
+    const config = configWords(a.attrs);
+    return `${nameOf(a.addon_key)}${config ? ` · ${config}` : ""}${a.qty > 1 ? ` ×${a.qty}` : ""}`;
+  });
   return parts.length ? parts.join(" · ") : "None";
 }
 

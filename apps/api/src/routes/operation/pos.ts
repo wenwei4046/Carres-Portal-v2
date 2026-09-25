@@ -29,6 +29,7 @@ import {
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
 import { chunk } from "../../lib/purchase-demand-read";
+import { supplierPoFactsOf, type SupplierFactRows } from "../../lib/supplier-card-facts";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
@@ -1327,6 +1328,63 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 
   const response: AwaitingStockShortageResponse = { shortage, orders };
   return c.json(response);
+});
+
+/**
+ * GET /for-order/:orderId — the Work Supplier card's facts (owner approval
+ * 2026-09-25, Workspace MASTER §5.10): every PO serving ONE Sales Order, read
+ * from Purchasing and the Warehouse. Read-only; nothing here writes.
+ */
+operationPosRouter.get("/for-order/:orderId", requireOperation, async (c) => {
+  const orderId = c.req.param("orderId");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) return c.json({ error: "not_found", message: "Order not found" }, 404);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [{ data: threads, error: tErr }, { data: sources, error: sErr }] = await Promise.all([
+    sb.from("order_supplier_threads").select("po_id").eq("order_id", orderId),
+    sb.from("po_line_sources").select("po_id").eq("order_id", orderId),
+  ]);
+  const e1 = tErr ?? sErr;
+  if (e1) {
+    const m = mapPgError(e1);
+    return c.json(m.body, m.status);
+  }
+  const poIds = [
+    ...new Set(
+      [...((threads ?? []) as Array<{ po_id: string | null }>), ...((sources ?? []) as Array<{ po_id: string | null }>)]
+        .map((r) => r.po_id)
+        .filter((v): v is string => Boolean(v)),
+    ),
+  ];
+  if (poIds.length === 0) return c.json({ purchaseOrders: [] });
+  const [pos, lines, destinations, promises, receipts] = await Promise.all([
+    sb
+      .from("purchase_orders")
+      .select("id, status, placed_at, official_delivery_date, eta_date, do_number, do_uploaded_at, destination_id, suppliers(name)")
+      .in("id", poIds),
+    sb.from("purchase_order_lines").select("po_id, destination_id, sku, qty, received_qty").in("po_id", poIds),
+    sb.from("purchasing_destinations").select("id, name"),
+    sb
+      .from("po_supplier_promises")
+      .select("po_id, kind, answer, new_date, about_date, previous_date, reason, evidence, recorded_at")
+      .eq("kind", "tomorrow_delivery")
+      .in("po_id", poIds)
+      .is("po_line_id", null),
+    sb.from("warehouse_receipts").select("po_id, goods_received_at, status").in("po_id", poIds),
+  ]);
+  const e2 = pos.error ?? lines.error ?? destinations.error ?? promises.error ?? receipts.error;
+  if (e2) {
+    const m = mapPgError(e2);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    purchaseOrders: supplierPoFactsOf({
+      pos: (pos.data ?? []) as SupplierFactRows["pos"],
+      lines: (lines.data ?? []) as SupplierFactRows["lines"],
+      destinations: (destinations.data ?? []) as SupplierFactRows["destinations"],
+      promises: (promises.data ?? []) as SupplierFactRows["promises"],
+      receipts: (receipts.data ?? []) as SupplierFactRows["receipts"],
+    }),
+  });
 });
 
 // ----- GET /:id/audit -----

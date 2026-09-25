@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import "./receiving-workspace.css";
 import { Link } from "react-router-dom";
 import {
   caseProductCategory,
@@ -200,7 +201,7 @@ function ReadMode({
             </span>
           </Prop>
           <Prop label="Supplier">{supplierName}</Prop>
-          <Prop label="Deliver To">{warehouseName}</Prop>
+          <Prop label="Supplier Deliver To">{warehouseName}</Prop>
           {po.eta_date ? (
             <Prop label="Expected arrival">
               <span className="tabular-nums">{fmtDateShort(po.eta_date)}</span>
@@ -463,7 +464,7 @@ function ReceivingMode({
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  /** `Deliver To` is the instruction; `Actual Site` is where the goods
+  /** `Supplier Deliver To` is the instruction; `Actual Site` is where the goods
    *  physically arrived. "" = the PO's own booked warehouse. */
   const [actualSiteId, setActualSiteId] = useState<string>("");
   const [arrivalEvidence, setArrivalEvidence] = useState<
@@ -671,13 +672,13 @@ function ReceivingMode({
     "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9";
 
   return (
-    <div data-testid="receiving-mode" className="pb-20">
+    <div data-testid="receiving-mode" className="receiving-workspace min-w-0 pb-20">
       {/* 1 · header and source facts */}
-      <div className="flex items-start gap-2">
+      <div className="receiving-header flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1 text-body text-kit-slate-12">
           {supplierName} → {warehouseName}
         </div>
-        <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0">
+        <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0 max-w-full break-words">
           {po.id}
         </span>
       </div>
@@ -688,31 +689,31 @@ function ReceivingMode({
 
       {/* 2 · Receiving Details */}
       <Section title="Receiving Details">
-        <div className="flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Goods received on
+            Goods Received Date
           </span>
           <input
             type="date"
             value={goodsReceivedAt}
             onChange={(e) => setGoodsReceivedAt(e.target.value)}
-            aria-label="Goods received on"
+            aria-label="Goods Received Date"
             data-testid="goods-received-at"
             className={FIELD}
           />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Deliver To
+            Supplier Deliver To
           </span>
           <span className="text-body text-kit-slate-12">{warehouseName}</span>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Goods arrived at
           </span>
           {/* Where the goods PHYSICALLY arrived. It never overwrites
-              `Deliver To` — both facts are preserved (owner correction
+              `Supplier Deliver To` — both facts are preserved (owner correction
               2026-09-06 §3; the retired label was `Actual Site`). */}
           <select
             value={actualSiteId || po.warehouse_id}
@@ -728,20 +729,20 @@ function ReceivingMode({
             ))}
           </select>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Supplier DO No.
+            Supplier DO No
           </span>
           <input
             type="text"
             value={doNumber}
             onChange={(e) => setDoNumber(e.target.value)}
-            aria-label="Supplier DO No."
+            aria-label="Supplier DO No"
             data-testid="do-number"
             className={`${FIELD} flex-1`}
           />
         </div>
-        <div className="mt-1 flex items-start gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-start gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Signed DO photo
           </span>
@@ -753,7 +754,7 @@ function ReceivingMode({
             />
           </span>
         </div>
-        <div className="mt-1 flex items-start gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-start gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Arrival evidence
           </span>
@@ -767,7 +768,7 @@ function ReceivingMode({
             />
           </span>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Note (optional)
           </span>
@@ -1066,7 +1067,7 @@ function ReceivingMode({
 
       {/* 7 · sticky action area — the live pending figure beside the one
              primary action, on desktop and mobile alike. */}
-      <div className="sticky bottom-0 mt-3 flex items-center gap-2 border-t border-kit-slate-5 bg-white py-2">
+      <div className="receiving-actions sticky bottom-0 mt-3 flex flex-wrap items-center gap-2 border-t border-kit-slate-5 bg-white py-2">
         <button
           type="button"
           onClick={onDone}

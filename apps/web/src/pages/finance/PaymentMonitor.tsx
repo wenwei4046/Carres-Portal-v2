@@ -88,7 +88,7 @@ const COLUMN = {
   itemsStock: "Items & Stock",
   storage: "Storage",
   requested: "Requested Delivery Date",
-  confirmed: "Confirmed Delivery",
+  confirmed: "Scheduled delivery",
   timing: "Payment timing",
 } as const;
 

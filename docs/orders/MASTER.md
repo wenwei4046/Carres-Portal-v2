@@ -77,6 +77,12 @@ OWNER SCOPE  an authorised operator may find every order; owner may remain a fil
 ✗ payment collection accounting           ✗ service-case execution
 ```
 
+**Supplier-delay boundary — owner-approved 2026-09-24.** Purchasing owns the original PO Delivery
+Date, supplier answer, governed delay reason, WhatsApp evidence and revised expected arrival.
+Sales Orders reads the exact source-line impact and may open governed customer planning work; it
+never rewrites either the Purchasing facts or the customer's requested/confirmed delivery date from
+a supplier answer. Only the recorded customer outcome may change the customer plan.
+
 > ### ⚠️ AND THE NEXT ACTION IS A SUMMARY, NOT A POSSESSION (corrected on the draft, 2026-08-08)
 > The draft listed *"overall operational next action"* under OWNS. **It is not Orders'.**
 > `Issue PO` is Purchasing's act, `Call {logistics}` over `Confirm the delivery date` is Delivery's,
@@ -142,10 +148,24 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row except Delivery Order (BUILT by `0575`, Delivery MASTER §3.1) is APPROVED
-TARGET / NOT BUILT. Rows that were `…` are now approved as **original document date (YYMMDD) +
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** The formats below are
+approved targets; delivery status differs by family and by business. Rows that were `…` are now approved as **original document date (YYMMDD) +
 four random digits** (leading zeros allowed), Subscription with the `S` prefix, each prefix with its
 own independent daily pool of 10,000. Previously explicit formats are unchanged.
+
+**Implementation status — reconciled 2026-09-24 against the owning MASTERs and committed migrations:**
+
+| Family | Current implementation and remaining acceptance |
+|---|---|
+| Sales Order / Subscription Agreement | **APPROVED TARGET / NOT BUILT** for the new number formats. SO object revision records now attach `(n)` to the existing reference; current-page save/view messages use parentheses. This presentation correction does not implement new number allocation or certify every amendment surface. Existing SO implementation is not proof of the new numbering target. |
+| Purchase Order | **PARTIALLY DELIVERED.** New `PO` short-format allocation and independent daily prefix pools are implemented by `0574`. Purchasing MASTER §6.1 records PR #1551 (`e9bc40a0a`), production application and live formatter/pool checks; its authenticated new-PO issue-to-print walk remains owed. `SPO` numbering and the Outright/Subscription business partition remain **APPROVED TARGET / NOT BUILT**. This Orders reconciliation cites that owning evidence; it is not a new production verification. |
+| Delivery Order | **BUILT** by `0575`; Delivery MASTER §3.1 owns the implementation and verification evidence for `DO` / `SDO`. This does not establish completion of other document families. |
+| Other document formats in the table | **APPROVED TARGET / NOT BUILT** for the new formats. `0574` changes the shared pool key but switches the formatter only for `PO`; a per-prefix pool does not prove that each prefix's approved number shape or business partition has shipped. |
+| Physical Unit ID | **KEEP EXISTING**, one shared sequential series; no new format or Subscription prefix is required. |
+
+Existing saved numbers, issued documents and historical references remain unchanged. A built
+allocator, a deployed revision and an authenticated document walk are separate evidence; do not
+promote the whole table to built from any one of them.
 
 | Document | Outright | Subscription |
 |---|---|---|
@@ -693,11 +713,15 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-                        → `Disposal` (owner card 2026-09-23, BUILT): a labelled field reading the SAME
-                        `order_addons` rows Items prices — name, size, ×qty, NO money — and, in Edit,
-                        `Add disposal`, which is the same act as Items' `Add service` (one row, priced once
-                        in Items). Remove and quantity stay on the Items row. Shown only when the order
-                        carries a disposal or the page is in Edit
+                        → `Services`: Delivery owns the ONE service editor (owner correction 2026-09-24).
+                        In Edit, omit the visible `Services` label above the service list (owner correction
+                        2026-09-24); retain its accessible group name. Add, quantity, per-unit Size and
+                        Remove/Restore operate on the same draft addon rows.
+                        Catalogue names, selectable sizes and per-unit size summaries use the Sales Portal
+                        contract; no local renaming or invented size category. Server-owned delivery/stair
+                        charges are read-only. Items and PDF project the same quantity, configuration and
+                        charge; Items has no second Add service or service quantity/removal control.
+                        Read mode shows each service's name, configuration and ×qty without prices here.
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, BUILT 2026-09-23): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
@@ -719,9 +743,13 @@ PAYMENT                 the same money zone as the PDF, one arithmetic (owner ap
                         (`components/so-document-table.ts`): 11px/500 grey headers over a 1px line, 13px rows
                         with 8px cell padding divided by 1px lines beneath, amounts right-aligned with
                         tabular figures, only the closing total bold. Item Code and Approval code are ordinary
-                        13px values in the UI font — never monospace. A service's Item Code prints UPPER CASE
-                        on page and PDF from one function (`lib/service-code.ts`); the stored key is not
-                        rewritten, and the SO document payload now carries it (it printed `ADD-ON` before).
+                        13px values in the UI font — never monospace. A service's Item Code follows its
+                        governed identity, on page and PDF from one rule (`lib/service-code.ts`, the API
+                        mirrors it): a service LINKED in the catalogue prints the catalogue Service SKU
+                        (`addons.service_sku`, 0172 — `SVC-DISPOSE-MATTRESS`); an unlinked one (`DELIVERY`,
+                        `STAIR_CARRY`, bare by design per 0393) or a historical key prints exactly as saved.
+                        Nothing is upper-cased or rewritten; `order_addons.addon_key` stays the identity. The SO
+                        document payload now carries the code (it printed `ADD-ON` before).
                         Totals: a compact two-column block, every figure 13px; a 1px rule over `Total payable`
                         and over `Balance due`, which alone are weight 600
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
@@ -796,8 +824,11 @@ overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section
 
 **ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
 items stay (existing Class A rule). The one journey is:
-`Edit → Add / Remove (restorable before commit) → Reason for change → review the changes and their
-impact → Save or Submit amendment request → approval takes effect → each owning module handles its part`.
+`Edit → change fields / Add / Remove (restorable before commit) → Save or Submit amendment request
+opens Your changes → review Before/After and impact, enter Reason for change → confirm → approval
+takes effect where required → each owning module handles its part`. The review uses the shared Modal
+at submission, not a panel inserted above SO info during typing. Cancel closes the review and preserves
+the draft; reason and customer-agreement gates remain unchanged.
 1. **Submitting changes nothing.** While editing, a removed line is struck through and can be restored.
    After `Submit amendment request` the current order and its official PDF stay exactly as they were;
    the new version takes effect only on `Approve and apply`. `Reject` leaves the order unchanged.
@@ -1372,7 +1403,7 @@ DO2609-4827 · Delivery order issued
 ```
 
 Requirements are plain sentences, GitHub-checks style, with the met count:
-`Goods not ready (0 of 1)` · `No logistics chosen` · `Date + slot not confirmed` ·
+`Goods not ready (0 of 1)` · `Logistics not assigned` · `Scheduled delivery not recorded` ·
 `RM {amount} still to collect`. When the confirmed date lands on a refused day the gate adds
 `Date falls on a Sunday — pick another day` (Malaysian public holidays take the same pattern).
 
@@ -1837,9 +1868,9 @@ same breath; its replacement, `Customer date {date} · Delivery not arranged`, i
 the map, which separates the same two facts onto two nodes rather than two clauses:
 
 ```
-DELIVERY DATE node   Date + slot not confirmed · Customer requested: {date}
-                     /  Delivery appointment: {date} · {slot}
-DELIVERY ORDER gate  · Date + slot not confirmed        (a gate requirement)
+DELIVERY DATE node   Not scheduled yet · Requested delivery: {date}
+                     /  Scheduled delivery: {date} · {time, only when recorded}
+DELIVERY ORDER gate  · Scheduled delivery not recorded  (a gate requirement)
 ```
 
 **What survives unchanged is the RULE the wording existed to enforce:** the customer's promise and
@@ -2079,8 +2110,18 @@ planned `proceed_date`.
     invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent. Saved `orders.approval_code` is the at-sale reference;
     `orders.payment_slip_url` is the at-sale slip in `orders-attachments`. They appear with the
     saved method/months under `Payment details recorded at sale`, separate from transactions.
-    These saved details use a three-column `Method · Reference · Slip` table with the same
-    table styling as the transaction ledger, for every saved payment method. Existing wording,
+    These saved details use three labelled read-only fields (`Method · Reference · Slip`),
+    with the same FieldFrame, resting border, body text and insets as Delivery; narrow views
+    stack the fields. Actual transactions retain the shared Items/Payment table. The totals
+    occupy a full-width bordered two-column summary with a divider under each row,
+    body-size text and 8px cell insets; Total payable and Balance due remain bold.
+    Delivery uses two equal field columns throughout (single column on narrow screens):
+    address lines, state/city, postcode/building, floor/lift, stair count/services.
+    Labels, control sizes and the 12px field gaps stay governed by the existing kit.
+    In View, Delivery Services uses the same framed read-only presentation, one active service
+    per line with its saved configuration and quantity. In Edit, Delivery owns the single
+    service editor described above; Items projects those same draft rows without another writer.
+    The service editor spans the field grid so per-unit size controls remain readable. Existing wording,
     missing-value labels and evidence notes stay unchanged; no transaction fields are inferred.
     No payment amount, paid date or collector is inferred from the order's cumulative Paid or
     current salesperson. When no transactions exist, a positive Paid keeps the saved capture visible and explains that
@@ -5285,11 +5326,13 @@ due: **WITHIN THE DAY the Purchase Order is issued** (owner re-ruling 2026-08-16
 PO: **within the order day**. Logistics is assigned the moment purchase starts, not near the
 delivery.
 
-**`Call {logistics}` over `Confirm the delivery date`** (two structured Work lines, owner ruling
-2026-09-13; never joined with an em dash) — trigger: logistics assigned but the customer
-has not confirmed BOTH a date and a slot · completion: **a customer-confirmed date AND slot
-exist. A date logistics proposed is a fact, not a confirmation** · due: a settable number of
-working days before the date (**1 today**) · the checklist adds driver name, driver phone,
+**`Call {logistics}` over `Get the scheduled delivery date`** (two structured Work lines, owner
+rulings 2026-09-13 / 2026-09-24; never joined with an em dash) — trigger: logistics assigned but
+no Scheduled delivery date is recorded · completion: **a Scheduled delivery date exists; the time
+is OPTIONAL (owner ruling 2026-09-24). `Requested another date` from logistics is a fact, not a
+schedule** · due: a settable number of
+working days before the date (**2 — the Logistics card's `2 working days before` check,
+owner ruling 2026-09-24**) · the checklist adds driver name, driver phone,
 vehicle number and lift/registration requirements **for condominiums**.
 
 **Issuing the delivery order is NOT a person's action** (owner ruling 2026-08-16, blueprint
@@ -5446,7 +5489,7 @@ approval — black and white in the system, never verbal.
 **A Delivery Order issues only when, for the trip's Sales Order:**
 
 ```
-✓ the customer has confirmed a delivery date AND a time slot
+✓ a Scheduled delivery date is recorded (the time is optional — owner ruling 2026-09-24)
 ✓ the date is not a Sunday and not a Malaysian public holiday
 ✓ every goods line is reserved to this order (accessories pass automatically)
 ✓ logistics chosen
@@ -5729,10 +5772,11 @@ delivery order MUST still be stated as missing, because **nobody can DO a missin
 Most actions are performed by sending a message, so the message is part of the action. The
 bodies live in `apps/web/src/lib/wa-templates.ts`; **the rules live here.**
 
-- **A customer message never carries a delivery date.** Logistics agree the date and slot with
-  the customer; if a customer asks us, we give them the logistics company's contact. The ONE
-  exception is the delivery-eve reminder on an order still owing money, which may say
-  `today` / `tomorrow`.
+- **A customer message never carries a delivery date** except the governed exceptions: the
+  approved outstation confirmation (ERP-ARCH §6.5) and a Carres notice of a known delay (Workspace
+  §5.10). The logistics company agrees the day (owner correction 2026-09-25); if a customer asks us,
+  we give them the logistics company's contact. The delivery-eve reminder on an order still owing
+  money may say `today` / `tomorrow`.
 - **No pressure phrasing to a customer** — never *"settle by"*, never *"deliver on time"*.
 - **The salutation is never guessed.** Preferred-name field when set, otherwise the customer's
   own name in Title Case. **Never infer `Mr` / `Ms`.**

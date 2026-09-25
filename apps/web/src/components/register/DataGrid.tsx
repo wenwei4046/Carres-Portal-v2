@@ -45,6 +45,7 @@ import {
   Fragment,
   memo,
   useCallback,
+  useId,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -130,7 +131,8 @@ export type DataGridColumn<T> = {
       - 'enum' | 'text' | undefined → the classic checkbox value list. */
   filterType?: "date" | "number" | "numbering" | "enum" | "text";
   dateValue?: (row: T) => string | null | undefined;
-  /** Raw numeric value for `filterType: 'number'` min/max matching. */
+  /** Raw numeric value for `filterType: 'number'` min/max matching. The
+      column also sorts by it (blanks last) unless it has a `sortFn`. */
   numberValue?: (row: T) => number | null | undefined;
   /**
    * HOUZS port (so-list-houzs-port) — when true and the user hasn't manually
@@ -210,6 +212,13 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Told the column sort whenever it changes, and once on load with the
+      saved one; null when nothing is sorted. The Trial Balance prints its
+      headings only while nothing is sorted. Pass a stable function. */
+  onSortChange?: (sort: { key: string; dir: "asc" | "desc" } | null) => void;
+  /** Which rows a group heading's count counts. Absent = every row. The Trial
+      Balance counts its accounts, never its heading rows. */
+  countsInGroup?: (row: T) => boolean;
   /** Governed groups reuse the same group rows without creating a fake data column. */
   fixedGroups?: {
     /** `emptyLabel` — an always-open group with no rows says so beside its
@@ -506,6 +515,8 @@ export type DataGridProps<T> = {
      * every row is selectable, exactly as before.
      */
     isSelectable?: (row: never) => boolean;
+    /** Existing row facts explaining a refused tick; omitted callers stay unchanged. */
+    unselectableReason?: (row: never) => string | null;
     /**
      * ⭐ CARD 02-B (2026-08-27): a row whose checkbox stands for a SET of
      * child records renders indeterminate when only part of that set is
@@ -657,6 +668,8 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  onSortChange,
+  countsInGroup,
   fixedGroups,
   rowKey,
   rowDrag,
@@ -706,6 +719,7 @@ function DataGridInner<T>({
   onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
+  const selectionReasonId = useId();
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
      expanded row ids; rendering inserts a colSpan sub-<tr> directly under
      each expanded parent. Stored as a Set so the chevron column accessor
@@ -1361,6 +1375,22 @@ function DataGridInner<T>({
     if (!layout.sort) return filteredRows;
     const col = columns.find((c) => c.key === layout.sort!.key);
     if (!col) return filteredRows;
+    const dir = layout.sort.dir === "asc" ? 1 : -1;
+    // A column that declares its number sorts by it: the cell reads
+    // "RM 2,400.00", which would sort as text (900 after 6,334). A blank
+    // ("Not recorded") goes last either way.
+    const num = !col.sortFn && col.numberValue;
+    if (num) {
+      const n = (r: T) => {
+        const v = num(r);
+        return v == null || !Number.isFinite(v) ? null : v;
+      };
+      return [...filteredRows].sort((a, b) => {
+        const x = n(a), y = n(b);
+        if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+        return (x - y) * dir;
+      });
+    }
     const cmp =
       col.sortFn ??
       ((a: T, b: T) => {
@@ -1375,9 +1405,12 @@ function DataGridInner<T>({
         if (Number.isFinite(na) && Number.isFinite(nb) && va !== "" && vb !== "") return na - nb;
         return va.localeCompare(vb);
       });
-    const dir = layout.sort.dir === "asc" ? 1 : -1;
     return [...filteredRows].sort((a, b) => cmp(a, b) * dir);
   }, [filteredRows, columns, layout.sort, colValue]);
+
+  useEffect(() => {
+    onSortChange?.(layout.sort);
+  }, [layout.sort, onSortChange]);
 
   // Selection callback when row changes.
   useEffect(() => {
@@ -1424,6 +1457,7 @@ function DataGridInner<T>({
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
+    const countOf = (members: T[]) => (countsInGroup ? members.filter(countsInGroup).length : members.length);
     if (fixedGroups) {
       return fixedGroups.groups.flatMap((group): Render[] => {
         const members = sortedRows.filter((row) => fixedGroups.groupOf(row) === group.key);
@@ -1431,7 +1465,7 @@ function DataGridInner<T>({
            records, so "nothing to buy" is stated rather than implied. */
         if (members.length === 0 && !(group.alwaysOpen && sortedRows.length > 0)) return [];
         const collapsed = !group.alwaysOpen && collapsedGroups.has(group.key);
-        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen, emptyLabel: group.emptyLabel },
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: countOf(members), collapsed, alwaysOpen: group.alwaysOpen, emptyLabel: group.emptyLabel },
           ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
       });
     }
@@ -1470,7 +1504,7 @@ function DataGridInner<T>({
     const walk = (node: Node, level: number, parentPath: string) => {
       for (const child of node.children.values()) {
         const path = parentPath ? `${parentPath}${child.value}` : child.value;
-        const totalRows = collectRows(child).length;
+        const totalRows = countOf(collectRows(child));
         const collapsed = collapsedGroups.has(path);
         out.push({
           kind: "group",
@@ -1488,7 +1522,7 @@ function DataGridInner<T>({
     };
     walk(root, 0, "");
     return out;
-  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups]);
+  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups, countsInGroup]);
 
   /**
    * ⭐ GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18. This supersedes the
@@ -2374,6 +2408,32 @@ function DataGridInner<T>({
           {visibleColumns.map((col) => {
             const w = layout.widths[col.key] ?? col.width ?? 140;
             if (col.key === "__select__" && selectable) {
+              const canSelect = selectable.isSelectable?.(row as never) ?? true;
+              const refusal = canSelect ? null : (selectable.unselectableReason?.(row as never) ?? null);
+              const refusalId = refusal ? `${selectionReasonId}-${encodeURIComponent(key)}` : undefined;
+              const checkLabel = (
+                  <label
+                  className={`${narrowCanvas ? styles.checkHitNarrow : styles.checkHit}${refusal ? ` ${styles.checkRefused}` : ""}`}
+                  tabIndex={refusal ? 0 : undefined}
+                  aria-label={refusal ?? undefined}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label="Select row"
+                    aria-describedby={refusalId}
+                    data-testid={selectable.testId?.(row as never)}
+                    checked={selectable.selectedKeys.has(key)}
+                    disabled={!canSelect}
+                    /* A parent-of-children checkbox's third state — set via the
+                       ref exactly as the header checkbox sets its own. */
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
+                    }}
+                    onChange={() => selectable.onToggle(key)}
+                  />
+                  {refusal ? <span id={refusalId} className="sr-only">{refusal}</span> : null}
+                  </label>
+              );
               return (
                 <td
                   key={col.key}
@@ -2388,21 +2448,7 @@ function DataGridInner<T>({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <label className={narrowCanvas ? styles.checkHitNarrow : styles.checkHit}>
-                  <input
-                    type="checkbox"
-                    aria-label="Select row"
-                    data-testid={selectable.testId?.(row as never)}
-                    checked={selectable.selectedKeys.has(key)}
-                    disabled={!(selectable.isSelectable?.(row as never) ?? true)}
-                    /* A parent-of-children checkbox's third state — set via the
-                       ref exactly as the header checkbox sets its own. */
-                    ref={(el) => {
-                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
-                    }}
-                    onChange={() => selectable.onToggle(key)}
-                  />
-                  </label>
+                  {refusal ? <Tooltip content={refusal} side="right">{checkLabel}</Tooltip> : checkLabel}
                 </td>
               );
             }

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,23 @@ vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigate };
 });
+
+/* Page-journey tests model the viewer readiness boundary; PdfPreview.test.tsx
+   exercises actual page painting, failure and cancellation separately. */
+const previewState = vi.hoisted(() => ({ ready: true }));
+vi.mock("@/components/kit/PdfPreview", () => ({
+  default: ({ src, title, onReady, "data-testid": testId }: {
+    src: string; title: string; onReady: (ready: boolean) => void; "data-testid": string;
+  }) => {
+    useEffect(() => { onReady(previewState.ready); }, [src]);
+    return <section aria-label={title} data-testid={testId} data-src={src} />;
+  },
+}));
+async function clickIssue() {
+  await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+}
+
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -139,12 +157,14 @@ function renderPage(initialEntry = "/operation?tab=purchase") {
 }
 
 beforeEach(() => {
+  previewState.ready = true;
   navigate.mockClear();
   apiFetch.mockReset();
   localStorage.clear();
+  let nextUrl = 0;
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
-    value: vi.fn(() => "blob:so-batch-test"),
+    value: vi.fn(() => `blob:so-batch-${++nextUrl}`),
   });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
@@ -205,7 +225,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
 
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 1 PO",
+      "1 Sales Order · 1 item · 2 units · Issue 1 PO",
     );
 
     apiFetch.mockClear();
@@ -232,7 +252,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
           })
         : Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] }),
     );
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
       "PO-2041 · PO V1 · Sending not confirmed",
@@ -307,7 +327,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     await screen.findByTestId("so-batch-issue-workspace");
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO V3");
 

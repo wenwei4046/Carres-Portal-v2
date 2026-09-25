@@ -33,12 +33,16 @@
 // it in ListPageShell would draw a second page chrome inside one card.
 import { isLivePayment, type OrderPaymentRow } from "@carres/shared";
 import { fmtMoney } from "@carres/shared";
+import FieldFrame from "@/components/kit/FieldFrame";
+import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Loading from "@/components/kit/Loading";
 import EmptyState from "@/components/kit/EmptyState";
 import { fmtDate } from "@/lib/fmt-date";
 import { atSalePaymentWord, payMethodWord, viewSlip } from "@/lib/payment-display";
 import { useOrderPayments } from "@/lib/queries";
 import { SO_AMOUNT, SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "./so-document-table";
+
+const CAPTURE_FIELD = `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`;
 
 /** What the row is FOR, when it is not the ordinary case. A `payment` needs no
  *  word; a deposit and a storage collection are different debts and say so. */
@@ -70,26 +74,23 @@ export default function PaymentLedger({ orderId, saved }: {
        `Emergency contact` and `Billing`. */
     <div className="text-body" data-testid="so-payment-saved">
       <p className="font-semibold text-kit-slate-11">Payment details recorded at sale</p>
-      <div className="mt-2 overflow-x-auto">
-        <table className={SO_TABLE} aria-label="Payment details recorded at sale">
-          <thead>
-            <tr className={SO_HEAD_ROW}>
-              <th scope="col" className={`${SO_TH} text-left`}>Method</th>
-              <th scope="col" className={`${SO_TH} text-left`}>Reference</th>
-              <th scope="col" className={`${SO_TH} text-left`}>Slip</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className={SO_ROW}>
-              <td className={SO_TD} data-testid="money-instalment">{atSalePaymentWord(saved.method, saved.months) || "Not recorded"}</td>
-              <td className={`${SO_TD} break-words`}>{saved.reference || "Not recorded"}</td>
-              <td className={SO_TD}>{saved.slip ? (
-                <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
-                  className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
-              ) : "Not recorded"}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <FieldFrame id="so-payment-method" label="Method">
+          <div id="so-payment-method" className={CAPTURE_FIELD} data-testid="money-instalment">
+            {atSalePaymentWord(saved.method, saved.months) || "Not recorded"}
+          </div>
+        </FieldFrame>
+        <FieldFrame id="so-payment-reference" label="Reference">
+          <div id="so-payment-reference" className={CAPTURE_FIELD}>{saved.reference || "Not recorded"}</div>
+        </FieldFrame>
+        <FieldFrame id="so-payment-slip" label="Slip">
+          <div id="so-payment-slip" className={CAPTURE_FIELD}>
+            {saved.slip ? (
+              <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
+                className="text-body font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
+            ) : "Not recorded"}
+          </div>
+        </FieldFrame>
       </div>
     </div>
   ) : null;

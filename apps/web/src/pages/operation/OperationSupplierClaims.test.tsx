@@ -7,9 +7,10 @@ import type { SupplierClaimListRow } from "@/lib/queries";
 import OperationSupplierClaims from "./OperationSupplierClaims";
 const claimsQuery = vi.fn();
 const photosQuery = vi.fn();
+const refreshPhotos = vi.fn();
 const apiMock = vi.fn();
 vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiMock(...args) }));
-vi.mock("@/lib/queries", () => ({ useOperationSupplierClaims: (...args: unknown[]) => claimsQuery(...args), useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args) }));
+vi.mock("@/lib/queries", () => ({ fetchOperationSupplierClaimPhotos: (...args: unknown[]) => refreshPhotos(...args), useOperationSupplierClaims: (...args: unknown[]) => claimsQuery(...args), useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args) }));
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Supplier Claims</header> }));
 vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 vi.mock("./SalesOrderLedger", () => ({ RecordRanks: ({ words }: { words: { title: string; identity: string; detail: string[] } }) => <><span>{words.title}</span><span>{words.identity}</span><span>{words.detail.join(" · ")}</span></> }));
@@ -61,6 +62,7 @@ function show(at = "/operation?tab=claims") {
 }
 beforeEach(() => {
   apiMock.mockReset();
+  refreshPhotos.mockReset();
   localStorage.clear();
   claimsQuery.mockReturnValue({ data: { claims: [row(), row({ id: "c2", claim_no: "SC-1002", supplier_name: "Hooka", status: "closed" })] }, isLoading: false, isError: false });
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
@@ -144,11 +146,39 @@ describe("Supplier Claims factual Register and owning object", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Save|Send|Close claim/ })).not.toBeInTheDocument();
   });
-  it("shows unavailable files without reporting proof", () => {
-    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null }] } });
+  it("keeps unreadable photos in the shared viewer and retries only their owning claim", async () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ held_unit_codes: ["U1-000-064"] })] } });
+    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null, at: "2026-09-04T02:00:00Z" }] } });
+    refreshPhotos.mockResolvedValue({ photos: [{ path: "other.jpg", url: "https://example.test/other.jpg" }, { path: "lost.jpg", url: "https://example.test/fresh.jpg" }] });
     show("/operation?tab=claims&claim=c1");
-    expect(screen.getByText("Photo 1: unavailable")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Photo 1" })).not.toBeInTheDocument();
+    const opener = screen.getByRole("button", { name: "Photo 1" });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/SC-1001 · Evidence/)).toHaveTextContent("Fri, 4 Sep");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
+    expect(within(dialog).queryByText("U1-000-064")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+    const photo = await within(dialog).findByRole("img", { name: "Photo 1" });
+    expect(refreshPhotos).toHaveBeenCalledWith("c1");
+    expect(photo).toHaveAttribute("src", "https://example.test/fresh.jpg");
+    fireEvent.load(photo);
+    expect(within(dialog).getByRole("button", { name: "Zoom in" })).toBeEnabled();
+    fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
+    expect(screen.getByTestId("claim-panel-SC-1001")).toBeVisible();
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+  it("keeps the claim and file context open when the authorised photo refresh fails", async () => {
+    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null }] } });
+    refreshPhotos.mockRejectedValue(new Error("Access denied"));
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByRole("button", { name: "Photo 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded"));
+    expect(within(screen.getByRole("dialog")).getByText("SC-1001 · Evidence")).toBeVisible();
+    expect(screen.getByTestId("claim-panel-SC-1001")).toBeVisible();
   });
   it("does not turn a failed read into zero claims", () => {
     claimsQuery.mockReturnValue({ isError: true, error: Object.assign(new Error("Access denied"), { status: 403 }), refetch: vi.fn() });

@@ -1080,7 +1080,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   if (!row) return c.json({ error: "receipt not found" }, 404);
   const r = row as ReceiptRow;
 
-  const [{ data: units }, { data: evs }, { data: po }] = await Promise.all([
+  const [unitsRead, eventsRead, poRead] = await Promise.all([
     sb
       .from("receiving_unit_results")
       .select("stock_item_id, unit_code, outcome, issue_kind, note")
@@ -1099,6 +1099,40 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .eq("id", r.po_id as string)
       .maybeSingle(),
   ]);
+
+  // A missing read must never produce a seemingly complete formal receipt.
+  const readError = unitsRead.error ?? eventsRead.error ?? poRead.error;
+  if (readError) {
+    const m = mapPgError(readError);
+    return c.json(m.body, m.status);
+  }
+  const { data: units } = unitsRead;
+  const { data: evs } = eventsRead;
+  const { data: po } = poRead;
+  const itemIds = [...new Set((units ?? []).map((u) => u.stock_item_id as string))];
+  let items: Array<{ id: string; po_line_id: string | null; identity_scope: string | null }> = [];
+  try {
+    items = await readByIds(itemIds, (ids) =>
+      sb.from("ops_stock_items").select("id, po_line_id, identity_scope").in("id", ids),
+    );
+  } catch (e) {
+    const m = mapPgError(e as never);
+    return c.json(m.body, m.status);
+  }
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const receiptLineIds = new Set(
+    (Array.isArray(r.lines) ? r.lines : []).map((line: WarehouseReceiptLine) => line.id),
+  );
+  const unitResults = (units ?? []).flatMap((unit) => {
+    const item = itemById.get(unit.stock_item_id);
+    // Quantity-managed stock has a technical key, not an operator Unit ID.
+    if (item?.identity_scope === "quantity") return [];
+    return [{
+      ...unit,
+      po_line_id: item?.po_line_id && receiptLineIds.has(item.po_line_id)
+        ? item.po_line_id : null,
+    }];
+  });
 
   const userIds = [
     ...new Set(
@@ -1239,7 +1273,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       void_by_name: name(r.void_by),
       do_file_url: doUrl,
       arrival_evidence_files: arrivalEvidence,
-      unit_results: units ?? [],
+      unit_results: unitResults,
     },
     line_info: lineInfo,
     po: po ?? null,

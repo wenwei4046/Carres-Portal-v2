@@ -88,7 +88,7 @@ describe("closed sets", () => {
     // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa (Loo, 2026-07-31,
     // the To Order rail); +1 = columnFilter (Jess, 2026-08-01, the Excel ▼).
     // +2 = pillow · protector for the owner-approved line-by-line calendar cards.
-    expect(ICON_NAMES).toHaveLength(47);
+    expect(ICON_NAMES).toHaveLength(50);
     expect(ICON_NAMES).toContain("panelToggle");
     expect(ICON_NAMES).toContain("pillow");
     expect(ICON_NAMES).toContain("protector");
@@ -103,9 +103,11 @@ describe("closed sets", () => {
     expect(document.querySelector('[data-icon="on-hold"]')).toBeInTheDocument();
   });
 
-  it("has six type tokens and no seventh", () => {
-    expect(TYPE_TOKENS).toHaveLength(6);
-    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11]);
+  // The seventh, `control` (14/20), is the owner's Work toolbar ruling
+  // 2026-09-25 — an eighth still means editing this line.
+  it("has seven type tokens and no eighth", () => {
+    expect(TYPE_TOKENS).toHaveLength(7);
+    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11, 14]);
   });
 
   it("has one class pair per tone and no more", () => {

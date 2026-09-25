@@ -112,10 +112,13 @@ export function deliveryOrderIssueGate({
 }: DeliveryOrderIssueInput): DeliveryOrderIssueResult {
   const reasons: string[] = [];
 
-  if (!bookingConfirmed || !confirmedDateIso || !confirmedTimeSlot) {
+  /* Owner ruling 2026-09-24: the Scheduled date is the requirement; the time
+     is optional and never holds the document. */
+  void confirmedTimeSlot;
+  if (!bookingConfirmed || !confirmedDateIso) {
     if (waitBookingConfirm) {
       reasons.push(
-        "The customer has not confirmed a delivery date and time slot yet — record the confirmation first.",
+        "The delivery has no scheduled date yet — record the scheduled delivery first.",
       );
     }
     // The manual door does not wait for the confirmation — but a date that

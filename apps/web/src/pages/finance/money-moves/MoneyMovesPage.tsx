@@ -244,6 +244,8 @@ export interface MoneyMoveFormInitial {
   amount: number;
   fee: number;
   reference: string;
+  /** 0576: the card account the day's sales were paid into; Approve day pays from it only. */
+  from?: string;
 }
 
 /**
@@ -284,16 +286,16 @@ export function MoneyMoveForm({
     if (bank && moveAccounts("CARD_PAYOUT", "to", accounts.data ?? []).some((a) => a.code === bank)) setToCode(bank);
   };
 
-  /* 0572 — a card account a route serves is paid out on Card settlement (Approve day) only; the database refuses it here too. */
-  const routed = new Set((routes.data ?? []).map((r) => r.holding_code));
-  const cardSettlementOnly = kind === "CARD_PAYOUT" && !fixed && routed.size > 0;
+  /* 0576 — every card account is paid out on Card settlement (Approve day) only; the database refuses it here too. */
+  const cardSettlementOnly = kind === "CARD_PAYOUT" && !fixed && (accounts.data ?? []).some((a) => a.is_card_account);
   /* 0572 — Approve day pays only from a card account a route serves into that route's bank; the database refuses any other. */
+  const routed = new Set((routes.data ?? []).map((r) => r.holding_code));
   const routeBanks = (holding: string | undefined) =>
     new Set((routes.data ?? []).filter((r) => r.holding_code === holding).map((r) => r.bank_code));
   const options = (side: "from" | "to", holding?: string) =>
     moveAccounts(kind, side, accounts.data ?? [])
-      .filter((a) => !(cardSettlementOnly && side === "from" && routed.has(a.code)))
-      .filter((a) => !fixed || (side === "from" ? routed.has(a.code) : routeBanks(holding).has(a.code)))
+      .filter((a) => !(cardSettlementOnly && side === "from" && a.is_card_account))
+      .filter((a) => !fixed || (side === "from" ? routed.has(a.code) && a.code === initial?.from : routeBanks(holding).has(a.code)))
       .map((a) => ({ value: a.code, label: accountLabel(a) }));
   const onlyOne = (o: { value: string }[]) => (fixed && o.length === 1 ? o[0]!.value : undefined);
   const fromOptions = options("from");
@@ -386,10 +388,12 @@ export function MoneyMoveForm({
             options={fromOptions}
             hint={
               cardSettlementOnly
-                ? "A card account that has a payout bank in Finance Settings is paid out on Card settlement."
-                : fixed && routes.isSuccess && fromOptions.length === 0
-                  ? "No card account has a payout bank in Finance Settings yet. Set one there first."
-                  : undefined
+                ? "A card account is paid out on Card settlement."
+                : fixed && routes.isError
+                  ? "The payout banks did not load. Close this and try again."
+                  : fixed && routes.isSuccess && fromOptions.length === 0
+                    ? `${initial?.from ?? "This day's card account"} has no payout bank in Finance Settings yet. Set one there first.`
+                    : undefined
             }
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />

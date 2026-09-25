@@ -119,8 +119,8 @@ type SalesOrderData = {
   }>;
   addons: Array<{
     label: string;
-    /** The stored `addon_key`, printed as the Item Code (upper-cased by the
-     *  template). An absent code printed the `ADD-ON` placeholder. */
+    /** The Item Code: `addons.service_sku` for a linked service, else the
+     *  stored `addon_key` as saved. An absent code printed `ADD-ON`. */
     sku: string;
     qty: number;
     unit_price: number;
@@ -4070,14 +4070,21 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 
   // Add-on labels: human `addons.name` over the raw key ("dispose-mattress").
   const addonNameByKey = new Map<string, string>();
+  /* The catalogue's own Service SKU for a linked service (0172 — `addons.service_sku`,
+     e.g. `dispose-mattress` → `SVC-DISPOSE-MATTRESS`). An unlinked service
+     (`DELIVERY`, `STAIR_CARRY` — bare by design, 0393) has none. */
+  const addonSkuByKey = new Map<string, string>();
   try {
     const addonKeys = [...new Set(addons.map((a) => String(a.addon_key)))];
     if (addonKeys.length > 0) {
-      const { data: addonDefs } = await sb.from("addons").select("key, name").in("key", addonKeys);
+      const { data: addonDefs } = await sb.from("addons").select("key, name, service_sku").in("key", addonKeys);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const r of (addonDefs ?? []) as any[]) {
         if (typeof r.name === "string" && r.name.trim().length > 0) {
           addonNameByKey.set(String(r.key), r.name.trim());
+        }
+        if (typeof r.service_sku === "string" && r.service_sku.trim().length > 0) {
+          addonSkuByKey.set(String(r.key), r.service_sku.trim());
         }
       }
     }
@@ -4157,11 +4164,11 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     const unitPrice = Number(a.unit_price);
     return {
       label: addonNameByKey.get(String(a.addon_key)) ?? String(a.addon_key),
-      /* The service's own code for the Item Code cell. Without it the paper
-         printed the `ADD-ON` placeholder where the page printed the key —
-         an empty/placeholder Item Code is a defect (owner review 2026-08-09,
-         `lib/pdf/types.ts`). The template upper-cases it for display. */
-      sku: String(a.addon_key),
+      /* The Item Code: the catalogue Service SKU when the service is linked,
+         otherwise the saved key exactly as stored — never rewritten. Without a
+         code the paper printed the `ADD-ON` placeholder (a defect by the owner
+         review 2026-08-09, `lib/pdf/types.ts`). */
+      sku: addonSkuByKey.get(String(a.addon_key)) ?? String(a.addon_key),
       qty,
       unit_price: unitPrice,
       line_total: qty * unitPrice,

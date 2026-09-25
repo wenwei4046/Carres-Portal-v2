@@ -48,6 +48,12 @@ supplier date where present, otherwise the PO/source date). Awaiting receipt / F
 arrivals are the three filters. Physical arrival never substitutes for accepted correct quantity.
 Receive opens the existing ReceivingWorkspace full width in Inbound; returning preserves the list.
 
+**Supplier-delay boundary — owner-approved 2026-09-24.** Purchasing owns the exact PO/version,
+original PO Delivery Date, revised effective arrival, governed delay reason and WhatsApp evidence.
+Warehouse reads the revised effective arrival for planning only. A supplier message, screenshot,
+promise or Supplier DO never creates a receipt or GRN. Only the Receiving write door establishes
+Goods Received Date, received quantity, condition and physical Site.
+
 Outbound keeps DO/SO, pickup date, product quantity, the Loading entry and separate Required / Loaded /
 Driver confirmed counts visible. The default includes outstanding loading, missing loading evidence
 and outstanding driver confirmation. Warehouse loading does not impersonate driver acceptance.
@@ -1072,6 +1078,16 @@ their own name/avatar, organisation, authorised role, governed Sites and active 
 hold both NETS Warehouse and NETS Delivery roles, but every event records the role used for that
 act. Shared login, shared avatar and impersonation are forbidden. Removing or expiring one person
 stops future access without erasing their historical evidence.
+
+**The one company-level exception — owner ruling 2026-09-24 (Delivery §5.5, 0581).** A logistics
+company with NO portal login answers ONE delivery through its external link: the actor recorded is
+the company (`{company} via external link`), never a person, and the link can only save a scheduled
+date, ask for another date or report Cannot deliver. It moves no Unit and records no receipt,
+collection or handover. **APPROVED TARGET / NOT BUILT — `Collected from supplier`:** for the
+`Pickup from supplier` route (no GRN), a governed custody event names the PO/source lines, supplier,
+logistics company, collection date and time, quantity, the Supplier DO or collection evidence, the
+recorded source and actor; from it the logistics company holds the goods. It is not a receipt and
+not proof the customer received anything (Workspace §5.9 gaps).
 
 Optional partner APIs may **propose** receipt, collection, arrival, return and proof events. Before
 acceptance, Portal validates the partner organisation, individual operator, active role, permitted

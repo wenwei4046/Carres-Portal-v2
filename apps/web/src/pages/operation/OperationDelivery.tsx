@@ -34,7 +34,7 @@
  *
  * ⭐ BULK LOGISTICS ASSIGNMENT LIVES HERE (owner correction 2026-09-06).
  * The planning population includes deliveries that have no formal DO yet,
- * so the journey `No logistics picked → select rows → Assign logistics` runs
+ * so the journey `Logistics not assigned → select rows → Assign logistics` runs
  * on Monitor's work list, through the ONE governed door
  * (`AssignLogisticsDialog` → `/delivery-arrangements/assign`). Replacing an
  * existing partner is the governed `Change logistics` act (reason + history)
@@ -480,7 +480,7 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
         </div>
         {card.confirmedTime ? <span className="inline-flex items-center gap-1 text-label text-kit-slate-12">
           <Icon name="waiting" size={14} />{card.confirmedTime}
-        </span> : <span className="text-label text-kit-slate-11">{MONITOR_COPY.noTimeAgreed}</span>}
+        </span> : null}
       </>}
       footer={<Link to={monitorCardHref(card)} aria-label={card.doNumber ? `Open ${card.doNumber}` : `${MONITOR_COPY.editDelivery} ${so}`} className="inline-flex min-h-6 items-center gap-1 text-label text-blue-700 hover:underline">
         {card.doNumber ? MONITOR_COPY.openDo : MONITOR_COPY.editDelivery}<Icon name="open" size={14} />
@@ -1334,7 +1334,7 @@ export default function OperationDelivery() {
         sortFn: (a, b) => (a.confirmedDate ?? "").localeCompare(b.confirmedDate ?? ""),
       },
       {
-        /* COLUMN 9 — the partner, or `No logistics picked` in orange; the
+        /* COLUMN 9 — the partner, or `Logistics not assigned` in orange; the
            driver beneath once assigned. */
         key: "logistics",
         label: MONITOR_COLUMN.logistics,

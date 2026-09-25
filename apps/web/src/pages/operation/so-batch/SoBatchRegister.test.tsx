@@ -10,7 +10,7 @@ import type {
   SoBatchOrderRow,
   SoBatchPurchaseResponse,
 } from "@carres/shared";
-import { soBatchAction } from "@carres/shared";
+import { soBatchAction, purchaseDemandStateWords } from "@carres/shared";
 import type { SalesOrderExpansionResponse } from "@/lib/queries";
 
 const navigate = vi.fn();
@@ -310,12 +310,12 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 
 const onIssue = vi.fn();
 
-function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true) {
+function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
-        <SoBatchRegister data={data(over)} isLoading={false} onIssue={onIssue} />
+        <SoBatchRegister data={data(over)} isLoading={isLoading} onIssue={onIssue} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -558,7 +558,7 @@ describe("a missing DEFAULT destination does not stop the buying", () => {
 
     /* The selection actually happened - the bar is the page's own proof. */
     const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByText("1 Sales Order · 1 item · 2 units · Issue 1 PO")).toBeVisible();
   });
 
   it("opens on the first ACTIVE destination and says which, without blocking", () => {
@@ -568,6 +568,12 @@ describe("a missing DEFAULT destination does not stop the buying", () => {
     expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
     const note = screen.getByTestId("so-batch-no-default-destination");
     expect(note).toHaveTextContent("ticks open on Carres Klang");
+  });
+
+  it("does not report absent destination settings while their read is loading", () => {
+    renderRegister({ destinations: [], defaultDestinationId: null }, false, true);
+    expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-no-default-destination")).not.toBeInTheDocument();
   });
 
   it("an EMPTY list still blocks, and still names the setting", () => {
@@ -611,7 +617,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
 
     const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByText("1 Sales Order · 1 item · 2 units · Issue 1 PO")).toBeVisible();
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveAttribute(
       "title",
@@ -645,7 +651,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 1 PO",
+      "1 Sales Order · 1 item · 2 units · Issue 1 PO",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
@@ -704,7 +710,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     /* The leaf's own remainder — 1 unit, never the 2 already on the PO. */
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 1 unit · Issue 1 PO",
+      "1 Sales Order · 1 item · 1 unit · Issue 1 PO",
     );
   });
 
@@ -793,6 +799,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     const panel = screen.getByTestId(`so-batch-blocker-build::ob::${state}`);
     expect(panel.textContent).toBeTruthy();
     expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-ob")).toHaveAccessibleDescription(purchaseDemandStateWords(data().safetyDays)[state]);
   });
 
   it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
@@ -1524,7 +1531,7 @@ describe("the arrangement is the demand's, never the summary's", () => {
     fireEvent.change(within(box).getByTestId("so-batch-deliver-to-select-build::o8::a"), {
       target: { value: BULOH },
     });
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 1 unit");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item · 1 unit");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
@@ -1544,7 +1551,7 @@ describe("the arrangement is the demand's, never the summary's", () => {
     });
     fireEvent.click(within(box).getByTestId("so-batch-split-apply-build::o1::b1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 2 POs",
+      "1 Sales Order · 1 item · 2 units · Issue 2 POs",
     );
   });
 });
@@ -1690,7 +1697,7 @@ describe("a demand with several Unit records", () => {
     const table = within(box).getByTestId("goods-mini-table");
     fireEvent.click(within(table).getByRole("checkbox"));
     /* What the toolbar says and what the screen shows are the same number. */
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 1 unit");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item · 1 unit");
     expect(
       within(table).getAllByRole("checkbox").filter((c) => (c as HTMLInputElement).checked),
     ).toHaveLength(1);
@@ -1908,6 +1915,7 @@ describe("fourteen documents on a one-unit line", () => {
       registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
     });
     expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-o14")).toHaveAccessibleDescription("Coverage not checked");
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const demand = within(box).getByTestId("so-batch-part-B1201S-K");
@@ -2006,7 +2014,7 @@ describe("a demand that covers several item lines", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-oset"));
     const box = await screen.findByTestId("so-batch-inspector-oset");
     fireEvent.click(within(within(box).getByTestId("goods-mini-table")).getByRole("checkbox"));
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 2 items · 2 units");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::oset::s", allocations: [{ destinationId: KLANG, qty: 2 }] },
@@ -2074,7 +2082,7 @@ describe("a tick whose To buy has changed", () => {
   it("is dropped when the recomputed remainder is smaller", () => {
     const { rerender } = renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item · 2 units");
     /* Two Units of the two were answered off the shelf. */
     rerender(
       again({

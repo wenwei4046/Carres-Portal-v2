@@ -402,7 +402,7 @@ export default function CalendarPanel() {
 function DeliveryRow({ d }: { d: DayDelivery }) {
   const confirmed = d.kind === "confirmed";
   const loc = locationForAddress(d.address);
-  const carrier = d.partnerName?.trim() || "No logistics picked";
+  const carrier = d.partnerName?.trim() || "Logistics not assigned";
   return (
     <div
       className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors"

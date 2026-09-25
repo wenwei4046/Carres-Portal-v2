@@ -59,40 +59,96 @@ export const paidBeforeInvoiceNote = (line: Pick<StatementLine, "reclassified" |
 };
 
 export type StatementRow =
-  | { id: string; section: string; kind: "group"; name: string; amount: number }
+  | { id: string; section: string; kind: "group"; name: string; amount: number; depth: number }
   | {
       id: string; section: string; kind: "line"; code: string; name: string | null; amount: number;
-      nested: boolean; reclassified: number | null; reclassifiedFor: StatementLine["reclassifiedFor"];
+      nested: boolean; depth: number; reclassified: number | null; reclassifiedFor: StatementLine["reclassifiedFor"];
     }
   | { id: string; section: string; kind: "unclosed"; amount: number }
   | { id: string; section: string; kind: "nothing" };
 
+/** A header as `headingWalk` reads it: where it sits in the chart, the header
+ *  it sits under, and the lines filed directly under it that are to print. */
+export interface WalkGroup<L extends { ordinal: number }> {
+  code: string;
+  parentCode: string | null;
+  ordinal: number;
+  lines: readonly L[];
+}
+
 /**
- * The rows the table prints, in the served order. An account at RM 0.00 is
- * left out, as the Trial Balance does. A section where every account is at
- * RM 0.00 keeps its band and gets one line saying so (`No income in this
- * period.`). So even when every section is at zero, the bands stay, and so
- * does the bottom strip under them.
+ * One section's headers and lines in print order. A header line comes first,
+ * then everything under it in the chart's order: its own lines and the
+ * headers under it mixed together by `ordinal`, as the Chart of accounts
+ * lists them, down to any depth (0579). A header with no line anywhere under
+ * it is left out, so an empty header prints nothing. When one header holds
+ * the whole section and no header sits inside it, no header line prints
+ * (`headed` is false) and its lines print flush. The Balance Sheet, the Profit
+ * and Loss and the Trial Balance all print through this one walk.
+ */
+export function headingWalk<G extends WalkGroup<{ ordinal: number }>>(groups: readonly G[]): {
+  headed: boolean;
+  rows: ({ group: G; depth: number } | { line: G["lines"][number]; depth: number })[];
+} {
+  type L = G["lines"][number];
+  const codes = new Set(groups.map((g) => g.code));
+  const children = new Map<string | null, G[]>();
+  for (const g of groups) {
+    const parent = g.parentCode !== null && codes.has(g.parentCode) ? g.parentCode : null;
+    children.set(parent, [...(children.get(parent) ?? []), g]);
+  }
+  const shown = (g: G): boolean => g.lines.length > 0 || (children.get(g.code) ?? []).some(shown);
+  const roots = (children.get(null) ?? []).filter(shown);
+  // A header line only earns its place when there is more than one header,
+  // or when a header holds headers.
+  const headed = roots.length > 1 || groups.some((g) => g.parentCode !== null && codes.has(g.parentCode) && shown(g));
+  const rows: ({ group: G; depth: number } | { line: L; depth: number })[] = [];
+  const emit = (g: G, depth: number) => {
+    if (headed) rows.push({ group: g, depth });
+    // Lines and sub-headers in the chart's order. On a statement a
+    // sub-header's ordinal is its subtotal row, served right after everything
+    // under it, so it sorts against the lines beside it the way the chart does.
+    const under: ({ line: L } | { sub: G })[] = [
+      ...g.lines.map((line) => ({ line })),
+      ...(children.get(g.code) ?? []).filter(shown).map((sub) => ({ sub })),
+    ];
+    const at = (x: (typeof under)[number]) => ("sub" in x ? x.sub.ordinal : x.line.ordinal);
+    for (const x of under.sort((a, b) => at(a) - at(b))) {
+      if ("sub" in x) emit(x.sub, depth + 1);
+      else rows.push({ line: x.line, depth: headed ? depth + 1 : depth });
+    }
+  };
+  for (const g of roots) emit(g, 1);
+  return { headed, rows };
+}
+
+/**
+ * The rows the table prints, through `headingWalk`. Each header keeps its
+ * own subtotal. An account at RM 0.00 is left out, as the Trial Balance
+ * does, and so is a header with nothing but RM 0.00 under it. A section where
+ * every account is at RM 0.00 keeps its band and gets one line saying so
+ * (`No income in this period.`). So even when every section is at zero, the
+ * bands stay, and so does the bottom strip under them.
  */
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
   for (const s of sections) {
-    const groups = s.groups
-      .map((g) => ({ g, lines: g.lines.filter((l) => !isZeroMoney(l.amount)) }))
-      .filter((x) => x.lines.length > 0);
-    // A header line only earns its place when there is more than one.
-    const headed = groups.length > 1;
     const before = out.length;
-    for (const { g, lines } of groups) {
-      if (headed) {
-        out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal });
+    const { headed, rows } = headingWalk(
+      s.groups.map((g) => ({ ...g, lines: g.lines.filter((l) => !isZeroMoney(l.amount)) })),
+    );
+    for (const r of rows) {
+      if ("group" in r) {
+        const g = r.group;
+        out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal, depth: r.depth });
+        continue;
       }
-      for (const l of lines) {
-        out.push({
-          id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
-          amount: l.amount, nested: headed, reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
-        });
-      }
+      const l = r.line;
+      out.push({
+        id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
+        amount: l.amount, nested: headed, depth: r.depth,
+        reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
+      });
     }
     if (s.unclosedResult !== null && !isZeroMoney(s.unclosedResult)) {
       out.push({ id: `${s.kind}:unclosed`, section: s.kind, kind: "unclosed", amount: s.unclosedResult });
@@ -101,6 +157,10 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
   }
   return out;
 }
+
+/** Left padding by depth: a header at depth 1 sits flush, each level in one step. */
+const INDENT = ["", "", "pl-4", "pl-8", "pl-12"] as const;
+export const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
 
 export default function StatementTable({
   label,
@@ -140,13 +200,13 @@ export default function StatementTable({
       cell: (r) => {
         switch (r.kind) {
           case "group":
-            return <span className="font-semibold">{r.name}</span>;
+            return <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>;
           case "line": {
             // The account link, then (only when there is a note) a mark that
             // shows the note on hover or keyboard focus. A long name cuts off
             // with "…"; the mark never does.
             const note = lineNote?.(r) ?? null;
-            return <span className={`flex items-center ${r.nested ? "pl-4" : ""}`}>
+            return <span className={`flex items-center ${indent(r.depth)}`}>
               <Link className="min-w-0 truncate underline underline-offset-2" to={accountHref(r.code)}>
                 {r.code} {r.name ?? "Account name not available"}
               </Link>

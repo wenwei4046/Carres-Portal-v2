@@ -593,7 +593,7 @@ export default function PurchaseOrdersPage() {
     {
       key: "po_date",
       chooserGroup: "Document",
-      label: "PO Date",
+      label: "PO Doc Date",
       /* The registry's number, not this page's: SO Batch measured a cross-year
          date at 99px and landed on 120, which is the widest measurement of the
          field, so the field is 120 here too (ui MASTER §6.8). */
@@ -1587,12 +1587,11 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
       <Block title="Purchase order">
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Supplier" value={row.supplierName} />
-          <Fact label="Deliver To" value={row.deliverTo} />
+          <Fact label="Supplier Deliver To" value={row.deliverTo} />
           <Fact label="Source" value={sourceSummary(row.sources)} />
           <Fact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
-          {/* Same law as the register column: absence FIRST, then equality.
-              `Same as PO` is a claim about what the supplier said. */}
-          <Fact label="Supplier Delivery Date" value={!row.supplierDate ? "Not confirmed" : row.supplierDate === row.po.official_delivery_date ? "Same as PO" : fmtDate(row.supplierDate)} />
+          {/* Show the actual evidenced date, even when it matches the PO. */}
+          <Fact label="Supplier Confirmed Delivery Date" value={row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"} />
           {/* The CURRENT version and its sent mark, in the register's own words;
               earlier versions' marks stay in Revisions (MASTER §9.3). */}
           <Fact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
@@ -1831,7 +1830,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
       </div>
       <p className="mt-1 text-meta text-kit-slate-11">
         {known
-          ? `Supplier Delivery Date · ${fmtDate(known)}`
+          ? `Supplier Confirmed Delivery Date · ${fmtDate(known)}`
           : recordedReply
             ? `Supplier reply recorded without evidence · ${fmtDate(poReplyDateOf(recordedReply)!)}`
             : "Supplier has not confirmed the PO date"}
@@ -1876,7 +1875,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
       ) : null}
       {canRecord ? <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Supplier Delivery Date</span>
+          <span className="text-label text-kit-slate-11">Supplier Confirmed Delivery Date</span>
           <input
             type="date"
             value={date}

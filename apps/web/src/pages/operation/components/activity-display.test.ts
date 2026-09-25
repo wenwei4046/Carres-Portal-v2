@@ -169,3 +169,11 @@ describe("describeActivity — an absent value reads as words, never a dash", ()
     expect(d.body).not.toContain("—");
   });
 });
+
+ describe("delivery confirmation facts use operator labels", () => {
+   it.each([["confirmed_partner", "Logistics"], ["confirmed_time_slot", "Confirmed time"], ["confirmed_date", "Confirmed date"]])("names %s without a database key", (field, label) => {
+     const result = describeActivity({ kind: "activity", action: "order.field_changed", detail: {field, from: null, to: field === "confirmed_date" ? "2026-09-24" : "Confirmed"} });
+     expect(result.title).toBe(`${label} changed`);
+     expect(JSON.stringify(result)).not.toContain(field);
+   });
+ });

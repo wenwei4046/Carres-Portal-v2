@@ -184,7 +184,7 @@ describe("historyRecordWords translates stored values into governed words", () =
 
   it("translates stored field keys into the same plain words as the object page", () => {
     expect(historyWords("Staff correction - Rev 2 - customer_name")).toBe(
-      "Staff correction · Rev 2 · Customer name",
+      "Staff correction · (2) · Customer name",
     );
     expect(historyWords("Changed delivery_date and delivery_has_lift")).toBe(
       "Changed Requested Delivery Date and Lift available?",
@@ -299,7 +299,7 @@ describe("History says what changed, not only which field", () => {
 
   it("keeps the translated tail when the named revision is not loaded", () => {
     const words = historyRecordWords(event({ kind: "edit", revision: 99 }), []);
-    expect(words.detail).toEqual(["Rev 2 · Customer name"]);
+    expect(words.detail).toEqual(["(2) · Customer name"]);
   });
 
   it("prints the operator's own sentence, however the lane spelled the key", () => {
@@ -375,7 +375,7 @@ describe("Revisions are clear complete-version doors", () => {
   it("⭐ speaks the approved three ranks for Rev 1", () => {
     expect(revisionRecordWords(revisions[0], 1)).toEqual({
       title: "Original order",
-      identity: "Rev 1 · Current",
+      identity: "(1) · Current",
       detail: ["Recorded by Jess · Mon, 24 Aug 11:16"],
     });
   });
@@ -383,14 +383,14 @@ describe("Revisions are clear complete-version doors", () => {
   it("names the governed applied change on a later version, never the enum", () => {
     const words = revisionRecordWords(twoRevs[1], 2);
     expect(words.title).toBe("Customer change");
-    expect(words.identity).toBe("Rev 2 · Current");
+    expect(words.identity).toBe("(2) · Current");
     expect(words.detail[0]).toBe("Recorded by Kimmy Lee · Tue, 25 Aug 09:42");
     expect(JSON.stringify(words)).not.toContain("customer_change");
   });
 
   it("says an older version is identity alone, and keeps its note readable", () => {
     const words = revisionRecordWords({ ...twoRevs[1], note: "customer called" }, 3);
-    expect(words.identity).toBe("Rev 2");
+    expect(words.identity).toBe("(2)");
     expect(words.detail).toEqual([
       "Recorded by Kimmy Lee · Tue, 25 Aug 09:42",
       "customer called",
@@ -419,8 +419,8 @@ describe("Revisions are clear complete-version doors", () => {
       />,
     );
     /* One door per version: `Rev 1` appears exactly once on the surface. */
-    expect(screen.getAllByText(/^Rev 1$/)).toHaveLength(1);
-    expect(screen.getAllByText("Rev 2 · Current")).toHaveLength(1);
+    expect(screen.getAllByText(/^\(1\)$/)).toHaveLength(1);
+    expect(screen.getAllByText("(2) · Current")).toHaveLength(1);
     expect(screen.getByText("Original order")).toBeTruthy();
     expect(screen.getByText("Customer change")).toBeTruthy();
   });
@@ -526,3 +526,7 @@ describe("Sales Order Revisions and History are different records", () => {
     expect(screen.queryByText("Original order")).toBeNull();
   });
 });
+
+ it("attaches the revision to the saved reference without a space", () => {
+   expect(revisionRecordWords({ revision: 2, created_at: "2026-09-24", actor_kind: "missing" } as SalesOrderRevisionRow, 2, "SO2609-4827").identity).toBe("SO2609-4827(2) · Current");
+ });

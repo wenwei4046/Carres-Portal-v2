@@ -4,18 +4,19 @@
  *
  * Each sheet is read through the SAME query its own page uses (the Trial
  * Balance page, and Reports), and laid out from the same rows the page prints
- * (`statementRows` for the two statements, the Trial Balance page's debit and
- * credit sides). This file adds nothing up that a page does not already show.
+ * (`statementRows` for the two statements, `trialBalanceLines` for the Trial
+ * Balance). This file adds nothing up that a page does not already show.
  *
  * The workbook is written with `xlsx`, the library every list page's
  * `Export Excel` already uses; Reports → Payment writes its multi-sheet
  * workbook the same way.
  */
 import type { QueryClient } from "@tanstack/react-query";
-import type { TrialBalanceAccountRow, TrialBalanceReport } from "@carres/shared/finance-ledger";
-import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
+import type { TrialBalanceReport } from "@carres/shared/finance-ledger";
+import { ledgerKindWord } from "@carres/shared/finance-ledger";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { trialBalanceQuery } from "./ledger/ledger-queries";
+import { trialBalanceLabel, trialBalanceLines } from "./ledger/LedgerTrialBalance";
 import { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, statementRows } from "./reports/StatementTable";
 import {
   balanceSheetQuery,
@@ -88,25 +89,22 @@ const day = (iso: string) => fmtDate(iso, { year: "always" });
 const beforeGoLive =(goLive: string) => `The ledger started on ${day(goLive)}. Pick a day from then on.`;
 const noOpening = (goLive: string) => `Since ${day(goLive)} · No opening balances`;
 
-// The Trial Balance page's own sides: a debit balance in Debit, a credit balance in Credit.
-const net = (r: TrialBalanceAccountRow) => Math.round((r.total_debit - r.total_credit) * 100) / 100;
-const debitSide = (r: TrialBalanceAccountRow) => Math.max(net(r), 0);
-const creditSide = (r: TrialBalanceAccountRow) => Math.max(-net(r), 0);
-
 export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
   const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on)], []];
   if (tb.status === "before_go_live") return { name: "Trial Balance", rows: [...head, [beforeGoLive(tb.go_live_on)]] };
-  // As on the page: an account nothing was posted to has no balance to try.
-  const accounts = tb.accounts.filter((a) => !isZeroMoney(a.total_debit) || !isZeroMoney(a.total_credit));
-  const sum = (side: (r: TrialBalanceAccountRow) => number) =>
-    Math.round(accounts.reduce((s, r) => s + side(r), 0) * 100) / 100;
+  // The rows the page's Export Excel writes: headings by name with their Debit
+  // and Credit left empty, and the accounts anything was posted to, so adding
+  // up a column counts each account once and matches the Total line.
+  const lines = trialBalanceLines(tb);
+  const sum = (side: "debit" | "credit") =>
+    Math.round(lines.reduce((s, r) => (r.heading ? s : s + r[side]), 0) * 100) / 100;
   return {
     name: "Trial Balance",
     rows: [
       ...head,
       ["Account", "Kind", "Debit", "Credit"],
-      ...accounts.map((r) => [`${r.account_code} ${r.account_name}`, ledgerKindWord(r.kind), debitSide(r), creditSide(r)]),
-      ["Total", "", sum(debitSide), sum(creditSide)],
+      ...lines.map((r) => [trialBalanceLabel(r), ledgerKindWord(r.kind), r.heading ? "" : r.debit, r.heading ? "" : r.credit]),
+      ["Total", "", sum("debit"), sum("credit")],
     ],
   };
 }
@@ -125,9 +123,10 @@ function statementBody(
       out.push([ledgerKindWord(r.section), bySection.get(r.section)?.total ?? ""]);
     }
     switch (r.kind) {
-      case "group": out.push([r.name, r.amount]); break;
+      // Two spaces per level under the top, so a heading inside a heading reads as nested (0579).
+      case "group": out.push(["  ".repeat(r.depth - 1) + r.name, r.amount]); break;
       case "line": {
-        out.push([`${r.code} ${r.name ?? "Account name not available"}`, r.amount]);
+        out.push(["  ".repeat(r.depth - 1) + `${r.code} ${r.name ?? "Account name not available"}`, r.amount]);
         // The note the page shows in the tooltip next to the account, as a row of its own under it.
         const note = lineNote(r);
         if (note) out.push([note]);

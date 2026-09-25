@@ -13,6 +13,7 @@ import {
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
+import PdfPreview from "@/components/kit/PdfPreview";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
@@ -70,13 +71,6 @@ export interface SoBatchIssueWorkspaceProps {
 
 type Mode = "review" | "evidence";
 
-/**
- * THE COMMERCIAL DECISION AN OPERATOR MAKES PER SKU.
- *
- * `cost` is a STRING because it is what somebody typed. Parsing it early would
- * turn a half-typed `4` into a price of four ringgit; it becomes a number only
- * at the boundary, and only after it is valid.
- */
 export default function SoBatchIssueWorkspace({
   documents,
   destinations,
@@ -123,6 +117,8 @@ export default function SoBatchIssueWorkspace({
   );
 
   const current = documents[Math.min(at, Math.max(documents.length - 1, 0))];
+  const totalGoodsQty = documents.reduce((sum, document) => sum + document.lines.reduce(
+    (qty, line) => qty + line.parts.reduce((n, part) => n + part.qty, 0), 0), 0);
   const draftData = useMemo<PoTemplateData | null>(() => {
     if (!current) return null;
     const destination = destinations.find((d) => d.id === current.destinationId);
@@ -131,7 +127,7 @@ export default function SoBatchIssueWorkspace({
       po_number: "DRAFT",
       po_id: "",
       version: 0,
-      issue_date: "",
+      issue_date: current.poDate ?? "",
       /* ⭐ THE PREVIEW IS THE DOCUMENT (owner instruction 2026-09-23). The
          two addresses and the delivery date used to ride as empty strings, so
          the operator checked a paper that was missing the three facts the
@@ -153,6 +149,8 @@ export default function SoBatchIssueWorkspace({
          own date is `PO Date + n Settings working days`, and the document
          carries the server's answer or nothing at all. */
       eta_date: current.poDeliveryDate ?? null,
+      delivery_working_days: current.poDeliveryWorkingDays ?? null,
+      delivery_method: current.deliveryMethod ?? (current.supplierKind === "factory_pickup" ? "we_collect" : current.supplierKind === "own_logistics" ? "supplier_delivers" : null),
       terms: null,
       so_refs: [...new Set(current.lines.flatMap((line) => line.so == null ? [] : [line.so]))],
       lines: current.lines.flatMap((line) => line.parts.map((part) => ({
@@ -166,6 +164,9 @@ export default function SoBatchIssueWorkspace({
   }, [current, destinations]);
   const [draftPdf, setDraftPdf] = useState<{ data: PoTemplateData; url?: string; error?: string } | null>(null);
   const [draftAttempt, setDraftAttempt] = useState(0);
+  const [paintedUrl, setPaintedUrl] = useState<string | null>(null);
+  const draftUrl = draftPdf?.data === draftData ? draftPdf.url : undefined;
+  const previewReady = Boolean(draftUrl && paintedUrl === draftUrl);
   useEffect(() => {
     if (mode !== "review" || !draftData) return;
     let dead = false;
@@ -185,7 +186,7 @@ export default function SoBatchIssueWorkspace({
    * WHAT IS STOPPING THE WHOLE BATCH, named.
    *
    * It is computed across EVERY document, not the one on screen: the request is
-   * atomic, so a missing price on document 3 stops document 1 too, and an
+   * atomic, so a missing collection rule on document 3 stops document 1 too, and an
    * operator staring at a dead button on page 1 needs to be told that. The
    * first blocker wins — a list of five would be read as five problems when
    * fixing them is one pass.
@@ -240,7 +241,7 @@ export default function SoBatchIssueWorkspace({
   }, [documents]);
 
   async function issue() {
-    if (creating) return;
+    if (creating || (!coveringPo && (!previewReady || blocker || !documents.length))) return;
     setCreating(true);
     setError(null);
     try {
@@ -363,6 +364,7 @@ export default function SoBatchIssueWorkspace({
   const currentPo = mode === "evidence" ? pos[idx] : undefined;
 
   const currentPoId = currentPo?.id ?? null;
+  const [officialAttempt, setOfficialAttempt] = useState(0);
   /* The document on screen brings its own history with it. */
   useEffect(() => {
     if (!currentPoId) return;
@@ -393,25 +395,21 @@ export default function SoBatchIssueWorkspace({
       setPdfUrl(null);
       setPdfVersion(null);
     };
-  }, [currentPoId]);
+  }, [currentPoId, officialAttempt]);
 
   return (
     <div
       className={`${layoutStyles.issue} flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas`}
       data-testid="so-batch-issue-workspace"
     >
-      {/* The 50px destination header keeps its height at every width. Walked at
-          375px on 2026-08-24: the title WRAPPED and its second line was cut off
-          by the fixed row. A long name now truncates — the row is the law, and a
-          clipped word is worse than a shortened one. */}
-      <div className="flex h-[50px] shrink-0 items-center justify-between gap-3 border-b border-kit-slate-5 bg-white px-4">
-        <span className="flex min-w-0 items-baseline gap-3">
-          <span className="truncate text-page font-semibold">{W.reviewTitle}</span>
+      <div className="flex min-h-[50px] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-kit-slate-5 bg-white px-4 py-2">
+        <span className="flex min-w-0 flex-wrap items-baseline gap-3">
+          <span className="text-page font-semibold">{W.reviewTitle}</span>
           <span
             className="shrink-0 whitespace-nowrap text-meta text-kit-slate-11"
             data-testid="so-batch-issue-count"
           >
-            {idx + 1} of {total}
+            {total ? idx + 1 : 0} of {total} · {totalGoodsQty} {totalGoodsQty === 1 ? "unit" : "units"}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
@@ -440,42 +438,51 @@ export default function SoBatchIssueWorkspace({
         </span>
       </div>
 
-      {/* ⭐ 50 / 50 AT 1130px AND WIDER; STACKED BELOW IT (closure §10).
-          The split was unconditional, so on a narrower window each half got
-          under 565px and the PDF page became unreadable while the decision
-          controls clipped. Below the breakpoint the work comes FIRST and the
-          document follows it, because the operator's next act is on the left
-          and a page they cannot read is not worth the top half.
-
-          Stacked it is a flex COLUMN, not a one-column grid: walked at 1129px,
-          a grid compressed the work row and clipped every control in it. A flex
-          column with `shrink-0` panes is as tall as its content and scrolls. */}
+      {/* Approved desktop composition; only narrow canvases stack. */}
       <div
         className={`${layoutStyles.issueBody} min-h-0 flex-1`}
         data-testid="so-batch-issue-split"
       >
         {/* ── 50% · the only editable side ──────────────────────────────── */}
         <div
-          /* ⭐ `shrink-0` UNTIL THE BREAKPOINT, and that is not cosmetic.
-             Walked at 1129px on 2026-08-24: a two-row GRID compressed this pane
-             to 208px and CLIPPED it — the PO facts, blocker and both buttons
-             were cut off with no scrollbar, because the row
-             reported that it fitted. Stacked, the surface is a flex COLUMN and
-             this pane is as tall as its content; the split scrolls. Side by side
-             it is a grid item and `min-h-0` again, so the pane scrolls inside a
-             fixed split. */
           className={`${layoutStyles.issueWork} flex shrink-0 flex-col border-b border-kit-slate-5 bg-white p-4`}
           data-testid="so-batch-issue-work"
         >
           {mode === "review" && current ? (
             <>
               <h2
-                className="text-body font-semibold uppercase tracking-wide"
+                className="text-body font-semibold"
                 data-testid="so-batch-issue-title"
               >
                 {current.supplierName ?? "Supplier"} → {destinationName(current.destinationId)}
               </h2>
-              <table className="mt-3 w-full text-body">
+              <dl className="mt-3 grid grid-cols-1 gap-3 text-body">
+                <div>
+                  <dt className="text-label text-kit-slate-11">Supplier</dt>
+                  <dd>{current.supplierName ?? "Not recorded"}</dd>
+                  <dd className="whitespace-pre-wrap break-words text-meta">{current.supplierAddress || <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Address not recorded. Check Suppliers.</a>}</dd>
+                </div>
+                <div>
+                  <dt className="text-label text-kit-slate-11">Supplier Deliver To</dt>
+                  <dd>{current.destinationName || destinationName(current.destinationId) || "Not recorded"}</dd>
+                  <dd className="whitespace-pre-wrap break-words text-meta">{current.destinationAddress || <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Address not recorded. Check Purchasing Settings.</a>}</dd>
+                </div>
+                <div>
+                  <dt className="text-label text-kit-slate-11">Delivery Method</dt>
+                  <dd>{draftData?.delivery_method === "we_collect" ? "We collect" : draftData?.delivery_method === "supplier_delivers" ? "Supplier delivers" : <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Not recorded. Check Suppliers.</a>}</dd>
+                </div>
+                <div>
+                  <dt className="text-label text-kit-slate-11">PO Doc Date</dt>
+                  <dd>{current.poDate ? fmtDate(current.poDate) : "Not available. Go back and reload."}</dd>
+                  <dd className="text-meta text-kit-slate-11">Provisional. The date is recorded when issued.</dd>
+                </div>
+                <div>
+                  <dt className="text-label text-kit-slate-11">{current.poDeliveryWorkingDays != null ? `PO ${current.poDeliveryWorkingDays}-Day Delivery Date` : "PO Delivery Date"}</dt>
+                  <dd>{current.poDeliveryDate ? fmtDate(current.poDeliveryDate) : <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Not available. Check production days in Purchasing Settings.</a>}</dd>
+                </div>
+              </dl>
+              <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-body">
                 <thead>
                   <tr className="border-b border-kit-slate-5 text-label uppercase text-kit-slate-11">
                     <th className="py-1 text-left">Item</th>
@@ -520,6 +527,7 @@ export default function SoBatchIssueWorkspace({
                   ))}
                 </tbody>
               </table>
+              </div>
 
               {/* ⭐ FAIL CLOSED, AND SAY WHAT TO DO (closure §9). LINE 1 is the
                   fact, LINE 2 the act — never `Needs attention`, never a code,
@@ -539,7 +547,7 @@ export default function SoBatchIssueWorkspace({
                   <span className="text-meta text-kit-slate-11">{error.todo}</span>
                 </span>
               ) : null}
-              <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4">
                 <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
                   {backLabel ?? W.backToBuying}
                 </Button>
@@ -548,10 +556,10 @@ export default function SoBatchIssueWorkspace({
                   size="md"
                   data-testid="so-batch-issue-create"
                   loading={creating}
-                  disabled={!coveringPo && (documents.length === 0 || blocker !== null)}
+                  disabled={!coveringPo && (documents.length === 0 || blocker !== null || !previewReady)}
                   onClick={() => void issue()}
                 >
-                  {W.issuePo}
+                  Issue {documents.length} {documents.length === 1 ? "PO" : "POs"}
                 </Button>
               </div>
             </>
@@ -560,7 +568,7 @@ export default function SoBatchIssueWorkspace({
               {/* The form appears only once the official document has rendered:
                  until then there is no version to declare, and a confirmation
                  without one is the defect 0378 closes. */}
-              {pdfVersion != null ? (
+              {pdfVersion != null && pdfUrl != null && paintedUrl === pdfUrl ? (
                 <PoIssueEvidence
                   po={currentPo}
                   version={pdfVersion}
@@ -579,7 +587,7 @@ export default function SoBatchIssueWorkspace({
                 />
               ) : (
                 <p className="text-meta text-kit-slate-11" data-testid="so-batch-evidence-waiting">
-                  {pdfError ?? `Opening ${currentPo.id}…`}
+                  {pdfError ? "Could not load the preview. Try again on the document." : `Opening ${currentPo.id}…`}
                 </p>
               )}
               {/* LEAVING IS SAFE (file header): a numbered PO is never deleted
@@ -599,7 +607,7 @@ export default function SoBatchIssueWorkspace({
         {/* ── 50% · the document itself ─────────────────────────────────── */}
         <div
           /* Stacked, the document keeps a readable height rather than
-             collapsing to the height of an iframe nobody can read. */
+             collapsing while the pages are loading. */
           className={`${layoutStyles.issuePreview} flex min-h-[70vh] shrink-0 flex-col bg-kit-canvas p-4`}
           data-testid="so-batch-issue-preview"
         >
@@ -610,31 +618,30 @@ export default function SoBatchIssueWorkspace({
             <>
               <p className="mb-2 shrink-0 text-meta text-kit-slate-11">{W.previewNotSendable}</p>
               {draftPdf?.data === draftData && draftPdf?.url ? (
-                <iframe title="Draft purchase order preview" data-testid="so-batch-draft-pdf"
-                  className="min-h-0 w-full flex-1 rounded-control border border-kit-slate-6 bg-white"
-                  src={draftPdf.url} />
+                <PdfPreview key={draftPdf.url} title="Draft purchase order preview" data-testid="so-batch-draft-pdf"
+                  src={draftPdf.url} onReady={(ready) => setPaintedUrl(ready ? draftPdf.url! : null)} />
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-white text-meta text-kit-slate-11" role="status">
                   {draftPdf?.data === draftData && draftPdf?.error ? (
-                    <><p>{draftPdf.error}</p><button type="button" className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta" onClick={() => setDraftAttempt((n) => n + 1)}>Try again</button></>
+                    <><p>{draftPdf.error}</p><Button size="sm" onClick={() => setDraftAttempt((n) => n + 1)}>Try again</Button></>
                   ) : "Rendering preview…"}
                 </div>
               )}
             </>
           ) : currentPo ? (
             pdfUrl ? (
-              <iframe
-                title={`${currentPo.id} purchase order`}
-                data-testid={`so-batch-pdf-${currentPo.id}`}
-                className="h-full w-full rounded-control border border-kit-slate-6 bg-white"
-                src={pdfUrl}
-              />
+              <PdfPreview key={pdfUrl} title={`${currentPo.id} purchase order`}
+                data-testid={`so-batch-pdf-${currentPo.id}`} src={pdfUrl}
+                onReady={(ready) => setPaintedUrl(ready ? pdfUrl : null)} />
             ) : (
               <div
                 className="flex h-full items-center justify-center rounded-control border border-kit-slate-6 bg-white text-meta text-kit-slate-11"
                 data-testid={`so-batch-pdf-placeholder-${currentPo.id}`}
               >
-                {pdfError ?? `Rendering ${currentPo.id}…`}
+                {pdfError ? <div role="status" className="flex flex-col items-center gap-2">
+                  <p>Could not load the preview.</p>
+                  <Button size="sm" onClick={() => setOfficialAttempt((n) => n + 1)}>Try again</Button>
+                </div> : `Rendering ${currentPo.id}…`}
               </div>
             )
           ) : null}

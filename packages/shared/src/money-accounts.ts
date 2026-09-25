@@ -12,17 +12,19 @@
  * PURE — no clock, no I/O.
  */
 import { z } from "zod";
-import { ledgerAccountCodeShape } from "./finance-ledger";
+import { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE } from "./finance-ledger";
 
 export const MONEY_ACCOUNT_KINDS = ["CASH", "BANK", "HOLDING"] as const;
 export type MoneyAccountKind = (typeof MONEY_ACCOUNT_KINDS)[number];
 
-/** One row of `gl_money_accounts_list()`. */
+/** One row of `gl_money_accounts_list()`, and whether it is a card account. */
 export interface MoneyAccountRow {
   code: string;
   name: string;
   money_kind: MoneyAccountKind;
   is_active: boolean;
+  /** 0576: one of `_card_payout_holdings()`. A card payout from it is prepared on Card settlement only. */
+  is_card_account: boolean;
 }
 
 /** The kind as the page says it, in COPY-STANDARD's pay-method words:
@@ -51,9 +53,15 @@ const accountName = z
   .min(1, "Type the account name.")
   .max(60, "Keep the name to 60 characters.");
 
-/** Add: Finance names it and says bank or holding; the database picks the code. */
+/** Add: Finance names it and says bank or holding. The database picks the
+ *  number unless Finance types one (0577); when every number under the heading
+ *  is used, it asks for one. */
 export const moneyAccountAddInput = z.object({
   name: accountName,
+  code: z.string().trim()
+    .regex(/^([0-9]{4}|[0-9]{3}-[0-9A-Za-z][0-9]{3})$/, LEDGER_ACCOUNT_CODE_MESSAGE)
+    .transform((c) => c.toUpperCase())
+    .optional(),
   kind: z.enum(["BANK", "HOLDING"], {
     errorMap: () => ({ message: "Choose the kind: a bank, or an online payment company." }),
   }),

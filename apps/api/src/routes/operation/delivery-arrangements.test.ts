@@ -76,7 +76,7 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
     const res = queue.shift() ?? { data: null, error: null };
     const chain: Record<string, unknown> = {};
     const self = () => chain;
-    for (const m of ["select", "eq", "in", "order", "limit", "maybeSingle", "single"]) {
+    for (const m of ["select", "eq", "in", "order", "limit", "maybeSingle", "single", "update", "is", "neq"]) {
       chain[m] = vi.fn().mockImplementation(self);
     }
     chain.insert = vi.fn().mockImplementation((rows: unknown) => {
@@ -665,7 +665,7 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string; error: string };
     expect(body.code).toBe("later_date_needs_reply_proof");
-    expect(body.error).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(body.error).toBe("Save scheduled delivery — upload the WhatsApp reply");
     expect(upserts).toHaveLength(0);
   });
 
@@ -713,6 +713,21 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     expect(contact.purpose_key).toBe("confirm_delivery_date");
     expect(contact.contacted_person).toBe("partner");
     expect(contact.channel).toBe("call");
+  });
+
+  it("a DATE without a time is an agreement — the contact records Confirmed, not another date", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: { ...savedArrangement, confirmed_date: "2026-09-24", confirmed_time: null, reply_proof_path: null } },
+      { data: { id: "c-3" } },
+    ]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-24", informationReceivedFrom: "customer" });
+    expect(res.status).toBe(200);
+    const contact = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(contact.contacted_person).toBe("customer");
+    expect(contact.result_key).toBe("confirmed");
   });
 
   it("no `Information received from` — no contact is invented", async () => {

@@ -216,7 +216,7 @@ export function unitRuns(codes: readonly string[]): Array<{ first: string; last:
 }
 
 /** One Unit ID, its last three digits bold — the running number a packer reads. */
-function UnitCode({ code }: { code: string }) {
+export function UnitCode({ code }: { code: string }) {
   if (!UNIT_RE.test(code)) return <Text>{code}</Text>;
   return (
     <Text>
@@ -302,7 +302,7 @@ export function PoTemplate(data: PoTemplateData) {
   if (groups.length === 0) groups.push({ dest: destination, lines: [] });
   const poTotal = lines.reduce((n, l) => n + Number(l.qty), 0);
 
-  const daysLabel = !draft && data.delivery_working_days != null && data.delivery_working_days > 0
+  const daysLabel = data.delivery_working_days != null && data.delivery_working_days > 0
     ? `PO ${data.delivery_working_days}-Day\nDelivery Date`
     : "PO Delivery Date";
   const deliveryValue = poPrintDate(eta_date) ?? (draft ? null : "Not recorded");
@@ -310,7 +310,7 @@ export function PoTemplate(data: PoTemplateData) {
     data.delivery_method === "we_collect" ? "We collect" : data.delivery_method === "supplier_delivers" ? "Supplier delivers" : null;
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", draft ? "Assigned when issued" : poId],
-    ["PO Doc Date", draft ? null : poPrintDate(issue_date)],
+    ["PO Doc Date", poPrintDate(issue_date)],
     [daysLabel, deliveryValue, true],
     ["Delivery Method", methodValue],
   ];

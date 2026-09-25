@@ -317,7 +317,7 @@ import {
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema } from "@carres/shared";
+import { operationWorkResponseSchema, type LogisticsCardFacts } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -3907,16 +3907,19 @@ export interface SupplierClaimPhoto {
 /** Signed URLs for one claim's evidence. Fetched only when the operator opens
  *  the row — the URLs are short-lived, so minting them for a whole list would
  *  be both wasteful and stale by the time anyone clicked. */
+export function fetchOperationSupplierClaimPhotos(claimId: string) {
+  return apiFetch<{ photos: SupplierClaimPhoto[] }>(
+    `/api/operation/supplier-claims/${claimId}/photos`,
+  );
+}
+
 export function useOperationSupplierClaimPhotos(
   claimId: string | null,
   opts?: Partial<UseQueryOptions<{ photos: SupplierClaimPhoto[] }>>,
 ) {
   return useQuery({
     queryKey: qk.operation.supplierClaimPhotos(claimId ?? "none"),
-    queryFn: () =>
-      apiFetch<{ photos: SupplierClaimPhoto[] }>(
-        `/api/operation/supplier-claims/${claimId}/photos`,
-      ),
+    queryFn: () => fetchOperationSupplierClaimPhotos(claimId!),
     enabled: !!claimId,
     staleTime: 10 * 60_000,
     ...opts,
@@ -4229,6 +4232,8 @@ export interface ReceivingSessionDetail {
   receipt: WarehouseReceiptQueueRow & {
     unit_results: Array<{
       stock_item_id: string;
+      /** Exact source line; absent on older API deployments. Never inferred by SKU. */
+      po_line_id?: string | null;
       unit_code: string;
       outcome: "received" | "received_with_issue" | "not_received";
       issue_kind: "damaged" | "wrong_item" | null;
@@ -4254,13 +4259,15 @@ export interface ReceivingSessionDetail {
   events: ReceivingEvent[];
 }
 
+/** One authorised detail reader, also used to renew saved-evidence URLs. */
+export function fetchReceivingSessionDetail(id: string) {
+  return apiFetch<ReceivingSessionDetail>(`/api/operation/warehouse-receipts/${id}`);
+}
+
 export function useReceivingSessionDetail(id: string | null) {
   return useQuery<ReceivingSessionDetail>({
     queryKey: qk.operation.receivingSession(id ?? ""),
-    queryFn: () =>
-      apiFetch<ReceivingSessionDetail>(
-        `/api/operation/warehouse-receipts/${id}`,
-      ),
+    queryFn: () => fetchReceivingSessionDetail(id!),
     enabled: !!id,
   });
 }
@@ -4751,6 +4758,8 @@ export interface PurchaseRequestLineRow {
    * absence rather than a guess.
    */
   po_delivery_date?: string | null;
+  po_date?: string | null;
+  po_delivery_working_days?: number | null;
   /** The CATALOG's category for this line's SKU (`product_models.category`,
    *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
    *  `null` when Catalog has no category for the SKU. */
@@ -7080,6 +7089,61 @@ export function useSaveDeliveryArrangement(orderId: string | undefined, leg = 0)
       void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
   });
+}
+
+/**
+ * THE LOGISTICS CARD'S DELIVERY FACTS (0581) — the partner and whether it has
+ * a portal, the stock route read from Purchasing/Stock, the external link, the
+ * partner's latest answer and recent history. Nested under the scope's
+ * `delivery-arrangement` key, so every arrangement save refreshes it.
+ */
+export function useLogisticsCardFacts(orderId: string | null, leg = 0) {
+  return useQuery<LogisticsCardFacts, ApiError>({
+    queryKey: ["operation", "delivery-arrangement", orderId ?? "", "logistics-card", leg],
+    queryFn: () =>
+      apiFetch<LogisticsCardFacts>(`/api/operation/delivery-arrangements/${orderId}/logistics-card?leg=${leg}`),
+    enabled: Boolean(orderId),
+    staleTime: 15_000,
+  });
+}
+
+/**
+ * THE SUPPLIER CARD'S FACTS — Purchasing's POs serving one Sales Order
+ * (owner approval 2026-09-25, Workspace §5.9). Read-only.
+ */
+export function useSupplierCardFacts(orderId: string | null) {
+  return useQuery<{ purchaseOrders: import("@carres/shared").SupplierPoFact[] }, ApiError>({
+    queryKey: ["operation", "pos", "for-order", orderId ?? ""],
+    queryFn: () =>
+      apiFetch<{ purchaseOrders: import("@carres/shared").SupplierPoFact[] }>(
+        `/api/operation/pos/for-order/${encodeURIComponent(orderId ?? "")}`,
+      ),
+    enabled: Boolean(orderId),
+    staleTime: 30_000,
+  });
+}
+
+/** Create link · Revoke link (0581). Two explicit acts: a new link is only
+ *  ever created after the old one is revoked. */
+export function useDeliveryLinkActs(orderId: string | null, leg = 0) {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+  const create = useMutation({
+    mutationFn: () =>
+      apiFetch<{ link: { id: string; token: string; created_at: string } }>(
+        `/api/operation/delivery-arrangements/${orderId}/link?leg=${leg}`,
+        { method: "POST" },
+      ),
+    onSuccess: refresh,
+  });
+  const revoke = useMutation({
+    mutationFn: () =>
+      apiFetch<{ revoked: boolean }>(`/api/operation/delivery-arrangements/${orderId}/link/revoke?leg=${leg}`, {
+        method: "POST",
+      }),
+    onSuccess: refresh,
+  });
+  return { create, revoke };
 }
 
 export function useDeliveryOrdersRegister(opts?: { orderId?: string; enabled?: boolean }) {

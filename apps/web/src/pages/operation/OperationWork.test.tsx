@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 
@@ -13,6 +13,10 @@ let workState: {
 let authState = { role: "operation", email: "shasha@carres.test" };
 const refetch = vi.fn();
 
+/* The party cards read Delivery through their own queries; their behaviour is
+   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
+vi.mock("./work/WorkParties", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
@@ -145,7 +149,7 @@ describe("Operation Work — one server feed", () => {
   it("defaults everyone, including a manager, to My Work", () => {
     authState = { role: "principal", email: "shasha@carres.test" };
     show();
-    expect(screen.getByTestId("work-view-mine")).toHaveClass("bg-base-900");
+    expect(screen.getByTestId("work-view-mine")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
   });
 
@@ -181,16 +185,117 @@ describe("Operation Work — one server feed", () => {
       .toHaveTextContent("Covered by Yu Jun");
   });
 
-  it("uses the governed My Work section order and keeps No date separate", () => {
+  it("keeps the governed My Work order in one card run: broken, missed, then No date", () => {
     workState.data!.items = [
-      item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
-      item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
       item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
+      item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
+      item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
     ];
     show("/operation?tab=work&day=all");
-    expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
-    expect(screen.getByTestId("work-section-overdue")).toBeInTheDocument();
-    expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
+    const cards = [...screen.getByTestId("work-section-list").querySelectorAll("[data-work-card]")];
+    expect(cards.map((card) => card.getAttribute("data-testid"))).toEqual([
+      "work-row-SO-1318-ask_delivery_date",
+      "work-row-SO-1318-issue_po",
+      "work-row-SO-1318-confirm_supplier_date",
+    ]);
+    expect(cards[2]).toHaveTextContent("No date");
+  });
+
+  /* THE OWNER DENSITY RULING 2026-09-25 — exact values. The production walk
+     reads the computed pixels; these lock the classes that decide them. */
+  it("locks the density: header 72/64, title 28/24, heading 16, toolbar 36/40 in two rows", () => {
+    const savedWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 743 });
+    try {
+      show();
+      expect(screen.getByTestId("work-area")).toHaveAttribute("data-layout", "one");
+      const header = screen.getByTestId("workspace-header");
+      expect(header.className).toContain("h-16");
+      expect(header.className).toContain("min-[960px]:h-[72px]");
+      expect(header.className).toContain("px-4");
+      expect(header.className).toContain("min-[960px]:px-6");
+      const title = within(header).getByRole("heading", { name: "Work" });
+      expect(title.className).toContain("text-[24px]");
+      expect(title.className).toContain("min-[960px]:text-[28px]");
+      expect(title.className).toContain("min-[960px]:leading-[34px]");
+      // The one header row carries the top-bar icons: no second 44px bar.
+      expect(within(header).getByTestId("top-bar-icons")).toBeInTheDocument();
+      const count = screen.getByTestId("work-header-count");
+      expect(count.className).toContain("text-[12px]");
+      expect(count.className).toContain("min-[960px]:text-[13px]");
+
+      const heading = screen.getByTestId("work-list-heading");
+      expect(heading.className).toContain("text-[16px]");
+      expect(heading.className).toContain("leading-[22px]");
+      expect(heading.className).toContain("min-h-6");
+      expect(heading.className).toContain("mb-2");
+      expect(heading.className).not.toMatch(/text-strong|font-bold/);
+      expect(heading.querySelector("span")?.className).toContain("text-[13px]");
+      expect(screen.getByTestId("work-card-scroll").className).toContain("mt-2");
+
+      const toolbar = screen.getByTestId("work-toolbar");
+      expect(toolbar.className).toContain("p-2.5");
+      expect(toolbar.className).toContain("min-[600px]:p-3");
+      expect(toolbar.className).toContain("gap-2");
+      // Below 960px: exactly two row groups (four lines below 600px).
+      const rows = within(toolbar).getAllByTestId(/^work-toolbar-row-/);
+      expect(rows.map((r) => r.dataset.testid)).toEqual(["work-toolbar-row-1", "work-toolbar-row-2"]);
+      expect(within(rows[0]).getByTestId("work-compact-date")).toBeInTheDocument();
+      expect(within(rows[0]).getByTestId("work-compact-module")).toBeInTheDocument();
+      expect(within(rows[0]).getByTestId("work-view-mine")).toBeInTheDocument();
+      expect(within(rows[1]).getByRole("searchbox")).toBeInTheDocument();
+      expect(within(rows[1]).getByRole("button", { name: "Covered" })).toBeInTheDocument();
+      for (const control of [
+        screen.getByTestId("work-compact-date"),
+        screen.getByRole("searchbox"),
+        screen.getByRole("button", { name: "Covered" }),
+      ]) {
+        // 40px below 960px, 36px from 960px; 14/20 type.
+        expect(control.className).toContain("h-10");
+        expect(control.className).toContain("min-[960px]:h-9");
+        expect(control.className).toContain("text-control");
+      }
+      // The segmented control's 1px border sits inside the 36px (40px).
+      expect(screen.getByTestId("work-view-mine").className).toContain("h-[38px]");
+      expect(screen.getByTestId("work-view-mine").className).toContain("min-[960px]:h-[34px]");
+      expect(screen.getByTestId("work-view-mine").className).toContain("font-semibold");
+      expect(screen.getByTestId("work-view-switch").className).toContain("max-[599px]:basis-full");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
+    }
+  });
+
+  it("from 960px the toolbar is one row, search 240px, controls 36px (40px below 960px)", () => {
+    const savedWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+    try {
+      show();
+      const toolbar = screen.getByTestId("work-toolbar");
+      expect(toolbar.className).toContain("flex-wrap");
+      for (const row of within(toolbar).getAllByTestId(/^work-toolbar-row-/)) expect(row.className).toBe("contents");
+      expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-60");
+      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[960px]:h-9");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
+    }
+  });
+
+  it("locks the Team owner line: 32px avatar, 12px initials, 15px name, 12px counts on one 32px line", () => {
+    show();
+    fireEvent.click(screen.getByTestId("work-view-team"));
+    const heading = screen.getByTestId(`work-owner-heading-${SH}`);
+    expect(heading.className).toContain("h-8");
+    expect(heading.className).toContain("gap-2");
+    expect(heading.className).toContain("whitespace-nowrap");
+    const [avatar, name, count] = Array.from(heading.children) as HTMLElement[];
+    expect(avatar.className).toContain("h-8");
+    expect(avatar.className).toContain("w-8");
+    expect(avatar.className).toContain("text-[12px]");
+    expect(name).toHaveTextContent("Shasha");
+    expect(name.className).toContain("text-[15px]");
+    expect(name.className).toContain("leading-5");
+    expect(count.className).toContain("text-[12px]");
+    expect(count.className).toContain("font-normal");
   });
 
   it("reads search and filters from the URL", () => {
@@ -243,7 +348,9 @@ describe("Operation Work — one server feed", () => {
   it("selects work in the action panel before opening the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
-    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("Customer Delivery exists");
+    /* §5.10: a Sales Order's result lives on its party cards; the summary
+       says what is wrong, what to do and which record opens. */
+    expect(screen.getByRole("region", { name: "Work summary" })).toHaveTextContent("Ask customer for a delivery date");
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Open SO-1318" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
@@ -287,6 +394,40 @@ describe("Operation Work — one server feed", () => {
     expect(screen.getByTestId("work-error")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the last good list and the filters when a refresh fails, with one retry row", () => {
+    workState = { ...workState, isError: true };
+    show("/operation?tab=work&day=all");
+    expect(screen.getByTestId("work-refresh-failed")).toHaveTextContent("Work could not be loaded. Try again.");
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-error")).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("work-refresh-failed")).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("draws 50 cards, then 50 more when the list end scrolls into view; choosing a card never shrinks it", () => {
+    let reveal: (() => void) | null = null;
+    const Observer = vi.fn(function (this: unknown, callback: IntersectionObserverCallback) {
+      reveal = () => callback([{ isIntersecting: true } as IntersectionObserverEntry], this as IntersectionObserver);
+      return { observe: vi.fn(), disconnect: vi.fn(), unobserve: vi.fn(), takeRecords: vi.fn() };
+    });
+    vi.stubGlobal("IntersectionObserver", Observer);
+    workState.data!.items = Array.from({ length: 120 }, (_, n) => item({
+      id: `orders:${n}`,
+      object: { kind: "sales_order", id: `so-${n}`, label: `SO-${2000 + n}` },
+    }));
+    show("/operation?tab=work&day=all");
+    const cards = () => screen.getByTestId("work-section-list").querySelectorAll("[data-work-card]");
+    expect(cards()).toHaveLength(50);
+    act(() => reveal?.());
+    expect(cards()).toHaveLength(100);
+    fireEvent.click(cards()[80]);
+    expect(cards()).toHaveLength(100);
+    act(() => reveal?.());
+    expect(cards()).toHaveLength(120);
+    expect(screen.queryByTestId("work-list-more")).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it("shows a stable loading shell", () => {

@@ -15,7 +15,7 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
-import type { LedgerAccountMoveInput, LedgerAccountReorderInput } from "@carres/shared";
+import type { LedgerAccountAddInput, LedgerAccountMoveInput, LedgerAccountReorderInput } from "@carres/shared";
 
 import { apiFetch } from "@/lib/api";
 
@@ -105,6 +105,15 @@ export function useMoveAccount() {
   return useMutation<{ code: string }, Error, LedgerAccountMoveInput>({
     mutationFn: (v) =>
       apiFetch("/api/finance/ledger/accounts/move", { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** Add an account under a heading, or a heading with its first account (0577). */
+export function useAddAccount() {
+  const qc = useQueryClient();
+  return useMutation<{ code: string }, Error, LedgerAccountAddInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
