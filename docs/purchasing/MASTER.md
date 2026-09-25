@@ -737,6 +737,70 @@ JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot f
 date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
 Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
 
+**RECORD SUPPLIER ANSWER — UI COMPOSITION APPROVED (Jess, 2026-09-25, Purchasing Blueprint
+segment 1) · NOT BUILT.** The per-item answer model above is drawn ONCE, on the PO object page's
+`SUPPLIER REPLY` section (left facts column; the PDF pane stays), never as a second Workspace
+form. Measured before this ruling: production `SupplierDateBlock` records one date and one reason
+for the whole PO, accepts JPEG/PNG only, and heads itself `Supplier has not confirmed the PO date`
+— all three retire with this build.
+
+```text
+SUPPLIER REPLY                                        [Record supplier answer]
+PO 14-Day Delivery Date        Fri, 9 Oct
+Supplier Confirmed Delivery Date
+  Cody · King ×4                Not confirmed
+  Cody · Queen ×2               Not confirmed
+Last answer                    None recorded yet
+```
+
+`Record supplier answer` expands IN PLACE (no dialog, no 50/50 — an answer is not an
+outside-readable document, §8.2):
+
+```text
+RECORD SUPPLIER ANSWER                                            Cancel  Save
+[ ] Supplier DO received       Supplier DO No [          ]   DO file [Upload]
+
+Cody · King · 4 to deliver
+  (•) No change  ( ) Confirmed  ( ) New date  ( ) Split delivery
+Cody · Queen · 2 to deliver
+  ( ) No change  ( ) Confirmed  (•) New date  [ Mon, 12 Oct ▾ ]
+      Reason  [ Production delay ▾ ]     ← only when later than PO Delivery Date
+      Note    [                    ]     ← only for Other
+Evidence   WhatsApp screenshot · photo · video · PDF     [Upload]  ≥1 required
+Answered by supplier on  [ Fri, 25 Sep ▾ ]   Recorded by  {name} (you)
+```
+
+Split: `[ 3 ] pcs [ Fri, 9 Oct ▾ ]` · `[ 1 ] pcs [ Fri, 16 Oct ▾ ] Reason [ … ▾ ]` ·
+`+ Add another date` · `Total 4 of 4`. After save the section prints per line
+`3 pcs · Fri, 9 Oct · 1 pcs · Fri, 16 Oct · Delayed`, `Mon, 12 Oct · Delayed · Production delay`
+with `Supplier changed from Fri, 9 Oct` beneath, `Supplier DO · DO-2251 · Photos 1 · PDF 1`, and
+`Last answer · {date} · recorded by {name} · Evidence {n}`.
+
+- **Facts and doors.** `Supplier Confirmed Delivery Date` per line/batch = the newest append-only
+  answer row (line, quantity, date, server-classified Earlier/Delayed, reason, evidence, recorder,
+  server time, PO version). Write door: the existing `POST /pos/:id/tomorrow-delivery` and its SQL
+  door extended to line + batch scope in a NEW migration (0432/0585 untouched); no parallel
+  endpoint. `Supplier DO received` writes the PO's existing `do_number` / `do_uploaded_at`;
+  Receiving reads that same DO, never a second copy. `PO Delivery Date` never changes; an answer
+  mints no PO version and needs no resend.
+- **Work.** The D-1 occurrence derives per batch date; a recorded answer or a Supplier DO for that
+  date closes it; a moved date retires the old occurrence and derives the new one.
+- **States, all distinct.** Default `Not confirmed` · `None recorded yet` · Active (Save reads
+  `Save — {what is missing}` until complete) · Waiting (date shown; D-1 card the working day
+  before) · Completed (`Received · {GRN No}`, the line greyed `All received`, no further answer)
+  · Attention (`· Delayed · {reason}` + `Supplier changed from {date}`) · Missed
+  (`Supplier delivery date passed`) · Loading (three-line skeleton, no button) · Empty (PO not
+  sent → the section is absent; `Confirm PO sent to supplier` shows instead) · Error
+  (`Supplier answers could not be loaded` + `Try again`, other sections unaffected) · Permission
+  (non-Operation sees no button, never a grey one) · Missing original (`PO Delivery Date ·
+  Not recorded`; the answer is stored as `Reported`). A timeout re-reads the PO and never prints
+  a refusal it did not receive.
+- **Responsive.** 1440/1180: form in the left column, four radios on one row, one batch per row.
+  820: PDF stacks below (existing rule), form full width. 743: radios two per row, date and
+  reason on their own rows. 390: one card per goods line, radios stacked, upload full width,
+  `Cancel` `Save` fixed at the bottom at 40px.
+- **Words** are in [COPY-STANDARD: Record supplier answer words](../COPY-STANDARD.md#record-supplier-answer-words).
+
 **Who may record a supplier answer — OWNER RULING (Jess, 2026-09-25) · NOT BUILT.** Any active
 Operation person may record what the supplier answered — on a PO (`Record supplier answer`) and on
 a Supplier Claim (`Record supplier reply`, §9.5) — because the holder may be on medical leave or the
