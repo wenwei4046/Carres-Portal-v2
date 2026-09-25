@@ -2609,6 +2609,16 @@ to point at one of them and be wrong about the others.
 | The issued document | **`{DO number}`** + **`Delivery order issued`** | Released · Approved · Done |
 | The zoom controls | **`Zoom out`** · **`Zoom in`** · **`Fit the whole route`** (aria-labels) | Reset · Recenter · 100% |
 
+**THE `PROPOSED CHANGE` BANNER — owner ruling 2026-09-25 (Jess), APPROVED TARGET / NOT BUILT.**
+Printed above the canvas only while an amendment is `submitted` or `stale`; nothing otherwise.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Line 1 — the fact | **`A change to this order is waiting for approval — submitted {weekday, date} by {real staff name}.`** | Pending amendment · Amendment in progress · Proposed |
+| The door | **`Open the request →`** | View · Details · See change |
+| Line 2 — the reading rule | **`The map shows the order as it stands today, not the change.`** | omitting it — without it a reader assumes the map already shows the change |
+| An out-of-date request | line 1 becomes **`A change to this order is out of date — submitted {weekday, date} by {real staff name}.`**; door and line 2 unchanged | Stale · Conflict |
+
 **THE GATE REQUIREMENTS — one plain sentence each, with the count that makes them countable.**
 
 | Requirement | Use exactly | Do NOT use |

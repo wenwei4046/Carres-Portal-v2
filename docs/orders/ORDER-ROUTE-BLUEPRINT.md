@@ -251,7 +251,7 @@ Dependency-ordered. **No Cards are authored here** — that belongs to a BUILD l
 
 Everything else in this document is an engineering or design judgement and I have made it.
 
-1. **Does an operator need to see a waiting amendment on Order Route at all**, or is the `Order` tab
+1. ✅ **ANSWERED 2026-09-25 (Jess): YES** — the banner is law, recorded in `MASTER.md` § `PROPOSED CHANGE`. *(was:)* **Does an operator need to see a waiting amendment on Order Route at all**, or is the `Order` tab
    enough? *(If the Order tab is enough, §3.1 disappears — it is the only one of the four that is a
    genuine business-visibility choice rather than a correctness fix.)*
 2. **Do split deliveries actually happen often enough to draw?** I can see the database supports up to

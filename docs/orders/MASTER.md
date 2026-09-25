@@ -1463,6 +1463,25 @@ An open Service Case or Supplier Claim renders as a conditional strip beside the
 stage every Sales Order passes through and Service is not one. A CLOSED exception does not render.
 The status word is the owning module's own translation — no internal enum reaches this screen.
 
+### `PROPOSED CHANGE` — a waiting amendment is announced above the map · OWNER RULING 2026-09-25 (Jess) · APPROVED TARGET / NOT BUILT
+
+Measured 2026-09-24 (`ORDER-ROUTE-BLUEPRINT.md` §3.1): the string `amend` appears zero times in
+`packages/shared/src/sales-order-route.ts`, so while an amendment waits for a decision the map keeps
+drawing the original lanes as if nothing were in flight. Jess ruled on 2026-09-25 that the operator
+must see it on Order Route.
+
+- **One banner, above the canvas, never inside it.** The map keeps meaning *what is true now*; an
+  amendment is precisely not yet true. It is the same `warning` band kind every Register uses
+  (`role="alert"`, amber, zero height while absent) — no new kit component.
+- **Three sentences, no more:** the fact with who and when, the door, and the sentence that stops
+  the wrong reading — *the map below shows the order as it stands today, not the change.*
+- **It links, it never duplicates** (Law C): the Before/After lives on the `Order` tab; the banner
+  opens it. No proposed lane is drawn in a ghost style on the canvas — two truths on one surface
+  is the defect the 2026-08-16 ruling removed.
+- **Reads:** `sales_order_amendment_live` (the same read the Order tab makes) — status `submitted`
+  or `stale`, submitted by, submitted at. A `rejected` or `applied` request renders nothing.
+- Exact words live in `docs/COPY-STANDARD.md` § The Order Route words (registered with this ruling).
+
 ### The scenario matrix — what renders, and what deliberately does not
 
 | Scenario | What the map draws |
