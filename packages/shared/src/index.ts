@@ -1010,6 +1010,9 @@ export {
   poDateHistoryOf,
   poSupplierReplyOf,
   poSupplierDeliveryDateOf,
+  poLevelSupplierAnswerOf,
+  poLineSupplierAnswersOf,
+  poSupplierAnswerSummaryOf,
   poReplyDateOf,
   poRecordedReplyOf,
   poDocumentNumberOf,
@@ -1024,6 +1027,9 @@ export {
   type PoDateHistory,
   type PoDateHistoryEntry,
   type PoDatePromise,
+  type PoSupplierAnswerBatch,
+  type PoLineSupplierAnswer,
+  type PoSupplierAnswerSummary,
   type PoRiskRow,
   type PoRiskRung,
   type PoWorkspacePo,
@@ -3196,7 +3202,8 @@ export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 
-export { recordArrivalConfirmationInput, recordSupplierReplyInput } from "./schemas/operation";
+export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export type { RecordSupplierAnswersInput } from "./schemas/operation";
 
 export {
   purchaseOrderReplyWorkItems,

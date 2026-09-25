@@ -162,10 +162,11 @@ describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before ch
     expect(await attempt("delete from po_supplier_answer_screenshots where path like $1", [`${PO}/%`])).toBe("supplier_evidence_append_only");
   });
 
-  it("only PO Duty or an Operations superuser records supplier evidence", async () => {
+  it("any active Operation person records supplier evidence (owner ruling 2026-09-25, 0587) — the gate opens; the evidence rules still hold", async () => {
     await as(U.op);
-    expect(await reply({ supplierDate: "2026-10-21", reason: "Transport delay", screenshots: [`${PO}/delay-1.png`] })).toBe("42501");
-    expect(await confirm({ forDate: "2026-10-20" })).toBe("forbidden");
+    /* Past the actor gate, refused on the evidence — so nothing is written here. */
+    expect(await reply({ supplierDate: "2026-10-21", reason: "Transport delay", screenshots: [`${PO}/nobody-uploaded-this.png`] })).toBe("screenshot_not_found");
+    expect(await confirm({ forDate: "2026-10-20", destinationId: OTHER_DEST })).toBe("wrong_warehouse");
   });
 
   it("the day-before confirmation must name the exact effective arrival and the PO's own Warehouse", async () => {

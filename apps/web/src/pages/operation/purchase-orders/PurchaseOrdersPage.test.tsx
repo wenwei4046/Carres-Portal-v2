@@ -535,11 +535,16 @@ describe("Purchase Orders Register", () => {
     delete po.grns;
   });
 
-  it("the goods expansion reads Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items, read-only", () => {
+  it("the goods expansion reads Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items · Supplier Confirmed Delivery Date, read-only", () => {
     renderPage();
     const goods = screen.getByTestId("po-goods-PO-20260828-4827");
     const heads = [...goods.querySelectorAll("th")].map((th) => th.textContent);
-    expect(heads).toEqual(["Category", "Supplier", "Supplier Deliver To", "PO No / Unit ID", "Qty", "Items"]);
+    /* The seventh column — owner-approved 2026-09-25 (Purchasing §9.3): the
+       line's NEWEST supplier answer, read-only; the only write door is
+       `Record supplier answer` on the PO. */
+    expect(heads).toEqual(["Category", "Supplier", "Supplier Deliver To", "PO No / Unit ID", "Qty", "Items", "Supplier Confirmed Delivery Date"]);
+    /* No answer yet reads the dictionary's word for THIS column. */
+    expect(goods).toHaveTextContent("Not confirmed");
     /* A TRUTH table: nothing here can commit a unit or buy anything. */
     expect(goods.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(goods).not.toHaveTextContent("Ready Stock");

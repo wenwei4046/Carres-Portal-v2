@@ -1009,6 +1009,53 @@ export const recordArrivalConfirmationInput = z.object({
     message: "Record the reply channel, recipient, reporter and time.", path: ["channel"],
   });
 
+/**
+ * 0587 · the supplier's answer PER PO GOODS LINE (Purchasing §5.7, owner
+ * 2026-09-25): `no_change` · `confirmed` (the line's current expected date
+ * stands) · `new_date` · `split` (dated batches that must total the line's
+ * still-to-deliver quantity — the server checks the total). The server
+ * classifies every date against the immutable PO Delivery Date; a later date
+ * needs one of the eight governed reasons and `Other` needs a note. At least
+ * one evidence file (photo, video or PDF) — the Supplier DO file counts when it
+ * is the only one. Any active Operation person may record; the recorder is
+ * stored beside PO Duty and its cover.
+ */
+const supplierAnswerBatch = z.object({
+  qty: z.number().int().positive(),
+  date: z.string().date(),
+  reason: z.enum(PO_DELAY_REASONS).optional(),
+  remarks: z.string().trim().max(500).optional(),
+}).strict();
+
+export const recordSupplierAnswersInput = z.object({
+  poVersion: z.number().int().positive(),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
+  recipient: z.string().trim().min(1).max(200),
+  reportedBy: z.string().trim().min(1).max(200),
+  reportedAt: z.string().datetime({ offset: true }),
+  evidence: z.array(z.string().trim().min(1).max(2000)).max(20),
+  supplierDo: z.object({
+    number: z.string().trim().min(3).max(50),
+    file: z.string().trim().min(1).max(2000),
+  }).strict().nullable().optional(),
+  lines: z.array(z.object({
+    poLineId: z.string().uuid(),
+    answer: z.enum(["no_change", "confirmed", "new_date", "split"]),
+    date: z.string().date().optional(),
+    reason: z.enum(PO_DELAY_REASONS).optional(),
+    remarks: z.string().trim().max(500).optional(),
+    batches: z.array(supplierAnswerBatch).min(1).max(20).optional(),
+  }).strict()
+    .refine((l) => l.answer !== "new_date" || !!l.date, { message: "Record the supplier delivery date.", path: ["date"] })
+    .refine((l) => l.answer !== "split" || (l.batches?.length ?? 0) > 0, { message: "Add at least one delivery date to the split.", path: ["batches"] })
+    .refine((l) => l.reason !== "Other" || !!l.remarks?.trim(), { message: "Write why the supplier moved the date.", path: ["remarks"] })
+    .refine((l) => !l.batches || l.batches.every((b) => b.reason !== "Other" || !!b.remarks?.trim()), { message: "Write why the supplier moved the date.", path: ["batches"] }),
+  ).max(200),
+}).strict()
+  .refine((b) => b.evidence.length > 0 || !!b.supplierDo, { message: "Add the WhatsApp screenshot of the supplier's answer.", path: ["evidence"] })
+  .refine((b) => b.lines.some((l) => l.answer !== "no_change") || !!b.supplierDo, { message: "Answer at least one goods line or record the Supplier DO.", path: ["lines"] });
+export type RecordSupplierAnswersInput = z.infer<typeof recordSupplierAnswersInput>;
+
 export const recordSupplierReplyInput = z.object({
   poVersion: z.number().int().positive(),
   supplierDate: z.string().date(),
