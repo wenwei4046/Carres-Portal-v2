@@ -765,14 +765,15 @@ an answer is not an outside-readable document, §8.2):
 ```text
 RECORD SUPPLIER ANSWER   [ ] Supplier DO received  Supplier DO No [      ] [Upload]     Cancel  [Save]
 ☐  Item          To deliver  Answer                                    Date           Reason
-☐  Cody · King   4           [No change|Confirmed|New date|Split]
-☐  Cody · Queen  2           [No change|Confirmed|New date|Split]     [Mon, 12 Oct]  [Production delay ▾]
+☐  Cody · King   4           [Split delivery ▾]
+☐  Cody · Queen  2           [New date ▾]     [Mon, 12 Oct]  [Production delay ▾]
    └ split       [3] pcs [Fri, 9 Oct]   [1] pcs [Fri, 16 Oct] [Partial quantity ready ▾]   + Add another date   Total 4 of 4
 Evidence [Upload]  ≥1 WhatsApp screenshot · photo · video · PDF        Answered by supplier on [Fri, 25 Sep]
-2 selected · Apply to selected  [Confirmed|New date]                   ← bulk answer, one bar, never per row
+2 selected · Apply to selected  [Choose answer ▾]                   ← bulk answer, one bar, never per row
 ```
 
-- `Answer` is a four-segment control inside the row (kit segmented control, 32px). `Date` and
+- `Answer` is ONE kit Select in the row (owner choice 2026-09-26: a dropdown, not a four-segment
+  control — 140px instead of 330px, and the same control the rails and `Reason` already use). `Date` and
   `Reason` appear in the row only when the answer needs them (`New date`; `Reason` only when the
   date is later than PO Delivery Date; `Note` only for `Other`). A `Split delivery` row grows one
   36px sub-row per batch beneath its line, with `+ Add another date` and the live `Total {n} of {m}`.

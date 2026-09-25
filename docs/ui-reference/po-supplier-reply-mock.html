@@ -30,16 +30,34 @@ tr.split td{height:36px;background:#fafbfc}tr.split td:first-child{color:var(--i
 </div>
 
 <h1>Edit state — the same table, editable in place</h1>
-<p class="note">Answer = segmented control in the row. Date and Reason appear only when the answer needs them. A split adds 36px sub-rows. Tick rows → one bulk bar.</p>
+<p class="note">Answer = one dropdown in the row (No change · Confirmed · New date · Split delivery). Date and Reason appear only when the answer needs them. A split adds 36px sub-rows. Tick rows → one bulk bar.</p>
 <div class="card">
  <div class="head"><b>RECORD SUPPLIER ANSWER</b><span class="chk"></span><span>Supplier DO received</span><span class="in" style="min-width:120px;color:var(--ink2)">Supplier DO No</span><button class="btn">Upload DO</button><span class="sp"></span><button class="btn">Cancel</button><button class="btn p">Save</button></div>
  <table><tr><th style="width:32px"></th><th>Item</th><th class="num">To deliver</th><th>Answer</th><th>Date</th><th>Reason</th></tr>
- <tr><td><span class="chk"></span></td><td>Cody · King</td><td class="num">4</td><td><span class="seg"><span>No change</span><span>Confirmed</span><span>New date</span><span class="on">Split delivery</span></span></td><td></td><td></td></tr>
+ <tr><td><span class="chk"></span></td><td>Cody · King</td><td class="num">4</td><td><span class="in" style="min-width:140px">Split delivery ▾</span></td><td></td><td></td></tr>
  <tr class="split"><td></td><td>└ batch 1</td><td class="num"><span class="in s">3</span> pcs</td><td><span class="in">Fri, 9 Oct ▾</span></td><td></td><td></td></tr>
  <tr class="split"><td></td><td>└ batch 2</td><td class="num"><span class="in s">1</span> pcs</td><td><span class="in">Fri, 16 Oct ▾</span></td><td><span class="in" style="min-width:170px">Partial quantity ready ▾</span></td><td class="tag">+ Add another date &nbsp;·&nbsp; Total 4 of 4</td></tr>
- <tr><td><span class="chk" style="background:var(--blue3);border-color:var(--blue)"></span></td><td>Cody · Queen</td><td class="num">2</td><td><span class="seg"><span>No change</span><span>Confirmed</span><span class="on">New date</span><span>Split delivery</span></span></td><td><span class="in">Mon, 12 Oct ▾</span></td><td><span class="in" style="min-width:170px">Production delay ▾</span></td></tr>
+ <tr><td><span class="chk" style="background:var(--blue3);border-color:var(--blue)"></span></td><td>Cody · Queen</td><td class="num">2</td><td><span class="in" style="min-width:140px">New date ▾</span></td><td><span class="in">Mon, 12 Oct ▾</span></td><td><span class="in" style="min-width:170px">Production delay ▾</span></td></tr>
  </table>
  <div class="foot"><span>Evidence</span><button class="btn">Upload</button><span class="tag">≥1 WhatsApp screenshot · photo · video · PDF</span><span class="sp"></span><span>Answered by supplier on</span><span class="in">Fri, 25 Sep ▾</span></div>
- <div class="foot" style="background:var(--blue3);color:var(--ink)"><span>1 selected · Apply to selected</span><span class="seg" style="background:#fff"><span>Confirmed</span><span>New date</span></span></div>
+ <div class="foot" style="background:var(--blue3);color:var(--ink)"><span>1 selected · Apply to selected</span><span class="in" style="min-width:140px;background:#fff">Choose answer ▾</span></div>
+</div>
+
+<h1>Purchase Orders — left rail (240px, rail style C)</h1>
+<p class="note">Beside the Register. Counts count POs. Click a row to filter, click again to clear. No Clear filters button in the rail.</p>
+<div class="card" style="max-width:240px;padding:12px">
+ <div style="display:flex;align-items:center;gap:8px;font-weight:600;height:36px"><span>&#9993;</span>Supplier reply<span class="sp"></span><span class="tag">&#8963;</span></div>
+ <div style="display:flex;height:36px;align-items:center;padding-left:24px">Confirm tomorrow's supplier delivery<span class="sp"></span><span class="tag">2</span></div>
+ <div style="display:flex;height:36px;align-items:center;padding-left:24px;color:var(--blue);font-weight:500">Supplier Confirmed Delivery Date changed<span class="sp"></span><span>1</span></div>
+ <div style="display:flex;height:36px;align-items:center;padding-left:24px">Supplier delivery date passed<span class="sp"></span><span class="tag">0</span></div>
+ <div style="border-top:1px solid var(--line);margin:8px 0 12px"></div>
+ <div style="display:flex;align-items:center;gap:8px;font-weight:600;height:36px"><span>&#9776;</span>Receiving<span class="sp"></span><span class="tag">&#8963;</span></div>
+ <div style="display:flex;height:36px;align-items:center;padding-left:24px">Partly received<span class="sp"></span><span class="tag">0</span></div>
+ <div style="border-top:1px solid var(--line);margin:8px 0 12px"></div>
+ <div style="display:flex;align-items:center;gap:8px;font-weight:600;height:36px"><span>&#9673;</span>Supplier<span class="sp"></span><span class="tag">&#8963;</span></div>
+ <div class="in" style="width:100%;color:var(--ink2)">All suppliers ▾</div>
+ <div style="border-top:1px solid var(--line);margin:12px 0"></div>
+ <div style="display:flex;align-items:center;gap:8px;font-weight:600;height:36px"><span>&#8962;</span>Supplier Deliver To<span class="sp"></span><span class="tag">&#8963;</span></div>
+ <div class="in" style="width:100%;color:var(--ink2)">All destinations ▾</div>
 </div>
 </body></html>
