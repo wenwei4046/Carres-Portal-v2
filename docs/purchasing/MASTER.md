@@ -522,6 +522,40 @@ every Office working day (Mon–Fri) herself in Settings; the ruling does not ha
 so a later change of the setting changes the window days without a new rule. `PO Days` still does
 not move `Order By` (§9.1). A supplier's governed earlier cut-off still wins inside a window day.
 
+**PO WINDOW JOURNEY — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Purchasing's side of the
+daily PO Duty journey. Work card composition and whether the send area is embedded in the Work right
+panel belong to Workspace (handed off to the Workspace lane the same day); Purchasing supplies the
+facts, the one send area and the completion fact below.
+
+- **Settings.** `Settings → Purchasing → PO windows` carries `PO Days` (day ticks), `First PO
+  window` (default `11:30 AM`), `Second PO window` with an on/off switch (default `4:00 PM`).
+  Every change records actor, time, old value, new value and effective date; it never rewrites an
+  issued PO. The window times are **not built today** — only `PO Days` exists.
+- **One occurrence per window.** Eligible demand admitted before a window belongs to it; a supplier
+  with an earlier governed cut-off gets its own occurrence at its real time. Blocked lines (for
+  example `Production days not set`) are named with their owning setup door and never counted as
+  ready.
+- **Opening lands in SO Batch Purchase scoped to that window's exact demand, with every eligible
+  line pre-ticked.** The operator may untick or tick lines by hand before `Issue PO`; review and
+  issue authority are unchanged. SO Batch also works without Work: an authorised issuer may select
+  and issue at any time, and the window occurrence then closes from the same facts.
+- **Completion.** The occurrence completes only when every PO issued from its scope has its current
+  version marked sent (`PO sent to supplier`, `po_sends confirmed_sent`). Issuing alone does not
+  complete it. Opening WhatsApp or email never completes it.
+- **Missed window.** An unfinished occurrence keeps its own time and reads `Window passed · {time}`;
+  it never silently rolls into the next window. Later demand belongs to the next occurrence, so two
+  occurrences never share a line.
+- **One send area.** `PoIssueEvidence` (`Copy message` · `Open WhatsApp group` / `Open WhatsApp` ·
+  `Open email` · `Download PDF` · `PO sent to supplier`) is the only send control set, shown on the
+  SO Batch and Manual Purchase issue review and on the PO object (§8.2). Workspace may embed the same
+  component; it may never draw a second set.
+- **Action line for an issued PO whose current version is not marked sent**, by the supplier's
+  recorded channel: `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to
+  {Supplier}` · no channel recorded: `Send {PO No} to {Supplier}`. Several unconfirmed POs name the
+  earliest-due one; the fact line states `{n} of {m} POs`.
+- **Retired with this journey:** the per-Sales-Order `issue_po` card and `confirm_ready_date`
+  (`Supplier date missing`); the day-before check (§5.7) replaces the latter.
+
 **BUILD FACTS — branch `build/work-po-windows`, migrations 0584 / 0585 NOT APPLIED; nothing is live
 until Jess approves.**
 
@@ -536,6 +570,10 @@ until Jess approves.**
 - **Which demand.** Only lines SO Batch may buy (`isSelectableForBuying`) — including `can order
   early`, because the window, not Order By, now sets when PO Duty buys. `PO Days` still does not
   move `Order By`.
+- **Opening pre-ticks.** SO Batch opened with `?window=` ticks every eligible line once (default
+  destination); an unticked line stays unticked. The window name and `Clear filters` sit above the
+  grid so they stay visible while the selection bar replaces the toolbar.
+- **Several unsent POs** name the earliest (lowest PO No) in the card's send line.
 - **Completion.** `POST /pos/:id/confirm-sent` completes the window occurrence once no eligible
   demand is left and every PO it issued has its current version sent; `issue-batch` completes
   nothing. A received PO needs no sending; a PO serving two windows belongs to the earliest.

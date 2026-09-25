@@ -10,7 +10,8 @@
  *   before issue   `Buy {n} items for {m} Sales Orders`
  *                  `Issue the POs by 11:30 AM`
  *   after issue    `{k} POs issued · {x} not sent yet`
- *                  `Click WhatsApp, send PO260925-4827(1) to Ohana`
+ *                  `Click WhatsApp, send PO260925-4827(1) to Ohana` (the earliest
+ *                  unsent PO when several are owed)
  *
  * It closes when no eligible demand is left in the window AND every PO issued
  * from it has its CURRENT version marked `PO sent to supplier`. Opening
@@ -35,7 +36,6 @@ export const PO_WINDOW_WORK_COPY = {
   issueBy: (time: string) => `Issue the POs by ${time}`,
   issued: (issued: number, unsent: number) =>
     `${issued} ${issued === 1 ? "PO" : "POs"} issued · ${unsent} not sent yet`,
-  sendMany: (unsent: number) => `Send ${unsent} POs to suppliers`,
   sendWhatsApp: (po: string, supplier: string) => `Click WhatsApp, send ${po} to ${supplier}`,
   sendEmail: (po: string, supplier: string) => `Click Email, send ${po} to ${supplier}`,
   send: (po: string, supplier: string) => `Send ${po} to ${supplier}`,
@@ -227,11 +227,10 @@ export function poWindowWork(input: {
         problem: demandLeft
           ? PO_WINDOW_WORK_COPY.buy(items, orders)
           : PO_WINDOW_WORK_COPY.issued(pos.length, unsent),
+        /* Several unsent POs name the earliest one (Purchasing §5.6.1). */
         action: demandLeft || unsent === 0
           ? PO_WINDOW_WORK_COPY.issueBy(timeWord)
-          : unsent === 1
-            ? firstUnsent!.act!
-            : PO_WINDOW_WORK_COPY.sendMany(unsent),
+          : firstUnsent!.act!,
         recipient:
           recipientNames.length === 0
             ? null

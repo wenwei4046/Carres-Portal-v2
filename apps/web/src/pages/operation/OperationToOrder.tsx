@@ -151,6 +151,7 @@ export default function OperationToOrder() {
         initialSearch={scopeSo ? `SO-${scopeSo.replace(/^SO-/i, "")}` : undefined}
         scope={windowParts ? {
           label: `${PO_WINDOW_WORK_COPY.objectLabel(poWindowTimeWord(windowParts.time))} · ${fmtDate(windowParts.date)}`,
+          preselectKey: scopeWindow!,
           onClear: () => {
             const next = new URLSearchParams(searchParams);
             next.delete("window");

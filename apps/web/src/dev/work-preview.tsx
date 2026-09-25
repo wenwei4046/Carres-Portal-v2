@@ -296,7 +296,7 @@ function windowItem(key: string, label: string, problem: string, action: string,
 }
 if (pw) {
   FEED.items.push(
-    windowItem(W1130, "11:30 AM PO window", "3 POs issued · 2 not sent yet", "Send 2 POs to suppliers", "2 suppliers", true),
+    windowItem(W1130, "11:30 AM PO window", "3 POs issued · 2 not sent yet", "Click WhatsApp, send PO170926-4827(1) to Ohana", "2 suppliers", true),
     windowItem(W1600, "4:00 PM PO window", "Buy 7 items for 4 Sales Orders", "Issue the POs by 4:00 PM", "2 suppliers", false),
   );
 }

@@ -1335,7 +1335,7 @@ Batch's `?window=` scope read that stamp. Workspace decides the composition (han
 
 - **Middle card.** Before issue: `Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`,
   document reference `{time} PO window`. After issue: `{k} POs issued · {x} not sent yet` / the
-  one PO's send line, or `Send {x} POs to suppliers`. Items are business units; a Sales Order is
+  earliest unsent PO's send line. Items are business units; a Sales Order is
   counted once. Demand left beside unsent POs: buying leads.
 - **Right panel.** Summary → `To buy` (per supplier) → `POs to send` (one 72px card per PO, unsent
   first). While demand is left the summary's `Open {time} PO window` door — SO Batch scoped to

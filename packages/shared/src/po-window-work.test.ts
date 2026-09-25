@@ -43,7 +43,7 @@ describe("poWindowWork — one occurrence per PO window, never one per Sales Ord
       channelOf,
     });
     expect(w!.card.problem).toBe("3 POs issued · 2 not sent yet");
-    expect(w!.card.action).toBe("Send 2 POs to suppliers");
+    expect(w!.card.action).toBe("Click WhatsApp, send PO250925-4827(1) to Ohana");
     expect(w!.pos.map((p) => [p.documentNo, p.sent, p.act])).toEqual([
       ["PO250925-4827(1)", false, "Click WhatsApp, send PO250925-4827(1) to Ohana"],
       ["PO250925-4828(1)", false, "Click Email, send PO250925-4828(1) to Hookka"],

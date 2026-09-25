@@ -243,7 +243,7 @@ export interface SoBatchRegisterProps {
   onIssue: (selections: SoBatchSelection[]) => void;
   /** The PO window Work opened this page on (Purchasing §5.6.1): its name,
    *  and the way back to every window's demand. */
-  scope?: { label: string; onClear: () => void };
+  scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
 export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false, scope }: SoBatchRegisterProps) {
@@ -519,6 +519,27 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
       null,
     [data.defaultDestinationId, data.destinations],
   );
+
+  /* ⭐ A PO WINDOW OPENS PRE-TICKED (Purchasing §5.6.1, owner ruling
+     2026-09-25): Work opens this page on exactly the window's demand, every
+     eligible line already ticked to its default destination. The operator may
+     untick or tick by hand before `Issue PO`; it runs once per window, so a
+     line the operator unticked is never ticked back by a refetch. */
+  const preselectedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const key = scope?.preselectKey ?? null;
+    if (!key || preselectedFor.current === key || isLoading || !tickDestinationId) return;
+    const eligible = [...leafById.values()].filter((row) => selectable(row) && (row.toBuy ?? 0) > 0);
+    if (eligible.length === 0) return;
+    preselectedFor.current = key;
+    setSelected((prev) => {
+      const next = new Map(prev);
+      for (const row of eligible) {
+        if (!next.has(row.id)) next.set(row.id, { toBuy: row.toBuy ?? 0, allocations: defaultAllocations(row, tickDestinationId) });
+      }
+      return next;
+    });
+  }, [scope?.preselectKey, isLoading, leafById, selectable, tickDestinationId]);
 
   const toggleLeaf = useCallback(
     (id: string) => {
@@ -1279,6 +1300,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               fit the window. Every register that works mounts the grid inside
               a flex column (`SalesOrdersRegister.tsx:613`); this one put a
               bare wrapper in between and lost the chain. */}
+          {/* The PO window Work opened this page on stays named while its
+              lines are ticked — the grid's toolbar gives way to the
+              selection bar, so the scope lives above the grid. */}
+          {scope ? (
+            <div className="flex shrink-0 items-center gap-2 pb-2" data-testid="so-batch-window-scope">
+              <span className="truncate text-body font-medium text-kit-slate-12">{scope.label}</span>
+              <Button variant="ghost" size="sm" onClick={scope.onClear}>Clear filters</Button>
+            </div>
+          ) : null}
           <div
             className="flex min-h-0 flex-1 flex-col"
             data-testid="so-batch-grid"
@@ -1303,21 +1333,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               noMatchMessage={W.noMatch}
               onClearConditions={() => setFilter(SO_BATCH_RAIL_CLEAR)}
               toolbarStart={
-                !filterRailOpen || scope ? (
-                  <>
-                    {!filterRailOpen ? (
-                      <ShowFiltersButton
-                        onShow={() => setFilterRailVisible(true)}
-                        testId="so-batch-show-filters"
-                      />
-                    ) : null}
-                    {scope ? (
-                      <span className="flex min-w-0 items-center gap-2" data-testid="so-batch-window-scope">
-                        <span className="truncate text-body font-medium text-kit-slate-12">{scope.label}</span>
-                        <Button variant="ghost" size="sm" onClick={scope.onClear}>Clear filters</Button>
-                      </span>
-                    ) : null}
-                  </>
+                !filterRailOpen ? (
+                  <ShowFiltersButton
+                    onShow={() => setFilterRailVisible(true)}
+                    testId="so-batch-show-filters"
+                  />
                 ) : null
               }
               isLoading={isLoading}
