@@ -539,11 +539,11 @@ Delivery Order document — the DOCUMENT's own life
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
   before the arrangement is agreed — the ACTOR rungs, unchanged:
-    Operation must assign logistics · Call customer · Waiting for customer reply
+    Assign logistics · Call customer · Waiting for customer reply
   once a date is scheduled (time optional, owner ruling 2026-09-24) — the JOURNEY rungs:
     customer leg   Scheduled · Waiting for {partner} pickup · Collected by {partner} ·
                    On the way to customer · Delivered to customer · Failed Delivery
-    transfer leg   Transfer confirmed · Collected for transfer · In transit to {stop} ·
+    transfer leg   Transfer scheduled · Collected for transfer · In transit to {stop} ·
                    Arrived at {stop} · Transfer failed
   across both      Overdue · Order details incomplete
 ```
@@ -581,7 +581,7 @@ tab count and split, following the SELECTED RANGE and every active filter:
 
 LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
   customer leg        transfer leg           Ready · Stock risk · Hold delivery ·
-  Confirmed           Transfer confirmed     Logistics details incomplete · DO not released
+  Scheduled           Transfer scheduled     Logistics details incomplete · DO not released
   Collected by {p}    Collected for transfer
   On the way to       In transit to {stop}
     customer
@@ -615,7 +615,13 @@ Banned as status words on either surface, because each names a mood rather than 
 `Pending` · `In progress` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
 **`Scheduled` is the customer-leg word since the owner ruling of 2026-09-24**, which overwrites
 the 2026-09-14 `Confirmed` ruling: the customer's request is `Requested delivery`, the arranged
-day is `Scheduled delivery`, the result is `Delivered`. `Confirmed Delivery` / `Confirmed Time`
+day is `Scheduled delivery`, the result is `Delivered`. **`Transfer scheduled` is its transfer-leg
+pair since 2026-09-25** (owner ruling, Delivery segment 1; `Transfer confirmed` retired). The same
+ruling: `Assign logistics` replaces `Operation must assign logistics` on line one; `Ask {partner}
+for the result` replaces `{partner} must record the result` under `Overdue`; `Order details
+incomplete` prints the missing fact on line two; `Scheduled for {date}` · `Goods collected by
+{partner}` · `{partner} is delivering to the customer` · `Confirm delivery time` are retired, and
+ONE label function prints every surface (Delivery §8.4). `Confirmed Delivery` / `Confirmed Time`
 are retired as field words. `Delivery failed` is not a second spelling of **`Failed Delivery`**.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled

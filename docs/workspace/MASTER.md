@@ -959,7 +959,7 @@ reads `Scheduled delivery · 29 Oct`. Had the 2-day check been missed on Sat 24,
 |---|---|---|---|
 | `Pickup from Carres Klang Warehouse` | `Supplier Deliver To` → a Site of kind `own`, or Units reserved at an own Site | PO → supplier delivers + Supplier DO → GRN at Carres Klang (Goods Received Date) → pick · check · pack → Outbound `Warehouse loaded` + `Driver collected` | `Driver collected` |
 | `Pickup from supplier` | **NOT DERIVABLE YET** — no Purchasing fact records "logistics collects for the customer" | PO → supplier prepares + Supplier DO → `Collected from supplier` (APPROVED TARGET / NOT BUILT) — no GRN | `Collected from supplier` |
-| `Supplier sends directly to logistics` | `Supplier Deliver To` → a Site of kind `operation_partner` (AL Sungai Buloh, HOUZS Balakong — 0509) | PO → supplier delivers + Supplier DO → that Site's Inbound receipt/GRN → the Site's own outbound to the customer | the Site's receipt |
+| `Supplier sends directly to logistics` | `Supplier Deliver To` → a Site of kind `Logistics transit point` (AL Sungai Buloh, HOUZS Balakong, HOUZS Penang — 0509's `operation_partner`): the Logistics company's own point, never a Carres warehouse (Stock §5, owner correction 2026-09-25) | PO → supplier delivers + Supplier DO → that Site's Inbound receipt/GRN → the Site's own outbound to the customer | the Site's receipt |
 | `Supplier delivers to the customer` (Ohana) | a destination with no Site | a separate route, outside the three; not solved by this card | — |
 
 #### External link states
@@ -1011,6 +1011,13 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
    arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
    check through the one `logisticsCheckDueIso`.
 7. The Ohana supplier-to-customer route.
+9. Closed 2026-09-25 (owner yes, Delivery segment 1): the Work feed's `logisticsAssigned` reads
+   Delivery's arrangement (`ops_delivery_arrangements.partner_id`, leg-aware) — never the `orders`
+   columns alone, which stay a fallback until retired; the Logistics card's progress line reads the
+   same `deliveryWorkStatusOf` as the Monitor register and its words (`Scheduled` · `Transfer
+   scheduled` · `Collected by {company}` · `On the way to customer` · `Delivered to customer` · `Ask
+   {company} for the result`); one delivery-day reader (`confirmedDeliveryOf`: DO → arrangement →
+   legacy booking) serves the rail Calendar, Monitor and the Work feed.
 8. **Two contact days — owner ruling 2026-09-25 (Jess: keep both).** They are two different facts,
    never merged and never printed with the same words:
    - **`3 working days before`** the promised date (Orders Card 3 `T−3`, the `chase` lead
