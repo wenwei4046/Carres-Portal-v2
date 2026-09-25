@@ -468,14 +468,38 @@ function chartAnswer(tb: Result) {
   };
 }
 
+// 0580: the stored flag. 2300 has nothing under it and is still a heading.
+const FLAGGED_CHART = [
+  { ...CHART[0], is_heading: true },
+  { ...CHART[1], is_heading: false },
+  { code: "2300", name: "Taxes", kind: "LIABILITY", parent_code: null, is_control: false, control_for: null, is_active: true, is_heading: true },
+  { ...CHART[2], is_heading: false },
+];
+
 describe("GET /accounts", () => {
-  it("returns the chart with headers worked out from parents, and the ledger start", async () => {
+  it("reads the chart with star, so it still loads before 0580's column is there", async () => {
+    const { calls } = fakeClient(chartAnswer(ok([])));
+    await get("/accounts");
+    const read = calls.find((c) => c.name === "gl_accounts")!;
+    expect(ops(read, "select")).toEqual([["select", "*"]]);
+  });
+
+  it("before 0580, works headers out from parents; and gives the ledger start", async () => {
     fakeClient(chartAnswer(ok([])));
     const res = await get("/accounts");
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.go_live_on).toBe("2026-09-01");
     expect(body.accounts.map((a: AnyJson) => [a.code, a.is_header])).toEqual([["1000", true], ["1210", false], ["4100", false]]);
+  });
+
+  it("reads a heading from the stored flag, so an empty heading is still one (0580)", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) => (call.name === "gl_accounts" ? ok(FLAGGED_CHART) : answer(call)));
+    const body = await json(await get("/accounts"));
+    expect(body.accounts.map((a: AnyJson) => [a.code, a.is_header])).toEqual([
+      ["1000", true], ["1210", false], ["2300", true], ["4100", false],
+    ]);
   });
 
   it("names the headings no account moves into or out of (0570 gl_rule_headings)", async () => {
@@ -697,18 +721,39 @@ describe("POST /accounts/move and /accounts/reorder", () => {
     });
   });
 
-  it("refuses operation, a missing before-order, an emptied heading and an extra field before the database", async () => {
+  it("forwards the last account leaving its heading, and a move into an empty heading (0580)", async () => {
+    const { sb } = fakeClient(() => ok("2310"));
+    const out = await post("/accounts/move", {
+      code: "2310", toParentCode: "2100",
+      from: { was: ["2310"], now: [] },
+      to: { was: ["2110", "2120"], now: ["2110", "2120", "2310"] },
+    });
+    expect(out.status).toBe(200);
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_account_move", {
+      p_code: "2310", p_to_parent: "2100",
+      p_from_was: ["2310"], p_from_now: [],
+      p_to_was: ["2110", "2120"], p_to_now: ["2110", "2120", "2310"],
+    });
+    const back = await post("/accounts/move", {
+      code: "2310", toParentCode: "2300",
+      from: { was: ["2110", "2120", "2310"], now: ["2110", "2120"] },
+      to: { was: [], now: ["2310"] },
+    });
+    expect(back.status).toBe(200);
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_account_move", {
+      p_code: "2310", p_to_parent: "2300",
+      p_from_was: ["2110", "2120", "2310"], p_from_now: ["2110", "2120"],
+      p_to_was: [], p_to_now: ["2310"],
+    });
+  });
+
+  it("refuses operation, a missing before-order and an extra field before the database", async () => {
     expect((await post("/accounts/move", MOVE, "operation")).status).toBe(403);
     const { sb } = fakeClient(() => ok("x"));
-    expect((await post("/accounts/move", { ...MOVE, to: { was: [], now: ["5200"] } })).status).toBe(422);
-    // The last account under a heading never leaves it (0570), so an empty
-    // after-order for the heading it leaves never reaches the database.
-    const emptied = await post("/accounts/move", {
-      code: "1310", toParentCode: "1200",
-      from: { was: ["1310"], now: [] },
-      to: { was: ["1210"], now: ["1210", "1310"] },
-    });
-    expect(emptied.status).toBe(422);
+    // The heading it leaves always held the account, so its before-order is never empty.
+    expect((await post("/accounts/move", { ...MOVE, from: { was: [], now: ["5100"] } })).status).toBe(422);
+    // An empty heading's before-order is [], but it is still sent.
+    expect((await post("/accounts/move", { ...MOVE, to: { now: ["5200"] } })).status).toBe(422);
     expect((await post("/accounts/move", { ...MOVE, name: "Freight" })).status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
@@ -719,7 +764,7 @@ describe("POST /accounts/move and /accounts/reorder", () => {
     ["move_other_kind", "22023", 422, "An account moves only under a heading of the same kind."],
     ["move_into_itself", "22023", 422, "1200 Receivables is inside 1100 Cash and bank. A heading cannot go under a heading inside it."],
     ["move_rule_heading", "22023", 422, "2200 Customer money held decides how money may be recorded, not only where an account prints. No account moves into or out of it."],
-    ["move_last_child", "22023", 422, "2310 SST payable is the last account under 2300 Taxes. Move another account under that heading first."],
+    ["move_into_money_heading", "22023", 422, "1250 Loans and advances given is not a bank or cash account. Only bank and cash accounts go under 1100 Cash and bank."],
   ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
     fakeClient(() => refuse(sqlstate, details as string, message as string));
     const res = await post("/accounts/move", MOVE);
@@ -756,6 +801,88 @@ describe("GET /trial-balance", () => {
     expect(body.status).toBe("ok");
     expect(body.accounts.map((a: AnyJson) => a.account_code)).toEqual(["1210", "4100"]);
     expect(body).toMatchObject({ total_debit: 150, total_credit: 150, difference: 0, balances: true });
+  });
+
+  // A chart three headings deep, with made-up codes. Finance dragged Bank
+  // (CA-B) above Cash in hand (CA-A), so the chart's order is not the codes'
+  // order. Stock holds nothing that moved.
+  const DEEP = [
+    { code: "AS", name: "Assets", kind: "ASSET", parent_code: null, sort_order: 0 },
+    { code: "CA", name: "Current assets", kind: "ASSET", parent_code: "AS", sort_order: 0 },
+    { code: "CA-B", name: "Bank", kind: "ASSET", parent_code: "CA", sort_order: -1 },
+    { code: "CA-B1", name: "Maybank", kind: "ASSET", parent_code: "CA-B", sort_order: 0 },
+    { code: "CA-B2", name: "Public Bank", kind: "ASSET", parent_code: "CA-B", sort_order: 0 },
+    { code: "CA-A", name: "Cash in hand", kind: "ASSET", parent_code: "CA", sort_order: 0 },
+    { code: "ST", name: "Stock", kind: "ASSET", parent_code: "AS", sort_order: 0 },
+    { code: "ST-F", name: "Finished goods", kind: "ASSET", parent_code: "ST", sort_order: 0 },
+    { code: "IN", name: "Income", kind: "INCOME", parent_code: null, sort_order: 0 },
+    { code: "IN-S", name: "Sales", kind: "INCOME", parent_code: "IN", sort_order: 0 },
+  ].map((a) => ({ is_control: false, control_for: null, is_active: true, ...a }));
+  const deepAnswer = (moved: Record<string, [number, number]>) => (call: Call): Result => {
+    // readChart asks for sort_order, then code, across the whole chart.
+    if (call.name === "gl_accounts") return ok([...DEEP].sort((a, b) => a.sort_order - b.sort_order || a.code.localeCompare(b.code)));
+    if (call.name === "gl_config") return ok({ go_live_on: "2026-09-01" });
+    if (call.name !== "gl_trial_balance") return ok([]);
+    const accounts = [...DEEP].sort((a, b) => a.code.localeCompare(b.code)).map((a, i) => {
+      const [dr, cr] = moved[a.code] ?? [0, 0];
+      return tbRow({ ordinal: i + 1, row_kind: "ACCOUNT", account_code: a.code, account_name: a.name, kind: a.kind,
+        is_control: false, is_active: true, total_debit: dr.toFixed(2), total_credit: cr.toFixed(2), natural_balance: "0" });
+    });
+    const dr = Object.values(moved).reduce((t, [d]) => t + d, 0);
+    const cr = Object.values(moved).reduce((t, [, c]) => t + c, 0);
+    return ok([...accounts, tbRow({ ordinal: accounts.length + 1, row_kind: "TOTAL", total_debit: dr, total_credit: cr, balances: dr === cr })]);
+  };
+
+  it("gives every heading its own debit and credit subtotal at every depth, and each row its place in the chart", async () => {
+    // Maybank sits 500 on the debit side, Public Bank is overdrawn 30, Cash in hand holds 20; sales take the 490.
+    fakeClient(deepAnswer({ "CA-B1": [700, 200], "CA-B2": [10, 40], "CA-A": [20, 0], "IN-S": [0, 490] }));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10"));
+    expect(body.headings.map((h: AnyJson) => [h.code, h.depth, h.parent_code, h.chart_position, h.debit, h.credit])).toEqual([
+      ["AS", 1, null, 1, 520, 30],
+      ["CA", 2, "AS", 2, 520, 30],
+      ["CA-B", 3, "CA", 3, 500, 30],
+      ["ST", 2, "AS", 7, 0, 0],
+      ["IN", 1, null, 9, 0, 490],
+    ]);
+    // The accounts keep the ledger's own order, as before headings; each
+    // carries its heading and its place in the chart, counted with the
+    // headings' places, so Bank (3) sorts above Cash in hand (6).
+    expect(body.accounts.map((a: AnyJson) => [a.account_code, a.header_code, a.chart_position])).toEqual([
+      ["CA-A", "CA", 6], ["CA-B1", "CA-B", 4], ["CA-B2", "CA-B", 5], ["IN-S", "IN", 10], ["ST-F", "ST", 8],
+    ]);
+    // The totals are the ledger's own, never the subtotals added in again, and they balance.
+    expect(body).toMatchObject({ total_debit: 730, total_credit: 730, difference: 0, balances: true });
+  });
+
+  it("keeps the department filter, and the subtotals are that department's", async () => {
+    const { sb } = fakeClient(deepAnswer({ "CA-A": [20, 0], "IN-S": [0, 20] }));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10&departmentType=SHOWROOM"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10", p_department_type: "SHOWROOM", p_department_id: null });
+    expect(body.headings.find((h: AnyJson) => h.code === "AS")).toMatchObject({ debit: 20, credit: 0 });
+    expect(body.headings.find((h: AnyJson) => h.code === "CA-B")).toMatchObject({ debit: 0, credit: 0 });
+  });
+
+  it("refuses a trial balance with an account the chart does not hold, never prints it short", async () => {
+    const answer = deepAnswer({});
+    fakeClient((call) => {
+      if (call.name !== "gl_trial_balance") return answer(call);
+      return ok([
+        tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "XX", account_name: "Stray", kind: "ASSET", total_debit: "5.00", total_credit: "0" }),
+        tbRow({ ordinal: 2, row_kind: "TOTAL", total_debit: "5.00", total_credit: "0", balances: false }),
+      ]);
+    });
+    expect((await get("/trial-balance?asOf=2026-09-10")).status).toBe(500);
+  });
+
+  it("drops an empty heading too, by the stored flag (0580)", async () => {
+    const answer = chartAnswer(ok([
+      tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "2300", account_name: "Taxes", kind: "LIABILITY", total_debit: 0, total_credit: 0, natural_balance: 0 }),
+      tbRow({ ordinal: 2, row_kind: "ACCOUNT", account_code: "4100", account_name: "Sales", kind: "INCOME", total_debit: 0, total_credit: 0, natural_balance: 0 }),
+      tbRow({ ordinal: 3, row_kind: "TOTAL", total_debit: 0, total_credit: 0, balances: true }),
+    ]));
+    fakeClient((call) => (call.name === "gl_accounts" ? ok(FLAGGED_CHART) : answer(call)));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10"));
+    expect(body.accounts.map((a: AnyJson) => a.account_code)).toEqual(["4100"]);
   });
 
   it("defaults to today in Malaysia", async () => {

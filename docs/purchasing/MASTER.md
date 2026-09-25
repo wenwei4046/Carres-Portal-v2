@@ -356,6 +356,13 @@ logistics company collects at the factory; no GRN) needs a Purchasing fact that 
 and a Stock `Collected from supplier` custody event — **APPROVED TARGET / NOT BUILT**. Work and
 Delivery only READ the route; changing it stays a Purchasing edit (a new PO version once sent).
 
+**Work Supplier card and Route (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10)** read, per
+PO serving one Sales Order: issued or not, the immutable `PO Delivery Date`, the latest supplier
+reply (word, reason, evidence) and `effectiveArrivalOf`, the PO's Supplier DO (`do_number`,
+`do_uploaded_at`), Deliver To and the Warehouse's GRN date — through
+`GET /api/operation/pos/for-order/:orderId`. Nothing is written from Work; recording a supplier
+answer stays `Open {PO No}` until the reply rule is admitted as an embedded action.
+
 **ONE PO MAY CARRY SEVERAL DELIVER TO — owner ruling (Jess, 2026-09-22).** A sofa PO is always one
 Deliver To. A mattress or bedframe PO may send its goods to one or several governed Deliver To
 destinations; each goods line names its own (a null line follows the PO default). Moving goods to
@@ -507,6 +514,53 @@ supplier and one confirmation may issue separate supplier POs. The scope is sour
 matching one SO never silently includes its unrelated lines. How an exceptional earlier supplier
 window is visually composed remains a UI decision, not a reason to falsify its due time.
 
+**WINDOW DAYS — OWNER CORRECTION (Jess, 2026-09-25) · APPROVED / NOT BUILT.** The `PO Days`
+setting in Purchasing Settings **decides which days a PO window opens**. "Purchasing working day"
+above means a day ticked in `PO Days` that is also an Office working day (Office calendar and
+holidays). Work follows it: a PO window occurrence exists only on a PO Day. Jess sets `PO Days` to
+every Office working day (Mon–Fri) herself in Settings; the ruling does not hard-code that value,
+so a later change of the setting changes the window days without a new rule. `PO Days` still does
+not move `Order By` (§9.1). A supplier's governed earlier cut-off still wins inside a window day.
+
+**PO WINDOW JOURNEY — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Purchasing's side of the
+daily PO Duty journey. Work card composition and whether the send area is embedded in the Work right
+panel belong to Workspace (handed off to the Workspace lane the same day); Purchasing supplies the
+facts, the one send area and the completion fact below.
+
+- **Settings.** `Settings → Purchasing → PO windows` carries `PO Days` (day ticks), `First PO
+  window` (default `11:30 AM`), `Second PO window` with an on/off switch (default `4:00 PM`).
+  Every change records actor, time, old value, new value and effective date; it never rewrites an
+  issued PO. The window times are **not built today** — only `PO Days` exists.
+- **One occurrence per window.** Eligible demand admitted before a window belongs to it; a supplier
+  with an earlier governed cut-off gets its own occurrence at its real time. Blocked lines (for
+  example `Production days not set`) are named with their owning setup door and never counted as
+  ready.
+- **Opening lands in SO Batch Purchase scoped to that window's exact demand, with every eligible
+  line pre-ticked.** The operator may untick or tick lines by hand before `Issue PO`; review and
+  issue authority are unchanged. SO Batch also works without Work: an authorised issuer may select
+  and issue at any time, and the window occurrence then closes from the same facts.
+- **Completion.** The occurrence completes only when every PO issued from its scope has its current
+  version marked sent (`PO sent to supplier`, `po_sends confirmed_sent`). Issuing alone does not
+  complete it. Opening WhatsApp or email never completes it.
+- **Missed window.** An unfinished occurrence keeps its own time — it still reads `Issue the POs by
+  {time}` and Work marks it Missed — and it never silently rolls into the next window. Later demand belongs to the next occurrence, so two
+  occurrences never share a line.
+- **One send area.** `PoIssueEvidence` (`Copy message` · `Open WhatsApp group` / `Open WhatsApp` ·
+  `Open email` · `Download PDF` · `PO sent to supplier`) is the only send control set, shown on the
+  SO Batch and Manual Purchase issue review and on the PO object (§8.2). Workspace may embed the same
+  component; it may never draw a second set.
+- **Action line for an issued PO whose current version is not marked sent**, by the supplier's
+  recorded channel: `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to
+  {Supplier}` · no channel recorded: `Send {PO No} to {Supplier}`. Several unconfirmed POs name the
+  earliest-due one.
+- **Card words — OWNER CHOICE (Jess, 2026-09-25).** The Work card says what to do: before issue
+  `Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`; after issue
+  `{k} POs issued · {x} not sent yet` / the earliest unsent PO's send line; reference
+  `{time} PO window`. The count-style lines (`{time} PO window · {n} suppliers · {n} Sales Orders`,
+  `Issue POs to {suppliers}`, `{n} of {m} POs · Sending not confirmed`) are not used.
+- **Retired with this journey:** the per-Sales-Order `issue_po` card and `confirm_ready_date`
+  (`Supplier date missing`); the day-before check (§5.7) replaces the latter.
+
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
 - **THE VERSION IS DECLARED, NOT READ BACK.** The confirmation states the version it RENDERED;
@@ -598,6 +652,41 @@ WhatsApp screenshot (more may be retained) and one required governed reason:
 screenshot refuses the record. Evidence is append-only with supplier, recorder and server time;
 the immutable original PO Delivery Date and earlier answers are never overwritten. The existing
 arrival arithmetic recomputes only the affected open source-line scope and reports customer impact.
+
+**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** One
+`Record supplier answer` form on the PO records the supplier's answer **per PO goods line**. Each
+line chooses `No change` (default) · `Confirmed` · `New date` (the server classifies `Earlier` —
+no reason — or `Delayed` — one governed reason required) · `Split delivery` (any number of
+quantity + date batches via `+ Add another date`; batches must total the line's still-to-deliver
+quantity, shown as `Total {n} of {m}`; a later batch needs a reason). `Supplier DO received` sits at
+the top of the form because one Supplier DO normally covers the delivery; each line then states the
+quantity it covers. Exact-unit lines split by quantity only; Receiving verifies which Units arrive.
+The PO's `PO {n}-Day Delivery Date` (register column `PO Delivery Date`; `n` = the Settings value
+recorded on that PO at issue, never later Settings) never changes; every answer is append-only
+History with evidence, and the newest answer per line is the line's `Supplier Confirmed Delivery
+Date`. A supplier date answer creates no PO revision and no resend; changing quantity, goods or
+Deliver To is a PO change (new version), not an answer. Goods that arrive early without notice need
+no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
+Each batch derives its own day-before occurrence.
+
+**Answer evidence — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The answer form accepts
+photos, videos and PDF, several files per answer, through the shared Receiving uploader
+(`ArrivalEvidenceUploadField`) — never a second PO-only uploader; today's PO reply upload is
+JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot for a confirmation,
+date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
+Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
+
+**Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The eight reasons
+above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
+Material Shortage · Transport Delay · Waiting Customer Confirmation · Factory Closed · Other).
+`Waiting Customer Confirmation` is removed: it is not a supplier reason; customer waiting belongs to
+Sales `delay_planning`. Historical answers keep the reason they were recorded with; new answers
+cannot choose it.
+
+**Day-before occurrence wording (for Workspace, 2026-09-25):** fact `Confirm tomorrow's supplier
+delivery · {Supplier} · {date}`; action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO
+No}` (email channel: `Click Email, …`). Completion: a matching Supplier DO, or an evidenced
+confirmation for that exact date and Warehouse, recorded through `Record supplier answer`.
 
 One Office working day before the effective expected arrival,
 `purchasing.confirm_tomorrows_delivery` asks for either the **Supplier DO** or evidenced supplier
@@ -1380,6 +1469,8 @@ also has transit days.
 an input to this arithmetic — the SO Batch surface passes no review days to the planner at all, so
 `Order By` is calendar arithmetic alone and may legitimately land on a day POs are not sent (in the
 worked example above, a Saturday). It never becomes an unlock date and never delays a late line.
+`PO Days` does decide which days a PO window opens (owner correction 2026-09-25, §5.6.1); that
+is Work scheduling, not planning arithmetic.
 
 Timing classification, derived by the same engine:
 
@@ -2691,12 +2782,17 @@ own `Clear filters` are the shared listing standard's and are unchanged. No dupl
 a facet's number describes the whole register, never what another facet happens to have selected.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18.** Read-only
-ordered goods, exactly in order:
+**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
+owner-approved 2026-09-25 · NOT BUILT.** Read-only ordered goods, exactly in order:
 
 ```text
-Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items · Supplier Confirmed Delivery Date
 ```
+
+`Supplier Confirmed Delivery Date` (Jess, 2026-09-25) prints the line's newest supplier answer
+(§5.7 per-item answer): one date, or one row per batch as `{n} pcs · {date}` with `· Delayed` on a
+later batch; no answer reads `Not confirmed`. Read-only — the only write door is `Record supplier
+answer` on the PO. Its width comes from UI MASTER §6.8's registry.
 
 `PO No` is the first line of its cell and the associated Unit IDs sit underneath it in the same
 cell; item configuration sits beneath the item name. **The parent remains one row per PO** — a
@@ -4818,9 +4914,11 @@ Settings lives under the global header gear and requires authorised roles. It in
   `SalesOrderWorkspace` and `OperationOrdersControl` consume the shared Workspace Duty resolver;
   the Quick Rail reads the shared Work response. No caller may restore a direct `ops_po_duty`,
   cover-table read, page-local rota or compatibility response.
-- PO Days remain scheduling facts. They do not create reminders or `ops_tasks`; every order that
-  requires issue is already one structured `issue_po` Work projection, resolved to current PO Duty
-  and closed only by the owning order/purchase facts.
+- `PO Days` decides the days a PO window opens (owner correction 2026-09-25, §5.6.1); Jess sets
+  it to every Office working day. It creates no free-text reminder or `ops_tasks` row. **Target:** issue work is one Work occurrence per PO window
+  over the exact eligible demand, resolved to current PO Duty and closed only by the owning
+  order/purchase facts. The built per-Sales-Order `issue_po` projection is implementation evidence
+  that must converge onto the window occurrence, not the target.
 - approval limits and Manual Purchase purposes;
 - default `Supplier Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock

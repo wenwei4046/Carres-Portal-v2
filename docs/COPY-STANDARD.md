@@ -188,6 +188,8 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work communication controls (owner ruling 2026-09-17) | the owning module's own `Open WhatsApp group` · `Open WhatsApp` · `Copy message` in the right panel's `COMMUNICATION` section, labelled by the door the click opens | `Send` · `Sent` · `Message sent` · treating an opened WhatsApp or a copied message as sent evidence |
 | Work action sentences (owner ruling 2026-09-17; supplier correction 2026-09-24) | fact `Overdue delivery` · `Call {logistics}` over `Arrange a new delivery date` · `Ask {logistics}` over `Record the delivery result` · `Confirm tomorrow's supplier delivery` only one Office working day before the effective arrival · button `Record supplier answer` only on an admitted date-specific or exception action | `Date passed` · `Reschedule` · generic `Follow up supplier` · an immediate `Supplier has not confirmed the PO date` action after sending |
 | Purchasing arrival and delay words (owner ruling 2026-09-24) | `PO Delivery Date` for the immutable planned/default date · `Waiting for goods from supplier` after confirmed send · `Supplier DO` for the supplier's dispatch document · `Confirm tomorrow's supplier delivery` · `Confirmed for {date}` only with evidence · `Delayed · New expected date {date}` | `Supplier confirmed` for the calculated default date · `Delivery Order` when Supplier DO is meant · treating a WhatsApp screenshot or Supplier DO as Goods Received |
+| Purchasing supplier answer words (owner ruling 2026-09-25; Purchasing MASTER §5.7) | button `Record supplier answer` · top option `Supplier DO received` · per item `What changed?` with `No change` · `Confirmed` · `New date` (auto `Earlier` / `Delayed`) · `Split delivery` · `+ Add another date` · `Total {n} of {m}` · batch `{n} pcs · {date}` · `Evidence` · `Add a WhatsApp screenshot` · `Affects {SO No} · customer date {date}` · reasons `Production delay` · `Material unavailable` · `Capacity / scheduling delay` · `Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` · `Partial quantity ready` · `Other` · day-before action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` | `Part now, rest later` · `Waiting Customer Confirmation` · `Material Shortage` · `Factory Closed` · editing `PO {n}-Day Delivery Date` |
+| Purchasing PO window words (owner rulings 2026-09-25; Purchasing MASTER §5.6.1) | Work card, **owner choice 2026-09-25**: before issue `Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`; after issue `{k} POs issued · {x} not sent yet` / the earliest unsent PO's send line; reference `{time} PO window` · send lines `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to {Supplier}` · `Send {PO No} to {Supplier}` (no channel recorded) · permission `Only PO Duty can issue POs` · Settings `PO Days` · `First PO window` · `Second PO window` | `{time} PO window · {n} suppliers · {n} Sales Orders` · `Issue POs to {suppliers}` · `{n} of {m} POs · Sending not confirmed` as card lines · `Not marked as sent` · `then press PO sent to supplier` on the card · one card per Sales Order · `Supplier date missing` · treating an opened WhatsApp as sent |
 | Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
 | Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
 | Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
@@ -2021,7 +2023,9 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Stock Location` | Where a Unit actually stands today. Never the destination a purchase order instructs, and never the Sales Order's delivery address. |
 | `PO No / Ref No` | The stock picker's provenance cell: the document the goods came in on, with the `Unit ID` on its second line. Both print in full. Missing provenance reads `Not recorded`; it is never a reason to invent a PO. |
 
-Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date`, `Goods received on`.
+Retired labels for these same facts: `Supplier Delivery Date`, `Goods received on`. `PO Delivery
+Date` stays the column/register name; on a single-PO fact (PO page, PDF, answer form) it reads
+`PO {n}-Day Delivery Date` (clarified 2026-09-25 — this line previously listed it as retired).
 `Order By` remains an internal planning/detail fact, not the SO Batch/Manual Purchase parent column.
 `Expected Delivery Date` no longer merges default and confirmed dates in the PO register.
 
@@ -3394,6 +3398,37 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 **`Contact logistics today` is the owner's exact phrase** and is the one admitted use of `today` in
 an action line: it prints only on or after the check's own date, beside that date.
 
+## The complete Work right panel words — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT
+
+Workspace MASTER §5.10 owns composition, source boundaries, interaction and responsive law. This
+table freezes the new visible words; §5.9's Logistics vocabulary remains built and unchanged.
+
+| Meaning | Use exactly | Do not use |
+|---|---|---|
+| Layer order | selected work summary · `Order Route` · `Logistics` · `Customer` · `Supplier` · `Owner, timing and source` | duplicate task messages above every card · Journey · Steps |
+| Route points | `Proceed` · optional `Loan` · `PO` · `GRN` · `Contact` · `Delivery` | Stock received as a second GRN point · permanent Payment/Logistics circles |
+| Route progress | `{n} of {total}` · `{n} of {total} confirmed` · `Scheduled delivery · {date}` · `Delivered · {date}` | repeating `1 pending` beside equivalent progress |
+| Customer collapsed states | `{company} contacts the customer · by {date}` · `Scheduled {date}` · `Customer requested another date · {date}` · `Customer refused delivery` · `Phone number is wrong` · `Delivery delayed · customer notice required` | routine Carres `Contact due today` · routine `Waiting for customer` · Customer confirmed |
+| Customer normal state | read-only partner contact/deadline/result from Delivery; no Carres action | a routine Carres date-agreement checklist · `Accepted date` as a second scheduling workflow |
+| Customer exception actions | `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` | routine Carres scheduling · Follow up (alone) |
+| Supplier mission progress | `{n} of {total} POs issued` · `{n} of {total} dates ready` · `{n} of {total} received` · `{n} delayed` · `No purchase order for this Sales Order` | supplier names/PO numbers/owner in the collapsed group summary |
+| Supplier states | `PO not issued` · `Expected` · `Confirmation needed` · `Delayed` · `Arriving today` · `Received` · `Short received` | Ready without the exact fact · Stock received |
+| Supplier follow-up | `Confirmation needed today` · `Waiting for supplier` · `Arrival missed · Follow up supplier` · `Record supplier delay` | default-date confirmation immediately after PO issue |
+| Communication receipt | `Record as sent` · `Not sent` · `Waiting for customer` · `Waiting for supplier` · `No answer · Follow up today` | treating Copy/Open WhatsApp as sent or complete |
+| Missing contact | `WhatsApp unavailable · No phone number` · `Open customer record` (equivalent exact party door) | unexplained disabled control |
+| Refresh failure | `Some information could not be refreshed.` · `Try again` while the last good mission stays visible | replacing the mission with a generic error |
+| No selection / missing order | `Select a work item` · `Choose an item from the Work list to see its mission.` · `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` | empty fake Route · guessed `Logistics not assigned` |
+| Customer stored-result and partner lines | `Customer refused delivery` · `Phone number is wrong` · `Customer requested another date` · `{company} contacts the customer · by {date}` · `{company} contacts the customer.` · `Logistics not assigned` · `Delivered · {date}` · `No email recorded` · `No phone recorded` · `No contact recorded yet` | a guessed reply · a Carres calling line |
+| Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
+| Customer card sections | `Current action` · `Delivery` · `Partner contact` · `Contact by` · `Latest result` · `Open in Delivery` · `Exception` · `Evidence and communication history` · `Name not recorded` · `WhatsApp reply · 1 photo` · `In person` | Record reply · Accepted date |
+| Customer communication preview | only for a governed Carres exception or ERP-ARCHITECTURE §6.5 outstation release: `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
+| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · RM {amount} to collect by {date}` · `Payment · Finance is holding this delivery` | Blocked · a Payment circle |
+| Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
+| Customer exception doors | `Open Sales Order` (a known delay · a wrong phone number) · `Open in Delivery` (another date · a refusal) | a Work form |
+| Customer card read failure | `Customer contact unavailable` + `Open Sales Order` | a guessed partner state |
+| Supplier row labels | `PO Delivery Date` (the original, never changes) · ⭐ `Expected arrival` (the supplier's newest promised date) · `From stock · {ready} of {total} ready` · `No purchase order for this Sales Order · {n} items need one` · `{n} items need a PO` · `Open Sales Order` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Not needed yet` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Message copied` · `The message could not be copied. Try again.` · `Supplier details could not be loaded.` · `Try again` | Stock received · `Latest date` |
+| Permission | `You cannot view this record` · `Ask an authorised operation user for access.` | leaked party or money facts |
+
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.
@@ -4314,3 +4349,44 @@ Database sentences (shown as written):
 ### Sales Order existing-reference revisions and delivery Activity
 
 SO revision records display `<existing reference>(n)` with no space; the current version appends ` · Current`. Preserve the saved base reference and historical issued documents. Parenthesized revisions are presentation, not a new allocated number. Delivery Activity names `confirmed_date` as **Confirmed date**, `confirmed_time_slot` as **Confirmed time**, and `confirmed_partner` as **Logistics**; stored events remain unchanged.
+
+## APPROVED by YH on 25 Sep 2026, as written · Chart of accounts: any move between headings of the same kind (0580)
+
+YH's rulings of 24 Sep 2026: a drag works for every move between headings of the same kind; the last
+account under a heading may leave it, and the emptied heading stays a heading (bold, never posted to,
+never offered in an account picker, still takes accounts); an account that is not a bank or cash
+account never goes under the money accounts heading or a heading inside it, while a bank or cash
+account still moves out and back in. Rule headings stay locked, a heading never goes under itself or
+a heading inside it, and the staleness check stays.
+
+New database sentences (the screen prints them as written):
+
+| Word | Meaning |
+|---|---|
+| `{code} {name} is not a bank or cash account. Only bank and cash accounts go under {code} {name}.` | An account with no bank or cash row, moved under the money accounts heading or a heading inside it. The second `{code} {name}` is the money accounts heading. Tag `move_into_money_heading`. |
+| `{code} {name} holds {code} {name}, which is not a bank or cash account. Only bank and cash accounts go under {code} {name}.` | The same for a heading: it names the first account under it (by number) that is not a bank or cash account. A heading holding only bank and cash accounts, or nothing, may go in. |
+
+Retired by 0580 (never raised again, so never on screen):
+
+- `{code} {name} is the last account under {code} {name}. Move another account under that heading first.`
+  (approved 23 Sep, tag `move_last_child`). The last account may now leave; its heading stays a heading.
+
+Same words, new meaning:
+
+- `Move under {code} {name}`: the row menu now also lists a heading with nothing under it, and no longer
+  leaves out the heading when the account is the last one under its own heading. It lists the money
+  accounts heading, or a heading inside it, only for a bank or cash account, or for a heading that holds
+  nothing else.
+- `{code} {name} is not a heading. Move the account under a heading.` and
+  `{code} {name} is not a heading. Add the account under a heading.`: "a heading" is now the stored flag,
+  so a heading whose last account left is still a heading and takes a move or an add.
+- `Account {code} {name} is a group heading. Pick an account under it.` and
+  `{code} {name} is a heading. Choose one of the accounts under it.`: now also said for a heading with
+  nothing under it. The pickers never offer one, so a person meets these only from a form opened before
+  the heading was emptied.
+- Balance Sheet and Profit and Loss: a heading with nothing printed under it prints no line, not a `0.00`
+  line. This also covers a heading whose accounts are all retired and have never moved.
+
+Not screen words (a direct database change only, never raised by a screen): the flag guards
+`account {code} has accounts under it and stays a heading` and
+`account {code} has {n} posted line(s) and cannot become a header`.

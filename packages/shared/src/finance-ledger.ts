@@ -75,7 +75,9 @@ export interface LedgerAccount {
   is_control: boolean;
   control_for: string | null;
   is_active: boolean;
-  /** A header groups other accounts and can never be posted to (0461, 0468). */
+  /** A header groups other accounts and can never be posted to (0461, 0468).
+   *  Stored since 0580 (gl_accounts.is_heading), so it stays a header when its
+   *  last account leaves. */
   is_header: boolean;
   /** Where Finance dragged it among the accounts under the same parent (0557).
    *  Ties break on code, so 0 everywhere reads exactly as by-code order. It is
@@ -125,6 +127,36 @@ export interface TrialBalanceAccountRow {
   total_credit: number;
   /** Debits minus credits for asset and expense, credits minus debits otherwise (0465). */
   natural_balance: number;
+  /** The heading this account prints under: its parent, or itself when it
+   *  sits at the top of the chart. The same rule as the Balance Sheet (0579). */
+  header_code: string;
+  /** Its place in the chart's order, counted together with the headings'
+   *  places, so an account and a heading beside it sort as the chart lists them. */
+  chart_position: number;
+}
+
+/** One heading and its own subtotal: every account under it, at any depth,
+ *  counted once. */
+export interface TrialBalanceHeadingRow {
+  code: string;
+  name: string;
+  kind: string;
+  /** 1 at the top of the chart. */
+  depth: number;
+  /** The heading this one sits under; null at the top. */
+  parent_code: string | null;
+  /** Its place in the chart's order, counted together with the accounts' places. */
+  chart_position: number;
+  /** The Debit column and the Credit column of the accounts under it, added up. */
+  debit: number;
+  credit: number;
+}
+
+/** Where an account's balance sits on the Trial Balance: a debit balance in
+ *  Debit, a credit balance in Credit, whatever the account's kind. */
+export function trialBalanceSides(r: { total_debit: number; total_credit: number }): { debit: number; credit: number } {
+  const net = Math.round((r.total_debit - r.total_credit) * 100) / 100;
+  return { debit: Math.max(net, 0), credit: Math.max(-net, 0) };
 }
 
 export interface TrialBalanceReport {
@@ -132,7 +164,11 @@ export interface TrialBalanceReport {
   status: "ok" | "before_go_live";
   go_live_on: string;
   as_of: string;
+  /** In the ledger's own order, as before headings were sent. A heading is
+   *  left out unless something was posted to it. */
   accounts: TrialBalanceAccountRow[];
+  /** Every heading at every depth, in the chart's order. */
+  headings: TrialBalanceHeadingRow[];
   total_debit: number | null;
   total_credit: number | null;
   difference: number | null;

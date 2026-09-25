@@ -22,19 +22,23 @@ export const BS_SECTIONS = ["ASSET", "LIABILITY", "EQUITY"] as const;
  *  what the Balance Sheet moved onto (plus) or off (minus) this line from
  *  money paid before its document (0506, 0507); the move is already inside
  *  `amount`. `reclassifiedFor` is whose money that was, as the database says.
- *  Both null when nothing was moved, or before 0506 is applied. */
+ *  Both null when nothing was moved, or before 0506 is applied.
+ *  `ordinal` is its place in the chart: the database's row number. */
 export interface StatementLine {
   code: string;
   name: string | null;
   amount: number;
   reclassified: number | null;
   reclassifiedFor: "CUSTOMER" | "SUPPLIER" | null;
+  ordinal: number;
 }
 
 /** The accounts under one chart header, and the subtotal the ledger served.
  *  The subtotal counts every account under the header at any depth (0579).
  *  `depth` is 1 at the top; `parentCode` is the header this one sits under.
- *  Rows served before 0579 carry neither, and read as depth 1, no parent. */
+ *  Rows served before 0579 carry neither, and read as depth 1, no parent.
+ *  `ordinal` is the row number of its subtotal, which the database serves
+ *  right after everything under the header, in the chart's order. */
 export interface StatementGroup {
   code: string;
   name: string | null;
@@ -42,6 +46,7 @@ export interface StatementGroup {
   lines: StatementLine[];
   depth: number;
   parentCode: string | null;
+  ordinal: number;
 }
 
 /** Income, Expense, Asset, Liability or Equity, with its served total.
@@ -155,7 +160,7 @@ function inOrder(rows: Raw[], bad: Fail): Raw[] {
 interface Draft {
   kind: string;
   total: number | null;
-  groups: Map<string, { code: string; name: string | null; subtotal: number | null; lines: StatementLine[]; depth: number; parentCode: string | null }>;
+  groups: Map<string, { code: string; name: string | null; subtotal: number | null; lines: StatementLine[]; depth: number; parentCode: string | null; ordinal: number }>;
   /** Header codes in the order their subtotal rows were served: the chart's order. */
   subtotalOrder: string[];
   unclosedResult: number | null;
@@ -191,7 +196,7 @@ function readBody(
     const hdr = code(r.header_code, bad);
     let g = d.groups.get(hdr);
     if (!g) {
-      g = { code: hdr, name: nameOf(r.header_name, bad), subtotal: null, lines: [], depth: 1, parentCode: null };
+      g = { code: hdr, name: nameOf(r.header_name, bad), subtotal: null, lines: [], depth: 1, parentCode: null, ordinal: 0 };
       d.groups.set(hdr, g);
     }
     return g;
@@ -209,6 +214,7 @@ function readBody(
           amount: money(r.amount, bad),
           reclassified,
           reclassifiedFor: movedFor(r, reclassified, bad),
+          ordinal: r.ordinal as number,
         });
         break;
       }
@@ -219,6 +225,7 @@ function readBody(
         g.subtotal = money(r.amount, bad);
         g.depth = headerDepth(r.header_depth, bad);
         g.parentCode = r.parent_header_code === undefined || r.parent_header_code === null ? null : code(r.parent_header_code, bad);
+        g.ordinal = r.ordinal as number;
         d.subtotalOrder.push(g.code);
         break;
       }
@@ -251,7 +258,7 @@ function readBody(
     for (const c of d.subtotalOrder) {
       const g = d.groups.get(c)!;
       if (g.subtotal === null) throw bad();
-      groups.push({ code: g.code, name: g.name, subtotal: g.subtotal, lines: g.lines, depth: g.depth, parentCode: g.parentCode });
+      groups.push({ code: g.code, name: g.name, subtotal: g.subtotal, lines: g.lines, depth: g.depth, parentCode: g.parentCode, ordinal: g.ordinal });
     }
     if (groups.length !== d.groups.size) throw bad();
     sections.push({ kind: d.kind, total: d.total, groups, unclosedResult: d.unclosedResult });

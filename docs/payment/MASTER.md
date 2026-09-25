@@ -259,6 +259,12 @@ Delivery** (the customer's delivery date). Its ask day follows the same n > m ru
 ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
 
 Editable by authorised Manager permission; asking must start earlier than the deadline (n > m).
+
+**The Work right panel reads this clock (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10):**
+the Order Route's one payment line `Payment · RM {amount} to collect by {deadline}` and the Logistics
+card's day-before money gap use the same deadline (`paymentDeadlineOf`, `packages/shared`). Payment is
+never a route point and never `Blocked`. **Gap:** both still use the ruled default m = 2 (3 outstation)
+rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
 existing clock keeps its snapshot by construction and a new rule affects only new clocks from its

@@ -361,13 +361,21 @@ or opened message is never reply evidence. **BUILT 2026-09-13 (CARD 11, 0487
 `ops_delivery_contacts`)**: the one Worker door writes the record; the arrangement save that
 carries `Information received from` records the contact in the same request.
 
-### 5.2 · The contact deadline
+### 5.2 · Who contacts the customer, and the contact deadline
 
-Logistics contacts the customer at least THREE working days before `Requested Delivery Date`,
-whether or not the goods are in. The deadline is the shared `chase` step (`deliveryStepDueIso`,
-lead `logistics_call_working_days` = 3 since 0342, on the Mon–Sat delivery week with Malaysian
-public holidays), read by the Orders list, the booking brief and Monitor alike. A customer who
-has named no day has no deadline and is never late. A late contact keeps the deadline it missed.
+**The assigned Logistics company contacts the customer and agrees the date** (owner correction
+2026-09-25, Workspace §5.10). Operation may record the company's facts on its behalf (§2); the
+provenance stays the company's. Carres contacts the customer only for the Workspace §5.10 exceptions
+(a known delay, a company-recorded `Requested Another Date` or `Customer Refused Delivery`, wrong
+contact details) and the separate outstation release (ERP-ARCH §6.5). `customer_contact_by` (0488)
+informs the Monitor ladder only.
+
+**The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
+a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
+Requested date) on the Mon–Sat delivery week with Malaysian public holidays. The `3 working days
+before` check is the company-has-the-details step. The Route's `Contact` point and the Customer card
+read the same check. **Two contact days — owner ruling 2026-09-25 (keep both):** `3 working days before` the promised date (Orders Card 3 `T−3`, the `chase` lead) is the day the customer is contacted — the Delivery work list, Monitor and the booking brief; `2 working days before` is the deadline by which the Scheduled delivery must be recorded — Work, the Route and the Logistics card (Workspace §5.9 item 8). A customer who has named no day has no deadline and is
+never late. A late contact keeps the deadline it missed.
 
 ### 5.3 · Backward planning — Delivery owns the ONE calculation
 

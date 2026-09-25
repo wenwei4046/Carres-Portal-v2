@@ -715,6 +715,21 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     expect(contact.channel).toBe("call");
   });
 
+  it("a DATE without a time is an agreement — the contact records Confirmed, not another date", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: { ...savedArrangement, confirmed_date: "2026-09-24", confirmed_time: null, reply_proof_path: null } },
+      { data: { id: "c-3" } },
+    ]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-24", informationReceivedFrom: "customer" });
+    expect(res.status).toBe(200);
+    const contact = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(contact.contacted_person).toBe("customer");
+    expect(contact.result_key).toBe("confirmed");
+  });
+
   it("no `Information received from` — no contact is invented", async () => {
     const { inserts } = mockSb([
       { data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: true } },

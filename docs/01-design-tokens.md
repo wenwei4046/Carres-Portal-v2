@@ -39,9 +39,10 @@ does not exist.
 
 ## 1 · Typography
 
-Six tokens. A seventh does not exist and does not compile — each is one
+Seven tokens. An eighth does not exist and does not compile — each is one
 Tailwind `fontSize` entry carrying size + weight + line-height in ONE class, so
-a seventh cannot be written without editing the config.
+an eighth cannot be written without editing the config. The seventh, `control`,
+is the owner's Work toolbar ruling of 2026-09-25.
 
 | Token | Class | Size | Weight | Line | Use |
 |---|---|---:|---:|---:|---|
@@ -51,6 +52,7 @@ a seventh cannot be written without editing the config.
 | body | `text-body` | 13 | 400 | 18 | default — table rows, prose, buttons |
 | meta | `text-meta` | 12 | 400 | 16 | secondary info, captions, timestamps |
 | label | `text-label` | 11 | 500 | 14 | field labels, micro-labels, pill text |
+| control | `text-control` | 14 | 400 | 20 | workspace toolbar controls (Work) — 36px tall, 40px below 960px |
 
 **Weights: 400 · 500 · 600. There is no 700.** Frozen by Jess 2026-07-28 —
 600 and 700 were doing the same job at every size. A kit file writing
@@ -112,7 +114,7 @@ no existing step moved.
 
 ### 2.1.1 · The Work palette — owner correction 2026-09-24, BUILT (Work page only)
 
-The Work shell and its 124px cards carry six page-scoped steps the owner specified by value. They
+The Work shell and its 104px cards carry six page-scoped steps the owner specified by value. They
 live ONLY in `index.css` (`--work-*`) and `tailwind.config.ts` (`colors.work.*`), are used only
 under `pages/operation/work/**` and `OperationWork.tsx`, and never replace a kit step elsewhere.
 
@@ -181,7 +183,7 @@ own declaration, so a drift back to blue fails the suite.
 |---:|---|---|
 | 4 | `rounded-pill` | **checkbox** |
 | 6 | `rounded-control` | button · input · dropdown |
-| 9 | `rounded-work` | the Work page's sections and 124px cards only (owner correction 2026-09-24) |
+| 9 | `rounded-work` | the Work page's sections and 104px cards only (owner correction 2026-09-24; density 2026-09-25) |
 | 10 | `rounded-card` | card · panel · modal · drawer |
 | — | `rounded-full` | **pill · small tag** · avatar · status dot |
 
@@ -336,8 +338,9 @@ test proves nothing.
 Approved business vocabulary only; a word that has not been ruled may not appear
 on a screen. The dictionary is `docs/COPY-STANDARD.md`.
 
-**Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` · `Scheduled` ·
-`Appointment Pending` · `Booking Pending` · `POD`.
+**Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` ·
+`Appointment Pending` · `Booking Pending` · `POD`. (`Scheduled` is the customer-leg delivery word
+since the owner ruling of 2026-09-24 — COPY-STANDARD.)
 
 A banned DISPLAY word may still exist as a database or API value where
 compatibility requires it. Never rename a stored value silently — the screen

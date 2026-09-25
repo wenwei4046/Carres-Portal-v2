@@ -28,6 +28,7 @@ with #1205's text. The known-failing list is
 | `0463_customer_money_reaches_the_ledger` | **bug** | Compares `pg_get_function_identity_arguments()`, which includes argument names, with a types-only string. | Failed in production 2026-09-10. Fixed by #1205. |
 | `0466_an_invoice_is_where_revenue_is_recognised` | **bug** | Same mistake. | Fixed by #1205 before it was applied. |
 | `0149_rename_ohana_hookka` | **production data** | Renames supplier `…e1` from Ohana to HoOKkA, then asserts no "Ohana" row exists. `0134` inserts a separate Ohana row, and `0134` was applied to production in 12 hand-split chunks (`docs/archive/phase-10-worklog.md:1294`). Production's exact state then is unknowable from the repo. | Yes. |
+| `0561_the_voucher_line_guard_survives_a_rebuild` (added 2026-09-25) | **bug: cannot parse** | No `;` after the function's closing `$function$` (around line 265), so the `do $sanity$` check after it is read as part of the same statement: syntax error at or near "do". | Yes. Its function is live. Red line 6 keeps the file as it is. |
 
 ## Files that pass only because of a fixture
 

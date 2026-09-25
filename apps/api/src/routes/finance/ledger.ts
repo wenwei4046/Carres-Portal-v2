@@ -33,7 +33,11 @@ import {
   type RentalCheck,
   type RentalMonthUnposted,
   type SupplierDifference,
+  type TrialBalanceAccountRow,
+  type TrialBalanceHeadingRow,
   type TrialBalanceReport,
+  chartTree,
+  trialBalanceSides,
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { requireFinance } from "../../lib/auth-guards";
@@ -66,7 +70,8 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *                           0570, headings since 0577) — writes parent and order; never the number or the name.
  *   POST  /accounts         add an account under a heading, or a heading with its first
  *                           account (gl_account_add, 0577). The kind follows the heading.
- *   GET /trial-balance      every account as it stood at the end of a day
+ *   GET /trial-balance      every account as it stood at the end of a day, and every
+ *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
  *   GET /self-check         books · control accounts · receivables · payables · rental months · health
@@ -343,8 +348,10 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
   const [accounts, config] = await Promise.all([
     // 0557: the order Finance dragged, then the code. sort_order is 0 on every
     // account nobody has dragged, so the tiebreak keeps the by-code order.
+    // "*" so the chart still reads in the minutes between the deploy and
+    // 0580's SQL, when is_heading is not there yet.
     sb.from("gl_accounts")
-      .select("code,name,kind,parent_code,is_control,control_for,is_active,sort_order")
+      .select("*")
       .order("sort_order", { ascending: true })
       .order("code", { ascending: true }),
     sb.from("gl_config").select("go_live_on").limit(1).maybeSingle(),
@@ -352,8 +359,9 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
   if (accounts.error) return { error: accounts.error };
   if (config.error) return { error: config.error };
   const rows = (accounts.data ?? []) as Json[];
-  // A header is derived, never declared (0461): any account another row names
-  // as its parent.
+  // 0580: a heading is stored (is_heading), so a heading whose last account
+  // left is still a heading. Before 0580 is applied: any account another row
+  // names as its parent.
   const parents = new Set(rows.map((r) => r.parent_code).filter((p): p is string => typeof p === "string"));
   return {
     chart: {
@@ -366,7 +374,7 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
         is_control: r.is_control === true,
         control_for: (r.control_for as string | null) ?? null,
         is_active: r.is_active === true,
-        is_header: parents.has(String(r.code)),
+        is_header: typeof r.is_heading === "boolean" ? r.is_heading : parents.has(String(r.code)),
         sort_order: Number(r.sort_order ?? 0),
       })),
     },
@@ -523,6 +531,64 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
 
 // ── the trial balance ────────────────────────────────────────────────────────
 
+/**
+ * The trial balance's accounts, and every heading with its own subtotal at
+ * every depth. The rule is the Balance Sheet's (0579): a heading is an
+ * account with accounts under it, or one at the top of the chart; an account
+ * prints under its parent, a top one under itself. A heading prints as an
+ * account only if something was posted to it, which 0468 refuses. A heading's
+ * Debit and Credit are the Debit and Credit columns of every account under
+ * it, each counted once.
+ *
+ * The accounts stay in the ledger's own order, as the page has always had
+ * them. Each account and each heading carries its place in the chart's order
+ * (`chart_position`), counted in one sequence, so the page can print the
+ * accounts and sub-headings under a heading mixed the way the chart lists them.
+ *
+ * Null when an account the ledger totalled is not in the chart: a report
+ * that would lose a row is refused, never printed short.
+ */
+function trialBalanceTree(rows: Json[], chart: LedgerAccount[]): Pick<TrialBalanceReport, "accounts" | "headings"> | null {
+  const tree = chartTree(chart);
+  const byCode = new Map(tree.map((a, i) => [a.code, { ...a, position: i + 1 }]));
+  if (rows.some((r) => !byCode.has(String(r.account_code)))) return null;
+  const parentOf = new Map(tree.map((a) => [a.code, a.depth === 0 ? null : a.parent_code]));
+  const headings = new Map<string, TrialBalanceHeadingRow>();
+  for (const a of tree.filter((x) => x.is_header || x.depth === 0)) {
+    headings.set(a.code, {
+      code: a.code, name: a.name, kind: a.kind, depth: a.depth + 1,
+      parent_code: parentOf.get(a.code) ?? null, chart_position: byCode.get(a.code)!.position, debit: 0, credit: 0,
+    });
+  }
+  const accounts: TrialBalanceAccountRow[] = [];
+  for (const r of rows) {
+    const a = byCode.get(String(r.account_code))!;
+    const row: TrialBalanceAccountRow = {
+      account_code: a.code,
+      account_name: String(r.account_name),
+      kind: String(r.kind),
+      is_control: r.is_control === true,
+      is_active: r.is_active === true,
+      total_debit: num(r.total_debit),
+      total_credit: num(r.total_credit),
+      natural_balance: num(r.natural_balance),
+      header_code: headings.has(a.code) ? a.code : a.parent_code!,
+      chart_position: a.position,
+    };
+    if (a.is_header && isZeroMoney(row.total_debit) && isZeroMoney(row.total_credit)) continue;
+    accounts.push(row);
+    const side = trialBalanceSides(row);
+    for (let c: string | null | undefined = row.header_code; c; c = parentOf.get(c)) {
+      const h = headings.get(c);
+      if (h) {
+        h.debit = cents(h.debit + side.debit);
+        h.credit = cents(h.credit + side.credit);
+      }
+    }
+  }
+  return { accounts, headings: [...headings.values()] };
+}
+
 financeLedgerRouter.get("/trial-balance", requireFinance, async (c) => {
   const parsed = ledgerAsOfQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
@@ -540,31 +606,19 @@ financeLedgerRouter.get("/trial-balance", requireFinance, async (c) => {
   if (first.report_status === "BEFORE_GO_LIVE") {
     const report: TrialBalanceReport = {
       status: "before_go_live", go_live_on: String(first.go_live_on), as_of: String(first.as_of),
-      accounts: [], total_debit: null, total_credit: null, difference: null, balances: null,
+      accounts: [], headings: [], total_debit: null, total_credit: null, difference: null, balances: null,
     };
     return c.json(report);
   }
   const total = rows.find((r) => r.row_kind === "TOTAL");
   if (!total) return failed(c, "The trial balance");
-  // Headers can never be posted to (0468), so their rows are always zero and
-  // only repeat what the kind grouping already says.
-  const headers = new Set(chart.chart.accounts.filter((a) => a.is_header).map((a) => a.code));
+  const tree = trialBalanceTree(rows.filter((r) => r.row_kind === "ACCOUNT"), chart.chart.accounts);
+  if (!tree) return failed(c, "The trial balance");
   const report: TrialBalanceReport = {
     status: "ok",
     go_live_on: String(first.go_live_on),
     as_of: String(first.as_of),
-    accounts: rows
-      .filter((r) => r.row_kind === "ACCOUNT" && !headers.has(String(r.account_code)))
-      .map((r) => ({
-        account_code: String(r.account_code),
-        account_name: String(r.account_name),
-        kind: String(r.kind),
-        is_control: r.is_control === true,
-        is_active: r.is_active === true,
-        total_debit: num(r.total_debit),
-        total_credit: num(r.total_credit),
-        natural_balance: num(r.natural_balance),
-      })),
+    ...tree,
     total_debit: num(total.total_debit),
     total_credit: num(total.total_credit),
     difference: cents(num(total.total_debit) - num(total.total_credit)),

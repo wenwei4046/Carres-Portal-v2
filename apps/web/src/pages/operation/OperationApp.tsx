@@ -406,6 +406,10 @@ export default function OperationApp() {
           tab !== "warehouse-inbound" &&
           tab !== "warehouse-outbound" &&
           tab !== "arrival-source" &&
+          /* WORK — its one-row workspace header carries TopBarIcons (density
+             ruling 2026-09-25); the slim bar was a second 44px top row that
+             pushed the 743×704 detail below the fold. */
+          tab !== "work" &&
           !isStockUnitUrl && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${

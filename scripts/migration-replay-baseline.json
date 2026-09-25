@@ -4,6 +4,5 @@
   "0339_one_purchase_order_creation_authority.sql",
   "0398a_the_five_purposes_a_purchase_may_serve.sql",
   "0453_a_quantity_row_is_keyed_not_identified.sql",
-  "0463_customer_money_reaches_the_ledger.sql",
-  "0466_an_invoice_is_where_revenue_is_recognised.sql"
+  "0561_the_voucher_line_guard_survives_a_rebuild.sql"
 ]

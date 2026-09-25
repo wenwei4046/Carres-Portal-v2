@@ -7107,6 +7107,22 @@ export function useLogisticsCardFacts(orderId: string | null, leg = 0) {
   });
 }
 
+/**
+ * THE SUPPLIER CARD'S FACTS — Purchasing's POs serving one Sales Order
+ * (owner approval 2026-09-25, Workspace §5.9). Read-only.
+ */
+export function useSupplierCardFacts(orderId: string | null) {
+  return useQuery<{ purchaseOrders: import("@carres/shared").SupplierPoFact[] }, ApiError>({
+    queryKey: ["operation", "pos", "for-order", orderId ?? ""],
+    queryFn: () =>
+      apiFetch<{ purchaseOrders: import("@carres/shared").SupplierPoFact[] }>(
+        `/api/operation/pos/for-order/${encodeURIComponent(orderId ?? "")}`,
+      ),
+    enabled: Boolean(orderId),
+    staleTime: 30_000,
+  });
+}
+
 /** Create link · Revoke link (0581). Two explicit acts: a new link is only
  *  ever created after the old one is revoked. */
 export function useDeliveryLinkActs(orderId: string | null, leg = 0) {

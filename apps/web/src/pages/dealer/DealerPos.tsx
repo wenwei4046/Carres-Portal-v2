@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, Menu, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CreateOrderInput,
@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { useStaffSession } from "@/lib/staff";
 import StaffManagePage from "./staff/StaffManagePage";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
+import { staffColorHex, staffInitials } from "./staff/staff-ui";
 import {
   useBdDealers,
   useCancelOrder,
@@ -1004,6 +1005,12 @@ export default function DealerPos({
     onExit();
   }
 
+  function handleLogoHome() {
+    if (submitted || rentalDone) startAnotherOrder();
+    else if (step !== 1) setStep(1);
+    else onExit?.();
+  }
+
   const outletName = draft.outletId
     ? outlets.find((o) => o.id === draft.outletId)?.name
     : undefined;
@@ -1028,7 +1035,7 @@ export default function DealerPos({
       style={{ background: "var(--pos-bg)" }}
     >
       {/* Top bar — prototype .pos-topbar (Loo's Claude Design 2026-07-04). */}
-      <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
+      <header className="pos-topbar pos-topbar--desktop" style={{ height: 56, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
           {/* Loo 2026-07-26 — the logo is the "home" button: back to the
               catalog. Mid-wizard it just returns to step 1 (draft kept, same
@@ -1038,18 +1045,7 @@ export default function DealerPos({
           <button
             type="button"
             className="pos-wordmark"
-            onClick={() => {
-              // Three states, and the third one had no branch at all: sitting on
-              // step 1 with nothing submitted, this handler ran no statement and
-              // the logo was a live, focusable, silent button. An operator who
-              // clicks a dead control twice stops trying it on the screens where
-              // it DOES work, so the meaning is now total: finished → next sale,
-              // mid-wizard → back to the catalog, already at the catalog → leave
-              // POS through the door the shell already owns.
-              if (submitted || rentalDone) startAnotherOrder();
-              else if (step !== 1) setStep(1);
-              else onExit?.();
-            }}
+            onClick={handleLogoHome}
             aria-label="Back to catalog"
             data-testid="pos-logo-home"
           >
@@ -1195,6 +1191,181 @@ export default function DealerPos({
             <LogOut size={18} strokeWidth={1.75} />
           </button>
         </div>
+      </header>
+
+      {/* Phone-only top bar. The disabled menu button reserves Day 5's stable
+          category-drawer trigger; the existing catalog FAB remains the only
+          phone cart entrance until it becomes Day 8's sticky cart bar. */}
+      <header className={`pos-mobile-topbar hidden${submitted ? " is-complete" : ""}`}>
+        <div className="pos-mobile-topbar__main">
+          <button
+            type="button"
+            className="pos-mobile-topbar__icon"
+            aria-label="Categories menu unavailable"
+            disabled
+          >
+            <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="pos-wordmark pos-mobile-topbar__wordmark"
+            onClick={handleLogoHome}
+            aria-label="Back to catalog"
+          >
+            CARRES
+          </button>
+
+          <span className="pos-topbar__crumb pos-mobile-topbar__context">
+            POS · {contextLabel}
+          </span>
+
+          {staffMember ? (
+            <button
+              type="button"
+              className="pos-mobile-topbar__avatar"
+              onClick={clearStaffToken}
+              aria-label={`Switch staff. Current staff: ${staffMember.name}`}
+            >
+              <span
+                className="pos-staff-chip__avatar"
+                style={{ background: staffColorHex(staffMember.color) }}
+                aria-hidden="true"
+              >
+                {staffInitials(staffMember.name)}
+              </span>
+            </button>
+          ) : (
+            <Link
+              to="/me"
+              className="pos-mobile-topbar__avatar"
+              aria-label="Open profile"
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">
+                {initials}
+              </span>
+            </Link>
+          )}
+        </div>
+
+        {!submitted && (
+          <nav className="pos-mobile-topbar__steps" aria-label="Order steps">
+            {STEPS.map((s) => {
+              const clickable = s.n < step;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => clickable && setStep(s.n)}
+                  disabled={!clickable && s.n !== step}
+                  aria-current={step === s.n ? "step" : undefined}
+                  className={`pos-mobile-topbar__step ${step === s.n ? "is-active" : ""}`}
+                >
+                  <span className="pos-mobile-topbar__step-pill">
+                    <span className="pos-mobile-topbar__step-number">{s.n}</span>
+                    {s.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
+      </header>
+
+      {/* Tablet portrait gets the same compact hierarchy as phone, with a
+          count-only cart shortcut. It stays a separate header so neither the
+          phone nor the >=1024px desktop composition needs to change. */}
+      <header className={`pos-tablet-topbar hidden${submitted ? " is-complete" : ""}`}>
+        <div className="pos-tablet-topbar__main">
+          <button
+            type="button"
+            className="pos-tablet-topbar__icon"
+            aria-label="Categories menu unavailable"
+            disabled
+          >
+            <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="pos-wordmark pos-tablet-topbar__wordmark"
+            onClick={handleLogoHome}
+            aria-label="Back to catalog"
+          >
+            CARRES
+          </button>
+
+          <span className="pos-topbar__crumb pos-tablet-topbar__context">
+            POS · {contextLabel}
+          </span>
+
+          {!submitted && itemCount > 0 && (
+            <button
+              type="button"
+              className="pos-tablet-topbar__cart"
+              onClick={() => {
+                setStep(1);
+                setCartOpen(true);
+              }}
+              aria-label={`Open cart, ${itemCount} item${itemCount === 1 ? "" : "s"}`}
+            >
+              <ShoppingBag size={18} strokeWidth={1.75} aria-hidden="true" />
+              <span className="pos-tablet-topbar__cart-badge" aria-hidden="true">
+                {itemCount}
+              </span>
+            </button>
+          )}
+
+          {staffMember ? (
+            <button
+              type="button"
+              className="pos-tablet-topbar__avatar"
+              onClick={clearStaffToken}
+              aria-label={`Switch staff. Current staff: ${staffMember.name}`}
+            >
+              <span
+                className="pos-staff-chip__avatar"
+                style={{ background: staffColorHex(staffMember.color) }}
+                aria-hidden="true"
+              >
+                {staffInitials(staffMember.name)}
+              </span>
+            </button>
+          ) : (
+            <Link
+              to="/me"
+              className="pos-tablet-topbar__avatar"
+              aria-label="Open profile"
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">
+                {initials}
+              </span>
+            </Link>
+          )}
+        </div>
+
+        {!submitted && (
+          <nav className="pos-tablet-topbar__steps" aria-label="Order steps">
+            {STEPS.map((s) => {
+              const clickable = s.n < step;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => clickable && setStep(s.n)}
+                  disabled={!clickable && s.n !== step}
+                  aria-current={step === s.n ? "step" : undefined}
+                  className={`pos-tablet-topbar__step ${step === s.n ? "is-active" : ""}`}
+                >
+                  <span className="pos-tablet-topbar__step-pill">
+                    <span className="pos-tablet-topbar__step-number">{s.n}</span>
+                    {s.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
       </header>
 
       {/* No resume banner (Loo 2026-07-11): an unsaved draft silently restores

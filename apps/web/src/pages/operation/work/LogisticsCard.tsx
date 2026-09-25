@@ -21,7 +21,7 @@
  * (`LogisticsDetailsEdit`, `DeliveryDatesEdit`) or a Delivery door (link). The
  * one arithmetic is `logisticsCardModel` in @carres/shared.
  */
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -48,6 +48,7 @@ import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { chaseMessageFor } from "../delivery-chase";
 import { lineName, moneyOfOrder } from "../sales-order-facts";
 import { WorkSection } from "./WorkCard";
+import { escapeBelongsToControl } from "./PartyCardShell";
 
 const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -117,7 +118,7 @@ function StateIcon({ row }: { row: LogisticsCheckRow }) {
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h4 className="text-label font-semibold uppercase tracking-[0.04em] text-kit-slate-11">{children}</h4>;
+  return <h4 className="text-[11px] font-semibold uppercase leading-[14px] tracking-[0.04em] text-kit-slate-11">{children}</h4>;
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -129,18 +130,17 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; leg?: number }) {
-  const bodyId = useId();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<null | "logistics" | "schedule">(null);
+/**
+ * THE LOGISTICS MODEL, as one hook — the card, the Order Route's `Contact`
+ * point and the Customer card all read the SAME `logisticsCardModel` answer
+ * (Law D: the contact checkpoint is not a second clock).
+ */
+export function useLogisticsModel(orderId: string, leg = 0) {
   const scope = useDeliveryScopeCard(orderId, leg);
   const factsQ = useLogisticsCardFacts(orderId, leg);
-  const partnersQ = useDeliveryPartners();
-  const acts = useDeliveryLinkActs(orderId, leg);
   const card = scope.card;
   const facts = factsQ.data ?? null;
   const today = appTodayIso();
-
   const partnerName = card?.logisticsPartnerName ?? facts?.partner?.name ?? null;
   const o = card?.scope.o ?? null;
   const linkUrl = facts?.link ? `${window.location.origin}/delivery-link/${facts.link.token}` : null;
@@ -203,6 +203,37 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
       spell,
     });
   }, [card, o, facts, partnerName, today]);
+  return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model };
+}
+
+export default function LogisticsCard({
+  orderId,
+  leg = 0,
+  open: openProp,
+  onToggle,
+  primary = true,
+}: {
+  orderId: string;
+  leg?: number;
+  /** Controlled by the right panel: one party card open at a time (§5.10). */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
+  /** Whether this card holds the panel's ONE blue action (§5.10). */
+  primary?: boolean;
+}) {
+  const bodyId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const [openLocal, setOpenLocal] = useState(false);
+  const open = openProp ?? openLocal;
+  const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === "function" ? next(open) : next;
+    if (onToggle) onToggle(value);
+    else setOpenLocal(value);
+  };
+  const [editing, setEditing] = useState<null | "logistics" | "schedule">(null);
+  const partnersQ = useDeliveryPartners();
+  const acts = useDeliveryLinkActs(orderId, leg);
+  const { scope, factsQ, card, facts, partnerName, o, linkUrl, model } = useLogisticsModel(orderId, leg);
 
   if (scope.loading && !card) {
     return <WorkSection className="p-4 text-body text-kit-slate-11" data-testid="logistics-card">{PARTY_COPY.loading}</WorkSection>;
@@ -251,25 +282,25 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
   const doorFor = (door: LogisticsAction["door"]): ReactNode => {
     if (door === "assign" || door === "decide") {
       return (
-        <Button size="sm" variant="primary" onClick={() => setEditing("logistics")} data-testid="logistics-card-edit-logistics">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} onClick={() => setEditing("logistics")} data-testid="logistics-card-edit-logistics">
           {partnerName ? PARTY_COPY.changeLogistics : PARTY_COPY.assignLogistics}
         </Button>
       );
     }
     if (door === "schedule") {
       return (
-        <Button size="sm" variant="primary" onClick={() => setEditing("schedule")} data-testid="logistics-card-edit-schedule">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} onClick={() => setEditing("schedule")} data-testid="logistics-card-edit-schedule">
           {PARTY_COPY.recordScheduled}
         </Button>
       );
     }
     if (door === "contact") {
       return partner && !partner.hasPortal && !facts?.link ? (
-        <Button size="sm" variant="primary" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link">
           {LINK_COPY.createLink}
         </Button>
       ) : (
-        <Button size="sm" variant="primary" onClick={() => void copy(message, PARTY_COPY.copied, true)} data-testid="logistics-card-copy-message">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} onClick={() => void copy(message, PARTY_COPY.copied, true)} data-testid="logistics-card-copy-message">
           {PARTY_COPY.copyMessage}
         </Button>
       );
@@ -298,57 +329,70 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
   const timingTone = action?.timing === "missed" ? "text-kit-red-11" : action?.timing === "today" ? "text-kit-blue-11" : "text-kit-slate-11";
 
   return (
-    <WorkSection className="shrink-0" data-testid="logistics-card" aria-label={LOGISTICS_COPY.heading}>
+    <WorkSection
+      className="shrink-0"
+      data-testid="logistics-card"
+      aria-label={LOGISTICS_COPY.heading}
+      onKeyDown={(event) => {
+        /* §5.10: Escape collapses the open card and returns focus to its heading. */
+        if (event.key === "Escape" && open && editing === null && !escapeBelongsToControl(event)) {
+          event.stopPropagation();
+          setOpen(false);
+          toggleRef.current?.focus();
+        }
+      }}
+    >
       {/* ── COLLAPSED: at most five facts, one obvious control ───────────── */}
       <button
         type="button"
+        ref={toggleRef}
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-3 rounded-work px-4 py-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        className="flex min-h-[72px] w-full min-[960px]:min-h-0 items-center gap-2 rounded-work px-3 py-[9px] text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:items-start min-[960px]:gap-3 min-[960px]:px-4 min-[960px]:py-3"
         data-testid="logistics-card-toggle"
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span className={`text-body font-semibold ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
+            <span className={`text-[15px] font-semibold leading-5 ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
               {heading}
             </span>
-            <span className="text-label text-kit-slate-11" data-testid="logistics-card-progress">{LOGISTICS_COPY.checks(model.doneCount)}</span>
+            <span className="text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-progress">{LOGISTICS_COPY.checks(model.doneCount)}</span>
           </div>
           {action ? (
-            <div className="mt-1" data-testid="logistics-card-action">
-              <div className="text-body font-semibold text-kit-slate-12">{action.act}</div>
-              <div className={`text-label ${timingTone}`}>
+            <div data-testid="logistics-card-action">
+              <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[960px]:mt-1 min-[960px]:text-[14px] min-[960px]:leading-5">{action.act}</div>
+              <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>
                 {[action.result, dueText(action)].filter(Boolean).join(" · ")}
               </div>
             </div>
           ) : null}
           {scheduledLine ? (
-            <div className="mt-1 text-body text-kit-slate-12" data-testid="logistics-card-scheduled">
+            <div className="text-[12px] leading-4 text-kit-slate-12 min-[960px]:mt-1 min-[960px]:text-body" data-testid="logistics-card-scheduled">
               {LOGISTICS_COPY.scheduled} · {scheduledLine}
             </div>
           ) : null}
           {model.exception ? (
-            <div className="mt-1 flex items-center gap-1 text-body text-kit-amber-11" data-testid="logistics-card-exception">
+            <div className="flex items-center gap-1 text-[12px] leading-4 text-kit-amber-11 min-[960px]:mt-1 min-[960px]:text-body" data-testid="logistics-card-exception">
               <Icon name="late" size={14} />
               <span>{model.exception}</span>
             </div>
           ) : null}
         </div>
-        <span className="mt-0.5 text-kit-slate-11"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11 min-[960px]:h-auto min-[960px]:w-auto min-[960px]:mt-0.5" data-testid="logistics-card-chevron"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
       </button>
 
       {/* ── EXPANDED: eight sections in the owner's order ─────────────────── */}
       {open ? (
-        <div id={bodyId} className="flex flex-col gap-4 border-t border-work-line px-4 py-4" data-testid="logistics-card-body">
+        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[960px]:gap-4 min-[960px]:px-4 min-[960px]:py-4" data-testid="logistics-card-body">
           {/* 1 · Current action */}
           <section aria-label={PARTY_COPY.currentAction} className="flex flex-col gap-2">
             <SectionTitle>{PARTY_COPY.currentAction}</SectionTitle>
             {action ? (
               <>
                 <div>
-                  <div className="text-body font-semibold text-kit-slate-12">{action.act}</div>
-                  <div className={`text-label ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
+                  <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[960px]:text-[14px] min-[960px]:leading-5">{action.act}</div>
+                  <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
                 </div>
                 {editing === null ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -384,11 +428,11 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                   <div className="flex items-start gap-2">
                     <StateIcon row={row} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-label text-kit-slate-11">
+                      <div className="text-[12px] font-normal leading-4 text-kit-slate-11">
                         {row.label}
                         {row.dueIso ? ` · ${spell(row.dueIso)}` : ""}
                       </div>
-                      <div className={`text-body ${row.state === "missed" ? "text-kit-red-11" : "text-kit-slate-12"}`}>
+                      <div className={`text-[13px] font-normal leading-[18px] ${row.state === "missed" ? "text-kit-red-11" : "text-kit-slate-12"}`}>
                         {row.state === "not_needed"
                           ? LOGISTICS_COPY.notNeeded
                           : row.fact ?? (row.dueIso ? LOGISTICS_COPY.opens(spell(row.dueIso)) : LOGISTICS_COPY.noRequested)}
@@ -432,7 +476,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                 ) : null}
               </div>
               {editing === null ? (
-                <Button size="sm" onClick={() => setEditing("logistics")} data-testid="logistics-card-assignment-edit">
+                <Button size="touch" onClick={() => setEditing("logistics")} data-testid="logistics-card-assignment-edit">
                   {partnerName ? PARTY_COPY.changeLogistics : PARTY_COPY.assignLogistics}
                 </Button>
               ) : null}
@@ -495,10 +539,10 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                     : LINK_COPY.notOpened}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" icon="copy" onClick={() => void copy(linkUrl, LINK_COPY.linkCopied)} data-testid="logistics-card-copy-link">
+                  <Button size="touch" icon="copy" onClick={() => void copy(linkUrl, LINK_COPY.linkCopied)} data-testid="logistics-card-copy-link">
                     {LINK_COPY.copyLink}
                   </Button>
-                  <Button size="sm" disabled={acts.revoke.isPending} onClick={() => void revokeLink()} data-testid="logistics-card-revoke-link">
+                  <Button size="touch" disabled={acts.revoke.isPending} onClick={() => void revokeLink()} data-testid="logistics-card-revoke-link">
                     {LINK_COPY.revokeLink}
                   </Button>
                 </div>
@@ -512,7 +556,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                     `Create link`, this section states the fact and adds no twin. */}
                 {action?.door === "contact" ? null : (
                   <span className="self-start">
-                    <Button size="sm" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link-section">
+                    <Button size="touch" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link-section">
                       {LINK_COPY.createLink}
                     </Button>
                   </span>
@@ -530,7 +574,7 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
                   {message}
                 </pre>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" icon="copy" onClick={() => void copy(message, PARTY_COPY.copied, true)}>
+                  <Button size="touch" icon="copy" onClick={() => void copy(message, PARTY_COPY.copied, true)}>
                     {PARTY_COPY.copyMessage}
                   </Button>
                   {partnerRow?.whatsapp_group_url ? (
@@ -558,10 +602,10 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
               <ol className="flex flex-col gap-2">
                 {(facts?.history ?? []).map((h, i) => (
                   <li key={`${h.at}-${i}`}>
-                    <div className="text-body font-semibold text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
-                    <div className="text-meta text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
+                    <div className="text-[12px] font-normal leading-4 text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
+                    <div className="text-[12px] font-normal leading-4 text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
                     {h.detail ? (
-                      <div className="text-label text-kit-slate-11">
+                      <div className="text-[12px] font-normal leading-4 text-kit-slate-11">
                         {/* The API hands ISO days; the screen spells them (COPY: no ISO on screen). */}
                         {h.detail.replace(/\d{4}-\d{2}-\d{2}/g, (iso) => spell(iso))}
                       </div>

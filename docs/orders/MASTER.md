@@ -5331,7 +5331,8 @@ rulings 2026-09-13 / 2026-09-24; never joined with an em dash) — trigger: logi
 no Scheduled delivery date is recorded · completion: **a Scheduled delivery date exists; the time
 is OPTIONAL (owner ruling 2026-09-24). `Requested another date` from logistics is a fact, not a
 schedule** · due: a settable number of
-working days before the date (**1 today**) · the checklist adds driver name, driver phone,
+working days before the date (**2 — the Logistics card's `2 working days before` check,
+owner ruling 2026-09-24**) · the checklist adds driver name, driver phone,
 vehicle number and lift/registration requirements **for condominiums**.
 
 **Issuing the delivery order is NOT a person's action** (owner ruling 2026-08-16, blueprint
@@ -5771,10 +5772,11 @@ delivery order MUST still be stated as missing, because **nobody can DO a missin
 Most actions are performed by sending a message, so the message is part of the action. The
 bodies live in `apps/web/src/lib/wa-templates.ts`; **the rules live here.**
 
-- **A customer message never carries a delivery date.** Logistics agree the date and slot with
-  the customer; if a customer asks us, we give them the logistics company's contact. The ONE
-  exception is the delivery-eve reminder on an order still owing money, which may say
-  `today` / `tomorrow`.
+- **A customer message never carries a delivery date** except the governed exceptions: the
+  approved outstation confirmation (ERP-ARCH §6.5) and a Carres notice of a known delay (Workspace
+  §5.10). The logistics company agrees the day (owner correction 2026-09-25); if a customer asks us,
+  we give them the logistics company's contact. The delivery-eve reminder on an order still owing
+  money may say `today` / `tomorrow`.
 - **No pressure phrasing to a customer** — never *"settle by"*, never *"deliver on time"*.
 - **The salutation is never guessed.** Preferred-name field when set, otherwise the customer's
   own name in Title Case. **Never infer `Mr` / `Ms`.**

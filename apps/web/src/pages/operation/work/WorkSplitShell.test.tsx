@@ -32,4 +32,9 @@ describe("WorkSplitShell — the unframed workspace (owner correction 2026-09-24
     expect(screen.queryByText("Actions")).not.toBeInTheDocument();
     expect(screen.getByText("Detail")).toBeInTheDocument();
   });
+
+  it("below 960px the detail stage stacks its sections 8px apart", () => {
+    render(<WorkSplitShell layout="one" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
+    expect(screen.getByRole("region", { name: "Selected work" }).className).toContain("gap-2");
+  });
 });
