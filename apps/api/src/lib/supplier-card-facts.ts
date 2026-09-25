@@ -25,7 +25,7 @@ export interface SupplierFactRows {
     destination_id: string | null;
     suppliers: { name: string } | { name: string }[] | null;
   }>;
-  lines: ReadonlyArray<{ po_id: string; destination_id: string | null }>;
+  lines: ReadonlyArray<{ po_id: string; destination_id: string | null; qty?: number | string | null; received_qty?: number | string | null }>;
   destinations: ReadonlyArray<{ id: string; name: string }>;
   promises: ReadonlyArray<{
     po_id: string;
@@ -69,6 +69,9 @@ export function supplierPoFactsOf(rows: SupplierFactRows): SupplierPoFact[] {
           ? { answer: latest.answer, aboutIso: latest.about_date, previousIso: latest.previous_date, newIso: latest.new_date, recordedAt: latest.recorded_at }
           : null,
       });
+      const poLines = rows.lines.filter((l) => l.po_id === po.id);
+      const orderedQty = poLines.reduce((t, l) => t + Number(l.qty ?? 0), 0);
+      const receivedQty = poLines.reduce((t, l) => t + Number(l.received_qty ?? 0), 0);
       return {
         poNo: po.id,
         supplier,
@@ -79,6 +82,8 @@ export function supplierPoFactsOf(rows: SupplierFactRows): SupplierPoFact[] {
         supplierDo: po.do_number || po.do_uploaded_at ? { number: po.do_number, atIso: po.do_uploaded_at } : null,
         deliverTo: deliverTo.length ? [...new Set(deliverTo)].join(" · ") : null,
         grnIso: grn,
+        orderedQty,
+        receivedQty,
       };
     });
 }

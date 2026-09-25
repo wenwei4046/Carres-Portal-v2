@@ -26,16 +26,18 @@ const three = [
   po({ poNo: "PO-C", supplier: "XYZ Bedding", issued: false, originalIso: null, effectiveIso: null }),
 ];
 
-describe("the Supplier card is one card for every supplier", () => {
-  it("names the group, never pretending there is one supplier", () => {
+describe("the Supplier card is one card for every supplier (§5.10)", () => {
+  it("prints group progress plus the highest-material exception, never a name", () => {
     const m = supplierCardModel({ todayIso: "2026-10-16", pos: three, spell });
     expect(m.heading).toBe("Supplier · 3 suppliers");
-    expect(m.status).toEqual({ text: "Sleepwell delayed to 30 Oct · 2 of 3 POs issued", tone: "attention" });
-    expect(m.rows[0].poNo).toBe("PO-A");
-    expect(m.rows[0].replyWord).toBe("Delayed · Production Delay");
-    expect(m.rows[0].originalIso).toBe("2026-10-20");
-    expect(m.rows.map((r) => r.poNo)).toEqual(["PO-A", "PO-C", "PO-B"]);
-    expect(m.rows[1].replyWord).toBe("Not issued");
+    expect(m.status).toEqual({ text: "2 of 3 POs issued · 1 delayed", tone: "attention" });
+    expect(m.status.text).not.toMatch(/Sleepwell|PO-/);
+    expect(m.rows.map((r) => [r.poNo, r.stateText])).toEqual([
+      ["PO-A", "Delayed"],
+      ["PO-C", "PO not issued"],
+      ["PO-B", "Expected"],
+    ]);
+    expect(m.rows[0].originalIso).toBe("2026-10-20"); // the original date survives the delay
   });
 
   it("one supplier is named in the heading; no PO says so", () => {
@@ -43,20 +45,37 @@ describe("the Supplier card is one card for every supplier", () => {
     expect(supplierCardModel({ todayIso: "2026-10-16", pos: [], spell }).status.text).toBe("No purchase order for this Sales Order");
   });
 
-  it("the Supplier DO is needed one Office working day before the latest date", () => {
+  it("confirmation is needed one Office working day before arrival — the Supplier DO closes it", () => {
     const fri = supplierCardModel({ todayIso: "2026-10-16", pos: [po({ effectiveIso: "2026-10-19" })], spell });
-    expect(fri.rows[0].doLine).toBe("Needed by 16 Oct");
-    expect(fri.rows[0].doTone).toBe("current");
+    expect(fri.rows[0].stateText).toBe("Confirmation needed today");
+    expect(fri.status.text).toBe("1 of 1 dates ready · 1 confirmation needed");
     const early = supplierCardModel({ todayIso: "2026-10-12", pos: [po({ effectiveIso: "2026-10-19" })], spell });
-    expect(early.rows[0].doLine).toBe("Not needed yet");
-    const has = supplierCardModel({ todayIso: "2026-10-16", pos: [po({ supplierDo: { number: "DO-5531", atIso: "2026-10-16T02:00:00Z" } })], spell });
-    expect(has.rows[0].doLine).toBe("DO-5531 · 16 Oct");
+    expect(early.rows[0].state).toBe("expected");
+    const has = supplierCardModel({ todayIso: "2026-10-16", pos: [po({ effectiveIso: "2026-10-19", supplierDo: { number: "DO-5531", atIso: "2026-10-16T02:00:00Z" } })], spell });
+    expect(has.rows[0].state).toBe("expected");
+    expect(has.rows[0].checksDone).toBe(3);
   });
 
-  it("GRN is the Warehouse's fact", () => {
-    const m = supplierCardModel({ todayIso: "2026-10-30", pos: [po({ grnIso: "2026-10-20" }), po({ poNo: "PO-B", supplier: "ABC", grnIso: null })], spell });
-    expect(m.status.text).toBe("GRN received for 1 of 2");
-    expect(m.rows.find((r) => r.poNo === "PO-B")?.grnLine).toBe("Not received yet");
+  it("a default-date confirmation right after PO issue is not the pre-arrival confirmation", () => {
+    const m = supplierCardModel({
+      todayIso: "2026-10-16",
+      pos: [po({ effectiveIso: "2026-10-19", reply: { answer: "confirmed", reason: null, evidence: null, recordedAtIso: "2026-10-01T01:00:00Z" } })],
+      spell,
+    });
+    expect(m.rows[0].state).toBe("confirmationNeeded");
+  });
+
+  it("GRN is the Warehouse's fact: received, short received, arrival missed", () => {
+    const m = supplierCardModel({
+      todayIso: "2026-10-30",
+      pos: [po({ grnIso: "2026-10-20", orderedQty: 2, receivedQty: 2 }), po({ poNo: "PO-B", supplier: "ABC", effectiveIso: "2026-11-04" })],
+      spell,
+    });
+    expect(m.status.text).toBe("1 of 2 received · 1 arriving 4 Nov");
+    expect(supplierCardModel({ todayIso: "2026-10-30", pos: [po({ grnIso: "2026-10-20", orderedQty: 2, receivedQty: 1 })], spell }).rows[0].stateText).toBe("Short received");
+    const missed = supplierCardModel({ todayIso: "2026-10-22", pos: [po({ effectiveIso: "2026-10-20" })], spell });
+    expect(missed.rows[0].stateText).toBe("Arrival missed · Follow up supplier");
+    expect(missed.status.tone).toBe("missed");
   });
 });
 
@@ -82,7 +101,7 @@ describe("the Order Route is one compact line", () => {
   it("prints Proceed · PO · GRN · Contact · Delivery with one blue point", () => {
     const m = missionRouteModel(route());
     expect(m.points.map((p) => p.label)).toEqual(["Proceed", "PO", "GRN", "Contact", "Delivery"]);
-    expect(m.points.map((p) => p.status)).toEqual(["Done", "1 delayed", "0 of 3 received", "Due today", "Requested"]);
+    expect(m.points.map((p) => p.status)).toEqual(["Done", "2 of 3", "0 of 3", "Due today", "Requested"]);
     expect(m.points.find((p) => p.key === "po")?.dateText).toBe("22–30 Oct");
     expect(m.points.filter((p) => p.tone === "current")).toHaveLength(1);
     expect(m.header).toEqual({ text: "3 days left", tone: "future" });
@@ -90,13 +109,14 @@ describe("the Order Route is one compact line", () => {
   });
 
   it("Loan appears only with a loan record", () => {
+    expect(missionRouteModel(route()).points.some((p) => p.key === "loan")).toBe(false);
     expect(missionRouteModel(route({ loan: { state: "offered", atIso: "2026-09-20" } })).points[1]).toMatchObject({ key: "loan", status: "Offered" });
   });
 
   it("payment is one exception line, never a point and never Blocked", () => {
     const m = missionRouteModel(route({ payment: { owedText: "RM 1,250.00", deadlineIso: "2026-10-23", affects: true, financeHold: false } }));
     expect(m.paymentLine).toEqual({ text: "Payment · RM 1,250.00 to collect by 23 Oct", tone: "attention" });
-    expect(m.points.some((p) => p.label === "Payment")).toBe(false);
+    expect(m.points.some((p) => /Payment|Blocked/.test(p.label + p.status))).toBe(false);
     expect(missionRouteModel(route({ payment: { owedText: "RM 5.00", deadlineIso: null, affects: false, financeHold: true } })).paymentLine?.text).toBe(
       "Payment · Finance is holding this delivery",
     );

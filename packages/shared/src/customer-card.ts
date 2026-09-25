@@ -31,9 +31,12 @@ export const CUSTOMER_CARD_COPY = {
   delivered: (date: string) => `Delivered ${date}`,
   refused: "Customer refused delivery",
   phoneWrong: "Phone number is wrong",
-  anotherDate: (date: string | null) => (date ? `Customer requested another date · ${date}` : "Customer requested another date"),
+  anotherDate: "Customer requested another date",
+  /** §5.10 collapsed word; the Work receipt word is `followUpToday`. */
+  followUp: "No answer — follow up",
   followUpToday: "No answer · Follow up today",
-  waiting: (date: string) => `Waiting for customer · reply due ${date}`,
+  waiting: "Waiting for customer",
+  replyDue: (date: string) => `Reply due ${date}`,
   contactMissed: (date: string) => `Contact missed ${date}`,
   scheduled: (date: string) => `Scheduled ${date}`,
   contactDueToday: "Contact due today",
@@ -55,7 +58,7 @@ export const CUSTOMER_CARD_COPY = {
   /* checks */
   checkContacted: "Customer contacted",
   checkAgreed: "Delivery date agreed",
-  checkAddress: "Address and access checked",
+  checkAddress: "Address/access checked",
   /* sections */
   sectionAction: "Current action",
   sectionChecks: "Checks",
@@ -302,10 +305,10 @@ export function customerCardModel(input: CustomerCardInput): CustomerCardModel {
   else if (latestResult === "customer_refused_delivery") status = { text: CUSTOMER_CARD_COPY.refused, tone: "missed" };
   else if (latestResult === "contact_details_incorrect") status = { text: CUSTOMER_CARD_COPY.phoneWrong, tone: "attention" };
   else if (latestResult === "requested_another_date" && (!scheduled || (askedIso && askedIso !== scheduled)))
-    status = { text: CUSTOMER_CARD_COPY.anotherDate(askedIso ? spell(askedIso) : null), tone: "attention" };
+    status = { text: CUSTOMER_CARD_COPY.anotherDate, tone: "attention" };
   else if (contactMissed && due) status = { text: CUSTOMER_CARD_COPY.contactMissed(spell(due)), tone: "missed" };
-  else if (followUpDue) status = { text: CUSTOMER_CARD_COPY.followUpToday, tone: "attention" };
-  else if (waiting && followUpIso && !scheduled) status = { text: CUSTOMER_CARD_COPY.waiting(spell(followUpIso)), tone: "future" };
+  else if (followUpDue) status = { text: CUSTOMER_CARD_COPY.followUp, tone: "attention" };
+  else if (waiting && followUpIso && !scheduled) status = { text: CUSTOMER_CARD_COPY.waiting, tone: "future" };
   else if (scheduled) {
     const dueToday = mode === "operation" && history.length === 0 && due === today;
     status = {
