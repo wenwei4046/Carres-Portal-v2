@@ -1061,7 +1061,7 @@ Malaysia) or whose Logistics Partner is not the Klang Valley default.
                              The message states the delivery date, the balance, the payment
                              link, and that a delay asked after the goods leave carries a
                              storage charge.
-2. Money earlier             Payment must be complete 3 working days before Confirmed Delivery
+2. Money earlier             Payment must be complete 3 working days before Scheduled delivery
                              (the customer's delivery date — owner chose this anchor), not
                              Klang Valley's 2.
 ```
