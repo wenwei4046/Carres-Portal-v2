@@ -648,6 +648,22 @@ screenshot refuses the record. Evidence is append-only with supplier, recorder a
 the immutable original PO Delivery Date and earlier answers are never overwritten. The existing
 arrival arithmetic recomputes only the affected open source-line scope and reports customer impact.
 
+**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** One
+`Record supplier answer` form on the PO records the supplier's answer **per PO goods line**. Each
+line chooses `No change` (default) · `Confirmed` · `New date` (the server classifies `Earlier` —
+no reason — or `Delayed` — one governed reason required) · `Split delivery` (any number of
+quantity + date batches via `+ Add another date`; batches must total the line's still-to-deliver
+quantity, shown as `Total {n} of {m}`; a later batch needs a reason). `Supplier DO received` sits at
+the top of the form because one Supplier DO normally covers the delivery; each line then states the
+quantity it covers. Exact-unit lines split by quantity only; Receiving verifies which Units arrive.
+The PO's `PO {n}-Day Delivery Date` (register column `PO Delivery Date`; `n` = the Settings value
+recorded on that PO at issue, never later Settings) never changes; every answer is append-only
+History with evidence, and the newest answer per line is the line's `Supplier Confirmed Delivery
+Date`. A supplier date answer creates no PO revision and no resend; changing quantity, goods or
+Deliver To is a PO change (new version), not an answer. Goods that arrive early without notice need
+no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
+Each batch derives its own day-before occurrence.
+
 One Office working day before the effective expected arrival,
 `purchasing.confirm_tomorrows_delivery` asks for either the **Supplier DO** or evidenced supplier
 confirmation that the named goods will be sent/delivered to the named Warehouse on that exact next
