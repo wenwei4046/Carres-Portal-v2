@@ -19,10 +19,10 @@
  * scroll independently.
  *
  *   three  ≥1280px of page — rail · list · detail
- *   two    960–1279px      — the rail collapses (a toolbar control reopens
+ *   two    768–1279px      — the rail collapses (a toolbar control reopens
  *                            it); the list is exactly 400px and can never
  *                            be collapsed
- *   one    <960px          — Date and Module open from compact controls; the
+ *   one    <768px          — Date and Module open from compact controls; the
  *                            list (100% wide) and the detail share ONE stage
  */
 import type { ReactNode } from "react";

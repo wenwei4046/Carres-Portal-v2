@@ -136,7 +136,7 @@ export default function WorkOrderRoute({
   }
   if (!route) {
     return (
-      <WorkSection className="shrink-0 px-3 py-2 min-[960px]:px-4" data-testid="work-route">
+      <WorkSection className="shrink-0 px-3 py-2 min-[768px]:px-4" data-testid="work-route">
         <SectionTitle>{R.heading}</SectionTitle>
         <p className="mt-1 text-body text-kit-slate-11">{failed ? "Some information could not be refreshed." : "Order details unavailable"}</p>
       </WorkSection>
@@ -152,7 +152,7 @@ export default function WorkOrderRoute({
   const detail = openPoint ? route.points.find((p) => p.key === openPoint) ?? null : null;
 
   return (
-    <WorkSection className="shrink-0 px-3 py-1.5 min-[960px]:px-4" data-testid="work-route" aria-label={R.heading}>
+    <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
       <div className="flex h-[14px] items-center justify-between">
         <SectionTitle>{R.heading}</SectionTitle>
         {route.header ? (

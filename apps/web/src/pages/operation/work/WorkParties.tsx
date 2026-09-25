@@ -106,7 +106,7 @@ export default function WorkParties({
   if (!ref) return null;
   if (denied) {
     return (
-      <WorkSection className="shrink-0 p-3 min-[960px]:px-4" data-testid="work-mission-denied" role="status">
+      <WorkSection className="shrink-0 p-3 min-[768px]:px-4" data-testid="work-mission-denied" role="status">
         <p className="text-[15px] font-semibold leading-5 text-kit-slate-12">{PARTIES_COPY.deniedTitle}</p>
         <p className="mt-0.5 text-body text-kit-slate-11">{PARTIES_COPY.deniedBody}</p>
       </WorkSection>
@@ -126,7 +126,7 @@ export default function WorkParties({
     }
     if (!scope.failed) return null;
     return (
-      <WorkSection className="shrink-0 p-3 min-[960px]:px-4" data-testid="work-mission-unavailable" role="status">
+      <WorkSection className="shrink-0 p-3 min-[768px]:px-4" data-testid="work-mission-unavailable" role="status">
         <p className="text-[15px] font-semibold leading-5 text-kit-slate-12">{PARTIES_COPY.unavailableTitle}</p>
         <p className="mt-0.5 text-body text-kit-slate-11">{PARTIES_COPY.unavailableBody}</p>
         <div className="mt-2">

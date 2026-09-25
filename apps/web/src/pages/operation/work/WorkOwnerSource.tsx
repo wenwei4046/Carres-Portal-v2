@@ -15,11 +15,11 @@ export default function WorkOwnerSource({ item }: { item: OperationWorkItem }) {
   return (
     <WorkSection className="shrink-0" data-testid="work-owner-source">
       <details className="group">
-        <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-work px-3 text-[12px] font-medium leading-4 text-kit-slate-12 hover:bg-kit-slate-2 min-[960px]:px-4 [&::-webkit-details-marker]:hidden">
+        <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-work px-3 text-[12px] font-medium leading-4 text-kit-slate-12 hover:bg-kit-slate-2 min-[768px]:px-4 [&::-webkit-details-marker]:hidden">
           Owner, timing and source
           <span aria-hidden="true" className="text-kit-slate-11 transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
         </summary>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-work-line px-3 py-2.5 text-[12px] leading-4 min-[960px]:px-4">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-work-line px-3 py-2.5 text-[12px] leading-4 min-[768px]:px-4">
           <dt className="text-kit-slate-11">Normal owner</dt>
           <dd className="text-kit-slate-12">{normal ?? "Not assigned"}</dd>
           {acting && acting !== normal ? (

@@ -644,27 +644,27 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 - **THE WORK DENSITY — owner ruling 2026-09-25, APPROVED / BUILT. Exact values, not a direction.**
   Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
-  on the right, 72px tall with 24px sides from 960px wide; below 960px 24/30/600, 12/16/400, 64px,
+  on the right, 72px tall with 24px sides from 768px wide; below 768px 24/30/600, 12/16/400, 64px,
   16px sides. No breadcrumb row, no second title, KPI band or card header.
 - **Toolbar** — ONE white section (`rounded-work`), 12px padding (10px below 600px), 8px between
-  controls. Every control is 36px (40px below 960px), 14/20/400 (`text-control`), 12px sides,
-  `rounded-control`; the active `My Work`/`Team Work` segment is 600. Search is 240px from 960px
-  and fills its row below. From 960px the toolbar is one row (`Filters` · `My Work · Team Work` ·
-  Search · Owner · `Covered` · `Clear all`). **Below 960px it is exactly two rows** — `Date · Module ·
+  controls. Every control is 36px (40px below 768px), 14/20/400 (`text-control`), 12px sides,
+  `rounded-control`; the active `My Work`/`Team Work` segment is 600. Search is 240px from 768px
+  and fills its row below. From 768px the toolbar is one row (`Filters` · `My Work · Team Work` ·
+  Search · Owner · `Covered` · `Clear all`). **Below 768px it is exactly two rows** — `Date · Module ·
   My Work/Team Work`, then `Search · Owner · Covered` — **and below 600px exactly four**: `Date ·
   Module` / `My Work · Team Work` / Search / `Owner · Covered`; rows are 40px apart by 8px. The ruling's
   table put the 36/40px switch at 600px, but its 743px acceptance requires 40px rows; the
   acceptance is the more specific line, so controls (and the 12px canvas padding) switch at
-  960px with the header, and only the toolbar's own 12/10px padding and the four-row split switch
+  768px with the header, and only the toolbar's own 12/10px padding and the four-row split switch
   at 600px. Freshness is a read fact, not a manual business action.
 - **THE WORK SHELL — owner correction 2026-09-24, APPROVED / BUILT.** The workspace is an UNFRAMED
-  grid on the light-grey canvas with 16px padding (12px below 960px): no frame, fill, radius or
+  grid on the light-grey canvas with 16px padding (12px below 768px): no frame, fill, radius or
   shadow around it. The toolbar is one white section; 16px below it the columns sit 16px apart.
   Every white surface is its own section: 1px `work-line` (`#ccd7e5`) edge, 9px `rounded-work`
   radius, no shadow, no coloured corner. Breakpoints read the Work page's own width:
   **≥1280px** three columns `240px · 420px · remainder (≥480px)` — Date and Module as two separate
-  rail sections, the list, the detail; **960–1279px** the rail collapses behind the toolbar
-  `Filters` control and the list is exactly 400px (it never collapses); **<960px** Date and Module
+  rail sections, the list, the detail; **768–1279px** the rail collapses behind the toolbar
+  `Filters` control and the list is exactly 400px (it never collapses); **<768px** Date and Module
   open from compact toolbar controls and the list (100% wide) and the detail share ONE stage with
   `Back to work`.
 - **The list column** — the heading (the chosen Date, 16/22/600, with `{n} actions to do` 13/18/500
@@ -688,7 +688,7 @@ the same group and item grammar; zero matches is not the same as zero work.
 - The detail column stacks independent white sections: the selected action's header, its action
   section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order — in that order,
   Logistics · Customer · Supplier.
-- **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 960px, exact values:**
+- **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 768px, exact values:**
   12px canvas padding; sections 8px apart; `Back to work` a 40px row; the header card (12px
   padding, height follows content) carries the object line, the problem 16/22/600 and the action
   line 13/18; the task card (12px padding) puts its result line and the 32px `Open {object}`
@@ -697,7 +697,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   `Checks n of 3` 12px, a 40×40 chevron; Customer and Supplier collapse to exactly 72px; Logistics
   is at least 72px and grows only for its approved scheduled/exception facts (its five-fact
   collapsed law is unchanged); expanded bodies use 10px vertical padding and 8px between sections;
-  radius stays `rounded-work`. The same compact detail applies at 820px and 390px. From 960px the
+  radius stays `rounded-work`. The same compact detail applies at 820px and 390px. From 768px the
   previous detail geometry holds (16px gaps, 24/16px card padding, 14/20 current action).
 - **One header row.** Work's header carries the top-bar icons (`Jump to…` · alerts · help ·
   settings) itself, so the slim 44px GlobalTopBar is not drawn on Work — the same law every page
@@ -862,9 +862,9 @@ Scheduled delivery · 27 Oct                        ← only when scheduled; tim
 ```
 
 **Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
-redesigned):** party heading 15/20/600 · current action 14/20/600 (13/18/600 below 960px) · secondary fact 12/16/400 ·
+redesigned):** party heading 15/20/600 · current action 14/20/600 (13/18/600 below 768px) · secondary fact 12/16/400 ·
 section label 11/14/600 uppercase · check row 13/18/400 · history row 12/16/400 · button 13/18/500,
-at least 36px tall (40px below 960px). Customer and Supplier headings use the same 15/20/600.
+at least 36px tall (40px below 768px). Customer and Supplier headings use the same 15/20/600.
 
 `Logistics not assigned` replaces the heading when no company carries the delivery. Requested
 date, PO, GRN, DO, money-in-general and the check rows never sit on the collapsed card.
@@ -998,7 +998,7 @@ multi-supplier Supplier card, compact Order Route and their shared communication
 The same sentence never appears in all three layers. The summary says what is wrong and what to do;
 the Route says which mission obligation needs attention; the party card says who must answer and
 exposes the owning action. Only one party card expands at a time, and it remains expanded after a
-save or refresh. On a screen below 960px `Back to work` restores the same list position and filters.
+save or refresh. On a screen below 768px `Back to work` restores the same list position and filters.
 
 #### Order Route — one line, concurrent facts
 
@@ -1155,8 +1155,8 @@ After-sales starts a separate mission after delivery unless its own MASTER expli
 #### Exact responsive and state contract
 
 - ≥1280px: `240px rail · 420px list · remainder detail`; detail padding 16px, section gap 8px.
-- 960–1279px: 400px list plus detail; filters are behind the toolbar control.
-- <960px: list/detail share one stage; detail padding 12px; `Back to work` first.
+- 768–1279px: 400px list plus detail; filters are behind the toolbar control.
+- <768px: list/detail share one stage; detail padding 12px; `Back to work` first.
 - Route is 88px and one horizontally scrollable line. Collapsed party card is exactly 72px.
 - Summary title 16/22/600; supporting 13/18; party heading 15/20/600; state 12/16;
   expanded-section padding 10px; action buttons 36px; every touch target at least 40×40px.

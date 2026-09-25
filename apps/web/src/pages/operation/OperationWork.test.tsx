@@ -211,18 +211,18 @@ describe("Operation Work — one server feed", () => {
       expect(screen.getByTestId("work-area")).toHaveAttribute("data-layout", "one");
       const header = screen.getByTestId("workspace-header");
       expect(header.className).toContain("h-16");
-      expect(header.className).toContain("min-[960px]:h-[72px]");
+      expect(header.className).toContain("min-[768px]:h-[72px]");
       expect(header.className).toContain("px-4");
-      expect(header.className).toContain("min-[960px]:px-6");
+      expect(header.className).toContain("min-[768px]:px-6");
       const title = within(header).getByRole("heading", { name: "Work" });
       expect(title.className).toContain("text-[24px]");
-      expect(title.className).toContain("min-[960px]:text-[28px]");
-      expect(title.className).toContain("min-[960px]:leading-[34px]");
+      expect(title.className).toContain("min-[768px]:text-[28px]");
+      expect(title.className).toContain("min-[768px]:leading-[34px]");
       // The one header row carries the top-bar icons: no second 44px bar.
       expect(within(header).getByTestId("top-bar-icons")).toBeInTheDocument();
       const count = screen.getByTestId("work-header-count");
       expect(count.className).toContain("text-[12px]");
-      expect(count.className).toContain("min-[960px]:text-[13px]");
+      expect(count.className).toContain("min-[768px]:text-[13px]");
 
       const heading = screen.getByTestId("work-list-heading");
       expect(heading.className).toContain("text-[16px]");
@@ -237,7 +237,7 @@ describe("Operation Work — one server feed", () => {
       expect(toolbar.className).toContain("p-2.5");
       expect(toolbar.className).toContain("min-[600px]:p-3");
       expect(toolbar.className).toContain("gap-2");
-      // Below 960px: exactly two row groups (four lines below 600px).
+      // Below 768px: exactly two row groups (four lines below 600px).
       const rows = within(toolbar).getAllByTestId(/^work-toolbar-row-/);
       expect(rows.map((r) => r.dataset.testid)).toEqual(["work-toolbar-row-1", "work-toolbar-row-2"]);
       expect(within(rows[0]).getByTestId("work-compact-date")).toBeInTheDocument();
@@ -250,14 +250,14 @@ describe("Operation Work — one server feed", () => {
         screen.getByRole("searchbox"),
         screen.getByRole("button", { name: "Covered" }),
       ]) {
-        // 40px below 960px, 36px from 960px; 14/20 type.
+        // 40px below 768px, 36px from 768px; 14/20 type.
         expect(control.className).toContain("h-10");
-        expect(control.className).toContain("min-[960px]:h-9");
+        expect(control.className).toContain("min-[768px]:h-9");
         expect(control.className).toContain("text-control");
       }
       // The segmented control's 1px border sits inside the 36px (40px).
       expect(screen.getByTestId("work-view-mine").className).toContain("h-[38px]");
-      expect(screen.getByTestId("work-view-mine").className).toContain("min-[960px]:h-[34px]");
+      expect(screen.getByTestId("work-view-mine").className).toContain("min-[768px]:h-[34px]");
       expect(screen.getByTestId("work-view-mine").className).toContain("font-semibold");
       expect(screen.getByTestId("work-view-switch").className).toContain("max-[599px]:basis-full");
     } finally {
@@ -265,7 +265,7 @@ describe("Operation Work — one server feed", () => {
     }
   });
 
-  it("from 960px the toolbar is one row, search 240px, controls 36px (40px below 960px)", () => {
+  it("from 768px the toolbar is one row, search 240px, controls 36px (40px below 768px)", () => {
     const savedWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     try {
@@ -274,7 +274,7 @@ describe("Operation Work — one server feed", () => {
       expect(toolbar.className).toContain("flex-wrap");
       for (const row of within(toolbar).getAllByTestId(/^work-toolbar-row-/)) expect(row.className).toBe("contents");
       expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-60");
-      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[960px]:h-9");
+      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[768px]:h-9");
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
     }

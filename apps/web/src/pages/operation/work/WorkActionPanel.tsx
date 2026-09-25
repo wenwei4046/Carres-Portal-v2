@@ -42,7 +42,7 @@ export default function WorkActionPanel({
   return (
     <section
       aria-label="Work summary"
-      className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-4 min-[960px]:py-3"
+      className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[768px]:px-4 min-[768px]:py-3"
       data-testid="work-detail-header"
     >
       {/* On a phone (below 600px) the doors stack under the words (Jess's 390

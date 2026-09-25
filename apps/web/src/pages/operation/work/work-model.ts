@@ -223,7 +223,7 @@ export const WORK_MODULES: readonly OperationWorkModule[] = [
 
 /** Panels follow the Work area's own width, never the window's. */
 export function workLayoutFor(width: number): WorkLayout {
-  return width >= 1280 ? "three" : width >= 960 ? "two" : "one";
+  return width >= 1280 ? "three" : width >= 768 ? "two" : "one";
 }
 
 /** Source words for Work source health — never the raw feed key. */

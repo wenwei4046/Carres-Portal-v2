@@ -118,11 +118,11 @@ describe("workFocusDay — the day the focus list opens on", () => {
 });
 
 describe("workLayoutFor — panels follow the page width", () => {
-  it("uses three panels from 1280px, collapses only the rail from 960px, else one stage", () => {
+  it("uses three panels from 1280px, collapses only the rail from 768px, else one stage", () => {
     expect(workLayoutFor(1280)).toBe("three");
     expect(workLayoutFor(1279)).toBe("two");
-    expect(workLayoutFor(960)).toBe("two");
-    expect(workLayoutFor(959)).toBe("one");
+    expect(workLayoutFor(768)).toBe("two");
+    expect(workLayoutFor(767)).toBe("one");
   });
 });
 
