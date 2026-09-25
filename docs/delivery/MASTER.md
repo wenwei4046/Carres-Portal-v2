@@ -210,7 +210,7 @@ gate holds, numbered on the order and the leg; the customer leg's number mirrors
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
 - **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT
-  (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
+  (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month — **owner re-confirmed 2026-09-26: four digits stay**; a used-up month refuses by name and never widens; the carry-forward `do-number-month-capacity` is closed), Subscription trips
   issue **`SDO2609-48271`** (five, 100,000 a month): prefix + two-digit year + two-digit month of
   **issue** + `-` + random digits (leading zeros allowed). The two businesses are
   told apart by the prefix; the document model, gates and team are one. Fixed width — the system
@@ -1729,8 +1729,7 @@ authorised evidence but never becomes the order owner; managers are never dealt 
 handover changes the Sales Order PIC and its append-only responsibility evidence together.
 
 Delivery Duty is no longer the routine owner. It is used only when the Sales Order has no PIC so
-the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody holds
-Delivery Duty.` with `Set the holder in Workspace → Staff & Duties`. Once a PIC exists, every open
+the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody assigned · system error` over `Report it to IT` (owner ruling 2026-09-26: every order is dealt to a person, so an unowned order is a defect, never a Duty to fill — `Nobody holds Delivery Duty.` and its Staff & Duties door are retired). Once a PIC exists, every open
 and future routine Delivery action resolves to that PIC and cover. Governed delivery-charge
 exceptions continue to route to `delivery_charge_approver`. Corrections of saved facts,
 exceptional proof and refusal closure without an approved action definition enter no engine and
@@ -1941,7 +1940,30 @@ owners, permissions and the Partner Portal and API boundary; the cross-module re
 authoritative completion facts; and the intentional rejects. Automatic allocation, vehicle routing
 and customer self-scheduling are excluded from current truth rather than deferred blind spots.
 
-**PLAN MISSION COMPLETE — 2026-09-13.** The owner approved the complete Blueprint after the
+**PLAN MISSION COMPLETE — 2026-09-26 (Blueprint review, five segments, owner yes on each).** The
+2026-09-13 model stands; the 2026-09-25/26 rulings overwrite its words and three compositions (the
+Monitor brief's `View Sales Order` and `ETA`, the Delivery Order brief inside the register row, the
+two-column DO object) and add `Hold delivery` on every surface. **READY scopes, in dependency
+order — each a full production vertical slice (code · tests · PR · merge · deploy · production
+walk · MASTER closure):**
+
+```
+1  ONE STATUS LADDER      one label function for register · dropdown · card · phone card · Work card ·
+                          reports (§8.4); Work feed reads the arrangement; one delivery-day reader;
+                          confirm_time kind removed; leg status shared
+2  MONITOR BRIEF          ETA in the Logistics Details edit; View Sales Order in panel 1;
+                          Open Sales Order to change removed; Scheduled time (optional) label
+3  HOLD DELIVERY          the four surfaces (§3): Operation words · Payment row + Remove hold ·
+                          Warehouse Schedule/Outbound line · NETS page and link page line
+4  DELIVERY ORDERS        DO Date · DO No leading (leadingColumns) · 40px rows · status = the result ·
+                          the in-row two-column brief · the two-column object page · number doors
+5  SCHEDULE               card doors (number · See delivery details) · readiness words · the two-line
+                          empty range · Get delivery date queue and status words
+6  SETTINGS · NETS · LINK the §5.4/§5.5/§11 words (Logistics · Company details · Transit points ·
+                          Save delivery date · the shortened results)
+```
+
+The earlier closure record follows. **PLAN MISSION COMPLETE — 2026-09-13.** The owner approved the complete Blueprint after the
 corrections of 2026-09-12 and 2026-09-13; this MASTER persists the approved operating model and the
 contradicting older text in this file, `../orders/MASTER.md`, `../ui/MASTER.md`,
 `../COPY-STANDARD.md`, `../workspace/MASTER.md` and `../ERP-ARCHITECTURE.md` is overwritten. No

@@ -116,41 +116,12 @@ the defect was fixed elsewhere and this entry goes.
 
 ---
 
-## `do-number-month-capacity` — 🟡 OWNER DECISION, opened 2026-09-24 (measured, not estimated)
+## `do-number-month-capacity` — ✅ CLOSED 2026-09-26 by owner ruling: four digits stay
 
-**The Outright DO pool holds 10,000 numbers a month, and Jess's own volume benchmark reaches it.**
-
-`DO` + YYMM + **four** digits is 10,000 numbers per calendar month; `SDO` + YYMM + **five** is
-100,000. The pools are separate (proved: a full DO month does not touch SDO). When a month is used
-up the draw REFUSES by name — `delivery_order_numbers_used_up` — and **no new Delivery Order can be
-issued until the next month**. It never widens itself, which is the approved behaviour.
-
-| Volume | DOs per month (≈26 working days) | Against 10,000 |
-|---|---|---|
-| 30/day (today's shape) | 780 | 8% — comfortable |
-| 250/day (Jess's Coway benchmark, low) | 6,500 | 65% — works, but the redraw loop is already re-trying |
-| 400/day (Jess's benchmark, high) | 10,400 | **EXHAUSTED before month end** |
-
-Two costs, not one. The hard stop is obvious. The quieter one is the redraw: the allocator picks at
-random and retries a clash up to 500 times, so at 90% full it needs ~10 draws per number and at 99%
-full ~100 — still correct, and still inside the loop, but every issue gets slower as the month fills.
-
-**RECOMMENDATION (mine, not a ruling): give `DO` five digits, exactly like `SDO`.** One migration,
-one symmetric rule, 100,000 a month, and it costs one character on the supplier's paper
-(`DO2609-04827`). The alternative — `YYMMDD` instead of `YYMM` — gives 10,000 a DAY but changes the
-approved format more visibly and makes the number longer in a different place.
-
-**Why it is not fixed here.** The width is part of the format Jess approved on 2026-09-23
-(`DO2609-4827`, four digits, stated explicitly). Changing an approved document number silently is
-exactly what a numbering rule exists to prevent. It is one migration the day she says which way.
-
-**Closes when** the owner either widens the Outright series or accepts the monthly ceiling with the
-refusal as its guard.
-
-**Falsifier:** a measured Outright volume that stays well under ~8,000 DOs a month at go-live, in
-which case four digits is simply enough and this entry goes.
-
----
+Jess: *remain 4 digit.* The Outright DO series stays `DO` + YYMM + four digits (10,000 a month); a
+used-up month refuses by name (`delivery_order_numbers_used_up`) and never widens. The measured
+volume table below was the evidence; the owner accepted the ceiling with the refusal as its guard.
+Reopen only on a measured month above ~8,000 Outright DOs.
 
 ## `so-amendment-integration-tests-skip-in-ci` — EVIDENCE THAT PASSES LOCALLY AND IS NEVER RUN BY CI, opened 2026-09-23
 
@@ -237,37 +208,14 @@ card stops shipping. **Closes when the timeout or the hook lands.**
 **Falsifier:** a full `apps/api` suite that goes red on this file after the build moves into a
 hook — that would mean the budget was never the cause.
 
-## `collection-owner-unassigned-copy` — THE WORDS FOR AN UNOWNED ORDER, opened 2026-09-14
+## `collection-owner-unassigned-copy` — ✅ CLOSED 2026-09-26 by owner ruling
 
-**🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
-meets an order with no responsible person still prints `Nobody holds Delivery Duty.` with
-`Set the holder in Workspace → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
-and `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
-`apps/web/src/pages/finance/PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and
-`apps/web/src/pages/operation/OperationWork.tsx`).
-
-After 0504 the Delivery Duty holder has nothing to do with this answer. The responsible person is
-the individual the Sales Order was dealt to, so an unresolved owner means **no individual is in the
-Operation assignment pool** — and Staff & Duties cannot fix it. The sentence sends the operator to
-the wrong door, and the owner explicitly forbade asking for a Delivery Duty holder as a workaround.
-
-**The fix, ready to apply on her word:** `Nobody is assigned to this order.` with the door
-`Assign it in Sales Orders → Team`.
-
-**Why it was reported and not shipped:** an approved on-screen word changes only when the owner
-says so (CLAUDE.md §10, and one of the four reasons to interrupt her). Nothing operational depends
-on it today — the state is unreachable while the pool holds an individual, and production's pool
-holds two (Shasha CR005 · Yu Jun CR004). **Closes when she rules on the words.**
-
-**Falsifier:** an authenticated load that renders `monitor-owner-unassigned` or
-`collection-owner-none` on a real order. That would mean the pool has emptied and the wrong door is
-in front of an operator.
-
-**Supersedes `delivery-duty-initial-holder` (opened 2026-09-13, closed 2026-09-14 without being
-done).** That carry-forward asked the owner to name an initial `delivery_duty` holder so automatic
-ownership could resolve. She rejected the premise on 2026-09-13: responsibility is not a duty
-holder, it is the person the order was dealt to. 0504 removed the Delivery-Duty source, so the
-holder is no longer owed and automatic ownership no longer waits on anybody.
+Jess: *why no assign? meaning system error.* An order with no assigned person is a defect (every
+order is dealt to a person), so the surface says so and asks for a report, not for a Duty holder:
+**`Nobody assigned · system error`** over **`Report it to IT`**. Replaces `Nobody holds Delivery
+Duty.` / `Set the holder in Workspace → Staff & Duties` in COPY-STANDARD, Delivery §13.1, Payment
+§3 and Workspace; the code constants (`NO_DELIVERY_DUTY_HOLDER`, `SET_HOLDER_DOOR` in
+`packages/shared/src/payment-collection-owner.ts`) change in the Delivery build's first scope.
 
 ## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 
