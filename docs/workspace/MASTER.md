@@ -1014,26 +1014,52 @@ point and never wraps into two route rows.
 
 #### Customer card
 
-Collapsed height is exactly **72px**. It prints `Customer · {name}` and one mission state:
-`Contact due today` · `Waiting for customer` · `Scheduled {date}` ·
-`Customer requested another date` · `No answer — follow up` · `Delivered {date}`. Phone, email,
-owner and history do not appear collapsed.
+**Operating boundary — owner correction 2026-09-25.** The assigned Logistics company contacts the
+customer and agrees the delivery date. This card is not a routine Carres customer-calling queue and
+it does not give Operation a second scheduling workflow. Operation may record the partner's facts on
+its behalf under Delivery §2, but the provenance remains the Logistics company. Carres contacts the
+customer only when a source exception requires Carres judgement or correction:
+
+1. Sales Orders already knows the goods will be late (`delay_planning`) and Carres must notify the
+   customer through the Sales Order door;
+2. Logistics records `Requested Another Date` and Carres must decide the next arrangement in
+   Delivery;
+3. Logistics records `Customer Refused Delivery` and Carres must decide the next step in Delivery;
+4. Logistics records `Contact Details Incorrect` and Carres must correct the phone number in the
+   Sales Order.
+
+This overwrites the earlier §5.10 wording that made `Contact due today`, `Waiting for customer`,
+`Accepted date` and a routine Carres `WhatsApp`/`Email` date-agreement checklist appear on every
+mission. Those are not default Carres work. Outstation release remains the explicit separate
+ERP-ARCHITECTURE §6.5 exception and keeps its governed proof/message rule.
+
+Collapsed height is exactly **72px**. It prints `Customer · {name}` and one source-derived line:
+`{company} contacts the customer · by {date}` before the partner's deadline; `Scheduled {date}`
+after the arrangement; or the highest-material exception `Customer requested another date ·
+{date}` · `Customer refused delivery` · `Phone number is wrong` ·
+`Delivery delayed · customer notice required`. Phone, email, owner and history do not appear
+collapsed. Normal partner contact has no Carres button.
 
 Expanded order:
 
-1. **Current action** — governed `WhatsApp` / `Email` doors when contact data exists.
+1. **Current action** — absent during normal partner scheduling. For the four exceptions above,
+   show only the source-owned Carres action and door: `Tell the customer the new date` → Sales
+   Order; `Decide the next step for this delivery` → Delivery; `Correct the phone number` → Sales
+   Order.
 2. **Delivery** — `Requested delivery` · `Scheduled delivery` · `Delivered`.
-3. **Checklist** — `Customer contacted` · `Delivery date agreed` · `Address/access checked`.
-4. **Response** — `Accepted date` · `Requested another date` · `No answer` ·
-   `Delivery details changed`; no unrestricted outcome field.
-5. **Evidence and communication history** — source event, actor and time.
+3. **Partner contact** — company, contact deadline and latest Delivery-owned result/evidence. It is
+   read-only in Work except for the existing Delivery door that records the company's reply on its
+   behalf.
+4. **Exception** — only when one of the four governed exceptions exists; exact source fact, required
+   Carres result and owning door.
+5. **Evidence and communication history** — Delivery/Sales Orders source event, actor and time.
 
-`Accepted date` records Scheduled delivery through Delivery. `Requested another date` records the
-proposed date and returns planning to the owning module. `No answer` records Waiting with a governed
-reply-due/follow-up date. Sending a message never completes the operational work: the module's
-required fact does. Facts remain owned by Sales Orders (customer/requested date), Delivery
-(scheduled/delivered), the appropriate Sales Orders/Delivery address authority, and the shared
-source communication event.
+Completion is always the responsible source fact: Scheduled delivery for normal partner
+arrangement; the recorded delay/customer-notice consequence for a known late order; Delivery's
+decision for a requested date/refusal; or the corrected Sales Order phone number. Copying or opening
+WhatsApp never completes anything. Facts remain owned by Sales Orders (customer/requested date,
+delay planning and phone), Delivery (partner contact result, scheduled/delivered and arrangement
+decision), and their source communication evidence.
 
 #### Supplier card
 
@@ -1077,7 +1103,9 @@ Evidence belongs to the source communication event: WhatsApp screenshot, email r
 external-link answer or governed phone outcome. Customer messages use the customer/order reference;
 Supplier uses the PO reference; Logistics uses CR/TCF and never exposes internal SO number through
 the external link. Missing contact data prints the reason plus `Open {party} record`, not an
-unexplained disabled button.
+unexplained disabled button. This shared mechanism does not authorise a routine Carres customer
+scheduling message: Customer communication appears only for §5.10's four Carres exceptions or the
+separate governed outstation-release rule.
 
 #### Payment, Warehouse, loan and after-sales boundaries
 
