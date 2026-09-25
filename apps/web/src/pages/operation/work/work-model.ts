@@ -158,8 +158,6 @@ export interface WorkRailDay {
   holiday: string | null;
   count: number;
   today: boolean;
-  /** The second week's Monday — the strip draws a gap before it. */
-  weekStart?: boolean;
 }
 
 export interface WorkRailDates {
@@ -180,10 +178,9 @@ export interface WorkRailDates {
  */
 export function workRailDates(items: readonly WorkRow[], today: string, week: string): WorkRailDates {
   const monday = weekStartIso(week);
-  /* Two work weeks (owner review 2026-09-25 item 20): next week's dates are
-     one glance away instead of one arrow away. */
-  const dues = items.map((item) => item.dueIso);
-  const dates = [...workWeek(monday, dues), ...workWeek(addDaysIso(monday, 7), dues)];
+  /* One work week with arrows — the Payment Monitor rail Jess named as the
+     rail every page follows (owner ruling 2026-09-26). */
+  const dates = workWeek(monday, items.map((item) => item.dueIso));
   return {
     month: fmtMonth(addDaysIso(monday, 3)),
     previousWeek: addDaysIso(monday, -7),
@@ -200,16 +197,15 @@ export function workRailDates(items: readonly WorkRow[], today: string, week: st
         holiday: workHoliday(iso),
         count: items.filter((item) => item.dueIso === iso && item.timingBucket !== "overdue").length,
         today: iso === today,
-        weekStart: iso === addDaysIso(monday, 7),
       };
     }),
     noDate: items.filter((item) => item.timingBucket === "no_date").length,
   };
 }
 
-/** The Date select's options (UI MASTER §6.0 shell, owner ruling 2026-09-25):
- *  Missed first, the two work weeks, No working date last — every option
- *  prints its count, `0` included, and today says `Today`. */
+/** The Date options in order: Missed first, the work week, No working date
+ *  last — every option prints its count, `0` included, and today says
+ *  `Today`. The rail's day cards and its fixed rows read this one list. */
 export function workDateOptions(dates: WorkRailDates): { value: string; label: string }[] {
   const n = (count: number) => ` · ${count}`;
   return [
