@@ -35,12 +35,10 @@ export const MISSION_ROUTE_COPY = {
   done: "Done",
   notProceeded: "Not proceeded",
   loan: { offered: "Offered", accepted: "Accepted", declined: "Declined", lent: "Lent out", returned: "Returned" } as const,
-  notIssued: "Not issued",
-  issuedOf: (i: number, n: number) => `${i} of ${n} issued`,
-  issued: "Issued",
+  notIssued: "PO not issued",
+  of: (i: number, n: number) => `${i} of ${n}`,
   delayed: (k: number) => `${k} delayed`,
   fromStock: "From stock",
-  receivedOf: (r: number, n: number) => `${r} of ${n} received`,
   received: "Received",
   inStock: "In stock",
   due: (date: string) => `Due ${date}`,
@@ -129,14 +127,14 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
     : null;
   if (sup.total === 0) {
     points.push({ key: "po", label: C.label.po, dateText: null, status: input.fromStock ? C.fromStock : C.notIssued, tone: input.fromStock ? "done" : "current", final: false });
-    points.push({ key: "grn", label: C.label.grn, dateText: null, status: input.fromStock ? C.inStock : C.receivedOf(0, 0), tone: input.fromStock ? "done" : "future", final: false });
+    points.push({ key: "grn", label: C.label.grn, dateText: null, status: input.fromStock ? C.inStock : C.noDate, tone: input.fromStock ? "done" : "future", final: false });
   } else {
     const poTone: RouteTone = sup.delayedCount > 0 ? "attention" : sup.issuedCount < sup.total ? "current" : "done";
     points.push({
       key: "po",
       label: C.label.po,
       dateText: rangeText,
-      status: sup.delayedCount > 0 ? C.delayed(sup.delayedCount) : sup.issuedCount < sup.total ? C.issuedOf(sup.issuedCount, sup.total) : C.issued,
+      status: sup.issuedCount < sup.total ? C.of(sup.issuedCount, sup.total) : sup.delayedCount > 0 ? C.delayed(sup.delayedCount) : C.of(sup.total, sup.total),
       tone: poTone,
       final: false,
     });
@@ -146,7 +144,7 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
       key: "grn",
       label: C.label.grn,
       dateText: allIn ? d(sup.latestGrnIso) : range ? d(range.toIso) : null,
-      status: allIn ? C.received : C.receivedOf(sup.receivedCount, sup.total),
+      status: allIn ? C.received : C.of(sup.receivedCount, sup.total),
       tone: allIn ? "done" : overdue ? "attention" : "future",
       final: false,
     });

@@ -1364,7 +1364,7 @@ operationPosRouter.get("/for-order/:orderId", requireOperation, async (c) => {
       .from("purchase_orders")
       .select("id, status, placed_at, official_delivery_date, eta_date, do_number, do_uploaded_at, destination_id, suppliers(name)")
       .in("id", poIds),
-    sb.from("purchase_order_lines").select("po_id, destination_id").in("po_id", poIds),
+    sb.from("purchase_order_lines").select("po_id, destination_id, qty, received_qty").in("po_id", poIds),
     sb.from("purchasing_destinations").select("id, name"),
     sb
       .from("po_supplier_promises")

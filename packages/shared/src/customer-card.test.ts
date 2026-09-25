@@ -74,14 +74,14 @@ describe("the collapsed status line follows the governed precedence", () => {
     const m = customerCardModel(input({ todayIso: "2026-10-23", contactCheck: { dueIso: "2026-10-24", state: "not_open" }, contacts: [contact({})] }));
     expect(m.waiting).toBe(true);
     expect(m.followUpIso).toBe("2026-10-24");
-    expect(m.status).toEqual({ text: "Waiting for customer · reply due 24 Oct", tone: "future" });
+    expect(m.status).toEqual({ text: "Waiting for customer", tone: "future" });
     expect(m.action).toBeNull();
   });
 
   it("on the follow-up day the row returns to To do: No answer · Follow up today", () => {
     const m = customerCardModel(input({ todayIso: "2026-10-24", contacts: [contact({ result: "no_answer" })] }));
     expect(m.waiting).toBe(false);
-    expect(m.status.text).toBe("No answer · Follow up today");
+    expect(m.status.text).toBe("No answer — follow up");
     expect(m.action?.act).toBe("Contact customer today");
   });
 
@@ -96,7 +96,7 @@ describe("the collapsed status line follows the governed precedence", () => {
     const m = customerCardModel(
       input({ contacts: [contact({ result: "requested_another_date", note: askedForNote("2026-10-30"), evidencePath: "x.jpg" })] }),
     );
-    expect(m.status).toEqual({ text: "Customer requested another date · 30 Oct", tone: "attention" });
+    expect(m.status).toEqual({ text: "Customer requested another date", tone: "attention" });
     expect(m.action).toMatchObject({ act: "Record scheduled delivery", result: "The customer asked for 30 Oct", door: "schedule" });
   });
 
