@@ -53,6 +53,8 @@ therefore a page that owns a paper:
 - **Stock Transfer (`Transfer No`)** — `stock/MASTER.md` proves handover by
   scan, holder change and evidence, not by paper.
 
+**Driver signatures — owner ruling, 2026-09-24.** No Carres document requires a driver signature, for either Outright or Subscription. Do not print a driver signature field or make a driver signature a completion requirement. Customer receipt signatures and governed handover evidence remain separate facts. Existing issued PDFs remain historical records; this rule applies to newly generated documents.
+
 ## 2 · The shape every document shares
 
 ```

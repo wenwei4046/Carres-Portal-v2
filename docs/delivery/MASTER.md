@@ -1729,6 +1729,8 @@ confirmation does not alter billing rules, DO release gates or claim the full ro
 
 ### 14.2 · Loan
 
+**RULING — Jess, 2026-09-24:** No driver signature is required on the Loan Note or any other Carres document, for Outright or Subscription. The Loan Note retains the customer receipt signature only. Driver/team identity and governed handover evidence remain recorded independently; previously issued documents are not rewritten. The shared document rule lives in `docs/pdf/DOCUMENT-KIT.md`.
+
 Loan is conditional and appears only when a real stock delay and a customer decision create the
 need. Carres Operation offers the loan and records the customer's answer on the Sales Order; the
 offer, acceptance or rejection is a record in Orders beside `ops_sofa_loans`. Logistics never
