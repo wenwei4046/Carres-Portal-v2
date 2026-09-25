@@ -1,0 +1,203 @@
+<title>Payment Monitor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Carres tokens (docs/01-design-tokens.md) — Radix steps by value. Light only by choice: the portal is light. */
+  :root{
+    --canvas:#F7F8FA; --surface:#fff; --surface-alt:#f0f0f3; --expansion:#f9f9fb;
+    --border:#e0e1e6; --divider:#d9d9e0; --work-line:#ccd7e5;
+    --ink:#1c2024; --ink-2:#60646c; --ink-3:#8b8d98;
+    --blue-3:#e6f4fe; --blue-6:#b7d9f8; --blue-9:#0090ff; --blue-11:#0d74ce;
+    --green-3:#e6f6eb; --green-11:#218358; --amber-3:#fff7c2; --amber-11:#ab6400; --red-3:#feebec; --red-11:#ce2c31;
+    --r-control:6px; --r-work:9px; --r-card:10px;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--ink);font:13px/18px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;padding-block:0}
+  .note{background:#17243a;color:#fff;font-size:12px;line-height:16px;padding:6px 16px}
+  .shell{display:grid;grid-template-columns:60px 1fr;min-height:calc(100vh - 28px)}
+  .side{background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding-block:14px}
+  .side .logo{color:#e8412c;font-weight:600;font-size:11px;letter-spacing:.06em;margin-bottom:10px}
+  .side .ic{width:36px;height:36px;border-radius:var(--r-control);display:grid;place-items:center;color:var(--ink-2)}
+  .side .ic.on{background:var(--blue-3);color:var(--blue-11)}
+  .side svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .main{display:flex;flex-direction:column;min-width:0}
+  header.dest{height:50px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px}
+  header.dest h1{font-size:24px;line-height:32px;font-weight:600;margin:0}
+  header.dest .crumb{color:var(--ink-2);font-size:12px}
+  header.dest .util{margin-left:auto;display:flex;gap:10px;color:var(--ink-2)}
+  .stage{display:grid;grid-template-columns:240px 1fr;gap:16px;padding:16px;min-width:0}
+  /* Rail — Work's white section recipe (§5.5): 1px work-line, 9px radius, no shadow */
+  .rail{background:#fff;border:1px solid var(--work-line);border-radius:var(--r-work);align-self:start}
+  .rail h2{margin:0 12px;height:48px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);font-size:15px;line-height:22px;font-weight:600}
+  .rail h2 svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:2}
+  .group{padding:6px}
+  .group+.group{border-top:1px solid var(--border)}
+  .group .gh{font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);padding:6px 8px 2px}
+  .row{display:flex;align-items:center;gap:8px;min-height:40px;width:100%;border:0;background:none;text-align:left;padding:3px 8px;border-radius:var(--r-control);font:inherit;color:var(--ink);cursor:pointer}
+  .row:hover{background:var(--surface-alt)}
+  .row[aria-pressed="true"]{background:var(--blue-3);font-weight:600}
+  .row .w{flex:1;min-width:0}
+  .row .n{font-size:13px;line-height:18px;font-weight:600;color:var(--ink)}
+  .row .n.z{font-size:12px;line-height:16px;font-weight:400;color:var(--ink-2)}
+  .row .n.red{color:var(--red-11)}
+  .row.all{border-top:1px solid var(--border);border-radius:0;margin-top:4px;padding-top:8px}
+  .row:focus-visible,.chev:focus-visible,.btn:focus-visible,.link:focus-visible{outline:2px solid var(--blue-9);outline-offset:2px}
+  /* Register */
+  .reg{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .tb{height:45px;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid var(--border)}
+  .tb .picked{font-weight:600}
+  .tb .picked span{font-weight:400;color:var(--ink-2)}
+  .tb .util{margin-left:auto;display:flex;gap:6px}
+  .tb .util button{width:28px;height:28px;border:1px solid var(--divider);background:#fff;border-radius:var(--r-control);color:var(--ink-2);display:grid;place-items:center;cursor:pointer}
+  .tb .util svg,.chev svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .sheet{overflow-x:auto}
+  table{border-collapse:separate;border-spacing:0;min-width:1520px;width:100%}
+  thead th{position:sticky;top:0;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:16px;font-weight:600;text-align:left;padding:0 16px;height:36px;border-bottom:1px solid var(--divider);border-right:1px solid var(--border);white-space:nowrap}
+  thead th.num,td.num{text-align:right}
+  th:last-child,td:last-child{border-right:0}
+  tbody td{height:72px;padding:0 16px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
+  td.ctl{width:32px;padding:0 8px;border-right:0;max-width:none}
+  th.ctl{width:32px;padding:0 8px;border-right:0}
+  td.ctl+td,th.ctl+th{border-left:1px solid var(--border)}
+  .sticky1{position:sticky;left:0;background:#fff;z-index:1}
+  .sticky2{position:sticky;left:32px;background:#fff;z-index:1}
+  .sticky3{position:sticky;left:162px;background:#fff;z-index:1;box-shadow:1px 0 0 var(--border)}
+  .l1{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .l2{display:block;font-size:11px;line-height:14px;color:var(--ink-2);margin-top:2px;overflow:hidden;text-overflow:ellipsis}
+  .so{color:var(--blue-11);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+  .g{color:var(--green-11)} .o{color:var(--amber-11)} .r{color:var(--red-11)}
+  .chev{width:24px;height:24px;border:0;background:none;color:var(--ink-2);border-radius:var(--r-control);display:grid;place-items:center;cursor:pointer}
+  .chev[aria-expanded="true"] svg{transform:rotate(90deg)}
+  .av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#dbe7f5;color:#17243a;font-size:11px;font-weight:600;vertical-align:middle;margin-right:6px}
+  .act{display:flex;align-items:center;gap:6px;font-size:11px;line-height:14px;color:var(--ink-2);margin-top:2px}
+  tr.exp td{background:var(--expansion);height:auto;padding:12px 16px 16px 48px;white-space:normal;max-width:none;overflow:visible}
+  .doors{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-bottom:12px}
+  .btn{height:32px;padding:0 12px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-weight:500;color:var(--ink);cursor:pointer}
+  .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
+  .facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 24px;background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:12px 16px;margin-bottom:8px}
+  .facts .f{min-width:0}
+  .facts .k{font-size:11px;line-height:14px;font-weight:500;color:var(--ink-2)}
+  .facts .v{font-size:13px;line-height:18px;font-weight:600;margin-top:2px}
+  .facts .v small{font-weight:400;color:var(--ink-2)}
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:12px 16px;margin-bottom:8px}
+  .card h3{margin:0 0 6px;font-size:15px;line-height:22px;font-weight:600}
+  .card p{margin:0}
+  .todo .fact{font-weight:600}
+  .todo .sub{font-size:11px;line-height:14px;color:var(--ink-2);margin:2px 0 8px}
+  .docs table{min-width:0;width:auto}
+  .docs td{height:32px;padding:0 12px 0 0;border:0;max-width:none;white-space:nowrap}
+  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+  .link{background:none;border:0;color:var(--blue-11);font:inherit;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
+  .hist p{margin:0 0 4px}.hist .t{font-size:12px;color:var(--ink-2);margin-left:8px}
+  footer.ft{height:32px;display:flex;align-items:center;padding:0 16px;border-top:1px solid var(--border);color:var(--ink-2);font-size:12px}
+  @media (max-width:1100px){.stage{grid-template-columns:1fr}.rail{display:none}.side{display:none}.shell{grid-template-columns:1fr}.facts{grid-template-columns:repeat(2,minmax(0,1fr))}tr.exp td{padding-left:16px}}
+  @media (max-width:600px){.facts{grid-template-columns:1fr}.tb .picked{font-size:12px}}
+  @media (prefers-reduced-motion:no-preference){.chev svg{transition:transform 150ms}}
+</style>
+<div class="note">Design mock · Payment Monitor with the STATUS rail (owner approval 2026-09-25, segment 2) · fixture data, not customer data</div>
+<div class="shell">
+  <aside class="side" aria-label="Portal rail">
+    <div class="logo">CARRES</div>
+    <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 7h18v10H3zM3 12h18"/></svg></div>
+    <div class="ic on" title="Payments"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+  </aside>
+  <div class="main">
+    <header class="dest"><h1>Monitor</h1><span class="crumb">Payments</span>
+      <div class="util"><span>Jump to… ⌘K</span><span>🔔</span><span>?</span><span>⚙</span></div></header>
+    <div class="stage">
+      <nav class="rail" aria-label="Status">
+        <h2><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Status</h2>
+        <div class="group">
+          <div class="gh">Needs action</div>
+          <button class="row" data-k="missed" aria-pressed="true"><span class="w">Missed</span><span class="n red">1</span></button>
+          <button class="row" data-k="ask"><span class="w">Ask customer today</span><span class="n">2</span></button>
+          <button class="row" data-k="due"><span class="w">Payment due today</span><span class="n">1</span></button>
+          <button class="row" data-k="promised"><span class="w">Customer promised to pay today</span><span class="n">1</span></button>
+          <button class="row" data-k="storage"><span class="w">Storage Invoice not paid</span><span class="n">1</span></button>
+        </div>
+        <div class="group">
+          <div class="gh">Waiting</div>
+          <button class="row" data-k="later"><span class="w">Payment due later</span><span class="n">1</span></button>
+          <button class="row" data-k="nodate"><span class="w">No delivery date</span><span class="n z">0</span></button>
+          <button class="row" data-k="goods"><span class="w">Waiting for goods</span><span class="n">1</span></button>
+        </div>
+        <div class="group">
+          <div class="gh">Someone else's</div>
+          <button class="row" data-k="hold"><span class="w">Finance hold</span><span class="n z">0</span></button>
+          <button class="row" data-k="review"><span class="w">Needs review</span><span class="n z">0</span></button>
+        </div>
+        <div class="group">
+          <div class="gh">Done</div>
+          <button class="row" data-k="paid"><span class="w">Paid orders</span><span class="n">2</span></button>
+          <button class="row all" data-k="all"><span class="w">All unpaid orders</span><span class="n">7</span></button>
+        </div>
+      </nav>
+      <section class="reg" aria-label="Payment Monitor register">
+        <div class="tb"><span class="picked" id="picked">Missed <span>· 1 order</span></span>
+          <div class="util"><button aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button><button aria-label="Export"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 21h16"/></svg></button><button aria-label="Columns"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg></button></div></div>
+        <div class="sheet">
+          <table>
+            <thead><tr><th class="ctl sticky1"></th><th class="sticky2">SO No</th><th class="sticky3">Customer</th><th class="num">Balance due</th><th>Items &amp; Stock</th><th>Storage</th><th>Requested Delivery Date</th><th>Scheduled delivery</th><th>Payment timing</th></tr></thead>
+            <tbody id="rows">
+              <tr data-k="missed all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1401</span><span class="l2">TCF0541 · CR1122</span></td><td class="sticky3"><span class="l1">TAN SRI DATO' SERI MUHAMMAD</span><span class="l2">0123456789</span></td><td class="num"><span class="l1">RM 1,700.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Fri, 18 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Fri, 18 Sep · 2 PM to 5 PM</span></td><td><span class="l1 r">Payment should have been received</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
+              <tr class="exp" data-k="missed all"><td colspan="9">
+                <div class="doors"><button class="btn">Statement</button><button class="btn">Print</button><button class="btn">Create payment link</button><button class="btn">Record payment</button><button class="btn p">Ask customer to pay</button></div>
+                <div class="facts">
+                  <div class="f"><div class="k">Balance due</div><div class="v">RM 1,700.00 unpaid</div></div>
+                  <div class="f"><div class="k">Total payable · Paid</div><div class="v">RM 2,900.00 <small>· Paid RM 1,200.00</small></div></div>
+                  <div class="f"><div class="k">Requested delivery</div><div class="v">Fri, 18 Sep</div></div>
+                  <div class="f"><div class="k">Scheduled delivery</div><div class="v">Fri, 18 Sep <small>· 2 PM to 5 PM · NETS</small></div></div>
+                  <div class="f"><div class="k">Items &amp; Stock</div><div class="v g">Ready <small>· 1 of 1 · Carres Klang</small></div></div>
+                  <div class="f"><div class="k">Storage</div><div class="v">No storage charge</div></div>
+                  <div class="f"><div class="k">Payment due</div><div class="v r">Tue, 15 Sep <small>· 3 working days ago</small></div></div>
+                  <div class="f"><div class="k">Collection owner</div><div class="v">Shasha <small>· No cover today</small></div></div>
+                </div>
+                <div class="card todo"><h3>What to do</h3><p class="fact r">Payment should have been received</p><p class="sub">Ask customer to pay · Record the result.</p><button class="btn">Record the result</button></div>
+                <div class="card docs"><h3>Documents</h3><table><tr><td>RC2609-4821</td><td>RM 1,200.00</td><td>Thu, 3 Sep</td><td>Deposit</td><td><button class="link">Print</button> · <button class="link">Send</button></td></tr><tr><td>Invoice</td><td colspan="3"><small>Issued by the system when Balance due reaches RM 0, sent with the Receipt.</small></td><td></td></tr><tr><td>Statement</td><td colspan="3"></td><td><button class="link">Print</button></td></tr></table></div>
+                <div class="card hist"><h3>Communication History</h3><p><strong>Customer did not answer</strong><span class="t">Mon, 14 Sep, 4:10 PM · Shasha</span></p><p><strong>Payment message sent</strong><span class="t">Fri, 11 Sep, 10:02 AM · Shasha</span></p></div>
+              </td></tr>
+              <tr data-k="storage all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1404</span><span class="l2">TCF0612</span></td><td class="sticky3"><span class="l1">WONG MEI LING</span><span class="l2">0127775544</span></td><td class="num"><span class="l1">RM 1,800.00</span><span class="l2">includes storage RM 200.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1 o">Storage Invoice issued</span><span class="l2">RM 200.00 not paid</span></td><td><span class="l1">Wed, 23 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Wed, 23 Sep</span></td><td><span class="l1">Storage Invoice not paid</span><span class="act"><span class="av">YJ</span>Send the invoice and collect payment</span></td></tr>
+              <tr data-k="promised all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1405</span></td><td class="sticky3"><span class="l1">SITI AMINAH</span><span class="l2">0133332211</span></td><td class="num"><span class="l1">RM 2,100.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1 o">Sofa · Day 29</span><span class="l2">RM 400.00 so far</span></td><td><span class="l1">Thu, 24 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Thu, 24 Sep</span></td><td><span class="l1 o">Customer promised to pay today</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
+              <tr data-k="ask all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1406</span></td><td class="sticky3"><span class="l1">CHONG WEI JIE</span><span class="l2">0171234567</span></td><td class="num"><span class="l1">RM 1,000.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1">Free storage approved</span><span class="l2">until Sun, 27 Sep</span></td><td><span class="l1">Fri, 25 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Fri, 25 Sep · 10 AM to 1 PM</span></td><td><span class="l1">Ask customer today</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
+              <tr data-k="ask all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1403</span></td><td class="sticky3"><span class="l1">LIM KUAN YANG</span><span class="l2">0162389000</span></td><td class="num"><span class="l1">RM 1,800.00</span></td><td><span class="l1 g">Ready</span><span class="l2">2 of 2</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Sat, 26 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Sat, 26 Sep</span></td><td><span class="l1">Ask customer today</span><span class="act"><span class="av">YJ</span>Ask customer to pay</span></td></tr>
+              <tr data-k="due all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1408</span></td><td class="sticky3"><span class="l1">RAJESH KUMAR</span><span class="l2">0145556677</span></td><td class="num"><span class="l1">RM 1,000.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Wed, 23 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Wed, 23 Sep · 2 PM to 5 PM</span></td><td><span class="l1">Payment due today</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
+              <tr data-k="later all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1409</span><span class="l2">CR0899</span></td><td class="sticky3"><span class="l1">NORAINI BINTI ABDULLAH</span><span class="l2">0192223344</span></td><td class="num"><span class="l1">RM 3,400.00</span></td><td><span class="l1 g">Ready</span><span class="l2">2 of 2</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Fri, 2 Oct</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Fri, 2 Oct</span></td><td><span class="l1">Payment due Wed, 30 Sep</span><span class="act">Wait</span></td></tr>
+              <tr data-k="goods all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1402</span><span class="l2">CR0854</span></td><td class="sticky3"><span class="l1">NURUL AIN BINTI ISMAIL</span><span class="l2">0198887766</span></td><td class="num"><span class="l1">RM 1,600.00</span></td><td><span class="l1 o">Not ready</span><span class="l2">2 of 3 · 1 short</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Wed, 7 Oct</span></td><td><span class="l1">Not scheduled</span></td><td><span class="l1">Arrival not confirmed</span><span class="act">Wait</span></td></tr>
+              <tr data-k="paid"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1398</span></td><td class="sticky3"><span class="l1">LEE MEI FONG</span><span class="l2">0163334455</span></td><td class="num"><span class="l1">RM 0.00</span><span class="l2">Paid RM 2,400.00</span></td><td><span class="l1 g">Delivered</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Tue, 15 Sep</span></td><td><span class="l1 g">Delivered</span><span class="l2">Tue, 15 Sep</span></td><td><span class="l1 g">Paid</span><span class="l2">RC2609-4790 · INV2609-4790</span></td></tr>
+              <tr data-k="paid"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1399</span><span class="l2">TCF0590</span></td><td class="sticky3"><span class="l1">AHMAD FAIZAL</span><span class="l2">0176667788</span></td><td class="num"><span class="l1">RM 0.00</span><span class="l2">Paid RM 1,950.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Mon, 28 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Mon, 28 Sep</span></td><td><span class="l1 g">Paid</span><span class="l2">RC2609-4812 · INV2609-4812</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <footer class="ft" id="ft">1 order · RM 1,700.00 unpaid</footer>
+      </section>
+    </div>
+  </div>
+</div>
+<script>
+  (function(){
+    var rows=[].slice.call(document.querySelectorAll('#rows tr'));
+    var rail=[].slice.call(document.querySelectorAll('.rail .row'));
+    var words={missed:'Missed',ask:'Ask customer today',due:'Payment due today',promised:'Customer promised to pay today',storage:'Storage Invoice not paid',later:'Payment due later',nodate:'No delivery date',goods:'Waiting for goods',hold:'Finance hold',review:'Needs review',paid:'Paid orders',all:'All unpaid orders'};
+    function money(tr){var t=tr.querySelector('td.num .l1').textContent.replace(/[^\d.]/g,'');return Number(t)||0;}
+    function pick(k){
+      rail.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.k===k));});
+      var n=0,sum=0;
+      rows.forEach(function(tr){var on=(tr.dataset.k||'').split(' ').indexOf(k)>=0;tr.hidden=!on;if(on&&!tr.classList.contains('exp')){n++;sum+=money(tr);}});
+      document.getElementById('picked').innerHTML=words[k]+' <span>· '+n+(n===1?' order':' orders')+'</span>';
+      var ft=document.getElementById('ft');
+      if(n===0){ft.textContent=(k==='paid')?'No paid orders yet.':'No customer money is needed right now.';}
+      else if(k==='paid'){ft.textContent=n+(n===1?' order':' orders')+' · Paid';}
+      else{ft.textContent=n+(n===1?' order':' orders')+' · RM '+sum.toLocaleString('en-MY',{minimumFractionDigits:2})+' unpaid';}
+      var open=document.querySelector('.chev[aria-expanded="true"]');
+      if(open&&open.closest('tr').hidden){open.setAttribute('aria-expanded','false');}
+      syncExp();
+    }
+    function syncExp(){rows.forEach(function(tr){if(tr.classList.contains('exp')){var prev=tr.previousElementSibling;var c=prev.querySelector('.chev');tr.hidden=prev.hidden||c.getAttribute('aria-expanded')!=='true';}});}
+    rail.forEach(function(b){b.addEventListener('click',function(){pick(b.dataset.k);});});
+    document.querySelectorAll('.chev').forEach(function(c){c.addEventListener('click',function(){var open=c.getAttribute('aria-expanded')==='true';document.querySelectorAll('.chev').forEach(function(o){o.setAttribute('aria-expanded','false');});c.setAttribute('aria-expanded',String(!open));syncExp();});});
+    pick('missed');
+  })();
+</script>
