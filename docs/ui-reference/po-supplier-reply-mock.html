@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>PO Supplier reply — compact mock</title>
+<style>
+:root{--ink:#1c2024;--ink2:#60646c;--line:#e0e1e6;--hdr:#f0f1f4;--blue:#3e63dd;--blue3:#e6edfe;--amber:#a35a00;--red:#c62a2f;--canvas:#F7F8FA}
+*{box-sizing:border-box}body{margin:0;background:var(--canvas);font:13px/18px Inter,system-ui,sans-serif;color:var(--ink);padding:24px}
+h1{font-size:15px;line-height:22px;font-weight:600;margin:0 0 4px}.note{color:var(--ink2);font-size:12px;margin:0 0 16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:0;margin-bottom:24px;max-width:900px}
+.head{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--line);height:45px}
+.head b{font-size:11px;letter-spacing:.02em;font-weight:600;color:var(--ink2)}.head .meta{color:var(--ink2)}.sp{flex:1}
+.btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:#fff;font:inherit;font-weight:500}.btn.p{background:var(--blue);color:#fff;border-color:var(--blue)}
+table{border-collapse:collapse;width:100%}th{background:var(--hdr);color:var(--ink2);font-size:11px;font-weight:600;text-align:left;padding:0 8px;height:36px;border-right:1px solid var(--line)}
+td{padding:0 8px;height:40px;border-top:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle;white-space:nowrap}th:last-child,td:last-child{border-right:0}
+.sub{color:var(--ink2);font-size:11px;line-height:14px}.d{color:var(--amber)}.r{color:var(--red)}.num{text-align:right;font-variant-numeric:tabular-nums}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;height:32px}.seg span{padding:0 10px;line-height:30px;border-right:1px solid var(--line)}.seg span:last-child{border-right:0}.seg .on{background:var(--blue3);color:var(--blue);font-weight:500}
+.in{display:inline-block;height:32px;line-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:#fff;min-width:110px}.in.s{min-width:56px;text-align:right}
+tr.split td{height:36px;background:#fafbfc}tr.split td:first-child{color:var(--ink2)}
+.foot{display:flex;gap:16px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);height:45px;color:var(--ink2)}
+.chk{width:16px;height:16px;border:1px solid #8b8d98;border-radius:4px;display:inline-block;vertical-align:middle}
+.tag{color:var(--ink2);font-size:12px}
+</style></head><body>
+<h1>PO260903-4316(1) · Ohana — SUPPLIER REPLY, read state</h1>
+<p class="note">Left facts column of the PO object page at 1440 (PDF pane to the right, not drawn). One 40px row per goods line. 2 lines = 205px.</p>
+<div class="card">
+ <div class="head"><b>SUPPLIER REPLY</b><span class="meta">PO 14-Day Delivery Date · Fri, 9 Oct</span><span class="sp"></span><button class="btn">Record supplier answer</button></div>
+ <table><tr><th>Item</th><th class="num">Qty</th><th class="num">To deliver</th><th>Supplier Confirmed Delivery Date</th><th>Last answer</th></tr>
+ <tr><td>Cody · King<div class="sub">U1-000-101 … 104</div></td><td class="num">4</td><td class="num">4</td><td>3 pcs · Fri, 9 Oct · 1 pcs · Fri, 16 Oct <span class="d">· Delayed</span></td><td>Fri, 25 Sep · Shasha<div class="sub">Evidence 2</div></td></tr>
+ <tr><td>Cody · Queen<div class="sub">U1-000-105 · 106</div></td><td class="num">2</td><td class="num">2</td><td>Mon, 12 Oct <span class="d">· Delayed · Production delay</span><div class="sub">Supplier changed from Fri, 9 Oct</div></td><td>Fri, 25 Sep · Shasha<div class="sub">Evidence 2</div></td></tr>
+ </table>
+ <div class="foot">Supplier DO &nbsp;<b style="color:var(--ink);font-weight:500">DO-2251</b> · Photos 1 · PDF 1</div>
+</div>
+
+<h1>Edit state — the same table, editable in place</h1>
+<p class="note">Answer = segmented control in the row. Date and Reason appear only when the answer needs them. A split adds 36px sub-rows. Tick rows → one bulk bar.</p>
+<div class="card">
+ <div class="head"><b>RECORD SUPPLIER ANSWER</b><span class="chk"></span><span>Supplier DO received</span><span class="in" style="min-width:120px;color:var(--ink2)">Supplier DO No</span><button class="btn">Upload DO</button><span class="sp"></span><button class="btn">Cancel</button><button class="btn p">Save</button></div>
+ <table><tr><th style="width:32px"></th><th>Item</th><th class="num">To deliver</th><th>Answer</th><th>Date</th><th>Reason</th></tr>
+ <tr><td><span class="chk"></span></td><td>Cody · King</td><td class="num">4</td><td><span class="seg"><span>No change</span><span>Confirmed</span><span>New date</span><span class="on">Split delivery</span></span></td><td></td><td></td></tr>
+ <tr class="split"><td></td><td>└ batch 1</td><td class="num"><span class="in s">3</span> pcs</td><td><span class="in">Fri, 9 Oct ▾</span></td><td></td><td></td></tr>
+ <tr class="split"><td></td><td>└ batch 2</td><td class="num"><span class="in s">1</span> pcs</td><td><span class="in">Fri, 16 Oct ▾</span></td><td><span class="in" style="min-width:170px">Partial quantity ready ▾</span></td><td class="tag">+ Add another date &nbsp;·&nbsp; Total 4 of 4</td></tr>
+ <tr><td><span class="chk" style="background:var(--blue3);border-color:var(--blue)"></span></td><td>Cody · Queen</td><td class="num">2</td><td><span class="seg"><span>No change</span><span>Confirmed</span><span class="on">New date</span><span>Split delivery</span></span></td><td><span class="in">Mon, 12 Oct ▾</span></td><td><span class="in" style="min-width:170px">Production delay ▾</span></td></tr>
+ </table>
+ <div class="foot"><span>Evidence</span><button class="btn">Upload</button><span class="tag">≥1 WhatsApp screenshot · photo · video · PDF</span><span class="sp"></span><span>Answered by supplier on</span><span class="in">Fri, 25 Sep ▾</span></div>
+ <div class="foot" style="background:var(--blue3);color:var(--ink)"><span>1 selected · Apply to selected</span><span class="seg" style="background:#fff"><span>Confirmed</span><span>New date</span></span></div>
+</div>
+</body></html>
