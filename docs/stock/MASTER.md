@@ -634,7 +634,8 @@ decision and is not assumed here.**
 Receiving is never blocked because the GRN Duty holder is on MC or busy: every active Carres
 Operation staff member (and the Principal) sees `Receive` on the row and may post a receipt. GRN Duty
 still OWNS the Work card (`Receive the goods`) and its lateness; the actual receiver is recorded on
-the GRN as the person who did it, and the two identities stay separate (Architecture Law F: owner
+the GRN and in the Unit's History as the person who did it (owner: "record history will do"), and
+the two identities stay separate (Architecture Law F: owner
 and capability are different facts). `Not your duty today` is retired as a refusal on Inbound; the
 only refusals left are `No Site linked` and a Site that is not a Carres or transit Site. Warehouse
 Settings → `Access` shows this as `Receive goods · Everyone in Operation` by default, with the option
@@ -645,8 +646,8 @@ same build.
 **SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
 BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres
 showroom · Logistics transit point) · Operated by · Full address · Active` and offers `Add Site`.
-`PJ Showroom` (Carres showroom, operated by Carres) is added first; `HOUZS Penang` is added the day
-it is used. `Access` keeps `Manage Warehouse Settings` and `Receive goods` only; `Perform stock
+`PJ Showroom` (Carres showroom, operated by Carres) and `HOUZS Penang` (Logistics transit point,
+operated by HOUZS — owner instruction 2026-09-25: add it now, not later) are added in the same build. `Access` keeps `Manage Warehouse Settings` and `Receive goods` only; `Perform stock
 count` and `Confirm collection from Warehouse` return when Counts and NETS logins are built — no
 switch for a capability that does not exist.
 
