@@ -503,11 +503,11 @@ happens when the law is four lines long.**
 
 ### THE THREE SURFACES, AND THERE IS NO FOURTH
 
-> **Two-column object grammar — second user registered 2026-09-26.** Delivery's DO page (Delivery
-> §9, PR #1650) adopts LEFT = what happened / what to do (scrolls), RIGHT = read-only facts (420px,
-> fixed). The Payment Monitor's row expansion and the Payment Record object adopt the SAME grammar
-> (`payment/MASTER.md` §3, owner approval 2026-09-26). It is the existing Panel arranged in two
-> columns — still one scroll, no tab, no fourth way of opening a record.
+> **Payment page — the split rule's customer case, owner approval 2026-09-26.** The Payment
+> Monitor's `SO No` opens a 50/50 working page (`payment/MASTER.md` §3): the right half is the paper
+> the CUSTOMER receives (Sales Order with `Balance due` → WhatsApp message → Receipt → Invoice),
+> redrawn as the left half is worked. The register row's `▸` is a read-only nested HISTORY table,
+> the Sales Orders grammar. This is the existing split rule, not a new surface.
 ```
 INSPECT   inside the list      row expand      ↑↓ moves · Esc closes · read to decide
 WORK      full screen          four regions    the job gets done here

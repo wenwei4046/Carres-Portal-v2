@@ -346,31 +346,36 @@ working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
-**Owner approval 2026-09-25 / 2026-09-26 (segments 1, 4 and 6 of the Payment Blueprint review) ·
-APPROVED / NOT BUILT.** The row's expansion is TWO COLUMNS — the same object grammar Delivery's DO
-page adopts (Delivery §9 / UI MASTER §4.1, PR #1650): the LEFT column is what happened and what to
-do, the RIGHT column is the read-only facts. Design record `docs/payment/design/monitor-status-rail.html`.
+**Owner approval 2026-09-26 (segments 1, 4 and 6 of the Payment Blueprint review) · APPROVED / NOT
+BUILT — the Sales Orders / Purchase Orders pattern.** The register row's `▸` expansion is a LOOK,
+not a workplace: one nested read-only table in the register's own grammar (11px grey header, 13px
+cells, tabular numbers), the order's HISTORY newest first — `Date · What · Amount · By · Document`
+(receipts, sent messages, recorded answers, the issued Invoice). Nothing is done there. **Clicking
+`SO No` opens the Payment page** (`/finance/monitor/{orderId}`, back word `Monitor`, which restores
+the picked day, status, filters and scroll) — a 50/50 working page under UI MASTER §4.1's split rule,
+because every Payment act produces something the customer receives:
 
 ```text
-[Record payment] [Ask customer to pay ← blue] [⋯ Statement · Print · Create payment link]   doors, top right
-LEFT (remainder, ≥ 560px)                      RIGHT (420px, token side-panel-width)
-What to do      fact · one line · one button   Money     Goods · Storage (when any) · Total payable · Paid · Balance due
-Documents       Receipt rows · Invoice ·       Timing    Payment due {day} · Collection owner {name}
-                Statement                      Storage   {Group} · Day {n} · free until {day} · next check {day}
-Communication   newest first, 5, `Show all`    Customer  phone · reference
-History
+← Monitor   SO-1405 · SITI AMINAH · Balance due RM 2,500.00       [Record payment] [Ask customer to pay ← blue] [⋯]
+LEFT — the work                                     RIGHT — the paper the customer receives
+WHAT TO DO   fact · one line · one button           default: the Sales Order document (prints Balance due)
+MONEY        Goods · Storage · Total payable ·      Ask customer to pay → the WhatsApp message, live
+             Paid · Balance due                     Record payment     → the Receipt, live
+STORAGE      {Group} · Day {n} · free until ·       Balance due RM 0   → the Invoice
+             next check · the two storage doors
+HISTORY      the same nested table, complete
 ```
 
-Flat: one hairline between sections, no nested cards; section titles 11px uppercase slate-11; the
-row's own facts (customer, goods, dates, status, owner avatar) are not repeated. Below 1024px the
-right column moves above the left. The Work Customer card renders the same LEFT column (the Payment
-section); its Summary already carries the money. The paid Payment Record object (Payment Records)
-uses the same two columns: left = the Receipt document and History, right = Payment facts and
-Allocated to. The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
-opens the same row; `?invoice=` is retired with the Invoice-keyed row): the fact grid carries Money,
-Delivery Dates, Items & Stock, Storage and Collection owner as facts; the three blocks carry What to
-do, Documents and Communication History; Delivery's `Items, Services & Stock` panel opens from the
-`Items & Stock` cell as today. **There is no `Invoice` section**: the Invoice is the closing document and
+Left column words are the register's; no nested cards; below 1024px the paper stacks under the
+work. `⋯` holds `Statement` · `Print` · `Create payment link`. The Work Customer card's Payment
+section is the LEFT column only (the right panel cannot host two halves); its `Open SO-{n} in
+Payments` door opens this page. Design record `docs/payment/design/` (`monitor-status-rail.html`
+for the register, `payment-page.html` for the page). Delivery's DO row keeps its in-row work
+because its acts need no customer paper; Payment's acts do — that is the one reason the two differ.
+
+The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
+opens the Payment page; `?invoice=` is retired with the Invoice-keyed row): Delivery's `Items,
+Services & Stock` panel opens from the `Items & Stock` cell as today. **There is no `Invoice` section**: the Invoice is the closing document and
 lives with the Receipt in Payment Records. The doors sit on one strip above it (`Statement` ·
 `Print` · `Create payment link` · `Record payment` · `Ask customer to pay`); **one blue** — `Ask
 customer to pay` once the clock admits asking, otherwise `Record payment`. Money reads
@@ -2205,9 +2210,10 @@ replacement draft is issued from the order's `Generate invoice`, which draws a n
 
 50/50 is used only while editing a customer-facing message/Invoice, recording Payment, or sending
 Invoice/Receipt. Narrow widths stack action/form first, customer document/message preview second.
-**In place (owner approval 2026-09-25, segment 5):** `Ask customer to pay`, `Record the result` and
-`Record payment` open INSIDE the Monitor row's expansion (replacing its three blocks) and inside the
-Work Customer card's Payment section — the same components, never a page change. After a successful
+**On the Payment page (owner approval 2026-09-26, supersedes the 2026-09-25 in-row wording):** `Ask
+customer to pay`, `Record the result` and `Record payment` run on the Payment page — the left half
+is the form, the right half the paper — and inside the Work Customer card's Payment section (form
+only). The same components. After a successful
 posting the door strip's blue becomes `Send receipt and invoice` (one message, two documents); a
 recorded message adds one Communication History line and moves the Work card to `Waiting`.
 
