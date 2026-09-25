@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,10 +8,10 @@ import { itSaysNoBannedWord } from "@/test/banned-words";
 import LedgerTrialBalance, { trialBalanceLines } from "./LedgerTrialBalance";
 import { trialBalanceSheet } from "../month-end-pack";
 
-const api = vi.hoisted(() => ({ fetch: vi.fn() }));
+const api = vi.hoisted(() => ({ fetch: vi.fn(), sheet: vi.fn(() => ({})) }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
-vi.mock("xlsx", () => ({ utils: { json_to_sheet: () => ({}), book_new: () => ({}), book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
+vi.mock("xlsx", () => ({ utils: { json_to_sheet: api.sheet, book_new: () => ({}), book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 
 const acc = (code: string, name: string, kind: string, dr: number, cr: number) => ({
   account_code: code, account_name: name, kind, is_control: false, is_active: true,
@@ -39,6 +39,7 @@ function show(at = "/finance/ledger/trial-balance?asOf=2026-09-11") {
 
 beforeEach(() => {
   api.fetch.mockReset();
+  api.sheet.mockClear();
   api.fetch.mockResolvedValue(REPORT);
   localStorage.clear();
 });
@@ -206,6 +207,42 @@ describe("Trial Balance headings", () => {
     sortBy("Account");
     expect(screen.getByText("Current assets")).toBeInTheDocument();
     expect(printedAccounts()).toEqual(["CA-B1 Maybank", "CA-B2 Public Bank", "CA-C Cash in hand", "LI-T Trade payables", "IN-S Sales", "EX-P Purchases"]);
+  });
+
+  it("Export Excel leaves the heading lines' Debit and Credit empty, so a column sum counts each account once", async () => {
+    api.fetch.mockResolvedValue(NESTED);
+    show();
+    await screen.findByText("Bank");
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excel" }));
+    await waitFor(() => expect(api.sheet).toHaveBeenCalled());
+    const sheet = (api.sheet.mock.calls[0] as unknown[])[0] as Record<string, string>[];
+    expect(sheet.map((r) => `${r.Account}|${r.Debit}|${r.Credit}`)).toEqual([
+      "Assets||", "  Current assets||", "    Bank||",
+      "      CA-B1 Maybank|500|0", "      CA-B2 Public Bank|0|30", "    CA-C Cash in hand|20|0",
+      "LI-T Trade payables|0|100", "IN-S Sales|0|440", "EX-P Purchases|50|0",
+    ]);
+    const total = (side: string) => sheet.reduce((s, r) => s + Number(r[side] || 0), 0);
+    expect([total("Debit"), total("Credit")]).toEqual([570, 570]);
+  });
+
+  it("a search looks through the accounts alone and prints them flat, so the footer adds up what is on screen", async () => {
+    api.fetch.mockResolvedValue(NESTED);
+    show();
+    await screen.findByText("Bank");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "Current assets" } });
+    // A heading's name finds nothing: no bold heading line with a subtotal beside an RM 0.00 footer.
+    await waitFor(() => expect(screen.queryByText("Current assets")).not.toBeInTheDocument());
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "Maybank" } });
+    const link = await screen.findByRole("link", { name: "CA-B1 Maybank" });
+    // Flat, as while a column is sorted: not indented under a heading that is not there.
+    await waitFor(() => expect(link.parentElement).not.toHaveClass("pl-12"));
+    expect(screen.queryByText("Bank")).not.toBeInTheDocument();
+    expect(screen.getAllByText("RM 500.00").length).toBe(2);
+    expect(screen.getByTestId("trial-balance-summary")).toHaveTextContent("1 account ·");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "" } });
+    expect(await screen.findByText("Current assets")).toBeInTheDocument();
   });
 
   it("asks for the department it was given", async () => {

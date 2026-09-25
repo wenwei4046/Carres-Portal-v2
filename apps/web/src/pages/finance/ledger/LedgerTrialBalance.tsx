@@ -5,8 +5,9 @@
  * in the chart's order, and every heading, at every depth, carries its own
  * Debit and Credit subtotal, nested the way the Balance Sheet and the Profit
  * and Loss nest theirs (0579). The API adds those subtotals up. Sorting a
- * column prints the accounts alone, sorted; clearing the sort brings the
- * headings back.
+ * column or searching prints the accounts alone; clearing both brings the
+ * headings back. The Excel and PDF export keep the heading lines but leave
+ * their Debit and Credit empty, so a column sum counts each account once.
  *
  * It is a Register (§6.7), so there is no KPI strip. The debit and credit
  * totals are the grid's own footer row; the difference sits in the status
@@ -102,15 +103,18 @@ export default function LedgerTrialBalance() {
   const report = query.data;
   const notStarted = (query.error as { status?: number } | null)?.status === 409;
 
-  // A sorted column prints the accounts alone, sorted, as the page always
-  // has: a sort would pull accounts out from under their headings and leave
-  // the subtotals beside the wrong rows. Clearing the sort brings the
+  // A sorted column or a search prints the accounts alone, as the page always
+  // has: either would pull accounts out from under their headings and leave
+  // a subtotal beside rows it does not add up. Clearing both brings the
   // headings back.
   const [sorted, setSorted] = useState(false);
   const onSortChange = useCallback((s: unknown) => setSorted(s !== null), []);
+  const [searching, setSearching] = useState(false);
+  const onSearchChange = useCallback((q: string) => setSearching(q !== ""), []);
+  const flat = sorted || searching;
   const rows = useMemo(
-    () => (report?.status !== "ok" ? [] : sorted ? trialBalanceAccountLines(report) : trialBalanceLines(report)),
-    [report, sorted],
+    () => (report?.status !== "ok" ? [] : flat ? trialBalanceAccountLines(report) : trialBalanceLines(report)),
+    [report, flat],
   );
   const goLive = report?.go_live_on ?? null;
 
@@ -120,17 +124,19 @@ export default function LedgerTrialBalance() {
         ? <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>
         : <span className={indent(r.depth)}><Link className="underline underline-offset-2"
           to={ledgerAccountHref(r.code, goLive, asOf)}>{r.code} {r.name}</Link></span>,
-      searchValue: (r) => `${r.code} ${r.name}`,
+      // Search looks through accounts only; a heading never matches.
+      searchValue: (r) => (r.heading ? "" : `${r.code} ${r.name}`),
       exportValue: trialBalanceLabel },
     { key: "kind", label: "Kind", width: 130, accessor: (r) => ledgerKindWord(r.kind),
       groupValue: (r) => ledgerKindWord(r.kind), filterType: "enum" },
     { key: "debit", label: "Debit", width: 150, align: "right",
       accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.debit)}</span> : money(r.debit)),
-      numberValue: (r) => r.debit, exportValue: (r) => r.debit,
+      // A heading's subtotal stays out of the export, so a column sum adds each account once.
+      numberValue: (r) => r.debit, exportValue: (r) => (r.heading ? "" : r.debit),
       footerTotal: (visible) => rm(sum(visible, "debit")) },
     { key: "credit", label: "Credit", width: 150, align: "right",
       accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.credit)}</span> : money(r.credit)),
-      numberValue: (r) => r.credit, exportValue: (r) => r.credit,
+      numberValue: (r) => r.credit, exportValue: (r) => (r.heading ? "" : r.credit),
       footerTotal: (visible) => rm(sum(visible, "credit")) },
   ], [goLive, asOf]);
 
@@ -155,7 +161,7 @@ export default function LedgerTrialBalance() {
         <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.heading ? "heading" : "account"}:${r.code}`}
           storageKey="carres.finance.trial-balance.v1" appearance="reference" exportName="Trial Balance"
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
-          onSortChange={onSortChange} countsInGroup={isAccount}
+          onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
           searchPlaceholder="Search accounts…"
           toolbarStart={<span className="flex items-center gap-3 text-body">
             <span>As of</span>
