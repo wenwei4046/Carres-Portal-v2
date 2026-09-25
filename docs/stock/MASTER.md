@@ -620,7 +620,7 @@ Ready Stock
 Showroom Display
 Service Case
 Needs checking
-Available · Damaged · In repair · Incoming   (physical-state rows, same group)
+Available · Cannot sell · Incoming   (Inventory Status rows, same group)
 ```
 
 The dated work strip remains above the Register. For the selected actual date it shows only the
@@ -633,8 +633,8 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-PO Doc Date · Goods Received Date · Unit ID · Item · Stock use · Stock Location ·
-PO No / Ref No · SO Date · SO No
+PO Doc Date · Goods Received Date · Handed over · Unit ID · Item · Inventory Status · Condition ·
+Stock Location · Logistics · Delivery Location · SO Date · SO No · PO No / Ref No
 ```
 
 `Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
@@ -669,38 +669,38 @@ row prints `—` for Unit ID with `×{qty}` beside the product. Measured on prod
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
-**EVERY COLUMN HEAD IS A WORD THE DICTIONARY ALREADY RULES — owner correction 2026-09-25.** Under the Listing Template's rule 2 (record dates first, then the document number, exactly as
-Sales Orders leads with `Proceed Date · SO Doc Date · SO No`), the Unit's two record dates lead —
-`PO Doc Date` (the Unit is born with the PO) then `Goods Received Date` (it entered Carres control)
-— and `Unit ID` follows as the pinned identity that opens the record; `SO Date` precedes `SO No`
-for the same reason. The
-nine heads are `Unit ID` · `Item` · `Stock use` (this MASTER's approved availability word since
-2026-09-04) · `Stock Location` · `SO No` · `SO Date` · `PO No / Ref No` (the stock picker's
-provenance head: the document the goods came in on — a PO, or a Transfer/Repair/Claim number) ·
-`PO Doc Date` · `Goods Received Date`. `Product`, `PO/Source No`, `PO/Source date`, `Received`,
-`Site` and `Who has it` are retired as Inventory heads; no new head may be minted for this page.
+**THE THIRTEEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, APPROVED TARGET / NOT
+BUILT.** Under the Listing Template's rule 2 (record dates first, then the document number, exactly
+as Sales Orders leads with `Proceed Date · SO Doc Date · SO No`) the Unit's dates lead and the pinned
+`Unit ID` follows. Every head is a word the dictionary already rules; no head may be minted for this
+page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showroom Display`,
+`History` …) only filter the same table and never carry their own columns.
 
-**THE WORDS IN `Stock use` AND `Stock Location` — owner rulings 2026-09-25.**
+| Column | Meaning | Absence |
+|---|---|---|
+| `PO Doc Date` | the day the Unit was born (official PO issue) | `Not recorded` |
+| `Goods Received Date` | the day it entered Carres control (posted receipt) | `Not received` |
+| `Handed over` | the day the Warehouse posted OUT to the Logistics company (Delivery §4.1 record word) | blank while the Unit stands in a Site |
+| `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
+| `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
+| `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
+| `Condition` | the physical state, the stock picker's existing head: `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
+| `Stock Location` | the Carres or partner Site the Unit stands in or last stood in: `Carres Klang` · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`. Never a company, never NETS | — |
+| `Logistics` | the company whose driver took the goods (`NETS` · `AL` · `HOUZS`); filled only after OUT | blank |
+| `Delivery Location` | where the goods are going (the DO's customer address, or the next Site on a Journey leg); filled only after OUT | blank |
+| `SO Date` · `SO No` | the Sales Order the Unit is promised to | blank · `No SO` |
+| `PO No / Ref No` | the document the goods came in on (PO, Transfer, Repair, Claim number) | `Not recorded` |
 
-- `Stock Location` joins the default columns directly after `Stock use` and replaces `Who has it`
-  (owner correction 2026-09-25). It prints COPY-STANDARD's existing place words — `Carres Klang` ·
-  `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong` — while the Unit stands in a Site; once the
-  Warehouse has posted OUT and no Site has posted IN, it prints `{Logistics} · {Delivery Location}`
-  (`NETS Logistics · PJ Showroom` · `NETS Logistics · 12 Jalan SS2, PJ`): who picked up and where it
-  is going, nothing else. Nobody records the road — OUT at origin and IN at destination are the only
-  two events, exactly as SAP/Odoo stock-in-transit works (owner ruling 2026-09-25). `With NETS
-  Delivery`, `In transit` and `On the way` are not Inventory words. The rail has no `WHO HAS IT` group; it is `STOCK · OWNERSHIP ·
-  CONTROL`.
-- `Stock use` prints one plain word for what the Unit can do now: `Available` (can be promised) ·
-  `Reserved` (bound to the Sales Order in `SO No`; `Reserved / sold` is retired — a sold Unit is
-  delivered and lives in History) · `Incoming` (never in the default list). A Unit on the road keeps
-  its `Available`/`Reserved` word; the road shows in `Stock Location`. A Unit
-  that cannot be promised never prints the vague `Not available`: it prints the actual reason the
-  register holds — `Damaged` · `Wrong item` · `Waiting inspection` · `In repair` · `Customer return ·
-  check required` — so the operator reads what is wrong, not that something is.
-- Absence words: `No SO` (not promised to anyone) · `Not received` (no Receiving record) ·
-  `Not recorded` (the fact was never captured). Required facts (Unit ID · Product · Stock use)
-  never print an absence word; an empty required cell is a defect.
+Nobody records the road. OUT at origin (`Record {n} Units loaded to {Logistics}`, 0424) and IN at
+destination (Receiving, 0490) are the only two events, exactly as SAP/Odoo stock-in-transit works;
+between them the row keeps its `Stock Location`, gains `Handed over · Logistics · Delivery
+Location`, and after the customer signs it leaves the list into History. A partner leg reads the
+same way: Klang OUT → `Logistics AL · Delivery Location AL Sungai Buloh`; AL IN → `Stock Location
+AL Sungai Buloh`; AL OUT → `Logistics AL · Delivery Location {customer}`; delivered → History.
+`With NETS Delivery`, `In transit`, `On the way`, `Who has it`, `Site` and `Where` are not
+Inventory words. `Ownership` (`Carres Owned` · `Supplier Consignment`) · `Category` · `Last
+verified` · `Supplier` · `Last moved` stay one click away in `Columns`. Required facts (`Unit ID` ·
+`Item` · `Inventory Status`) never print an absence word; an empty required cell is a defect.
 
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
