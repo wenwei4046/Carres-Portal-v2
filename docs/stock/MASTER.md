@@ -826,6 +826,32 @@ The default includes outstanding loading, missing evidence and unmatched driver 
 Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
 filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
+**OUTBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
+composite `Document` / `Units` cells above as design; the Pickup status rail, the on-row `Loading`
+door, the full-width Loading workspace and the separate `Loaded` / `Driver confirmed` facts stay).**
+One row is one DO + Site scope, 40px, one fact per cell, in the owner's order:
+
+```
+Scheduled handover · Ship Date · DO No · SO No · Pickup By · Delivery Location · Item ·
+Required · Loaded · Driver confirmed · Loading
+```
+
+`Scheduled handover` is Delivery's planned pickup day; `Ship Date` is the day the Warehouse
+recorded the goods loaded (blank until then). `Pickup By` is the company whose driver comes
+(`NETS` · `AL` · `HOUZS`); `Delivery Location` is the customer address or the next Site. Several
+goods print `{n} items ▸` and keep the expansion (each Unit's scanned / checked / packed / loaded /
+driver-confirmed facts). `Required · Loaded · Driver confirmed` are three columns, never one
+number. The `Loading` cell prints `Done` once every required Unit is loaded and driver-confirmed,
+and the row stays under the `Loaded` filter. `Supplier DO No` is never an Outbound column — the
+supplier's delivery note belongs to Inbound. Driver confirmation remains the driver's own act
+through a personal NETS login (§11, NOT BUILT); until then a Carres operator records it on the
+driver's behalf and the record names both (`recorded by {staff} for {driver}`). Workspace: on the
+scheduled day the `warehouse.outbound_handover` rule gives one card — `{DO No} · {SO No} / {n}
+items · pickup by {company} today / Load the goods` — with `Open Outbound` landing on this row;
+**PROPOSAL / NOT LAW:** until NETS personal accounts and Site queues exist, that card resolves to the
+current GRN Duty so the work is visible to a Carres person; falsifier: the owner prefers it hidden
+until NETS logins exist.
+
 **Completion and return — owner approved 2026-09-16; built, production verification pending.** Once all
 required Units are loaded, make outstanding driver confirmation and the owning Delivery Order
 door clear instead of continuing to emphasise scanning as the next act. Warehouse never confirms
