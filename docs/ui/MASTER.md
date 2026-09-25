@@ -729,6 +729,21 @@ matching, new COPY labels, kit additions or implementation. Those remain a propo
 [discussion Card](../cards/SHARED-UI-calendar-work-activity-discussion.md). This PLAN ruling does
 not authorize application implementation or claim a complete customer history is already built.
 
+### ONE JOB, TWO DOORS — how work flows past the rail (owner-confirmed 2026-09-25, flow step 1)
+
+1. **One job, two doors.** A job can be done from Work or directly on its owning module page. Both
+   use the same module action and write the same single record (Workspace §5.1 Panel 3; ERP Law C).
+2. **Done means the source fact exists.** When the module records the result, the Work item closes
+   in both places at once. Nobody presses a separate `Done`.
+3. **The rail only reflects and links.** The recorded change then appears in Activity (who · when ·
+   what) and in the selected customer's history under Customers. Calendar changes only when a dated
+   arrangement changes; it never lists to-do items. No rail door performs or completes the job —
+   selecting a row opens Work or the owning module.
+
+Example: delivery photo. Work `Upload the delivery photo` and the DO page's upload are one action →
+the photo is saved once in Delivery → the Work item closes → Activity shows `Delivery photo uploaded`
+with actor and time → the customer's history shows the same event → Calendar is unchanged.
+
 ### WHAT IS ON SCREEN TODAY — measured source, 2026-09-24
 
 `OperationRightRail.tsx` still mounts Calendar, My Work (`TasksPanel`) and Activity. Customer search
