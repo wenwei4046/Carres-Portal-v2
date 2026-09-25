@@ -64,7 +64,7 @@ export const CUSTOMER_CARD_COPY = {
   sectionChecks: "Checks",
   sectionDelivery: "Delivery",
   sectionContact: "Contact",
-  sectionHistory: "Evidence and recent history",
+  sectionHistory: "Evidence and communication history",
   carresContacts: "Carres contacts this customer",
   companyContacts: (company: string) => `${company} contacts this customer`,
   noEmail: "No email recorded",

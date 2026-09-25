@@ -31,6 +31,7 @@ import {
   type RoutePointKey,
   type RouteTone,
 } from "@carres/shared";
+import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
 import { useLoanOffers } from "@/lib/queries";
@@ -259,9 +260,7 @@ function RouteDetail({
     </Link>
   );
   const partyButton = (label: string, party: "logistics" | "customer" | "supplier") => (
-    <button type="button" className="inline-flex min-h-10 items-center rounded-control border border-kit-slate-5 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3" onClick={() => onOpenParty(party)}>
-      {label}
-    </button>
+    <Button size="touch" onClick={() => onOpenParty(party)}>{label}</Button>
   );
   const row = (left: string, right: string, key?: string) => (
     <div key={key ?? left} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] leading-4">

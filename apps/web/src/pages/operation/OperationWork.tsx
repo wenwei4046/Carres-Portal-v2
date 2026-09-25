@@ -31,6 +31,7 @@ import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
+import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { TopBarIcons } from "./components/GlobalTopBar";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
@@ -709,9 +710,7 @@ export default function OperationWork() {
                 /* §5.10: the last good mission stays; only this line says so. */
                 <div className="flex shrink-0 items-center gap-3 rounded-work border border-work-line bg-white px-3 py-2" role="status" aria-live="polite" data-testid="work-detail-refresh-failed">
                   <p className="min-w-0 flex-1 text-body text-kit-slate-12">Some information could not be refreshed.</p>
-                  <button type="button" onClick={retry} className="h-10 shrink-0 rounded-control border border-kit-slate-4 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3 min-[960px]:h-9">
-                    Try again
-                  </button>
+                  <Button size="touch" onClick={retry}>Try again</Button>
                 </div>
               ) : null}
               <WorkActionPanel item={selected.source} hasParties={orderRefOf(selected.source) !== null} onOpen={() => navigate(selected.destination)} />
