@@ -686,7 +686,25 @@ the same group and item grammar; zero matches is not the same as zero work.
   grows for it. The loading skeleton is the same 104px / 60px geometry. In a 704px list viewport
   six cards show whole (6 × 104 + 5 × 8 = 664px). At 743px the card keeps exactly this geometry.
 - The detail column stacks independent white sections: the selected action's header, its action
-  section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order.
+  section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order — in that order,
+  Logistics · Customer · Supplier.
+- **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 960px, exact values:**
+  12px canvas padding; sections 8px apart; `Back to work` a 40px row; the header card (12px
+  padding, height follows content) carries the object line, the problem 16/22/600 and the action
+  line 13/18; the task card (12px padding) puts its result line and the 32px `Open {object}`
+  button (13px) on ONE row, then the 36px `Owner, timing and source` disclosure (12px). Party cards:
+  12px sides, heading 15/20/600, current action 13/18/600, supporting/status text 12/16,
+  `Checks n of 3` 12px, a 40×40 chevron; Customer and Supplier collapse to exactly 72px; Logistics
+  is at least 72px and grows only for its approved scheduled/exception facts (its five-fact
+  collapsed law is unchanged); expanded bodies use 10px vertical padding and 8px between sections;
+  radius stays `rounded-work`. The same compact detail applies at 820px and 390px. From 960px the
+  previous detail geometry holds (16px gaps, 24/16px card padding, 14/20 current action).
+- **One header row.** Work's header carries the top-bar icons (`Jump to…` · alerts · help ·
+  settings) itself, so the slim 44px GlobalTopBar is not drawn on Work — the same law every page
+  with its own Destination Header follows. When the row is too narrow (390px) the count wraps under
+  the title inside the 64px row; the title never truncates. Acceptance at 743×704: two toolbar rows,
+  and the detail title, task card, Logistics, Customer and Supplier headings all visible without
+  scrolling.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
@@ -843,7 +861,7 @@ Scheduled delivery · 27 Oct                        ← only when scheduled; tim
 ```
 
 **Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
-redesigned):** party heading 15/20/600 · current action 14/20/600 · secondary fact 12/16/400 ·
+redesigned):** party heading 15/20/600 · current action 14/20/600 (13/18/600 below 960px) · secondary fact 12/16/400 ·
 section label 11/14/600 uppercase · check row 13/18/400 · history row 12/16/400 · button 13/18/500,
 at least 36px tall (40px below 960px). Customer and Supplier headings use the same 15/20/600.
 
