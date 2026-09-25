@@ -111,10 +111,12 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
                       (select go_live_on from gl_config where id))::text as on_date`);
     const { pay_from, expense, on_date } = acct.rows[0];
     await actAs(U.financePreparer);
+    // Every voucher line names its department (0540); Office takes any expense.
     voucherId = (
       await q(
         `select public.payment_voucher_save_draft(null, 'DIRECT', null, $1, $2::date, $3,
-                  jsonb_build_array(jsonb_build_object('account_code', $4::text, 'description', 'IT line', 'amount', 10))) as id`,
+                  jsonb_build_array(jsonb_build_object('account_code', $4::text, 'description', 'IT line', 'amount', 10,
+                                                       'department_type', 'OFFICE'))) as id`,
         [`IT payee ${RUN}`, on_date, pay_from, expense],
       )
     ).rows[0].id as string;
