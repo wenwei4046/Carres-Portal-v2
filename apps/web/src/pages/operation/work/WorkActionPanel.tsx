@@ -11,18 +11,11 @@
  * own section at the bottom (`WorkOwnerSource`), never here.
  */
 import type { ReactNode } from "react";
-import type { OperationWorkItem, OperationWorkModule } from "@carres/shared";
+import type { OperationWorkItem } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import DeliveryProofReviewWork from "../components/DeliveryProofReviewWork";
+import { WORK_MODULE_WORD } from "./module-word";
 
-export const WORK_MODULE_WORD: Record<OperationWorkModule, string> = {
-  orders: "Sales Orders",
-  purchasing: "Purchasing",
-  receiving: "Receiving",
-  delivery: "Delivery",
-  payment: "Payment",
-  issue_tracker: "Issue Tracker",
-};
 
 export default function WorkActionPanel({
   item,

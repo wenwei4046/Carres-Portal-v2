@@ -5,7 +5,7 @@
  */
 import type { OperationWorkItem } from "@carres/shared";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
-import { WORK_MODULE_WORD } from "./WorkActionPanel";
+import { WORK_MODULE_WORD } from "./module-word";
 import { WorkSection } from "./WorkCard";
 
 export default function WorkOwnerSource({ item }: { item: OperationWorkItem }) {

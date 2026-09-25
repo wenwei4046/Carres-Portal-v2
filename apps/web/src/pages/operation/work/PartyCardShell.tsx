@@ -38,7 +38,7 @@ export function ToneLine({ tone, children, testId }: { tone: PartyTone; children
   const icon = TONE_ICON[tone];
   return (
     <span className={`inline-flex min-w-0 items-center gap-1 text-[12px] font-normal leading-4 ${TONE_TEXT[tone]}`} data-testid={testId}>
-      {icon ? <Icon name={icon} size={12} /> : null}
+      {icon ? <Icon name={icon} size={14} /> : null}
       <span className="min-w-0">{children}</span>
     </span>
   );
