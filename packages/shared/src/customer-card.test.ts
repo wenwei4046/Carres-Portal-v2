@@ -150,3 +150,20 @@ describe("follow-up and message", () => {
   });
 
 });
+
+describe("review fixes (#1608)", () => {
+  it("the follow-up day is counted from the Carres business day, not the UTC date", () => {
+    // 07:30 MYT Fri 23 Oct is stored as 22 Oct 23:30Z → next Delivery working day is Sat 24 Oct.
+    expect(customerFollowUpIso("2026-10-22T23:30:00Z")).toBe("2026-10-24");
+    expect(customerWaitingOf({ latest: { atIso: "2026-10-22T23:30:00Z", result: "waiting_for_customer_reply" }, todayIso: "2026-10-23" }).waiting).toBe(true);
+  });
+
+  it("a missed check shows the act even while a reply is awaited — a passed day is always To do", () => {
+    const m = customerCardModel(
+      input({ todayIso: "2026-10-26", contactCheck: { dueIso: "2026-10-24", state: "missed" }, contacts: [contact({ atIso: "2026-10-26T01:00:00Z" })] }),
+    );
+    expect(m.status.tone).toBe("missed");
+    expect(m.action?.act).toBe("Contact customer today");
+  });
+});
+

@@ -101,6 +101,8 @@ export const CUSTOMER_CARD_COPY = {
   detailsChanged: "Change the address in the Sales Order, then record the reply.",
   replyRecorded: "Reply recorded",
   replyFailed: "The reply could not be recorded. Try again.",
+  addressFailed: "The reply is recorded. The address check could not be recorded. Try again.",
+  copyFailed: "The message could not be copied. Try again.",
   needsProof: "Upload the customer's WhatsApp reply first.",
   needsDate: "Choose the date the customer asked for.",
 } as const;
@@ -177,8 +179,18 @@ export interface CustomerContactFact {
  * contact: the next Delivery working day (Mon–Sat + public holidays). The
  * Work feed and the card both ask THIS (Law D).
  */
+/** The Carres business day (Asia/Kuala_Lumpur, UTC+8, no daylight saving) of
+ *  a timestamp. `07:30 MYT Fri 23 Oct` is stored `2026-10-22T23:30:00Z`; its
+ *  day is the 23rd, never the 22nd a bare slice would give. */
+export function mytDayOf(iso: string): string {
+  if (ISO.test(iso)) return iso;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso.slice(0, 10);
+  return new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
 export function customerFollowUpIso(contactAtIso: string, holidays?: WorkingDayOptions["holidays"]): string | null {
-  const day = contactAtIso.slice(0, 10);
+  const day = mytDayOf(contactAtIso);
   if (!ISO.test(day)) return null;
   return addWorkingDays(day, 1, { holidays });
 }
@@ -321,7 +333,7 @@ export function customerCardModel(input: CustomerCardInput): CustomerCardModel {
       action = { act: CUSTOMER_CARD_COPY.correctPhone, result: CUSTOMER_CARD_COPY.correctPhoneResult, dueIso: due, timing: timingOf(due, today), door: "sales_order" };
     } else if (latestResult === "requested_another_date" && askedIso && askedIso !== scheduled) {
       action = { act: CUSTOMER_CARD_COPY.recordScheduled, result: CUSTOMER_CARD_COPY.customerAsked(spell(askedIso)), dueIso: due, timing: timingOf(due, today), door: "schedule" };
-    } else if (!scheduled && mode === "operation" && !waiting) {
+    } else if (!scheduled && mode === "operation" && (!waiting || contactMissed)) {
       const timing = timingOf(due, today);
       action = {
         act: timing === "today" || timing === "missed" || !due ? CUSTOMER_CARD_COPY.contactToday : CUSTOMER_CARD_COPY.contactBy(spell(due)),

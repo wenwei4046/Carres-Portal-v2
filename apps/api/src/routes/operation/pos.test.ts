@@ -2876,3 +2876,51 @@ describe("POST evidenced supplier reply", () => {
     expect(userClient).not.toHaveBeenCalled();
   });
 });
+
+describe("GET /api/operation/pos/for-order/:orderId — the Work Supplier card's facts (§5.10)", () => {
+  const ORDER = "11111111-2222-4333-8444-555555555555";
+  function chainFor(rows: Record<string, unknown[]>, calls: Array<[string, string, unknown[]]>) {
+    return vi.fn((table: string) => {
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "in", "is", "order"]) {
+        chain[m] = vi.fn((...args: unknown[]) => {
+          calls.push([table, m, args]);
+          return chain;
+        });
+      }
+      chain.then = (resolve: (v: unknown) => unknown) => resolve({ data: rows[table] ?? [], error: null });
+      return chain;
+    });
+  }
+
+  it("reads only the ARRIVAL answer (`tomorrow_delivery`) and returns Purchasing's facts per PO", async () => {
+    const calls: Array<[string, string, unknown[]]> = [];
+    const from = chainFor(
+      {
+        order_supplier_threads: [{ po_id: "PO-A" }],
+        po_line_sources: [],
+        purchase_orders: [{ id: "PO-A", status: "open", placed_at: "2026-10-01T02:00:00Z", official_delivery_date: "2026-10-20", eta_date: "2026-10-21", do_number: null, do_uploaded_at: null, destination_id: "d1", suppliers: { name: "Sleepwell" } }],
+        purchase_order_lines: [{ po_id: "PO-A", destination_id: null, sku: "M1", qty: 1, received_qty: 0 }],
+        purchasing_destinations: [{ id: "d1", name: "Carres Klang Warehouse" }],
+        po_supplier_promises: [{ po_id: "PO-A", kind: "tomorrow_delivery", answer: "delayed", new_date: "2026-10-30", about_date: "2026-10-21", previous_date: "2026-10-21", reason: "Production Delay", evidence: "wa.jpg", recorded_at: "2026-10-10T01:00:00Z" }],
+        warehouse_receipts: [],
+      },
+      calls,
+    );
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const res = await app.fetch(new Request(`http://localhost/api/operation/pos/for-order/${ORDER}`, {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(calls).toContainEqual(["po_supplier_promises", "eq", ["kind", "tomorrow_delivery"]]);
+    const body = (await res.json()) as { purchaseOrders: Array<Record<string, unknown>> };
+    expect(body.purchaseOrders[0]).toMatchObject({ poNo: "PO-A", supplier: "Sleepwell", originalIso: "2026-10-20", effectiveIso: "2026-10-30", etaIso: "2026-10-21" });
+  });
+
+  it("refuses a caller outside Operation/Principal", async () => {
+    const res = await app.fetch(new Request(`http://localhost/api/operation/pos/for-order/${ORDER}`, {
+      headers: { Authorization: `Bearer ${await makeJwt("finance")}` },
+    }), env);
+    expect(res.status).toBe(403);
+  });
+});

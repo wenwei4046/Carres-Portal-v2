@@ -66,3 +66,21 @@ describe("supplierPoFactsOf reads Purchasing and the Warehouse, never guesses", 
     expect(a.supplierDo).toEqual({ number: "DO-5531", atIso: "2026-10-19T02:00:00Z" });
   });
 });
+
+describe("review fix (#1608): only the ARRIVAL answer counts", () => {
+  it("a newer ready-date promise never overrides the supplier's delay", () => {
+    const rows = {
+      ...base,
+      promises: [
+        ...base.promises.map((p) => ({ ...p, kind: "tomorrow_delivery" })),
+        { po_id: "PO-A", kind: "ready_date", answer: "confirmed", new_date: "2026-10-20", about_date: null, previous_date: null, reason: null, evidence: null, recorded_at: "2026-10-12T01:00:00Z" },
+      ],
+    };
+    const [a] = supplierPoFactsOf(rows);
+    expect(a.effectiveIso).toBe("2026-10-30");
+    expect(a.reply?.answer).toBe("delayed");
+    expect(a.reply?.aboutIso).toBe("2026-10-20");
+    expect(a.etaIso).toBe("2026-10-21");
+  });
+});
+

@@ -29,6 +29,9 @@ export interface SupplierFactRows {
   destinations: ReadonlyArray<{ id: string; name: string }>;
   promises: ReadonlyArray<{
     po_id: string;
+    /** Only `tomorrow_delivery` — the answer about the ARRIVAL date (orders.ts
+     *  reads the same kind). A ready-date or balance promise is not it. */
+    kind?: string | null;
     answer: string;
     new_date: string | null;
     about_date: string | null;
@@ -48,7 +51,7 @@ export function supplierPoFactsOf(rows: SupplierFactRows): SupplierPoFact[] {
       const supplier = Array.isArray(po.suppliers) ? po.suppliers[0]?.name ?? null : po.suppliers?.name ?? null;
       const latest =
         rows.promises
-          .filter((p) => p.po_id === po.id)
+          .filter((p) => p.po_id === po.id && (p.kind ?? "tomorrow_delivery") === "tomorrow_delivery")
           .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
       const destIds = [...new Set(rows.lines.filter((l) => l.po_id === po.id).map((l) => l.destination_id ?? po.destination_id))];
       if (destIds.length === 0) destIds.push(po.destination_id);
@@ -78,7 +81,11 @@ export function supplierPoFactsOf(rows: SupplierFactRows): SupplierPoFact[] {
         issued: Boolean(po.placed_at),
         originalIso: po.official_delivery_date,
         effectiveIso: effective,
-        reply: latest ? { answer: latest.answer, reason: latest.reason, evidence: latest.evidence, recordedAtIso: latest.recorded_at } : null,
+        reply: latest
+          ? { answer: latest.answer, reason: latest.reason, evidence: latest.evidence, recordedAtIso: latest.recorded_at, aboutIso: latest.about_date }
+          : null,
+        status: po.status,
+        etaIso: po.eta_date,
         supplierDo: po.do_number || po.do_uploaded_at ? { number: po.do_number, atIso: po.do_uploaded_at } : null,
         deliverTo: deliverTo.length ? [...new Set(deliverTo)].join(" · ") : null,
         grnIso: grn,

@@ -7,12 +7,16 @@ const spell = (iso: string) => {
   return `${d} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]}`;
 };
 
+/* Purchasing's arrival call anchors on the PO's expected arrival (`eta_date`);
+   a fixture's eta follows its latest date unless the test says otherwise. */
 const po = (over: Partial<SupplierPoFact>): SupplierPoFact => ({
   poNo: "PO260924-1001",
   supplier: "Sleepwell",
   issued: true,
+  status: "open",
   originalIso: "2026-10-20",
   effectiveIso: "2026-10-20",
+  etaIso: over.effectiveIso ?? "2026-10-20",
   reply: null,
   supplierDo: null,
   deliverTo: "Carres Klang Warehouse",
@@ -136,3 +140,50 @@ describe("the Order Route is one compact line", () => {
     expect(m.points.at(-1)?.tone).toBe("missed");
   });
 });
+
+describe("review fixes (#1608) — Purchasing's arrival call, short receipts, the route", () => {
+  it("an answer ABOUT the exact arrival date closes the confirmation; one about another date does not", () => {
+    const about = (aboutIso: string) =>
+      supplierCardModel({
+        todayIso: "2026-10-16",
+        pos: [po({ effectiveIso: "2026-10-19", reply: { answer: "confirmed", reason: null, evidence: null, recordedAtIso: "2026-10-09T01:00:00Z", aboutIso } })],
+        spell,
+      }).rows[0];
+    expect(about("2026-10-19").state).toBe("expected"); // answered a week early, about THIS date → Purchasing counts it
+    expect(about("2026-10-19").checksDone).toBe(3);
+    expect(about("2026-10-12").state).toBe("confirmationNeeded"); // an answer about an old date is about nothing
+  });
+
+  it("a short receipt is not received — for the card and for the Route", () => {
+    const m = supplierCardModel({ todayIso: "2026-10-30", pos: [po({ grnIso: "2026-10-20", orderedQty: 5, receivedQty: 3 })], spell });
+    expect(m.rows[0].state).toBe("shortReceived");
+    expect(m.receivedCount).toBe(0);
+    const r = missionRouteModel(route({ supplier: m, todayIso: "2026-10-30" }));
+    expect(r.points.find((p) => p.key === "grn")?.status).toBe("0 of 1");
+  });
+
+  it("one missed arrival turns the Route's GRN point red, even when another PO is due later", () => {
+    const m = supplierCardModel({
+      todayIso: "2026-10-24",
+      pos: [po({ poNo: "A", effectiveIso: "2026-10-20" }), po({ poNo: "B", supplier: "ABC", effectiveIso: "2026-10-30" })],
+      spell,
+    });
+    expect(m.arrivalMissedCount).toBe(1);
+    expect(missionRouteModel(route({ supplier: m })).points.find((p) => p.key === "grn")?.tone).toBe("missed");
+  });
+
+  it("Contact says Due today only on its day, even when a partner answer opened the check early", () => {
+    const early = missionRouteModel(route({ todayIso: "2026-10-22", contact: { dueIso: "2026-10-24", state: "open" } }));
+    const contact = early.points.find((p) => p.key === "contact");
+    expect(contact?.status).toBe("Due"); // the date is already on the line above
+    expect(contact?.dateText).toBe("24 Oct");
+  });
+});
+
+describe("review fix (#1608): a failed supplier read never wipes the route", () => {
+  it("PO and GRN say Unavailable; Proceed, Contact and Delivery still print", () => {
+    const m = missionRouteModel(route({ supplier: null }));
+    expect(m.points.map((p) => p.status)).toEqual(["Done", "Unavailable", "Unavailable", "Due today", "Requested"]);
+  });
+});
+

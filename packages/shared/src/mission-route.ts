@@ -41,7 +41,8 @@ export const MISSION_ROUTE_COPY = {
   fromStock: "From stock",
   received: "Received",
   inStock: "In stock",
-  due: (date: string) => `Due ${date}`,
+  due: "Due",
+  unavailable: "Unavailable",
   missed: "Missed",
   delivered: "Delivered",
   scheduled: "Scheduled",
@@ -65,7 +66,9 @@ export interface MissionRouteInput {
   todayIso: string;
   proceededIso: string | null;
   loan: { state: keyof typeof MISSION_ROUTE_COPY.loan; atIso: string | null } | null;
-  supplier: Pick<SupplierCardModel, "total" | "issuedCount" | "receivedCount" | "delayedCount" | "arrivalRange" | "latestGrnIso">;
+  /** Null when Purchasing's read failed: PO and GRN say `Unavailable`, every
+   *  other point still prints (a partial failure never wipes the route). */
+  supplier: Pick<SupplierCardModel, "total" | "issuedCount" | "receivedCount" | "delayedCount" | "arrivalRange" | "latestGrnIso" | "arrivalMissedCount"> | null;
   /** Goods reserved from stock with no PO at all. */
   fromStock: boolean;
   contact: { dueIso: string | null; state: LogisticsCheckState };
@@ -117,7 +120,7 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
   }
 
   const sup = input.supplier;
-  const range = sup.arrivalRange;
+  const range = sup?.arrivalRange ?? null;
   const rangeText = range
     ? range.fromIso === range.toIso
       ? d(range.fromIso)
@@ -125,7 +128,10 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
         ? `${+range.fromIso.slice(8, 10)}–${d(range.toIso)}`
         : `${d(range.fromIso)}–${d(range.toIso)}`
     : null;
-  if (sup.total === 0) {
+  if (!sup) {
+    points.push({ key: "po", label: C.label.po, dateText: null, status: C.unavailable, tone: "future", final: false });
+    points.push({ key: "grn", label: C.label.grn, dateText: null, status: C.unavailable, tone: "future", final: false });
+  } else if (sup.total === 0) {
     points.push({ key: "po", label: C.label.po, dateText: null, status: input.fromStock ? C.fromStock : C.notIssued, tone: input.fromStock ? "done" : "current", final: false });
     points.push({ key: "grn", label: C.label.grn, dateText: null, status: input.fromStock ? C.inStock : C.noDate, tone: input.fromStock ? "done" : "future", final: false });
   } else {
@@ -139,24 +145,28 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
       final: false,
     });
     const allIn = sup.receivedCount === sup.total;
-    const overdue = !allIn && Boolean(range && range.toIso < today);
+    /* The card's own answer: any PO whose arrival passed without a GRN. */
+    const overdue = !allIn && sup.arrivalMissedCount > 0;
     points.push({
       key: "grn",
       label: C.label.grn,
       dateText: allIn ? d(sup.latestGrnIso) : range ? d(range.toIso) : null,
       status: allIn ? C.received : C.of(sup.receivedCount, sup.total),
-      tone: allIn ? "done" : overdue ? "attention" : "future",
+      tone: allIn ? "done" : overdue ? "missed" : "future",
       final: false,
     });
   }
 
   const cs = input.contact.state;
+  const cDue = input.contact.dueIso ? input.contact.dueIso.slice(0, 10) : null;
+  /* `open` can mean "a partner answered before the day"; only the day itself is Due today. */
+  const dueToday = cs === "open" && cDue === today;
   points.push({
     key: "contact",
     label: C.label.contact,
-    dateText: d(input.contact.dueIso),
-    status: cs === "done" || cs === "not_needed" ? C.done : cs === "open" ? C.dueToday : cs === "missed" ? C.missed : input.contact.dueIso ? C.due(spell(input.contact.dueIso)) : C.noDate,
-    tone: cs === "done" || cs === "not_needed" ? "done" : cs === "open" ? "current" : cs === "missed" ? "missed" : "future",
+    dateText: d(cDue),
+    status: cs === "done" || cs === "not_needed" ? C.done : cs === "missed" ? C.missed : dueToday ? C.dueToday : cDue ? C.due : C.noDate,
+    tone: cs === "done" || cs === "not_needed" ? "done" : cs === "missed" ? "missed" : cs === "open" ? "current" : "future",
     final: false,
   });
 

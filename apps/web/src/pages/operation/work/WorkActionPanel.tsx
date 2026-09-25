@@ -22,12 +22,16 @@ export default function WorkActionPanel({
   embedded,
   onOpen,
   hasParties = false,
+  primaryAct = null,
 }: {
   item: OperationWorkItem;
   embedded?: ReactNode;
   onOpen: () => void;
   /** The mission's party cards carry the result; the summary stays compact. */
   hasParties?: boolean;
+  /** The mission's ONE blue act while every party card is collapsed (§5.10):
+   *  it opens that card. Absent when a card is open or the work is embedded. */
+  primaryAct?: { label: string; onClick: () => void } | null;
 }) {
   /* The party is said once: `Call AL Logistics`, never `Call AL Logistics · AL Logistics`. */
   const action = `${item.action}${item.recipient && !item.action.includes(item.recipient) ? ` · ${item.recipient}` : ""}`;
@@ -50,7 +54,12 @@ export default function WorkActionPanel({
             <p className="text-[13px] leading-[18px] text-kit-slate-11" data-testid="work-detail-result">{result}</p>
           ) : null}
         </div>
-        <div className="shrink-0" data-testid="work-detail-open-row">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2" data-testid="work-detail-open-row">
+          {primaryAct && item.interaction.mode !== "embedded" ? (
+            <Button type="button" size="touch" variant="primary" onClick={primaryAct.onClick} data-testid="work-detail-primary-act">
+              {primaryAct.label}
+            </Button>
+          ) : null}
           <Button type="button" size="touch" onClick={onOpen}>Open {item.object.label}</Button>
         </div>
       </div>

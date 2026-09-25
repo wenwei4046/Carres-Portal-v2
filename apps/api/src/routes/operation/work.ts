@@ -43,6 +43,7 @@ import {
 import { collectionOwnerResolution, customerWaitingOf, type CollectionOwnerContextRow } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { chunk } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import operationOrdersRouter from "./orders";
@@ -1328,18 +1329,26 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
  *  `ops_delivery_contacts` (0487). It answers ONLY the Waiting tab; a failed
  *  read leaves every item in To do (never hides work). */
 export type LatestCustomerContact = { contacted_at: string; result_key: string; channel: string };
-async function readLatestCustomerContacts(c: Context<AppEnv>): Promise<Map<string, LatestCustomerContact>> {
+async function readLatestCustomerContacts(
+  c: Context<AppEnv>,
+  orderIds: readonly string[],
+): Promise<Map<string, LatestCustomerContact>> {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("ops_delivery_contacts")
-    .select("order_id, contacted_at, result_key, channel")
-    .eq("contacted_person", "customer")
-    .eq("leg", 0)
-    .order("contacted_at", { ascending: false });
   const latest = new Map<string, LatestCustomerContact>();
-  if (error) return latest;
-  for (const row of (data ?? []) as Array<LatestCustomerContact & { order_id: string }>) {
-    if (!latest.has(row.order_id)) latest.set(row.order_id, row);
+  /* Only the orders this feed carries, 100 at a time — never the whole table,
+     so no row cap can silently drop a Waiting item back into To do. */
+  for (const batch of chunk([...orderIds], 100)) {
+    const { data, error } = await sb
+      .from("ops_delivery_contacts")
+      .select("order_id, contacted_at, result_key, channel")
+      .eq("contacted_person", "customer")
+      .eq("leg", 0)
+      .in("order_id", batch)
+      .order("contacted_at", { ascending: false });
+    if (error) return new Map();
+    for (const row of (data ?? []) as Array<LatestCustomerContact & { order_id: string }>) {
+      if (!latest.has(row.order_id)) latest.set(row.order_id, row);
+    }
   }
   return latest;
 }
@@ -1421,7 +1430,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, issueSource, timingRules, proofFacts, customerContacts] =
+         invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1457,8 +1466,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
       readCollectionTimingRules(c),
       readProofFacts(c),
-      readLatestCustomerContacts(c),
     ]);
+  const customerContacts = await readLatestCustomerContacts(c, orders.orders.map((row) => row.id));
   const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);

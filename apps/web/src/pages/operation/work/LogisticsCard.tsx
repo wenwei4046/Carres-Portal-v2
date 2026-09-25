@@ -48,6 +48,7 @@ import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { chaseMessageFor } from "../delivery-chase";
 import { lineName, moneyOfOrder } from "../sales-order-facts";
 import { WorkSection } from "./WorkCard";
+import { escapeBelongsToControl } from "./PartyCardShell";
 
 const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -335,7 +336,7 @@ export default function LogisticsCard({
       aria-label={LOGISTICS_COPY.heading}
       onKeyDown={(event) => {
         /* §5.10: Escape collapses the open card and returns focus to its heading. */
-        if (event.key === "Escape" && open) {
+        if (event.key === "Escape" && open && editing === null && !escapeBelongsToControl(event)) {
           event.stopPropagation();
           setOpen(false);
           toggleRef.current?.focus();

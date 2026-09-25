@@ -61,7 +61,7 @@ describe("an order the panel cannot read", () => {
   it("says so — never a guessed Logistics not assigned", async () => {
     const WorkParties = (await import("./WorkParties")).default;
     const item = { object: { kind: "sales_order", id: "order-1", label: "SO-1362" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    render(<MemoryRouter><WorkParties item={item} /></MemoryRouter>);
+    render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
     expect(screen.getByTestId("work-mission-unavailable")).toHaveTextContent("Order details unavailable");
     expect(screen.getByText("The work item still exists, but its Sales Order could not be loaded.")).toBeInTheDocument();
     expect(screen.queryByText("Logistics not assigned")).not.toBeInTheDocument();
@@ -71,7 +71,7 @@ describe("an order the panel cannot read", () => {
     scopeState.failed = false;
     const WorkParties = (await import("./WorkParties")).default;
     const item = { object: { kind: "sales_order", id: "order-9", label: "SO-9" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    const { container } = render(<MemoryRouter><WorkParties item={item} /></MemoryRouter>);
+    const { container } = render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
     expect(container).toBeEmptyDOMElement();
     scopeState.failed = true;
   });
@@ -79,7 +79,7 @@ describe("an order the panel cannot read", () => {
   it("a work item that names no Sales Order draws no mission at all", async () => {
     const WorkParties = (await import("./WorkParties")).default;
     const item = { object: { kind: "manual_purchase", id: "mp-1", label: "MP-12" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    const { container } = render(<MemoryRouter><WorkParties item={item} /></MemoryRouter>);
+    const { container } = render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
     expect(container).toBeEmptyDOMElement();
   });
 });

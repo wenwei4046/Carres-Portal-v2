@@ -23,7 +23,7 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { orderActionLines, workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
@@ -51,8 +51,7 @@ import {
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkParties from "./work/WorkParties";
-import { orderRefOf } from "./work/order-ref";
+import WorkParties, { type MissionReport, type Party } from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import WorkRail, { WorkDateSection, WorkModuleSection } from "./work/WorkDayNav";
 import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
@@ -100,6 +99,16 @@ export default function OperationWork() {
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
+  /* §5.10: which party card is open (one at a time) and what the mission
+     reports — the summary opens a card and carries the one blue act while
+     every card is collapsed. Reset whenever another work item is chosen. */
+  const [openParty, setOpenParty] = useState<Party | null>(null);
+  const [mission, setMission] = useState<MissionReport>({ shown: false, act: null });
+  const reportMission = useCallback((report: MissionReport) => {
+    setMission((before) =>
+      before.shown === report.shown && before.act?.party === report.act?.party && before.act?.label === report.act?.label ? before : report,
+    );
+  }, []);
   /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -318,6 +327,12 @@ export default function OperationWork() {
   );
 
   const selectedId = params.get("selected");
+  const selectedKey = (visible.find((item) => item.id === selectedId) ?? visible[0] ?? null)?.id ?? null;
+  /* A new item starts with every card collapsed. The mission (keyed per item)
+     reports itself on mount — child effects run first, so it is not reset here. */
+  useEffect(() => {
+    setOpenParty(null);
+  }, [selectedKey]);
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   const visibleIds = new Set(visible.map((item) => item.id));
   // The date rail and its badge already say when; the list is one ordered run.
@@ -713,8 +728,13 @@ export default function OperationWork() {
                   <Button size="touch" onClick={retry}>Try again</Button>
                 </div>
               ) : null}
-              <WorkActionPanel item={selected.source} hasParties={orderRefOf(selected.source) !== null} onOpen={() => navigate(selected.destination)} />
-              <WorkParties item={selected.source} />
+              <WorkActionPanel
+                item={selected.source}
+                hasParties={mission.shown}
+                primaryAct={mission.act && !openParty ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
+                onOpen={() => navigate(selected.destination)}
+              />
+              <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
               <WorkOwnerSource item={selected.source} />
             </>
           ) : (

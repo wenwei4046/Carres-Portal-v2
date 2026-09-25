@@ -42,7 +42,8 @@ import { SectionTitle, TONE_TEXT } from "./PartyCardShell";
 import { useSupplierCard } from "./SupplierCard";
 import { WorkSection } from "./WorkCard";
 
-const spell = (iso: string) => fmtDateShort(iso);
+/* A date never splits over two lines (§5.10). */
+const spell = (iso: string) => fmtDateShort(iso).replace(" ", "\u00a0");
 const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const DOT: Record<RouteTone, string> = {
@@ -68,7 +69,10 @@ export function useMissionRoute(orderId: string) {
   const o = lm.o;
   const card = lm.card;
   const route = useMemo(() => {
-    if (!card || !o || !lm.model || !supplier) return null;
+    if (!card || !o || !lm.model) return null;
+    /* Purchasing still loading → wait; Purchasing failed → the route prints
+       without it (PO · GRN `Unavailable`), never a wiped line. */
+    if (!supplier && !factsQ.isError) return null;
     const today = appTodayIso();
     const holidays = myHolidaySet();
     const money = moneyOfOrder(o);
@@ -86,8 +90,8 @@ export function useMissionRoute(orderId: string) {
       todayIso: today,
       proceededIso: (o.proceeded_at ?? o.proceed_date ?? null)?.slice(0, 10) ?? null,
       loan,
-      supplier,
-      fromStock: supplier.total === 0 && card.stock.ready,
+      supplier: supplier ?? null,
+      fromStock: Boolean(supplier && supplier.total === 0 && card.stock.ready),
       contact: { dueIso: lm.model.rows[1].dueIso, state: lm.model.rows[1].state },
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,
@@ -100,8 +104,8 @@ export function useMissionRoute(orderId: string) {
       },
       spell,
     });
-  }, [card, o, lm.model, lm.facts, supplier, loansQ.data]);
-  return { route, lm, supplier, customer, loading: lm.scope.loading || factsQ.isLoading, failed: lm.scope.failed || factsQ.isError };
+  }, [card, o, lm.model, lm.facts, supplier, factsQ.isError, loansQ.data]);
+  return { route, lm, supplier, customer, factsQ, loading: lm.scope.loading || factsQ.isLoading, failed: lm.scope.failed };
 }
 
 export default function WorkOrderRoute({
@@ -111,7 +115,7 @@ export default function WorkOrderRoute({
   orderId: string;
   onOpenParty: (party: "logistics" | "customer" | "supplier") => void;
 }) {
-  const { route, lm, supplier, customer, loading, failed } = useMissionRoute(orderId);
+  const { route, lm, supplier, customer, factsQ, loading, failed } = useMissionRoute(orderId);
   const [openPoint, setOpenPoint] = useState<RoutePointKey | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef<HTMLButtonElement>(null);
@@ -175,6 +179,12 @@ export default function WorkOrderRoute({
           ))}
         </ol>
       </div>
+      {factsQ.isError ? (
+        <div className="flex flex-wrap items-center gap-2 text-[12px] leading-4 text-kit-amber-11" data-testid="work-route-supplier-failed" role="status">
+          <span>Some information could not be refreshed.</span>
+          <Button size="touch" onClick={() => void factsQ.refetch()}>Try again</Button>
+        </div>
+      ) : null}
       {exceptions.length > 0 ? (
         <ul className="mb-0.5 flex flex-col" data-testid="work-route-exceptions">
           {exceptions.map((e) => (

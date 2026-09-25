@@ -50,7 +50,8 @@ import { DeliveryDatesEdit, ReplyProofField, useReplyProofUpload } from "../comp
 import { useLogisticsModel } from "./LogisticsCard";
 import { Fact, PartyCardShell, SectionTitle, ToneLine } from "./PartyCardShell";
 
-const spell = (iso: string) => fmtDateShort(iso);
+/* A date never splits over two lines (§5.10). */
+const spell = (iso: string) => fmtDateShort(iso).replace(" ", "\u00a0");
 /** `25 Sep, 10:42` — the panel's one date-and-time spelling (§5.10). */
 export const whenText = (iso: string) => `${fmtDateShort(iso)}, ${fmtDate(iso, { timeOnly: true })}`;
 
@@ -131,6 +132,9 @@ export default function CustomerCard({
   const [askedIso, setAskedIso] = useState<string | null>(null);
   const [proofPath, setProofPath] = useState<string | null>(null);
   const [addressChecked, setAddressChecked] = useState(false);
+  /* The reply and the address check are two writes: once the reply is saved,
+     a retry sends only what is still missing — never the reply twice. */
+  const [replySaved, setReplySaved] = useState(false);
 
   const card = lm.card;
   const o = lm.o;
@@ -177,6 +181,7 @@ export default function CustomerCard({
     setAskedIso(null);
     setProofPath(null);
     setAddressChecked(false);
+    setReplySaved(false);
     setMode(null);
   };
 
@@ -210,27 +215,31 @@ export default function CustomerCard({
       return;
     }
     try {
-      await record.mutateAsync({
-        purpose: reply === "another_date" ? "confirm_new_delivery_date" : "confirm_delivery_date",
-        channel,
-        contactedPerson: "customer",
-        result,
-        replyEvidencePath: proofPath,
-        note: reply === "another_date" && askedIso ? askedForNote(askedIso) : null,
-      });
-      if (addressChecked) {
+      if (!replySaved) {
         await record.mutateAsync({
-          purpose: "confirm_delivery_address",
+          purpose: reply === "another_date" ? "confirm_new_delivery_date" : "confirm_delivery_date",
           channel,
           contactedPerson: "customer",
-          result: "confirmed",
+          result,
+          replyEvidencePath: proofPath,
+          note: reply === "another_date" && askedIso ? askedForNote(askedIso) : null,
         });
+        setReplySaved(true);
       }
-      toast.success(C.replyRecorded);
-      resetReply();
     } catch {
       toast.error(C.replyFailed);
+      return;
     }
+    if (addressChecked) {
+      try {
+        await record.mutateAsync({ purpose: "confirm_delivery_address", channel, contactedPerson: "customer", result: "confirmed" });
+      } catch {
+        toast.error(C.addressFailed);
+        return;
+      }
+    }
+    toast.success(C.replyRecorded);
+    resetReply();
   }
 
   const status = (() => {
@@ -259,6 +268,7 @@ export default function CustomerCard({
       status={status}
       open={open}
       onToggle={onToggle}
+      escapeLocked={mode !== null}
     >
       {/* 1 · Current action */}
       <section aria-label={C.sectionAction} className="flex flex-col gap-2">
@@ -303,9 +313,13 @@ export default function CustomerCard({
             </Link>
           </div>
         ) : null}
-        {!phone ? (
+        {!phone && action?.door === "contact" ? (
           <p className="flex flex-wrap items-center gap-2 text-label text-kit-slate-11" data-testid="party-customer-no-phone">
             {C.whatsappUnavailable}
+            <Link className="inline-flex min-h-10 items-center gap-1 text-kit-blue-11 hover:underline" to={salesOrderHref}>
+              {C.openSalesOrder}
+              <Icon name="open" size={14} />
+            </Link>
           </p>
         ) : null}
 
@@ -320,7 +334,7 @@ export default function CustomerCard({
             {askSent ? (
               <div className="flex flex-wrap items-center gap-2" data-testid="party-customer-was-sent">
                 <span className="text-body text-kit-slate-12">{C.wasSent}</span>
-                <Button size="touch" variant="primary" disabled={record.isPending} onClick={() => void recordSent()} data-testid="party-customer-record-sent">
+                <Button size="touch" variant={variant(true)} disabled={record.isPending} onClick={() => void recordSent()} data-testid="party-customer-record-sent">
                   {C.recordSent}
                 </Button>
                 <Button size="touch" onClick={() => { setAskSent(false); setMode(null); }} data-testid="party-customer-not-sent">
@@ -334,8 +348,12 @@ export default function CustomerCard({
                   icon="copy"
                   onClick={() => {
                     void navigator.clipboard.writeText(message).then(
-                      () => toast.success(C.messageCopied),
-                      () => toast.error(C.replyFailed),
+                      () => {
+                        toast.success(C.messageCopied);
+                        /* Copying is not sending either — ask, as after Open WhatsApp. */
+                        setAskSent(true);
+                      },
+                      () => toast.error(C.copyFailed),
                     );
                   }}
                 >
@@ -468,7 +486,7 @@ export default function CustomerCard({
             ) : null}
             <div className="flex flex-wrap gap-2">
               {reply !== "details_changed" ? (
-                <Button type="submit" size="touch" variant="primary" disabled={!reply || record.isPending || proof.busy} data-testid="party-customer-save-reply">
+                <Button type="submit" size="touch" variant={variant(true)} disabled={!reply || record.isPending || proof.busy} data-testid="party-customer-save-reply">
                   {C.saveReply}
                 </Button>
               ) : null}

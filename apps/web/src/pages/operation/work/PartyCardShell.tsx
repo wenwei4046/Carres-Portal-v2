@@ -57,7 +57,15 @@ export function Fact({ label, children, testId }: { label: string; children: Rea
   );
 }
 
-export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, status, open, onToggle, children }: {
+/** Escape pressed inside a control that owns Escape (a Select, a date picker,
+ *  a dialog, a text field) belongs to that control, never to the card. */
+export function escapeBelongsToControl(event: { defaultPrevented: boolean; target: EventTarget | null }): boolean {
+  if (event.defaultPrevented) return true;
+  const el = event.target as Element | null;
+  return Boolean(el?.closest?.('input, textarea, select, [role="listbox"], [role="option"], [role="combobox"], [role="dialog"], [role="menu"]'));
+}
+
+export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, status, open, onToggle, escapeLocked = false, children }: {
   testId: string;
   /** DOM id the Order Route scrolls to when it opens this card. */
   anchorId?: string;
@@ -68,6 +76,8 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
   status: ReactNode;
   open: boolean;
   onToggle: (open: boolean) => void;
+  /** A half-filled form is open: Escape never throws it away. */
+  escapeLocked?: boolean;
   children: ReactNode;
 }) {
   const bodyId = useId();
@@ -79,7 +89,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
       data-testid={testId}
       aria-label={party}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && open) {
+        if (event.key === "Escape" && open && !escapeLocked && !escapeBelongsToControl(event)) {
           event.stopPropagation();
           onToggle(false);
           toggleRef.current?.focus();
@@ -114,7 +124,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         </span>
       </button>
       {open ? (
-        <div id={bodyId} className="flex flex-col gap-3 border-t border-work-line p-2.5 min-[960px]:gap-4 min-[960px]:px-4 min-[960px]:py-3" data-testid={`${testId}-body`}>
+        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[960px]:px-4" data-testid={`${testId}-body`}>
           {children}
         </div>
       ) : null}

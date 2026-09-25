@@ -10,16 +10,17 @@
  * file computes no arrival of its own (Law D).
  *
  * Per supplier, four checks: PO issued · delivery date known · pre-arrival
- * confirmation (Supplier DO or evidenced confirmation, due one Office working
- * day before arrival) · GRN received.
+ * confirmation · GRN received. The pre-arrival confirmation is NOT decided
+ * here: Purchasing's `tomorrowDeliveryCallOf` owns it (anchored on the PO's
+ * expected arrival, closed only by an answer ABOUT that exact date), and a
+ * Supplier DO on the PO also settles it. A partial GRN is not "received".
  *
  * PURE — no clock, no I/O. Dates are ISO `YYYY-MM-DD`; `spell` prints them.
  */
+import { myHolidaySet } from "./my-holidays";
+import { PURCHASING_OFFICE_OFF_DAYS, tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
 import { subtractWorkingDays, type WorkingDayOptions } from "./working-days";
 import type { PartyTone } from "./customer-card";
-
-/** The Office week — Purchasing's calendar (Mon–Fri). */
-const OFFICE_OFF_DAYS = [0, 6];
 
 export const SUPPLIER_CARD_COPY = {
   heading: "Supplier",
@@ -73,8 +74,11 @@ export interface SupplierPoFact {
   originalIso: string | null;
   /** Purchasing's `effectiveArrivalOf` — latest reply → original → plan. */
   effectiveIso: string | null;
-  /** The latest recorded supplier reply, when one exists. */
-  reply: { answer: string; reason: string | null; evidence: string | null; recordedAtIso: string } | null;
+  /** The latest recorded `tomorrow_delivery` supplier reply, when one exists. */
+  reply: { answer: string; reason: string | null; evidence: string | null; recordedAtIso: string; aboutIso?: string | null } | null;
+  /** `purchase_orders.status` and `eta_date` — what Purchasing's arrival call reads. */
+  status?: string | null;
+  etaIso?: string | null;
   supplierDo: { number: string | null; atIso: string | null } | null;
   deliverTo: string | null;
   /** The Warehouse's Goods received date — never a supplier claim. */
@@ -111,6 +115,8 @@ export interface SupplierCardModel {
   /** Earliest and latest effective arrival across issued POs (route top line). */
   arrivalRange: { fromIso: string; toIso: string } | null;
   latestGrnIso: string | null;
+  /** POs whose arrival passed without a GRN — the Route's GRN tone reads it. */
+  arrivalMissedCount: number;
 }
 
 const RANK: Record<SupplierRowState, number> = {
@@ -132,25 +138,45 @@ export function supplierCardModel(input: {
 }): SupplierCardModel {
   const today = input.todayIso.slice(0, 10);
   const spell = input.spell;
+  const holidays = input.holidays ?? myHolidaySet();
+  const office = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
   const rows: SupplierRow[] = input.pos.map((po) => {
     const eff = po.effectiveIso ? po.effectiveIso.slice(0, 10) : null;
-    const confirmByIso = eff ? subtractWorkingDays(eff, 1, { offDays: OFFICE_OFF_DAYS, holidays: input.holidays }) : null;
     const delayed = po.issued && po.reply?.answer === "delayed";
-    const replyConfirms =
-      po.reply !== null &&
-      (po.reply.answer === "confirmed" || po.reply.answer === "shipping") &&
-      Boolean(confirmByIso && po.reply.recordedAtIso.slice(0, 10) >= subtractWorkingDays(confirmByIso, 1, { offDays: OFFICE_OFF_DAYS, holidays: input.holidays }));
-    const confirmed = Boolean(po.supplierDo?.number || po.supplierDo?.atIso) || replyConfirms;
-    const received = Boolean(po.grnIso);
-    const short = received && po.orderedQty != null && po.receivedQty != null && po.receivedQty < po.orderedQty;
+    const ordered = po.orderedQty ?? null;
+    const receivedQty = po.receivedQty ?? null;
+    const owed = ordered !== null && receivedQty !== null ? Math.max(0, ordered - receivedQty) : 1;
+    /* Purchasing's one arrival call: open from the working day before the
+       expected arrival until an answer ABOUT that date is recorded. */
+    const anchor = po.etaIso ?? po.originalIso ?? null;
+    const call = po.issued
+      ? tomorrowDeliveryCallOf(
+          {
+            poId: po.poNo,
+            supplierId: "",
+            status: po.status ?? "open",
+            etaDateIso: anchor,
+            tomorrowAnswerAboutDateIso: po.reply?.aboutIso ?? null,
+            lines: [{ id: `${po.poNo}#owed`, sku: "owed", qty: owed, receivedQty: 0, shortSinceIso: null, balanceAnswerAboutQty: null }],
+          },
+          { todayIso: today, holidays: new Set(holidays as Iterable<string>) },
+        )
+      : null;
+    const hasDo = Boolean(po.supplierDo?.number || po.supplierDo?.atIso);
+    const answeredAbout = Boolean(anchor && po.reply?.aboutIso && po.reply.aboutIso.slice(0, 10) === anchor.slice(0, 10));
+    const confirmed = hasDo || answeredAbout;
+    const confirmByIso = call?.dueIso ?? (anchor ? subtractWorkingDays(anchor.slice(0, 10), 1, office) : null);
+    const received = Boolean(po.grnIso) && !(ordered !== null && receivedQty !== null && receivedQty < ordered);
+    const short = Boolean(po.grnIso) && !received;
 
     let state: SupplierRowState;
     if (!po.issued) state = "notIssued";
-    else if (received) state = short ? "shortReceived" : "received";
+    else if (received) state = "received";
+    else if (short) state = "shortReceived";
     else if (eff && eff < today) state = "arrivalMissed";
     else if (delayed) state = "delayed";
     else if (eff === today) state = "arrivingToday";
-    else if (confirmByIso && today >= confirmByIso && !confirmed) state = "confirmationNeeded";
+    else if (call && !hasDo) state = "confirmationNeeded";
     else state = "expected";
 
     const tone: PartyTone =
@@ -163,7 +189,7 @@ export function supplierCardModel(input: {
     return {
       ...po,
       state,
-      stateText: state === "confirmationNeeded" && confirmByIso === today ? SUPPLIER_CARD_COPY.confirmationToday : SUPPLIER_CARD_COPY.state[state],
+      stateText: state === "confirmationNeeded" && call && !call.late ? SUPPLIER_CARD_COPY.confirmationToday : SUPPLIER_CARD_COPY.state[state],
       tone,
       confirmByIso,
       confirmed,
@@ -178,7 +204,8 @@ export function supplierCardModel(input: {
   const names = [...new Set(rows.map((r) => r.supplier).filter((v): v is string => Boolean(v)))];
   const heading = names.length === 1 ? SUPPLIER_CARD_COPY.one(names[0]) : names.length > 1 ? SUPPLIER_CARD_COPY.many(names.length) : SUPPLIER_CARD_COPY.heading;
   const issuedCount = rows.filter((r) => r.issued).length;
-  const receivedCount = rows.filter((r) => r.grnIso).length;
+  /* A short receipt is not received: only a full GRN counts. */
+  const receivedCount = rows.filter((r) => r.state === "received").length;
   const delayedCount = rows.filter((r) => r.delayed).length;
   const datedCount = rows.filter((r) => r.issued && r.effectiveIso).length;
   const dates = rows.filter((r) => r.issued && r.effectiveIso).map((r) => (r.effectiveIso as string).slice(0, 10)).sort();
@@ -212,8 +239,8 @@ export function supplierCardModel(input: {
     } else if (count("arrivingToday")) {
       exception = SUPPLIER_CARD_COPY.arriving(count("arrivingToday"), spell(today));
     } else if (receivedCount > 0 && receivedCount < total) {
-      const next = rows.filter((r) => !r.grnIso && r.effectiveIso).map((r) => (r.effectiveIso as string).slice(0, 10)).sort()[0];
-      if (next) exception = SUPPLIER_CARD_COPY.arriving(rows.filter((r) => !r.grnIso && r.effectiveIso?.slice(0, 10) === next).length, spell(next));
+      const next = rows.filter((r) => r.state !== "received" && r.effectiveIso).map((r) => (r.effectiveIso as string).slice(0, 10)).sort()[0];
+      if (next) exception = SUPPLIER_CARD_COPY.arriving(rows.filter((r) => r.state !== "received" && r.effectiveIso?.slice(0, 10) === next).length, spell(next));
     }
     status = { text: exception ? `${progress} · ${exception}` : progress, tone };
   }
@@ -229,5 +256,6 @@ export function supplierCardModel(input: {
     datedCount,
     arrivalRange: dates.length ? { fromIso: dates[0], toIso: dates[dates.length - 1] } : null,
     latestGrnIso: grns.length ? grns[grns.length - 1] : null,
+    arrivalMissedCount: count("arrivalMissed"),
   };
 }

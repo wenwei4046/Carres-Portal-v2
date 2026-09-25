@@ -19,10 +19,24 @@ import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
 import { useOperationSuppliers, useSupplierCardFacts } from "@/lib/queries";
-import { buildSupplierReminder } from "@/lib/wa-templates";
+import { buildSupplierChase, buildSupplierReminder } from "@/lib/wa-templates";
 import { Fact, PartyCardShell, ToneLine } from "./PartyCardShell";
 
-const spell = (iso: string) => fmtDateShort(iso);
+/* A date never splits over two lines (§5.10): `27 Oct` joined by a no-break space. */
+const spell = (iso: string) => fmtDateShort(iso).replace(" ", "\u00a0");
+
+/** The rows that carry a supplier act (a button) — the card and the panel's
+ *  one-blue ranking ask the SAME predicate. Missed → today → attention. */
+const ACT_STATES = new Set(["arrivalMissed", "delayed", "confirmationNeeded"]);
+export function supplierActRowOf(rows: readonly SupplierRow[]): SupplierRow | null {
+  const acting = rows.filter((r) => r.issued && ACT_STATES.has(r.state));
+  return (
+    acting.find((r) => r.tone === "missed") ??
+    acting.find((r) => r.tone === "current") ??
+    acting.find((r) => r.tone === "attention") ??
+    null
+  );
+}
 const poHref = (po: string) => `/operation/procurement?po=${encodeURIComponent(po)}`;
 
 export function useSupplierCard(orderId: string) {
@@ -60,12 +74,7 @@ export default function SupplierCard({
     return <div className="h-[72px] shrink-0 animate-pulse rounded-work border border-work-line bg-white motion-reduce:animate-none" data-testid="party-supplier-loading" aria-label="Loading suppliers" />;
   }
   const failed = factsQ.isError || !model;
-  /* The row that holds the card's blue action: missed → today → attention. */
-  const firstActionable =
-    model?.rows.find((r) => r.tone === "missed") ??
-    model?.rows.find((r) => r.tone === "current") ??
-    model?.rows.find((r) => r.tone === "attention") ??
-    null;
+  const firstActionable = model ? supplierActRowOf(model.rows) : null;
 
   return (
     <PartyCardShell
@@ -121,8 +130,10 @@ function OpenPurchasing() {
 }
 
 function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow; reference: string | null; group: string | null; primary: boolean }) {
-  const needsAct = row.state === "confirmationNeeded" || row.state === "arrivalMissed" || row.state === "delayed" || row.state === "notIssued";
-  const message = buildSupplierReminder({
+  const needsAct = row.issued && ACT_STATES.has(row.state);
+  /* Purchasing's two tones: `Remind` before the date, the firmer chase once it passed. */
+  const build = row.state === "arrivalMissed" ? buildSupplierChase : buildSupplierReminder;
+  const message = build({
     poNo: row.poNo,
     ref: reference,
     lines: row.lines ?? [],
@@ -170,7 +181,7 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
               onClick={() => {
                 void navigator.clipboard.writeText(message).then(
                   () => toast.success("Message copied"),
-                  () => toast.error(S.unavailable),
+                  () => toast.error("The message could not be copied. Try again."),
                 );
               }}
               data-testid={`party-supplier-copy-${row.poNo}`}
@@ -182,7 +193,9 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
                 <Icon name="message" size={14} />
                 Open WhatsApp group
               </a>
-            ) : null}
+            ) : (
+              <span className="text-label text-kit-slate-11">WhatsApp group not set</span>
+            )}
           </>
         ) : null}
         {row.issued && !row.grnIso ? (
