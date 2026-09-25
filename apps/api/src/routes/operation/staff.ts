@@ -9,7 +9,7 @@ import {
   type OpsStaffMember,
 } from "@carres/shared";
 import { dutyHolders, hasDuty, myDuties, requireDuty } from "../../lib/duties";
-import { fail } from "../../lib/route-helpers";
+import { fail, readAllPages, tooManyRows } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -34,6 +34,9 @@ import type { AppEnv } from "../../types";
 const staffRouter = new Hono<AppEnv>();
 
 const USER_ID = z.string().uuid();
+/** Auto-assign refuses rather than deal a partial set (both callers ignore
+ *  errors, so this never reaches the screen). */
+const TOO_MANY_OPEN_ORDERS = "There are too many open orders to assign here.";
 
 function requireOperationOrPrincipal(
   role: string,
@@ -236,21 +239,28 @@ staffRouter.post("/auto-assign", async (c) => {
 
   // 3) OPEN orders (mirrors the list's controlTabOf: delivered stage/status =
   //    closed) + their current owner AND how they got it.
-  const { data: orders, error: ordErr } = await sb
-    .from("orders")
-    .select(
-      "id, status, operation_stage, ops_order_control(assigned_staff, assigned_by)",
-    )
-    .neq("status", "cancelled");
-  if (ordErr) return fail(c, ordErr);
+  //    Filtered in the query and read page by page: one read stops at 1000
+  //    rows, and delivered history used to fill that page before open orders.
+  //    operation_stage is NULL on a new order, and `neq` alone would drop it.
   type Ovl = { assigned_staff?: string | null; assigned_by?: string | null };
-  const ovlOf = (o: { ops_order_control?: Ovl[] | Ovl | null }): Ovl | null => {
+  type OpenOrder = { id: string; ops_order_control?: Ovl[] | Ovl | null };
+  const read = await readAllPages<OpenOrder>((lo, hi) =>
+    sb
+      .from("orders")
+      .select("id, ops_order_control(assigned_staff, assigned_by)")
+      .neq("status", "cancelled")
+      .neq("status", "delivered")
+      .or("operation_stage.is.null,operation_stage.neq.delivered")
+      .order("id")
+      .range(lo, hi),
+  );
+  if ("error" in read) return fail(c, read.error);
+  if (!("rows" in read)) return tooManyRows(c, TOO_MANY_OPEN_ORDERS);
+  const ovlOf = (o: OpenOrder): Ovl | null => {
     const raw = o.ops_order_control;
     return (Array.isArray(raw) ? raw[0] : raw) ?? null;
   };
-  const open = (orders ?? []).filter(
-    (o) => o.operation_stage !== "delivered" && o.status !== "delivered",
-  );
+  const open = read.rows;
 
   // 4) DEAL WHAT NOBODY CARRIES (0504) — the arithmetic is the shared
   //    `planOpsAssignment`, so the rule has exactly one implementation.
@@ -281,7 +291,9 @@ staffRouter.post("/auto-assign", async (c) => {
       })),
       { onConflict: "order_id" },
     );
-    if (!error) assigned += chunk.length;
+    // A failed save is a failed response, never a smaller count.
+    if (error) return fail(c, error);
+    assigned += chunk.length;
   }
   return c.json({ assigned });
 });
