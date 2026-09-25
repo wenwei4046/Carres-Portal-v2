@@ -1,0 +1,118 @@
+<title>Payment Page</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root{--canvas:#F7F8FA;--surface:#fff;--surface-alt:#f0f0f3;--border:#e0e1e6;--divider:#d9d9e0;--ink:#1c2024;--ink-2:#60646c;--ink-3:#8b8d98;
+    --blue-3:#e6f4fe;--blue-9:#0090ff;--blue-11:#0d74ce;--amber-11:#ab6400;--red-11:#ce2c31;--r-control:6px;--r-card:10px;color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--ink);font:13px/18px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;padding-block:0}
+  .note{background:#17243a;color:#fff;font-size:12px;line-height:16px;padding:6px 16px}
+  .shell{display:grid;grid-template-columns:60px 1fr;min-height:calc(100vh - 28px)}
+  .side{background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding-block:14px}
+  .side .logo{color:#e8412c;font-weight:600;font-size:11px;letter-spacing:.06em;margin-bottom:10px}
+  .side .ic{width:36px;height:36px;border-radius:var(--r-control);display:grid;place-items:center;color:var(--ink-2)}
+  .side .ic.on{background:var(--blue-3);color:var(--blue-11)}
+  .side svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .main{display:flex;flex-direction:column;min-width:0;overflow-x:auto}
+  header.dest{height:50px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px}
+  header.dest .back{color:var(--blue-11);text-decoration:none;font-size:13px}
+  header.dest h1{font-size:20px;line-height:28px;font-weight:600;margin:0;display:flex;gap:10px;align-items:baseline}
+  header.dest h1 .so{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+  header.dest h1 .cust{font-weight:400;font-size:15px;color:var(--ink-2)}
+  header.dest .due{font-size:13px;color:var(--ink-2)}header.dest .due b{color:var(--ink)}
+  header.dest .doors{margin-left:auto;display:flex;gap:6px}
+  .btn{height:32px;padding:0 12px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-weight:500;color:var(--ink);cursor:pointer}
+  .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
+  .btn.sm{height:28px;font-size:12px;padding:0 10px}
+  .stage{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;min-width:1024px;align-items:start}
+  .work{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .box{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden}
+  .box h2{margin:0;height:34px;display:flex;align-items:center;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--divider)}
+  .box .body{padding:10px 12px}
+  .fact{font-weight:600}.fact.o{color:var(--amber-11)}.meta{color:var(--ink-2);font-size:12px;line-height:16px;margin:2px 0 8px}
+  table.t{border-collapse:collapse;width:100%}.t th{height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--divider);border-right:1px solid var(--border)}
+  .t td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
+  .t th:last-child,.t td:last-child{border-right:0}.t tr:last-child td{border-bottom:0}.t .num{text-align:right}.t .m{color:var(--ink-2)}
+  .t tr.sum td{font-weight:600;border-top:1px solid var(--divider)}.t tr.due td{font-weight:600}
+  .so{color:var(--blue-11);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+  .link{color:var(--blue-11);text-decoration:underline;text-underline-offset:2px;background:none;border:0;font:inherit;padding:0;cursor:pointer}
+  .btns{display:flex;flex-wrap:wrap;gap:6px}
+  /* Right — the paper */
+  .paper{position:sticky;top:16px}
+  .paper .tabs{display:flex;gap:2px;background:var(--surface-alt);border-radius:7px;padding:3px;margin-bottom:8px;width:max-content}
+  .paper .tabs span{padding:4px 10px;border-radius:5px;font-size:12px;font-weight:600;color:var(--ink-2)}.paper .tabs span.on{background:#fff;color:var(--ink)}
+  .sheet{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:32px 36px;min-height:640px;font-size:12px;line-height:18px;color:var(--ink)}
+  .sheet .brand{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
+  .sheet .brand b{font-size:20px;letter-spacing:.06em;color:#e8412c}
+  .sheet .brand .dt{text-align:right;color:var(--ink-2)}.sheet .brand .dt b{font-size:14px;color:var(--ink);letter-spacing:0}
+  .sheet h3{font-size:16px;margin:0 0 12px;font-weight:600}
+  .sheet .kv{display:grid;grid-template-columns:120px 1fr;gap:2px 12px;margin-bottom:20px}.sheet .kv span:nth-child(odd){color:var(--ink-2)}
+  .sheet table{border-collapse:collapse;width:100%;margin-bottom:16px}.sheet th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--ink);padding:6px 0}
+  .sheet td{padding:6px 0;border-bottom:1px solid var(--surface-alt)}.sheet .num{text-align:right}
+  .sheet .totals{margin-left:auto;width:280px;display:grid;grid-template-columns:1fr auto;gap:4px 16px}
+  .sheet .totals .big{font-size:14px;font-weight:600;border-top:1px solid var(--ink);padding-top:6px}
+  .sheet .foot{margin-top:28px;color:var(--ink-2);font-size:11px}
+  @media (max-width:1024px){.stage{grid-template-columns:1fr;min-width:0}.paper{position:static}}
+</style>
+<div class="note">Design mock · the Payment page (opened from the Monitor's SO No) · left = the work, right = the paper the customer receives · fixture data</div>
+<div class="shell">
+  <aside class="side" aria-label="Portal rail">
+    <div class="logo">CARRES</div>
+    <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 7h18v10H3zM3 12h18"/></svg></div>
+    <div class="ic on" title="Payments"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+  </aside>
+  <div class="main">
+    <header class="dest">
+      <a class="back" href="monitor-status-rail.html">← Monitor</a>
+      <h1><span class="so">SO-1405</span><span class="cust">SITI AMINAH</span></h1>
+      <span class="due">Balance due <b>RM 2,500.00</b> · Payment due Tue, 22 Sep</span>
+      <div class="doors"><button class="btn">Record payment</button><button class="btn p">Ask customer to pay</button><button class="btn" aria-label="More actions" title="Statement · Print · Create payment link">⋯</button></div>
+    </header>
+    <div class="stage">
+      <div class="work">
+        <section class="box"><h2>What to do</h2><div class="body">
+          <p class="fact o" style="margin:0">Customer promised to pay today</p>
+          <p class="meta">Ask customer to pay, then record the answer. Collection owner Shasha · No cover today.</p>
+          <button class="btn sm">Record the result</button>
+        </div></section>
+        <section class="box"><h2>Money</h2>
+          <table class="t">
+            <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
+            <tr><td>Storage · Sofa · 29 days</td><td class="num">RM 400.00</td></tr>
+            <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
+            <tr><td>Paid</td><td class="num">RM 900.00</td></tr>
+            <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
+          </table>
+        </section>
+        <section class="box"><h2>Storage</h2><div class="body">
+          <p style="margin:0 0 2px"><b>Sofa · Day 29</b></p>
+          <p class="meta">Started Wed, 19 Aug · free until Tue, 1 Sep · RM 200.00 every 14 days · next check Fri, 18 Sep</p>
+          <div class="btns"><button class="btn sm">Request more free days</button><button class="btn sm">Check the stored furniture</button></div>
+        </div></section>
+        <section class="box"><h2>History</h2>
+          <table class="t">
+            <thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
+            <tr><td>Tue, 15 Sep</td><td>Customer will pay on Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
+            <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">Screenshot</a></td></tr>
+            <tr><td>Mon, 7 Sep</td><td>Deposit received</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span> · <a class="link" href="#">Print</a> · <a class="link" href="#">Send</a></td></tr>
+            <tr><td>Mon, 7 Sep</td><td>Order proceeded</td><td class="num m">—</td><td>Sales</td><td><span class="so">SO-1405</span> · <a class="link" href="#">Print</a></td></tr>
+          </table>
+        </section>
+      </div>
+      <aside class="paper" aria-label="The paper the customer receives">
+        <div class="tabs"><span class="on">Sales Order</span><span>Message</span><span>Receipt</span><span>Invoice</span></div>
+        <div class="sheet">
+          <div class="brand"><b>CARRES</b><div class="dt"><b>SALES ORDER</b><br>SO-1405 · Mon, 7 Sep 2026</div></div>
+          <div class="kv"><span>Customer</span><span>SITI AMINAH · 0133332211</span><span>Delivery address</span><span>12, Jalan Damai 3, 41200 Klang, Selangor</span><span>Requested delivery</span><span>Thu, 24 Sep 2026</span></div>
+          <table><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr>
+            <tr><td>Booqit 3-seater sofa · Sand · Seat height 24</td><td class="num">1</td><td class="num">3,000.00</td></tr>
+            <tr><td>Storage · 29 days from 19 Aug 2026</td><td class="num">—</td><td class="num">400.00</td></tr></table>
+          <div class="totals"><span>Total payable</span><span class="num">RM 3,400.00</span><span>Paid to date</span><span class="num">RM 900.00</span><span class="big">BALANCE DUE</span><span class="big num">RM 2,500.00</span></div>
+          <p class="foot">Pay to Hong Leong Bank ····1234 (account number to be entered in Settings) · Please pay by Tue, 22 Sep 2026 · Important Notes: to be supplied by the owner.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
