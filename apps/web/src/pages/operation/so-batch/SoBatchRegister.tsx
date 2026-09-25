@@ -241,9 +241,12 @@ export interface SoBatchRegisterProps {
   hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
   onIssue: (selections: SoBatchSelection[]) => void;
+  /** The PO window Work opened this page on (Purchasing §5.6.1): its name,
+   *  and the way back to every window's demand. */
+  scope?: { label: string; onClear: () => void };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false, scope }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -1300,11 +1303,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               noMatchMessage={W.noMatch}
               onClearConditions={() => setFilter(SO_BATCH_RAIL_CLEAR)}
               toolbarStart={
-                !filterRailOpen ? (
-                  <ShowFiltersButton
-                    onShow={() => setFilterRailVisible(true)}
-                    testId="so-batch-show-filters"
-                  />
+                !filterRailOpen || scope ? (
+                  <>
+                    {!filterRailOpen ? (
+                      <ShowFiltersButton
+                        onShow={() => setFilterRailVisible(true)}
+                        testId="so-batch-show-filters"
+                      />
+                    ) : null}
+                    {scope ? (
+                      <span className="flex min-w-0 items-center gap-2" data-testid="so-batch-window-scope">
+                        <span className="truncate text-body font-medium text-kit-slate-12">{scope.label}</span>
+                        <Button variant="ghost" size="sm" onClick={scope.onClear}>Clear filters</Button>
+                      </span>
+                    ) : null}
+                  </>
                 ) : null
               }
               isLoading={isLoading}

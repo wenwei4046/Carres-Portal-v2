@@ -25,7 +25,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { orderActionLines, workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
+import { orderActionLines, workspaceDutyLabelOf, type OperationWorkItem, type OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
@@ -53,6 +53,7 @@ import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
 import WorkParties, { type MissionReport, type Party } from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
+import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import WorkRail, { WorkDateSection, WorkModuleSection } from "./work/WorkDayNav";
 import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
 
@@ -83,6 +84,18 @@ function deliveryLines(item: WorkRow): { act: string; result: string | null } | 
       ? orderActionLines("deliver_today", { deliveryDate: fmtDate(item.dueIso) }).act
       : item.action;
   return { act, result: item.requiredResult || null };
+}
+
+/** A PO window's mission (Purchasing §5.6.1): the summary, whose `Open`
+ *  door is the blue act while demand is left, then To buy and POs to send. */
+function PoWindowMission({ item, onOpen }: { item: OperationWorkItem; onOpen: () => void }) {
+  const { window } = usePoWindow(item);
+  return (
+    <>
+      <WorkActionPanel item={item} onOpen={onOpen} openIsPrimary={(window?.demand.rowIds.length ?? 0) > 0} />
+      <PoWindowPanel item={item} />
+    </>
+  );
 }
 
 /** Team Work's owner group: the normal owner, a named person, or the duty. */
@@ -728,13 +741,19 @@ export default function OperationWork() {
                   <Button size="touch" onClick={retry}>Try again</Button>
                 </div>
               ) : null}
-              <WorkActionPanel
-                item={selected.source}
-                hasParties={mission.shown}
-                primaryAct={mission.act && !mission.openCardHasAct ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
-                onOpen={() => navigate(selected.destination)}
-              />
-              <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
+              {selected.source.object.kind === "po_window" ? (
+                <PoWindowMission item={selected.source} onOpen={() => navigate(selected.destination)} />
+              ) : (
+                <>
+                  <WorkActionPanel
+                    item={selected.source}
+                    hasParties={mission.shown}
+                    primaryAct={mission.act && !mission.openCardHasAct ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
+                    onOpen={() => navigate(selected.destination)}
+                  />
+                  <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
+                </>
+              )}
               <WorkOwnerSource item={selected.source} />
             </>
           ) : (

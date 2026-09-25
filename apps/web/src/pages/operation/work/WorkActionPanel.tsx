@@ -23,6 +23,7 @@ export default function WorkActionPanel({
   onOpen,
   hasParties = false,
   primaryAct = null,
+  openIsPrimary = false,
 }: {
   item: OperationWorkItem;
   embedded?: ReactNode;
@@ -32,6 +33,9 @@ export default function WorkActionPanel({
   /** The mission's ONE blue act while every party card is collapsed (§5.10):
    *  it opens that card. Absent when a card is open or the work is embedded. */
   primaryAct?: { label: string; onClick: () => void } | null;
+  /** The `Open {object}` door IS the act (a PO window with demand left opens
+   *  SO Batch Purchase on exactly that window) — then it is the one blue. */
+  openIsPrimary?: boolean;
 }) {
   /* The party is said once: `Call AL Logistics`, never `Call AL Logistics · AL Logistics`. */
   const action = `${item.action}${item.recipient && !item.action.includes(item.recipient) ? ` · ${item.recipient}` : ""}`;
@@ -66,7 +70,7 @@ export default function WorkActionPanel({
               </Button>
             </div>
           ) : null}
-          <Button type="button" size="touch" onClick={onOpen}>Open {item.object.label}</Button>
+          <Button type="button" size="touch" variant={openIsPrimary ? "primary" : "neutral"} onClick={onOpen} data-testid="work-detail-open">Open {item.object.label}</Button>
         </div>
       </div>
       {item.interaction.mode === "embedded" ? (

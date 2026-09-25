@@ -25,6 +25,8 @@
  */
 import { parsePoWindowKey, poWindowTimeWord } from "./po-windows";
 import { poDocumentNumberOf } from "./po-workspace";
+import type { PurchaseDemandRow } from "./purchase-demands";
+import { isSelectableForBuying, type SoBatchOrderRow } from "./so-batch-purchase";
 
 export const PO_WINDOW_WORK_COPY = {
   objectLabel: (time: string) => `${time} PO window`,
@@ -241,4 +243,60 @@ export function poWindowWork(input: {
     });
   }
   return out;
+}
+
+/** A supplier row's recorded doors (`suppliers.whatsapp_group_url` · `contact`
+ *  · `contact_email`), as the supplier reads return them. */
+export interface PoWindowSupplierDoors {
+  id: string;
+  whatsapp_group_url?: string | null;
+  contact?: string | null;
+  contact_email?: string | null;
+}
+
+/**
+ * The window model over the SO Batch read — the Work feed, its completion
+ * probe and the Work right panel all run THIS, so "which demand and which POs
+ * a window holds" has one answer (Law D). Only rows SO Batch may actually
+ * buy (`isSelectableForBuying`) are demand; a received PO needs no sending.
+ */
+export function poWindowWorkFromSoBatch(
+  read: {
+    rows: readonly PurchaseDemandRow[];
+    registerRows: readonly SoBatchOrderRow[];
+    poWindowsUnavailable?: boolean;
+  },
+  suppliers: readonly PoWindowSupplierDoors[],
+  opts: { keepClosed?: boolean } = {},
+): PoWindowWork[] {
+  if (read.poWindowsUnavailable) throw new Error("PO window settings are unavailable");
+  const doors = new Map(suppliers.map((s) => [s.id, s]));
+  return poWindowWork({
+    rows: read.rows.filter(isSelectableForBuying).map((row) => ({
+      id: row.id,
+      orderId: row.orderId,
+      so: row.so,
+      supplierId: row.supplierId,
+      supplier: row.supplier,
+      toBuy: row.toBuy ?? 0,
+      poWindow: row.poWindow ?? null,
+    })),
+    pos: read.registerRows.flatMap((reg) => reg.pos.map((po) => ({
+      poId: po.poId,
+      version: po.version ?? 1,
+      supplierId: po.supplierId,
+      supplierName: po.supplierName,
+      sentCurrentVersion: po.sentCurrentVersion || po.status === "received",
+      poWindow: po.poWindow ?? null,
+    }))),
+    channelOf: (supplierId) => {
+      const door = supplierId ? doors.get(supplierId) : undefined;
+      return poSendChannelOf(door ? {
+        whatsappGroupUrl: door.whatsapp_group_url ?? null,
+        contact: door.contact ?? null,
+        contactEmail: door.contact_email ?? null,
+      } : null);
+    },
+    ...(opts.keepClosed ? { keepClosed: true } : {}),
+  });
 }

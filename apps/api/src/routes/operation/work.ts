@@ -39,10 +39,9 @@ import {
   type WorkingDayOptions,
   WAREHOUSE_OFF_DAYS,
   PURCHASING_OFFICE_OFF_DAYS,
-  isSelectableForBuying,
   orderActionLines,
-  poSendChannelOf,
-  poWindowWork,
+  poWindowWorkFromSoBatch,
+  type PoWindowSupplierDoors,
   type OrderActionKey,
   type PoWindowWork,
   type SoBatchPurchaseResponse,
@@ -556,39 +555,10 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
  *  answer. */
 export function poWindowsOf(
   read: Pick<SoBatchPurchaseResponse, "rows" | "registerRows" | "poWindowsUnavailable">,
-  suppliers: Parameters<typeof projectPoWindowWork>[0]["suppliers"],
+  suppliers: readonly PoWindowSupplierDoors[],
   opts: { keepClosed?: boolean } = {},
 ): PoWindowWork[] {
-  if (read.poWindowsUnavailable) throw new Error("PO window settings are unavailable");
-  const doors = new Map(suppliers.map((s) => [s.id, s]));
-  return poWindowWork({
-    rows: read.rows.filter(isSelectableForBuying).map((row) => ({
-      id: row.id,
-      orderId: row.orderId,
-      so: row.so,
-      supplierId: row.supplierId,
-      supplier: row.supplier,
-      toBuy: row.toBuy ?? 0,
-      poWindow: row.poWindow ?? null,
-    })),
-    pos: read.registerRows.flatMap((reg) => reg.pos.map((po) => ({
-      poId: po.poId,
-      version: po.version ?? 1,
-      supplierId: po.supplierId,
-      supplierName: po.supplierName,
-      sentCurrentVersion: po.sentCurrentVersion || po.status === "received",
-      poWindow: po.poWindow ?? null,
-    }))),
-    channelOf: (supplierId) => {
-      const door = supplierId ? doors.get(supplierId) : undefined;
-      return poSendChannelOf(door ? {
-        whatsappGroupUrl: door.whatsapp_group_url ?? null,
-        contact: door.contact ?? null,
-        contactEmail: door.contact_email ?? null,
-      } : null);
-    },
-    ...(opts.keepClosed ? { keepClosed: true } : {}),
-  });
+  return poWindowWorkFromSoBatch(read, suppliers, opts);
 }
 
 /** Order-track keys whose Work occurrence is the PO window card instead. */

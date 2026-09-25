@@ -181,6 +181,26 @@ describe("persisted evidence survives a reload", () => {
   });
 });
 
+describe("the form opens on the supplier's RECORDED channel (Jess's send lines, 2026-09-25)", () => {
+  it("an email-only supplier opens on Email with its address — the Work line says Click Email", async () => {
+    apiFetch.mockResolvedValue({ ok: true });
+    render(
+      <PoIssueEvidence
+        po={{ ...PO, whatsappGroupUrl: null, contact: null, contactEmail: "buy@hooka.my" }}
+        version={1}
+        evidence={[]}
+        doors={DOORS}
+        onOpened={onOpened}
+        onConfirmed={onConfirmed}
+      />,
+    );
+    expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveValue("buy@hooka.my");
+    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    expect(JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body)).toMatchObject({ channel: "email", recipient: "buy@hooka.my" });
+  });
+});
+
 describe("the confirmation declares the version it is looking at", () => {
   it("sends poVersion with the channel and recipient", async () => {
     apiFetch.mockResolvedValue({ ok: true });
