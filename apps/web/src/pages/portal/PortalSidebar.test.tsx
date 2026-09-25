@@ -140,9 +140,9 @@ describe("PortalSidebar — role visibility", () => {
 });
 
 describe("PortalSidebar — narrow desktop", () => {
-  /* Owner review 2026-09-25 item 9: names by default at every width; only
-     the person's own collapse is remembered. */
-  it("stays the named rail below 1280 unless the person collapsed it", () => {
+  /* Owner review 2026-09-25 item 9 applies from 1280px; below it the named
+     rail would push Work into the phone layout, so it starts as icons. */
+  it("starts as the 60px icon rail below 1280", () => {
     const previous = window.matchMedia;
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -160,8 +160,8 @@ describe("PortalSidebar — narrow desktop", () => {
 
     try {
       renderAt("/operation?tab=delivery");
-      expect(screen.getByRole("complementary")).toHaveStyle({ width: "232px" });
-      expect(screen.queryByRole("button", { name: "Show menu" })).toBeNull();
+      expect(screen.getByRole("complementary")).toHaveStyle({ width: "60px" });
+      expect(screen.getByRole("button", { name: "Show menu" })).toBeInTheDocument();
     } finally {
       Object.defineProperty(window, "matchMedia", { configurable: true, value: previous });
     }

@@ -18,7 +18,7 @@ Every fix below uses the kit and the governed words. A fix that needs a new word
 | 6 | empty list | `Nothing assigned to you` with no door | add `See Team Work` | BUILT — this PR |
 | 7 | list tabs | `To do · Waiting · Completed` stretch to the page width | tabs match the list width | BUILT — this PR |
 | 8 | toolbar | Search fills a row; `Covered` sits alone | Search 240px beside `Covered` | BUILT — this PR |
-| 9 | sidebar | 12 icons, no labels | expanded by default with names; collapse is the choice | BUILT — this PR |
+| 9 | sidebar | 12 icons, no labels | names by default from 1280px; below that icons, so Work keeps two panels (the named rail pushed a 941px window back into phone mode — measured 2026-09-25) | BUILT — #1639 + follow-up |
 | 10 | sidebar | `OP` avatar, no name | name and role | BUILT — this PR |
 | 11 | header | bell badge 78 never clears | count only today's unread | **needs design** — the bell counts live order alerts, there is no notification record to mark read; a separate card |
 | 12 | header | `Jump to… ⌘K` is a developer shortcut | `Search` | BUILT — this PR |

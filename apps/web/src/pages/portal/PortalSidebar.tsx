@@ -43,6 +43,11 @@ import {
 } from "./purchasing-sidebar";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
+/* Below 1280px the rail starts as icons: the 232px named rail would push the
+   Work area under 768px and hand a 941px window the phone layout — measured on
+   production 2026-09-25 right after item 9 shipped. Names by default apply
+   from 1280px, where they fit beside two Work panels. */
+const NARROW_DESKTOP_QUERY = "(max-width: 1279px)";
 
 /* ⭐ THE MEASURED RAIL (CARD-2026-08-19-sidebar-expandable-modules §3).
  *
@@ -178,15 +183,27 @@ export default function PortalSidebar() {
   const searchTab = new URLSearchParams(location.search).get("tab");
 
   // Collapse — self-owned, persisted. Icon rail = more room for wide tables.
-  /* Names by default (owner review 2026-09-25 item 9): the rail collapses
-     only when the person collapsed it, never because the window is narrow. */
+  /* Names by default from 1280px (owner review 2026-09-25 item 9); a narrower
+     window starts as icons so Work keeps its two panels. */
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(COLLAPSE_KEY) === "1";
+      return (
+        localStorage.getItem(COLLAPSE_KEY) === "1" ||
+        window.matchMedia?.(NARROW_DESKTOP_QUERY).matches === true
+      );
     } catch {
       return false;
     }
   });
+  useEffect(() => {
+    const media = window.matchMedia?.(NARROW_DESKTOP_QUERY);
+    if (!media) return;
+    const collapseAtNarrowDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setCollapsed(true);
+    };
+    media.addEventListener("change", collapseAtNarrowDesktop);
+    return () => media.removeEventListener("change", collapseAtNarrowDesktop);
+  }, []);
   const toggleCollapse = () =>
     setCollapsed((c) => {
       const next = !c;
