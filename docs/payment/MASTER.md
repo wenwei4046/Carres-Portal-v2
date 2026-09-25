@@ -2202,6 +2202,11 @@ replacement draft is issued from the order's `Generate invoice`, which draws a n
 
 50/50 is used only while editing a customer-facing message/Invoice, recording Payment, or sending
 Invoice/Receipt. Narrow widths stack action/form first, customer document/message preview second.
+**In place (owner approval 2026-09-25, segment 5):** `Ask customer to pay`, `Record the result` and
+`Record payment` open INSIDE the Monitor row's expansion (replacing its three blocks) and inside the
+Work Customer card's Payment section — the same components, never a page change. After a successful
+posting the door strip's blue becomes `Send receipt and invoice` (one message, two documents); a
+recorded message adds one Communication History line and moves the Work card to `Waiting`.
 
 ### Bank transfer and evidence
 
