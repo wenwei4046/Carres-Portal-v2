@@ -4347,7 +4347,7 @@ Database sentences (shown as written):
 
 SO revision records display `<existing reference>(n)` with no space; the current version appends ` · Current`. Preserve the saved base reference and historical issued documents. Parenthesized revisions are presentation, not a new allocated number. Delivery Activity names `confirmed_date` as **Confirmed date**, `confirmed_time_slot` as **Confirmed time**, and `confirmed_partner` as **Logistics**; stored events remain unchanged.
 
-## PROPOSAL — PENDING APPROVAL · Chart of accounts: any move between headings of the same kind (0580)
+## APPROVED by YH on 25 Sep 2026, as written · Chart of accounts: any move between headings of the same kind (0580)
 
 YH's rulings of 24 Sep 2026: a drag works for every move between headings of the same kind; the last
 account under a heading may leave it, and the emptied heading stays a heading (bold, never posted to,
