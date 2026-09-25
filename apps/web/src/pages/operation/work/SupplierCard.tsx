@@ -60,7 +60,12 @@ export default function SupplierCard({
     return <div className="h-[72px] shrink-0 animate-pulse rounded-work border border-work-line bg-white motion-reduce:animate-none" data-testid="party-supplier-loading" aria-label="Loading suppliers" />;
   }
   const failed = factsQ.isError || !model;
-  const firstActionable = model?.rows.find((r) => r.tone === "missed" || r.tone === "current" || r.tone === "attention") ?? null;
+  /* The row that holds the card's blue action: missed → today → attention. */
+  const firstActionable =
+    model?.rows.find((r) => r.tone === "missed") ??
+    model?.rows.find((r) => r.tone === "current") ??
+    model?.rows.find((r) => r.tone === "attention") ??
+    null;
 
   return (
     <PartyCardShell

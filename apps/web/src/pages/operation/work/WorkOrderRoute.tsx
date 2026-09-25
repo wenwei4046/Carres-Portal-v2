@@ -47,9 +47,9 @@ const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFra
 const DOT: Record<RouteTone, string> = {
   done: "bg-kit-slate-12 border-kit-slate-12",
   current: "bg-kit-blue-9 border-kit-blue-9",
-  attention: "bg-kit-amber-9 border-kit-amber-9",
+  attention: "bg-kit-amber-11 border-kit-amber-11",
   missed: "bg-kit-red-9 border-kit-red-9",
-  future: "bg-white border-kit-slate-7",
+  future: "bg-white border-kit-slate-9",
 };
 const STATUS_TEXT: Record<RouteTone, string> = {
   done: TONE_TEXT.done,
@@ -154,15 +154,15 @@ export default function WorkOrderRoute({
           </span>
         ) : null}
       </div>
-      <div ref={scrollRef} className="-mx-1 overflow-x-auto overscroll-x-contain" data-testid="work-route-scroll">
-        <ol className="relative flex h-[62px] min-w-max items-stretch px-1 min-[480px]:min-w-0" data-testid="work-route-line">
+      <div ref={scrollRef} className="-mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="work-route-scroll">
+        <ol className="relative flex h-[60px] w-full min-w-max items-stretch px-1" data-testid="work-route-line">
           {route.points.map((point, index) => (
-            <li key={point.key} className="relative flex min-w-[64px] flex-1 justify-center">
+            <li key={point.key} className="relative flex min-w-[60px] flex-1 justify-center">
               {index > 0 ? (
-                <span aria-hidden="true" className={`absolute left-0 right-1/2 top-[23px] h-px ${route.points[index - 1].tone === "done" ? "bg-kit-slate-9" : "border-t border-dashed border-kit-slate-7"}`} />
+                <span aria-hidden="true" className={`absolute left-0 right-1/2 top-[22px] h-px ${route.points[index - 1].tone === "done" ? "bg-kit-slate-9" : "border-t border-dashed border-kit-slate-6"}`} />
               ) : null}
               {index < route.points.length - 1 ? (
-                <span aria-hidden="true" className={`absolute left-1/2 right-0 top-[23px] h-px ${point.tone === "done" ? "bg-kit-slate-9" : "border-t border-dashed border-kit-slate-7"}`} />
+                <span aria-hidden="true" className={`absolute left-1/2 right-0 top-[22px] h-px ${point.tone === "done" ? "bg-kit-slate-9" : "border-t border-dashed border-kit-slate-6"}`} />
               ) : null}
               <PointButton
                 point={point}
@@ -216,15 +216,15 @@ function PointButton({
       aria-controls={`route-detail-${point.key}`}
       aria-label={`${point.label}${point.dateText ? ` · ${point.dateText}` : ""} · ${point.status} · ${toneWord}`}
       onClick={onClick}
-      className={`relative z-[1] flex min-w-[56px] flex-col items-center rounded-control px-1 text-center hover:bg-kit-slate-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9 ${open ? "bg-kit-slate-2" : ""}`}
+      className={`relative z-[1] flex min-w-[56px] flex-col items-center rounded-control px-0.5 text-center hover:bg-kit-slate-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9 ${open ? "bg-kit-slate-2" : ""}`}
       data-testid={`work-route-point-${point.key}`}
     >
       <span className={`h-4 whitespace-nowrap text-[11px] leading-4 tabular-nums ${point.final ? "font-semibold text-kit-slate-12" : "text-kit-slate-11"}`}>
         {point.dateText ?? " "}
       </span>
-      <span className="flex h-[14px] items-center justify-center" aria-hidden="true">
+      <span className="flex h-3 items-center justify-center" aria-hidden="true">
         <span
-          className={`grid place-items-center rounded-full border-2 ${DOT[point.tone]} ${point.final ? "h-3.5 w-3.5 ring-2 ring-offset-1 ring-kit-slate-7" : "h-3 w-3"}`}
+          className={`grid place-items-center rounded-full border-2 ${DOT[point.tone]} ${point.final ? "h-3 w-3 ring-2 ring-offset-1 ring-kit-slate-6" : "h-2.5 w-2.5"}`}
         >
           {point.tone === "done" ? <Icon name="ready" size={8} /> : null}
         </span>

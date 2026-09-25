@@ -99,6 +99,11 @@ export default function OperationWork() {
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
+  /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
+  const backRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (activePanel === "detail") backRef.current?.focus();
+  }, [activePanel]);
   /** 960–1279px: the rail is collapsed until the toolbar's `Filters` opens it. */
   const [railOpen, setRailOpen] = useState(false);
   /** Below 960px: which compact filter control is open. */
@@ -695,7 +700,7 @@ export default function OperationWork() {
           detail={selected ? (
             <>
               {layout === "one" ? (
-                <button type="button" className="inline-flex h-10 shrink-0 items-center gap-1.5 self-start text-body text-kit-blue-11" data-testid="work-back" onClick={() => setActivePanel("list")}>
+                <button ref={backRef} type="button" className="inline-flex h-10 shrink-0 items-center gap-1.5 self-start text-body text-kit-blue-11" data-testid="work-back" onClick={() => setActivePanel("list")}>
                   <Icon name="back" />
                   Back to work
                 </button>

@@ -9,9 +9,10 @@ import type { OperationWorkItem } from "@carres/shared";
 import { PartyCardShell, ToneLine } from "./PartyCardShell";
 import { primaryPartyOf } from "./WorkParties";
 
+const scopeState = { failed: true };
 vi.mock("../delivery-scope-card", () => ({
   useOrderIdFromRef: () => null,
-  useDeliveryScopeCard: () => ({ card: null, loading: false, failed: true }),
+  useDeliveryScopeCard: () => ({ card: null, loading: false, failed: scopeState.failed }),
 }));
 
 describe("the party-card shell", () => {
@@ -22,9 +23,10 @@ describe("the party-card shell", () => {
       </PartyCardShell>,
     );
     const toggle = screen.getByTestId("party-x-toggle");
-    expect(toggle.className).toContain("h-[72px]");
+    expect(toggle.className).toContain("h-[70px]"); // + the 1px edge = 72px
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveAccessibleName("Show Customer details");
+    /* The name carries the party, its state and the act — not a bare verb. */
+    expect(toggle).toHaveAccessibleName(/Customer · Lim Kuan Yang.*Contact due today.*Show Customer details/);
     expect(screen.getByTestId("party-x-heading").className).toContain("text-[15px]");
     expect(screen.getByTestId("party-x-heading").className).toContain("leading-5");
     expect(screen.getByText("Contact due today").parentElement?.className).toContain("text-[12px]");
@@ -63,6 +65,15 @@ describe("an order the panel cannot read", () => {
     expect(screen.getByTestId("work-mission-unavailable")).toHaveTextContent("Order details unavailable");
     expect(screen.getByText("The work item still exists, but its Sales Order could not be loaded.")).toBeInTheDocument();
     expect(screen.queryByText("Logistics not assigned")).not.toBeInTheDocument();
+  });
+
+  it("an order simply outside the Operation list draws nothing (not a failure)", async () => {
+    scopeState.failed = false;
+    const WorkParties = (await import("./WorkParties")).default;
+    const item = { object: { kind: "sales_order", id: "order-9", label: "SO-9" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
+    const { container } = render(<MemoryRouter><WorkParties item={item} /></MemoryRouter>);
+    expect(container).toBeEmptyDOMElement();
+    scopeState.failed = true;
   });
 
   it("a work item that names no Sales Order draws no mission at all", async () => {

@@ -70,7 +70,9 @@ export default function WorkParties({ item }: { item: OperationWorkItem }) {
   const scope = useDeliveryScopeCard(orderId);
   if (!ref) return null;
   if (!orderId || (!scope.card && !scope.loading)) {
-    if (scope.loading) return null;
+    /* A FAILED read says so; an order simply outside the Operation list
+       (the latest 500) draws nothing — never a guessed party state. */
+    if (scope.loading || !scope.failed) return null;
     return (
       <WorkSection className="shrink-0 p-3 min-[960px]:px-4" data-testid="work-mission-unavailable" role="status">
         <p className="text-[15px] font-semibold leading-5 text-kit-slate-12">{PARTIES_COPY.unavailableTitle}</p>
@@ -92,14 +94,21 @@ function Mission({ orderId, item }: { orderId: string; item: OperationWorkItem }
   const supplier = useSupplierCard(orderId);
   const embedded = item.interaction.mode === "embedded";
 
-  const supplierFirst = supplier.model?.rows.find((r) => r.tone === "missed" || r.tone === "current" || r.tone === "attention") ?? null;
+  const rows = supplier.model?.rows ?? [];
+  const supplierTiming: Timing = rows.some((r) => r.tone === "missed")
+    ? "missed"
+    : rows.some((r) => r.tone === "current")
+      ? "today"
+      : rows.some((r) => r.tone === "attention")
+        ? "ahead"
+        : null;
   const primary = embedded
     ? null
     : primaryPartyOf(
         {
           logistics: lm.model?.currentAction ? lm.model.currentAction.timing : null,
           customer: customer.model?.action ? customer.model.action.timing : null,
-          supplier: supplierFirst ? (supplierFirst.tone === "missed" ? "missed" : supplierFirst.tone === "current" ? "today" : "ahead") : null,
+          supplier: supplierTiming,
         },
         partyOfWork(item),
       );

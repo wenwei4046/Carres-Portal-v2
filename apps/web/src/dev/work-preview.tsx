@@ -59,7 +59,7 @@ function item(module: OperationWorkModule, actionOn: string | null, missedDays =
     module,
     ruleKey: "follow",
     ruleVersion: 1,
-    object: { kind: "sales_order", id, label: words.ref ?? `SO2609-${4800 + seq}` },
+    object: { kind: module === "purchasing" || module === "receiving" ? "purchase_order" : "sales_order", id, label: words.ref ?? `SO2609-${4800 + seq}` },
     problem: words.problem,
     action: words.action,
     recipient: words.recipient,
@@ -165,6 +165,8 @@ const lc = new URLSearchParams(window.location.search).get("lc") ?? "due";
 const firstDelivery = FEED.items.find((i) => i.module === "delivery");
 if (firstDelivery) {
   firstDelivery.object = { kind: "delivery_scope", id: ORDER, label: "SO-1362" };
+  firstDelivery.id = "delivery:SO-1362:confirm_delivery_date";
+  firstDelivery.ruleKey = "confirm_delivery_date";
   firstDelivery.problem = "The delivery is not scheduled";
   firstDelivery.action = "Call AL Logistics";
   firstDelivery.recipient = "AL Logistics";
@@ -176,7 +178,7 @@ const ORDERS = {
   orders: [
     {
       id: ORDER, so: 1362, status: "proceed_order", operation_stage: "ready_to_dispatch", warehouse_id: null,
-      customer_name: "LIM KUAN YANG", customer_phone: "012-345 6789",
+      customer_name: "LIM KUAN YANG", customer_phone: "012-345 6789", customer_email: "kuanyang.lim@example.com",
       customer_address: "12 Jalan Sekolah, 41000 Klang, Selangor", customer_address_city: "Klang", customer_address_state: "Selangor",
       building_type: "Condo", delivery_floor: 7, delivery_has_lift: true,
       placed_at: "2026-09-01T02:00:00Z", proceeded_at: "2026-09-01T02:00:00Z",
@@ -200,8 +202,39 @@ const ARRANGEMENTS = {
       }]
     : [],
   events: [],
-  contacts: [],
+  contacts: [] as Array<Record<string, unknown>>,
 };
+
+/* ── THE REST OF THE RIGHT PANEL (owner approval 2026-09-25, §5.10) ──────────
+   `?cm=` — the Customer: `operation` (Carres calls; default), `waiting`
+   (Record as sent yesterday), `partner` (the company calls).
+   `?sp=` — the Suppliers: `three` (default: one delayed, one expected, one
+   not issued), `none` (no PO), `received`. `?loan=1` adds a loan offer. */
+const cm = new URLSearchParams(window.location.search).get("cm") ?? "operation";
+const sp = new URLSearchParams(window.location.search).get("sp") ?? "three";
+const loanOn = new URLSearchParams(window.location.search).get("loan") === "1";
+if (cm === "waiting") {
+  ARRANGEMENTS.contacts.push({
+    id: "c-1", order_id: ORDER, leg: 0, purpose_key: "confirm_delivery_date", channel: "whatsapp", contacted_person: "customer",
+    contact_owner_user_id: ME, acting_user_id: ME, contacted_at: `${REAL_TODAY}T02:42:00Z`, result_key: "waiting_for_customer_reply",
+    reply_evidence_path: null, next_action: null, note: "Template: Confirm delivery date", on_behalf_of_partner_id: null, recorded_by: ME, recorded_at: `${REAL_TODAY}T02:42:00Z`,
+  });
+}
+const plusDays = (n: number) => addWorkingDays(REAL_TODAY, n, { holidays: myHolidaySet() });
+/* The feed's Waiting fact — what the server derives from that contact. */
+if (cm === "waiting" && firstDelivery) {
+  firstDelivery.timing = { ...firstDelivery.timing, actionOn: TODAY, businessDueOn: TODAY, placement: "on_day", missedAge: { state: "counted", workingDays: 0, basis: { calendarKey: "module+person", from: TODAY, to: TODAY } } };
+  firstDelivery.communication = { channel: "whatsapp", recipient: "Lim Kuan Yang", sentAt: `${REAL_TODAY}T02:42:00.000Z`, replyState: "waiting", replyDueOn: plusDays(1) };
+}
+const SUPPLIERS = sp === "none"
+  ? []
+  : sp === "received"
+    ? [{ poNo: "PO260910-4827", supplier: "Hookka Industries", issued: true, originalIso: plusDays(-2), effectiveIso: plusDays(-2), reply: null, supplierDo: { number: "DO-5531", atIso: `${plusDays(-3)}T02:00:00Z` }, deliverTo: "Carres Klang Warehouse", grnIso: plusDays(-2), orderedQty: 2, receivedQty: 2, lines: [{ sku: "mattress:M1401F-K", qty: 1 }] }]
+    : [
+        { poNo: "PO260910-4827", supplier: "Sleepwell", issued: true, originalIso: plusDays(1), effectiveIso: plusDays(6), reply: { answer: "delayed", reason: "Production Delay", evidence: "arrangement/wa-1.jpg", recordedAtIso: `${REAL_TODAY}T01:00:00Z` }, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "mattress:M1401F-K", qty: 1 }] },
+        { poNo: "PO260911-1188", supplier: "ABC Furniture", issued: true, originalIso: plusDays(2), effectiveIso: plusDays(2), reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "bedframe:B1201S-K", qty: 1 }] },
+        { poNo: "PO260912-2044", supplier: "XYZ Bedding", issued: false, originalIso: null, effectiveIso: null, reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 2, receivedQty: 0, lines: [{ sku: "pillow:P01", qty: 2 }] },
+      ];
 let linkActive = lc === "link";
 const facts = () => ({
   partner: withPartner ? { id: AL, name: "AL Logistics", hasPortal: false, kvDefault: false } : null,
@@ -233,7 +266,20 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return new Response(JSON.stringify(FEED), { status: 200, headers: { "Content-Type": "application/json" } });
   }
   if (/\/api\/operation\/orders(\?|$)/.test(url)) return json(ORDERS);
-  if (/\/api\/operation\/partners(\?|$)/.test(url)) return json({ partners: [{ id: AL, name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/example" }] });
+  if (/\/api\/operation\/partners(\?|$)/.test(url)) return json({ partners: [{ id: AL, name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/example", customer_contact_by: cm === "partner" ? "partner" : "operation" }] });
+  if (/\/api\/operation\/pos\/for-order\//.test(url)) return json({ purchaseOrders: SUPPLIERS });
+  if (/\/loan-offers/.test(url)) return json({ offers: loanOn ? [{ id: "lo-1", seq: 1, order_id: ORDER, event: "offered", item_id: null, label: "Loan sofa", reason: null, recorded_by: ME, recorded_at: `${REAL_TODAY}T01:00:00Z`, unit_id: null }] : [] });
+  if (/\/api\/operation\/staff(\?|$)/.test(url)) return json({ staff: [{ user_id: ME, email: "sha@carres.co", name: "Shasha", pooled: true, available: true, note: null, last_seen_at: null, duties: [] }], myDuties: [] });
+  if (/\/api\/operation\/suppliers(\?|$)/.test(url)) return json({ suppliers: [{ id: "s-1", name: "Sleepwell", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, whatsapp_group_url: "https://chat.whatsapp.com/sleepwell" }] });
+  if (/\/contacts\?/.test(url) && init?.method === "POST") {
+    const body = JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>;
+    ARRANGEMENTS.contacts.push({
+      id: `c-${ARRANGEMENTS.contacts.length + 2}`, order_id: ORDER, leg: 0, purpose_key: body.purpose, channel: body.channel, contacted_person: body.contactedPerson,
+      contact_owner_user_id: ME, acting_user_id: ME, contacted_at: new Date().toISOString(), result_key: body.result,
+      reply_evidence_path: body.replyEvidencePath ?? null, next_action: null, note: body.note ?? null, on_behalf_of_partner_id: null, recorded_by: ME, recorded_at: new Date().toISOString(),
+    });
+    return json({ contact: { id: "c-new" } });
+  }
   if (/\/api\/operation\/delivery-arrangements(\?|$)/.test(url)) return json(ARRANGEMENTS);
   if (/\/api\/operation\/delivery-orders(\?|$)/.test(url)) return json({ deliveryOrders: [], attempts: [], handoverEvents: [], proofReviews: [], attemptEvidence: [] });
   if (/\/logistics-card/.test(url)) return json(facts());
@@ -246,7 +292,8 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 useAuth.setState({ role: "operation", user: { id: ME, email: "sha@carres.co" } as never });
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-const start = new URLSearchParams(window.location.search).get("at") ?? "/operation?tab=work&day=2026-09-16";
+const start = new URLSearchParams(window.location.search).get("at")
+  ?? "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
