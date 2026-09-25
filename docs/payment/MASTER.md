@@ -189,7 +189,7 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   MASTER).
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. Sorting `Payment timing`
-  returns to that order. The footer says `{n} orders · RM {x} balance due`.
+  returns to that order. The footer says `{n} orders · RM {x} unpaid`.
 - **A row opens below itself (owner ruling 2026-09-16).** The chevron `Show payment details`, the
   `Items & Stock` cell and the `Storage` cell open the SAME collection workspace inside the
   listing, the way a Delivery row opens its brief; the picked day, filters, search, scroll and the
@@ -252,7 +252,7 @@ is itself the defect, and the date law outranks a module's examples.
 Shared `My Work / Team Work` remains the one owner-resolved daily Work Engine. Monitor is the full
 collection control overview; My Work and Team Work show the same authoritative actions filtered by
 owner and date. No second action record, completion fact, owner calculation or manual `Done`.
-Work deep-links to the same collection workspace the Monitor row opens (`/finance/monitor?invoice=`).
+Work deep-links to the same collection workspace the Monitor row opens (`/finance/monitor?order=`).
 
 ### Payment inside Work — owner ruling 2026-09-25 · APPROVED / LOCKED (composition), NOT BUILT
 
@@ -341,11 +341,17 @@ working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
-The Monitor row opens one one-scroll object for the SO's collection below itself (Work's
-`?invoice=` opens the same row): Money → Delivery Dates → Items, Services & Stock → Storage → What
-to do → Collection owner → Invoice → Related Payments → Communication History. The doors sit on one
-strip above it (`Statement` · `Print` · `Create payment link` · `Record payment`); a full-page
-object with the `Monitor` back word remains only for money already off the Monitor. Its doors are `Record payment` (the canonical posting), `Ask customer to pay`, `Record the
+**Owner approval 2026-09-25 (segment 1 of the Payment Blueprint review) · APPROVED / NOT BUILT.**
+The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
+opens the same row; `?invoice=` is retired with the Invoice-keyed row): Money → Delivery Dates →
+Items, Services & Stock → Storage → What to do → Collection owner → Related Payments →
+Communication History. **There is no `Invoice` section**: the Invoice is the closing document and
+lives with the Receipt in Payment Records. The doors sit on one strip above it (`Statement` ·
+`Print` · `Create payment link` · `Record payment` · `Ask customer to pay`); **one blue** — `Ask
+customer to pay` once the clock admits asking, otherwise `Record payment`. Money reads
+`RM {x} unpaid` over `Total payable RM {t} · Paid RM {p}`. There is no full-page workspace: a paid
+SO has left the Monitor and its money is in Payment Records (`SO-{n} needs no payment right now. Its
+money is in Payment Records.`). The row's facts and Work's card are one read of one Work item. Its doors are `Record payment` (the canonical posting), `Ask customer to pay`, `Record the
 result`, `Create payment link`, the §6/§7 storage doors, `Statement` and `Print`. Staff record a
 structured result: `Customer paid` · `Customer will pay on a date` · `Customer needs help` ·
 `Customer disputes the amount` · `Customer did not answer`; the system creates the next action.
@@ -593,8 +599,8 @@ it cannot fix an unassigned order. `Payment Duty` is RETIRED: no caller remained
 so the catalogue no longer offers it. There is no universal Sales Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover
-and actor. Every Payment item deep-links to `/finance/monitor?invoice={id}` — the same collection
-workspace the Monitor row opens. The Monitor reads these items for its owner avatar and never
+and actor. Every Payment item deep-links to `/finance/monitor?order={orderId}` — the same collection
+workspace the Monitor row opens (owner approval 2026-09-25; `?invoice=` retired). The Monitor reads these items for its owner avatar and never
 resolves an owner itself. Summaries name work: `3 customer balances need collection today`,
 `1 payment should have been received already`, `2 storage payments need collection`. `8 open ·
 2 late` is forbidden. Shared Calendar may show `Payment deadline` · `Customer promised to pay` ·
@@ -2151,8 +2157,8 @@ SO and factual state (`Payment recorded` · `VOIDED`). Print is direct output. A
 allocation / Void payment live in header overflow; unauthorised staff never see them. A void
 preserves the original Receipt with VOIDED, reason and history.
 
-Collection workspace order (§3): Money → Delivery Dates → Items, Services & Stock → Storage → What to do →
-Collection owner → Invoice → Related Payments → Communication History. Check money, goods readiness/arrival and customer Delivery before creating collection Work.
+Collection workspace order (§3, owner approval 2026-09-25): Money → Delivery Dates → Items, Services & Stock →
+Storage → What to do → Collection owner → Related Payments → Communication History (no Invoice section). Check money, goods readiness/arrival and customer Delivery before creating collection Work.
 When goods are not ready and arrival is unknown, show `Wait`; never create a blind payment chase.
 Draft may be edited and issued. Issued Invoice has no ordinary Edit; correction voids the old
 Invoice and creates a linked replacement. (0476 · BUILT: `Void and replace` sits in the Invoice
