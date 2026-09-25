@@ -52,7 +52,7 @@ export default function WorkSplitShell({
     return (
       <div data-testid="work-split-shell" data-layout="one" className={`${COLUMN} flex-1`}>
         {activePanel === "detail" ? (
-          <section aria-label="Selected work" className={`${COLUMN} flex-1 gap-4 overflow-y-auto`}>{detail}</section>
+          <section aria-label="Selected work" className={`${COLUMN} flex-1 gap-2 overflow-y-auto`}>{detail}</section>
         ) : (
           <section aria-label="Work actions" className={`${COLUMN} flex-1`}>{list}</section>
         )}

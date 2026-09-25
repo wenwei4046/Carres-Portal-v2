@@ -19,12 +19,12 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
     : null;
   return (
     <>
-      <header className="shrink-0 rounded-work border border-work-line bg-white px-6 py-4">
+      <header className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-6 min-[960px]:py-4" data-testid="work-detail-header">
         <p className="text-label font-medium text-kit-slate-11">{item.object.label} · {MODULE[item.module]}</p>
-        <h2 className="mt-1 text-section font-semibold text-kit-slate-12">{item.problem}</h2>
-        <p className="mt-1 text-body text-kit-slate-11">{action}</p>
+        <h2 className="mt-1 text-[16px] font-semibold leading-[22px] text-kit-slate-12 min-[960px]:text-section" data-testid="work-detail-title">{item.problem}</h2>
+        <p className="mt-1 text-body text-kit-slate-11" data-testid="work-detail-action">{action}</p>
       </header>
-      <section aria-label="What to do" className="shrink-0 rounded-work border border-work-line bg-white px-6 py-4">
+      <section aria-label="What to do" className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-6 min-[960px]:py-4" data-testid="work-detail-task">
         <div className="max-w-[760px]">
         {item.interaction.mode === "embedded" ? (
           <section aria-label="Do this work" className="flex flex-col gap-3">
@@ -37,12 +37,12 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
           <p className="text-body text-kit-slate-11">{item.requiredResult}</p>
         )}
 
-        <div className="mt-4">
+        <div className="mt-2 min-[960px]:mt-4">
           <Button type="button" onClick={onOpen}>Open {item.object.label}</Button>
         </div>
 
-        <details className="mt-4 border-t border-kit-slate-5 pt-3 text-label text-kit-slate-11">
-          <summary className="cursor-pointer font-medium text-kit-slate-12">Owner, timing and source</summary>
+        <details className="mt-2 border-t border-kit-slate-5 text-label text-kit-slate-11 min-[960px]:mt-4" data-testid="work-detail-disclosure">
+          <summary className="flex h-9 cursor-pointer items-center text-[12px] font-medium leading-4 text-kit-slate-12">Owner, timing and source</summary>
           <div className="mt-2 flex flex-col gap-1">
             <p>{item.owner.acting?.name ?? item.owner.normal?.name ?? "Not assigned"}</p>
             <p>{item.timing.actionOn ?? item.timing.noDateReason ?? "No working date"}</p>

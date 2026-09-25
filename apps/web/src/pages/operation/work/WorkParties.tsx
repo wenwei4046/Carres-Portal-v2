@@ -49,13 +49,14 @@ function PartyShell({ title, summary, children, testId }: { title: string; summa
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-3 rounded-work px-4 py-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        className="flex h-[72px] w-full items-center gap-2 rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:h-auto min-[960px]:items-start min-[960px]:gap-3 min-[960px]:px-4 min-[960px]:py-3"
+        data-testid={`${testId}-toggle`}
       >
         <div className="min-w-0 flex-1">{summary}</div>
-        <span className="mt-0.5 text-kit-slate-11"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11 min-[960px]:mt-0.5 min-[960px]:h-auto min-[960px]:w-auto" data-testid={`${testId}-chevron`}><Icon name={open ? "collapse" : "expand"} size={16} /></span>
       </button>
       {open ? (
-        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-4 py-3">
+        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[960px]:px-4 min-[960px]:py-3">
           {children}
         </div>
       ) : null}
@@ -119,7 +120,7 @@ export default function WorkParties({ item }: { item: OperationWorkItem }) {
      assigned`. */
   if (!ref || !orderId || (!scope.card && !scope.loading)) return null;
   return (
-    <div className="flex flex-col gap-4" data-testid="work-parties">
+    <div className="flex flex-col gap-2 min-[960px]:gap-4" data-testid="work-parties">
       <LogisticsCard orderId={orderId} />
       <CustomerCard orderId={orderId} />
       <SupplierCard orderId={orderId} />

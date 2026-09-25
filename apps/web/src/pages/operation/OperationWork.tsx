@@ -685,7 +685,7 @@ export default function OperationWork() {
           detail={selected ? (
             <>
               {layout === "one" ? (
-                <button type="button" className="inline-flex min-h-10 shrink-0 items-center gap-1.5 self-start text-body text-kit-blue-11" onClick={() => setActivePanel("list")}>
+                <button type="button" className="inline-flex h-10 shrink-0 items-center gap-1.5 self-start text-body text-kit-blue-11" data-testid="work-back" onClick={() => setActivePanel("list")}>
                   <Icon name="back" />
                   Back to work
                 </button>
