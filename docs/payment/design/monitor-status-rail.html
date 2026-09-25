@@ -64,20 +64,22 @@
   .doors{display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px}
   .btn{height:28px;padding:0 10px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
-  .grid .money td,.grid .docs td{border-right:0;height:24px;max-width:none;padding:0 12px 0 0;white-space:nowrap}.grid .money td:last-child{padding-right:0}
-  .cols{display:grid;grid-template-columns:minmax(300px,1fr) minmax(260px,1fr) minmax(380px,1.4fr);gap:0}
-  .col{min-width:0;padding:0 16px 4px 0}.col+.col{border-left:1px solid var(--border);padding-left:16px}
-  .col h3{margin:0 0 6px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
-  .col h3.sub2{margin-top:12px}
-  .col p{margin:0 0 4px}.col .fact{font-weight:600}.col .meta{font-size:12px;line-height:16px;color:var(--ink-2)}
-  .col .btns{display:flex;flex-wrap:wrap;gap:6px}
-  table.money{border-collapse:collapse;width:100%;max-width:300px}.money td{height:24px;padding:0;font-size:13px;line-height:18px;border-bottom:1px solid var(--surface-alt)}
-  .money .num{text-align:right}.money tr.sum td{border-top:1px solid var(--divider);font-weight:600}.money tr.due td{font-weight:600;border-bottom:0}
-  table.docs{border-collapse:collapse;width:100%}.docs td{padding:0 12px 0 0;height:24px;white-space:nowrap;font-size:12px;line-height:16px;border-bottom:1px solid var(--surface-alt)}.docs tr:last-child td{border-bottom:0}
-  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}.docs td.m{white-space:normal}.docs td.num{text-align:right}
+  .grid .money td,.grid .docs td,.grid .kv td{border-right:0;border-bottom:0;height:24px;max-width:none;padding:0 12px 0 0;white-space:nowrap}
+  .two{display:grid;grid-template-columns:minmax(560px,1fr) 420px;gap:16px;align-items:start}
+  .left,.right{display:flex;flex-direction:column;min-width:0}
+  .sec{padding:8px 0}.sec+.sec{border-top:1px solid var(--border)}
+  .right{background:#fff;border:1px solid var(--border);border-radius:var(--r-control);padding:0 12px}
+  .sec h3{margin:0 0 4px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+  .sec p{margin:0 0 4px}.sec .fact{font-weight:600}.sec .meta{font-size:12px;line-height:16px;color:var(--ink-2)}.sec .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  table.money,table.kv{border-collapse:collapse;width:100%}.grid .money td{border-bottom:1px solid var(--surface-alt)}.money .num{text-align:right;font-variant-numeric:tabular-nums}
+  .grid .money tr.sum td{border-top:1px solid var(--divider);font-weight:600}.grid .money tr.due td{font-weight:600;border-bottom:0}
+  .grid .kv td:first-child{color:var(--ink-2);font-size:12px;width:120px}.grid .kv td{white-space:normal}
+  table.docs{border-collapse:collapse;width:100%}.grid .docs td{font-size:12px;line-height:16px;border-bottom:1px solid var(--surface-alt)}.docs tr:last-child td{border-bottom:0}
+  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500;width:110px}.docs td.m{white-space:normal}.docs td.num{text-align:right}.docs td.act{text-align:right;padding-right:0}
   .hl{font-size:12px;line-height:16px}.hl .t{color:var(--ink-2);margin-left:6px}
   footer.ft{height:32px;display:flex;align-items:center;padding:0 12px;border-top:1px solid var(--border);color:var(--ink-2);font-size:12px}
   @media (max-width:1100px){.side{display:none}.shell{grid-template-columns:1fr}}
+  @media (max-width:1024px){.two{grid-template-columns:1fr}.right{order:-1}}
   @media (prefers-reduced-motion:no-preference){.xchev svg{transition:transform 150ms}}
 </style>
 <div class="note">Design mock · Payment Monitor · same density as the Sales Orders register (40px rows) · fixture data, not customer data · a narrow window scrolls sideways</div>
@@ -132,39 +134,53 @@
               <tr data-d="2026-09-17" data-k="promised"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1405</span></td><td class="s3">SITI AMINAH</td><td class="num">RM 2,500.00</td><td>Ready · 1 of 1</td><td>Sofa · Day 29 · RM 400.00 so far</td><td>Thu, 24 Sep</td><td>Scheduled · Thu, 24 Sep</td><td class="o">Customer promised to pay today</td><td><span class="av">SH</span>Shasha</td></tr>
               <tr class="exp" data-d="2026-09-17" data-k="promised"><td colspan="10"><div class="expbox">
                 <div class="doors"><button class="btn">Record payment</button><button class="btn p">Ask customer to pay</button><button class="btn" aria-label="More actions" title="Statement · Print · Create payment link">⋯</button></div>
-                <div class="cols">
-                  <section class="col">
-                    <h3>Money</h3>
-                    <table class="money">
-                      <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
-                      <tr><td>Storage · Sofa · 29 days</td><td class="num">RM 400.00</td></tr>
-                      <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
-                      <tr><td>Paid</td><td class="num">RM 900.00</td></tr>
-                      <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
-                    </table>
-                    <p class="meta">Payment due Tue, 22 Sep · Collection owner Shasha</p>
-                    <p class="meta">SITI AMINAH · 0133332211 · No reference</p>
-                  </section>
-                  <section class="col">
-                    <h3>What to do</h3>
-                    <p class="fact o">Customer promised to pay today</p>
-                    <p class="meta">Ask customer to pay, then record the answer.</p>
-                    <p><button class="btn">Record the result</button></p>
-                    <h3 class="sub2">Storage</h3>
-                    <p class="meta">Sofa · Day 29 · started Wed, 19 Aug · free until Tue, 1 Sep · next check Fri, 18 Sep</p>
-                    <p class="btns"><button class="btn">Request more free days</button><button class="btn">Check the stored furniture</button></p>
-                  </section>
-                  <section class="col">
-                    <h3>Documents</h3>
-                    <table class="docs">
-                      <tr><td>RC2609-4830</td><td class="num">RM 900.00</td><td>Mon, 7 Sep</td><td><button class="link">Print</button> · <button class="link">Send</button></td></tr>
-                      <tr><td>Invoice</td><td colspan="2" class="m">Issued when Balance due is RM 0</td><td></td></tr>
-                      <tr><td>Statement</td><td colspan="2"></td><td><button class="link">Print</button></td></tr>
-                    </table>
-                    <h3 class="sub2">Communication History</h3>
-                    <p class="hl"><b>Customer will pay on a date</b> · promised Thu, 17 Sep<span class="t">Tue, 15 Sep · Shasha</span></p>
-                    <p class="hl"><b>Payment message sent</b><span class="t">Tue, 15 Sep · Shasha</span></p>
-                  </section>
+                <div class="two">
+                  <div class="left">
+                    <section class="sec">
+                      <h3>What to do</h3>
+                      <p class="fact o">Customer promised to pay today</p>
+                      <p class="meta">Ask customer to pay, then record the answer.</p>
+                      <p><button class="btn">Record the result</button></p>
+                    </section>
+                    <section class="sec">
+                      <h3>Documents</h3>
+                      <table class="docs">
+                        <tr><td>RC2609-4830</td><td class="num">RM 900.00</td><td>Mon, 7 Sep</td><td>Deposit</td><td class="act"><button class="link">Print</button> · <button class="link">Send</button></td></tr>
+                        <tr><td>Invoice</td><td colspan="3" class="m">Issued when Balance due is RM 0</td><td></td></tr>
+                        <tr><td>Statement</td><td colspan="3"></td><td class="act"><button class="link">Print</button></td></tr>
+                      </table>
+                    </section>
+                    <section class="sec">
+                      <h3>Communication History</h3>
+                      <p class="hl"><b>Customer will pay on a date</b> · promised Thu, 17 Sep<span class="t">Tue, 15 Sep · Shasha</span></p>
+                      <p class="hl"><b>Payment message sent</b><span class="t">Tue, 15 Sep · Shasha</span></p>
+                    </section>
+                  </div>
+                  <aside class="right">
+                    <section class="sec">
+                      <h3>Money</h3>
+                      <table class="money">
+                        <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
+                        <tr><td>Storage · Sofa · 29 days</td><td class="num">RM 400.00</td></tr>
+                        <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
+                        <tr><td>Paid</td><td class="num">RM 900.00</td></tr>
+                        <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
+                      </table>
+                    </section>
+                    <section class="sec">
+                      <h3>Timing</h3>
+                      <table class="kv"><tr><td>Payment due</td><td>Tue, 22 Sep</td></tr><tr><td>Collection owner</td><td>Shasha · No cover today</td></tr></table>
+                    </section>
+                    <section class="sec">
+                      <h3>Storage</h3>
+                      <table class="kv"><tr><td>Group</td><td>Sofa · Day 29</td></tr><tr><td>Started</td><td>Wed, 19 Aug · free until Tue, 1 Sep</td></tr><tr><td>Next check</td><td>Fri, 18 Sep</td></tr></table>
+                      <p class="btns"><button class="btn">Request more free days</button><button class="btn">Check the stored furniture</button></p>
+                    </section>
+                    <section class="sec">
+                      <h3>Customer</h3>
+                      <table class="kv"><tr><td>Phone</td><td>0133332211</td></tr><tr><td>Reference</td><td class="m">No reference</td></tr></table>
+                    </section>
+                  </aside>
                 </div>
               </div></td></tr>
               <tr data-d="2026-09-17" data-k="ask"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1406</span></td><td class="s3">CHONG WEI JIE</td><td class="num">RM 1,000.00</td><td>Ready · 1 of 1</td><td>Free until Sun, 27 Sep</td><td>Fri, 25 Sep</td><td>Scheduled · Fri, 25 Sep · 10 AM</td><td>Ask customer today</td><td><span class="av">SH</span>Shasha</td></tr>
