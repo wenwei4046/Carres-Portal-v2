@@ -1177,8 +1177,14 @@ separate governed outstation-release rule.
 #### Payment, Warehouse, loan and after-sales boundaries
 
 Payment is a Route/party exception only when it materially affects delivery; it is not another
-calendar card. Use the Payment MASTER's governed collection/approval action and do not invent
-`Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
+calendar card. **Owner ruling 2026-09-25 (APPROVED / NOT BUILT; `../payment/MASTER.md` "Payment
+inside Work"):** a collection Work item's object is the **Sales Order** (never an Invoice, so the
+Route and party cards always draw); the middle card prints `Balance due RM {x}` over `Ask customer
+to pay`; the Summary carries the money and the one blue `Ask customer to pay`; the Route exception
+line is `Payment due {day}` (`to collect by` is retired); the Customer card keeps Delivery's collapsed
+line and gains an expanded **Payment** section whose doors (`Ask customer to pay` · `Record the
+result` · `Record payment`) open Payment's own compositions in place. One fact, one place. Do not
+invent `Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
 Purchasing; GRN/received quantity belongs to Warehouse. Loan is its optional independent point.
 After-sales starts a separate mission after delivery unless its own MASTER explicitly connects it.
 

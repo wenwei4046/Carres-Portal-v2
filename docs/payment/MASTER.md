@@ -59,8 +59,27 @@ All entry paths use one Payment posting service and idempotency key. Operation m
 received in delivery/storage; the Responsible Delivery Operation — the order's collection owner —
 may post normal collection. Neither writes a second `orders.paid` truth or receipt identity.
 
-`outstanding = issued live invoice obligations − canonical allocated money received`.
-Unknown and zero differ. No screen recalculates outstanding or storage independently.
+**THE MONEY RULE — OWNER RULING (Jess, 2026-09-25) · APPROVED / LOCKED. This overwrites the
+former invoice-keyed model completely.**
+
+```text
+1  The customer pays (the deposit) → the order Proceeds → Operation receives the order
+2  A balance remains → collect it before delivery (the collection clock below)
+3  Balance due reaches RM 0 → the system issues the Invoice and Operation sends Receipt + Invoice
+   to the customer together, in one message
+```
+
+`Balance due = Sales Order total payable − money received` — the Sales Order's own `orderMoney`,
+the same figure the Sales Order page and PDF print as `Balance due`. **An Invoice never asks for
+money.** The customer is asked to pay against the Sales Order (`SO No` and its `Balance due`); the
+Invoice is the closing document, issued automatically the moment `Balance due` reaches RM 0 and sent
+with the Receipt. There is no manual `Generate invoice` door and no draft/issue step for staff.
+Unknown and zero differ. No screen recalculates `Balance due` or storage independently.
+
+**PROPOSAL / NOT LAW — Storage (to be settled in the Storage segment of the 2026-09-25 Blueprint
+review):** a storage charge is one more line of the same `Balance due`, not a separate Storage
+Invoice that asks for money; the one closing Invoice prints it. Falsifier: the owner keeps the
+Storage Invoice / Additional Storage Invoice as separate customer documents.
 
 One successful `Record payment` atomically creates Payment, allocates it, updates derived
 outstanding, mints one receipt, appends SO activity, and closes/recalculates Work. Failure rolls
@@ -101,8 +120,9 @@ Workspace          duties, cover, working calendars
 
 ### Payment Monitor
 
-Payment Monitor is a full-width control listing keyed on the Sales Order: one row per SO that
-still needs customer money. It is not a calendar, a document register, a KPI dashboard or a
+Payment Monitor is a full-width control listing keyed on the Sales Order: one row per Proceeded SO
+whose `Balance due` is above RM 0 (owner ruling 2026-09-25 — the row is the Sales Order, never an
+Invoice; an order with no Invoice is still a row). It is not a calendar, a document register, a KPI dashboard or a
 second My Work.
 
 **THE LISTING IS DELIVERY'S LISTING (owner ruling 2026-09-16 — this overwrites the seven-column
@@ -121,16 +141,16 @@ viewport (like Operation's), so the sheet — not the window — scrolls and the
 Columns, in exactly this order:
 
 ```text
-SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing
+SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing
 ```
 
 - **SO No** — line 1 the SO number, which opens the formal Sales Order; line 2 the customer's own
   reference(s) when recorded, else nothing. Never joined into one number.
 - **Customer** — line 1 the name; line 2 the phone on record.
-- **Amount needed** = issued live Invoice obligations − canonical allocated money (`soRemaining`,
-  the one arithmetic), right-aligned. Line 2 `includes storage RM {amount}` only while an issued
+- **Balance due** = the Sales Order's total payable − money received (the one arithmetic; owner
+  ruling 2026-09-25 — the word was `Amount needed` until then), right-aligned. Line 2 `includes storage RM {amount}` only while an issued
   Storage Invoice is inside it. An accrued, not yet issued storage charge stays in `Storage` as
-  `RM {amount} so far` and never enters Amount needed.
+  `RM {amount} so far` and never enters Balance due.
 - **Items & Stock** — Delivery's own cell, Delivery's own arithmetic (`monitorGoodsOf` over the
   Stock register's allocated Units and Purchasing's recorded arrivals), for the whole Sales Order:
   `Ready` (green) / `Not ready` (orange) over `2 of 2` · `1 of 2 · 1 short` · `Arriving after the
@@ -169,7 +189,7 @@ SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery 
   MASTER).
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. Sorting `Payment timing`
-  returns to that order. The footer says `{n} orders · RM {x} still needed`.
+  returns to that order. The footer says `{n} orders · RM {x} balance due`.
 - **A row opens below itself (owner ruling 2026-09-16).** The chevron `Show payment details`, the
   `Items & Stock` cell and the `Storage` cell open the SAME collection workspace inside the
   listing, the way a Delivery row opens its brief; the picked day, filters, search, scroll and the
@@ -233,6 +253,32 @@ Shared `My Work / Team Work` remains the one owner-resolved daily Work Engine. M
 collection control overview; My Work and Team Work show the same authoritative actions filtered by
 owner and date. No second action record, completion fact, owner calculation or manual `Done`.
 Work deep-links to the same collection workspace the Monitor row opens (`/finance/monitor?invoice=`).
+
+### Payment inside Work — owner ruling 2026-09-25 · APPROVED / LOCKED (composition), NOT BUILT
+
+Staff finish collection from Work OR from the Monitor; both open the same Work item, the same
+Payment components and the same completion fact (`Balance due` = RM 0). Work's standard right
+panel (`../workspace/MASTER.md` §5.10) is not changed; Payment occupies exactly three places in it,
+and **one fact appears in one place**:
+
+```text
+Middle card (104px)   PAYMENT · {customer}          module · recipient
+                      RM 1,800.00 unpaid            the problem — the money, once (#1635's word)
+                      Ask customer to pay           the action
+                      SO-1404                  ↗    the object is the Sales Order, never an Invoice
+Summary               RM 1,800.00 unpaid / Ask customer to pay · {customer} / [Ask customer to pay] [Open SO-1404]
+Order Route           the deadline, once — the exception line under the route. ⚠ WORDS PENDING OWNER
+                      RECONCILIATION 2026-09-25: this chat's `Payment due {day}` versus #1635's
+                      `Payment · Hold delivery · RM {amount} unpaid · by {date}` (the owner called
+                      `by` confusing in this chat the same day). Until ruled, #1635's spelling stands.
+Customer card         collapsed: Delivery's own line, unchanged (no money repeated)
+                      expanded PAYMENT section: [Ask customer to pay] [Record the result] [Record payment]
+                      · Last answer {result · day} · Payment's Communication History (read, not copied)
+```
+
+The three doors open Payment's own compositions in place (the way the Logistics card embeds
+Delivery's forms); Work draws no form and stores nothing. The card and the Summary print the
+Monitor's `Payment timing` fact family and the one money spelling `RM {amount} unpaid` (#1635) — one dictionary.
 
 ### Collection admission — 催钱前先看货
 
@@ -356,7 +402,8 @@ evidence. A voided Receipt cannot be sent as a valid Receipt.
 
 ## 4 · Documents
 
-- Invoice asks for money; Receipt proves money was recorded.
+- Receipt proves money was recorded; the Invoice is the closing document issued at `Balance due`
+  RM 0 and sent with the Receipt (owner ruling 2026-09-25). Neither asks for money.
 - Sales Invoice, Storage Invoice and Additional Storage Invoice use one governed numbering and
   immutable document service.
 - An issued invoice is never edited; correction voids it and issues a linked replacement.
