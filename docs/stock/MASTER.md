@@ -1456,7 +1456,7 @@ Supplier Return creates Outbound work; only actual supplier/collection-party acc
 restored.
 
 **OPERATOR JOURNEY →** return receiver opens the expected Inbound work, scans Unit/source,
-condition/components/evidence and submits receipt into `Needs checking`. Supplier-return operator
+condition/components/evidence and submits receipt into `Needs checking`. (Purchasing §9.6, owner-approved 2026-09-25: the Outbound `Return to supplier` work is opened by an issued PRTN naming exact Units; Outbound records collector, time, Units and proof, and Purchasing reads them as `Not picked up` · `Partly picked up` · `Fully picked up`.) Supplier-return operator
 opens Outbound, scans the exact Unit and identifies the actual supplier collector. Repair operator
 records out handover; Portal keeps the repair partner as holder and creates a concrete follow-up if
 the dated return is not submitted; actual return is scanned through Inbound and checked again.
