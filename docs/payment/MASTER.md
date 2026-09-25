@@ -125,24 +125,27 @@ whose `Balance due` is above RM 0 (owner ruling 2026-09-25 — the row is the Sa
 Invoice; an order with no Invoice is still a row). It is not a calendar, a document register, a KPI dashboard or a
 second My Work.
 
-**THE LISTING IS DELIVERY'S LISTING (owner ruling 2026-09-16 — this overwrites the seven-column
-`Goods` / `Customer delivery` listing completely).** It reuses the Delivery Monitor's shared
-register: the same DataGrid, type sizes, spacing, toolbar (`Search` · `Export` · `Columns`),
-sorting, per-column filters and fixed 32px footer. **Every parent row is a fixed 72px with at most
-two lines per cell** — one primary fact, one supporting line; a cell never grows or shrinks the row
-and never shows a third line, an overlap or a cut glyph. The listing is not a card list. It has no
-selection checkbox, because it has no bulk act. **`SO No` and `Customer` are sticky**; the sheet
-scrolls sideways inside itself (eight columns need ≈1,600px against ≈950px of sheet). On a phone
-(below 768px — also a 200% browser zoom) only `SO No` pins, because the two pins together are wider
-than the sheet. A long value (a customer's name, a reference) may be cut to fit the row, and its
-complete value opens by click or keyboard, never by hover alone. The Finance frame is a fixed
-viewport (like Operation's), so the sheet — not the window — scrolls and the rail and footer stay.
+**THE LISTING IS THE SALES ORDERS REGISTER'S DENSITY — owner direction 2026-09-25 (Payment
+Blueprint segment 3; this overwrites the 2026-09-16 72px two-line row completely).** The Monitor reuses
+the shared DataGrid exactly as the Sales Orders Register does: **40px rows, one fact per cell on one
+line**, 13px cells, 11px headers, the same toolbar (search field · `Export` · `Columns`), sorting,
+per-column filters and fixed 32px footer. Supporting facts (the customer's phone and references,
+`includes storage`, the delivery time, the Logistics company) live in the row's expansion, not in a
+second cell line. `SO No` and `Customer` are sticky; the sheet scrolls sideways inside itself;
+content decides each column's width, never the sheet. Colour appears in ONE column only — `Payment
+timing` (red past the deadline, amber for a promise/ask day) — every other cell is plain text, with
+`Not ready` in amber as the single goods exception. Design record:
+`docs/payment/design/monitor-status-rail.html`.
 
 Columns, in exactly this order:
 
 ```text
-SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing
+SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing | Owner
 ```
+
+- **Owner** (new, 2026-09-25) — the acting person as avatar + name from the shared Work item (cover
+  ring when covered; `Not assigned` link when nobody resolves); empty on a `Wait` row. The action
+  word is not repeated here: it is the expansion's blue door and the Work card's line.
 
 - **SO No** — line 1 the SO number, which opens the formal Sales Order; line 2 the customer's own
   reference(s) when recorded, else nothing. Never joined into one number.
