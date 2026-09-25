@@ -539,6 +539,27 @@ rather than hiding the row. After a successful save the affected row, its quanti
 counts and the receipt records are re-read; a failed save preserves what the operator typed.
 Inbound still owns no write path and carries no Work column or duty avatar.
 
+**INBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
+2026-09-15 four-group composite cells above as design; that card's Site tabs, three filters,
+on-row `Receive`, full-width Receiving Workspace and `Destinations without a Site` tab stay).**
+One row is one arrangement, 40px, one fact per cell, dates first, in the owner's order:
+
+```
+PO Delivery Date · Supplier Delivery Date · PO No · Supplier · Item · Order Qty · Received Qty ·
+Pending Delivery Qty · Goods Received Date · Receive
+```
+
+`Supplier Delivery Date` prints `Not confirmed` while the supplier has not answered. `Damaged Qty` ·
+`Wrong Item Qty` · `PO Issued` · `SO No` · `To` stay in `Columns`. An arrangement with several
+goods prints `{n} items ▸` in `Item` and keeps the row expansion — the one Inbound exception to
+"no expansion", because ten goods on one PO cannot share one line; the expansion lists each item
+with its own quantities and exact Units. An arrangement past its date with no receipt prints
+`Expected {date} · not received` as the row's first line in `Item`, never a colour. The
+`Receive` column keeps its three words (`Receive` · `Checking…` · `Not your duty today`) and the
+no-Site tab prints `No Site linked`. Workspace: on the arrival day the existing `receiving.check_in`
+rule gives the current GRN Duty one card — `{PO No} · {Supplier} / {n} items arriving today /
+Receive the goods` — whose `Open Inbound` door lands on this row; Inbound itself creates no Work.
+
 Clicks are explicit: the Document number opens the document; the Product cell (its arrow and its
 content are ONE expansion entry) expands the row; a Unit ID inside the expansion opens that Unit's
 record; the row itself navigates nowhere. **The expansion has ONE job: the full product detail** —
