@@ -712,6 +712,13 @@ Activity provides recent cross-module business changes within the signed-in pers
 permissions, including authorized colleagues' changes; it is not presence, a public log or an
 employee-only personal log. Modules remain writers and each object's History remains its ledger.
 
+**Who sees it — owner direction 2026-09-24 ("everyone should can see").** The rail is not an
+Operation-only feature: every portal shows it, and each signed-in person sees only what their existing
+permissions already allow. Today it is mounted only in the Operation shell (operation + principal
+roles, `App.tsx:132`) — a build gap. How it is scoped for each portal, including external portals
+(dealer, supplier, delivery partner) that may see only their own records, is **PROPOSAL / NOT LAW**
+in the discussion Card; no permission is widened by this direction.
+
 Formal Work, My Work and Team Work remain at their existing Workspace destination. Removing the
 rail shortcut changes no owner, obligation, calculation, due date or completion rule. No Work
 badge remains on the replacement customer door. Team and Duty editing are not rail slots;
@@ -893,7 +900,8 @@ is technically present.
 
 - The left navigation is grouped by responsibility using the destination grammar in
   `../ERP-ARCHITECTURE.md` §2.1. It is not one flat list.
-- `Work` is a formal destination with `My Work` and `Team Work`; the Quick Rail is only its peek.
+- `Work` is a formal destination with `My Work` and `Team Work`; since the 2026-09-24 owner ruling (§5)
+  the right rail no longer peeks at Work — Work is reached from its own navigation door.
 - There is one central `Settings` destination with module deep-links. Module shortcuts enter that
   destination and do not manufacture `Sales Settings`, `SO Maintenance` or similar sidebar homes.
 - `Old Orders` is temporary cutover infrastructure and must retire; it is not ERP Shell V1.

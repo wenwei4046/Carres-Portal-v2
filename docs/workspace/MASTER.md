@@ -605,7 +605,7 @@ or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Worki
 Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
 `Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
 `Missed`. Multiple filters combine and every active filter is
-visible, individually removable and represented in the URL so Dashboard and Right Rail can open
+visible, individually removable and represented in the URL so Dashboard and module doors can open
 the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
 does not change business state.
 
@@ -783,8 +783,8 @@ identity; it never changes the owner, due date or completion fact.
 |---|---|
 | My Work / Team Work use one server-composed open feed | Retain; make all admitted modules use the same transport contract and source health |
 | My Work defaults correctly and Team groups by normal owner | Retain; add complete cover/handover and unresolved-Duty evidence everywhere |
-| Right Rail reads the same cache and opens `day` filters; since HF-3 (2026-09-17) the badge, the panel and My Work share one identity (the signed-in account id), one focus day (`workFocusDay`) and one `Missed` + `Today` count (`myMissedAndToday`); the badge accessible name is `My Work · {n} missed · {n} today`; loading keeps count placeholders and a failed refresh keeps the last-safe counts with `Last updated {time}` and source words | Retain; all supported filters must be URL-visible and use the same vocabulary |
-| Current main Work page has scope toggles and limited Rail-linked time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
+| The Right Rail My Work slot (HF-3, 2026-09-17: one identity, one focus day `workFocusDay`, one `Missed` + `Today` count `myMissedAndToday`) is built and still mounted | Retire it under §7 (owner 2026-09-24); Work keeps the one identity, focus day and count; all supported filters stay URL-visible |
+| Current main Work page has scope toggles and limited time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
 | Current rows show object, problem, action and due; Delivery/Warehouse show required result | Make required result accessible on every item and visible whenever completion would otherwise be ambiguous |
 | Current rows use truncation on narrow content | Replace with wrapping under 1024px; prove object/problem/action/result/due remain readable at 390px |
 | Current source composition is one all-or-nothing read and the item shape omits parts of §5.2.1 | Build the permission-scoped feed envelope, isolate source failures, distinguish true empty from no match and preserve governed last-safe observation |
@@ -798,7 +798,7 @@ Work is ready for owner acceptance only when all are demonstrable:
 
 - every admitted source rule in §6.1 produces one stable identity and source completion removes that
   identity without a manual Done act;
-- My Work, Team Work and Right Rail use one authorised response and one cache identity;
+- My Work and Team Work use one authorised response and one cache identity;
 - every returned occurrence and admitted-source health record satisfies §5.2.1; one failed source
   leaves healthy-source actions usable and cannot be rendered as a complete or zero set;
 - normal owner, cover, acting person, `Not assigned` and actual completed actor remain
@@ -807,7 +807,7 @@ Work is ready for owner acceptance only when all are demonstrable:
   the governed working-day law;
 - blockers retain the original working day and missed age, and source failure cannot reduce or clear
   any count;
-- search and every filter in §5.3 combine, serialize to the URL and restore through Dashboard/Rail
+- search and every filter in §5.3 combine, serialize to the URL and restore through Dashboard and module doors
   deep links without broadening permission scope;
 - every row exposes object, fact/problem, concrete action, recipient when applicable, required result,
   due/late fact and exact owning door without repeating owner/object in sentence prose;
@@ -1488,8 +1488,8 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
   health, recent changes. No horizontal pipeline, compressed five-column board or sideways KPI strip.
 - Counts and amounts never truncate. Long measure explanations wrap; object doors remain keyboard and
   touch accessible. Hover-only source/threshold evidence also opens by focus/tap.
-- Right Rail remains a My Work navigation peek beside Dashboard on supported desktop widths; it is
-  not folded into Dashboard. On narrow screens its existing navigation door remains separate.
+- The right rail (Calendar · Customers · Activity, UI MASTER §5) stays beside Dashboard on supported
+  desktop widths; it is not folded into Dashboard. Work is reached from its own navigation door.
 
 ### 8.5 · Current → proposed gap audit — 2026-09-07
 
@@ -1532,7 +1532,7 @@ Dashboard is ready for owner acceptance only when all are demonstrable:
   healthy sections usable during a partial failure;
 - the reading order and complete measure meaning remain operable at 1440, 1024 and 390px by keyboard,
   screen reader and touch, with no sideways KPI strip or hover-only evidence;
-- the global Right Rail remains a separate My Work doorway and Dashboard remains one independent
+- the global right rail stays separate from Dashboard (UI MASTER §5), and Dashboard remains one independent
   top-level destination outside the `WORKSPACE` navigation group.
 
 ## 9 · Delivery sequence
@@ -1548,7 +1548,7 @@ action projection → owner Duty/person rule → due/calendar
 → completion fact → exact deep link and history evidence
 
 AFTER CORE MODULES CONVERGE
-My Work → Team Work → module-rail previews → Notifications
+My Work → Team Work → Notifications (the right rail is governed by UI MASTER §5)
 
 LAST
 Dashboard → management facts → cross-module trends → production validation
@@ -1595,7 +1595,7 @@ honest Work for admitted modules.
 - **Workspace Work composition — BUILT, repository-verified 2026-09-16; NOT production-verified.**
   Branch `build/work-ui` now renders the governed My Work / Team Work composition from the one v2
   server response, with working-day navigation, owner/module/cover filters, exact object selection,
-  responsive list/detail behavior and the shared Right Rail counts. The browser validates the full
+  responsive list/detail behavior and the (since superseded, §7) Right Rail counts. The browser validates the full
   v2 response at the query boundary: an old or partial contract is a visible read failure and can
   neither crash the page nor masquerade as an empty desk. Repository gates: `OperationWork.test.tsx`
   12/12; `work-cache-isolation.test.tsx` 11/11 including the invalid-contract regression; authenticated
@@ -1819,7 +1819,7 @@ The execution sequence that implements this authority is recorded in
 - source completion closes one stable Work identity;
 - actual actor and approval evidence remain immutable;
 - no module has an independent staff list, approver name or cover resolver;
-- Right Rail and Notifications read the same Work truth;
+- Notifications read the same Work truth; the right rail never counts Work;
 - Dashboard reads verified facts and never becomes another queue;
 - production verification precedes every completion claim.
 
@@ -1846,7 +1846,7 @@ This matrix proves document coverage, not implementation or production completio
 The page Blueprint is reviewable when every row points to current truth with no contradiction. The
 pages are built only when their acceptance contracts pass against current implementation and real
 authorised accounts. The global Dashboard remains outside these three destinations and retains its
-separate §§8–8.6 contract. Right Rail and Notifications retain the supporting §7–7.1 contract and
+separate §§8–8.6 contract. Notifications and the right-rail boundary retain the supporting §7–7.1 contract and
 never become a fourth Workspace destination.
 
 ### 13.1 · Owner-review result — 2026-09-16
@@ -1858,7 +1858,7 @@ Dashboard ──management fact drill-down──▶ owning Register / Team Work
 Workspace ──Work──▶ exact owning action door
           ├─Staff & Duties──▶ shared owner/cover resolution
           └─Issue Tracker──▶ Issue truth + shared Current Action
-Right Rail ──filtered count──▶ My Work
+Right rail ──(no Work count; UI MASTER §5)
 Notifications ──event receipt──▶ Work / owning object
 ```
 
