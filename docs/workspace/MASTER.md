@@ -1139,34 +1139,19 @@ alone—announce every status.
 
 These close the questions §5.10 leaves to the owning modules; they change no approved word or layer.
 
-- **Who contacts the customer** is Delivery's per-company setting `customer_contact_by` (0488,
-  Delivery §5.2): `operation` — Carres agrees the date and the Customer card carries `Contact due
-  today`; `partner` — the logistics company does (every active company today), the card prints
-  `{company} contacts the customer · by {date}` and Carres acts only on exceptions. Same card, same
-  words; only the current act changes. With no company assigned, Carres owns the contact.
+- **Who contacts the customer** is the assigned Logistics company (owner correction 2026-09-25,
+  §5.10 Customer card). There is no Carres calling mode: Delivery's `customer_contact_by` (0488)
+  informs the Monitor ladder only and never gives Work a routine Carres contact act.
 - **The contact checkpoint is not a second clock.** The Route's `Contact` point and the Customer card
-  read the Logistics card's `2 working days before` check (§5.9).
-- **Customer status precedence** (one line): `Delivered {date}` → `Customer refused delivery` →
-  `Phone number is wrong` → `Customer requested another date` → `Contact missed {date}` (red — a
-  missed deadline outranks waiting) → `No answer — follow up` → `Waiting for customer` →
-  `Scheduled {date}` (with the blue fragment `· Contact due today` only in operation mode while the
-  customer was never contacted; the date stays neutral) → `Contact due today` / `Contact due {date}` →
-  the partner-mode line. `Customer refused delivery` and `Phone number is wrong` print only when
-  Delivery's contact record (0487) carries that stored result; the recordable answers stay the four.
-- **Answers write Delivery's contact record** (`ops_delivery_contacts`, 0487): `Accepted date` opens
-  Delivery's `DeliveryDatesEdit` with `Information received from: Customer` (a later date needs the
-  WhatsApp reply); `Requested another date` stores `Requested Another Date` with the asked date and
-  the customer's WhatsApp reply; `No answer` stores `No Answer`; `Delivery details changed` stores
-  nothing — `Change the address in the Sales Order, then record the reply.` with the Sales Order door;
-  `Address/access checked` is a contact with purpose `Confirm Delivery Address`, result `Confirmed`
-  (plus a condominium's registration). `Record as sent` stores `Waiting for Customer Reply` with the
-  template named in its note.
-- **Reply due / follow-up day** = the next Delivery working day after the recorded contact (Mon–Sat +
-  public holidays) — derived (`customerFollowUpIso`), never typed. The Work feed sets
-  `communication.replyState = waiting` and `replyDueOn` on the customer delivery-date items from the
-  latest customer contact; `Waiting` lists them until that day; a missed action day is always To do.
-  `Completed` needs source-owned closure receipts (§5.2.1) and says `No work completed for this
-  selection.` until they exist.
+  read the Logistics card's `2 working days before` check (§5.9); on the Customer card it is the
+  partner's deadline (`{company} contacts the customer · by {date}`), never a Carres task.
+- **Customer exceptions are read from their owners** (`customerCardModel`): a known delay = the Sales
+  Order action engine has `delay_planning` or `arrange_new_delivery_date` open (read from the one Work
+  feed); `Requested Another Date` = Logistics' own answer (0581 link/portal) or a Delivery contact
+  record; `Customer Refused Delivery` and `Contact Details Incorrect` = the latest Delivery contact
+  record (0487). Each act opens its owner's door and writes nothing in Work. `Waiting` is not
+  derived for the customer; the Waiting tab lists only a source-recorded waiting state (§5.2.1
+  `communication.replyState`) and is empty until a module records one.
 - **Payment exception line** beneath the Route: `Payment · RM {amount} to collect by {date}` (amber
   once the deadline is reached) or `Payment · Finance is holding this delivery`; the deadline is
   `paymentDeadlineOf` — the one the Logistics day-before check reads (2 working days before the
@@ -1183,15 +1168,19 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
   the loan Unit (`ops_sofa_loans`: lent out · returned). A loan is a loaner Unit, not financing.
 - **Logistics collapsed stays as deployed** (§5.9, up to five facts); `exactly 72px` binds the
   Customer and Supplier cards, and the 743×704 acceptance requires all three headings visible.
+- **The Route line is 88px; each exception line beneath it (payment, `Logistics not assigned`,
+  `Logistics · Cannot deliver`) adds one 16px row.** A failed Purchasing read keeps the route:
+  `PO` and `GRN` read `Unavailable` with `Try again`. The supplier pre-arrival confirmation is
+  Purchasing's `tomorrowDeliveryCallOf` (anchored on the PO's expected arrival, closed by an answer
+  about that exact date) or a Supplier DO; only the `tomorrow_delivery` answer feeds the latest date;
+  a short receipt is not received.
 - **Permission state:** `You cannot view this record` · `Ask an authorised operation user for access.`
-- **One visible blue.** The blue goes to the most urgent party (missed → due today → the selected
-  work's party → future); when the operator opens a different card that has an act, the blue moves to
-  the open card, so exactly one blue is visible. An admitted embedded action is always the blue.
+- **One visible blue.** The blue goes to the most urgent party act (missed → due today → the selected
+  work's party → future). With every card collapsed, the summary carries it as one button (the act's
+  words) that opens that card; once a card with an act is open, the blue sits in that card instead.
+  An admitted embedded action is always the blue and the summary then carries none.
 - **An order outside the Operation list** (the read returns the latest 500) draws no route or cards;
   only a FAILED read prints `Order details unavailable` (gap: a per-order read).
-- **Customer message** (Orders §9, owner approval 2026-09-25): `Hello {Name}, this is Carres about your
-  order {REF}. We are arranging your delivery for {date}. Please reply to confirm this date, or tell us
-  a date that suits you.`
 - **Not built by this card:** outstation customer confirmation before the first leg (ERP-ARCH §6.5) ·
   customer chase answer link (§6.4) · supplier reply embedded in Work · closure receipts for
   `Completed` · the Ohana supplier-to-customer route.

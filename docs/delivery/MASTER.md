@@ -363,12 +363,12 @@ carries `Information received from` records the contact in the same request.
 
 ### 5.2 · Who contacts the customer, and the contact deadline
 
-**Who calls** is the company's setting `customer_contact_by` (0488, Delivery Settings): `partner` —
-the logistics company agrees the day with the customer (today every active company); `operation` —
-Carres staff do. The Work Customer card (`../workspace/MASTER.md` §5.10) reads it; the card and its
-words are identical in both modes, only the current act changes. Carres still contacts the customer
-itself for the exceptions: another date the company asked for, a later date that needs the
-customer's WhatsApp proof, a refusal or a wrong phone number.
+**The assigned Logistics company contacts the customer and agrees the date** (owner correction
+2026-09-25, Workspace §5.10). Operation may record the company's facts on its behalf (§2); the
+provenance stays the company's. Carres contacts the customer only for the Workspace §5.10 exceptions
+(a known delay, a company-recorded `Requested Another Date` or `Customer Refused Delivery`, wrong
+contact details) and the separate outstation release (ERP-ARCH §6.5). `customer_contact_by` (0488)
+informs the Monitor ladder only.
 
 **The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
@@ -376,12 +376,6 @@ Requested date) on the Mon–Sat delivery week with Malaysian public holidays. T
 before` check is the company-has-the-details step. The Route's `Contact` point and the Customer card
 read the same check; there is no second clock. A customer who has named no day has no deadline and is
 never late. A late contact keeps the deadline it missed.
-
-**Waiting and follow-up (owner approval 2026-09-25).** `Record as sent` stores the contact with result
-`Waiting for Customer Reply`; `No answer` stores `No Answer`. Either one's follow-up day is the next
-Delivery working day after the contact — derived, never typed. Until then the Work item lists under
-`Waiting`; on the day it returns to `To do` (`No answer · Follow up today`). A passed governed action
-day is always `To do`.
 
 ### 5.3 · Backward planning — Delivery owns the ONE calculation
 
