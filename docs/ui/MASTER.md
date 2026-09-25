@@ -731,6 +731,57 @@ matching, new COPY labels, kit additions or implementation. Those remain a propo
 [discussion Card](../cards/SHARED-UI-calendar-work-activity-discussion.md). This PLAN ruling does
 not authorize application implementation or claim a complete customer history is already built.
 
+### ONE JOB, TWO DOORS — how work flows past the rail (owner-confirmed 2026-09-25, flow step 1)
+
+1. **One job, two doors.** A job can be done from Work or directly on its owning module page. Both
+   use the same module action and write the same single record (Workspace §5.1 Panel 3; ERP Law C).
+2. **Done means the source fact exists.** When the module records the result, the Work item closes
+   in both places at once. Nobody presses a separate `Done`.
+3. **The rail only reflects and links.** The recorded change then appears in Activity (who · when ·
+   what) and in the selected customer's history under Customers. Calendar changes only when a dated
+   arrangement changes; it never lists to-do items. No rail door performs or completes the job —
+   selecting a row opens Work or the owning module.
+
+Example: delivery photo. Work `Upload the delivery photo` and the DO page's upload are one action →
+the photo is saved once in Delivery → the Work item closes → Activity shows `Delivery photo uploaded`
+with actor and time → the customer's history shows the same event → Calendar is unchanged.
+
+### CALENDAR — pick a day, see each module's dated arrangements (owner-confirmed 2026-09-25, flow step 2)
+
+```text
+Calendar                                    [×]
+Everything you can see · Updated 10:42
+[Thu, 24 Sep] [Fri, 25 Sep] [This week]      month grid below
+FRI, 25 SEP
+Delivery      2 scheduled deliveries      ›  Delivery Monitor ?date=
+              1 NETS contact deadline     ›  Delivery Monitor ?date= (that kind only)
+Warehouse     1 arriving                  ›  ?tab=warehouse-arrival-schedule&date=
+              3 pickups                   ›  ?tab=warehouse-pickup-schedule&date=
+Purchasing    1 return pickup             ›  Purchase Returns
+Payment       2 promised payments         ›  Payment Monitor ?day=
+              1 free storage ends         ›  Payment Monitor ?day=
+Subscription  1 service visit             ›  Rental (no date/record door yet — build gap)
+```
+
+1. **Each module reports its own dated arrangements; Calendar only summarises.** Every row names
+   what it counts in the module's own words; never a mixed total such as `5 jobs`. A zero prints
+   nothing.
+2. **A row opens that module's page on that day, filtered to that kind.** Back returns to the same
+   Calendar day.
+3. **Each person sees only the modules their existing permissions allow** (Operation all; Warehouse
+   its Arrival/Pickup rows; Finance Payment and Subscription).
+4. **One event, one owner, one count.** A supplier arrival counts once, under Warehouse, from the same
+   `warehouse-schedule` projection the Schedule pages read; Purchasing never counts it again. Special
+   movements (`Transfer arrival` · `Transfer pickup` · `Customer/failed-delivery return` · `Return from
+   repair` · `Supplier replacement`) keep their names only inside the Schedule page's cards. A row that
+   names the company prints `Pickup By {company}`.
+5. **A source that fails to load says so and never prints `0`.**
+6. **Not on Calendar:** Work to-dos; Issue Tracker (its MASTER rejects a calendar); private HR facts;
+   modules not built yet (stock counts, Repair Orders).
+7. **Contact deadlines belong to the Logistics company** (owner correction 2026-09-25, Workspace §5.10):
+   `{n} {company} contact deadline(s)` shows the day the company must reach the customer, so staff can see
+   whether it did; it is not a Carres call list.
+
 ### WHAT IS ON SCREEN TODAY — measured source, 2026-09-24
 
 `OperationRightRail.tsx` still mounts Calendar, My Work (`TasksPanel`) and Activity. Customer search

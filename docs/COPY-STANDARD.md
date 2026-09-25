@@ -214,6 +214,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
 | Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
 | Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Workspace → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
+| Rail Calendar day rows (owner-confirmed 2026-09-25, UI MASTER §5) | `{n} scheduled deliveries` · `{n} {company} contact deadline(s)` · `{n} arriving` · `{n} pickups` · `Pickup By {company}` · `{n} return pickup(s)` · `{n} promised payment(s)` · `{n} free storage ends` · `{n} service visit(s)`; zero prints nothing; a failed source says it could not be loaded | `supplier arrival` · `pickups by logistics` · `{n} jobs` · `0` for a failed source |
 | Right Rail healthy clear — **retires with the rail My Work slot (UI MASTER §5, owner 2026-09-24)** | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure — **retires with the rail My Work slot** | `My Work could not be refreshed` | No work due now · No open work |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |

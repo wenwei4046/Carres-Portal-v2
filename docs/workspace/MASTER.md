@@ -1045,7 +1045,8 @@ attention amber, urgent/missed red and future/unavailable grey. Normally only on
 - **Proceed** — the recorded order-to-proceed fact/date.
 - **Loan** — optional; current loan fact/date only, never hidden under Payment.
 - **PO** — `{issued} of {total}` and the applicable supplier date or date range.
-- **GRN** — Warehouse receipt progress/date. There is no duplicate `Stock received` point.
+- **GRN** — Warehouse receipt progress/date, read from `receivingSummaryOf` (the one receipt
+  arithmetic, Stock MASTER §7) — never a second count. There is no duplicate `Stock received` point.
 - **Contact** — the customer/logistics contact checkpoint protecting delivery.
 - **Delivery** — the final mission deadline: `Scheduled delivery · {date}`, then `Delivered · {date}`.
 
@@ -1148,7 +1149,12 @@ that component and its `po_sends` record, not the generic `Record as sent` store
 
 **Every goods need of the Sales Order counts — owner decision 2026-09-25.** Goods served from stock
 (order lines no PO of this order carries) get their own row `From stock · {ready} of {total} ready ·
-{Site}` (Delivery's readiness per line; Stock's Site for the reserved Units). Their short pieces are
+{Site}` (Delivery's readiness per line). `{Site}` is Inventory's `Stock Location` for the reserved
+Units — `Carres Klang` · `PJ Showroom` · a transit point, never `NETS` — and readiness respects
+Inventory's `Stock Condition`; the row's door is Inventory `?tab=stock-onhand&so={SO No}` (one Unit:
+`&unit={Unit ID}`). Words follow Stock MASTER §7 (owner rulings 2026-09-25): never `Who has it` ·
+`Where` · `With NETS Delivery` · `In transit` · `Stock use` · `Not available`; `Inventory Status` is
+`Available` · `Reserved` · `Cannot sell`. Their short pieces are
 goods that need a PO: with no PO for the order the collapsed line reads `No purchase order for this
 Sales Order · {n} items need one` and the card's door is the Sales Order (its `issue_po` act). The
 Route's `PO` point reads `From stock` only when no goods still need a PO. Evidence: production SO-1222
