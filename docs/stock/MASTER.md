@@ -118,7 +118,7 @@ append-only history.
 | `Carres Klang` | inside Carres's own Klang warehouse (NETS operates it; NETS is never printed as the place) |
 | `PJ Showroom` | inside the showroom |
 | `{Logistics} · {Delivery Location}` (e.g. `NETS Logistics · PJ Showroom`) | the Logistics company has taken the goods (Warehouse posted OUT) and no Site has posted IN yet: the cell names who picked up and where it is going, nothing else (owner ruling 2026-09-25) |
-| `AL Sungai Buloh` · `HOUZS Balakong` | inside a partner Site |
+| `AL Sungai Buloh` · `HOUZS Balakong` (future `HOUZS Penang`) | at a Logistics company's TRANSIT POINT — owner correction 2026-09-25: AL and HOUZS are Logistics companies Carres assigns, not Carres warehouses; their Sites exist so an arrival there can be received, and a Unit standing there always shows `Pickup By {company}` and its `Delivery Location` beside it |
 | the selected JB partner warehouse · EU or SSY on the Singapore leg | partner custody on a Journey leg |
 
 **Owner correction 2026-09-25: there is no `Who has it` fact on screen.** Carres owns the goods and
@@ -241,6 +241,21 @@ page: Outbound holds the origin check/handover work; Inbound holds destination r
 Inventory shows the resulting current holder and History. It is used only for governed Site-to-Site
 movement within Carres control. Customer Delivery uses its DO/Journey, while Supplier Return and
 Repair retain their own source documents and reuse the same physical-handover contract.
+
+**TRANSFER FORM — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT.** `Request Transfer` on
+Inventory opens a one-scroll form titled `Transfer` (no `Warehouse ·` prefix, no
+`Transfer / Return / Repair` composite title) with dictionary words: `Pickup Location` (a Carres
+Site the Units stand in) · `Delivery Location` (a Carres Site only — `PJ Showroom`; a move to a
+Logistics transit point or a customer is a Delivery Journey, never a Transfer, owner 2026-09-25) ·
+`Pickup By` (a Logistics company only: `NETS` · `AL` · `HOUZS`) · `Ship Date` · `Expected arrival` ·
+`Reason` · `Units` (`Find Unit` offers only `Available` Units standing at the Pickup Location; never
+`Incoming`, `Reserved` or `Cannot sell`). Saving mints `TR-{n}` and projects it: a `Transfer pickup`
+card on Pickup Schedule and an Outbound row on Ship Date, a `Transfer arrival` card on Arrival
+Schedule and an Inbound row on the destination Site's tab, and `Delivery Location {Site}` on the
+Units' Inventory rows. Workspace: `{TR No} / {n} Units to {Site} / Load the goods` on Ship Date and
+`{TR No} / {n} Units arriving from {Site} / Receive the goods` on the arrival day, through the same
+Outbound/Inbound rules. The retired party picker that listed organisations, roles and Sites together
+(`AL, AL, HOUZS, HOUZS, NETS, NETS Delivery, Carres Warehouse, PJ Showroom, E2E LP-…`) is a defect.
 
 Transfer Detail follows the Object Detail Template and shows `Transfer No · source request · exact
 Units · From · To · collection date · arrival date · delivery party · Outbound work · Inbound work ·
