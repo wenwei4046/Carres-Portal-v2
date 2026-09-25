@@ -3394,6 +3394,27 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 **`Contact logistics today` is the owner's exact phrase** and is the one admitted use of `today` in
 an action line: it prints only on or after the check's own date, beside that date.
 
+## The complete Work right panel words — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT
+
+Workspace MASTER §5.10 owns composition, source boundaries, interaction and responsive law. This
+table freezes the new visible words; §5.9's Logistics vocabulary remains built and unchanged.
+
+| Meaning | Use exactly | Do not use |
+|---|---|---|
+| Layer order | selected work summary · `Order Route` · `Logistics` · `Customer` · `Supplier` · `Owner, timing and source` | duplicate task messages above every card · Journey · Steps |
+| Route points | `Proceed` · optional `Loan` · `PO` · `GRN` · `Contact` · `Delivery` | Stock received as a second GRN point · permanent Payment/Logistics circles |
+| Route progress | `{n} of {total}` · `{n} of {total} confirmed` · `Scheduled delivery · {date}` · `Delivered · {date}` | repeating `1 pending` beside equivalent progress |
+| Customer collapsed states | `Contact due today` · `Waiting for customer` · `Scheduled {date}` · `Customer requested another date` · `No answer — follow up` · `Delivered {date}` | Customer confirmed |
+| Customer checks | `Customer contacted` · `Delivery date agreed` · `Address/access checked` | generic Done boxes without source facts |
+| Customer answers | `Accepted date` · `Requested another date` · `No answer` · `Delivery details changed` | free-text outcome |
+| Supplier mission progress | `{n} of {total} POs issued` · `{n} of {total} dates ready` · `{n} of {total} received` · `{n} delayed` · `No purchase order for this Sales Order` | supplier names/PO numbers/owner in the collapsed group summary |
+| Supplier states | `PO not issued` · `Expected` · `Confirmation needed` · `Delayed` · `Arriving today` · `Received` · `Short received` | Ready without the exact fact · Stock received |
+| Supplier follow-up | `Confirmation needed today` · `Waiting for supplier` · `Arrival missed · Follow up supplier` · `Record supplier delay` | default-date confirmation immediately after PO issue |
+| Communication receipt | `Record as sent` · `Not sent` · `Waiting for customer` · `Waiting for supplier` · `No answer · Follow up today` | treating Copy/Open WhatsApp as sent or complete |
+| Missing contact | `WhatsApp unavailable · No phone number` · `Open customer record` (equivalent exact party door) | unexplained disabled control |
+| Refresh failure | `Some information could not be refreshed.` · `Try again` while the last good mission stays visible | replacing the mission with a generic error |
+| No selection / missing order | `Select a work item` · `Choose an item from the Work list to see its mission.` · `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` | empty fake Route · guessed `Logistics not assigned` |
+
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.
