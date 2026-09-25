@@ -608,20 +608,24 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   the count alone (the toolbar button already names the day). The header speaks only when My Work
   is empty while the team has work: `0 for you · {n} for the team`, and the empty list offers
   `See Team Work`.
-- **Words:** `Covering for others` (not `Covered`) · rail section `Page` / `All pages` (not
+- **Words:** `Covering` (not `Covered`; `Covering for others` wrapped the 941px toolbar) · rail section `Page` / `All pages` (not
   Module) · header `Search` with no printed shortcut · `Help` and `Settings` beside their icons ·
   the right rail names each icon.
 - **The Date rail** prints every count, `0` included; `Today` in words beside today's date;
   `No working date` always listed; two work weeks with a divider before the second Monday; the
   section heading is slate, not blue.
 - **List tabs** all carry a number (`Completed 0` until the ledger's Completed list is wired).
-- **My Work / Team Work** active segment is kit blue. Search is 240px beside `Covering for others`
+- **My Work / Team Work** active segment is kit blue. Search is 240px beside `Covering`
   at every width above 600px.
 - **The empty list is one bordered white section** the height of its words.
 - **Sidebar:** names by default from 1280px; below that it starts as icons (a 232px named rail
   would push Work under 768px and into the phone layout — measured on production 2026-09-25);
   the person's own collapse is remembered; the bottom block shows the account's name where one
   exists.
+- **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
+  sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
+  `0 for you · {n} for the team` wraps instead of truncating. An empty list draws no
+  `Select a work item` box.
 - **Not done — needs its own card:** the bell badge (item 11) counts live order alerts and has no
   notification record to mark read.
 

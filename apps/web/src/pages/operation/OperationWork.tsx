@@ -538,7 +538,7 @@ export default function OperationWork() {
            the header speaks only when My Work is empty while the team is not
            (item 5), so a new hire never reads `0` as a free day. */
         activeView === "mine" && !loading && beforeDay.length === 0 && teamTotal > 0 ? (
-          <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[768px]:text-[13px] min-[768px]:leading-[18px]" data-testid="work-header-count">
+          <span className="block whitespace-normal text-[12px] font-normal leading-4 text-base-400 min-[768px]:text-[13px] min-[768px]:leading-[18px]" data-testid="work-header-count">
             0 for you · {teamTotal} for the team
           </span>
         ) : null
@@ -624,8 +624,8 @@ export default function OperationWork() {
             </div>
           </div>
           <div className={toolbarRow} data-testid="work-toolbar-row-2">
-            {/* Search is 240px beside `Covering for others` (item 8); only a
-                phone gives it the whole row. */}
+            {/* Search is 240px beside `Covering` (item 8); only a phone gives
+                it the whole row. */}
             <div className={layout === "one" ? "w-60 shrink-0 max-[599px]:w-auto max-[599px]:basis-full" : "w-60 shrink-0"}>
               <SearchInput
                 toolbar
@@ -650,7 +650,7 @@ export default function OperationWork() {
               onClick={() => updateParam("covered", covered ? null : "1")}
               className={toolbarButton(covered)}
             >
-              Covering for others
+              Covering
             </button>
             {activeView === "team" && ownerFocus && (
               <button
@@ -779,12 +779,12 @@ export default function OperationWork() {
               )}
               <WorkOwnerSource item={selected.source} />
             </>
-          ) : (
+          ) : loading || listTotal > 0 ? (
             <WorkSection className="shrink-0 p-6" data-testid="work-detail-empty">
               <p className="text-[15px] font-semibold leading-5 text-kit-slate-12">Select a work item</p>
               <p className="mt-0.5 text-body text-kit-slate-11">Choose an item from the Work list to see its mission.</p>
             </WorkSection>
-          )}
+          ) : null /* nothing to select: no box asks for a choice */}
         />
       </div>
     </ListPageShell>

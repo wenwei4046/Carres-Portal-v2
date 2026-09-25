@@ -25,7 +25,7 @@ Every fix below uses the kit and the governed words. A fix that needs a new word
 | 13 | header | `?` and the gear have no words | label or remove | BUILT — this PR |
 | 14 | right rail | three unlabelled icons | names, or fold into the sidebar | BUILT — this PR |
 | 15 | toolbar | `My Work / Team Work` black segment off the blue system | blue active segment | BUILT — this PR |
-| 16 | toolbar | `Covered` is jargon | `Covering for others` (word to COPY) | BUILT — this PR |
+| 16 | toolbar | `Covered` is jargon | `Covering` (word to COPY; `Covering for others` wrapped the 941px toolbar) | BUILT — this PR |
 | 17 | toolbar | `All modules` uses a computer word | `All pages` (word to COPY) | BUILT — this PR |
 | 18 | Date rail | `Date` heading is blue but not a link | slate heading | BUILT — this PR |
 | 19 | Date rail | `Missed` shows no count in My Work | `Missed {n}`, `0` printed | BUILT — this PR |
@@ -38,6 +38,11 @@ Every fix below uses the kit and the governed words. A fix that needs a new word
 
 **Also found, outside this card:** `GET /api/operation/dashboard` answered 500 on production
 (2026-09-25) — fixed by 0586, PR #1637.
+
+**Round 2 (Jess, 2026-09-25, from live screenshots — approved as a batch):** 26 phone shell —
+below 768px the sidebar is a `Menu` drawer and the right rail is not drawn, so the page has the
+whole width · 27 the header team count wraps instead of truncating · 28 an empty list draws no
+`Select a work item` box · 29 `Covering` keeps the 941px toolbar on one row. **BUILT.**
 
 **Acceptance for each ticked item:** a rendered walk at 1440×900, 829×900, 743×704 and 390×844
 with the measurement in the PR, and the Workspace MASTER §5 rows overwritten in the same PR.
