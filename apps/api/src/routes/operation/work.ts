@@ -43,6 +43,7 @@ import {
 import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { chunk } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import operationOrdersRouter from "./orders";
@@ -198,6 +199,10 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** §6.1 (0489) — the proof reviews and attempt evidence per document
    *  number, read once. Absent ⇒ no review work is composed. */
   proofFacts?: ProofFactsByDo | null;
+  /** Delivery's arrangement per order (leg 0) — THE booking fact (owner
+   *  decision 2026-09-25, Workspace §5.9 gap 6). Absent ⇒ the legacy booking
+   *  signal (a caller that has not read Delivery, e.g. an older test). */
+  arrangements?: ReadonlyMap<string, { confirmedDate: string | null }> | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -217,6 +222,13 @@ export function projectSalesOrdersFromModuleFacts(input: {
           0,
         )
       : null;
+    /* ONE booking truth: Delivery's arrangement when the feed read it —
+       a Scheduled date there IS the booking; no legacy `booking_stage`. */
+    const arrangement = input.arrangements ? input.arrangements.get(row.id) ?? null : undefined;
+    const booking =
+      arrangement === undefined
+        ? { stage: control?.booking_stage ?? null, confirmedDate: control?.confirmed_date ?? null }
+        : { stage: arrangement?.confirmedDate ? "confirmed" : null, confirmedDate: arrangement?.confirmedDate ?? null };
     const hold = storageHold({
       storageFrom: control?.storage_from ?? null,
       override: control?.storage_fee_override ?? null,
@@ -248,8 +260,8 @@ export function projectSalesOrdersFromModuleFacts(input: {
       deliveryDate: row.delivery_date,
       deliveryDateTbd: row.delivery_date_tbd === true,
       logisticsAssigned: Boolean(row.delivery_partner_id || row.ops_assigned_logistic),
-      bookingStage: control?.booking_stage ?? null,
-      confirmedDate: control?.confirmed_date ?? null,
+      bookingStage: booking.stage,
+      confirmedDate: booking.confirmedDate,
       deliveryOrderNumber: row.do_number,
       deliveryPhotos: control?.delivery_photos,
       lineTotal,
@@ -290,7 +302,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
           row.delivery_date_tbd !== true &&
           row.status !== "delivered",
         promisedDateIso: row.delivery_date_tbd ? null : row.delivery_date,
-        confirmedDateIso: control?.confirmed_date ?? null,
+        confirmedDateIso: booking.confirmedDate,
         deliveredAtIso: row.delivered_at ?? null,
         delayDetectedAtIso: control?.delay_detected_at ?? null,
         delayDecisionAtIso: control?.delay_decision_at ?? null,
@@ -1290,6 +1302,30 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
   return { reviews, evidenceAt };
 }
 
+/** Delivery's arrangement (leg 0) per feed order — the Scheduled date is the
+ *  booking (Delivery MASTER §5). Read for the feed's own orders only, 100 at a
+ *  time. A failed read fails the Delivery facts loudly rather than silently
+ *  falling back to the legacy booking. */
+async function readArrangements(
+  c: Context<AppEnv>,
+  orderIds: readonly string[],
+): Promise<Map<string, { confirmedDate: string | null }>> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const out = new Map<string, { confirmedDate: string | null }>();
+  for (const batch of chunk([...orderIds], 100)) {
+    const { data, error } = await sb
+      .from("ops_delivery_arrangements")
+      .select("order_id, confirmed_date")
+      .eq("leg", 0)
+      .in("order_id", batch);
+    if (error) throw new Error("Workspace delivery-arrangement source could not be read");
+    for (const row of (data ?? []) as Array<{ order_id: string; confirmed_date: string | null }>) {
+      out.set(row.order_id, { confirmedDate: row.confirmed_date });
+    }
+  }
+  return out;
+}
+
 /**
  * §6 — `Check the stored furniture`, every configured interval.
  *
@@ -1404,6 +1440,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readCollectionTimingRules(c),
       readProofFacts(c),
     ]);
+  const arrangements = await readArrangements(c, orders.orders.map((row) => row.id));
   const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
@@ -1449,6 +1486,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     invoiceStorageByOrder,
     timingRules,
     proofFacts,
+    arrangements,
   };
   // Owner ruling 2026-09-17 — routine Delivery work is the order's responsible
   // Operation person. A probe pass per order learns which orders carry a

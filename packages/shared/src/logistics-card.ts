@@ -189,6 +189,25 @@ function stateFor(dueIso: string | null, todayIso: string, startedIso: string | 
   return "missed";
 }
 
+/**
+ * THE ONE CHECK CLOCK — the date of one Logistics check (owner ruling
+ * 2026-09-24): `3`/`2 working days before` count back from the Requested date
+ * (the Scheduled one only when the customer never named a day); `1 working day
+ * before` from the Scheduled date, else the Requested one. The card, the Order
+ * Route and the Work feed's `confirm_delivery_date` all read THIS (Law D) —
+ * the Work item once counted its own `chase` lead and named another day.
+ */
+export function logisticsCheckDueIso(
+  key: LogisticsCheckKey,
+  input: { requestedIso: string | null; scheduledIso: string | null; holidays?: WorkingDayOptions["holidays"] },
+): string | null {
+  const valid = (iso: string | null) => (iso && ISO.test(iso.slice(0, 10)) ? iso.slice(0, 10) : null);
+  const requested = valid(input.requestedIso);
+  const scheduled = valid(input.scheduledIso);
+  const from = key === "t1" ? scheduled ?? requested : requested ?? scheduled;
+  return from ? subtractWorkingDays(from, LOGISTICS_CHECK_LEAD[key], { holidays: input.holidays }) : null;
+}
+
 export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardModel {
   const opts: WorkingDayOptions = { holidays: input.holidays };
   const valid = (iso: string | null) => (iso && ISO.test(iso.slice(0, 10)) ? iso.slice(0, 10) : null);
@@ -202,12 +221,10 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
 
   /* The first two checks keep the date they were counted from: the requested
      date (the scheduled one only when the customer never named a day). */
-  const earlyAnchor = requested ?? scheduled;
-  const due = (key: LogisticsCheckKey, from: string | null) =>
-    from ? subtractWorkingDays(from, LOGISTICS_CHECK_LEAD[key], opts) : null;
-  const t3Due = due("t3", earlyAnchor);
-  const t2Due = due("t2", earlyAnchor);
-  const t1Due = due("t1", anchor);
+  const clock = { requestedIso: requested, scheduledIso: scheduled, holidays: opts.holidays };
+  const t3Due = logisticsCheckDueIso("t3", clock);
+  const t2Due = logisticsCheckDueIso("t2", clock);
+  const t1Due = logisticsCheckDueIso("t1", clock);
 
   /* ── 3 working days before ── */
   const t3Done = Boolean(partner && (input.detailsReceivedIso || scheduled));
@@ -340,10 +357,26 @@ export function moneyAffectsDelivery(input: {
   holidays?: WorkingDayOptions["holidays"];
 }): boolean {
   if (!(input.owed > 0) || !input.anchorIso) return false;
-  const deadline = subtractWorkingDays(input.anchorIso.slice(0, 10), input.outstation ? 3 : 2, {
-    holidays: input.holidays,
-  });
-  return input.todayIso.slice(0, 10) >= deadline;
+  const deadline = paymentDeadlineOf(input);
+  return deadline !== null && input.todayIso.slice(0, 10) >= deadline;
+}
+
+/**
+ * The day payment must be complete for this delivery — the ONE deadline the
+ * Logistics day-before check, the Order Route's payment line and the collapsed
+ * exception all read (Law D). Payment's ruled default: 2 working days before
+ * the anchor in the Klang Valley, 3 outstation (Payment MASTER "Collection
+ * timing"; the effective-dated rule row is not readable by Operation — gap
+ * recorded there).
+ */
+export function paymentDeadlineOf(input: {
+  anchorIso: string | null;
+  outstation: boolean;
+  holidays?: WorkingDayOptions["holidays"];
+}): string | null {
+  const anchor = input.anchorIso?.slice(0, 10) ?? null;
+  if (!anchor || !ISO.test(anchor)) return null;
+  return subtractWorkingDays(anchor, input.outstation ? 3 : 2, { holidays: input.holidays });
 }
 
 /* ── the external link ─────────────────────────────────────────────────── */

@@ -1,62 +1,80 @@
+/**
+ * THE SELECTED WORK SUMMARY — the top of the right panel (Workspace §5.10).
+ *
+ * It answers only: what is wrong · what to do now · which record opens the
+ * source module. `{object} · {module}` · the problem 16/22/600 · the action
+ * 13/18 · the `Open {object}` door on the same row. When the work has no party
+ * cards (it names no single Sales Order) the required result prints under the
+ * action so the act is never ambiguous. An admitted embedded action (Delivery
+ * proof review) renders beneath with `Finish when: {statement}` (§5.1) — and
+ * is then the panel's one blue action. Owner, timing and source live in their
+ * own section at the bottom (`WorkOwnerSource`), never here.
+ */
 import type { ReactNode } from "react";
-import type { OperationWorkItem, OperationWorkModule } from "@carres/shared";
+import type { OperationWorkItem } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import DeliveryProofReviewWork from "../components/DeliveryProofReviewWork";
+import { WORK_MODULE_WORD } from "./module-word";
 
-const MODULE: Record<OperationWorkModule, string> = {
-  orders: "Sales Orders",
-  purchasing: "Purchasing",
-  receiving: "Receiving",
-  delivery: "Delivery",
-  payment: "Payment",
-  issue_tracker: "Issue Tracker",
-};
 
-export default function WorkActionPanel({ item, embedded, onOpen }: { item: OperationWorkItem; embedded?: ReactNode; onOpen: () => void }) {
-  const action = `${item.action}${item.recipient ? ` · ${item.recipient}` : ""}`;
+export default function WorkActionPanel({
+  item,
+  embedded,
+  onOpen,
+  hasParties = false,
+  primaryAct = null,
+}: {
+  item: OperationWorkItem;
+  embedded?: ReactNode;
+  onOpen: () => void;
+  /** The mission's party cards carry the result; the summary stays compact. */
+  hasParties?: boolean;
+  /** The mission's ONE blue act while every party card is collapsed (§5.10):
+   *  it opens that card. Absent when a card is open or the work is embedded. */
+  primaryAct?: { label: string; onClick: () => void } | null;
+}) {
+  /* The party is said once: `Call AL Logistics`, never `Call AL Logistics · AL Logistics`. */
+  const action = `${item.action}${item.recipient && !item.action.includes(item.recipient) ? ` · ${item.recipient}` : ""}`;
   const owningForm = item.interaction.mode === "embedded" && item.interaction.componentKey === "delivery.proof_review"
     ? <DeliveryProofReviewWork doNumber={item.object.id} />
     : null;
+  const result = item.interaction.mode === "read_only" ? item.interaction.reason : item.requiredResult;
   return (
-    <>
-      <header className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-6 min-[960px]:py-4" data-testid="work-detail-header">
-        <p className="text-label font-medium text-kit-slate-11">{item.object.label} · {MODULE[item.module]}</p>
-        <h2 className="text-[16px] font-semibold leading-[22px] text-kit-slate-12" data-testid="work-detail-title">{item.problem}</h2>
-        <p className="text-body text-kit-slate-11" data-testid="work-detail-action">{action}</p>
-      </header>
-      <section aria-label="What to do" className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-6 min-[960px]:py-4" data-testid="work-detail-task">
-        <div className="max-w-[760px]">
-        {item.interaction.mode === "embedded" ? (
-          <section aria-label="Do this work" className="flex flex-col gap-3">
-            <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
-            {embedded ?? owningForm}
-          </section>
-        ) : null}
-
-        {/* Below 960px the result line and its one door share a row, so the
-            party cards stay above the fold at 743×704 (density ruling
-            2026-09-25); from 960px they stack as before. */}
-        <div className={`flex items-center gap-3 min-[960px]:block ${item.interaction.mode === "embedded" ? "mt-2 min-[960px]:mt-4" : ""}`} data-testid="work-detail-open-row">
-          {item.interaction.mode !== "embedded" ? (
-            <p className="min-w-0 flex-1 text-body text-kit-slate-11">
-              {item.interaction.mode === "read_only" ? item.interaction.reason : item.requiredResult}
-            </p>
+    <section
+      aria-label="Work summary"
+      className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-4 min-[960px]:py-3"
+      data-testid="work-detail-header"
+    >
+      {/* On a phone (below 600px) the doors stack under the words (Jess's 390
+          rule): the primary act fills its row, `Open {object}` takes the next.
+          From 600px they sit beside the text, so the 743×704 acceptance keeps
+          all three party headings in view. */}
+      <div className="flex flex-col gap-2 min-[600px]:flex-row min-[600px]:items-start min-[600px]:gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium leading-[14px] text-kit-slate-11">{item.object.label} · {WORK_MODULE_WORD[item.module]}</p>
+          <h2 className="text-[16px] font-semibold leading-[22px] text-kit-slate-12" data-testid="work-detail-title">{item.problem}</h2>
+          <p className="text-[13px] leading-[18px] text-kit-slate-11" data-testid="work-detail-action">{action}</p>
+          {!hasParties && item.interaction.mode !== "embedded" ? (
+            <p className="text-[13px] leading-[18px] text-kit-slate-11" data-testid="work-detail-result">{result}</p>
           ) : null}
-          <div className={`shrink-0 ${item.interaction.mode === "embedded" ? "" : "min-[960px]:mt-4"}`}>
-            <Button type="button" onClick={onOpen}>Open {item.object.label}</Button>
-          </div>
         </div>
-
-        <details className="mt-2 border-t border-kit-slate-5 text-label text-kit-slate-11 min-[960px]:mt-4" data-testid="work-detail-disclosure">
-          <summary className="flex h-9 cursor-pointer items-center text-[12px] font-medium leading-4 text-kit-slate-12">Owner, timing and source</summary>
-          <div className="mt-2 flex flex-col gap-1">
-            <p>{item.owner.acting?.name ?? item.owner.normal?.name ?? "Not assigned"}</p>
-            <p>{item.timing.actionOn ?? item.timing.noDateReason ?? "No working date"}</p>
-            <p>{item.observedAt}</p>
-          </div>
-        </details>
+        <div className="flex flex-col items-start gap-2 min-[600px]:max-w-[50%] min-[600px]:shrink-0 min-[600px]:flex-row min-[600px]:flex-wrap min-[600px]:justify-end" data-testid="work-detail-open-row">
+          {primaryAct && item.interaction.mode !== "embedded" ? (
+            <div className="grid w-full min-[600px]:block min-[600px]:w-auto" data-testid="work-detail-primary-row">
+              <Button type="button" size="touch" variant="primary" onClick={primaryAct.onClick} data-testid="work-detail-primary-act">
+                {primaryAct.label}
+              </Button>
+            </div>
+          ) : null}
+          <Button type="button" size="touch" onClick={onOpen}>Open {item.object.label}</Button>
         </div>
-      </section>
-    </>
+      </div>
+      {item.interaction.mode === "embedded" ? (
+        <section aria-label="Do this work" className="mt-3 flex max-w-[760px] flex-col gap-3" data-testid="work-detail-task">
+          <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
+          {embedded ?? owningForm}
+        </section>
+      ) : null}
+    </section>
   );
 }

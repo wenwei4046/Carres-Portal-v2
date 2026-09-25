@@ -27,6 +27,7 @@
  * duplicate.
  */
 
+import { logisticsCheckDueIso } from "./logistics-card";
 import { collectionClock, type CollectionTiming } from "./collection-clock";
 import { deliveryStepDueIso, type DeliveryQueueLeads } from "./delivery-queue";
 import { orderActionDueIso, OFFICE_OFF_DAYS } from "./order-action-due";
@@ -699,7 +700,8 @@ export function workItemsForOrder(
   ctx: OrderWorkContext,
   todayIso: string,
   opts: WorkingDayOptions = {},
-  leads?: DeliveryQueueLeads,
+  /* Kept for callers; the delivery-date clock is now the Logistics check. */
+  _leads?: DeliveryQueueLeads,
 ): WorkItem[] {
   const officeOpts: WorkingDayOptions = { ...opts, offDays: OFFICE_OFF_DAYS };
   const dueOf = (key: OrderActionKey): IsoDate | null => {
@@ -713,7 +715,13 @@ export function workItemsForOrder(
         return anchor ? (anchor.slice(0, 10) as IsoDate) : null;
       }
       case "confirm_delivery_date":
-        return deliveryStepDueIso("chase", ctx.promisedDateIso, opts, leads);
+        /* ONE clock with the Logistics card (Workspace §5.9 gap 6, owner
+           decision 2026-09-25): the `2 working days before` check. */
+        return logisticsCheckDueIso("t2", {
+          requestedIso: ctx.promisedDateIso,
+          scheduledIso: ctx.confirmedDateIso,
+          holidays: opts.holidays,
+        }) as IsoDate | null;
       case "deliver_today":
         return deliveryStepDueIso("deliver_today", ctx.confirmedDateIso, opts);
       case "upload_delivery_photo":
