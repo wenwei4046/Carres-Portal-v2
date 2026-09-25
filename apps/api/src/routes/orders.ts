@@ -3695,7 +3695,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
  *  the order is already in Place with `dateTbd: true`. */
 ordersRouter.post(
   "/:id/date",
-  // 0581 — recording the date is Sales Orders' completion fact for
+  // 0584 — recording the date is Sales Orders' completion fact for
   // `ask_delivery_date`; the writer observes this door, never edits it.
   salesOrderWorkCompletion({ rules: ["ask_delivery_date"], orderId: (c) => c.req.param("id") ?? null }),
   (c) =>

@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0581_a_work_occurrence_keeps_its_sends_replies_and_completion.sql
+-- 0584_a_work_occurrence_keeps_its_sends_replies_and_completion.sql
 -- Workspace MASTER §5 · owner rulings 2026-09-24 (Jess) — the Work lifecycle
 -- `To do` · `Waiting` · `Completed` and its smallest data contract.
 --
@@ -87,7 +87,7 @@ create table if not exists public.work_occurrence_events (
 );
 
 comment on table public.work_occurrence_events is
-  '0581 · append-only Work lifecycle ledger: request_sent (Waiting), reply_received (back to To do), completed (only from the owning module''s completion fact). State is derived, never stored. Written only by work_record_request_sent / work_record_reply_received / work_record_completed.';
+  '0584 · append-only Work lifecycle ledger: request_sent (Waiting), reply_received (back to To do), completed (only from the owning module''s completion fact). State is derived, never stored. Written only by work_record_request_sent / work_record_reply_received / work_record_completed.';
 
 create index if not exists work_occurrence_events_occurrence_idx
   on public.work_occurrence_events (occurrence_id, at);

@@ -10,7 +10,7 @@ vi.mock("../../lib/supabase", () => ({
 
 import { userClient } from "../../lib/supabase";
 
-// The Work Completed writer (0581) observes this door from a middleware and is
+// The Work Completed writer (0584) observes this door from a middleware and is
 // proven in lib/sales-order-work-completion*.test.ts; here it passes through,
 // so these tests keep asserting only what the door itself writes.
 vi.mock("../../lib/sales-order-work-completion", async (importOriginal) => ({
@@ -525,7 +525,7 @@ describe("GET /api/operation/orders", () => {
     expect(eq).toHaveBeenCalledWith("operation_stage", "ready_to_dispatch");
   });
 
-  it("0581 · narrows to one order for the Work completion probe, and refuses a malformed id", async () => {
+  it("0584 · narrows to one order for the Work completion probe, and refuses a malformed id", async () => {
     const { eq } = mockOrdersList([ORDER_ROW]);
     const jwt = await makeJwt("operation");
     const id = "11111111-0000-4000-8000-000000000001";

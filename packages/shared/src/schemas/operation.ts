@@ -985,7 +985,7 @@ export type OperationReceiveThreadsInput = z.infer<typeof OperationReceiveThread
  * `reported` when the original is genuinely unknown. A `reason` travels only
  * when the operator was shown the delay question. */
 /**
- * 0582 · the day-before check's evidence: the Supplier DO, or an evidenced
+ * 0585 · the day-before check's evidence: the Supplier DO, or an evidenced
  * supplier confirmation, that the PO's goods go to its own Warehouse on the
  * exact effective arrival. The server checks the date, the Warehouse and the
  * version; this schema only refuses an incomplete body.
@@ -1017,7 +1017,7 @@ export const recordSupplierReplyInput = z.object({
   channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
   recipient: z.string().trim().min(1).max(200),
   evidence: z.string().trim().min(1).max(2000),
-  /** 0582 · further WhatsApp screenshots beside the evidence file. */
+  /** 0585 · further WhatsApp screenshots beside the evidence file. */
   screenshots: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
   reportedBy: z.string().trim().min(1).max(200),
   reportedAt: z.string().datetime({ offset: true }),

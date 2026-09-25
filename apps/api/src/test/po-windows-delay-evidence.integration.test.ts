@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 
 /**
- * 0582 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN (owner rulings
+ * 0585 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN (owner rulings
  * 2026-09-24, Purchasing MASTER §§5.6.1, 5.7):
  *
  *   PO windows        11:30 / optional 16:00, editable; a supplier cut-off must
@@ -37,7 +37,7 @@ const OTHER_DEST = uid("72");
 const PO = `PO-IT-${HEX}`;
 const ORIGINAL = "2026-10-12";
 
-describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before check (real PostgreSQL, 0582)", () => {
+describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before check (real PostgreSQL, 0585)", () => {
   let db: pg.Client;
   const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
   async function attempt(sql: string, params: unknown[] = []): Promise<string> {
@@ -82,7 +82,7 @@ describe.skipIf(!URL)("PO windows, supplier delay evidence and the day-before ch
     await q("begin");
     await q("set local session_replication_role = replica");
     for (const [id, role] of [[U.boss, "principal"], [U.op, "operation"]] as const) {
-      const email = `it-0582-${role}-${RUN}@carres.test`;
+      const email = `it-0585-${role}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
       await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, $3, $4, 'active', true)", [id, email, `IT ${role}`, role]);
     }

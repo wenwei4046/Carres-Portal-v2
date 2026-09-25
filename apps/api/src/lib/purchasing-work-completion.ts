@@ -1,5 +1,5 @@
 /**
- * ⭐ PURCHASING'S COMPLETION FACTS (0581 · owner direction, Jess 2026-09-24).
+ * ⭐ PURCHASING'S COMPLETION FACTS (0584 · owner direction, Jess 2026-09-24).
  *
  *   issue_po                       (object: the Sales Order) a purchase order
  *                                  now serves the order — issued by SO Batch.
@@ -8,11 +8,11 @@
  *   purchasing.supplier_date_passed  (object: the PO) a new governed supplier
  *                                  answer on the CURRENT version — a delay
  *                                  carries a governed reason, a new date and
- *                                  at least one WhatsApp screenshot (0582)
+ *                                  at least one WhatsApp screenshot (0585)
  *   purchasing.confirm_tomorrows_delivery  (object: the PO, one occurrence
  *                                  per effective date) the Supplier DO or an
  *                                  evidenced confirmation for that exact date
- *                                  and the PO's own Warehouse (0582)
+ *                                  and the PO's own Warehouse (0585)
  *
  * `purchasing.supplier_reply` — waiting for an immediate answer after sending
  * — is RETIRED (2026-09-24) and completes nothing here.
@@ -98,7 +98,7 @@ export interface SupplierReplyFacts {
    *  probe already proved there was none the moment before this write. */
   answerId: string | null;
   poVersion: number;
-  /** The screenshots kept for that answer (0582). */
+  /** The screenshots kept for that answer (0585). */
   screenshotCount: number;
 }
 

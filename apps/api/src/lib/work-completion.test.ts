@@ -1,5 +1,5 @@
 /**
- * The shared Completed writer (0581 · owner rulings 2026-09-24), exercised
+ * The shared Completed writer (0584 · owner rulings 2026-09-24), exercised
  * through the Sales Orders spec: only a module write whose own completion
  * fact now holds, on an occurrence the one-object probe showed open just
  * before, becomes `completed`.

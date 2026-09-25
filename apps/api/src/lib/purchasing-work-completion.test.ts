@@ -1,5 +1,5 @@
 /**
- * Purchasing's completion facts (0581 · owner direction 2026-09-24):
+ * Purchasing's completion facts (0584 · owner direction 2026-09-24):
  * `issue_po` closes when a purchase order now serves the order; the PO's
  * supplier-reply Work closes on an evidenced answer for its current version.
  */

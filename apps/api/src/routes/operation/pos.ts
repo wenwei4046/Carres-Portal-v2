@@ -128,7 +128,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     );
   }
   const { status, supplierId } = parsed.data;
-  // 0581 · ONE PO, THE SAME ROW: the Work completion probe reads exactly what
+  // 0584 · ONE PO, THE SAME ROW: the Work completion probe reads exactly what
   // this register reads (promises, sends, lines) for a single PO.
   const onlyPoId = c.req.query("poId") ?? null;
   if (onlyPoId !== null && (onlyPoId.trim() === "" || onlyPoId.length > 64)) {
@@ -339,7 +339,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // history lives beside the field, never down in Activity). Same bounded
   // read — no extra round-trip.
   const promisesByPo = new Map<string, Record<string, unknown>[]>();
-  // 0582 · the day-before check's evidence (Supplier DO or evidenced
+  // 0585 · the day-before check's evidence (Supplier DO or evidenced
   // confirmation for an exact date and the PO's own Warehouse). Strict: a
   // failed read fails the register rather than reopening confirmed checks.
   const arrivalConfirmationsByPo = new Map<string, Record<string, unknown>[]>();
@@ -2197,7 +2197,7 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   reason_required: "reason_required",
   nothing_changed: "nothing_changed",
   sent_po_needs_revision: "sent_po_needs_revision",
-  // 0582 · the delay and day-before evidence refusals.
+  // 0585 · the delay and day-before evidence refusals.
   other_note_required: "other_note_required",
   screenshot_required: "screenshot_required",
   screenshot_not_found: "screenshot_not_found",
@@ -2240,7 +2240,7 @@ function mapSupplierCallError(
 // Record the answer to the exact sent PO version with outside evidence.
 // The transaction preserves the original document date and projects only goods
 // arrival planning to the Sales lines explicitly linked to this PO.
-// 0581 — the evidenced answer to the current PO version completes the PO's
+// 0584 — the evidenced answer to the current PO version completes the PO's
 // supplier-reply Work. It observes only a body this door will accept, so an
 // incomplete answer is still refused before any database call.
 operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, supplierReplyWorkCompletion({
@@ -2257,7 +2257,7 @@ operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, supplierRepl
   return c.json({ ok: true, result: data });
 });
 
-// ----- POST /:id/arrival-confirmation (0582) -----
+// ----- POST /:id/arrival-confirmation (0585) -----
 // The day-before check's evidence: the Supplier DO, or the supplier's evidenced
 // confirmation, for the exact effective arrival and the PO's own Warehouse. It
 // is NOT a receipt — only Receiving and its GRN prove the goods arrived.

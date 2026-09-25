@@ -212,7 +212,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     );
   }
   const { stage, channel, search } = parsed.data;
-  // 0581 · ONE ORDER, THE SAME ROW. The Work completion probe reads exactly
+  // 0584 · ONE ORDER, THE SAME ROW. The Work completion probe reads exactly
   // what this list reads — the select AND every enrichment below (po_skus,
   // arrivals, units) — for a single order, so "was it open" has one answer.
   const onlyOrderId = c.req.query("orderId") ?? null;
@@ -1867,7 +1867,7 @@ const saveRevisionInput = z
 operationOrdersRouter.post(
   "/:id/save",
   requireOperation,
-  // 0581 — an office save that records the Requested Delivery Date (or the
+  // 0584 — an office save that records the Requested Delivery Date (or the
   // customer's "not yet") completes `ask_delivery_date`; a save that does not
   // touch it costs no Work read.
   salesOrderWorkCompletion({
@@ -2592,7 +2592,7 @@ async function amendmentOrderId(c: Context<AppEnv>): Promise<string | null> {
 operationOrdersRouter.post(
   "/amendment/:amendmentId/decide",
   requirePrincipal,
-  // 0581 — an APPROVED amendment applies its Requested Delivery Date to the
+  // 0584 — an APPROVED amendment applies its Requested Delivery Date to the
   // order: that is the completion fact for `ask_delivery_date`.
   salesOrderWorkCompletion({
     rules: ["ask_delivery_date"],

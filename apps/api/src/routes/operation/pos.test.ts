@@ -198,7 +198,7 @@ describe("GET /api/operation/pos", () => {
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === "po_supplier_promises") return { select: promiseSelect };
-        // 0582 · the day-before check's evidence rides the register read.
+        // 0585 · the day-before check's evidence rides the register read.
         if (table === "po_arrival_confirmations") return { select: vi.fn(() => ({ in: vi.fn(() => paged([])) })) };
         if (table === "orders") return { select: ordersSelect };
         if (table === "product_skus") return { select: skusSelect };
@@ -643,7 +643,7 @@ describe("GET /api/operation/pos", () => {
     expect(eq).toHaveBeenCalledWith("supplier_id", supId);
   });
 
-  it("0581 · narrows to one PO for the Work completion probe, and refuses a blank one", async () => {
+  it("0584 · narrows to one PO for the Work completion probe, and refuses a blank one", async () => {
     const { eq } = mockPosList([PO_ROW]);
     const jwt = await makeJwt("operation");
     const ok = await app.fetch(
@@ -2861,7 +2861,7 @@ describe("opening an app records an OPEN, and completes nothing", () => {
 });
 
 
-describe("POST day-before arrival confirmation (0582)", () => {
+describe("POST day-before arrival confirmation (0585)", () => {
   const DEST = "11111111-0000-4000-8000-00000000d001";
   const confirmation = {
     poVersion: 2, forDate: "2026-10-20", destinationId: DEST, kind: "supplier_confirmation",

@@ -102,7 +102,7 @@ export const PO_STATE_ACTION_SHORT = {
  * in the free-text Remarks beside it, never inside the category.
  */
 /** The eight governed supplier delay reasons (owner ruling 2026-09-24,
- *  Purchasing MASTER §5.7; `purchasing_supplier_delay_reasons()` in 0582).
+ *  Purchasing MASTER §5.7; `purchasing_supplier_delay_reasons()` in 0585).
  *  `Other` alone requires a short note. Rows recorded before keep their
  *  earlier words. */
 export const PO_DELAY_REASONS = [

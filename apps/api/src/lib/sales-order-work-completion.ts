@@ -1,5 +1,5 @@
 /**
- * ⭐ SALES ORDERS' COMPLETION FACTS (0581 · owner rulings, Jess 2026-09-24).
+ * ⭐ SALES ORDERS' COMPLETION FACTS (0584 · owner rulings, Jess 2026-09-24).
  *
  * Sales Orders owns two Work rules whose completion fact is a Sales Orders
  * write:

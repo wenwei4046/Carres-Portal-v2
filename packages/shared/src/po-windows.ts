@@ -1,6 +1,6 @@
 /**
  * ⭐ DAILY PO WINDOWS (Purchasing MASTER §5.6.1 · owner rulings, Jess
- * 2026-09-24; storage 0582).
+ * 2026-09-24; storage 0585).
  *
  *   first window      11:30 Malaysia time, editable
  *   second window     16:00, editable, may be switched off
@@ -138,7 +138,7 @@ export interface EffectiveArrivalPromise {
 
 /**
  * The effective expected arrival — mirrors `purchasing_po_effective_arrival`
- * (0582): the latest EVIDENCED answer on the CURRENT version, else the
+ * (0585): the latest EVIDENCED answer on the CURRENT version, else the
  * immutable original PO Delivery Date, else the live planning date.
  */
 export function effectivePoArrivalOf(po: {

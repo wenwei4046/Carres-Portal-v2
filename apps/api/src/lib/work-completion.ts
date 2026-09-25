@@ -1,5 +1,5 @@
 /**
- * ⭐ THE COMPLETED WRITER (0581 · owner rulings, Jess 2026-09-24).
+ * ⭐ THE COMPLETED WRITER (0584 · owner rulings, Jess 2026-09-24).
  *
  * Only the owning module's completion fact produces `completed`; Work never
  * marks anything done. Each module supplies ONE spec per object kind:
@@ -179,7 +179,7 @@ export async function withWorkCompletion(
   return response;
 }
 
-/** The 0581 completion door — the service role only. Replays are idempotent. */
+/** The 0584 completion door — the service role only. Replays are idempotent. */
 export async function recordWorkCompleted(c: Context<AppEnv>, write: CompletedWrite): Promise<void> {
   const { error } = await adminClient(c.env).rpc("work_record_completed", {
     p_occurrence_id: write.occurrenceId,

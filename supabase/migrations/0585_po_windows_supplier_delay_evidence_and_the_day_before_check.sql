@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0582_po_windows_supplier_delay_evidence_and_the_day_before_check.sql
+-- 0585_po_windows_supplier_delay_evidence_and_the_day_before_check.sql
 -- Purchasing MASTER §§5.6.1, 5.7 · owner rulings 2026-09-24 (Jess), PR #1598.
 --
 -- WHAT WAS MISSING, MEASURED on origin/main ac1d280ea
@@ -58,15 +58,15 @@ alter table public.purchasing_settings
     not po_window_second_enabled or po_window_second is not null);
 
 comment on column public.purchasing_settings.po_window_first is
-  '0582 · the first daily PO window, Malaysia wall-clock time (initially 11:30). Demand admitted before it belongs to it.';
+  '0585 · the first daily PO window, Malaysia wall-clock time (initially 11:30). Demand admitted before it belongs to it.';
 comment on column public.purchasing_settings.po_window_second is
-  '0582 · the optional second daily PO window (initially 16:00); used only while po_window_second_enabled.';
+  '0585 · the optional second daily PO window (initially 16:00); used only while po_window_second_enabled.';
 
 alter table public.purchasing_supplier_settings
   add column if not exists po_cutoff time;
 
 comment on column public.purchasing_supplier_settings.po_cutoff is
-  '0582 · this supplier''s governed EARLIER cut-off (Malaysia time). A standard window later than it is invalid for the supplier; when no standard window is at or before it, the cut-off itself is the supplier''s window. NULL = the standard windows.';
+  '0585 · this supplier''s governed EARLIER cut-off (Malaysia time). A standard window later than it is invalid for the supplier; when no standard window is at or before it, the cut-off itself is the supplier''s window. NULL = the standard windows.';
 
 create or replace function public.purchasing_set_po_windows(
   p_first          time,
@@ -171,7 +171,7 @@ create table if not exists public.po_supplier_answer_screenshots (
 );
 
 comment on table public.po_supplier_answer_screenshots is
-  '0582 · every WhatsApp screenshot kept for a supplier answer (at least one for a delay; more may be kept). Append-only; written only by purchasing_record_supplier_reply.';
+  '0585 · every WhatsApp screenshot kept for a supplier answer (at least one for a delay; more may be kept). Append-only; written only by purchasing_record_supplier_reply.';
 
 create index if not exists po_supplier_answer_screenshots_answer_idx
   on public.po_supplier_answer_screenshots (answer_id);
@@ -391,7 +391,7 @@ as $fn$
 $fn$;
 
 comment on function public.purchasing_po_effective_arrival(text) is
-  '0582 · the effective expected arrival: the latest evidenced supplier answer on the CURRENT version, else the immutable original PO Delivery Date, else the live planning date. Mirrors effectivePoArrivalOf (shared) — one definition.';
+  '0585 · the effective expected arrival: the latest evidenced supplier answer on the CURRENT version, else the immutable original PO Delivery Date, else the live planning date. Mirrors effectivePoArrivalOf (shared) — one definition.';
 
 revoke all on function public.purchasing_po_effective_arrival(text) from public, anon;
 grant execute on function public.purchasing_po_effective_arrival(text) to authenticated;
@@ -424,7 +424,7 @@ create table if not exists public.po_arrival_confirmations (
 );
 
 comment on table public.po_arrival_confirmations is
-  '0582 · the day-before check''s evidence: the Supplier DO, or an evidenced supplier confirmation, that the PO''s goods go to its own Warehouse on the exact effective arrival. Never a receipt: only Receiving/GRN proves arrival. Append-only; written only by purchasing_record_arrival_confirmation.';
+  '0585 · the day-before check''s evidence: the Supplier DO, or an evidenced supplier confirmation, that the PO''s goods go to its own Warehouse on the exact effective arrival. Never a receipt: only Receiving/GRN proves arrival. Append-only; written only by purchasing_record_arrival_confirmation.';
 
 create index if not exists po_arrival_confirmations_po_idx
   on public.po_arrival_confirmations (po_id, for_date);

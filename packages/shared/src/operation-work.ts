@@ -168,7 +168,7 @@ export const operationWorkItemSchema = z.object({
   tone: z.enum(["danger", "warning", "info", "success", "neutral"]),
   locked: z.boolean(),
   broken: z.boolean(),
-  /** To do · Waiting, derived from the 0581 ledger (work-lifecycle.ts). A
+  /** To do · Waiting, derived from the 0584 ledger (work-lifecycle.ts). A
    *  projector never sets it; the Work read attaches it. Absent reads as To do
    *  (`workLifecycleOrToDo`). */
   lifecycle: operationWorkLifecycleSchema.optional(),
@@ -205,7 +205,7 @@ export const operationWorkResponseSchema = z.object({
   generatedOn: z.string().date(),
   closureReceipt: operationWorkClosureReceiptSchema.nullable(),
   sources: operationWorkSourcesSchema,
-  /** Completed occurrences from the 0581 ledger (recent window), written only
+  /** Completed occurrences from the 0584 ledger (recent window), written only
    *  by the owning modules' completion facts. Absent on a read without it. */
   completed: z.array(operationWorkCompletedSchema).optional(),
 }).strict().superRefine((response, ctx) => {

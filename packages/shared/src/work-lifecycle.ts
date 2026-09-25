@@ -1,6 +1,6 @@
 /**
  * ⭐ THE WORK LIFECYCLE — `To do` · `Waiting` · `Completed` (owner rulings,
- * Jess 2026-09-24; ledger 0581 `work_occurrence_events`).
+ * Jess 2026-09-24; ledger 0584 `work_occurrence_events`).
  *
  *   request_sent    Waiting. From an integrated provider only after the
  *                   provider accepted it; otherwise staff's explicit
@@ -121,7 +121,7 @@ export const WORK_REPLY_WORKING_DAYS: Readonly<Record<string, number>> = {};
 
 /** The reply due date: working days after `sentOn` on the Malaysian office
  *  calendar — Saturday, Sunday and the shared public holidays are skipped,
- *  the same days the 0581 door refuses. */
+ *  the same days the 0584 door refuses. */
 export function workReplyDueOn(sentOn: string, ruleKey?: string): string {
   const days = (ruleKey && WORK_REPLY_WORKING_DAYS[ruleKey]) || 1;
   return addWorkingDays(sentOn, days, { holidays: myHolidaySet(), offDays: OFFICE_OFF_DAYS });

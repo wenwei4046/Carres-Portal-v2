@@ -1,5 +1,5 @@
 /**
- * The Work lifecycle doors on `/api/operation/work` (0581, owner rulings
+ * The Work lifecycle doors on `/api/operation/work` (0584, owner rulings
  * 2026-09-24): the read attaches To do / Waiting from the ledger, and the two
  * staff doors record a send or a reply against the CURRENT open occurrence.
  */
@@ -61,7 +61,7 @@ function feed(items: OperationWorkItem[]): OperationWorkResponse {
   );
 }
 
-/** An in-memory ledger with the 0581 doors' rules. */
+/** An in-memory ledger with the 0584 doors' rules. */
 function memoryLedger(rows: WorkOccurrenceEvent[] = []) {
   const calls: Array<Record<string, unknown>> = [];
   let n = 0;

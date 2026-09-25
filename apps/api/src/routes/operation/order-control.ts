@@ -578,7 +578,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
  */
 orderControlRouter.post(
   "/:id/delay-decision",
-  // 0581 — the recorded decision is Sales Orders' completion fact for
+  // 0584 — the recorded decision is Sales Orders' completion fact for
   // `delay_planning`.
   salesOrderWorkCompletion({ rules: ["delay_planning"], orderId: (c) => c.req.param("id") ?? null }),
   async (c) => {

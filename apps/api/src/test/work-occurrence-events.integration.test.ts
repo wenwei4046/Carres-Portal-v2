@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 
 /**
- * 0581 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN: the Work
+ * 0584 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN: the Work
  * lifecycle ledger `work_occurrence_events` (owner rulings 2026-09-24).
  *
  *   request_sent    internal staff only; moves Work to Waiting, never completes it
@@ -29,7 +29,7 @@ const CUSTOMER = uid("c1");
 const OCC = `orders:it-${HEX}:ask_delivery_date`;
 const OTHER = `orders:it-${HEX}:other_rule`;
 
-describe.skipIf(!URL)("the Work lifecycle ledger (real PostgreSQL, 0581)", () => {
+describe.skipIf(!URL)("the Work lifecycle ledger (real PostgreSQL, 0584)", () => {
   let db: pg.Client;
   const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
   /** One call in a savepoint: a refusal comes back as its detail or code. */

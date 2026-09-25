@@ -303,7 +303,7 @@ type BatchLineDecision = z.infer<
   typeof soBatchIssueInput
 >["documentDecisions"][number]["lineDecisions"][number];
 
-// 0581 — a purchase order now serving the order is Purchasing's completion
+// 0584 — a purchase order now serving the order is Purchasing's completion
 // fact for that order's `issue_po`; the writer observes, never edits.
 toOrderRouter.post("/issue-batch", requireOperation, soBatchIssueWorkCompletion(), async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);

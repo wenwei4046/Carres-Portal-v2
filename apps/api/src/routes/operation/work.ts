@@ -382,7 +382,7 @@ interface PurchaseOrderArrivalSource extends PurchaseOrderWorkSource {
   tomorrow_answer_about_date?: string | null;
   official_delivery_date?: string | null;
   destination_id?: string | null;
-  /** 0582 · the day-before check's evidence. */
+  /** 0585 · the day-before check's evidence. */
   arrival_confirmations?: Array<{
     po_version: number;
     for_date: string;
@@ -1633,7 +1633,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   );
 }
 
-// ── THE WORK LIFECYCLE LEDGER (0581, owner rulings 2026-09-24) ──────────────
+// ── THE WORK LIFECYCLE LEDGER (0584, owner rulings 2026-09-24) ──────────────
 //
 // To do · Waiting are DERIVED from `work_occurrence_events`; Completed is
 // written only by the owning module's completion fact (service role). The
@@ -1642,7 +1642,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
 // against the CURRENT open occurrence and source version. Opening or copying a
 // message never reaches these doors.
 
-/** A refusal the ledger names (the 0581 doors' `detail`). */
+/** A refusal the ledger names (the 0584 doors' `detail`). */
 export class WorkLedgerRefusal extends Error {
   constructor(readonly code: string, message: string) {
     super(message);
@@ -1718,7 +1718,7 @@ function refusalOf(error: { code?: string; details?: string | null; message: str
   return new WorkLedgerRefusal("ledger_failed", error.message);
 }
 
-/** The Supabase ledger: reads under the caller's RLS, writes through 0581's doors. */
+/** The Supabase ledger: reads under the caller's RLS, writes through 0584's doors. */
 export const supabaseWorkLedger: WorkLedger = {
   async read(c, occurrenceIds) {
     const sb = userClient(c.env, c.var.auth.jwt);
