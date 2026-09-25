@@ -368,7 +368,9 @@ export type SalesOrderTemplateData = {
     address?: string | null;
   };
 
-  /** orders.proceed_date (0165) — optional; row skipped when absent. */
+  /** SALES ORDER INFO `Proceed Date` — `orders.proceeded_at`, the actual
+   *  Sales → Operation handoff (never the planned `orders.proceed_date`).
+   *  Optional; the row is skipped when absent. */
   proceed_date?: string | null;
 
   lines: Array<{

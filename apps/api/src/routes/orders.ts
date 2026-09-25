@@ -38,6 +38,7 @@ import {
 } from "@carres/shared";
 import { invoicePayments } from "./finance/invoices";
 import { userClient, adminClient } from "../lib/supabase";
+import { resolveActorNames } from "../lib/actor-names";
 import { getStaffContext, isStoreActivated } from "../lib/staff-token";
 import {
   getOrderSkus,
@@ -78,7 +79,14 @@ type SalesOrderData = {
   /** Golden SO (STAGE 2) — raw ISO stamps for ORDER DETAILS; the template
    *  formats them. */
   ordered_date: string | null;
+  /** SALES ORDER INFO `Proceed Date` — `orders.proceeded_at`, the actual
+   *  Sales → Operation handoff (owner 2026-09-21). Never the planned
+   *  production-start `orders.proceed_date`. */
   proceed_date: string | null;
+  /** Footer `Issued by` — the person whose write CREATED the order: the
+   *  earliest `order_history` row's `by_user_id`, resolved by the one
+   *  `resolveActorNames`. Never the salesperson. Null when not recorded. */
+  issued_by: string | null;
   order_id: string;
   order_code: string;
   status_label: string;
@@ -3989,7 +3997,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     .from("orders")
     .select(
       "id, so, status, channel, customer_name, customer_phone, customer_address, " +
-        "customer_email, customer_emergency, proceed_date, " +
+        "customer_email, customer_emergency, proceeded_at, " +
         "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
         "paid, payment_method, approval_code, signature_url, placed_at, " +
         "order_lines(sku, qty, unit_price, attrs), " +
@@ -4284,11 +4292,28 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   // immediately when render fires.
   const signatureSignedUrl = await signAttachment(sb, o.signature_url ?? null);
 
+  // WHO ISSUED IT — the creating write's actor, read the way the Sales Order
+  // History reads it (earliest `order_history` row). A failed or empty read
+  // prints the template's absence; it never blocks the document.
+  let issuedBy: string | null = null;
+  try {
+    const { data: hist } = await sb
+      .from("order_history")
+      .select("by_user_id, occurred_at")
+      .eq("order_id", id)
+      .order("occurred_at", { ascending: true });
+    const creator = ((hist ?? []) as Array<{ by_user_id: string | null }>)[0]?.by_user_id ?? null;
+    if (creator) issuedBy = (await resolveActorNames(sb, [creator])).get(creator) ?? null;
+  } catch {
+    issuedBy = null;
+  }
+
   const payload: SalesOrderData = {
     so_number,
     issue_date,
     ordered_date: (o.placed_at as string | null) ?? null,
-    proceed_date: o.proceed_date ?? null,
+    proceed_date: (o.proceeded_at as string | null) ?? null,
+    issued_by: issuedBy,
     order_id: id,
     order_code: `SO-${o.so}`,
     status_label: statusLabel,
