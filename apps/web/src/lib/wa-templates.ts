@@ -13,10 +13,11 @@
  *  - Multi-line: REAL line breaks ("\n"); `waEncode` turns them into %0A for a
  *    wa.me deep link. Clipboard copy keeps the real breaks.
  *  - {items} = ONE line per item: "{qty}× {model}".
- *  - Customer messages carry NO delivery date and no pressure phrasing
- *    ("settle by", "deliver on time") — the logistic partner contacts the
- *    customer for the final slot; if the customer asks about delivery, ops
- *    replies with the partner's contact.
+ *  - Customer messages carry no pressure phrasing ("settle by", "deliver on
+ *    time"). They carry a delivery date ONLY when Carres itself is agreeing it
+ *    (owner approval 2026-09-25, Orders §9 — `buildCustomerDeliveryDateMessage`,
+ *    the Work Customer card); otherwise the logistic partner contacts the
+ *    customer for the final slot.
  *  - {salutation} = the optional preferred-name/title field when set, else the
  *    customer name through the ONE display rule. NEVER auto-infer Mr/Ms.
  */
@@ -345,4 +346,15 @@ export function buildPartnerGroupMessage(
  *  breaks become %0A. */
 export function waEncode(text: string): string {
   return encodeURIComponent(text);
+}
+
+// ── CUSTOMER — the delivery date Carres is agreeing (Work Customer card) ─────
+/** Template `Confirm delivery date` (owner approval 2026-09-25, Workspace
+ *  §5.10): leads with the customer's own reference, never the SO number; no
+ *  money; the date Carres is agreeing. */
+export function buildCustomerDeliveryDateMessage(i: { name: string | null; reference: string | null; dateText: string | null }): string {
+  const name = i.name?.trim() || "there";
+  const about = i.reference ? `your order ${i.reference}` : "your order";
+  const date = i.dateText ? ` for ${i.dateText}` : "";
+  return `Hello ${name}, this is Carres about ${about}. We are arranging your delivery${date}. Please reply to confirm this date, or tell us a date that suits you.`;
 }

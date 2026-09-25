@@ -76,7 +76,7 @@ export default function WorkSplitShell({
       <section aria-label="Work actions" className={COLUMN}>
         {list}
       </section>
-      <section aria-label="Selected work" className={`${COLUMN} gap-4 overflow-y-auto`}>
+      <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto`}>
         {detail}
       </section>
     </div>

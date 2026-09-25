@@ -1,129 +1,134 @@
 /**
- * THE PARTY CARDS — the Work right panel's `Logistics · Customer · Supplier`
- * (owner rulings 2026-09-24, docs/workspace/MASTER.md §5.9).
+ * THE SELECTED MISSION — the right panel below the Work summary
+ * (Workspace MASTER §5.10, owner approval 2026-09-25):
  *
- * Logistics is the one card with an approved specification and its own acts.
- * Customer and Supplier share its stable shell but carry ONLY facts their
- * owners already publish, and one door to that owner — no new SOP, no action
- * of their own until their specifications are approved.
+ *   Order Route → Logistics → Customer → Supplier
  *
- * A party card appears only when the selected work names exactly ONE Sales
- * Order: a purchase order that serves many orders has no single customer.
+ * It appears only when the selected work names exactly ONE Sales Order: a
+ * purchase order that serves many orders has no single customer. An order the
+ * panel cannot read says so (`Order details unavailable`) — never a guessed
+ * `Logistics not assigned`.
+ *
+ * Two panel laws live here because they span the cards:
+ *   · ONE card open at a time — opening one collapses the others; the open
+ *     card survives a save or a refresh of the same order;
+ *   · ONE blue action across the panel — missed first, then due today, then
+ *     the selected work's own party, then a future follow-up.
  */
-import { useId, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import type { OperationWorkItem } from "@carres/shared";
-import Icon from "@/components/kit/Icon";
-import { displayCustomerName } from "@/lib/customer-name";
-import { useLogisticsCardFacts } from "@/lib/queries";
+import Button from "@/components/kit/Button";
 import { useDeliveryScopeCard, useOrderIdFromRef } from "../delivery-scope-card";
-import LogisticsCard, { PARTY_COPY } from "./LogisticsCard";
+import CustomerCard, { useCustomerCard } from "./CustomerCard";
+import LogisticsCard, { useLogisticsModel } from "./LogisticsCard";
+import SupplierCard, { useSupplierCard } from "./SupplierCard";
+import WorkOrderRoute from "./WorkOrderRoute";
+import { orderRefOf } from "./order-ref";
+
+export { orderRefOf };
 import { WorkSection } from "./WorkCard";
 
 export const PARTIES_COPY = {
-  customer: "Customer",
-  supplier: "Supplier",
-  openSalesOrder: "Open Sales Order",
-  noSupplier: "No purchase order for this Sales Order",
-  phone: "Phone",
-  address: "Delivery address",
-  notRecorded: "Not recorded",
+  unavailableTitle: "Order details unavailable",
+  unavailableBody: "The work item still exists, but its Sales Order could not be loaded.",
+  tryAgain: "Try again",
 } as const;
 
-/** The order a work item names, or null when it names several / none. */
-export function orderRefOf(item: OperationWorkItem): { orderId?: string | null; soLabel?: string | null; doNumber?: string | null } | null {
-  const kind = item.object.kind;
-  if (kind === "sales_order" || kind === "delivery_scope") return { orderId: item.object.id };
-  if (kind === "delivery_order") return { doNumber: item.object.id };
-  if (/^SO-\d+/.test(item.object.label)) return { soLabel: item.object.label };
+type Party = "logistics" | "customer" | "supplier";
+
+/** Which party card the selected work itself belongs to. */
+function partyOfWork(item: OperationWorkItem): Party | null {
+  if (item.module === "purchasing" || item.module === "receiving") return "supplier";
+  if (item.ruleKey === "ask_delivery_date") return "customer";
+  if (item.module === "delivery") return "logistics";
   return null;
 }
 
-function PartyShell({ title, summary, children, testId }: { title: string; summary: ReactNode; children: ReactNode; testId: string }) {
-  const [open, setOpen] = useState(false);
-  const bodyId = useId();
-  return (
-    <WorkSection className="shrink-0" data-testid={testId} aria-label={title}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => setOpen((v) => !v)}
-        className="flex h-[72px] w-full items-center gap-2 rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:h-auto min-[960px]:items-start min-[960px]:gap-3 min-[960px]:px-4 min-[960px]:py-3"
-        data-testid={`${testId}-toggle`}
-      >
-        <div className="min-w-0 flex-1">{summary}</div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11 min-[960px]:mt-0.5 min-[960px]:h-auto min-[960px]:w-auto" data-testid={`${testId}-chevron`}><Icon name={open ? "collapse" : "expand"} size={16} /></span>
-      </button>
-      {open ? (
-        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[960px]:px-4 min-[960px]:py-3">
-          {children}
-        </div>
-      ) : null}
-    </WorkSection>
-  );
-}
+type Timing = "ahead" | "today" | "missed" | "no_date" | null;
+const RANK: Record<string, number> = { missed: 0, today: 1, ahead: 3, no_date: 4 };
 
-function CustomerCard({ orderId }: { orderId: string }) {
-  const { card } = useDeliveryScopeCard(orderId);
-  const o = card?.scope.o;
-  if (!o) return null;
-  const name = displayCustomerName(o.customer_name) || PARTIES_COPY.notRecorded;
-  return (
-    <PartyShell
-      title={PARTIES_COPY.customer}
-      testId="party-customer"
-      summary={<span className="text-[15px] font-semibold leading-5 text-kit-slate-12">{PARTIES_COPY.customer} · {name}</span>}
-    >
-      <div className="text-body text-kit-slate-12">{PARTIES_COPY.phone}: {o.customer_phone || PARTIES_COPY.notRecorded}</div>
-      <div className="text-body text-kit-slate-12">{PARTIES_COPY.address}: {(o.customer_address ?? "").trim() || PARTIES_COPY.notRecorded}</div>
-      <Link className="inline-flex min-h-6 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to={`/operation/orders/so/${encodeURIComponent(orderId)}`}>
-        {PARTIES_COPY.openSalesOrder}
-        <Icon name="open" size={14} />
-      </Link>
-    </PartyShell>
-  );
-}
-
-function SupplierCard({ orderId }: { orderId: string }) {
-  const factsQ = useLogisticsCardFacts(orderId);
-  const pos = (factsQ.data?.routes ?? []).flatMap((r) => r.purchaseOrders);
-  const suppliers = [...new Set(pos.map((p) => p.supplier).filter((v): v is string => Boolean(v)))];
-  return (
-    <PartyShell
-      title={PARTIES_COPY.supplier}
-      testId="party-supplier"
-      summary={
-        <span className="text-[15px] font-semibold leading-5 text-kit-slate-12">
-          {PARTIES_COPY.supplier} · {suppliers.length > 0 ? suppliers.join(" · ") : PARTIES_COPY.noSupplier}
-        </span>
-      }
-    >
-      {pos.length === 0 ? <p className="text-body text-kit-slate-11">{PARTIES_COPY.noSupplier}</p> : null}
-      {pos.map((po) => (
-        <div key={po.poNo} className="text-body text-kit-slate-12">{PARTY_COPY.poLine(po.poNo, po.supplier)}</div>
-      ))}
-      <Link className="inline-flex min-h-6 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to="/operation/procurement">
-        {PARTY_COPY.openPurchasing}
-        <Icon name="open" size={14} />
-      </Link>
-    </PartyShell>
-  );
+/** The ONE blue action: missed → today → the selected work's party → future. */
+export function primaryPartyOf(candidates: Record<Party, Timing>, selected: Party | null): Party | null {
+  let best: Party | null = null;
+  let bestRank = Number.POSITIVE_INFINITY;
+  for (const party of ["logistics", "customer", "supplier"] as Party[]) {
+    const timing = candidates[party];
+    if (!timing) continue;
+    let rank = RANK[timing] ?? 5;
+    if (rank >= 2 && party === selected) rank = 2;
+    if (rank < bestRank) {
+      best = party;
+      bestRank = rank;
+    }
+  }
+  return best;
 }
 
 export default function WorkParties({ item }: { item: OperationWorkItem }) {
   const ref = orderRefOf(item);
   const orderId = useOrderIdFromRef(ref ?? {});
   const scope = useDeliveryScopeCard(orderId);
-  /* A party card speaks only about an order Delivery can actually read: an
-     order it cannot find draws nothing, never a guessed `Logistics not
-     assigned`. */
-  if (!ref || !orderId || (!scope.card && !scope.loading)) return null;
+  if (!ref) return null;
+  if (!orderId || (!scope.card && !scope.loading)) {
+    if (scope.loading) return null;
+    return (
+      <WorkSection className="shrink-0 p-3 min-[960px]:px-4" data-testid="work-mission-unavailable" role="status">
+        <p className="text-[15px] font-semibold leading-5 text-kit-slate-12">{PARTIES_COPY.unavailableTitle}</p>
+        <p className="mt-0.5 text-body text-kit-slate-11">{PARTIES_COPY.unavailableBody}</p>
+        <div className="mt-2">
+          <Button size="touch" onClick={() => window.location.reload()}>{PARTIES_COPY.tryAgain}</Button>
+        </div>
+      </WorkSection>
+    );
+  }
+  /* Keyed by order: a new mission starts with every card collapsed. */
+  return <Mission key={orderId} orderId={orderId} item={item} />;
+}
+
+function Mission({ orderId, item }: { orderId: string; item: OperationWorkItem }) {
+  const [openParty, setOpenParty] = useState<Party | null>(null);
+  const lm = useLogisticsModel(orderId);
+  const customer = useCustomerCard(orderId);
+  const supplier = useSupplierCard(orderId);
+  const embedded = item.interaction.mode === "embedded";
+
+  const supplierFirst = supplier.model?.rows.find((r) => r.tone === "missed" || r.tone === "current" || r.tone === "attention") ?? null;
+  const primary = embedded
+    ? null
+    : primaryPartyOf(
+        {
+          logistics: lm.model?.currentAction ? lm.model.currentAction.timing : null,
+          customer: customer.model?.action ? customer.model.action.timing : null,
+          supplier: supplierFirst ? (supplierFirst.tone === "missed" ? "missed" : supplierFirst.tone === "current" ? "today" : "ahead") : null,
+        },
+        partyOfWork(item),
+      );
+
+  /* Opening a card from the Route brings it into view. */
+  const [scrollTo, setScrollTo] = useState<Party | null>(null);
+  useEffect(() => {
+    if (!scrollTo) return;
+    document.getElementById(`party-${scrollTo}-${orderId}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    setScrollTo(null);
+  }, [scrollTo, orderId]);
+
+  const toggle = (party: Party) => (open: boolean) => setOpenParty(open ? party : null);
+  const reference = (lm.o?.source_ref ?? []).filter(Boolean).join(" · ") || null;
+
   return (
-    <div className="flex flex-col gap-2 min-[960px]:gap-4" data-testid="work-parties">
-      <LogisticsCard orderId={orderId} />
-      <CustomerCard orderId={orderId} />
-      <SupplierCard orderId={orderId} />
+    <div className="flex flex-col gap-2" data-testid="work-parties">
+      <WorkOrderRoute
+        orderId={orderId}
+        onOpenParty={(party) => {
+          setOpenParty(party);
+          setScrollTo(party);
+        }}
+      />
+      <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
+        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={primary === "logistics"} />
+      </div>
+      <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={primary === "customer"} />
+      <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={primary === "supplier"} />
     </div>
   );
 }

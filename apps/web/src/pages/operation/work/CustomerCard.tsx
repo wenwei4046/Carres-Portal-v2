@@ -30,7 +30,6 @@ import {
   askedForNote,
   askedForOf,
   customerCardModel,
-  customerMessage,
   customerReplyNeedsProof,
   myHolidaySet,
   type CustomerContactFact,
@@ -44,6 +43,7 @@ import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { useDeliveryArrangements, useDeliveryPartners, useOperationStaff, useRecordDeliveryContact } from "@/lib/queries";
 import { waLink } from "@/lib/wa-link";
+import { buildCustomerDeliveryDateMessage } from "@/lib/wa-templates";
 import { DeliveryDatesEdit, ReplyProofField, useReplyProofUpload } from "../components/DeliveryBrief";
 import { useLogisticsModel } from "./LogisticsCard";
 import { Fact, PartyCardShell, SectionTitle, ToneLine } from "./PartyCardShell";
@@ -163,7 +163,7 @@ export default function CustomerCard({
   const address = (o.customer_address ?? "").trim() || null;
   const reference = (o.source_ref ?? []).filter(Boolean).join(" · ") || null;
   const agreeingIso = card.confirmedDate ?? card.scope.customerDeliveryIso ?? null;
-  const message = customerMessage({ name, reference, dateText: agreeingIso ? spell(agreeingIso) : null });
+  const message = buildCustomerDeliveryDateMessage({ name, reference, dateText: agreeingIso ? spell(agreeingIso) : null });
   const wa = waLink(phone);
   const salesOrderHref = `/operation/orders/so/${encodeURIComponent(orderId)}`;
   const action = model.action;

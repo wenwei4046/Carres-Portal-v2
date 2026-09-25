@@ -82,6 +82,8 @@ export interface SupplierPoFact {
   /** Σ ordered / Σ accepted received quantity on this PO's lines. */
   orderedQty?: number;
   receivedQty?: number;
+  /** The PO's goods, for Purchasing's own supplier message. */
+  lines?: Array<{ sku: string; qty: number }>;
 }
 
 export type SupplierRowState = keyof typeof SUPPLIER_CARD_COPY.state;

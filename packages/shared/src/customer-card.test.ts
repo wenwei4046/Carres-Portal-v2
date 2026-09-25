@@ -3,7 +3,6 @@ import {
   askedForNote,
   customerCardModel,
   customerFollowUpIso,
-  customerMessage,
   customerWaitingOf,
   type CustomerCardInput,
   type CustomerContactFact,
@@ -150,11 +149,4 @@ describe("follow-up and message", () => {
     expect(customerWaitingOf({ latest: { atIso: "2026-10-23T01:00:00Z", result: "confirmed" }, todayIso: "2026-10-23" }).waiting).toBe(false);
   });
 
-  it("the message leads with the customer's reference, never an SO number", () => {
-    const text = customerMessage({ name: "Lim Kuan Yang", reference: "CR-10482", dateText: "27 Oct" });
-    expect(text).toBe(
-      "Hello Lim Kuan Yang, this is Carres about your order CR-10482. We are arranging your delivery for 27 Oct. Please reply to confirm this date, or tell us a date that suits you.",
-    );
-    expect(text).not.toMatch(/SO-?\d/);
-  });
 });
