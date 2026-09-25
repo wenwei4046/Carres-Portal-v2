@@ -48,6 +48,7 @@
   .badge i{font-style:normal;font-size:15px;line-height:20px;font-weight:600;color:var(--ink)}
   .badge.today{border-color:var(--blue-9)}.badge.today b{color:var(--blue-11);border-color:var(--blue-6)}.badge.today i{color:var(--blue-11)}
   .gh .wk{margin-left:auto;font-size:12px;line-height:16px;font-weight:400;color:var(--ink-2)}.gh .wk+.chev{margin-left:8px}
+  .row .w b{font-weight:600}.row .w .ex{color:var(--ink-2);margin-left:6px;font-weight:400}.row.today .w b,.row.today .w .ex{color:var(--blue-11)}
   /* Register */
   .reg{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);display:flex;flex-direction:column;min-width:0;overflow:hidden}
   .tb{height:45px;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid var(--border)}
@@ -121,13 +122,13 @@
         <div class="group"><button class="row all" data-d="all" aria-pressed="false"><span class="w">All unpaid orders</span><span class="n">7</span></button></div>
         <div class="group">
           <div class="gh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>Date<span class="wk">‹ 14–18 Sep ›</span><span class="chev">˄</span></div>
-          <button class="row" data-d="missed" aria-pressed="false"><span class="lead"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2"/></svg></span><span class="w">Missed</span><span class="n red">1</span></button>
-          <button class="row" data-d="2026-09-14" aria-pressed="false"><span class="badge"><b>MON</b><i>14</i></span><span class="w"></span><span class="n">0</span></button>
-          <button class="row" data-d="2026-09-15" aria-pressed="false"><span class="badge"><b>TUE</b><i>15</i></span><span class="w"></span><span class="n">1</span></button>
-          <button class="row" data-d="2026-09-16" aria-pressed="false"><span class="badge"><b>WED</b><i>16</i></span><span class="w">Malaysia Day</span><span class="n">0</span></button>
-          <button class="row" data-d="2026-09-17" aria-pressed="true"><span class="badge today"><b>THU</b><i>17</i></span><span class="w">Today</span><span class="n">4</span></button>
-          <button class="row" data-d="2026-09-18" aria-pressed="false"><span class="badge"><b>FRI</b><i>18</i></span><span class="w"></span><span class="n">1</span></button>
-          <button class="row" data-d="nodate" aria-pressed="false"><span class="lead"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M4 4l16 18"/></svg></span><span class="w">No date</span><span class="n">0</span></button>
+          <button class="row" data-d="missed" aria-pressed="false"><span class="w"><b>Missed</b></span><span class="n red">1</span></button>
+          <button class="row" data-d="2026-09-14" aria-pressed="false"><span class="w"><b>Mon 14</b></span><span class="n z">0</span></button>
+          <button class="row" data-d="2026-09-15" aria-pressed="false"><span class="w"><b>Tue 15</b></span><span class="n">1</span></button>
+          <button class="row" data-d="2026-09-16" aria-pressed="false"><span class="w"><b>Wed 16</b><span class="ex">· Malaysia Day</span></span><span class="n z">0</span></button>
+          <button class="row today" data-d="2026-09-17" aria-pressed="true"><span class="w"><b>Thu 17</b><span class="ex">· Today</span></span><span class="n">4</span></button>
+          <button class="row" data-d="2026-09-18" aria-pressed="false"><span class="w"><b>Fri 18</b></span><span class="n">1</span></button>
+          <button class="row" data-d="nodate" aria-pressed="false"><span class="w">No date</span><span class="n">0</span></button>
         </div>
         <div class="group">
           <div class="gh"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Status<span class="chev">˄</span></div>
