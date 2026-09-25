@@ -1011,6 +1011,11 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
    arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
    check through the one `logisticsCheckDueIso`.
 7. The Ohana supplier-to-customer route.
+10. Closed 2026-09-26 (owner yes, Delivery segment 3): the Work items `Record the delivery result`,
+   `Upload the delivery photo`, `Upload the signed DO` and `Check the delivery proof` deep-link to
+   the Delivery Orders register with that document's row revealed and its brief open (Delivery
+   §8.7), the way Delivery arrangement items reveal the Monitor row — never to a separate page;
+   the proof-review form Work embeds stays the same component.
 9. Closed 2026-09-25 (owner yes, Delivery segment 1): the Work feed's `logisticsAssigned` reads
    Delivery's arrangement (`ops_delivery_arrangements.partner_id`, leg-aware) — never the `orders`
    columns alone, which stay a fallback until retired; the Logistics card's progress line reads the
