@@ -4122,7 +4122,7 @@ function DrawerBody({
                         {deliveryDateGapFact(chasePartnerName)}
                       </MiniBadge>
                     );
-                  return <MiniBadge tone="muted">No logistics picked</MiniBadge>;
+                  return <MiniBadge tone="muted">Logistics not assigned</MiniBadge>;
                 })()}
                 {/* deadline date lives ONCE — on the card header below (mono);
                     a second sans copy here read as "two fonts" (Jess). */}
@@ -4162,7 +4162,7 @@ function DrawerBody({
                           ? "Not confirmed"
                           : order.ops_assigned_logistic
                             ? deliveryDateGapFact(chasePartnerName)
-                            : "No logistics picked";
+                            : "Logistics not assigned";
                 return (
                   <div className="max-w-[700px]">
                     {/* Grounded delivery card (Loan template; Jess 2026-07-19) —
@@ -4191,9 +4191,9 @@ function DrawerBody({
                               className={`text-body font-semibold truncate ${
                                 deliveredDone ? "text-base-500" : "text-base-900"
                               }`}
-                              title={chasePartnerName ?? "No logistics picked yet"}
+                              title={chasePartnerName ?? "Logistics not assigned"}
                             >
-                              {chasePartnerName ?? "No logistics picked yet"}
+                              {chasePartnerName ?? "Logistics not assigned"}
                             </div>
                           </div>
                         </div>

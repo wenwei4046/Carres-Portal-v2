@@ -38,7 +38,21 @@ export const CONTROL_MULTI_LINE = "px-2 py-1";
  * the Portal standard 2026-08-01): fully rounded, a little more breathing
  * room, same skin as every other control.
  */
-export function controlClass(error: boolean, shape: "single" | "multi" | "pill"): string {
+/**
+ * `toolbar` — a workspace toolbar control (Work, owner density ruling
+ * 2026-09-25): 36px from 960px, 40px below, 14/20 type, 12px sides.
+ */
+export const CONTROL_TOOLBAR = "h-10 min-[960px]:h-9 px-3 text-control";
+
+export function controlClass(error: boolean, shape: "single" | "multi" | "pill" | "toolbar"): string {
+  if (shape === "toolbar") {
+    return [
+      CONTROL_BASE.replace("text-body ", ""),
+      "rounded-control",
+      error ? CONTROL_BORDER.error : CONTROL_BORDER.rest,
+      CONTROL_TOOLBAR,
+    ].join(" ");
+  }
   return [
     CONTROL_BASE,
     shape === "pill" ? "rounded-full" : "rounded-control",

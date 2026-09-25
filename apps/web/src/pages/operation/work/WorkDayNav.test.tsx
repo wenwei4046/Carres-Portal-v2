@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { WorkDayStrip } from "./WorkDayNav";
+import { WorkDateSection } from "./WorkDayNav";
 import type { WorkRailDates } from "./work-model";
 
 const DATES: WorkRailDates = {
@@ -16,27 +16,22 @@ const DATES: WorkRailDates = {
   ],
 };
 
-describe("WorkDayStrip (below 768px)", () => {
-  it("offers the same Date options in one wrapping row, never a sideways scroller", () => {
+describe("WorkDateSection (rail column and the compact Date control)", () => {
+  it("offers Missed, the week's days and the week arrows as one section", () => {
     const pick = vi.fn();
     const week = vi.fn();
-    render(<WorkDayStrip dates={DATES} selected="2026-09-16" onSelect={pick} onWeek={week} />);
-    const nav = screen.getByRole("navigation", { name: "Date" });
-    for (const button of within(nav).getAllByRole("button").filter((b) => b.hasAttribute("aria-pressed"))) {
-      expect((button.parentElement as HTMLElement).className).toMatch(/flex-wrap/);
-    }
+    render(<WorkDateSection dates={DATES} selected="2026-09-16" onSelect={pick} onWeek={week} />);
+    const section = screen.getByRole("region", { name: "Date" });
     // An icon never carries a meaning alone: Missed is written beside its glyph.
-    expect(within(nav).getByRole("button", { name: "Missed · 3 actions" })).toHaveTextContent("Missed3");
-    expect(nav.innerHTML).not.toMatch(/overflow-x/);
-    expect(within(nav).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day · 4 actions" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(nav).getByRole("button", { name: "Thu, 17 Sep · Today · 1 action" }).querySelector("[data-today]")).not.toBeNull();
-    expect(within(nav).getByRole("button", { name: "Mon, 14 Sep" }).querySelector("[data-rail-count]")).toBeNull();
-    expect(within(nav).queryByRole("button", { name: /^No working date/ })).toBeNull();
-    expect(nav).toHaveTextContent("Wed, 16 Sep · Malaysia Day");
-    expect(nav).not.toHaveTextContent("Today");
-    fireEvent.click(within(nav).getByRole("button", { name: "Missed · 3 actions" }));
+    expect(within(section).getByRole("button", { name: "Missed · 3 actions" })).toHaveTextContent("Missed3");
+    expect(within(section).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day · 4 actions" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(section).getByRole("button", { name: "Thu, 17 Sep · Today · 1 action" }).querySelector("[data-today]")).not.toBeNull();
+    expect(within(section).getByRole("button", { name: "Mon, 14 Sep" }).querySelector("[data-rail-count]")).toBeNull();
+    expect(within(section).queryByRole("button", { name: /^No working date/ })).toBeNull();
+    expect(section).not.toHaveTextContent("Today");
+    fireEvent.click(within(section).getByRole("button", { name: "Missed · 3 actions" }));
     expect(pick).toHaveBeenCalledWith("missed");
-    fireEvent.click(within(nav).getByRole("button", { name: "Next week" }));
+    fireEvent.click(within(section).getByRole("button", { name: "Next week" }));
     expect(week).toHaveBeenCalledWith("2026-09-21");
   });
 });

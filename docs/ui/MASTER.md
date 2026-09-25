@@ -271,6 +271,12 @@ The maintained mission state above and these transitions are part of every Plan/
    concise Constitution starters; do not make Jess reconstruct lane law in a giant prompt.
 
 Plan Decision Persistence makes the authoritative MASTER—not chat length—the memory mechanism.
+
+For Workspace Work, the complete owner-approved right-panel composition, exact 72px party-card
+geometry, one-line concurrent Order Route, Customer/Supplier states, shared communication behaviour
+and responsive acceptance are governed by `workspace/MASTER.md` §5.10. UI work must preserve the
+deployed §5.5 left/middle density and §5.9 Logistics behaviour; existing Customer/Supplier shells are
+implementation evidence, not proof that the approved target is complete.
 PLAN mode blocks application implementation but requires governing-document updates for approved
 truth. Once an approved READY scope is handed to BUILD/DELIVERY mode, §1.1 and the Constitution's
 Engineer-Owned Delivery law apply: engineering chooses its own compliant execution method and owns
@@ -867,6 +873,10 @@ developer who knows the schema is not the acceptance reader; a new operator is.
      scheduled job or database automation acted — never inferred from a missing id.
   5. An old record whose individual actor cannot be recovered — including one written by a
      shared role login — says **`Staff identity not recorded`**. A person is never invented.
+  6. **The one COMPANY actor — owner ruling 2026-09-24.** A logistics company with no portal
+     login that answers through its external link (Delivery §5.5) is recorded and displayed as
+     **`{company} via external link`** (`AL Logistics via external link · Wed, 16 Sep`). It is an
+     organisation, never a person, and no screen may print a person's name for it.
 - A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
   `Original order`; a later approved/applied Revision names the governed change. Selecting a
   Revision opens the complete read-only version and its document truth.

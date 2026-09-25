@@ -1079,6 +1079,16 @@ hold both NETS Warehouse and NETS Delivery roles, but every event records the ro
 act. Shared login, shared avatar and impersonation are forbidden. Removing or expiring one person
 stops future access without erasing their historical evidence.
 
+**The one company-level exception — owner ruling 2026-09-24 (Delivery §5.5, 0581).** A logistics
+company with NO portal login answers ONE delivery through its external link: the actor recorded is
+the company (`{company} via external link`), never a person, and the link can only save a scheduled
+date, ask for another date or report Cannot deliver. It moves no Unit and records no receipt,
+collection or handover. **APPROVED TARGET / NOT BUILT — `Collected from supplier`:** for the
+`Pickup from supplier` route (no GRN), a governed custody event names the PO/source lines, supplier,
+logistics company, collection date and time, quantity, the Supplier DO or collection evidence, the
+recorded source and actor; from it the logistics company holds the goods. It is not a receipt and
+not proof the customer received anything (Workspace §5.9 gaps).
+
 Optional partner APIs may **propose** receipt, collection, arrival, return and proof events. Before
 acceptance, Portal validates the partner organisation, individual operator, active role, permitted
 Site/journey, source document, exact Unit ID, event order, duplicate submission, actual time,

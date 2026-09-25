@@ -348,6 +348,21 @@ from Warehouse authority. An external destination does not create Carres Stock m
 can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
 exist, a new destination may not silently invent who receives or what Stock consequence follows.
 
+**The destination decides the customer delivery's stock route — owner ruling 2026-09-24
+(Workspace §5.9).** A destination resolving to an own Site is `Pickup from Carres Klang Warehouse`;
+one resolving to a partner Site (AL Sungai Buloh, HOUZS) is `Supplier sends directly to logistics`;
+one with no Site (Ohana) is the separate supplier-to-customer flow. `Pickup from supplier` (the
+logistics company collects at the factory; no GRN) needs a Purchasing fact that does not exist yet
+and a Stock `Collected from supplier` custody event — **APPROVED TARGET / NOT BUILT**. Work and
+Delivery only READ the route; changing it stays a Purchasing edit (a new PO version once sent).
+
+**Work Supplier card and Route (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10)** read, per
+PO serving one Sales Order: issued or not, the immutable `PO Delivery Date`, the latest supplier
+reply (word, reason, evidence) and `effectiveArrivalOf`, the PO's Supplier DO (`do_number`,
+`do_uploaded_at`), Deliver To and the Warehouse's GRN date — through
+`GET /api/operation/pos/for-order/:orderId`. Nothing is written from Work; recording a supplier
+answer stays `Open {PO No}` until the reply rule is admitted as an embedded action.
+
 **ONE PO MAY CARRY SEVERAL DELIVER TO — owner ruling (Jess, 2026-09-22).** A sofa PO is always one
 Deliver To. A mattress or bedframe PO may send its goods to one or several governed Deliver To
 destinations; each goods line names its own (a null line follows the PO default). Moving goods to

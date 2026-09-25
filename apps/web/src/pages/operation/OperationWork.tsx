@@ -23,16 +23,16 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Lock } from "lucide-react";
 import { orderActionLines, workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
-import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
+import Icon from "@/components/kit/Icon";
+import { TopBarIcons } from "./components/GlobalTopBar";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 import {
   filterWork,
@@ -49,17 +49,14 @@ import {
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkRail, { WorkDateSection, WorkDayStrip, WorkModuleSection } from "./work/WorkDayNav";
+import WorkParties from "./work/WorkParties";
+import WorkRail, { WorkDateSection, WorkModuleSection } from "./work/WorkDayNav";
+import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
 
 type ViewKey = "mine" | "team";
 
-const TONE_DOT: Record<string, string> = {
-  danger: "bg-danger",
-  warning: "bg-warning",
-  info: "bg-info",
-  success: "bg-success",
-  neutral: "bg-base-300",
-};
+/** Cards drawn per step once a list passes 50 (card kit §List states). */
+const CARD_STEP = 50;
 
 const MODULE_LABEL: Record<OperationWorkModule, string> = {
   orders: "Sales Orders",
@@ -69,16 +66,6 @@ const MODULE_LABEL: Record<OperationWorkModule, string> = {
   payment: "Payment",
   issue_tracker: "Issue Tracker",
 };
-
-/** Timing is metadata. Object, problem, and action keep their own ranks. */
-function supportingLine(i: WorkRow): string {
-  // A missed age the server could not count (an owner calendar is not set up)
-  // is never printed as `0` — MASTER §5.4 forbids inventing missed age.
-  if (i.timingBucket === "overdue" && i.dueIso && i.source.timing.missedAge.state === "counted") {
-    return `Required ${fmtDate(i.dueIso)} · ${i.workingDaysLate} working ${i.workingDaysLate === 1 ? "day" : "days"} missed`;
-  }
-  return i.dueIso ? `Required ${fmtDate(i.dueIso)}` : "No working date";
-}
 
 /**
  * ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
@@ -101,68 +88,6 @@ function ownerGroupKey(i: WorkRow): string {
     (i.ownerName ? `person:${i.ownerName}` : `duty:${i.ownerDuty ?? "No owner yet"}`);
 }
 
-function WorkRowButton({
-  item,
-  onOpen,
-  scope,
-  selected,
-}: {
-  item: WorkRow;
-  onOpen: (i: WorkRow) => void;
-  scope: ViewKey;
-  selected: boolean;
-}) {
-  const delivery = deliveryLines(item);
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      data-testid={`work-row-${item.soRef}-${item.ruleKey}`}
-      onClick={() => onOpen(item)}
-      className={`w-full flex items-start gap-3 px-4 py-3 text-left ${selected ? "bg-kit-blue-3 shadow-[inset_2px_0_0_var(--blue-9)]" : "hover:bg-base-50"}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`h-2 w-2 rounded-full shrink-0 ${TONE_DOT[item.broken ? "danger" : item.tone] ?? "bg-base-300"}`}
-      />
-      <span className="flex-1 min-w-0">
-        <span className="block text-label font-semibold text-base-500">
-          {item.soRef} · {MODULE_LABEL[item.module]}
-        </span>
-        <span className={`${cjkClassName(item.problem)} block text-body font-semibold text-base-900`}>
-          {item.problem}
-        </span>
-        <span className={`${cjkClassName(item.action)} block text-body text-base-700`}>
-          {item.locked && (
-            <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
-          )}
-          {delivery?.act ?? item.action}{item.recipient ? ` · ${item.recipient}` : ""}
-        </span>
-        {item.requiredResult ? (
-          <span
-            className="block text-body text-base-600"
-            data-testid="work-row-result"
-          >
-            {delivery?.result ?? item.requiredResult}
-          </span>
-        ) : null}
-        <span
-          className={`block text-label font-normal ${
-            item.timingBucket === "overdue" ? "text-danger" : "text-base-600"
-          }`}
-        >
-          {supportingLine(item)}
-          {item.ownerState === "covered" && item.activeCover
-            ? scope === "mine"
-              ? ` · Covered for ${item.normalOwner?.name ?? "normal owner"}`
-              : ` · Covered by ${item.activeCover.name ?? "cover"}`
-            : ""}
-        </span>
-      </span>
-    </button>
-  );
-}
-
 export default function OperationWork() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -171,13 +96,19 @@ export default function OperationWork() {
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
+  /** 960–1279px: the rail is collapsed until the toolbar's `Filters` opens it. */
+  const [railOpen, setRailOpen] = useState(false);
+  /** Below 960px: which compact filter control is open. */
+  const [compact, setCompact] = useState<"date" | "module" | null>(null);
 
-  // The Work AREA decides the panels, not the window: with the portal sidebar
-  // open a 1280px window leaves ~950px, which cannot hold 1100px of panels.
-  // A width of 0 means the area is not laid out yet — the window is the only
-  // honest estimate until it is.
+  // The PAGE decides the panels, not the window: with the portal sidebar open
+  // a 1440px window leaves ~1200px of page. The page is this page's own
+  // full-width frame (canvas padding included), so the owner's breakpoints
+  // (1280 · 960) read exactly as written when no sidebar is drawn. A width of
+  // 0 means the page is not laid out yet — the window is the only honest
+  // estimate until it is.
   useLayoutEffect(() => {
-    const area = workAreaRef.current;
+    const area = workAreaRef.current?.closest<HTMLElement>("[data-testid='operation-work']") ?? workAreaRef.current;
     if (!area) return;
     const measure = () => {
       const width = area.getBoundingClientRect().width;
@@ -194,7 +125,7 @@ export default function OperationWork() {
   }, []);
 
   // One identity, shared with the Right Rail (HF-3): the signed-in account id.
-  const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, retry } = useOpenWorkSet();
+  const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, refreshFailed, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -372,270 +303,402 @@ export default function OperationWork() {
   const selectedId = params.get("selected");
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   const visibleIds = new Set(visible.map((item) => item.id));
-  const displayMyGroups = workSections(visible);
+  // The date rail and its badge already say when; the list is one ordered run.
+  const myItems = workSections(visible).flatMap((section) => section.items);
   const displayTeamGroups = visibleTeamGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
   const openRow = (i: WorkRow) => {
     updateParam("selected", i.id);
-    if (layout !== "three") setActivePanel("detail");
+    if (layout === "one") setActivePanel("detail");
   };
+
+  /* Card kit §List states: past 50 cards the list draws 50 more each time its
+     end scrolls into view, in the same order, so keyboard order never jumps.
+     A new selection of filters starts again at 50. */
+  const [cardLimit, setCardLimit] = useState(CARD_STEP);
+  // Choosing a card is not a new selection of filters: `selected` never resets.
+  const listKey = [...params.entries()].filter(([key]) => key !== "selected").map(([k, v]) => `${k}=${v}`).join("&");
+  useEffect(() => setCardLimit(CARD_STEP), [listKey]);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const listTotal = activeView === "mine" ? myItems.length : displayTeamGroups.reduce((n, g) => n + g.items.length, 0);
+  const hasMore = listTotal > cardLimit;
+  useEffect(() => {
+    const sentinel = moreRef.current;
+    if (!sentinel || !hasMore) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setCardLimit(Number.POSITIVE_INFINITY);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setCardLimit((limit) => limit + CARD_STEP);
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, cardLimit]);
+  let teamBudget = cardLimit;
+  const shownTeamGroups = displayTeamGroups.flatMap((g) => {
+    if (teamBudget <= 0) return [];
+    const items = g.items.slice(0, teamBudget);
+    teamBudget -= items.length;
+    return [{ ...g, items }];
+  });
+
+  const listTab: WorkListTab = params.get("list") === "waiting" || params.get("list") === "completed"
+    ? params.get("list") as WorkListTab
+    : "todo";
+  /** The heading names the chosen Date — the same words as the rail. */
+  const listHeading = selectedDay === "missed"
+    ? "Missed"
+    : selectedDay === "no_date"
+      ? "No working date"
+      : isWorkDate(selectedDay)
+        ? fmtDate(selectedDay)
+        : "Work";
+  const moduleWord = moduleFilter === "all" ? "All modules" : MODULE_LABEL[moduleFilter];
+
+  const card = (i: WorkRow) => (
+    <WorkCard
+      cover={i.ownerState === "covered" && i.activeCover
+        ? activeView === "mine"
+          ? `Covered for ${i.normalOwner?.name ?? "normal owner"}`
+          : `Covered by ${i.activeCover.name ?? "cover"}`
+        : null}
+      key={`${i.orderId}:${i.ruleKey}`}
+      item={i}
+      moduleLabel={MODULE_LABEL[i.module]}
+      action={`${deliveryLines(i)?.act ?? i.action}`}
+      today={generatedOn}
+      selected={layout !== "one" && selected?.id === i.id}
+      onSelect={() => openRow(i)}
+      onOpenRecord={() => navigate(i.destination)}
+    />
+  );
+
+  const dateSection = railDates ? (
+    <WorkDateSection
+      dates={railDates}
+      selected={railSelected}
+      onSelect={(key) => {
+        updateParam("day", key);
+        setCompact(null);
+      }}
+      onWeek={(monday) => updateParam("week", monday)}
+    />
+  ) : null;
+  const moduleSection = (
+    <WorkModuleSection
+      modules={railModules}
+      counts={moduleCounts}
+      total={moduleCountRows.length}
+      selected={moduleFilter}
+      onSelect={(module) => {
+        updateParam("module", module);
+        setCompact(null);
+      }}
+    />
+  );
+
+  /* One toolbar control: 36px from 960px, 40px below; 14/20; 12px sides. */
+  const toolbarRow = layout === "one" ? "flex flex-wrap items-center gap-2" : "contents";
+  const toolbarButton = (active: boolean) =>
+    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[960px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
+
+  const listBody = listTab !== "todo" ? (
+    <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
+      {listTab === "waiting" ? "No work waiting for this selection." : "No work completed for this selection."}
+    </p>
+  ) : loading ? (
+    <WorkCardSkeleton />
+  ) : error && !refreshFailed ? (
+    <div className="rounded-work border border-work-line bg-white px-4 py-3" data-testid="work-error">
+      <p className="text-body text-danger">Work could not be loaded. Try again.</p>
+      <button type="button" onClick={retry} className="mt-2 rounded-control border border-kit-slate-4 bg-white px-3 py-1.5 text-body text-kit-slate-12">
+        Try again
+      </button>
+    </div>
+  ) : activeView === "mine" ? (
+    myItems.length === 0 ? emptyBody : (
+      <div className="flex flex-col gap-2" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
+    )
+  ) : displayTeamGroups.length === 0 ? (
+    emptyBody
+  ) : (
+    <div className="flex flex-col gap-4">
+      {shownTeamGroups.map((g) => (
+        <section key={g.key} className="flex flex-col gap-2" data-testid={`work-owner-group-${g.key}`}>
+          <h3 className="flex h-8 min-w-0 items-center gap-2 whitespace-nowrap" data-testid={`work-owner-heading-${g.key}`}>
+            {g.person ? (
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold leading-4"
+                style={{
+                  /* Stable per-person colour — the account id where one
+                     exists, else the group key (a salesperson has no ops
+                     account; the hash only needs a stable string). */
+                  backgroundColor: avatarColor(g.userId ?? g.key).bg,
+                  color: avatarColor(g.userId ?? g.key).fg,
+                }}
+              >
+                {personInitials(g.name, "")}
+              </span>
+            ) : null}
+            <span className="min-w-0 truncate text-[15px] font-semibold leading-5 text-kit-slate-12">{g.name}</span>
+            <span className="shrink-0 text-[12px] font-normal leading-4 text-kit-slate-11">
+              {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
+              {g.late > 0 && <span className="font-medium text-danger"> · {g.late} missed</span>}
+            </span>
+            {g.coverName && (
+              <span className="min-w-0 truncate text-[12px] font-normal leading-4 text-kit-amber-11">
+                Cover today: {g.coverName}
+              </span>
+            )}
+          </h3>
+          {g.dutyKey && (
+            // The governed configuration failure with its ONE door
+            // (workspace/MASTER §4 · Delivery MASTER §13.1): never a
+            // fallback person, never a Work-local assignment control.
+            <p className="text-label text-kit-slate-11" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
+              Nobody holds {g.name}.{" "}
+              <Link className="text-kit-blue-11 underline" to="/operation?tab=staff-duties">
+                Set the holder in Workspace → Staff &amp; Duties
+              </Link>
+            </p>
+          )}
+          {g.items.map(card)}
+        </section>
+      ))}
+    </div>
+  );
 
   return (
     <ListPageShell
       title="Work"
       testId="operation-work"
+      workspace
+      actions={<TopBarIcons />}
       titleRight={
         // Every count says WHAT it counts (card §7 — supersedes `open · overdue`).
-        <span className="text-label text-base-400">
+        <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[960px]:text-[13px] min-[960px]:leading-[18px]" data-testid="work-header-count">
           {visible.length} action{visible.length === 1 ? "" : "s"} to do
           {lateCount > 0 ? ` · ${lateCount} missed` : ""}
         </span>
       }
-      toolbar={
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="inline-flex rounded-md border border-base-200 overflow-hidden">
-            {(
-              [
-                ["mine", "My Work"],
-                ["team", "Team Work"],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                data-testid={`work-view-${k}`}
-                aria-pressed={activeView === k}
-                onClick={() => {
-                  setParams((before) => {
-                    const next = new URLSearchParams(before);
-                    if (k === "mine") {
-                      next.delete("scope");
-                      next.delete("owner");
-                    } else next.set("scope", "team");
-                    return next;
-                  }, { replace: true });
-                }}
-                className={`px-3 py-1.5 text-body ${
-                  activeView === k
-                    ? "bg-base-900 text-white font-semibold"
-                    : "bg-white text-base-600 hover:bg-base-50"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {activeView === "team" && ownerFocus && (
-            <button
-              type="button"
-              data-testid="work-owner-clear"
-              onClick={() => updateParam("owner", null)}
-              className="px-2 py-1 rounded-full text-label border border-base-900 bg-base-900 text-white"
-            >
-              {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
-              · Clear
-            </button>
-          )}
-          <SearchInput
-            id="work-search"
-            value={search}
-            onChange={(event) => updateParam("q", event.target.value)}
-            placeholder="Search work…"
-          />
-          {activeView === "team" && (
-            <Select
-              id="work-owner"
-              value={ownerFocus ?? "all"}
-              onValueChange={(value) => updateParam("owner", value)}
-              options={ownerOptions}
-            />
-          )}
-          <Select
-            id="work-module"
-            value={moduleFilter}
-            onValueChange={(value) => updateParam("module", value)}
-            options={[
-              { value: "all", label: "All modules" },
-              { value: "orders", label: "Sales Orders" },
-              { value: "purchasing", label: "Purchasing" },
-              { value: "receiving", label: "Receiving" },
-              { value: "delivery", label: "Delivery" },
-              { value: "payment", label: "Payment" },
-              { value: "issue_tracker", label: "Issue Tracker" },
-            ]}
-          />
-          <button
-            type="button"
-            aria-pressed={covered}
-            onClick={() => updateParam("covered", covered ? null : "1")}
-            className={`px-3 py-1.5 rounded-md border text-body ${covered ? "border-base-900 bg-base-900 text-white" : "border-base-200 bg-white text-base-600"}`}
-          >
-            Covered
-          </button>
-          {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
-            <button
-              type="button"
-              onClick={() => setParams((before) => {
-                const next = new URLSearchParams(before);
-                for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
-                return next;
-              }, { replace: true })}
-              className="px-2 py-1.5 text-body text-kit-blue-11"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-      }
     >
-      <div ref={workAreaRef} data-testid="work-area" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <WorkSplitShell
-        layout={layout}
-        activePanel={activePanel}
-        rail={railDates ? (
-          <WorkRail>
-            <WorkDateSection
-              dates={railDates}
-              selected={railSelected}
-              onSelect={(key) => updateParam("day", key)}
-              onWeek={(monday) => updateParam("week", monday)}
-            />
-            <WorkModuleSection
-              modules={railModules}
-              counts={moduleCounts}
-              total={moduleCountRows.length}
-              selected={moduleFilter}
-              onSelect={(module) => updateParam("module", module)}
-            />
-          </WorkRail>
-        ) : null}
-        list={(<div className="h-full overflow-y-auto" data-testid="work-list">
-        {layout === "one" && railDates ? (
-          <WorkDayStrip
-            dates={railDates}
-            selected={railSelected}
-            onSelect={(key) => updateParam("day", key)}
-            onWeek={(monday) => updateParam("week", monday)}
-          />
-        ) : null}
-        <div className="px-4 py-3">
-        {!loading && !error && unhealthySources.length > 0 ? (
-          <div className="mb-3 border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
-            {unhealthySources.map((source) => (
-              <p key={source.key}>
-                Could not refresh {MODULE_LABEL[source.key]}
-                {source.lastSuccessfulAt
-                  ? ` · Last updated ${fmtDate(source.lastSuccessfulAt) === fmtDate(generatedOn)
-                    ? fmtDate(source.lastSuccessfulAt, { timeOnly: true })
-                    : fmtDate(source.lastSuccessfulAt, { time: true })}`
-                  : ""}
-              </p>
-            ))}
+      <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+        {/* The toolbar: ONE independent white section (owner density ruling
+            2026-09-25). Below 960px it is exactly two rows — Date · Module ·
+            My/Team, then Search · Owner · Covered — and below 600px four:
+            Date · Module / My/Team / Search / Owner · Covered. */}
+        <WorkSection aria-label="Work toolbar" className={`flex shrink-0 gap-2 p-2.5 min-[600px]:p-3 ${layout === "one" ? "flex-col" : "flex-wrap items-center"}`} data-testid="work-toolbar">
+          <div className={toolbarRow} data-testid="work-toolbar-row-1">
+            {layout === "two" ? (
+              <button
+                type="button"
+                aria-expanded={railOpen}
+                aria-controls="work-filters"
+                data-testid="work-filters-toggle"
+                onClick={() => setRailOpen((open) => !open)}
+                className={toolbarButton(railOpen)}
+              >
+                <Icon name="panelToggle" />
+                Filters
+              </button>
+            ) : null}
+            {layout === "one" ? (
+              <>
+                <button
+                  type="button"
+                  aria-expanded={compact === "date"}
+                  data-testid="work-compact-date"
+                  onClick={() => setCompact((open) => (open === "date" ? null : "date"))}
+                  className={toolbarButton(compact === "date")}
+                >
+                  <Icon name="date" />
+                  {listHeading}
+                </button>
+                <button
+                  type="button"
+                  aria-expanded={compact === "module"}
+                  data-testid="work-compact-module"
+                  onClick={() => setCompact((open) => (open === "module" ? null : "module"))}
+                  className={toolbarButton(compact === "module")}
+                >
+                  <Icon name="modules" />
+                  {moduleWord}
+                </button>
+              </>
+            ) : null}
+            {/* The border is inside the 36px (40px): each segment is 34px (38px). */}
+            <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
+              {(
+                [
+                  ["mine", "My Work"],
+                  ["team", "Team Work"],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  data-testid={`work-view-${k}`}
+                  aria-pressed={activeView === k}
+                  onClick={() => {
+                    setParams((before) => {
+                      const next = new URLSearchParams(before);
+                      if (k === "mine") {
+                        next.delete("scope");
+                        next.delete("owner");
+                      } else next.set("scope", "team");
+                      return next;
+                    }, { replace: true });
+                  }}
+                  className={`h-[38px] px-3 text-control min-[960px]:h-[34px] max-[599px]:flex-1 ${
+                    activeView === k
+                      ? "bg-kit-slate-12 font-semibold text-white"
+                      : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : null}
-        {loading ? (
-          <div className="space-y-3 py-2" aria-label="Loading work" data-testid="work-loading">
-            {[0, 1, 2].map((index) => (
-              <div key={index} className="rounded-md border border-base-200 bg-white px-4 py-3 animate-pulse">
-                <div className="h-3 w-24 rounded bg-base-100" />
-                <div className="mt-2 h-4 w-56 max-w-full rounded bg-base-100" />
-                <div className="mt-2 h-3 w-80 max-w-full rounded bg-base-100" />
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="py-8" data-testid="work-error">
-            <p className="text-body text-danger">Work could not be loaded. Try again.</p>
-            <button type="button" onClick={retry} className="mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700">
-              Try again
+          <div className={toolbarRow} data-testid="work-toolbar-row-2">
+            <div className={layout === "one" ? "min-w-[160px] flex-1 max-[599px]:basis-full" : "w-60 shrink-0"}>
+              <SearchInput
+                toolbar
+                id="work-search"
+                value={search}
+                onChange={(event) => updateParam("q", event.target.value)}
+                placeholder="Search work…"
+              />
+            </div>
+            {activeView === "team" && (
+              <Select
+                id="work-owner"
+                value={ownerFocus ?? "all"}
+                onValueChange={(value) => updateParam("owner", value)}
+                options={ownerOptions}
+                toolbar
+              />
+            )}
+            <button
+              type="button"
+              aria-pressed={covered}
+              onClick={() => updateParam("covered", covered ? null : "1")}
+              className={toolbarButton(covered)}
+            >
+              Covered
             </button>
+            {activeView === "team" && ownerFocus && (
+              <button
+                type="button"
+                data-testid="work-owner-clear"
+                onClick={() => updateParam("owner", null)}
+                className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
+              >
+                {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
+                · Clear
+              </button>
+            )}
+            {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
+              <button
+                type="button"
+                onClick={() => setParams((before) => {
+                  const next = new URLSearchParams(before);
+                  for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
+                  return next;
+                }, { replace: true })}
+                className="h-10 px-2 text-control text-kit-blue-11 min-[960px]:h-9"
+              >
+                Clear all
+              </button>
+            )}
           </div>
-        ) : activeView === "mine" ? (
-          displayMyGroups.length === 0 ? (
-            emptyBody
-          ) : (
-            displayMyGroups.map((g) => (
-              <section key={g.key} className="mb-5" data-testid={`work-section-${g.key}`}>
-                <h2 className="text-label font-semibold text-base-500 uppercase tracking-wide mb-1.5">
-                  {g.label}
-                  <span className="ml-2 font-normal normal-case text-base-400">
-                    {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
-                    {g.items.filter((item) => item.timingBucket === "overdue").length > 0 && <span className="text-danger"> · {g.items.filter((item) => item.timingBucket === "overdue").length} missed</span>}
+        </WorkSection>
+
+        {/* Below 960px the chosen compact control opens its section here. */}
+        {layout === "one" && compact ? (
+          <div className="shrink-0" data-testid={`work-compact-${compact}-panel`}>
+            {compact === "date" ? dateSection : moduleSection}
+          </div>
+        ) : null}
+
+        <WorkSplitShell
+          layout={layout}
+          activePanel={activePanel}
+          railOpen={railOpen}
+          rail={(
+            <div id="work-filters">
+              <WorkRail>
+                {dateSection}
+                {moduleSection}
+              </WorkRail>
+            </div>
+          )}
+          list={(
+            <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
+              {/* The heading and tabs stay put; the cards scroll beneath them. */}
+              <div className="shrink-0">
+                <h2 className="mb-2 flex min-h-6 flex-wrap items-baseline gap-x-1.5 text-[16px] font-semibold leading-[22px] text-work-ink" data-testid="work-list-heading">
+                  {listHeading}
+                  <span className="text-[13px] font-medium leading-[18px] text-work-muted">
+                    {visible.length} action{visible.length === 1 ? "" : "s"} to do
                   </span>
                 </h2>
-                <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
-                  {g.items.map((i) => (
-                    <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i as WorkRow} onOpen={openRow} scope="mine" selected={selected?.id === i.id} />
+                <WorkListTabs
+                  value={listTab}
+                  counts={{ todo: visible.length }}
+                  onChange={(tab) => updateParam("list", tab === "todo" ? null : tab)}
+                />
+              </div>
+              {!loading && !error && unhealthySources.length > 0 ? (
+                <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
+                  {unhealthySources.map((source) => (
+                    <p key={source.key}>
+                      Could not refresh {MODULE_LABEL[source.key]}
+                      {source.lastSuccessfulAt
+                        ? ` · Last updated ${fmtDate(source.lastSuccessfulAt) === fmtDate(generatedOn)
+                          ? fmtDate(source.lastSuccessfulAt, { timeOnly: true })
+                          : fmtDate(source.lastSuccessfulAt, { time: true })}`
+                        : ""}
+                    </p>
                   ))}
                 </div>
-              </section>
-            ))
-          )
-        ) : displayTeamGroups.length === 0 ? (
-          emptyBody
-        ) : (
-          displayTeamGroups.map((g) => (
-            <section key={g.key} className="mb-5" data-testid={`work-owner-group-${g.key}`}>
-              <h2 className="flex items-center gap-2 mb-1.5">
-                {g.person ? (
-                  <span
-                    aria-hidden="true"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-                    style={{
-                      /* Stable per-person colour — the account id where one
-                         exists, else the group key (a salesperson has no ops
-                         account; the hash only needs a stable string). */
-                      backgroundColor: avatarColor(g.userId ?? g.key).bg,
-                      color: avatarColor(g.userId ?? g.key).fg,
-                    }}
-                  >
-                    {personInitials(g.name, "")}
-                  </span>
-                ) : null}
-                <span className="text-body font-semibold text-base-900">{g.name}</span>
-                <span className="text-label font-normal text-base-400">
-                  {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
-                  {g.late > 0 && <span className="text-danger"> · {g.late} missed</span>}
-                </span>
-                {g.coverName && (
-                  <span className="text-label font-normal text-kit-amber-11">
-                    Cover today: {g.coverName}
-                  </span>
-                )}
-              </h2>
-              {g.dutyKey && (
-                // The governed configuration failure with its ONE door
-                // (workspace/MASTER §4 · Delivery MASTER §13.1): never a
-                // fallback person, never a Work-local assignment control.
-                <p className="mb-1.5 text-label text-base-500" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
-                  Nobody holds {g.name}.{" "}
-                  <Link className="text-kit-blue-11 underline" to="/operation?tab=staff-duties">
-                    Set the holder in Workspace → Staff &amp; Duties
-                  </Link>
-                </p>
-              )}
-              <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
-                {g.items.map((i) => (
-                  <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} scope="team" selected={selected?.id === i.id} />
-                ))}
+              ) : null}
+              {refreshFailed ? (
+                // A failed refresh keeps the last good list and the filters;
+                // only this row says so (card kit §List states).
+                <div className="mt-3 flex shrink-0 items-center gap-3 rounded-work border border-work-line bg-white px-3 py-2" role="status" data-testid="work-refresh-failed">
+                  <p className="min-w-0 flex-1 text-body text-danger">Work could not be loaded. Try again.</p>
+                  <button type="button" onClick={retry} className="h-8 shrink-0 rounded-control border border-kit-slate-4 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3">
+                    Try again
+                  </button>
+                </div>
+              ) : null}
+              <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
+                <div key={listTab} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
+                  {listBody}
+                </div>
+                {hasMore && listTab === "todo" ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
               </div>
-            </section>
-          ))
-        )}
-        </div>
-        </div>)}
-        detail={selected ? (
-          <div>
-            {layout !== "three" ? (
-              <button type="button" className="min-h-10 px-4 text-body text-kit-blue-11" onClick={() => setActivePanel("list")}>Back to work</button>
-            ) : null}
-            <WorkActionPanel item={selected.source} onOpen={() => navigate(selected.destination)} />
-          </div>
-        ) : (
-          <div className="p-6 text-body text-kit-slate-11">Select work to see what to do.</div>
-        )}
-      />
+            </div>
+          )}
+          detail={selected ? (
+            <>
+              {layout === "one" ? (
+                <button type="button" className="inline-flex h-10 shrink-0 items-center gap-1.5 self-start text-body text-kit-blue-11" data-testid="work-back" onClick={() => setActivePanel("list")}>
+                  <Icon name="back" />
+                  Back to work
+                </button>
+              ) : null}
+              <WorkActionPanel item={selected.source} onOpen={() => navigate(selected.destination)} />
+              <WorkParties item={selected.source} />
+            </>
+          ) : (
+            <WorkSection className="shrink-0 p-6 text-body text-kit-slate-11">Select work to see what to do.</WorkSection>
+          )}
+        />
       </div>
     </ListPageShell>
   );

@@ -346,8 +346,8 @@ describe("the DELIVERY ORDER gate", () => {
     expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "1 of 5 requirements met"]);
     expect(gate.requirements.map((r) => r.text)).toEqual([
       "Goods not ready (1 of 3)",
-      "No logistics chosen",
-      "Date + slot not confirmed",
+      "Logistics not assigned",
+      "Scheduled delivery not recorded",
       "RM 1,249.00 still outstanding — collect, or request a payment approval",
       "No Finance hold",
     ]);

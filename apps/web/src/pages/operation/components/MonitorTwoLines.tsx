@@ -86,10 +86,11 @@ export function joinLines(a: string, b: string | null | undefined): string {
 }
 
 /**
- * ⭐ `Confirmed Delivery` (COPY-STANDARD, Delivery Monitor words): `Confirmed`
- * over the day and window once BOTH are agreed; `Not confirmed` over
- * `{day} · No time agreed` when only the day is; `Not confirmed` and NOTHING
- * beneath while no day is agreed. The one spelling for both Monitors.
+ * ⭐ `Scheduled delivery` (owner ruling 2026-09-24 — overwrites `Confirmed
+ * Delivery`): `Scheduled` over the day, and the time ONLY when one was
+ * recorded — time is optional and its absence is not an exception, so no
+ * `No time agreed` line exists. `Not scheduled` and NOTHING beneath while no
+ * day is recorded. The one spelling for both Monitors.
  */
 export function confirmedDeliveryLines(c: { dateIso: string | null; time: string | null }): {
   line1: string;
@@ -97,14 +98,11 @@ export function confirmedDeliveryLines(c: { dateIso: string | null; time: string
   line2: string | null;
   line2Tone: "none" | "orange" | "red";
 } {
-  if (c.dateIso && c.time) {
-    return { line1: MONITOR_COPY.confirmed, tone: "green", line2: `${fmtDate(c.dateIso)} · ${c.time}`, line2Tone: "none" };
-  }
   if (c.dateIso) {
     return {
-      line1: MONITOR_COPY.notConfirmed,
-      tone: "orange",
-      line2: `${fmtDate(c.dateIso)} · ${MONITOR_COPY.noTimeAgreed}`,
+      line1: MONITOR_COPY.confirmed,
+      tone: "green",
+      line2: c.time ? `${fmtDate(c.dateIso)} · ${c.time}` : fmtDate(c.dateIso),
       line2Tone: "none",
     };
   }

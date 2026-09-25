@@ -80,13 +80,13 @@ describe("order action words — the row line", () => {
     expect(orderActionLine("confirm_delivery_date", { logistics: "NETS" })).toBe("Call NETS");
     expect(orderActionLines("confirm_delivery_date", { logistics: "NETS" })).toEqual({
       act: "Call NETS",
-      result: "Confirm the delivery date",
+      result: "Get the scheduled delivery date",
     });
-    /* The DAY is agreed and only the window is missing (owner ruling
-       2026-09-12): line two asks for the time, never re-asks the date. */
+    /* The time is optional (owner ruling 2026-09-24): a row never asks for a
+       time on its own, whatever the day. */
     expect(orderActionLines("confirm_delivery_date", { logistics: "NETS", dayAgreed: true })).toEqual({
       act: "Call NETS",
-      result: "Confirm the delivery time",
+      result: "Get the scheduled delivery date",
     });
     expect(orderActionLines("arrange_new_delivery_date", { logistics: "NETS" })).toEqual({
       act: "Call NETS",
