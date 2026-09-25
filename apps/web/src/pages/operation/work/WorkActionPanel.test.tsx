@@ -77,4 +77,9 @@ describe("WorkActionPanel", () => {
     render(<WorkActionPanel hasParties item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
     expect(screen.queryByTestId("work-detail-result")).not.toBeInTheDocument();
   });
+
+  it("says the party once", () => {
+    render(<WorkActionPanel item={{ ...base, action: "Call AL Logistics", recipient: "AL Logistics", interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
+    expect(screen.getByTestId("work-detail-action")).toHaveTextContent(/^Call AL Logistics$/);
+  });
 });
