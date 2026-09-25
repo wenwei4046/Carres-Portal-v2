@@ -1022,10 +1022,10 @@ precedence:
 | 2 | `Customer refused delivery` | red |
 | 3 | `Phone number is wrong` | amber |
 | 4 | `Customer requested another date · {date}` | amber |
-| 5 | `No answer · Follow up today` (the follow-up day has come) | amber |
-| 6 | `Waiting for customer · reply due {date}` | grey |
-| 7 | `Contact missed {date}` | red |
-| 8 | `Scheduled {date}` · plus `· Contact due today` when the check is still open | neutral / blue |
+| 5 | `Contact missed {date}` (a missed deadline outranks waiting — Waiting never hides it) | red |
+| 6 | `No answer · Follow up today` (the follow-up day has come) | amber |
+| 7 | `Waiting for customer · reply due {date}` | grey |
+| 8 | `Scheduled {date}`, plus `· Contact due today` in operation mode while the customer has not been contacted and the check is today — only the `Contact due today` fragment is blue; the date stays neutral | neutral (+ blue fragment) |
 | 9 | `Contact due today` · `Contact due {date}` | blue / grey |
 | 10 | `{company} contacts the customer · by {date}` (partner mode, nothing for Carres) | grey |
 
@@ -1144,9 +1144,9 @@ row and secondary actions share the next; the route stays one line; no page-leve
 | Refresh failed | the last good mission stays · `Some information could not be refreshed.` · `Try again` |
 | No selection | `Select a work item` · `Choose an item from the Work list to see its mission.` — no empty route or cards |
 | Sales Order unreadable | `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` · `Try again` |
-| Party empty | `Logistics not assigned` + `Assign logistics` · `Customer contact unavailable` + `Open Sales Order` · `No purchase order for this Sales Order` + `Open Purchasing` |
+| Party empty | `Logistics not assigned` + `Assign logistics` · `Customer contact unavailable` + `Open Sales Order` (the owner's "customer record" — the customer's contact facts live on the Sales Order) · `No purchase order for this Sales Order` + `Open Purchasing` |
 | Partial | only the missing part is named (`Scheduled delivery unavailable`); every other fact still shows |
-| Permission | `You do not have access to this work` — no customer, supplier or money fact leaks |
+| Permission | ⭐ `You cannot view this record` · ⭐ `Ask an authorised operation user for access.` — no customer, supplier or money fact leaks |
 
 Focus follows the visual order; route points and card headings are buttons; `Escape` collapses the
 open card; status is text + icon, never colour alone; loading and refresh failure announce politely.
