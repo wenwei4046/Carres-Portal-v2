@@ -25,7 +25,7 @@ export interface SupplierFactRows {
     destination_id: string | null;
     suppliers: { name: string } | { name: string }[] | null;
   }>;
-  lines: ReadonlyArray<{ po_id: string; destination_id: string | null; qty?: number | string | null; received_qty?: number | string | null }>;
+  lines: ReadonlyArray<{ po_id: string; destination_id: string | null; sku?: string | null; qty?: number | string | null; received_qty?: number | string | null }>;
   destinations: ReadonlyArray<{ id: string; name: string }>;
   promises: ReadonlyArray<{
     po_id: string;
@@ -84,6 +84,7 @@ export function supplierPoFactsOf(rows: SupplierFactRows): SupplierPoFact[] {
         grnIso: grn,
         orderedQty,
         receivedQty,
+        lines: poLines.filter((l) => l.sku).map((l) => ({ sku: l.sku as string, qty: Number(l.qty ?? 0) })),
       };
     });
 }

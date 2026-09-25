@@ -109,7 +109,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
           </span>
           <span className="flex min-w-0" data-testid={`${testId}-status`}>{status}</span>
         </span>
-        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11" aria-hidden="true">
+        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11" aria-hidden="true" data-testid={`${testId}-chevron`}>
           <Icon name={open ? "collapse" : "expand"} size={16} />
         </span>
       </button>

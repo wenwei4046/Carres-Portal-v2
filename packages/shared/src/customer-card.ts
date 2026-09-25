@@ -105,16 +105,6 @@ export const CUSTOMER_CARD_COPY = {
   needsDate: "Choose the date the customer asked for.",
 } as const;
 
-/** The governed customer message — leads with the customer's own reference,
- *  never the SO number; carries the date Carres is agreeing (owner approval
- *  2026-09-25, Orders §9). */
-export function customerMessage(input: { name: string | null; reference: string | null; dateText: string | null }): string {
-  const name = input.name?.trim() || "there";
-  const about = input.reference ? `your order ${input.reference}` : "your order";
-  const date = input.dateText ? ` for ${input.dateText}` : "";
-  return `Hello ${name}, this is Carres about ${about}. We are arranging your delivery${date}. Please reply to confirm this date, or tell us a date that suits you.`;
-}
-
 /* ── the reply the operator records ────────────────────────────────────── */
 
 export type CustomerReplyKey =

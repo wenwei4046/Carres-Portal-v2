@@ -12,6 +12,7 @@ import {
   rmAmount,
   salutationOf,
   waEncode,
+  buildCustomerDeliveryDateMessage,
 } from "./wa-templates";
 
 describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
@@ -213,5 +214,15 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(c).toContain("by 2 Jul 26 — overdue");
     expect(r).toContain("please confirm the delivery date");
     expect(c).toContain("following up");
+  });
+});
+
+describe("buildCustomerDeliveryDateMessage — the Work Customer card's template (§5.10)", () => {
+  it("leads with the customer's own reference, carries the date, never an SO number or money", () => {
+    const text = buildCustomerDeliveryDateMessage({ name: "Lim Kuan Yang", reference: "CR-10482", dateText: "27 Oct" });
+    expect(text).toBe(
+      "Hello Lim Kuan Yang, this is Carres about your order CR-10482. We are arranging your delivery for 27 Oct. Please reply to confirm this date, or tell us a date that suits you.",
+    );
+    expect(text).not.toMatch(/SO-?\d|RM/);
   });
 });

@@ -348,7 +348,9 @@ describe("Operation Work — one server feed", () => {
   it("selects work in the action panel before opening the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
-    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("Customer Delivery exists");
+    /* §5.10: a Sales Order's result lives on its party cards; the summary
+       says what is wrong, what to do and which record opens. */
+    expect(screen.getByRole("region", { name: "Work summary" })).toHaveTextContent("Ask customer for a delivery date");
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Open SO-1318" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
