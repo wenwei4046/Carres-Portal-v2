@@ -4113,6 +4113,49 @@ neither is an approved design.
 | The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT + CLAIM-RECORD PHOTOS; authenticated readback recorded** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
+**SUPPLIER REPLY RECORDING — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Measured on
+production the same day: 71 claims (70 `open`, 1 `closed`), 70 with `requested_action`, **1** with
+`supplier_response`; the three SQL doors exist (`supplier_claim_record_request` ·
+`supplier_claim_record_response` · `supplier_claim_close`, 0291) and **no web caller** exists for
+any of them — the record prints `Supplier instruction and reply recording are not available here
+yet.`; no claim send ledger table exists; `work.ts` projects no claim action. The approved
+journey, both ways to the same completion fact:
+
+```text
+From Work:    `Ask {Supplier} to reply to the supplier claim` → Open → claim record → Record supplier reply
+From module:  Supplier Claims → Supplier Claim No → the same claim record → the same button
+Completion:   supplier_response stored with scope, date and evidence; the Work occurrence closes itself
+```
+
+- **Two buttons on the record's Supplier section, in order.** `Record what we asked` (one of the
+  governed asks; freezes once answered) then `Record supplier reply`. The database already refuses an
+  answer without an ask; a reply that arrives first is stored as contact evidence and becomes the
+  formal reply once the ask is recorded — never a forced earlier ask.
+- **The reply form:** `Supplier's answer` (`Replacement` · `Deliver remaining` · `Repair` ·
+  `Return & replace` · `Reject` · `Other agreement`) · `Applies to` (`Whole claim` or `These Units`
+  — a claim-level answer is stored claim-level and never distributed per Unit; an unanswered Unit
+  stays `Not recorded`) · `Supplier's date` (the supplier's promised delivery/collection/return date,
+  the seed for the day-before check and any RO/PRTN) · `Evidence` (the shared uploader: photo, video,
+  PDF; a phone answer records who spoke, what and when) · `Note` (required for `Reject` and `Other
+  agreement`). `POST /:id/response` is extended with scope, date and evidence; no parallel endpoint.
+- **Timing (§9.5 "2 + 2", now stated):** `Reply expected` = ask + **2** Office working days; **2**
+  more without a reply escalates to supervision. Both numbers are `Settings → Purchasing → Supplier
+  claims` values with those starting values — they exist nowhere today.
+- **Who:** any active Operation person records; the recorder is stored (§5.7 ruling). Authorised
+  Outcome stays PO Duty/cover/superuser.
+- **Sending evidence (`Claim sent · {channel} · {recipient} · {time} · {actor}`)** needs the
+  document-agnostic send ledger §9.7 already requires (lift `po_sends` into a shared component and
+  table); the claim pack PDF stays optional (§3.3) — a WhatsApp message plus evidence is a valid
+  request.
+- **States on the record:** `Not recorded` → `Reply expected {date}` → `Reply overdue · {date}` →
+  `Escalated to {name}` → the recorded answer line `{answer} · {scope} · by {date} · recorded {date}
+  · {recorder}` with `Evidence {n}` and History. Missing evidence or a missing note names itself
+  beside the button; a timeout re-reads the record and never prints a refusal it did not receive.
+- **Responsive:** ≥1180 the form is a 560px right panel on the record; 820/743 full width under
+  the Supplier section; 390 full width, one Unit tick per row, 40px bottom actions.
+- **Register consequence:** the `Supplier Response` column prints the recorded answer word; the rail's
+  `Supplier Response` facet reads the same stored value.
+
 **The reply-recording build reuses what exists; it does not grow a second system.**
 
 - **Reuse the existing server door.** `POST /api/ops/operation/supplier-claims/:id/response`
