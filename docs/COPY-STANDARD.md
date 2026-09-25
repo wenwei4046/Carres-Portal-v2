@@ -4287,7 +4287,7 @@ is the proposal. No new sentence is added.
   about money still in the account comes before the number is touched. If the chart then refuses,
   `Active` stays saved, and the sentence says why the name or number did not change.
 
-## PROPOSAL — PENDING APPROVAL (0576, Approve day pays from the day's card account)
+## APPROVED by YH on 25 Sep 2026, as written (0576, Approve day pays from the day's card account)
 
 - The sales on this day were paid into more than one card account ({codes}), so one payout cannot cover them. Check the payment method of each sale.
 - The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.
