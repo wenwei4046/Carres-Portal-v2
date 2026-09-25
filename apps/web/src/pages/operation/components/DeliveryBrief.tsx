@@ -103,7 +103,7 @@ function absentWord(word: string) {
 const trim = (v: string | null | undefined) => (v ?? "").trim();
 
 /* ── THE REPLY SCREENSHOT — an upload, never a typed path ──────────────────── */
-function useReplyProofUpload(orderId: string, leg: number) {
+export function useReplyProofUpload(orderId: string, leg: number) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const upload = useCallback(
@@ -140,7 +140,7 @@ function useReplyProofUpload(orderId: string, leg: number) {
   return { upload, busy, error };
 }
 
-function ReplyProofField({
+export function ReplyProofField({
   id,
   path,
   busy,
@@ -184,17 +184,29 @@ function ReplyProofField({
 /** Exported for the Work Logistics card (owner ruling 2026-09-24): Work
  *  embeds THIS Delivery-owned form and calls the same door — it never draws a
  *  second form for the same act (Law C). */
-export function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard; onDone: () => void }) {
+export function DeliveryDatesEdit({
+  card,
+  onDone,
+  initialDate,
+  initialFrom,
+}: {
+  card: DeliveryMonitorCard;
+  onDone: () => void;
+  /** The Work Customer card opens this door with the date the customer
+   *  agreed or asked for (Workspace §5.9); Monitor passes neither. */
+  initialDate?: string | null;
+  initialFrom?: InformationReceivedFrom;
+}) {
   const row = card.scope;
   const arrangement = row.arrangement;
   const leg = card.leg ?? 0;
   const partner = card.logisticsPartnerName;
   const save = useSaveDeliveryArrangement(card.orderId, leg);
   const proof = useReplyProofUpload(card.orderId, leg);
-  const [date, setDate] = useState<string | null>(card.confirmedDate);
+  const [date, setDate] = useState<string | null>(initialDate ?? card.confirmedDate);
   const [time, setTime] = useState<string | undefined>(card.confirmedTime ?? undefined);
   const [from, setFrom] = useState<InformationReceivedFrom | undefined>(
-    partner ? "partner" : "customer",
+    initialFrom ?? (partner ? "partner" : "customer"),
   );
   const [proofPath, setProofPath] = useState<string | null>(arrangement?.reply_proof_path ?? null);
   const holidays = useMemo(() => myHolidaySet(), []);
