@@ -1408,8 +1408,7 @@ expansion's governed write state.
 ### 8.7 · The Delivery Orders register — production-verified 2026-09-11
 
 `/operation/delivery-orders` is the shared Register engine top to bottom: row checkboxes, header
-select-all over the visible filtered rows, the in-place same-height selection toolbar, ▸ expansion
-showing THIS TRIP's goods lines read-only (the one `trip_groups` derivation), sticky `DO No`
+select-all over the visible filtered rows, the in-place same-height selection toolbar, ▸ expansion opening the DELIVERY ORDER BRIEF (owner ruling 2026-09-26, below), sticky `DO No`
 identity, search, governed per-column filters, Export, Columns and the fixed 32px footer.
 
 **Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
@@ -1439,6 +1438,32 @@ identity, search, governed per-column filters, Export, Columns and the fixed 32p
   only:` strip lists every live condition. Below 1100px the rail starts collapsed.
 - **Selection:** `{N} delivery orders selected · Clear · Print {N} delivery orders` plus the
   shared selected-row Excel export.
+
+**THE DELIVERY ORDER BRIEF — owner ruling 2026-09-26, APPROVED TARGET / NOT BUILT.** The row's ▸
+opens the document's own brief IN PLACE, on the Monitor grammar (§8.5–8.6): the operator records the
+result, uploads the signed DO, confirms the receipt and reviews the proof without leaving the
+register, its queue or its narrowings, and the row moves queues by itself. The brief is TWO
+COLUMNS at a canvas ≥1024px — left, what happened; right, whose document this is — and one column
+below it (right block first):
+
+```
+LEFT · what happened (scrolls with the row)         RIGHT · whose document (facts, read-only)
+  Delivery history      Record delivery result        Status     Delivered · Partially Delivered · …
+  Warehouse handover    Confirm logistics receipt     Proof      Not reviewed yet · Proof Accepted …
+  Evidence              Upload signed DO ·            Hold       Paid · Hold delivery · RM x unpaid
+                        Proof review · Save review    Customer   name · phone · address · building
+  Exceptions            (facts and Work lines)        Logistics  company · driver · vehicle
+                                                      Scheduled  day · time · ETA · Warehouse
+                                                      Related    SO-{n} · Order Route · Payments ·
+                                                                 Unit … · Case … · sibling DO
+```
+
+The left column carries the acts in each panel's right slot (the Monitor's one-control rule); the
+right column carries no control — every fact there is Delivery's own record or a read of Sales,
+Stock or Payment, and every door is the record's number or name. The goods lines (`trip_groups`)
+sit at the top of the left column, read-only. The register's WORK TO DO queues put no extra button
+on the row any more: the queue reveals the row and the act is in the brief. The `DO No` still opens
+the full Delivery Order object (§9) — for `Print` and for links from outside the register.
 
 ### 8.8 · The arrangement record and partner writes
 
@@ -1531,8 +1556,17 @@ the two documents cannot drift.
 The DO object uses the existing Carres Object Detail Template and only its governed section and
 navigation mechanism. Object Header: `← Delivery Orders | DO-180826-3035 · SO-1322 · {customer}`
 with `Print` and the global utilities. No tab strip is created for the sections below; they are
-one governed scroll of kit `Panel` sections, in this order, each with its own header control only
-where an act exists:
+kit `Panel` sections in this order, each with its own header control only where an act exists.
+**Two columns at ≥1024px (owner ruling 2026-09-26: screens are wide, not tall):** the left column
+scrolls and holds the document and what happened (`Delivery Order` · `Delivery history` ·
+`Warehouse handover` · `Evidence` · `Exceptions` · `History`); the right column is fixed, about
+420px (the token side-panel width), and holds whose document this is — `Status` · `Proof` · `Hold`
+· customer and address · logistics, driver, vehicle, scheduled day, time, ETA, Warehouse ·
+`Related records` — all read-only, each door the record's number or name. Below 1024px the right
+block prints first and the page is one scroll. The register's in-row brief (§8.7) is the same
+composition without the document; this page exists for `Print` and for links from Work and other
+modules. The pattern is Shopify's order page and Linear's issue page — facts fixed on the right,
+events on the left — on Carres tokens and panels:
 
 ```
 Delivery Order        customer, address, Warehouse, partner, arrangement, goods scope, site
@@ -1893,6 +1927,7 @@ their absence as a design blind spot:
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
 | **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; `Order details incomplete` still prints the deadline on line two; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
+| the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
 ### 15.2 · Whole-domain closure
