@@ -214,3 +214,33 @@ describe("the external link", () => {
     expect(message).not.toMatch(/SO-?1362/);
   });
 });
+
+describe("density below 960px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
+  it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
+    draw();
+    const toggle = screen.getByTestId("logistics-card-toggle");
+    expect(toggle.className).toContain("min-h-[72px]");
+    expect(toggle.className).toContain("px-3");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[15px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-5");
+    const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
+    expect(act.className).toContain("text-[13px]");
+    expect(act.className).toContain("leading-[18px]");
+    expect(act.className).toContain("font-semibold");
+    expect(status.className).toContain("text-[12px]");
+    expect(status.className).toContain("leading-4");
+    expect(screen.getByTestId("logistics-card-progress").className).toContain("text-[12px]");
+    const chevron = screen.getByTestId("logistics-card-chevron");
+    expect(chevron.className).toContain("h-10");
+    expect(chevron.className).toContain("w-10");
+  });
+
+  it("expanded: 10px vertical padding and 8px between sections", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("logistics-card-toggle"));
+    const body = screen.getByTestId("logistics-card-body");
+    expect(body.className).toContain("py-2.5");
+    expect(body.className).toContain("gap-2");
+    expect(body.className).toContain("px-3");
+  });
+});

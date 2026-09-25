@@ -218,6 +218,8 @@ describe("Operation Work — one server feed", () => {
       expect(title.className).toContain("text-[24px]");
       expect(title.className).toContain("min-[960px]:text-[28px]");
       expect(title.className).toContain("min-[960px]:leading-[34px]");
+      // The one header row carries the top-bar icons: no second 44px bar.
+      expect(within(header).getByTestId("top-bar-icons")).toBeInTheDocument();
       const count = screen.getByTestId("work-header-count");
       expect(count.className).toContain("text-[12px]");
       expect(count.className).toContain("min-[960px]:text-[13px]");

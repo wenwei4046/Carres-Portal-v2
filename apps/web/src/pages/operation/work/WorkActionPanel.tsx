@@ -31,14 +31,20 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
             <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
             {embedded ?? owningForm}
           </section>
-        ) : item.interaction.mode === "read_only" ? (
-          <p className="text-body text-kit-slate-11">{item.interaction.reason}</p>
-        ) : (
-          <p className="text-body text-kit-slate-11">{item.requiredResult}</p>
-        )}
+        ) : null}
 
-        <div className="mt-2 min-[960px]:mt-4">
-          <Button type="button" onClick={onOpen}>Open {item.object.label}</Button>
+        {/* Below 960px the result line and its one door share a row, so the
+            party cards stay above the fold at 743×704 (density ruling
+            2026-09-25); from 960px they stack as before. */}
+        <div className={`flex items-center gap-3 min-[960px]:block ${item.interaction.mode === "embedded" ? "mt-2 min-[960px]:mt-4" : ""}`} data-testid="work-detail-open-row">
+          {item.interaction.mode !== "embedded" ? (
+            <p className="min-w-0 flex-1 text-body text-kit-slate-11">
+              {item.interaction.mode === "read_only" ? item.interaction.reason : item.requiredResult}
+            </p>
+          ) : null}
+          <div className={`shrink-0 ${item.interaction.mode === "embedded" ? "" : "min-[960px]:mt-4"}`}>
+            <Button type="button" onClick={onOpen}>Open {item.object.label}</Button>
+          </div>
         </div>
 
         <details className="mt-2 border-t border-kit-slate-5 text-label text-kit-slate-11 min-[960px]:mt-4" data-testid="work-detail-disclosure">
