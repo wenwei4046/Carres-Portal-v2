@@ -634,7 +634,7 @@ The default current-Inventory columns are:
 
 ```
 Goods Received Date · Ship Date · SO No · Inventory Status · Stock Condition · PO No / Ref No ·
-Unit ID · Item · Logistics · Stock Location · Delivery Location
+Unit ID · Item · Pickup By · Stock Location · Delivery Location
 ```
 
 `Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
@@ -684,7 +684,7 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
 | `Stock Condition` | the physical state (owner rename 2026-09-25; the stock picker's `Condition` head follows so the portal keeps one word): `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
 | `Stock Location` | the Carres or partner Site the Unit stands in or last stood in: `Carres Klang` · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`. Never a company, never NETS | — |
-| `Logistics` | the company whose driver took the goods (`NETS` · `AL` · `HOUZS`); filled only after OUT | blank |
+| `Pickup By` | the company whose driver took the goods (`NETS` · `AL` · `HOUZS`); the owner's short word 2026-09-25 (international `Carrier` is banned here; `Logistics` was unclear to the owner); filled only after OUT | blank |
 | `Delivery Location` | where the goods are going (the DO's customer address, or the next Site on a Journey leg); filled only after OUT | blank |
 | `SO No` | the Sales Order the Unit is promised to | `No SO` |
 | `PO No / Ref No` | the document the goods came in on (PO, Transfer, Repair, Claim number) | `Not recorded` |
@@ -692,10 +692,10 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 
 Nobody records the road. OUT at origin (`Record {n} Units loaded to {Logistics}`, 0424) and IN at
 destination (Receiving, 0490) are the only two events, exactly as SAP/Odoo stock-in-transit works;
-between them the row keeps its `Stock Location`, gains `Ship Date · Logistics · Delivery
+between them the row keeps its `Stock Location`, gains `Ship Date · Pickup By · Delivery
 Location`, and after the customer signs it leaves the list into History. A partner leg reads the
-same way: Klang OUT → `Logistics AL · Delivery Location AL Sungai Buloh`; AL IN → `Stock Location
-AL Sungai Buloh`; AL OUT → `Logistics AL · Delivery Location {customer}`; delivered → History.
+same way: Klang OUT → `Pickup By AL · Delivery Location AL Sungai Buloh`; AL IN → `Stock Location
+AL Sungai Buloh`; AL OUT → `Pickup By AL · Delivery Location {customer}`; delivered → History.
 `With NETS Delivery`, `In transit`, `On the way`, `Who has it`, `Site` and `Where` are not
 Inventory words. `Ownership` (`Carres Owned` · `Supplier Consignment`) · `SO Date` · `PO Doc Date` · `Category` ·
 `Last verified` · `Supplier` · `Last moved` stay one click away in `Columns`. Required facts (`Unit ID` ·
