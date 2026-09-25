@@ -249,7 +249,9 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
   creates no document row (its number is owned in the pool).
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
-  facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·
+  facts decide `Created · Out for delivery · Delivered · Partially Delivered · Failed Delivery (each
+  + its ONE reason; owner ruling 2026-09-25 — the umbrella `Delivery exception` is retired, `Exception`
+  is a banned word and the result itself says what happened) ·
   Cancelled`. **This is the DOCUMENT's own vocabulary and it stays as it is.** **`Arrived`
   (BUILT 2026-09-13, Card 20):** an intermediate Journey leg's document — a leg before the
   last — whose `delivered` result (0491/0496) is the goods reaching the named partner warehouse
@@ -258,7 +260,7 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
   on the document = the §4 chain's `Received by logistics` fact with no result recorded yet; it is
   never derived from the calendar. The document ladder and the Monitor status dictionary in §8.4
   never borrow each other's words.
-- **A failed document keeps its Delivery exception and reason FOREVER**; it is never rewritten as
+- **A failed document keeps its `Failed Delivery` / `Partially Delivered` and reason FOREVER**; it is never rewritten as
   Delivered. When a new date is booked the system issues a NEW DO; the old one stays as history.
 - **Staff can never delete or void a DO.** The ONE void door (`delivery_order_void`) accepts only
   `order_cancelled` or `rescheduled` and records reason, actor and time. The booking-confirm door
@@ -481,7 +483,8 @@ Employee results are **`Delivered`** · **`Partially Delivered`** · **`Failed D
 
 `Delivered` requires actual time, receiver, delivered goods and the governed evidence. Missing
 evidence creates the `Upload delivery proof` work, whose row names `Upload delivery photo` and/or
-`Upload signed Delivery Order`; completing or reviewing proof never renames the result.
+`Upload signed DO` (owner ruling 2026-09-25; the paper's full name stays `Signed Delivery Order` in
+prose and on the document); completing or reviewing proof never renames the result.
 
 For each exact delivered Unit, Delivery emits one idempotent success fact. If Stock says that Unit
 was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
@@ -1416,9 +1419,13 @@ identity, search, governed per-column filters, Export, Columns and the fixed 32p
   Location` · `Driver submission`. Off by default: `Goods` · `Created`. `Requested Delivery Date`
   opens no editor here; `SO No` opens the Sales Order and `DO No` the Delivery Order. `Assign
   logistics` never appears on this register.
-- **One `Status` column with the document ladder** (§3.1); line 2 of a `Delivery exception`
-  carries the recorded result and its reason (`Partially Delivered · {reason}`); `Cancelled`
-  keeps its void reason. Search, filter and export print the same spelling as the cell.
+- **One `Status` column with the document ladder** (§3.1): line 1 `Created` · `Out for delivery` ·
+  `Arrived` · `Delivered` · `Partially Delivered` · `Failed Delivery` · `Cancelled`; line 2 the ONE
+  reason (`Customer unreachable`, `Sofa not ready`, `Rescheduled`). The umbrella `Delivery
+  exception` is retired (owner ruling 2026-09-25). Search, filter and export print the same
+  spelling as the cell. **Date first (owner ruling 2026-09-17, re-confirmed 2026-09-25):** `DO Date ·
+  DO No` lead and pin (both at ≥768px, `DO No` alone below); the heading is `DO Date`, never `DO
+  date`; the row is 40px (UI §6.0), adopted in this page's build.
 - **`Driver submission`**: `Photos {n}` opens the gallery, `Videos {n}` the player, `Signed
   Delivery Order` the paper, each a door; a kind with no files offers no button; an unknown ledger
   prints `Not recorded`; every viewer states that an upload is evidence of an upload. The media
@@ -1538,7 +1545,10 @@ Warehouse handover    the recorded chain with recorder, role, company and proof;
 Evidence              every file bound to the event it proves; the proof-review acts (§6.1)
 Exceptions            open and historical problems with owner and next act
 History               the append-only audit of every object change and proxy record
-Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs
+Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs — each
+                      door is the record's own number or name (`SO-1322` · `Order Route` · `Payments` ·
+                      `Unit id-dtd627907` · `Case SC-1031` · `DO2609-0002`), never `Open … →` (owner
+                      ruling 2026-09-25)
 ```
 
 **BUILT 2026-09-13 (Card 16):** `DeliveryOrderPage.tsx` is the seven sections above in order on
@@ -1585,7 +1595,7 @@ appears in any line. The row's status word carries the fact.
 | confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
 | confirmed day passed, no result | `Ask NETS` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
 | delivered, photo missing | `Upload the delivery photo` | `Attach the photo from NETS` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | photo on the ledger |
-| delivered, signed DO missing | `Upload the signed Delivery Order` | `Attach the paper the customer signed` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | signed file on record |
+| delivered, signed DO missing | `Upload the signed DO` | `Attach the paper the customer signed` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | signed file on record |
 | delivered, proof not reviewed | `Check the delivery proof` | `Accept it, ask for more, or reject it` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | review recorded |
 | Failed Delivery recorded | the §7 next action, for example `Call the customer` | `Confirm a new delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | the named next fact |
 | Cannot Deliver reported by the partner | `Decide the next step for this delivery` | `Keep NETS with a new date, correct the details, or change logistics` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | arrangement event recorded |
@@ -1849,6 +1859,7 @@ only when a real vehicle-level fact exists.
 | Paid in full · Payment pending · Needs attention, on Monitor | `Paid` · `Hold delivery` over `RM {amount} unpaid` · a specific fact word |
 | Do not deliver · still to collect · Finance is holding this delivery · Payment blocked · Money in full | `Hold delivery` over `RM {amount} unpaid` or `Finance hold · {reason}`; the gate's met word is `Paid` (owner ruling 2026-09-25, §3) |
 | Open Sales Order to change, inside the brief | `View Sales Order` (read-only, in place); the row's `SO No` opens the order to change |
+| Delivery exception · DO date · `Open {record} →` · `No delivery result recorded yet — evidence binds to the delivery it proves.` · `No signed document yet` · `No delivery photo yet` · `Upload signed Delivery Order` (queue and button) · the long register empty sentence | `Partially Delivered` / `Failed Delivery` on line 1 · `DO Date` · the record's number or name · `No delivery result yet.` · `No signed DO yet` · `No photo yet` · `Upload signed DO` · `No delivery orders yet.` over `The system issues one when goods, logistics, date and money are ready.` (owner ruling 2026-09-25, segment 3) |
 | Call customer · Stock risk · Logistics details incomplete · DO not released · Open DO · Show delivery brief · `{n} deliveries need a confirmed date.` · Open No confirmed date | `Get delivery date from {partner}` / `… from customer` · `Goods not ready` · `Driver and vehicle not recorded` · (nothing — the reason prints) · the DO number · `See delivery details` · `No delivery scheduled this week.` over the link `{n} orders still need a delivery date.` (owner ruling 2026-09-25) |
 | Ready at Carres Klang Warehouse | `Ready` in Status and `Carres Klang` in Location |
 | Edit Delivery · Save Delivery | `Update date and time` · `Save scheduled delivery`; the other panel acts by their own names |
