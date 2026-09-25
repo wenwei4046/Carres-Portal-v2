@@ -738,43 +738,48 @@ date change or split, and the Supplier DO file for `Supplier DO received`. Video
 Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
 
 **RECORD SUPPLIER ANSWER — UI COMPOSITION APPROVED (Jess, 2026-09-25, Purchasing Blueprint
-segment 1) · NOT BUILT.** The per-item answer model above is drawn ONCE, on the PO object page's
-`SUPPLIER REPLY` section (left facts column; the PDF pane stays), never as a second Workspace
-form. Measured before this ruling: production `SupplierDateBlock` records one date and one reason
-for the whole PO, accepts JPEG/PNG only, and heads itself `Supplier has not confirmed the PO date`
-— all three retire with this build.
+segment 1; compact table revision the same day — "we got width, not tall") · NOT BUILT.** The
+per-item answer model above is drawn ONCE, on the PO object page's `SUPPLIER REPLY` section (left
+facts column; the PDF pane stays), never as a second Workspace form. Measured before this ruling:
+production `SupplierDateBlock` records one date and one reason for the whole PO, accepts JPEG/PNG
+only, and heads itself `Supplier has not confirmed the PO date` — all three retire with this build.
+
+**The section is a TABLE, one 40px row per goods line, in both its read and its edit state** —
+the Linear/Shopify-admin grammar (edit in the row, one action bar, sub-rows for a split), never a
+stacked label/value form. Two lines cost ~200px; the retired stacked draft cost ~420px.
+
+Read state:
 
 ```text
-SUPPLIER REPLY                                        [Record supplier answer]
-PO 14-Day Delivery Date        Fri, 9 Oct
-Supplier Confirmed Delivery Date
-  Cody · King ×4                Not confirmed
-  Cody · Queen ×2               Not confirmed
-Last answer                    None recorded yet
+SUPPLIER REPLY                    PO 14-Day Delivery Date · Fri, 9 Oct      [Record supplier answer]
+Item            Qty  To deliver  Supplier Confirmed Delivery Date                     Last answer
+Cody · King      4   4           3 pcs · Fri, 9 Oct · 1 pcs · Fri, 16 Oct · Delayed    Fri, 25 Sep · Shasha
+Cody · Queen     2   2           Mon, 12 Oct · Delayed · Production delay              Fri, 25 Sep · Shasha
+                                 Supplier changed from Fri, 9 Oct
+Supplier DO     DO-2251 · Photos 1 · PDF 1
 ```
 
-`Record supplier answer` expands IN PLACE (no dialog, no 50/50 — an answer is not an
-outside-readable document, §8.2):
+Edit state (`Record supplier answer` turns the same table editable in place; no dialog, no 50/50 —
+an answer is not an outside-readable document, §8.2):
 
 ```text
-RECORD SUPPLIER ANSWER                                            Cancel  Save
-[ ] Supplier DO received       Supplier DO No [          ]   DO file [Upload]
-
-Cody · King · 4 to deliver
-  (•) No change  ( ) Confirmed  ( ) New date  ( ) Split delivery
-Cody · Queen · 2 to deliver
-  ( ) No change  ( ) Confirmed  (•) New date  [ Mon, 12 Oct ▾ ]
-      Reason  [ Production delay ▾ ]     ← only when later than PO Delivery Date
-      Note    [                    ]     ← only for Other
-Evidence   WhatsApp screenshot · photo · video · PDF     [Upload]  ≥1 required
-Answered by supplier on  [ Fri, 25 Sep ▾ ]   Recorded by  {name} (you)
+RECORD SUPPLIER ANSWER   [ ] Supplier DO received  Supplier DO No [      ] [Upload]     Cancel  [Save]
+☐  Item          To deliver  Answer                                    Date           Reason
+☐  Cody · King   4           [No change|Confirmed|New date|Split]
+☐  Cody · Queen  2           [No change|Confirmed|New date|Split]     [Mon, 12 Oct]  [Production delay ▾]
+   └ split       [3] pcs [Fri, 9 Oct]   [1] pcs [Fri, 16 Oct] [Partial quantity ready ▾]   + Add another date   Total 4 of 4
+Evidence [Upload]  ≥1 WhatsApp screenshot · photo · video · PDF        Answered by supplier on [Fri, 25 Sep]
+2 selected · Apply to selected  [Confirmed|New date]                   ← bulk answer, one bar, never per row
 ```
 
-Split: `[ 3 ] pcs [ Fri, 9 Oct ▾ ]` · `[ 1 ] pcs [ Fri, 16 Oct ▾ ] Reason [ … ▾ ]` ·
-`+ Add another date` · `Total 4 of 4`. After save the section prints per line
-`3 pcs · Fri, 9 Oct · 1 pcs · Fri, 16 Oct · Delayed`, `Mon, 12 Oct · Delayed · Production delay`
-with `Supplier changed from Fri, 9 Oct` beneath, `Supplier DO · DO-2251 · Photos 1 · PDF 1`, and
-`Last answer · {date} · recorded by {name} · Evidence {n}`.
+- `Answer` is a four-segment control inside the row (kit segmented control, 32px). `Date` and
+  `Reason` appear in the row only when the answer needs them (`New date`; `Reason` only when the
+  date is later than PO Delivery Date; `Note` only for `Other`). A `Split delivery` row grows one
+  36px sub-row per batch beneath its line, with `+ Add another date` and the live `Total {n} of {m}`.
+- Ticking rows and `Apply to selected` answer several lines at once (the shared bulk grammar:
+  checkbox column + one action bar, no repeated per-row buttons). Validation is on blur, in the
+  cell; the Save button names the first blocker.
+- The table scrolls sideways inside its own box below 1180; the page never does.
 
 - **Facts and doors.** `Supplier Confirmed Delivery Date` per line/batch = the newest append-only
   answer row (line, quantity, date, server-classified Earlier/Delayed, reason, evidence, recorder,
@@ -795,10 +800,11 @@ with `Supplier changed from Fri, 9 Oct` beneath, `Supplier DO · DO-2251 · Phot
   (non-Operation sees no button, never a grey one) · Missing original (`PO Delivery Date ·
   Not recorded`; the answer is stored as `Reported`). A timeout re-reads the PO and never prints
   a refusal it did not receive.
-- **Responsive.** 1440/1180: form in the left column, four radios on one row, one batch per row.
-  820: PDF stacks below (existing rule), form full width. 743: radios two per row, date and
-  reason on their own rows. 390: one card per goods line, radios stacked, upload full width,
-  `Cancel` `Save` fixed at the bottom at 40px.
+- **Responsive.** 1440/1180: the table in the left column, every column in one row. 820: PDF
+  stacks below (existing rule); the table keeps its columns and scrolls inside its box. 743: same,
+  `Reason` wraps under `Date` in the cell. 390: one 54px two-line row per goods line (item on line
+  one, segmented control on line two), Date/Reason as a third line only when needed, upload full
+  width, `Cancel` `Save` fixed at the bottom at 40px.
 - **Words** are in [COPY-STANDARD: Record supplier answer words](../COPY-STANDARD.md#record-supplier-answer-words).
 
 **Who may record a supplier answer — OWNER RULING (Jess, 2026-09-25) · NOT BUILT.** Any active

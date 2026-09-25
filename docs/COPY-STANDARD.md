@@ -2037,7 +2037,8 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 | Supplier DO at the top of the form | `Supplier DO received` · `Supplier DO No` · `DO file` |
 | Per-line answer, four radios | `No change` · `Confirmed` · `New date` · `Split delivery` |
 | Split batches | `{n} pcs · {date}` · `+ Add another date` · `Total {n} of {m}` |
-| Still-to-deliver line heading | `{item} · {n} to deliver` |
+| Table heads | `Item` · `Qty` · `To deliver` · `Answer` · `Date` · `Reason` · `Supplier Confirmed Delivery Date` · `Last answer` |
+| Bulk answer bar | `{n} selected · Apply to selected` |
 | Delay reasons (the eight, shown only when the date is later than PO Delivery Date) | `Production delay` · `Material unavailable` · `Capacity / scheduling delay` · `Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` · `Partial quantity ready` · `Other` (`Note` required) |
 | Dates and people | `Answered by supplier on` · `Recorded by {name}` |
 | Result lines | `Delayed` · `Earlier` · `Reported` (no original date) · `Supplier changed from {date}` · `All received` · `Received · {GRN No}` |
