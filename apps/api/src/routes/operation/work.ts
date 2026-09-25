@@ -38,8 +38,14 @@ import {
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
   WAREHOUSE_OFF_DAYS,
+  PURCHASING_OFFICE_OFF_DAYS,
+  isSelectableForBuying,
   orderActionLines,
+  poSendChannelOf,
+  poWindowWork,
   type OrderActionKey,
+  type PoWindowWork,
+  type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
 import {
@@ -73,6 +79,7 @@ import workspaceDutiesRouter from "./workspace-duties";
 import opsStaffRouter from "./staff";
 import financeInvoicesRouter from "../finance/invoices";
 import issuesRouter from "../ops/issues";
+import purchaseDemandsRouter from "./purchase-demands";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
@@ -527,6 +534,135 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
       // and derives a new one for the new date.
       occurrenceKey: effective,
     }));
+  });
+}
+
+/**
+ * ⭐ ONE OCCURRENCE PER PO WINDOW (Purchasing §5.6.1 · Workspace §6.1 ·
+ * owner rulings 2026-09-24/25).
+ *
+ * Reads the SO Batch read's own `poWindow` stamps — never a second window
+ * arithmetic — and gives PO Duty one card per window: the exact eligible
+ * demand to buy, then each PO issued from it until its current version is
+ * marked `PO sent to supplier`. The per-Sales-Order `issue_po` and the
+ * retired `confirm_ready_date` never reach Work (see `loadOperationWork`).
+ *
+ * A received PO needs no sending — the goods are already in — so it counts
+ * as issued and done. Unreadable window settings are a Purchasing source
+ * failure, never an empty buying day.
+ */
+/** The window model over the SO Batch read — the feed, the probe and the
+ *  completion facts all run THIS, so "which POs a window issued" has one
+ *  answer. */
+export function poWindowsOf(
+  read: Pick<SoBatchPurchaseResponse, "rows" | "registerRows" | "poWindowsUnavailable">,
+  suppliers: Parameters<typeof projectPoWindowWork>[0]["suppliers"],
+  opts: { keepClosed?: boolean } = {},
+): PoWindowWork[] {
+  if (read.poWindowsUnavailable) throw new Error("PO window settings are unavailable");
+  const doors = new Map(suppliers.map((s) => [s.id, s]));
+  return poWindowWork({
+    rows: read.rows.filter(isSelectableForBuying).map((row) => ({
+      id: row.id,
+      orderId: row.orderId,
+      so: row.so,
+      supplierId: row.supplierId,
+      supplier: row.supplier,
+      toBuy: row.toBuy ?? 0,
+      poWindow: row.poWindow ?? null,
+    })),
+    pos: read.registerRows.flatMap((reg) => reg.pos.map((po) => ({
+      poId: po.poId,
+      version: po.version ?? 1,
+      supplierId: po.supplierId,
+      supplierName: po.supplierName,
+      sentCurrentVersion: po.sentCurrentVersion || po.status === "received",
+      poWindow: po.poWindow ?? null,
+    }))),
+    channelOf: (supplierId) => {
+      const door = supplierId ? doors.get(supplierId) : undefined;
+      return poSendChannelOf(door ? {
+        whatsappGroupUrl: door.whatsapp_group_url ?? null,
+        contact: door.contact ?? null,
+        contactEmail: door.contact_email ?? null,
+      } : null);
+    },
+    ...(opts.keepClosed ? { keepClosed: true } : {}),
+  });
+}
+
+/** Order-track keys whose Work occurrence is the PO window card instead. */
+export const PURCHASING_WINDOW_OWNED: ReadonlySet<string> = new Set(["issue_po", "confirm_ready_date"]);
+
+export function projectPoWindowWork(input: {
+  read: Pick<SoBatchPurchaseResponse, "rows" | "registerRows" | "poWindowsUnavailable">;
+  suppliers: readonly {
+    id: string;
+    whatsapp_group_url?: string | null;
+    contact?: string | null;
+    contact_email?: string | null;
+  }[];
+  poDuty: WorkspaceDutyResolution | null;
+  today: string;
+  now: string;
+}): OperationWorkItem[] {
+  const windows = poWindowsOf(input.read, input.suppliers);
+  const holidays = myHolidaySet();
+  const owner = input.poDuty;
+  const now = Date.parse(input.now);
+  return windows.map((w: PoWindowWork) => {
+    const passed = Date.parse(w.dueAt) <= now;
+    const destination = `/operation?tab=purchase&window=${encodeURIComponent(w.key)}`;
+    const item: WorkItem = {
+      ruleKey: "purchasing.po_window",
+      module: "purchasing",
+      soRef: w.card.objectLabel,
+      orderId: w.key,
+      action: w.card.action,
+      ownerRule: "po_duty",
+      ownerDutyKey: "po_duty",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
+      tone: passed ? "warning" : "info",
+      locked: false,
+      broken: false,
+      dueIso: w.date,
+      workingDaysLate: input.today > w.date
+        ? countWorkingDays(w.date, input.today, { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays })
+        : 0,
+    };
+    return operationWorkItemFromProjection(item, {
+      object: { kind: "po_window", id: w.key, label: w.card.objectLabel },
+      problem: w.card.problem,
+      recipient: w.card.recipient,
+      requiredResult: w.card.requiredResult,
+      destination,
+      /* The ONE shared send area (Purchasing §8.2) is embedded per PO in the
+         Work right panel; buying itself opens SO Batch Purchase scoped to this
+         window. */
+      interaction: w.pos.some((po) => !po.sent)
+        ? {
+            mode: "embedded",
+            actionKey: "purchasing.confirm_po_sent",
+            componentKey: "purchasing.po_issue_evidence",
+            capability: "POST /api/operation/pos/:id/confirm-sent",
+            inputContract: "ConfirmPoSentInput",
+            evidenceContract: "po_sends confirmed_sent for the rendered version",
+            idempotencyKey: "po_id + po_version; a repeat adds history only, the Work completion is recorded once",
+            staleVersion: "ConfirmPoSentInput.poVersion",
+            staleRefusal: "stale_po_version",
+            successReceipt: "PO sent to supplier — version, channel, recipient, actor and Malaysia time",
+            fallbackDestination: destination,
+          }
+        : undefined,
+      sourceVersion: `${w.key}|${w.demand.rowIds.join(",")}|${w.pos.map((po) => `${po.documentNo}:${po.sent ? 1 : 0}`).join(",")}`,
+      today: input.today,
+    });
   });
 }
 
@@ -1453,6 +1589,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
   internal.route("/issues", issuesRouter);
+  internal.route("/purchase/demands", purchaseDemandsRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
          invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
@@ -1606,11 +1743,25 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   const sourceResults = await Promise.all([
     loadWorkSource("orders", observedAt, async () =>
-      orderItems.filter((item) => item.module === "orders" && item.ruleKey !== "collect")),
+      orderItems.filter((item) =>
+        item.module === "orders" &&
+        item.ruleKey !== "collect" &&
+        /* ⭐ Purchasing §5.6.1 / §5.7: buying is ONE card per PO window, never
+           one per Sales Order, and the calculated PO Delivery Date is not a
+           supplier confirmation — the Sales Order's own action ladder keeps
+           both words; Work shows the window card instead. */
+        !PURCHASING_WINDOW_OWNED.has(item.ruleKey))),
     loadWorkSource("purchasing", observedAt, async () => [
       ...manualItems,
       ...purchaseOrderItems,
       ...arrivalCheckItems,
+      ...projectPoWindowWork({
+        read: await readInternal<SoBatchPurchaseResponse>(internal, "/purchase/demands", c),
+        suppliers: suppliers.suppliers as Parameters<typeof projectPoWindowWork>[0]["suppliers"],
+        poDuty,
+        today,
+        now: observedAt,
+      }),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),
     loadWorkSource("delivery", observedAt, async () =>
@@ -1933,6 +2084,63 @@ export async function probePurchaseOrderWork(
   ];
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+/** The SO Batch read and supplier doors, read as the caller — the window
+ *  probe and completion facts see exactly what the Work feed sees. */
+async function readPoWindowSource(c: Context<AppEnv>): Promise<{
+  read: SoBatchPurchaseResponse;
+  suppliers: Parameters<typeof projectPoWindowWork>[0]["suppliers"];
+}> {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/purchase/demands", purchaseDemandsRouter);
+  internal.route("/suppliers", operationSuppliersRouter);
+  const [read, suppliers] = await Promise.all([
+    readInternal<SoBatchPurchaseResponse>(internal, "/purchase/demands", c),
+    readInternal<{ suppliers: Parameters<typeof projectPoWindowWork>[0]["suppliers"] }>(internal, "/suppliers", c),
+  ]);
+  return { read, suppliers: suppliers.suppliers };
+}
+
+/** One PO window's open occurrence, on its current ledger identity. */
+export async function probePoWindowWork(
+  c: Context<AppEnv>,
+  windowKey: string,
+  ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const source = await readPoWindowSource(c);
+  const now = new Date().toISOString();
+  const items = projectPoWindowWork({ ...source, poDuty: null, today: todayIsoMYT(), now })
+    .filter((item) => item.object.id === windowKey);
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+/** What a window issued, and whether every one of those POs is now sent. */
+export async function poWindowSendFacts(
+  c: Context<AppEnv>,
+  windowKey: string,
+): Promise<{ poIds: string[]; demandLeft: number; allSent: boolean }> {
+  const source = await readPoWindowSource(c);
+  const window = poWindowsOf(source.read, source.suppliers, { keepClosed: true }).find((w) => w.key === windowKey);
+  if (!window) return { poIds: [], demandLeft: 0, allSent: false };
+  return {
+    poIds: window.pos.map((po) => po.poId),
+    demandLeft: window.demand.rowIds.length,
+    allSent: window.pos.length > 0 && window.unsent === 0,
+  };
+}
+
+/** The windows a PO was issued from — before its send is recorded. */
+export async function poWindowKeysServing(c: Context<AppEnv>, poId: string): Promise<string[]> {
+  const source = await readPoWindowSource(c);
+  return poWindowsOf(source.read, source.suppliers)
+    .filter((w) => w.pos.some((po) => po.poId === poId))
+    .map((w) => w.key);
 }
 
 /**

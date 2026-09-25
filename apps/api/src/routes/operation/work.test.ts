@@ -14,6 +14,8 @@ import {
   projectPaymentCollectionWork,
   projectPurchaseOrderReplyWork,
   projectPurchaseOrderArrivalCheckWork,
+  projectPoWindowWork,
+  PURCHASING_WINDOW_OWNED,
   projectReceivingWork,
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
@@ -1111,5 +1113,79 @@ describe("payment.check_stored_furniture", () => {
     });
     expect(items).toHaveLength(1);
     expect(items[0]?.timing.actionOn).toBe("2026-09-06");
+  });
+});
+
+describe("the PO window card — one occurrence per window, never one per Sales Order (Purchasing §5.6.1)", () => {
+  const poDuty = {
+    dutyKey: "po_duty",
+    onDate: "2026-09-25",
+    normalOwner: { userId: "shasha", name: "Shasha" },
+    buddy: null,
+    activeCover: null,
+    actingPerson: { userId: "shasha", name: "Shasha" },
+    state: "primary" as const,
+    assignmentId: "assignment-1",
+  };
+  const demand = (id: string, orderId: string, supplierId: string, supplier: string, toBuy: number, poWindow: string | null) => ({
+    id, orderId, so: null, supplierId, supplier, toBuy, poWindow,
+    state: "safety_days_full", issueRef: { proposalKey: "p", buildKey: "b" },
+  });
+  const read = (rows: unknown[], pos: unknown[] = []) => ({
+    rows,
+    registerRows: [{ orderId: "o1", pos }],
+  }) as unknown as Parameters<typeof projectPoWindowWork>[0]["read"];
+  const suppliers = [
+    { id: "ohana", whatsapp_group_url: "https://chat.whatsapp.com/ohana" },
+    { id: "hookka", contact_email: "po@hookka.test" },
+  ];
+
+  it("gives PO Duty one card over the window's exact demand, due at the window", () => {
+    const items = projectPoWindowWork({
+      read: read([
+        demand("r1", "o1", "ohana", "Ohana", 2, "2026-09-25T11:30"),
+        demand("r2", "o2", "hookka", "Hookka", 1, "2026-09-25T11:30"),
+        demand("r3", "o3", "ohana", "Ohana", 4, "2026-09-25T16:00"),
+      ]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T02:00:00.000Z",
+    });
+    expect(items.map((i) => [i.object.id, i.object.label, i.problem, i.action, i.recipient, i.timing.actionOn, i.owner.acting?.name])).toEqual([
+      ["2026-09-25T11:30", "11:30 AM PO window", "Buy 3 items for 2 Sales Orders", "Issue the POs by 11:30 AM", "2 suppliers", "2026-09-25", "Shasha"],
+      ["2026-09-25T16:00", "4:00 PM PO window", "Buy 4 items for 1 Sales Order", "Issue the POs by 4:00 PM", "Ohana", "2026-09-25", "Shasha"],
+    ]);
+    expect(items[0]!.ruleKey).toBe("purchasing.po_window");
+    expect(items[0]!.destination).toBe("/operation?tab=purchase&window=2026-09-25T11%3A30");
+    expect(items[0]!.interaction.mode).toBe("open_module");
+    expect(items[0]!.tone).toBe("info");
+  });
+
+  it("after issue: speaks the send line and embeds the one shared send area", () => {
+    const [item] = projectPoWindowWork({
+      read: read([], [{ poId: "PO250925-4827", status: "open", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    });
+    expect(item!.problem).toBe("1 PO issued · 1 not sent yet");
+    expect(item!.action).toBe("Click WhatsApp, send PO250925-4827(1) to Ohana");
+    expect(item!.interaction).toMatchObject({ mode: "embedded", componentKey: "purchasing.po_issue_evidence", staleRefusal: "stale_po_version" });
+    // 12:00 MYT is past 11:30 — the card warns within the day.
+    expect(item!.tone).toBe("warning");
+  });
+
+  it("a received PO needs no sending, so its window owes nothing", () => {
+    expect(projectPoWindowWork({
+      read: read([], [{ poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    })).toEqual([]);
+  });
+
+  it("unreadable window settings fail the Purchasing source instead of showing an empty day", () => {
+    expect(() => projectPoWindowWork({
+      read: { rows: [], registerRows: [], poWindowsUnavailable: true } as never,
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    })).toThrow(/unavailable/);
+  });
+
+  it("the per-Sales-Order issue_po and the retired confirm_ready_date are the window card's, not Work's", () => {
+    expect([...PURCHASING_WINDOW_OWNED].sort()).toEqual(["confirm_ready_date", "issue_po"]);
   });
 });

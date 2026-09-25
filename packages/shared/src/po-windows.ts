@@ -89,6 +89,43 @@ function calendarOf(opts: PoWindowCalendar) {
   return { offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS, holidays: opts.holidays ?? myHolidaySet() };
 }
 
+/**
+ * THE WINDOW DAYS (owner correction, Jess 2026-09-25 — Purchasing §5.6.1).
+ * A PO window opens only on a day ticked in `PO Days` that is also an Office
+ * working day. `poDays` uses the `purchasing_settings.po_days` convention
+ * (0 = Sunday … 6 = Saturday). The setting decides; nothing here assumes
+ * Mon–Fri. An empty `PO Days` leaves the Office week, never a week with no
+ * window at all — a calendar with no working day cannot place demand.
+ */
+export function poWindowCalendarOf(
+  poDays: readonly number[],
+  holidays?: ReadonlySet<string>,
+): PoWindowCalendar {
+  const ticked = new Set(poDays.map(Number));
+  const offDays = [0, 1, 2, 3, 4, 5, 6].filter(
+    (day) => PURCHASING_OFFICE_OFF_DAYS.includes(day) || (ticked.size > 0 && !ticked.has(day)),
+  );
+  return { offDays, ...(holidays ? { holidays } : {}) };
+}
+
+/** The stable key of a window: `2026-09-25T11:30` (Malaysia wall clock). */
+export function poWindowKeyOf(window: Pick<PoWindow, "date" | "time">): string {
+  return `${window.date}T${window.time}`;
+}
+
+/** `2026-09-25T11:30` → `{ date, time }`, or null for anything else. */
+export function parsePoWindowKey(key: string): { date: string; time: string } | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(key);
+  return match ? { date: match[1]!, time: `${match[2]}:${match[3]}` } : null;
+}
+
+/** `11:30` → `11:30 AM`; `16:00` → `4:00 PM` — the screen's clock word. */
+export function poWindowTimeWord(time: string): string {
+  const [h, m] = hhmm(time).split(":").map(Number) as [number, number];
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
 /** The window demand admitted at `admittedAtIso` belongs to. */
 export function poWindowFor(
   admittedAtIso: string,
@@ -153,69 +190,4 @@ export function effectivePoArrivalOf(po: {
       && p.reported_at && p.recorded_by && p.new_date)
     .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
   return (answer?.new_date ?? po.officialDeliveryDate ?? po.etaDate)?.slice(0, 10) ?? null;
-}
-
-// ── one mission per window ────────────────────────────────────────────────────
-
-export interface PoWindowDemand {
-  /** The exact source line. */
-  id: string;
-  orderId: string;
-  orderLabel: string;
-  supplierId: string;
-  supplierName: string;
-  admittedAt: string;
-  supplierCutoff: string | null;
-}
-
-export interface PoWindowMission {
-  /** `po_window:2026-09-22T11:30` — the window is the occurrence. */
-  id: string;
-  window: PoWindow;
-  dueAt: string;
-  missed: boolean;
-  lineCount: number;
-  suppliers: Array<{ supplierId: string; supplierName: string; lines: PoWindowDemand[] }>;
-}
-
-/**
- * One actionable mission per window over the exact eligible source lines,
- * grouped by supplier — never one per Sales Order, and matching one order
- * never pulls its lines from another window.
- */
-export function poWindowMissions(
-  demands: readonly PoWindowDemand[],
-  settings: PoWindowSettings,
-  nowIso: string,
-  opts: PoWindowCalendar = {},
-): PoWindowMission[] {
-  const byWindow = new Map<string, { window: PoWindow; lines: PoWindowDemand[] }>();
-  for (const demand of demands) {
-    const window = poWindowFor(demand.admittedAt, settings, demand.supplierCutoff, opts);
-    const key = `po_window:${window.date}T${window.time}`;
-    const entry = byWindow.get(key) ?? { window, lines: [] };
-    entry.lines.push(demand);
-    byWindow.set(key, entry);
-  }
-  const now = Date.parse(nowIso);
-  return [...byWindow.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([id, { window, lines }]) => {
-      const bySupplier = new Map<string, { supplierId: string; supplierName: string; lines: PoWindowDemand[] }>();
-      for (const line of lines) {
-        const group = bySupplier.get(line.supplierId) ?? { supplierId: line.supplierId, supplierName: line.supplierName, lines: [] };
-        group.lines.push(line);
-        bySupplier.set(line.supplierId, group);
-      }
-      return {
-        id,
-        window,
-        dueAt: window.dueAt,
-        missed: Date.parse(window.dueAt) <= now,
-        lineCount: lines.length,
-        suppliers: [...bySupplier.values()]
-          .map((group) => ({ ...group, lines: [...group.lines].sort((a, b) => a.id.localeCompare(b.id)) }))
-          .sort((a, b) => a.supplierName.localeCompare(b.supplierName)),
-      };
-    });
 }

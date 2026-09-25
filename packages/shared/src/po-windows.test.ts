@@ -3,7 +3,10 @@ import {
   effectivePoArrivalOf,
   poDateForIssue,
   poWindowFor,
-  poWindowMissions,
+  poWindowCalendarOf,
+  poWindowKeyOf,
+  poWindowTimeWord,
+  parsePoWindowKey,
   supplierPoWindows,
   type PoWindowSettings,
 } from "./po-windows";
@@ -97,30 +100,32 @@ describe("effectivePoArrivalOf — one definition of the effective arrival", () 
   });
 });
 
-describe("poWindowMissions — one mission per window, never one per Sales Order", () => {
-  const demand = (id: string, so: string, supplierId: string, supplierName: string, admittedAt: string, cutoff: string | null = null) =>
-    ({ id, orderId: `o-${so}`, orderLabel: so, supplierId, supplierName, admittedAt, supplierCutoff: cutoff });
-
-  it("groups the exact source lines into their window, by supplier, and says when each is due", () => {
-    const missions = poWindowMissions([
-      demand("line-1", "SO2609-4801", "s-nf", "Nice Future", my("2026-09-22T08:10:00")),
-      demand("line-2", "SO2609-4801", "s-hk", "Hookka", my("2026-09-22T09:40:00")),
-      demand("line-3", "SO2609-4802", "s-nf", "Nice Future", my("2026-09-22T10:55:00")),
-      demand("line-4", "SO2609-4803", "s-nf", "Nice Future", my("2026-09-22T12:15:00")),
-      demand("line-5", "SO2609-4804", "s-dl", "Dorsettloft", my("2026-09-22T09:00:00"), "10:00"),
-    ], STANDARD, my("2026-09-22T11:45:00"));
-    expect(missions.map((m) => [m.id, m.dueAt, m.missed, m.lineCount, m.suppliers.map((s) => `${s.supplierName}:${s.lines.map((l) => l.id).join("+")}`)])).toEqual([
-      ["po_window:2026-09-22T10:00", "2026-09-22T10:00:00+08:00", true, 1, ["Dorsettloft:line-5"]],
-      ["po_window:2026-09-22T11:30", "2026-09-22T11:30:00+08:00", true, 3, ["Hookka:line-2", "Nice Future:line-1+line-3"]],
-      ["po_window:2026-09-22T16:00", "2026-09-22T16:00:00+08:00", false, 1, ["Nice Future:line-4"]],
-    ]);
+describe("the window days follow the PO Days setting (Jess 2026-09-25)", () => {
+  it("a PO Day that is also an Office day opens windows; an unticked weekday does not", () => {
+    const monWedFri = poWindowCalendarOf([1, 3, 5], new Set());
+    // Monday 21 Sep after the last window → next PO Day is Wednesday, not Tuesday.
+    expect(poWindowFor(my("2026-09-21T17:00:00"), STANDARD, null, monWedFri)).toMatchObject({ date: "2026-09-23", time: "11:30" });
+    // Tuesday demand waits for Wednesday's first window.
+    expect(poWindowFor(my("2026-09-22T09:00:00"), STANDARD, null, monWedFri)).toMatchObject({ date: "2026-09-23", time: "11:30" });
   });
+  it("ticking Saturday never opens a window on an Office off day", () => {
+    const withSaturday = poWindowCalendarOf([1, 2, 3, 4, 5, 6], new Set());
+    expect(poWindowFor(my("2026-09-26T09:00:00"), STANDARD, null, withSaturday)).toMatchObject({ date: "2026-09-28" });
+  });
+  it("a public holiday closes the window day", () => {
+    const cal = poWindowCalendarOf([1, 2, 3, 4, 5], new Set(["2026-09-24"]));
+    expect(poWindowFor(my("2026-09-23T17:00:00"), STANDARD, null, cal)).toMatchObject({ date: "2026-09-25" });
+  });
+});
 
-  it("matching one Sales Order never pulls its unrelated lines into another window", () => {
-    const missions = poWindowMissions([
-      demand("line-1", "SO2609-4801", "s-nf", "Nice Future", my("2026-09-22T08:10:00")),
-      demand("line-9", "SO2609-4801", "s-nf", "Nice Future", my("2026-09-22T13:00:00")),
-    ], STANDARD, my("2026-09-22T08:30:00"));
-    expect(missions.map((m) => m.suppliers.flatMap((s) => s.lines.map((l) => l.id)))).toEqual([["line-1"], ["line-9"]]);
+describe("window keys and words", () => {
+  it("round-trips the key and spells the clock", () => {
+    expect(poWindowKeyOf({ date: "2026-09-25", time: "11:30" })).toBe("2026-09-25T11:30");
+    expect(parsePoWindowKey("2026-09-25T16:00")).toEqual({ date: "2026-09-25", time: "16:00" });
+    expect(parsePoWindowKey("po_window:2026-09-25T16:00")).toBeNull();
+    expect(poWindowTimeWord("11:30")).toBe("11:30 AM");
+    expect(poWindowTimeWord("16:00")).toBe("4:00 PM");
+    expect(poWindowTimeWord("12:05")).toBe("12:05 PM");
+    expect(poWindowTimeWord("00:15")).toBe("12:15 AM");
   });
 });

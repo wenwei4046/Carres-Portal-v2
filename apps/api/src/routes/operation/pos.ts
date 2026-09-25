@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { arrivalConfirmationWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
+import { arrivalConfirmationWorkCompletion, poSentWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
@@ -2433,7 +2433,9 @@ operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
 // channel, recipient, actor, Malaysia time and — read from the purchase order,
 // never accepted from here — the EXACT version that left. Current PO Duty is
 // enforced in SQL, because a door only the UI guards is not guarded.
-operationPosRouter.post("/:id/confirm-sent", requireOperation, async (c) => {
+// 0584/0585 — the send is Purchasing's completion fact for the PO window it
+// was issued from (Purchasing §5.6.1); the writer observes, never edits.
+operationPosRouter.post("/:id/confirm-sent", requireOperation, poSentWorkCompletion(), async (c) => {
   const parsed = await parseJsonBody(c, confirmPoSentInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);

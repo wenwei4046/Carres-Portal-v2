@@ -7,6 +7,7 @@ import {
   type PurchasingSettingChange,
   type PurchasingSettings,
   type PurchasingSupplierRow,
+  type PoWindowSettings,
 } from "@carres/shared";
 
 /**
@@ -301,5 +302,54 @@ export async function loadPurchasingSettings(
     supplierCollections,
     deliveryPartners,
     lastChanges,
+  };
+}
+
+/**
+ * ⭐ THE DAILY PO WINDOWS (Purchasing MASTER §5.6.1; storage 0585).
+ *
+ * The first window, the optional second, whether the second is on, and each
+ * supplier's governed earlier cut-off. `PO Days` (0303) decides WHICH days a
+ * window opens (owner correction 2026-09-25) and rides here so every reader
+ * builds the one calendar through `poWindowCalendarOf`.
+ *
+ * Like the loader above there is NO fallback object: an unreadable setting is
+ * an error the caller reports, never an invented 11:30.
+ */
+export interface LoadedPoWindows {
+  settings: PoWindowSettings;
+  poDays: number[];
+  cutoffBySupplier: Map<string, string>;
+}
+
+export async function loadPoWindows(sb: SupabaseClient): Promise<LoadedPoWindows> {
+  const [settings, cutoffs] = await Promise.all([
+    sb
+      .from("purchasing_settings")
+      .select("po_days, po_window_first, po_window_second, po_window_second_enabled")
+      .eq("id", 1)
+      .single(),
+    sb.from("purchasing_supplier_settings").select("supplier_id, po_cutoff").not("po_cutoff", "is", null),
+  ]);
+  if (settings.error) throw new Error(`purchasing_settings po windows: ${settings.error.message}`);
+  if (cutoffs.error) throw new Error(`purchasing_supplier_settings po_cutoff: ${cutoffs.error.message}`);
+  const row = settings.data as {
+    po_days: number[] | null;
+    po_window_first: string;
+    po_window_second: string | null;
+    po_window_second_enabled: boolean;
+  };
+  const cutoffBySupplier = new Map<string, string>();
+  for (const r of (cutoffs.data ?? []) as Array<{ supplier_id: string; po_cutoff: string | null }>) {
+    if (r.po_cutoff) cutoffBySupplier.set(r.supplier_id, r.po_cutoff.slice(0, 5));
+  }
+  return {
+    settings: {
+      first: row.po_window_first.slice(0, 5),
+      second: row.po_window_second ? row.po_window_second.slice(0, 5) : null,
+      secondEnabled: row.po_window_second_enabled === true,
+    },
+    poDays: (row.po_days ?? []).map(Number),
+    cutoffBySupplier,
   };
 }

@@ -1,7 +1,8 @@
 /**
  * Purchasing's completion facts (0584 · owner direction 2026-09-24):
- * `issue_po` closes when a purchase order now serves the order; the PO's
- * supplier-reply Work closes on an evidenced answer for its current version.
+ * a PO window closes when its demand is bought and every PO it issued is
+ * marked sent; the PO's supplier-reply Work closes on an evidenced answer
+ * for its current version.
  */
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
@@ -10,17 +11,16 @@ import type { AppEnv } from "../types";
 import { withWorkCompletion, type CompletedWrite, type WorkCompletionDeps, type WorkCompletionSpec } from "./work-completion";
 import {
   arrivalConfirmationResult,
-  issuePoResult,
-  orderIdsOfSoBatchSelections,
+  poWindowResult,
   supplierReplyResult,
   type ArrivalConfirmationFacts,
-  type IssuePoFacts,
+  type PoWindowSendFacts,
   type SupplierReplyFacts,
 } from "./purchasing-work-completion";
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
-const A = "aaaaaaaa-0000-4000-8000-000000000001";
-const B = "bbbbbbbb-0000-4000-8000-000000000002";
+const W1 = "2026-09-25T11:30";
+const W2 = "2026-09-25T16:00";
 
 function item(objectId: string, ruleKey: string, label: string, actionOn: string | null): OperationWorkItem {
   return {
@@ -33,10 +33,12 @@ function item(objectId: string, ruleKey: string, label: string, actionOn: string
 }
 
 describe("Purchasing completion facts", () => {
-  it("issue_po holds only when a purchase order serves the order", () => {
-    expect(issuePoResult("issue_po", { purchaseOrderIds: ["PO2609-2", "PO2609-1"] })).toBe("purchase_orders=PO2609-1,PO2609-2");
-    expect(issuePoResult("issue_po", { purchaseOrderIds: [] })).toBeNull();
-    expect(issuePoResult("delay_planning", { purchaseOrderIds: ["PO2609-1"] })).toBeNull();
+  it("a PO window holds only when its demand is bought and every PO it issued is sent", () => {
+    expect(poWindowResult("purchasing.po_window", { poIds: ["PO250925-2", "PO250925-1"], demandLeft: 0, allSent: true })).toBe("po_sends=PO250925-1,PO250925-2");
+    expect(poWindowResult("purchasing.po_window", { poIds: ["PO250925-1"], demandLeft: 0, allSent: false })).toBeNull();
+    expect(poWindowResult("purchasing.po_window", { poIds: ["PO250925-1"], demandLeft: 2, allSent: true })).toBeNull();
+    expect(poWindowResult("purchasing.po_window", { poIds: [], demandLeft: 0, allSent: false })).toBeNull();
+    expect(poWindowResult("issue_po", { poIds: ["PO250925-1"], demandLeft: 0, allSent: true })).toBeNull();
   });
 
   it("a passed supplier date closes only on a governed answer to the current version — with its screenshot", () => {
@@ -55,18 +57,6 @@ describe("Purchasing completion facts", () => {
     expect(arrivalConfirmationResult("purchasing.supplier_date_passed", facts)).toBeNull();
   });
 
-  it("SO Batch names the orders it buys for; anything else names none", () => {
-    expect(orderIdsOfSoBatchSelections({
-      selections: [
-        { demandId: `build::${A}::sofa-1` },
-        { demandId: `build::${A}::sofa-2` },
-        { demandId: `build::${B}::bed` },
-        { demandId: "ready::whatever" },
-      ],
-    })).toEqual([A, B]);
-    expect(orderIdsOfSoBatchSelections(null)).toEqual([]);
-    expect(orderIdsOfSoBatchSelections({ selections: "x" })).toEqual([]);
-  });
 });
 
 async function run<F>(spec: WorkCompletionSpec<F>, objectIds: string[], status = 200) {
@@ -84,39 +74,54 @@ async function run<F>(spec: WorkCompletionSpec<F>, objectIds: string[], status =
   return { recorded, logs };
 }
 
-describe("a batch issue completes issue_po only for the orders a PO now serves", () => {
-  it("A got its PO; B left Work because its goods became ready from stock — only A is completed", async () => {
+describe("PO sent to supplier completes the window only when its last PO is sent", () => {
+  it("W1's last PO was sent; W2 still has demand — only W1 is completed", async () => {
     let call = 0;
-    const spec: WorkCompletionSpec<IssuePoFacts> = {
+    const spec: WorkCompletionSpec<PoWindowSendFacts> = {
       owner: "Purchasing",
-      rules: ["issue_po"],
+      rules: ["purchasing.po_window"],
       probe: async (_c, id) => {
         call += 1;
         const before = call <= 2;
-        return before ? [item(id, "issue_po", id === A ? "SO-1301" : "SO-1302", "2026-09-22")] : [];
+        const label = id === W1 ? "11:30 AM PO window" : "4:00 PM PO window";
+        return before || id === W2 ? [item(id, "purchasing.po_window", label, "2026-09-25")] : [];
       },
-      readFacts: async (_c, id) => ({ purchaseOrderIds: id === A ? ["PO2609-4827"] : [] }),
-      result: issuePoResult,
+      readFacts: async (_c, id) => (id === W1
+        ? { poIds: ["PO250925-4827", "PO250925-4828"], demandLeft: 0, allSent: true }
+        : { poIds: ["PO250925-4828"], demandLeft: 3, allSent: true }),
+      result: poWindowResult,
     };
-    const { recorded, logs } = await run(spec, [A, B]);
+    const { recorded } = await run(spec, [W1, W2]);
     expect(recorded).toEqual([expect.objectContaining({
-      occurrenceId: `orders:${A}:issue_po`,
-      objectLabel: "SO-1301",
-      actionOn: "2026-09-22",
-      resultReference: "purchase_orders=PO2609-4827",
+      occurrenceId: `purchasing:${W1}:purchasing.po_window`,
+      objectLabel: "11:30 AM PO window",
+      actionOn: "2026-09-25",
+      resultReference: "po_sends=PO250925-4827,PO250925-4828",
       actorId: ME,
     })]);
+  });
+
+  it("a window that left Work without every PO sent is not completed", async () => {
+    let call = 0;
+    const spec: WorkCompletionSpec<PoWindowSendFacts> = {
+      owner: "Purchasing", rules: ["purchasing.po_window"],
+      probe: async (_c, id) => (++call === 1 ? [item(id, "purchasing.po_window", "11:30 AM PO window", "2026-09-25")] : []),
+      readFacts: async () => ({ poIds: ["PO250925-4827"], demandLeft: 0, allSent: false }),
+      result: poWindowResult,
+    };
+    const { recorded, logs } = await run(spec, [W1]);
+    expect(recorded).toEqual([]);
     expect(logs).toContain("work left without its completion fact: not recorded as completed");
   });
 
-  it("a refused batch completes nothing", async () => {
-    const spec: WorkCompletionSpec<IssuePoFacts> = {
-      owner: "Purchasing", rules: ["issue_po"],
-      probe: async (_c, id) => [item(id, "issue_po", "SO-1301", null)],
-      readFacts: async () => ({ purchaseOrderIds: ["PO-1"] }),
-      result: issuePoResult,
+  it("a refused send completes nothing", async () => {
+    const spec: WorkCompletionSpec<PoWindowSendFacts> = {
+      owner: "Purchasing", rules: ["purchasing.po_window"],
+      probe: async (_c, id) => [item(id, "purchasing.po_window", "11:30 AM PO window", null)],
+      readFacts: async () => ({ poIds: ["PO-1"], demandLeft: 0, allSent: true }),
+      result: poWindowResult,
     };
-    expect((await run(spec, [A], 409)).recorded).toEqual([]);
+    expect((await run(spec, [W1], 409)).recorded).toEqual([]);
   });
 });
 

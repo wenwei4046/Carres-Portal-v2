@@ -331,6 +331,14 @@ export interface PurchaseDemandRow {
   ownerName: string | null;
   /** The duty word, when no person resolves. */
   ownerDuty: string | null;
+  /**
+   * The daily PO window this demand belongs to (`2026-09-25T11:30`, Malaysia
+   * wall clock) — stamped by the SO Batch read with `poWindowFor` over the
+   * order's Proceed time, the PO windows, the `PO Days` calendar and the
+   * supplier's cut-off (Purchasing §5.6.1). `null`: no Proceed time on
+   * record, so no window is guessed. Optional: an older Worker sends none.
+   */
+  poWindow?: string | null;
 }
 
 // ─── The action ──────────────────────────────────────────────────────────────
@@ -910,6 +918,7 @@ export const purchaseDemandRowSchema = z.object({
     .optional(),
   ownerName: z.string().nullable(),
   ownerDuty: z.string().nullable(),
+  poWindow: z.string().nullable().optional(),
 });
 
 export const purchaseDemandsResponseSchema = z.object({

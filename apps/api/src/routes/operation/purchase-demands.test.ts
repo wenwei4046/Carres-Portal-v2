@@ -1441,3 +1441,81 @@ describe("Card 02-C · a `place` order is invisible to Purchasing", () => {
     expect(tbd.state).toBe("no_customer_date");
   });
 });
+
+describe("the daily PO window of every demand line (Purchasing §5.6.1, owner rulings 2026-09-24/25)", () => {
+  /* TODAY is Wednesday 2 September; `PO Days` is Mon/Wed/Fri. */
+  function windowTables(cutoff: string | null = null) {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    t.purchasing_settings = {
+      data: {
+        ...(t.purchasing_settings!.data as Record<string, unknown>),
+        po_window_first: "11:30:00",
+        po_window_second: "16:00:00",
+        po_window_second_enabled: true,
+      },
+      error: null,
+    };
+    t.purchasing_supplier_settings = {
+      data: [{ supplier_id: NICE, off_days: [0], transit_days: 1, po_cutoff: cutoff }],
+      error: null,
+    };
+    const proceeded: Record<string, string> = {
+      o1: "2026-09-02T09:00:00+08:00", // before 11:30 → today's first window
+      o5: "2026-09-02T12:00:00+08:00", // after 11:30 → today's second window
+      o4: "2026-09-02T17:00:00+08:00", // after the last → next PO Day (Friday)
+    };
+    t.orders = {
+      data: (t.orders!.data as Record<string, unknown>[]).map((o) => ({
+        ...o,
+        proceeded_at: proceeded[o.id as string] ?? null,
+      })),
+      error: null,
+    };
+    return t;
+  }
+  const windowsByOrder = (rows: SoBatchPurchaseResponse["rows"]) =>
+    Object.fromEntries([...new Set(rows.map((r) => r.orderId))].sort().map((id) => [
+      id, [...new Set(rows.filter((r) => r.orderId === id).map((r) => r.poWindow ?? null))],
+    ]));
+
+  it("stamps each line with the window its order's Proceed time falls into — on PO Days only", async () => {
+    const { body } = await rowsOf(windowTables());
+    const stamped = windowsByOrder(body.rows);
+    expect(stamped.o1).toEqual(["2026-09-02T11:30"]);
+    expect(stamped.o5).toEqual(["2026-09-02T16:00"]);
+    expect(stamped.o4).toEqual(["2026-09-04T11:30"]);
+    // No Proceed time on record → no window is guessed.
+    expect(stamped.o3).toEqual([null]);
+    expect(body.poWindowsUnavailable).toBeUndefined();
+  });
+
+  it("a supplier's earlier cut-off is that supplier's own window; other suppliers keep theirs", async () => {
+    const { body } = await rowsOf(windowTables("10:00:00"));
+    const o1 = body.rows.filter((r) => r.orderId === "o1");
+    expect(o1.filter((r) => r.supplierId === NICE).length).toBeGreaterThan(0);
+    expect(o1.filter((r) => r.supplierId === NICE).map((r) => r.poWindow)).toEqual(
+      o1.filter((r) => r.supplierId === NICE).map(() => "2026-09-02T10:00"),
+    );
+    expect(o1.filter((r) => r.supplierId !== NICE && r.supplierId).every((r) => r.poWindow === "2026-09-02T11:30")).toBe(true);
+  });
+
+  it("`?window=` opens exactly that window's lines — never the order's other lines", async () => {
+    const { res } = await getDemands(windowTables(), "operation", "/api/operation/purchase/demands?window=2026-09-02T16:00");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as SoBatchPurchaseResponse;
+    expect([...new Set(body.rows.map((r) => r.orderId))]).toEqual(["o5"]);
+    expect(body.registerRows.map((r) => r.orderId)).toEqual(["o5"]);
+  });
+
+  it("refuses a malformed window", async () => {
+    const { res } = await getDemands(windowTables(), "operation", "/api/operation/purchase/demands?window=today");
+    expect(res.status).toBe(400);
+  });
+
+  it("unreadable window settings stamp nothing and SAY so — buying still works", async () => {
+    const { body } = await rowsOf();
+    expect(body.poWindowsUnavailable).toBe(true);
+    expect(body.rows.every((r) => r.poWindow == null)).toBe(true);
+    expect(body.rows.length).toBeGreaterThan(0);
+  });
+});

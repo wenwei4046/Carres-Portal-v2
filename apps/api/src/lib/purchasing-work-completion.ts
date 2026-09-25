@@ -1,10 +1,13 @@
 /**
  * ⭐ PURCHASING'S COMPLETION FACTS (0584 · owner direction, Jess 2026-09-24).
  *
- *   issue_po                       (object: the Sales Order) a purchase order
- *                                  now serves the order — issued by SO Batch.
- *                                  The PO then waits for goods; silence from
- *                                  the supplier is not work.
+ *   purchasing.po_window           (object: the PO window) no eligible demand
+ *                                  is left in the window and every PO issued
+ *                                  from it has its CURRENT version marked
+ *                                  `PO sent to supplier` (po_sends
+ *                                  confirmed_sent). Opening WhatsApp or email
+ *                                  completes nothing. The PO then waits for
+ *                                  goods; silence from the supplier is not work.
  *   purchasing.supplier_date_passed  (object: the PO) a new governed supplier
  *                                  answer on the CURRENT version — a delay
  *                                  carries a governed reason, a new date and
@@ -23,68 +26,43 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "../types";
 import { adminClient } from "./supabase";
-import { probeOrderWorkLazily } from "./sales-order-work-completion";
 import { workCompletion, type WorkCompletionDeps, type WorkCompletionSpec, workCompletionDeps } from "./work-completion";
 
-// ── issue_po — the Sales Order is now served by a purchase order ──────────────
+// ── purchasing.po_window — every PO the window issued is marked sent ─────────
 
-export interface IssuePoFacts {
-  /** The purchase orders that serve this order (by `so` or `so_refs`). */
-  purchaseOrderIds: string[];
+export interface PoWindowSendFacts {
+  /** Every PO issued from the window (Work's own window model). */
+  poIds: string[];
+  /** Eligible demand lines still unbought in the window. */
+  demandLeft: number;
+  /** TRUE only when the window issued at least one PO and all are sent. */
+  allSent: boolean;
 }
 
-export function issuePoResult(ruleKey: string, facts: IssuePoFacts): string | null {
-  if (ruleKey !== "issue_po" || facts.purchaseOrderIds.length === 0) return null;
-  return `purchase_orders=${[...facts.purchaseOrderIds].sort().join(",")}`;
+export function poWindowResult(ruleKey: string, facts: PoWindowSendFacts): string | null {
+  if (ruleKey !== "purchasing.po_window" || !facts.allSent || facts.demandLeft > 0) return null;
+  return `po_sends=${[...facts.poIds].sort().join(",")}`;
 }
 
-export async function readIssuePoFacts(c: Context<AppEnv>, orderId: string): Promise<IssuePoFacts> {
-  const admin = adminClient(c.env);
-  const order = await admin.from("orders").select("so").eq("id", orderId).single();
-  if (order.error) throw new Error(order.error.message);
-  const so = (order.data as { so: number | null }).so;
-  if (so === null) return { purchaseOrderIds: [] };
-  // The same link the order list and the drawer use: `so` or `so_refs[]`.
-  const pos = await admin
-    .from("purchase_orders")
-    .select("id, status")
-    .or(`so.eq.${so},so_refs.cs.{${so}}`);
-  if (pos.error) throw new Error(pos.error.message);
-  return {
-    purchaseOrderIds: ((pos.data ?? []) as Array<{ id: string; status: string | null }>)
-      .filter((po) => po.status !== "cancelled")
-      .map((po) => po.id),
-  };
-}
-
-export function issuePoCompletionSpec(): WorkCompletionSpec<IssuePoFacts> {
+export function poWindowCompletionSpec(): WorkCompletionSpec<PoWindowSendFacts> {
   return {
     owner: "Purchasing",
-    rules: ["issue_po"],
-    probe: probeOrderWorkLazily,
-    readFacts: (c, orderId) => readIssuePoFacts(c, orderId),
-    result: issuePoResult,
+    rules: ["purchasing.po_window"],
+    probe: async (c, windowKey) => (await import("../routes/operation/work")).probePoWindowWork(c, windowKey),
+    readFacts: async (c, windowKey) => (await import("../routes/operation/work")).poWindowSendFacts(c, windowKey),
+    result: poWindowResult,
   };
 }
 
-/** SO Batch names each order it buys for as `build::{orderId}::{build}`. */
-export function orderIdsOfSoBatchSelections(body: unknown): string[] {
-  const selections = (body as { selections?: Array<{ demandId?: unknown }> } | null)?.selections ?? [];
-  const ids = new Set<string>();
-  for (const selection of selections) {
-    const match = /^build::([0-9a-f-]{36})::/i.exec(String(selection?.demandId ?? ""));
-    if (match) ids.add(match[1]!);
-  }
-  return [...ids];
-}
-
-export function soBatchIssueWorkCompletion(
+/** `PO sent to supplier` — the one act that can close a PO window. The
+ *  windows are named BEFORE the write, from the same model the feed runs. */
+export function poSentWorkCompletion(
   deps: () => WorkCompletionDeps = workCompletionDeps,
 ): MiddlewareHandler<AppEnv> {
   return workCompletion({
     targets: async (c) => [{
-      spec: issuePoCompletionSpec(),
-      objectIds: orderIdsOfSoBatchSelections(await c.req.json().catch(() => null)),
+      spec: poWindowCompletionSpec(),
+      objectIds: await (await import("../routes/operation/work")).poWindowKeysServing(c, c.req.param("id") ?? ""),
     }],
   }, deps);
 }

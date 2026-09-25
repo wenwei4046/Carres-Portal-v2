@@ -721,6 +721,14 @@ export interface SoBatchOrderPoFact {
   officialDeliveryDate: IsoDate | null;
   /** TRUE = the current PDF version has confirmed-sent evidence. */
   sentCurrentVersion: boolean;
+  /** The current PDF version — `PO250925-4827(2)`. Optional on the wire. */
+  version?: number;
+  /**
+   * The PO window THIS order's demand for this PO's supplier fell into — the
+   * same stamp as the demand rows (Purchasing §5.6.1). A PO serving several
+   * orders carries one stamp per order row; Work counts it in the earliest.
+   */
+  poWindow?: string | null;
 }
 
 /**
@@ -794,6 +802,8 @@ export const soBatchOrderRowSchema = z.object({
       destinationId: z.string().nullable(),
       officialDeliveryDate: z.string().nullable(),
       sentCurrentVersion: z.boolean(),
+      version: z.number().int().positive().optional(),
+      poWindow: z.string().nullable().optional(),
     }),
   ),
   lines: z.array(
@@ -920,6 +930,12 @@ export const soBatchPurchaseResponseSchema = z.object({
    * The browser only PRINTS it; the arithmetic stays on the server.
    */
   safetyDays: z.number().int(),
+  /**
+   * The PO window settings could not be read, so no row carries `poWindow`.
+   * Buying still works; Work reports its Purchasing source as failed rather
+   * than showing an empty buying day (Purchasing §5.6.1).
+   */
+  poWindowsUnavailable: z.boolean().optional(),
 });
 
 export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;

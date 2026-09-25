@@ -3186,6 +3186,7 @@ export * from "./schemas/loan-offer";
 export * from "./operation-work";
 export * from "./work-lifecycle";
 export * from "./po-windows";
+export * from "./po-window-work";
 export * from "./sales-order-work-source";
 export * from "./storage-obligation";
 export * from "./payment-collection-outcome";

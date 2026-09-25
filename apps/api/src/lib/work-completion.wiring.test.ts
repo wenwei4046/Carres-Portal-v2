@@ -20,7 +20,7 @@ vi.mock("./purchasing-work-completion", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./purchasing-work-completion")>();
   return {
     ...actual,
-    soBatchIssueWorkCompletion: () => async (c: { json: (b: unknown) => Response }) => c.json({ wired: ["issue_po"] }),
+    poSentWorkCompletion: () => async (c: { json: (b: unknown) => Response }) => c.json({ wired: ["purchasing.po_window"] }),
     supplierReplyWorkCompletion: () => async (c: { json: (b: unknown) => Response }) =>
       c.json({ wired: ["purchasing.supplier_date_passed"] }),
     arrivalConfirmationWorkCompletion: () => async (c: { json: (b: unknown) => Response }) =>
@@ -53,8 +53,13 @@ const post = async (app: Hono<AppEnv>, path: string) =>
   (await app.request(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json();
 
 describe("the Purchasing doors that complete Work", () => {
-  it("the SO Batch issue completes issue_po", async () => {
-    expect(await post(mount("operation"), "/api/operation/to-order/issue-batch")).toEqual({ wired: ["issue_po"] });
+  it("PO sent to supplier completes the PO window it was issued from", async () => {
+    expect(await post(mount("operation"), "/api/operation/pos/PO2609-4827/confirm-sent")).toEqual({ wired: ["purchasing.po_window"] });
+  });
+  it("the SO Batch issue completes nothing — issuing is not sending", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("../routes/operation/to-order.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/WorkCompletion/);
   });
   it("the recorded supplier answer completes only the passed-date follow-up", async () => {
     expect(await post(mount("operation"), "/api/operation/pos/PO2609-4827/tomorrow-delivery"))
