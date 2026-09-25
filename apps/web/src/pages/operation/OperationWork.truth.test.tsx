@@ -248,8 +248,11 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
     expect(rail()).toBeInTheDocument();
+    /* Rail OR detail at this width — never a 140px detail. */
+    expect(screen.queryByRole("region", { name: "Selected work" })).toBeNull();
     fireEvent.click(within(rail()).getByRole("button", { name: "Hide filters" }));
     expect(screen.queryByTestId("work-rail")).toBeNull();
+    expect(screen.getByRole("region", { name: "Selected work" })).toBeInTheDocument();
     expect(screen.getByTestId("work-rail-collapsed")).toHaveTextContent("Show filters");
     fireEvent.click(screen.getByTestId("work-show-filters-rail"));
     expect(screen.getByTestId("work-rail")).toBeInTheDocument();

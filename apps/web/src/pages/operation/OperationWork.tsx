@@ -697,6 +697,7 @@ export default function OperationWork() {
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
+          railBeside={railVisible}
           list={(
             <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
               {/* The heading and tabs stay put; the cards scroll beneath them. */}

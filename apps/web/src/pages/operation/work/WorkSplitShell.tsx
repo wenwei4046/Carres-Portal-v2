@@ -37,6 +37,7 @@ export default function WorkSplitShell({
   activePanel = "list",
   railOpen = false,
   rail,
+  railBeside = false,
   list,
   detail,
 }: {
@@ -47,6 +48,9 @@ export default function WorkSplitShell({
   /** Absent since the §6.0 shell (owner ruling 2026-09-25): Date and Page are
    *  toolbar selects, so the list and the detail share the whole width. */
   rail?: ReactNode;
+  /** At `two` the page's own rail (drawn beside this shell) is open: the
+   *  list takes the width and the detail waits for a pick. */
+  railBeside?: boolean;
   list: ReactNode;
   detail: ReactNode;
 }) {
@@ -66,12 +70,14 @@ export default function WorkSplitShell({
   /* At `two` the rail and the detail never share the page (Jess, 2026-09-26:
      a 140px detail is no detail): the rail beside the list, or the list
      beside the detail. Choosing a card hides the rail. */
-  const hideDetail = layout === "two" && showRail;
+  const hideDetail = layout === "two" && (showRail || railBeside);
   const columns = layout === "three"
     ? showRail ? "grid-cols-[240px_420px_minmax(480px,1fr)]" : "grid-cols-[420px_minmax(480px,1fr)]"
     : showRail
       ? "grid-cols-[240px_minmax(0,1fr)]"
-      : "grid-cols-[400px_minmax(0,1fr)]";
+      : hideDetail
+        ? "grid-cols-[minmax(0,1fr)]"
+        : "grid-cols-[400px_minmax(0,1fr)]";
   return (
     <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 gap-4 ${columns}`}>
       {showRail ? (
