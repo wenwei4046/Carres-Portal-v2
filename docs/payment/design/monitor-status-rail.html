@@ -70,7 +70,8 @@
   .chev[aria-expanded="true"] svg{transform:rotate(90deg)}
   .av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#dbe7f5;color:#17243a;font-size:11px;font-weight:600;vertical-align:middle;margin-right:6px}
   .act{display:flex;align-items:center;gap:6px;font-size:11px;line-height:14px;color:var(--ink-2);margin-top:2px}
-  tr.exp td{background:var(--expansion);height:auto;padding:12px 16px 16px 48px;white-space:normal;max-width:none;overflow:visible}
+  tr.exp>td{background:var(--expansion);height:auto;padding:0;white-space:normal;max-width:none;overflow:visible}
+  .expbox{position:sticky;left:0;padding:12px 16px 16px 48px;box-sizing:border-box}
   .doors{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-bottom:12px}
   .btn{height:32px;padding:0 12px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
@@ -85,7 +86,8 @@
   .todo .fact{font-weight:600}
   .todo .sub{font-size:11px;line-height:14px;color:var(--ink-2);margin:2px 0 8px}
   .docs table{min-width:0;width:auto}
-  .docs td{height:32px;padding:0 12px 0 0;border:0;max-width:none;white-space:nowrap}
+  tr.exp .docs table{min-width:0;width:auto;border-collapse:collapse}
+  tr.exp .docs td{height:32px;padding:0 16px 0 0;border:0;max-width:none;white-space:nowrap;background:#fff}
   .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
   .link{background:none;border:0;color:var(--blue-11);font:inherit;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
   .hist p{margin:0 0 4px}.hist .t{font-size:12px;color:var(--ink-2);margin-left:8px}
@@ -143,7 +145,7 @@
             <thead><tr><th class="ctl sticky1"></th><th class="sticky2">SO No</th><th class="sticky3">Customer</th><th class="num">Balance due</th><th>Items &amp; Stock</th><th>Storage</th><th>Requested Delivery Date</th><th>Scheduled delivery</th><th>Payment timing</th></tr></thead>
             <tbody id="rows">
               <tr data-k="missed all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1401</span><span class="l2">TCF0541 · CR1122</span></td><td class="sticky3"><span class="l1">TAN SRI DATO' SERI MUHAMMAD</span><span class="l2">0123456789</span></td><td class="num"><span class="l1">RM 1,700.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1">No storage charge</span></td><td><span class="l1">Fri, 18 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Fri, 18 Sep · 2 PM to 5 PM</span></td><td><span class="l1 r">Payment should have been received</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
-              <tr class="exp" data-k="missed all"><td colspan="9">
+              <tr class="exp" data-k="missed all"><td colspan="9"><div class="expbox">
                 <div class="doors"><button class="btn">Statement</button><button class="btn">Print</button><button class="btn">Create payment link</button><button class="btn">Record payment</button><button class="btn p">Ask customer to pay</button></div>
                 <div class="facts">
                   <div class="f"><div class="k">Balance due</div><div class="v">RM 1,700.00 unpaid</div></div>
@@ -158,7 +160,7 @@
                 <div class="card todo"><h3>What to do</h3><p class="fact r">Payment should have been received</p><p class="sub">Ask customer to pay · Record the result.</p><button class="btn">Record the result</button></div>
                 <div class="card docs"><h3>Documents</h3><table><tr><td>RC2609-4821</td><td>RM 1,200.00</td><td>Thu, 3 Sep</td><td>Deposit</td><td><button class="link">Print</button> · <button class="link">Send</button></td></tr><tr><td>Invoice</td><td colspan="3"><small>Issued by the system when Balance due reaches RM 0, sent with the Receipt.</small></td><td></td></tr><tr><td>Statement</td><td colspan="3"></td><td><button class="link">Print</button></td></tr></table></div>
                 <div class="card hist"><h3>Communication History</h3><p><strong>Customer did not answer</strong><span class="t">Mon, 14 Sep, 4:10 PM · Shasha</span></p><p><strong>Payment message sent</strong><span class="t">Fri, 11 Sep, 10:02 AM · Shasha</span></p></div>
-              </td></tr>
+              </div></td></tr>
               <tr data-k="storage all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1404</span><span class="l2">TCF0612</span></td><td class="sticky3"><span class="l1">WONG MEI LING</span><span class="l2">0127775544</span></td><td class="num"><span class="l1">RM 1,800.00</span><span class="l2">includes storage RM 200.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1 o">Storage Invoice issued</span><span class="l2">RM 200.00 not paid</span></td><td><span class="l1">Wed, 23 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Wed, 23 Sep</span></td><td><span class="l1">Storage Invoice not paid</span><span class="act"><span class="av">YJ</span>Send the invoice and collect payment</span></td></tr>
               <tr data-k="promised all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1405</span></td><td class="sticky3"><span class="l1">SITI AMINAH</span><span class="l2">0133332211</span></td><td class="num"><span class="l1">RM 2,100.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1 o">Sofa · Day 29</span><span class="l2">RM 400.00 so far</span></td><td><span class="l1">Thu, 24 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Thu, 24 Sep</span></td><td><span class="l1 o">Customer promised to pay today</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
               <tr data-k="ask all"><td class="ctl sticky1"><button class="chev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="sticky2"><span class="l1 so">SO-1406</span></td><td class="sticky3"><span class="l1">CHONG WEI JIE</span><span class="l2">0171234567</span></td><td class="num"><span class="l1">RM 1,000.00</span></td><td><span class="l1 g">Ready</span><span class="l2">1 of 1</span></td><td><span class="l1">Free storage approved</span><span class="l2">until Sun, 27 Sep</span></td><td><span class="l1">Fri, 25 Sep</span></td><td><span class="l1 g">Scheduled</span><span class="l2">Fri, 25 Sep · 10 AM to 1 PM</span></td><td><span class="l1">Ask customer today</span><span class="act"><span class="av">SH</span>Ask customer to pay</span></td></tr>
@@ -198,6 +200,8 @@
     function syncExp(){rows.forEach(function(tr){if(tr.classList.contains('exp')){var prev=tr.previousElementSibling;var c=prev.querySelector('.chev');tr.hidden=prev.hidden||c.getAttribute('aria-expanded')!=='true';}});}
     rail.forEach(function(b){b.addEventListener('click',function(){pick(b.dataset.k);});});
     document.querySelectorAll('.chev').forEach(function(c){c.addEventListener('click',function(){var open=c.getAttribute('aria-expanded')==='true';document.querySelectorAll('.chev').forEach(function(o){o.setAttribute('aria-expanded','false');});c.setAttribute('aria-expanded',String(!open));syncExp();});});
+    function fit(){var w=document.querySelector('.sheet').clientWidth;document.querySelectorAll('.expbox').forEach(function(b){b.style.width=w+'px';});}
+    window.addEventListener('resize',fit);fit();
     pick('missed');
   })();
 </script>
