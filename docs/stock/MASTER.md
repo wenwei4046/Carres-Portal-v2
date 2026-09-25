@@ -639,6 +639,17 @@ remain in Inbound, not current Inventory. Delivered, returned-to-supplier, writt
 ended Units leave the default current list but remain searchable in History with their distinct
 lifecycle outcome.
 
+**THE DEFAULT LIST IS WHAT CARRES PHYSICALLY HOLDS — owner ruling 2026-09-25, APPROVED TARGET /
+NOT BUILT.** `All stock` opens on the Units Carres actually holds: `Available · Reserved / sold ·
+Not available · In transit`. `Incoming` (born with the PO, not yet received) is never in that
+default; it stays reachable as its own `Stock use` rail row, and the footer prints one extra line,
+`{n} still to arrive · see Inbound`, whose number is the same `Pending Delivery` arithmetic Inbound
+reads (`receivingSummaryOf`), never a second count. Measured on production 2026-09-25: `All stock
+222` while 127 of those rows were `Incoming` and only 95 were in a Carres Site — a new operator read
+222 as goods on the floor. Mature systems (Odoo On Hand vs Incoming, SAP/Dynamics expected receipts,
+2990 On hand/Incoming) separate the two for the same reason. Falsifier: an operator who needs the
+Incoming rows inside the default list to do a daily Warehouse job.
+
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
 Unit; they do not require permanent rail rows. `Needs checking` states the exact observed problem,
