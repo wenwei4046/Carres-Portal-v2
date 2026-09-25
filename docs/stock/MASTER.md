@@ -67,7 +67,7 @@ Ready Stock is a shared eligible-Unit view; Counts & Adjustments belongs within 
 Reports, Settings, Work and Calendar keep their shared Shell homes. There is no Warehouse-local
 Dashboard, Monitor, Transfer, Ready Stock or Counts top-level destination.
 
-Approved words include Where · Who has it · Carres Owned · Supplier Consignment · Report issue ·
+Approved words include Stock Location (the one place word on screen; `Where` / `Who has it` are retired as screen words, owner 2026-09-25 — the holder remains an internal custody fact) · Carres Owned · Supplier Consignment · Report issue ·
 Count again. Generic status editing, Add stock, Remove stock and Mark done remain forbidden.
 UI Kit acceptance remains pending the owner's visual review; implementation is not a design freeze.
 
@@ -669,7 +669,7 @@ row prints `—` for Unit ID with `×{qty}` beside the product. Measured on prod
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
-**THE WORDS IN `Stock use`, `Site` AND `Who has it` — owner rulings 2026-09-25.**
+**THE WORDS IN `Stock use` AND `Stock Location` — owner rulings 2026-09-25.**
 
 - `Stock Location` joins the default columns directly after `Stock use` and replaces `Who has it`
   (owner correction 2026-09-25). It prints COPY-STANDARD's existing place words — `Carres Klang` ·
