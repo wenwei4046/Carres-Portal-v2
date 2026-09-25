@@ -2590,6 +2590,10 @@ export interface DeliveryPartnerRow {
   pickup_days?: number[] | null;
   journey_regions?: unknown;
   surcharge_areas?: string[] | null;
+  /** 0488 — who agrees the day with the customer: the company or Carres
+   *  Operation. The Work Customer card follows it (Workspace §5.10). Absent on
+   *  an older Worker → read as `partner` (today's value for every company). */
+  customer_contact_by?: "partner" | "operation" | null;
 }
 export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];

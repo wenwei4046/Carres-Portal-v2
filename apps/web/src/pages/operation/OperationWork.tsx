@@ -46,6 +46,7 @@ import {
   workRailDates,
   workSections,
   type WorkWhen,
+  workListTabOf,
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
@@ -228,7 +229,15 @@ export default function OperationWork() {
   const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
   const selectedDay = day === "focus" ? focusDay : day;
   const inDay = (item: WorkRow) => inWorkDay(item, day, generatedOn, focusDay);
-  const visible = beforeDay.filter(inDay);
+  const listTab: WorkListTab = params.get("list") === "waiting" || params.get("list") === "completed"
+    ? params.get("list") as WorkListTab
+    : "todo";
+  /* To do · Waiting (§5.10): one day's open set split by the recorded reply
+     state; the rail's counts keep the whole open set. */
+  const inDaySet = beforeDay.filter(inDay);
+  const todoRows = inDaySet.filter((item) => workListTabOf(item) === "todo");
+  const waitingRows = inDaySet.filter((item) => workListTabOf(item) === "waiting");
+  const visible = listTab === "waiting" ? waitingRows : listTab === "completed" ? [] : todoRows;
   const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
 
   /** Module counts ignore the module filter and nothing else: scope · owner ·
@@ -344,9 +353,6 @@ export default function OperationWork() {
     return [{ ...g, items }];
   });
 
-  const listTab: WorkListTab = params.get("list") === "waiting" || params.get("list") === "completed"
-    ? params.get("list") as WorkListTab
-    : "todo";
   /** The heading names the chosen Date — the same words as the rail. */
   const listHeading = selectedDay === "missed"
     ? "Missed"
@@ -404,7 +410,7 @@ export default function OperationWork() {
   const toolbarButton = (active: boolean) =>
     `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[960px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
 
-  const listBody = listTab !== "todo" ? (
+  const listBody = listTab === "completed" || (listTab === "waiting" && !loading && visible.length === 0) ? (
     <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
       {listTab === "waiting" ? "No work waiting for this selection." : "No work completed for this selection."}
     </p>
@@ -643,12 +649,12 @@ export default function OperationWork() {
                 <h2 className="mb-2 flex min-h-6 flex-wrap items-baseline gap-x-1.5 text-[16px] font-semibold leading-[22px] text-work-ink" data-testid="work-list-heading">
                   {listHeading}
                   <span className="text-[13px] font-medium leading-[18px] text-work-muted">
-                    {visible.length} action{visible.length === 1 ? "" : "s"} to do
+                    {todoRows.length} action{todoRows.length === 1 ? "" : "s"} to do
                   </span>
                 </h2>
                 <WorkListTabs
                   value={listTab}
-                  counts={{ todo: visible.length }}
+                  counts={{ todo: todoRows.length, ...(waitingRows.length > 0 ? { waiting: waitingRows.length } : {}) }}
                   onChange={(tab) => updateParam("list", tab === "todo" ? null : tab)}
                 />
               </div>
@@ -680,7 +686,7 @@ export default function OperationWork() {
                 <div key={listTab} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
                   {listBody}
                 </div>
-                {hasMore && listTab === "todo" ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
+                {hasMore && listTab !== "completed" ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
               </div>
             </div>
           )}
