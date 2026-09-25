@@ -1291,11 +1291,10 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Owning module · action identity | Why it exists / required result | Owner rule | Due law | What closes it / next |
 |---|---|---|---|---|
 | Sales Orders · `ask_delivery_date` | Requested delivery date absent · obtain the customer's date or `not yet` answer | Responsible Salesperson | `No date` for admitted legacy rows | Requested Delivery Date or governed no-date answer exists · order planning continues |
-| Sales Orders · `issue_po` | Demand is uncovered · obtain PO coverage | PO Duty | Purchasing Order By date | PO covers demand · supplier-confirmation work may open |
 | Sales Orders · `delay_planning` | Supplier date breaks the customer commitment · record the customer-plan decision for that exact date | Responsible Delivery Operation for the customer commitment | 2 Office working days from detection | Decision and decided ETA recorded · Delivery opens the governed next booking act when required |
 | Purchasing · `manual_purchase.approve` | Manual Purchase awaits a decision · approval/refusal recorded | Purchasing Approver | Request Order By date, Office calendar | Decision stored · approved demand may require PO issue |
 | Purchasing · `manual_purchase.issue_po` | Approved demand/current PO version has not reached supplier · sent evidence | PO Duty | Request Order By date, Office calendar | Current version has confirmed-send evidence · normal state becomes Waiting for goods; no immediate reply task |
-| Purchasing · `purchasing.confirm_ready_date` | Open PO has no standing ready/arrival promise · supplier promise recorded | PO Duty | Customer date − buffer − production calendars | Standing supplier promise exists; the calculated PO Delivery Date alone is not confirmation |
+| Purchasing · `purchasing.po_window` | Eligible SO demand is stamped into a daily PO window, or a PO issued from that window has an unsent current version · buy the window's demand and send every PO | PO Duty | The window's own time on its day (PO Days that are Office working days; a supplier's earlier cut-off is its own window) | No eligible demand left in the window and every PO issued from it has its current version marked `PO sent to supplier` · the PO waits for goods |
 | Purchasing · `purchasing.supplier_reply` | **Retired 2026-09-24:** absence of an immediate answer after sending is not work | — | — | Early exception is recorded in Purchasing when reported; otherwise the exact-date day-before rule governs |
 | Purchasing · `purchasing.supplier_date_passed` | Supplier date passed with goods owing · new evidenced arrival answer | PO Duty | Supplier date, closure-adjusted | New governed supplier answer/date exists |
 | Purchasing · `purchasing.confirm_tomorrows_delivery` | Effective arrival is tomorrow · obtain Supplier DO or evidenced confirmation for that exact date and named Warehouse | PO Duty | One Office working day before effective arrival | Matching Supplier DO or evidenced tomorrow-delivery confirmation exists; a later delay records required reason/new date/WhatsApp evidence in Purchasing and derives a new date-specific occurrence |
@@ -1323,10 +1322,37 @@ are fixtures, and production keeps the current page until each admitted projecti
 `issue_delivery_order` is registered system automation, not a person's Work item: the same
 transaction that completes its gate issues the document. Claims remain in shared Work only where
 the authoritative Claims projection above is still active; no old Purchasing claim queue may create
-a duplicate occurrence. Older order-track keys such as `confirm_ready_date` and `collect` may remain
-as compatibility identities only where they resolve to the same Purchasing or Payment obligation;
-they may not produce a second open item. A module action not listed here is excluded until it passes
-§6.
+a duplicate occurrence. The Sales Order's own action ladder keeps `issue_po`, `confirm_ready_date`
+and `collect` as its words on the Sales Order; none of them opens a Work item — buying is the PO
+window card, the calculated PO Delivery Date is not a supplier confirmation (Purchasing §5.7), and
+collection is Payment's. A module action not listed here is excluded until it passes §6.
+
+### 6.2 · The PO window card — BUILT, awaiting owner review (not live)
+
+Purchasing §5.6.1 owns the window law and the one arithmetic (`poWindowFor`); the SO Batch read
+stamps every eligible demand line and every lineage PO with its window, and both this card and SO
+Batch's `?window=` scope read that stamp. Workspace decides the composition (handoff 2026-09-25):
+
+- **Middle card.** Before issue: `Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`,
+  document reference `{time} PO window`. After issue: `{k} POs issued · {x} not sent yet` / the
+  one PO's send line, or `Send {x} POs to suppliers`. Items are business units; a Sales Order is
+  counted once. Demand left beside unsent POs: buying leads.
+- **Right panel.** Summary → `To buy` (per supplier) → `POs to send` (one 72px card per PO, unsent
+  first). While demand is left the summary's `Open {time} PO window` door — SO Batch scoped to
+  exactly the window's lines — is the one blue act and every PO card starts closed. Once bought,
+  the first unsent PO opens on Jess's send line (`Click WhatsApp, send …` / `Click Email, send …` /
+  `Send …` by the supplier's recorded channel) and **the one shared send area** (`PoIssueEvidence`,
+  Purchasing §8.2), embedded — never a second set of send controls. It opens on the supplier's
+  recorded channel. Opening WhatsApp or email records nothing.
+- **Completion.** `PO sent to supplier` is the door that completes the window, and only when the
+  window has no eligible demand left and every PO it issued has its current version sent. Issuing
+  completes nothing. A received PO needs no sending. A PO serving orders from two windows is
+  counted once, in the earliest. Unreadable window settings fail the Purchasing source instead of
+  showing an empty day.
+- **Open review points (not law).** The embedded send area keeps its own heading
+  (`{PO} · PO V1 · Sending not confirmed`) inside the card — a shared-component wording question for
+  Purchasing. Purchasing Settings has storage (0585) for the window times and supplier cut-offs but
+  no editing screen yet; until one ships, the windows stay 11:30 AM and 4:00 PM.
 
 ## 7 · Right Rail and Notifications
 
@@ -1716,9 +1742,9 @@ honest Work for admitted modules.
 - The legacy `/api/operation/po-duty` response-shape adapter and its client hooks are retired.
   Purchase Orders, the Sales Order Route and Orders Control now read today's acting PO / GRN person
   from the shared Workspace Duty resolver; dated cover changes the acting person without rewriting
-  the normal holder. The legacy PO-day `ops_tasks` reminder is also retired: each Sales Order that
-  needs a PO is already an authoritative `issue_po` Work projection owned by current PO Duty. PO
-  Days remain Purchasing scheduling facts and never create a second free-text task.
+  the normal holder. The legacy PO-day `ops_tasks` reminder is also retired: demand that needs a
+  PO is the PO window Work occurrence (§6.2) owned by current PO Duty. `PO Days` decide which days
+  a window opens and never create a second free-text task.
 - `GET /api/operation/work` is now the one server-composed feed for admitted Sales Orders,
   Manual Purchase, Purchase Order supplier-reply and Receiving actions. Purchase Order reply work
   reads the exact current-version send and evidenced supplier-answer facts, resolves PO Duty and

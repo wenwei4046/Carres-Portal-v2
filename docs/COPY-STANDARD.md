@@ -3425,6 +3425,24 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Supplier row labels | `PO Delivery Date` (the original, never changes) · ⭐ `Expected arrival` (the supplier's newest promised date) · `From stock · {ready} of {total} ready` · `No purchase order for this Sales Order · {n} items need one` · `{n} items need a PO` · `Open Sales Order` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Not needed yet` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Message copied` · `The message could not be copied. Try again.` · `Supplier details could not be loaded.` · `Try again` | Stock received · `Latest date` |
 | Permission | `You cannot view this record` · `Ask an authorised operation user for access.` | leaked party or money facts |
 
+## The PO window card words — owner rulings 2026-09-24/25 · BUILT, awaiting owner review (not live)
+
+Purchasing §5.6.1 owns the window law; Workspace §6.1 owns the card. One Work card per PO window —
+never one `Issue PO` card per Sales Order. The send lines are Jess's own wording (2026-09-25).
+
+| Meaning | Use exactly | Do not use |
+|---|---|---|
+| The window, as the card's document reference | `{time} PO window` (`11:30 AM PO window` · `4:00 PM PO window`) | Batch · Round · Cycle · `7 lines` |
+| Before issue — what to buy | `Buy {n} items for {m} Sales Orders` (singular `1 item` · `1 Sales Order`) | `{n} lines from {m} Sales Orders` · a card per Sales Order |
+| Before issue — the act and its time | `Issue the POs by {time}` | Review and issue · Order By |
+| After issue — what is owed | `{k} POs issued · {x} not sent yet` (singular `1 PO issued`) | Acknowledged · Confirmed by supplier |
+| After issue — the act | one PO: its send line; several: `Send {x} POs to suppliers` | Chase · Follow up |
+| The send line, by the supplier's recorded channel | `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to {Supplier}` · none recorded: `Send {PO No} to {Supplier}` | treating Open WhatsApp / Open email / Download PDF as sent |
+| The completing act | `PO sent to supplier` (the one shared send area, Purchasing §5.6) | a Work tick-box · Mark done |
+| Required result | `Every PO issued and marked as sent` | Supplier replied |
+| Right panel sections | `To buy` (`{n} items · {m} Sales Orders` per supplier) · `POs to send` (`{PO No} · {Supplier}` · `Sending not confirmed` · `Sent`) | a second send form |
+| SO Batch opened from the card | `{time} PO window · {date}` · `Clear filters` | the whole Sales Order's unrelated lines |
+
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.
