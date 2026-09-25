@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { arrivalConfirmationWorkCompletion, poSentWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
@@ -13,6 +14,7 @@ import {
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierReplyInput,
+  recordArrivalConfirmationInput,
   confirmPoSentInput,
   recordSendInput,
   revisePoInput,
@@ -126,6 +128,12 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     );
   }
   const { status, supplierId } = parsed.data;
+  // 0584 · ONE PO, THE SAME ROW: the Work completion probe reads exactly what
+  // this register reads (promises, sends, lines) for a single PO.
+  const onlyPoId = c.req.query("poId") ?? null;
+  if (onlyPoId !== null && (onlyPoId.trim() === "" || onlyPoId.length > 64)) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "poId must be a purchase order number" }, 422);
+  }
 
   const sb = userClient(c.env, c.var.auth.jwt);
   const pos: Array<Record<string, unknown>> = [];
@@ -159,6 +167,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 
     if (status !== "all") q = q.eq("status", status);
     if (supplierId) q = q.eq("supplier_id", supplierId);
+    if (onlyPoId) q = q.eq("id", onlyPoId);
 
     const { data, error } = await q
       .order("placed_at", { ascending: false })
@@ -330,6 +339,28 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // history lives beside the field, never down in Activity). Same bounded
   // read — no extra round-trip.
   const promisesByPo = new Map<string, Record<string, unknown>[]>();
+  // 0585 · the day-before check's evidence (Supplier DO or evidenced
+  // confirmation for an exact date and the PO's own Warehouse). Strict: a
+  // failed read fails the register rather than reopening confirmed checks.
+  const arrivalConfirmationsByPo = new Map<string, Record<string, unknown>[]>();
+  if (poIds.length > 0) {
+    const confirmations = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("po_arrival_confirmations")
+        .select("id, po_id, po_version, for_date, destination_id, kind, supplier_do_no, recorded_at")
+        .in("po_id", ids)
+        .order("recorded_at", { ascending: false }),
+    );
+    if (confirmations.error) {
+      const m = mapPgError(confirmations.error);
+      return c.json(m.body, m.status);
+    }
+    for (const row of confirmations.data) {
+      const pid = row.po_id as string;
+      arrivalConfirmationsByPo.set(pid, [...(arrivalConfirmationsByPo.get(pid) ?? []), row]);
+    }
+  }
   if (poIds.length > 0) {
     const promiseResult = await readEveryChunked<Record<string, unknown>, string>(
       poIds,
@@ -777,6 +808,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       orders: ordersOf(row),
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       promises: promisesByPo.get(row.id as string) ?? [],
+      arrival_confirmations: arrivalConfirmationsByPo.get(row.id as string) ?? [],
       sends: sendsByPo.get(row.id as string) ?? [],
       grns: grnsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => {
@@ -2165,6 +2197,15 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   reason_required: "reason_required",
   nothing_changed: "nothing_changed",
   sent_po_needs_revision: "sent_po_needs_revision",
+  // 0585 · the delay and day-before evidence refusals.
+  other_note_required: "other_note_required",
+  screenshot_required: "screenshot_required",
+  screenshot_not_found: "screenshot_not_found",
+  arrival_date_mismatch: "arrival_date_mismatch",
+  wrong_warehouse: "wrong_warehouse",
+  evidence_required: "evidence_required",
+  evidence_not_found: "evidence_not_found",
+  reported_at_invalid: "reported_at_invalid",
 };
 
 function mapSupplierCallError(
@@ -2199,13 +2240,36 @@ function mapSupplierCallError(
 // Record the answer to the exact sent PO version with outside evidence.
 // The transaction preserves the original document date and projects only goods
 // arrival planning to the Sales lines explicitly linked to this PO.
-operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) => {
+// 0584 — the evidenced answer to the current PO version completes the PO's
+// supplier-reply Work. It observes only a body this door will accept, so an
+// incomplete answer is still refused before any database call.
+operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, supplierReplyWorkCompletion({
+  when: async (c) => recordSupplierReplyInput.safeParse(await c.req.json().catch(() => null)).success,
+}), async (c) => {
   const parsed = await parseJsonBody(c, recordSupplierReplyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("purchasing_record_supplier_reply", {
     p_po_id: c.req.param("id"),
     p_reply: parsed.data,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
+// ----- POST /:id/arrival-confirmation (0585) -----
+// The day-before check's evidence: the Supplier DO, or the supplier's evidenced
+// confirmation, for the exact effective arrival and the PO's own Warehouse. It
+// is NOT a receipt — only Receiving and its GRN prove the goods arrived.
+operationPosRouter.post("/:id/arrival-confirmation", requireOperation, arrivalConfirmationWorkCompletion({
+  when: async (c) => recordArrivalConfirmationInput.safeParse(await c.req.json().catch(() => null)).success,
+}), async (c) => {
+  const parsed = await parseJsonBody(c, recordArrivalConfirmationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_record_arrival_confirmation", {
+    p_po_id: c.req.param("id"),
+    p: parsed.data,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
@@ -2369,7 +2433,9 @@ operationPosRouter.post("/:id/sends", requireOperation, async (c) => {
 // channel, recipient, actor, Malaysia time and — read from the purchase order,
 // never accepted from here — the EXACT version that left. Current PO Duty is
 // enforced in SQL, because a door only the UI guards is not guarded.
-operationPosRouter.post("/:id/confirm-sent", requireOperation, async (c) => {
+// 0584/0585 — the send is Purchasing's completion fact for the PO window it
+// was issued from (Purchasing §5.6.1); the writer observes, never edits.
+operationPosRouter.post("/:id/confirm-sent", requireOperation, poSentWorkCompletion(), async (c) => {
   const parsed = await parseJsonBody(c, confirmPoSentInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);

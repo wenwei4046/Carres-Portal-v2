@@ -39,7 +39,7 @@ interface Props {
   register?: boolean;
   /** A workspace page (Work) draws its own toolbar and unframed columns; the
    *  shell supplies a one-row header and the canvas padding (16px, 12px
-   *  below 960px) only. */
+   *  below 768px) only. */
   workspace?: boolean;
   /** Page title → the 56px PageHeader bar (t-h2). Optional: when both `title`
    *  and `breadcrumb` are omitted the whole white header row is skipped — used
@@ -122,18 +122,18 @@ export default function ListPageShell({
           removed my 2row header — Order + synced"). Module-tab pages skip the
           whole block (Jess 2026-07-22, UI-KIT §A0 "Module-tab law"). */}
       {/* A workspace page (Work) has ONE title row and nothing above it — owner
-          density ruling 2026-09-25: 72px / 24px sides from 960px, 64px / 16px
+          density ruling 2026-09-25: 72px / 24px sides from 768px, 64px / 16px
           below; the title is 28/34 (24/30 narrow). */}
       {hasHeader && workspace && (
         <div
-          className="shrink-0 flex h-16 items-center gap-3 bg-white border-b border-base-200 px-4 min-[960px]:h-[72px] min-[960px]:px-6"
+          className="shrink-0 flex h-16 items-center gap-3 bg-white border-b border-base-200 px-4 min-[768px]:h-[72px] min-[768px]:px-6"
           data-testid="workspace-header"
         >
           {/* The title never truncates; when the row is too narrow (390px,
               with the top-bar icons) the count wraps beneath it inside the
               same 64px row. */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3">
-            <h1 className="shrink-0 text-[24px] font-semibold leading-[30px] text-base-900 min-[960px]:text-[28px] min-[960px]:leading-[34px]">
+            <h1 className="shrink-0 text-[24px] font-semibold leading-[30px] text-base-900 min-[768px]:text-[28px] min-[768px]:leading-[34px]">
               {title}
             </h1>
             {titleRight && <div className="ml-auto flex min-w-0 max-w-full items-center gap-1.5">{titleRight}</div>}
@@ -172,7 +172,7 @@ export default function ListPageShell({
           on the cream page bg. The strip lives INSIDE the right column, so it
           NEVER spans above the facet: the facet's Summary top sits on the same
           line as the strip top. */}
-      <div className={register ? "flex-1 flex min-h-0 p-2" : workspace ? "flex-1 flex min-h-0 p-3 min-[960px]:p-4" : "flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5"}>
+      <div className={register ? "flex-1 flex min-h-0 p-2" : workspace ? "flex-1 flex min-h-0 p-3 min-[768px]:p-4" : "flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5"}>
         {hasFacet && facetOpen && (
           <aside
             style={

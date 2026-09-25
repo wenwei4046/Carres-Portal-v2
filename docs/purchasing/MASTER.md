@@ -519,7 +519,7 @@ Supplier out-of-stock, delayed model/fabric, changed quantity or changed price i
 A supplier price change stops the issue/change and routes to the commercial approver; Operations
 does not decide it.
 
-#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; target, not built
+#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; BUILT on branch, awaiting owner review (not live)
 
 SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
 Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
@@ -580,6 +580,31 @@ facts, the one send area and the completion fact below.
   `Issue POs to {suppliers}`, `{n} of {m} POs · Sending not confirmed`) are not used.
 - **Retired with this journey:** the per-Sales-Order `issue_po` card and `confirm_ready_date`
   (`Supplier date missing`); the day-before check (§5.7) replaces the latter.
+
+**BUILD FACTS — branch `build/work-po-windows`, migrations 0584 / 0585 NOT APPLIED; nothing is live
+until Jess approves.**
+
+- **Admission time is the Sales Order's `Proceed`** (`orders.proceeded_at`) — the moment the order
+  enters SO Batch (§9.1). An order with no recorded Proceed time gets no window; none is guessed.
+- **One arithmetic, one stamp.** The SO Batch read stamps every demand line and every lineage PO with
+  `poWindow` (`2026-09-25T11:30`) through `poWindowFor` over the windows, the `PO Days` calendar
+  (`poWindowCalendarOf`: ticked PO Days ∩ Office working days and holidays) and the supplier's
+  cut-off. `?window=` scopes SO Batch to exactly those lines; Work's window card (Workspace §6.2)
+  reads the same stamp. Unreadable window settings stamp nothing and say `poWindowsUnavailable` —
+  buying still works.
+- **Which demand.** Only lines SO Batch may buy (`isSelectableForBuying`) — including `can order
+  early`, because the window, not Order By, now sets when PO Duty buys. `PO Days` still does not
+  move `Order By`.
+- **Opening pre-ticks.** SO Batch opened with `?window=` ticks every eligible line once (default
+  destination); an unticked line stays unticked. The window name and `Clear filters` sit above the
+  grid so they stay visible while the selection bar replaces the toolbar.
+- **Several unsent POs** name the earliest (lowest PO No) in the card's send line.
+- **Completion.** `POST /pos/:id/confirm-sent` completes the window occurrence once no eligible
+  demand is left and every PO it issued has its current version sent; `issue-batch` completes
+  nothing. A received PO needs no sending; a PO serving two windows belongs to the earliest.
+- **Gap.** 0585 stores the window times (`purchasing_set_po_windows`) and supplier cut-offs
+  (`purchasing_set_supplier_po_cutoff`), but Purchasing Settings has no editing screen for them yet;
+  until it ships the windows are the 11:30 AM / 4:00 PM defaults and no supplier has a cut-off.
 
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
@@ -695,6 +720,16 @@ photos, videos and PDF, several files per answer, through the shared Receiving u
 JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot for a confirmation,
 date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
 Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
+
+**Who may record a supplier answer — OWNER RULING (Jess, 2026-09-25) · NOT BUILT.** Any active
+Operation person may record what the supplier answered — on a PO (`Record supplier answer`) and on
+a Supplier Claim (`Record supplier reply`, §9.5) — because the holder may be on medical leave or the
+job not yet handed to the buddy. The record stores the actual recorder and server time as its own
+fact; normal PO Duty and any dated cover are shown and stored separately and are never rewritten
+by who recorded. This widens RECORDING only: issuing a PO, `Change Deliver To`, revising or
+cancelling a PO, and authorising a claim outcome stay with PO Duty, dated cover and the Operations
+Superuser (§5.3), because those are Carres commitments to the supplier. The Work occurrence still
+routes to PO Duty; anyone's recorded answer closes it.
 
 **Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The eight reasons
 above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
@@ -902,6 +937,10 @@ request has one; CO, RO and other documents keep their own numbers. Historical `
 
 ### 6.2 Unit ID
 
+**Labels are printed at the warehouse — owner ruling 2026-09-25 (Stock §3, APPROVED TARGET / NOT
+BUILT).** The PO object gains `Print Unit ID labels` (one 50 × 30 mm QR label per minted Unit ID);
+suppliers are not required to label. Purchasing mints the IDs; the label is only their carrier.
+
 The locked human-readable format is:
 
 ```text
@@ -1070,8 +1109,9 @@ formal Receiving Record number and exists from the posted session; a draft/submi
 formal GRN.
 
 Normal GRN Duty, dated cover and actual actor remain separate evidence. Jess and the governed
-Operations Superuser may perform the operational act without becoming GRN Duty. An ordinary person
-outside duty/cover/capability is refused by the same web, API and SQL authority.
+Operations Superuser may perform the operational act without becoming GRN Duty. **Owner ruling 2026-09-25 (Stock §7): every active Operation staff member may post a
+receipt** — receiving is never blocked by the GRN Duty holder's absence; GRN Duty keeps the Work
+card, the GRN records the actual receiver. The former duty/cover-only refusal is overwritten.
 
 The user-facing gate uses two lines:
 
@@ -4078,6 +4118,49 @@ neither is an approved design.
 | The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT + CLAIM-RECORD PHOTOS; authenticated readback recorded** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
 | The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
+**SUPPLIER REPLY RECORDING — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Measured on
+production the same day: 71 claims (70 `open`, 1 `closed`), 70 with `requested_action`, **1** with
+`supplier_response`; the three SQL doors exist (`supplier_claim_record_request` ·
+`supplier_claim_record_response` · `supplier_claim_close`, 0291) and **no web caller** exists for
+any of them — the record prints `Supplier instruction and reply recording are not available here
+yet.`; no claim send ledger table exists; `work.ts` projects no claim action. The approved
+journey, both ways to the same completion fact:
+
+```text
+From Work:    `Ask {Supplier} to reply to the supplier claim` → Open → claim record → Record supplier reply
+From module:  Supplier Claims → Supplier Claim No → the same claim record → the same button
+Completion:   supplier_response stored with scope, date and evidence; the Work occurrence closes itself
+```
+
+- **Two buttons on the record's Supplier section, in order.** `Record what we asked` (one of the
+  governed asks; freezes once answered) then `Record supplier reply`. The database already refuses an
+  answer without an ask; a reply that arrives first is stored as contact evidence and becomes the
+  formal reply once the ask is recorded — never a forced earlier ask.
+- **The reply form:** `Supplier's answer` (`Replacement` · `Deliver remaining` · `Repair` ·
+  `Return & replace` · `Reject` · `Other agreement`) · `Applies to` (`Whole claim` or `These Units`
+  — a claim-level answer is stored claim-level and never distributed per Unit; an unanswered Unit
+  stays `Not recorded`) · `Supplier's date` (the supplier's promised delivery/collection/return date,
+  the seed for the day-before check and any RO/PRTN) · `Evidence` (the shared uploader: photo, video,
+  PDF; a phone answer records who spoke, what and when) · `Note` (required for `Reject` and `Other
+  agreement`). `POST /:id/response` is extended with scope, date and evidence; no parallel endpoint.
+- **Timing (§9.5 "2 + 2", now stated):** `Reply expected` = ask + **2** Office working days; **2**
+  more without a reply escalates to supervision. Both numbers are `Settings → Purchasing → Supplier
+  claims` values with those starting values — they exist nowhere today.
+- **Who:** any active Operation person records; the recorder is stored (§5.7 ruling). Authorised
+  Outcome stays PO Duty/cover/superuser.
+- **Sending evidence (`Claim sent · {channel} · {recipient} · {time} · {actor}`)** needs the
+  document-agnostic send ledger §9.7 already requires (lift `po_sends` into a shared component and
+  table); the claim pack PDF stays optional (§3.3) — a WhatsApp message plus evidence is a valid
+  request.
+- **States on the record:** `Not recorded` → `Reply expected {date}` → `Reply overdue · {date}` →
+  `Escalated to {name}` → the recorded answer line `{answer} · {scope} · by {date} · recorded {date}
+  · {recorder}` with `Evidence {n}` and History. Missing evidence or a missing note names itself
+  beside the button; a timeout re-reads the record and never prints a refusal it did not receive.
+- **Responsive:** ≥1180 the form is a 560px right panel on the record; 820/743 full width under
+  the Supplier section; 390 full width, one Unit tick per row, 40px bottom actions.
+- **Register consequence:** the `Supplier Response` column prints the recorded answer word; the rail's
+  `Supplier Response` facet reads the same stored value.
+
 **The reply-recording build reuses what exists; it does not grow a second system.**
 
 - **Reuse the existing server door.** `POST /api/ops/operation/supplier-claims/:id/response`
@@ -4410,6 +4493,46 @@ approved claim outcome — and `0548` carries that door in SQL
 the REGISTER, not a creation screen, so the screen that calls it is a later scope with its own
 owner decision. The evidence viewer is not wired either: the entries carry the door and say
 why they are inactive. The populated-record and physical lifecycle walk remains owed.
+
+**CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Measured the same day: all 71
+claims carry no `carres_execution`; `POST /:id/carres-execution` exists with no web caller; the
+returns API has only `GET /`; `purchasing_issue_purchase_return` (0548) has no screen; the record
+offers `Plan Repair` / `Plan Supplier replacement` links and nothing for a return. The approved
+chain lives on the ONE claim record, both ways to the same facts:
+
+```text
+From Work:    `Issue the purchase return to {Supplier}` → claim record
+From module:  Supplier Claims → Supplier Claim No → the same record
+Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Issue Purchase Return`
+              → send (shared send area) → Confirm tomorrow's pickup → Outbound handover (Stock)
+              → Supplier Received Date
+```
+
+- **`Record what Carres does next`** on the record's Result section writes `carres_execution`
+  through the existing route; options are the five stored values, displayed `Return to supplier` ·
+  `Collect defective item` · `Replace first` · `Collect first` · `Exchange on collection`. It is
+  a Carres commitment: PO Duty, dated cover or Operations Superuser only.
+- **`Issue Purchase Return`** appears once `Return to supplier` is recorded and calls the 0548 door
+  through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
+  held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
+  (defaults from each Unit's current Stock Location; editing moves nothing) · `Return To` (the
+  supplier's recorded return address from Supplier Master; absent → `Add the return address of
+  {Supplier}`, never the registered address by assumption) · `Confirmed Pickup` (optional at
+  issue). Issue writes the PRTN row and its Units and moves no stock. A Unit changed under the
+  form is refused by name; `No return was issued.`
+- **Sending** uses the shared document send area (`Return document sent to supplier`; the
+  document-agnostic send ledger §9.7 requires); 50/50 during issue/revision, full width after.
+- **Pickup:** one Office working day before `Confirmed Pickup Date`, Work
+  `Confirm tomorrow's pickup · {Supplier}` (same rule as the PO day-before check); a passed date
+  with nothing collected reads `Pickup missed · Follow up supplier`. The physical handover is
+  Stock's Outbound `Return to supplier` (Stock §12.8) — collector, time, exact Units, proof —
+  read here as `Not picked up` · `Partly picked up` · `Fully picked up`. `Supplier Received Date`
+  is recorded from supplier evidence; fully picked up never implies it.
+- **Record states:** `What Carres does · Not recorded` → `Return to supplier` (Issue available) →
+  `Return document not sent` → `Return document sent · {channel} · {date}` → `Pickup date not
+  confirmed` / confirmed → picked-up facts → `Supplier Received Date`.
+- **Responsive:** ≥1180 form + PDF side by side; 820/743 stacked, PDF below; 390 full width, one
+  Unit tick per row, 40px bottom actions.
 
 **Authenticated readback — 2026-09-24, existing register only.** On production
 `893b7f33d54ecd3c0ab51755d6d98d09f47407d2`, principal opened Purchase Returns from its
@@ -4995,6 +5118,7 @@ are snapshots, not editable truth or a second settlement ledger.
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
+| Any active Operation person (owner ruling 2026-09-25) | record a supplier's answer on a PO or a supplier's reply on a Claim, with evidence; the recorder is stored as actual actor | issue, revise or cancel a PO; `Change Deliver To`; authorise a claim outcome; become the duty holder by recording |
 | Operations Superuser (`operation@carres.com` by its flag; Jess as a principal person — never the shared `principal@` login) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |

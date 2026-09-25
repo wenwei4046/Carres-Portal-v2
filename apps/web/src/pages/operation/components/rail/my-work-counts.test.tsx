@@ -180,7 +180,7 @@ function badgeCounts(): [number, number] {
 
 /** The number printed on the icon (null when no badge renders). */
 function badgeNumber(): number | null {
-  const text = railButton().querySelector("span")?.textContent ?? null;
+  const text = railButton().querySelector("[data-rail-badge]")?.textContent ?? null;
   return text === null ? null : Number(text);
 }
 

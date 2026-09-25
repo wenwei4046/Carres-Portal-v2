@@ -175,11 +175,11 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(within(dayNav()).getByRole("button", { name: "Fri, 18 Sep · 1 action" })).toBeInTheDocument();
   });
 
-  it("3 · Wed, 16 Sep names Malaysia Day beside its badge and prints no zero (rail ruling 2026-09-24)", () => {
+  it("3 · Wed, 16 Sep names Malaysia Day beside its badge and prints its zero (owner review 2026-09-25 item 19)", () => {
     show();
     const row = within(dayNav()).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day" });
     expect(row).toHaveTextContent("Malaysia Day");
-    expect(row.querySelector("[data-rail-count]")).toBeNull();
+    expect(row.querySelector("[data-rail-count]")).toHaveTextContent("0");
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
@@ -218,13 +218,13 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
       inModule("delivery", "2026-09-17"),
     ]);
     const first = show("/operation?tab=work&module=payment");
-    const rail = screen.getByRole("region", { name: "Module" });
+    const rail = screen.getByRole("region", { name: "Page" });
     expect(within(rail).getByRole("button", { name: "Delivery · 2 actions" })).toHaveTextContent(/2$/);
     expect(within(rail).getByRole("button", { name: "Payment · 1 action" })).toHaveTextContent(/1$/);
     first.unmount();
 
     show();
-    const allRail = screen.getByRole("region", { name: "Module" });
+    const allRail = screen.getByRole("region", { name: "Page" });
     const moduleSum = ["Sales Orders", "Purchasing", "Receiving", "Delivery", "Payment", "Issue Tracker"]
       .map((label) => Number(within(allRail).getByRole("button", { name: new RegExp(`^${label}`) }).querySelector("[data-rail-count]")?.textContent ?? 0))
       .reduce((sum, n) => sum + n, 0);

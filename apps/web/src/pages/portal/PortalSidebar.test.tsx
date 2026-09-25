@@ -140,6 +140,8 @@ describe("PortalSidebar — role visibility", () => {
 });
 
 describe("PortalSidebar — narrow desktop", () => {
+  /* Owner review 2026-09-25 item 9 applies from 1280px; below it the named
+     rail would push Work into the phone layout, so it starts as icons. */
   it("starts as the 60px icon rail below 1280", () => {
     const previous = window.matchMedia;
     Object.defineProperty(window, "matchMedia", {

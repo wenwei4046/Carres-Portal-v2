@@ -188,7 +188,14 @@ export default function PoIssueEvidence({
   onOpened?: (channel: "whatsapp" | "email") => void;
   onConfirmed: () => void;
 }) {
-  const [channel, setChannel] = useState<SendChannel>("whatsapp");
+  /* The supplier's RECORDED channel is the default — the Work send line says
+     `Click Email, send …` for an email-only supplier, so the form must not
+     open on an empty WhatsApp recipient (Jess's send lines, 2026-09-25). */
+  const [channel, setChannel] = useState<SendChannel>(() =>
+    !po.whatsappGroupUrl?.trim() && !(po.contact ?? "").replace(/\D/g, "") && po.contactEmail?.trim()
+      ? "email"
+      : "whatsapp",
+  );
   /* `null` until the person types: the recipient then prefills from the
      Supplier Master record for the chosen channel (group link or chat number
      for WhatsApp, address for email). It is never the supplier's name. */

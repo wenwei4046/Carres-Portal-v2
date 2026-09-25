@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import {
   myHolidaySet,
+  parsePoWindowKey,
   poDeliveryDateOf,
+  poWindowCalendarOf,
+  poWindowFor,
+  poWindowKeyOf,
   productionWorkingDaysFor,
   purchaseDemandBlockerOf,
   purchaseDemandQuantities,
@@ -30,6 +34,7 @@ import {
 } from "../../lib/purchase-demand-read";
 import { mapPgError, fail } from "../../lib/route-helpers";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
+import { loadPoWindows } from "../../lib/purchasing-settings";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -306,6 +311,7 @@ async function loadRegisterRows(
           destinationId: po.destination_id,
           officialDeliveryDate: po.official_delivery_date?.slice(0, 10) ?? null,
           sentCurrentVersion: sentCurrent(po),
+          version: po.version ?? 1,
         };
       });
 
@@ -348,6 +354,12 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   const scopeSo = rawSo == null || rawSo === "" ? null : Number(rawSo);
   if (scopeSo != null && (!Number.isInteger(scopeSo) || scopeSo <= 0)) {
     return c.json({ error: "invalid_so", code: "invalid_param" }, 400);
+  }
+  /* The PO window scope Work opens (Purchasing §5.6.1): exactly the demand
+     lines stamped with that window, never a whole Sales Order's other lines. */
+  const scopeWindow = c.req.query("window") || null;
+  if (scopeWindow != null && !parsePoWindowKey(scopeWindow)) {
+    return c.json({ error: "invalid_window", code: "invalid_param" }, 400);
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -802,12 +814,52 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     console.error("so batch — procurement partners unavailable", (e as Error).message);
   }
 
+  /* ── 5 · the daily PO window of every demand line and lineage PO ─────────
+   *
+   * ONE arithmetic (Purchasing §5.6.1): the order's Proceed time, the PO
+   * windows, the `PO Days` calendar and the supplier's earlier cut-off →
+   * `poWindowFor`. Work's window occurrence and this page's `?window=` scope
+   * both read these stamps, so the card and the page it opens cannot
+   * disagree. An unreadable setting stamps nothing and SAYS so — buying still
+   * works, and Work reports its Purchasing source instead of an empty day. */
+  let poWindowsUnavailable = false;
+  try {
+    const windows = await loadPoWindows(sb);
+    const calendar = poWindowCalendarOf(windows.poDays, holidays);
+    const memo = new Map<string, string | null>();
+    const stamp = (orderId: string, supplierId: string | null): string | null => {
+      const key = `${orderId}::${supplierId ?? ""}`;
+      if (memo.has(key)) return memo.get(key)!;
+      const admittedAt = registerFacts.ordersById.get(orderId)?.proceededAt ?? null;
+      const value = admittedAt
+        ? poWindowKeyOf(poWindowFor(
+            admittedAt,
+            windows.settings,
+            supplierId ? windows.cutoffBySupplier.get(supplierId) ?? null : null,
+            calendar,
+          ))
+        : null;
+      memo.set(key, value);
+      return value;
+    };
+    for (const row of rows) row.poWindow = stamp(row.orderId, row.supplierId);
+    for (const reg of registerRes.registerRows) {
+      for (const po of reg.pos) po.poWindow = stamp(reg.orderId, po.supplierId);
+    }
+  } catch (e) {
+    poWindowsUnavailable = true;
+    console.error("so batch — PO windows unavailable", (e as Error).message);
+  }
+
+  const windowRows = scopeWindow == null ? rows : rows.filter((row) => row.poWindow === scopeWindow);
+  const windowOrders = new Set(windowRows.map((row) => row.orderId));
   const scopedRows =
-    scopeSo == null ? rows : rows.filter((row) => row.so === scopeSo);
-  const scopedRegisterRows =
-    scopeSo == null
-      ? registerRes.registerRows
-      : registerRes.registerRows.filter((row) => row.so === scopeSo);
+    scopeSo == null ? windowRows : windowRows.filter((row) => row.so === scopeSo);
+  const scopedRegisterRows = registerRes.registerRows.filter(
+    (row) =>
+      (scopeSo == null || row.so === scopeSo) &&
+      (scopeWindow == null || windowOrders.has(row.orderId)),
+  );
 
   const body: SoBatchPurchaseResponse = {
     today,
@@ -834,6 +886,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     /* Card 02-A — the governed Safety days value, so the rail words follow
        the one setting. The browser prints it; the arithmetic stayed here. */
     safetyDays: settings.orderByBufferDays,
+    ...(poWindowsUnavailable ? { poWindowsUnavailable: true } : {}),
   };
   return c.json(body);
 });

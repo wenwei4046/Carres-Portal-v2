@@ -215,7 +215,7 @@ describe("the external link", () => {
   });
 });
 
-describe("density below 960px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
+describe("density below 768px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
   it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
     draw();
     const toggle = screen.getByTestId("logistics-card-toggle");

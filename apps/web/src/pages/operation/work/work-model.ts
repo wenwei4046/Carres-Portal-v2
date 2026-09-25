@@ -158,6 +158,8 @@ export interface WorkRailDay {
   holiday: string | null;
   count: number;
   today: boolean;
+  /** The second week's Monday — the strip draws a gap before it. */
+  weekStart?: boolean;
 }
 
 export interface WorkRailDates {
@@ -178,7 +180,10 @@ export interface WorkRailDates {
  */
 export function workRailDates(items: readonly WorkRow[], today: string, week: string): WorkRailDates {
   const monday = weekStartIso(week);
-  const dates = workWeek(monday, items.map((item) => item.dueIso));
+  /* Two work weeks (owner review 2026-09-25 item 20): next week's dates are
+     one glance away instead of one arrow away. */
+  const dues = items.map((item) => item.dueIso);
+  const dates = [...workWeek(monday, dues), ...workWeek(addDaysIso(monday, 7), dues)];
   return {
     month: fmtMonth(addDaysIso(monday, 3)),
     previousWeek: addDaysIso(monday, -7),
@@ -195,6 +200,7 @@ export function workRailDates(items: readonly WorkRow[], today: string, week: st
         holiday: workHoliday(iso),
         count: items.filter((item) => item.dueIso === iso && item.timingBucket !== "overdue").length,
         today: iso === today,
+        weekStart: iso === addDaysIso(monday, 7),
       };
     }),
     noDate: items.filter((item) => item.timingBucket === "no_date").length,
@@ -223,7 +229,7 @@ export const WORK_MODULES: readonly OperationWorkModule[] = [
 
 /** Panels follow the Work area's own width, never the window's. */
 export function workLayoutFor(width: number): WorkLayout {
-  return width >= 1280 ? "three" : width >= 960 ? "two" : "one";
+  return width >= 1280 ? "three" : width >= 768 ? "two" : "one";
 }
 
 /** Source words for Work source health — never the raw feed key. */

@@ -302,6 +302,8 @@ type BatchLineDecision = z.infer<
   typeof soBatchIssueInput
 >["documentDecisions"][number]["lineDecisions"][number];
 
+// Issuing is not the window's completion: the PO window card stays open until
+// every PO it issued is marked `PO sent to supplier` (`/pos/:id/confirm-sent`).
 toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 

@@ -517,10 +517,12 @@ Monitor.** The Monitor row's expansion is the delivery brief: four kit `Panel`s 
 Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock`). Where a
 panel owns a Delivery write, the `Panel`'s one right-slot control (`Update date and time`,
 `Assign logistics` / `Change logistics`) flips that panel's own body into a focused edit state
-with its named Save (`Save confirmed delivery`); the operator stays on the same row, queue and
+with its named Save (`Save scheduled delivery`); the operator stays on the same row, queue and
 narrowings. No overflow menu and no separate dialog is invented for these acts, and no other
-register may copy this without its own owner ruling. Sales facts inside the brief stay read-only
-behind `Open Sales Order to change`. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
+register may copy this without its own owner ruling. Sales facts inside the brief stay read-only:
+the first panel's control `View Sales Order` unfolds the governed Sales Order document in place
+(owner ruling 2026-09-25 — INSPECT stays INSPECT, no fourth surface), and the row's `SO No` is the
+door to change them. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
 
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
@@ -827,7 +829,7 @@ Current implementation differences from the above target are build gaps, not a c
   second action. It is a status word, not an action sentence.
   **THE DELIVERY SCHEDULE CARD CARRIES TWO FACTS ON TWO LINES — owner ruling 2026-09-14
   (`../delivery/MASTER.md` §8.2 · §8.4):** line 1 the journey progress, line 2 the readiness or
-  blocker (`Ready` · `Stock risk` · `Payment blocked` · `Logistics details incomplete` ·
+  blocker (`Ready` · `Stock risk` · `Hold delivery` · `Logistics details incomplete` ·
   `DO not released`). The two never merge into one status, because a progress rung and a
   readiness fact answer different questions and come from different arithmetics. Every card also
   wears a TYPE label (`DELIVERY` · `TRANSFER`) whose two populations are never summed into one

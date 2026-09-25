@@ -290,7 +290,8 @@ SUPPLY CHAIN
 │       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
-│   ├── Monitor
+│   ├── Arrival Schedule
+│   ├── Pickup Schedule
 │   ├── Inbound
 │   ├── Inventory
 │   └── Outbound
@@ -681,7 +682,9 @@ PIC falls back to `Delivery Duty`, where the unresolved work remains visible wit
 Duties correction door. The Loan offer and decision stay with the Customer Order.
 
 **SUMMARISES** — the customer's promised date and confirmed booking · what the order contains ·
-whether money holds it.
+whether money holds it — and when it does, every party reads the same `Hold delivery` with the
+reason line its role may see, from Payment's record (owner ruling 2026-09-25,
+`delivery/MASTER.md` §3; Payment §3, Stock §8, Workspace §5.9 carry their sides).
 
 **LINKS TO** — the customer order.
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { operationWorkCompletedSchema, operationWorkLifecycleSchema } from "./work-lifecycle";
 import { WORK_RULES, type WorkItem } from "./work-engine";
 
 export const operationWorkModuleSchema = z.enum([
@@ -167,6 +168,10 @@ export const operationWorkItemSchema = z.object({
   tone: z.enum(["danger", "warning", "info", "success", "neutral"]),
   locked: z.boolean(),
   broken: z.boolean(),
+  /** To do · Waiting, derived from the 0584 ledger (work-lifecycle.ts). A
+   *  projector never sets it; the Work read attaches it. Absent reads as To do
+   *  (`workLifecycleOrToDo`). */
+  lifecycle: operationWorkLifecycleSchema.optional(),
 }).strict();
 
 export const operationWorkSourceHealthSchema = z.object({
@@ -200,6 +205,9 @@ export const operationWorkResponseSchema = z.object({
   generatedOn: z.string().date(),
   closureReceipt: operationWorkClosureReceiptSchema.nullable(),
   sources: operationWorkSourcesSchema,
+  /** Completed occurrences from the 0584 ledger (recent window), written only
+   *  by the owning modules' completion facts. Absent on a read without it. */
+  completed: z.array(operationWorkCompletedSchema).optional(),
 }).strict().superRefine((response, ctx) => {
   if (response.complete && response.sources.some((source) => source.state !== "healthy")) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["complete"], message: "A response with a non-current source cannot be complete" });
@@ -219,12 +227,49 @@ function identityPart(value: string): string {
   return value.trim().replaceAll(":", "%3A");
 }
 
+/** `orders:{object}:{rule}`, a date-specific `…:@{key}` and/or a later
+ *  generation `…:g2` → its parts. The object part keeps its escaping; module
+ *  and rule never contain `:`. */
+export function parseWorkOccurrenceId(id: string): {
+  module: OperationWorkModule;
+  objectId: string;
+  ruleKey: string;
+  occurrenceKey: string | null;
+  generation: number;
+} | null {
+  const parts = id.split(":");
+  if (parts.length < 3 || parts.length > 5) return null;
+  const module = operationWorkModuleSchema.safeParse(parts[0]);
+  if (!module.success || !parts[1] || !parts[2]) return null;
+  let occurrenceKey: string | null = null;
+  let generation = 1;
+  for (const [index, part] of parts.slice(3).entries()) {
+    const gen = /^g(\d+)$/.exec(part);
+    if (part.startsWith("@") && part.length > 1 && index === 0) {
+      occurrenceKey = part.slice(1).replaceAll("%3A", ":");
+    } else if (gen && Number(gen[1]) >= 2 && index === parts.length - 4) {
+      generation = Number(gen[1]);
+    } else {
+      return null;
+    }
+  }
+  return { module: module.data, objectId: parts[1].replaceAll("%3A", ":"), ruleKey: parts[2], occurrenceKey, generation };
+}
+
+/**
+ * The stable occurrence identity (Workspace MASTER §2: module + rule + source
+ * object + occurrence). `occurrenceKey` names WHICH time a date-specific rule
+ * fires — `purchasing.confirm_tomorrows_delivery` for Tue 20 Oct is a different
+ * obligation from the same check for Fri 23 Oct after a delay.
+ */
 export function operationWorkStableId(
   module: OperationWorkModule,
   objectId: string,
   ruleKey: string,
+  occurrenceKey?: string | null,
 ): string {
-  return [module, objectId, ruleKey].map(identityPart).join(":");
+  const base = [module, objectId, ruleKey].map(identityPart).join(":");
+  return occurrenceKey ? `${base}:@${identityPart(occurrenceKey)}` : base;
 }
 
 export interface OperationWorkPresentation {
@@ -243,6 +288,8 @@ export interface OperationWorkPresentation {
   actionOn?: string | null;
   noDateReason?: string | null;
   interaction?: OperationWorkInteraction;
+  /** A date-specific rule's occurrence (see `operationWorkStableId`). */
+  occurrenceKey?: string | null;
 }
 
 /** Translate a module engine's open projection into the transport contract.
@@ -272,7 +319,7 @@ export function operationWorkItemFromProjection(
     : actionOn < presentation.today ? "missed" : "on_day";
   return operationWorkItemSchema.parse({
     contractVersion: 2,
-    id: operationWorkStableId(module, presentation.object.id, item.ruleKey),
+    id: operationWorkStableId(module, presentation.object.id, item.ruleKey, presentation.occurrenceKey),
     module,
     ruleKey: item.ruleKey,
     ruleVersion: rule.version,

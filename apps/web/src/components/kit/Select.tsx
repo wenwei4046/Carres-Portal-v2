@@ -57,7 +57,7 @@ export default function Select({
   onValueChange: (value: string) => void;
   placeholder?: string;
   options: readonly SelectOption[];
-  /** A workspace toolbar control — 36px, 40px below 960px. */
+  /** A workspace toolbar control — 36px, 40px below 768px. */
   toolbar?: boolean;
 }) {
   /* D0.5b.1 — null outside a dialog, which is Radix's own "use <body>", so the

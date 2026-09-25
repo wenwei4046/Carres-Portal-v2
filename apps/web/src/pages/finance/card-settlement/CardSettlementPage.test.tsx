@@ -249,6 +249,26 @@ describe("Card settlement", () => {
     );
   });
 
+  it("a matched day paid into no card account, or into two, says so in red and offers no Approve day (0576)", async () => {
+    const none = day({ group_key: "900000000061 / 90000061", row_count: 1, matched_count: 1, holding_codes: [] });
+    const two = day({ group_key: "900000000062 / 90000062", row_count: 2, matched_count: 2, holding_codes: ["1131", "1132"] });
+    net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [none, two], rows: [] };
+    show();
+    for (const title of await screen.findAllByTitle("Check the sales")) fireEvent.click(title);
+
+    const a = await screen.findByTestId("card-day-PBB|2026-09-18|900000000061 / 90000061");
+    expect(within(a).getByRole("alert")).toHaveTextContent(
+      "The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.",
+    );
+    expect(within(a).queryByRole("button", { name: "Approve day" })).toBeNull();
+
+    const b = await screen.findByTestId("card-day-PBB|2026-09-18|900000000062 / 90000062");
+    expect(within(b).getByRole("alert")).toHaveTextContent(
+      "The sales on this day were paid into more than one card account (1131, 1132), so one payout cannot cover them. Check the payment method of each sale.",
+    );
+    expect(within(b).queryByRole("button", { name: "Approve day" })).toBeNull();
+  });
+
   it("an import that opens earlier automatic matches again says so", async () => {
     net.routes["POST /api/finance/card-settlement/import"] = { rows: 1, imported: 1, matched: 1, released: 1 };
     show();

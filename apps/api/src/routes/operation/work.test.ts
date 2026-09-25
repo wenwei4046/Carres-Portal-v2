@@ -14,6 +14,8 @@ import {
   projectPaymentCollectionWork,
   projectPurchaseOrderReplyWork,
   projectPurchaseOrderArrivalCheckWork,
+  projectPoWindowWork,
+  PURCHASING_WINDOW_OWNED,
   projectReceivingWork,
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
@@ -106,8 +108,9 @@ describe("operation Work response composition", () => {
     });
     app.route(
       "/api/operation/work",
-      createOperationWorkRouter(async () =>
-        composeOperationWorkResponse(healthySources([base]), [], "2026-09-06"),
+      createOperationWorkRouter(
+        async () => composeOperationWorkResponse(healthySources([base]), [], "2026-09-06"),
+        { read: async () => [], readCompleted: async () => [], recordRequestSent: async () => "", recordReplyReceived: async () => "" },
       ),
     );
 
@@ -285,6 +288,14 @@ describe("operation Work response composition", () => {
       "/operation?tab=manual-purchase&mp=request-1",
     );
     expect(issuance[0]?.requiredResult).toBe("Purchase order issued");
+    /* Owner review 2026-09-25 (items 6/7): the document number is the
+       reference; the composed context stands in only while none exists. */
+    expect(issuance[0]?.object.label).toBe("Manual Purchase · Office use · Klang · Nice Future");
+    const numbered = projectManualPurchaseWork({
+      requests: [{ ...common, reference: "MPR250924-4827", status: "ready_to_order" }],
+      approver: null, poDuty, today: "2026-09-06",
+    });
+    expect(numbered[0]?.object.label).toBe("MPR250924-4827");
   });
 
   it("an ISSUED Manual Purchase raises no work for a missing send confirmation", () => {
@@ -620,50 +631,23 @@ describe("operation Work response composition", () => {
     expect(clean.some((i) => i.ruleKey === "collect")).toBe(false);
   });
 
-  it("admits supplier reply work from the owning PO facts with PO Duty and the exact PO door", () => {
-    const person = { userId: "po-duty", name: "Yu Jun" };
-    const [item] = projectPurchaseOrderReplyWork({
+  it("does not admit a sent-but-unanswered PO as Work (supplier_reply retired 2026-09-24)", () => {
+    const items = projectPurchaseOrderReplyWork({
       pos: [{
         id: "PO-2041",
         supplier_id: "supplier-1",
         status: "open",
         version: 2,
         promises: [],
-        sends: [{
-          kind: "confirmed_sent",
-          channel: "whatsapp",
-          sent_at: "2026-09-03T17:00:00Z",
-          po_version: 2,
-        }],
+        sends: [{ kind: "confirmed_sent", channel: "whatsapp", sent_at: "2026-09-03T17:00:00Z", po_version: 2 }],
         purchase_order_lines: [{ qty: 4, received_qty: 0 }],
       }],
       suppliers: [{ id: "supplier-1", name: "Nice Future" }],
-      poDuty: {
-        dutyKey: "po_duty",
-        onDate: "2026-09-08",
-        normalOwner: person,
-        buddy: null,
-        activeCover: null,
-        actingPerson: person,
-        state: "primary",
-        assignmentId: "assignment-1",
-      },
+      poDuty: null,
       today: "2026-09-08",
     });
-
-    expect(item).toMatchObject({
-      id: "purchasing:PO-2041:purchasing.supplier_reply",
-      module: "purchasing",
-      object: { kind: "purchase_order", id: "PO-2041", label: "PO-2041" },
-      problem: "Supplier has not confirmed the PO date",
-      action: "Ask Nice Future to confirm the PO delivery date",
-      recipient: "Nice Future",
-      owner: { dutyKey: "po_duty", normal: person, acting: person },
-      timing: { actionOn: "2026-09-04", placement: "missed", missedAge: { state: "not_calculable" } },
-      destination: "/operation?tab=purchase-orders&po=PO-2041",
-    });
-    expect(item?.action).not.toContain("Yu Jun");
-    expect(item?.completionPredicate).toContain("exact current PO version");
+    // The PO waits for goods from the supplier; silence is not a task.
+    expect(items).toEqual([]);
   });
 
   /* ── THE ADVANCE ARRIVAL CHECK reaches shared Work (owner ruling
@@ -704,7 +688,8 @@ describe("operation Work response composition", () => {
     it("opens one office working day before the arrival, owned by the current PO Duty", () => {
       const [item] = project();
       expect(item).toMatchObject({
-        id: "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery",
+        // One occurrence per effective date (2026-09-24).
+        id: "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11",
         module: "purchasing",
         object: { kind: "purchase_order", id: "PO-3001", label: "PO-3001" },
         action: "Call Ohana — confirm tomorrow's delivery",
@@ -734,16 +719,45 @@ describe("operation Work response composition", () => {
       expect(project({ eta_date: "2026-09-18" }, "2026-09-10")).toHaveLength(0);
     });
 
-    it("closes on an answer about THIS date and reopens when the factory moves it", () => {
-      /* Answered about the arrival we hold → nothing left to ask. */
-      expect(project({ tomorrow_answer_about_date: "2026-09-11" })).toHaveLength(0);
-      /* The factory then moved the day: the old answer is about nothing, and
-         the obligation is open again against the new date. */
-      const [reopened] = project({
-        eta_date: "2026-09-14",
-        tomorrow_answer_about_date: "2026-09-11",
-      }, "2026-09-12");
-      expect(reopened?.timing?.actionOn).toBe("2026-09-11");
+    const DEST = "11111111-0000-4000-8000-00000000d001";
+    const confirmation = (over: Record<string, unknown> = {}) => ({
+      po_version: 1, for_date: "2026-09-11", destination_id: DEST, kind: "supplier_confirmation", ...over,
+    });
+
+    it("anchors on the ORIGINAL PO Delivery Date, never our planning estimate (owner ruling 2026-09-24)", () => {
+      const [item] = project({ official_delivery_date: "2026-09-11", eta_date: "2026-09-09" });
+      expect(item?.id).toBe("purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11");
+      expect(item?.timing?.actionOn).toBe("2026-09-10");
+    });
+
+    it("closes only on the Supplier DO or an evidenced confirmation for THIS date and the PO's own Warehouse", () => {
+      const base = { official_delivery_date: "2026-09-11", destination_id: DEST };
+      /* The old "any answer about the date" no longer closes it. */
+      expect(project({ ...base, tomorrow_answer_about_date: "2026-09-11" })).toHaveLength(1);
+      expect(project({ ...base, arrival_confirmations: [confirmation()] })).toHaveLength(0);
+      expect(project({ ...base, arrival_confirmations: [confirmation({ kind: "supplier_do" })] })).toHaveLength(0);
+      /* Another Warehouse, another date or an older version proves nothing. */
+      expect(project({ ...base, arrival_confirmations: [confirmation({ destination_id: "other" })] })).toHaveLength(1);
+      expect(project({ ...base, arrival_confirmations: [confirmation({ for_date: "2026-09-10" })] })).toHaveLength(1);
+      expect(project({ ...base, version: 2, arrival_confirmations: [confirmation()] })).toHaveLength(1);
+    });
+
+    it("an evidenced delay moves the effective arrival: the old date's check retires and a new one opens for the new date", () => {
+      const delay = {
+        kind: "tomorrow_delivery", answer: "delayed", po_version: 1, about_date: "2026-09-11", previous_date: null,
+        new_date: "2026-09-15", reason: "Transport delay", channel: "whatsapp", recipient: "Ohana group",
+        evidence: "PO-3001/delay.png", reported_by: "Ah Hock", reported_at: "2026-09-09T02:00:00Z",
+        recorded_by: "u-1", recorded_at: "2026-09-09T02:05:00Z",
+      };
+      const base = { official_delivery_date: "2026-09-11", destination_id: DEST, promises: [delay] };
+      /* On Thu 10 Sep the old check (for Fri 11) is gone. */
+      expect(project(base, "2026-09-10")).toHaveLength(0);
+      /* On Mon 14 Sep the check for Tue 15 Sep is open, as a NEW occurrence. */
+      const [next] = project(base, "2026-09-14");
+      expect(next?.id).toBe("purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-15");
+      /* The confirmation for the OLD date proves nothing about the new one. */
+      expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-14")).toHaveLength(1);
+      expect(project({ ...base, arrival_confirmations: [confirmation({ for_date: "2026-09-15" })] }, "2026-09-14")).toHaveLength(0);
     });
 
     it("stays open and turns late once the check day has passed", () => {
@@ -1107,5 +1121,79 @@ describe("payment.check_stored_furniture", () => {
     });
     expect(items).toHaveLength(1);
     expect(items[0]?.timing.actionOn).toBe("2026-09-06");
+  });
+});
+
+describe("the PO window card — one occurrence per window, never one per Sales Order (Purchasing §5.6.1)", () => {
+  const poDuty = {
+    dutyKey: "po_duty",
+    onDate: "2026-09-25",
+    normalOwner: { userId: "shasha", name: "Shasha" },
+    buddy: null,
+    activeCover: null,
+    actingPerson: { userId: "shasha", name: "Shasha" },
+    state: "primary" as const,
+    assignmentId: "assignment-1",
+  };
+  const demand = (id: string, orderId: string, supplierId: string, supplier: string, toBuy: number, poWindow: string | null) => ({
+    id, orderId, so: null, supplierId, supplier, toBuy, poWindow,
+    state: "safety_days_full", issueRef: { proposalKey: "p", buildKey: "b" },
+  });
+  const read = (rows: unknown[], pos: unknown[] = []) => ({
+    rows,
+    registerRows: [{ orderId: "o1", pos }],
+  }) as unknown as Parameters<typeof projectPoWindowWork>[0]["read"];
+  const suppliers = [
+    { id: "ohana", whatsapp_group_url: "https://chat.whatsapp.com/ohana" },
+    { id: "hookka", contact_email: "po@hookka.test" },
+  ];
+
+  it("gives PO Duty one card over the window's exact demand, due at the window", () => {
+    const items = projectPoWindowWork({
+      read: read([
+        demand("r1", "o1", "ohana", "Ohana", 2, "2026-09-25T11:30"),
+        demand("r2", "o2", "hookka", "Hookka", 1, "2026-09-25T11:30"),
+        demand("r3", "o3", "ohana", "Ohana", 4, "2026-09-25T16:00"),
+      ]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T02:00:00.000Z",
+    });
+    expect(items.map((i) => [i.object.id, i.object.label, i.problem, i.action, i.recipient, i.timing.actionOn, i.owner.acting?.name])).toEqual([
+      ["2026-09-25T11:30", "11:30 AM PO window", "Buy 3 items for 2 Sales Orders", "Issue the POs by 11:30 AM", "2 suppliers", "2026-09-25", "Shasha"],
+      ["2026-09-25T16:00", "4:00 PM PO window", "Buy 4 items for 1 Sales Order", "Issue the POs by 4:00 PM", "Ohana", "2026-09-25", "Shasha"],
+    ]);
+    expect(items[0]!.ruleKey).toBe("purchasing.po_window");
+    expect(items[0]!.destination).toBe("/operation?tab=purchase&window=2026-09-25T11%3A30");
+    expect(items[0]!.interaction.mode).toBe("open_module");
+    expect(items[0]!.tone).toBe("info");
+  });
+
+  it("after issue: speaks the send line and embeds the one shared send area", () => {
+    const [item] = projectPoWindowWork({
+      read: read([], [{ poId: "PO250925-4827", status: "open", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    });
+    expect(item!.problem).toBe("1 PO issued · 1 not sent yet");
+    expect(item!.action).toBe("Click WhatsApp, send PO250925-4827(1) to Ohana");
+    expect(item!.interaction).toMatchObject({ mode: "embedded", componentKey: "purchasing.po_issue_evidence", staleRefusal: "stale_po_version" });
+    // 12:00 MYT is past 11:30 — the card warns within the day.
+    expect(item!.tone).toBe("warning");
+  });
+
+  it("a received PO needs no sending, so its window owes nothing", () => {
+    expect(projectPoWindowWork({
+      read: read([], [{ poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    })).toEqual([]);
+  });
+
+  it("unreadable window settings fail the Purchasing source instead of showing an empty day", () => {
+    expect(() => projectPoWindowWork({
+      read: { rows: [], registerRows: [], poWindowsUnavailable: true } as never,
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    })).toThrow(/unavailable/);
+  });
+
+  it("the per-Sales-Order issue_po and the retired confirm_ready_date are the window card's, not Work's", () => {
+    expect([...PURCHASING_WINDOW_OWNED].sort()).toEqual(["confirm_ready_date", "issue_po"]);
   });
 });

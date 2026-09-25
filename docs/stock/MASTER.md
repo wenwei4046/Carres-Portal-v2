@@ -67,7 +67,7 @@ Ready Stock is a shared eligible-Unit view; Counts & Adjustments belongs within 
 Reports, Settings, Work and Calendar keep their shared Shell homes. There is no Warehouse-local
 Dashboard, Monitor, Transfer, Ready Stock or Counts top-level destination.
 
-Approved words include Where · Who has it · Carres Owned · Supplier Consignment · Report issue ·
+Approved words include Stock Location (the one place word on screen; `Where` / `Who has it` are retired as screen words, owner 2026-09-25 — the holder remains an internal custody fact) · Carres Owned · Supplier Consignment · Report issue ·
 Count again. Generic status editing, Add stock, Remove stock and Mark done remain forbidden.
 UI Kit acceptance remains pending the owner's visual review; implementation is not a design freeze.
 
@@ -94,25 +94,38 @@ counted goods; `null` prints `—`. A counted row cannot be reached by scanning,
 ever printed for it.
 Receiving verifies the identities Purchasing issued and never creates, replaces or renumbers one.
 
-The supplier currently adds `CARRES UNIT ID: U1-000-001` only to its own package label. A supplier
-physical-Unit label, QR, barcode and Carres template are not required now. Carres Operations attaches
-the same text ID to the physical Unit at the showroom. Future supplier labelling or QR/barcode is
-only a carrier for the same Unit ID. A wrong or unreadable label starts a controlled issue, never a
+**THE WAREHOUSE PRINTS AND STICKS THE LABEL — owner ruling 2026-09-25, APPROVED TARGET / NOT
+BUILT.** Suppliers do not label Units yet, so the label is applied at receipt, exactly as serial
+capture at goods receipt works in SAP/Dynamics. `Print Unit ID labels` on the PO and on the Inbound
+row produces one label per Unit ID for a thermal label printer (50 × 30 mm roll; the warehouse buys
+a Brother QL / TSC / Zebra class printer, ~RM 400–900 once, labels ~3 sen each): a QR code holding
+only the Unit ID, `CARRES UNIT ID` small, `U1-000-091` large (readable at 2 m), the item name small.
+QR, not a barcode — smaller and any phone camera reads it. Two labels per Unit: one on the packaging
+(scanned at receipt) and one on the goods themselves (the packaging is thrown away). Receiving lists
+the PO's expected Unit IDs; which identical piece gets which ID does not matter — the receiver sticks
+a label, ticks `Received`, and that label is what every later scan reads. A NETS login may print
+labels (printing changes no record). The Receiving and Loading scan boxes accept the phone camera
+reading the QR as well as typed input. When a supplier later prints `CARRES UNIT ID: U1-000-001`
+on its own packaging, the receiver only verifies; the screens do not change. A wrong or unreadable label starts a controlled issue, never a
 second Unit. Replacement labels keep the original ID and full evidence.
 
 Every active Unit has Catalog identity, source order, ownership, **Where**, **Who has it**,
 condition, calculated availability, reservation connection, last verified date, evidence and
 append-only history.
 
-| Where | Who has it |
+| Stock Location | Meaning |
 |---|---|
-| Carres Klang Warehouse | NETS Warehouse |
-| On the way to PJ Showroom | NETS Delivery |
-| PJ Showroom | PJ Showroom |
-| selected JB partner warehouse | JB partner |
-| On the way to the Singapore customer | EU or SSY |
+| `Carres Klang` | inside Carres's own Klang warehouse (NETS operates it; NETS is never printed as the place) |
+| `PJ Showroom` | inside the showroom |
+| `{Logistics} · {Delivery Location}` (e.g. `NETS Logistics · PJ Showroom`) | the Logistics company has taken the goods (Warehouse posted OUT) and no Site has posted IN yet: the cell names who picked up and where it is going, nothing else (owner ruling 2026-09-25) |
+| `AL Sungai Buloh` · `HOUZS Balakong` (future `HOUZS Penang`) | at a Logistics company's TRANSIT POINT — owner correction 2026-09-25: AL and HOUZS are Logistics companies Carres assigns, not Carres warehouses; their Sites exist so an arrival there can be received, and a Unit standing there always shows `Pickup By {company}` and its `Delivery Location` beside it |
+| the selected JB partner warehouse · EU or SSY on the Singapore leg | partner custody on a Journey leg |
 
-NETS is not a Site. Site, operating party and role are separate. Independently saleable or
+**Owner correction 2026-09-25: there is no `Who has it` fact on screen.** Carres owns the goods and
+sells them to the customer; the one place column `Stock Location` (COPY-STANDARD's existing heading
+and place words) already says where the Unit stands and, on the road, that the driver has it.
+Ownership (`Carres Owned` · `Supplier Consignment`) is a separate optional column. `Operated by NETS`
+is a Warehouse Settings fact about the Site, never a value on a Unit. NETS is not a Site. Independently saleable or
 replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
 Missing required modules, components or packages prevents Ready stock eligibility.
 
@@ -228,6 +241,21 @@ page: Outbound holds the origin check/handover work; Inbound holds destination r
 Inventory shows the resulting current holder and History. It is used only for governed Site-to-Site
 movement within Carres control. Customer Delivery uses its DO/Journey, while Supplier Return and
 Repair retain their own source documents and reuse the same physical-handover contract.
+
+**TRANSFER FORM — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT.** `Request Transfer` on
+Inventory opens a one-scroll form titled `Transfer` (no `Warehouse ·` prefix, no
+`Transfer / Return / Repair` composite title) with dictionary words: `Pickup Location` (a Carres
+Site the Units stand in) · `Delivery Location` (a Carres Site only — `PJ Showroom`; a move to a
+Logistics transit point or a customer is a Delivery Journey, never a Transfer, owner 2026-09-25) ·
+`Pickup By` (a Logistics company only: `NETS` · `AL` · `HOUZS`) · `Ship Date` · `Expected arrival` ·
+`Reason` · `Units` (`Find Unit` offers only `Available` Units standing at the Pickup Location; never
+`Incoming`, `Reserved` or `Cannot sell`). Saving mints `TR-{n}` and projects it: a `Transfer pickup`
+card on Pickup Schedule and an Outbound row on Ship Date, a `Transfer arrival` card on Arrival
+Schedule and an Inbound row on the destination Site's tab, and `Delivery Location {Site}` on the
+Units' Inventory rows. Workspace: `{TR No} / {n} Units to {Site} / Load the goods` on Ship Date and
+`{TR No} / {n} Units arriving from {Site} / Receive the goods` on the arrival day, through the same
+Outbound/Inbound rules. The retired party picker that listed organisations, roles and Sites together
+(`AL, AL, HOUZS, HOUZS, NETS, NETS Delivery, Carres Warehouse, PJ Showroom, E2E LP-…`) is a defect.
 
 Transfer Detail follows the Object Detail Template and shows `Transfer No · source request · exact
 Units · From · To · collection date · arrival date · delivery party · Outbound work · Inbound work ·
@@ -387,7 +415,10 @@ column, and previous/next page the whole week at every width. The date sequence 
 projection's; this law fixes presentation only and hardcodes no weekday.
 
 Cards preserve the owning document and Site, use quiet Expected/Scheduled badges, and show real
-loading separately from driver acceptance. Delayed and undated work stays reachable under its real
+loading separately from driver acceptance. **A card names its Units — owner ruling 2026-09-25:** one
+to three exact Units print their Unit IDs on the card (`U1-000-082 · U1-000-083 · U1-000-084`);
+more than three print `{n} Units` and the IDs are on the Inbound/Outbound row; counted goods print
+`{item} ×{qty}`. A pickup card prints `Pickup By {company}`. Delayed and undated work stays reachable under its real
 dates; no automatic rescheduling occurs.
 
 The daily journey is: open the appropriate schedule, follow its exact Inbound or Outbound entry,
@@ -535,6 +566,31 @@ rather than hiding the row. After a successful save the affected row, its quanti
 counts and the receipt records are re-read; a failed save preserves what the operator typed.
 Inbound still owns no write path and carries no Work column or duty avatar.
 
+**INBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
+2026-09-15 four-group composite cells above as design; that card's Site tabs, three filters,
+on-row `Receive`, full-width Receiving Workspace and `Destinations without a Site` tab stay).**
+One row is one arrangement, 40px, one fact per cell, dates first, in the owner's order:
+
+```
+PO Delivery Date · Supplier Delivery Date · Goods Received Date · PO No · Supplier ·
+Supplier DO No · Item · Order Qty · Received Qty · Pending Delivery Qty · Receive
+```
+
+(owner's order 2026-09-25: the three dates first — planned, supplier-confirmed, actual — then the
+two documents and the supplier, then the goods and the three quantities, `Receive` last.
+`Supplier DO No` opens that delivery's receipt; a PO delivered in two trucks lists two DO numbers.)
+
+`Supplier Delivery Date` prints `Not confirmed` while the supplier has not answered. `Damaged Qty` ·
+`Wrong Item Qty` · `PO Issued` · `SO No` · `To` stay in `Columns`. An arrangement with several
+goods prints `{n} items ▸` in `Item` and keeps the row expansion — the one Inbound exception to
+"no expansion", because ten goods on one PO cannot share one line; the expansion lists each item
+with its own quantities and exact Units. An arrangement past its date with no receipt prints
+`Expected {date} · not received` as the row's first line in `Item`, never a colour. The
+`Receive` column keeps its three words (`Receive` · `Checking…` · `Not your duty today`) and the
+no-Site tab prints `No Site linked`. Workspace: on the arrival day the existing `receiving.check_in`
+rule gives the current GRN Duty one card — `{PO No} · {Supplier} / {n} items arriving today /
+Receive the goods` — whose `Open Inbound` door lands on this row; Inbound itself creates no Work.
+
 Clicks are explicit: the Document number opens the document; the Product cell (its arrow and its
 content are ONE expansion entry) expands the row; a Unit ID inside the expansion opens that Unit's
 record; the row itself navigates nowhere. **The expansion has ONE job: the full product detail** —
@@ -574,6 +630,27 @@ is a gate. The UI offers the `Receive` control on exactly the same global answer
 server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
 decision and is not assumed here.**
 
+**EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT.**
+Receiving is never blocked because the GRN Duty holder is on MC or busy: every active Carres
+Operation staff member (and the Principal) sees `Receive` on the row and may post a receipt. GRN Duty
+still OWNS the Work card (`Receive the goods`) and its lateness; the actual receiver is recorded on
+the GRN and in the Unit's History as the person who did it (owner: "record history will do"), and
+the two identities stay separate (Architecture Law F: owner
+and capability are different facts). `Not your duty today` is retired as a refusal on Inbound; the
+only refusals left are `No Site linked` and a Site that is not a Carres or transit Site. Warehouse
+Settings → `Access` shows this as `Receive goods · Everyone in Operation` by default, with the option
+to narrow it later. The database gate `receiving_require_post_authority` (GRN Duty · cover ·
+Operations Superuser) is overwritten by this ruling and must widen to active Operation staff in the
+same build.
+
+**SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
+BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres
+showroom · Logistics transit point) · Operated by · Full address · Active` and offers `Add Site`.
+`PJ Showroom` (Carres showroom, operated by Carres) and `HOUZS Penang` (Logistics transit point,
+operated by HOUZS — owner instruction 2026-09-25: add it now, not later) are added in the same build. `Access` keeps `Manage Warehouse Settings` and `Receive goods` only; `Perform stock
+count` and `Confirm collection from Warehouse` return when Counts and NETS logins are built — no
+switch for a capability that does not exist.
+
 **COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
 mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of
 a gap that does not exist. Only an `exact_unit` scope missing its minted identities is incomplete,
@@ -609,13 +686,14 @@ arrival as physical Stock.
 Inventory is the one current list. Its left rail filters the same Unit authority:
 
 ```
-STOCK                         WHO HAS IT               OWNERSHIP
-All Stock                     NETS Warehouse           Carres Owned
-Reserved for Sales Orders     NETS Delivery            Supplier Consignment
-Ready Stock                   PJ Showroom
-Showroom Display              Other outlets            CONTROL
-Service Case                                            Counts & Adjustments
-Needs checking                                          History
+STOCK                         OWNERSHIP                CONTROL
+All stock                     Carres Owned             Counts & Adjustments
+Reserved                      Supplier Consignment     History
+Ready Stock
+Showroom Display
+Service Case
+Needs checking
+Available · Cannot sell · Incoming   (Inventory Status rows, same group)
 ```
 
 The dated work strip remains above the Register. For the selected actual date it shows only the
@@ -628,8 +706,8 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-Unit ID · Product · Stock use · Who has it · SO No · SO date ·
-PO/Source No · PO/Source date · Received
+Goods Received Date · Ship Date · SO No · Inventory Status · Stock Condition · PO No / Ref No ·
+Unit ID · Item · Pickup By · Stock Location · Delivery Location
 ```
 
 `Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
@@ -638,6 +716,86 @@ No SO No means unallocated only; it does not make the Unit Ready Stock. Goods no
 remain in Inbound, not current Inventory. Delivered, returned-to-supplier, written-off or otherwise
 ended Units leave the default current list but remain searchable in History with their distinct
 lifecycle outcome.
+
+**THE DEFAULT LIST IS WHAT CARRES PHYSICALLY HOLDS — owner ruling 2026-09-25, APPROVED TARGET /
+NOT BUILT.** `All stock` opens on the Units Carres actually holds: `Available · Reserved / sold ·
+Not available · In transit`. `Incoming` (born with the PO, not yet received) is never in that
+default; it stays reachable as its own `Stock use` rail row, and the footer prints one extra line,
+`{n} still to arrive · see Inbound`, whose number is the same `Pending Delivery` arithmetic Inbound
+reads (`receivingSummaryOf`), never a second count. Measured on production 2026-09-25: `All stock
+222` while 127 of those rows were `Incoming` and only 95 were in a Carres Site — a new operator read
+222 as goods on the floor. Mature systems (Odoo On Hand vs Incoming, SAP/Dynamics expected receipts,
+2990 On hand/Incoming) separate the two for the same reason. Falsifier: an operator who needs the
+Incoming rows inside the default list to do a daily Warehouse job.
+
+**ONE ROW IS ONE UNIT, ONE CELL IS ONE FACT — owner ruling 2026-09-25, APPROVED TARGET / NOT
+BUILT.** The Register uses the nine approved columns above as nine separate 40px single-line
+columns under the Listing Template (`../ui/MASTER.md` §6.0): 13px/18 body text, 11px/600 slate
+header at 36px, 8px cell padding, `Unit ID` pinned left as the sticky identity, a long value
+ending in `…` and shown whole on hover/focus, dates and numbers never cut. **There is no row
+expansion and nothing is folded into a composite cell**: the shipped four-group cells (`Site /
+stock use`, `Orders / dates`) are retired as design, and a Unit's further facts live in Unit
+Detail, opened from the Unit ID. `Site · Ownership · Condition · Category · Last verified ·
+Supplier · Last moved` remain one click away in `Columns`. Every identifier prints in its ruled
+form — `U1-000-084` · `SO2609-4827` · `PO260924-4827` · a five-digit `DO`/`SDO` — and a quantity
+row prints `—` for Unit ID with `×{qty}` beside the product. Measured on production 2026-09-25:
+each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
+screen shows fifteen.
+
+**THE ELEVEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, APPROVED TARGET / NOT
+BUILT.** The order is the owner's own sequence (2026-09-25, second correction): the two dates first
+(in, out), the Sales Order and its saleability, then the source document and the pinned `Unit ID`,
+then the goods and the movement facts; it is not the Sales Orders date-first order. Every head is a word the dictionary already rules; no head may be minted for this
+page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showroom Display`,
+`History` …) only filter the same table and never carry their own columns.
+
+| Column | Meaning | Absence |
+|---|---|---|
+| `Goods Received Date` | the day it entered Carres control (posted receipt) | `Not received` |
+| `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
+| `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
+| `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
+| `Stock Condition` | the physical state (owner rename 2026-09-25; the stock picker's `Condition` head follows so the portal keeps one word): `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
+| `Stock Location` | the Carres or partner Site the Unit stands in or last stood in: `Carres Klang` · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`. Never a company, never NETS | — |
+| `Pickup By` | the company whose driver took the goods (`NETS` · `AL` · `HOUZS`); the owner's short word 2026-09-25 (international `Carrier` is banned here; `Logistics` was unclear to the owner); filled only after OUT | blank |
+| `Delivery Location` | where the goods are going (the DO's customer address, or the next Site on a Journey leg); filled only after OUT | blank |
+| `SO No` | the Sales Order the Unit is promised to | `No SO` |
+| `PO No / Ref No` | the document the goods came in on (PO, Transfer, Repair, Claim number) | `Not recorded` |
+| `Ship Date` | the day the Warehouse posted OUT to the Logistics company — the international pair to `Goods Received Date` (Oracle/Dynamics/NetSuite `Ship Date`; SAP `Goods Issue Date`, rejected because `issue` reads as a problem) | blank while the Unit stands in a Site |
+
+Nobody records the road. OUT at origin (`Record {n} Units loaded to {Logistics}`, 0424) and IN at
+destination (Receiving, 0490) are the only two events, exactly as SAP/Odoo stock-in-transit works;
+between them the row keeps its `Stock Location`, gains `Ship Date · Pickup By · Delivery
+Location`, and after the customer signs it leaves the list into History. A partner leg reads the
+same way: Klang OUT → `Pickup By AL · Delivery Location AL Sungai Buloh`; AL IN → `Stock Location
+AL Sungai Buloh`; AL OUT → `Pickup By AL · Delivery Location {customer}`; delivered → History.
+`With NETS Delivery`, `In transit`, `On the way`, `Who has it`, `Site` and `Where` are not
+Inventory words. `Ownership` (`Carres Owned` · `Supplier Consignment`) · `SO Date` · `PO Doc Date` · `Category` ·
+`Last verified` · `Supplier` · `Last moved` stay one click away in `Columns`. Required facts (`Unit ID` ·
+`Item` · `Inventory Status`) never print an absence word; an empty required cell is a defect.
+
+**DAMAGED OR OLD GOODS CAN STILL BE SOLD — owner ruling 2026-09-25 (clearance).** `Stock Condition`
+never decides `Inventory Status` by itself. A Unit becomes `Cannot sell` only while a reported
+problem is being checked, while it is `In repair`, or while it is a `Wrong item` waiting for the
+supplier. After the check, the current GRN Duty decides: repair, return to supplier, or
+`Make available for sale` — which puts a `Damaged` or `Old` Unit back to `Available` for clearance
+sale while its `Stock Condition` keeps saying `Damaged` / `Old`, so Sales sees exactly what they are
+selling. Sales' Ready Stock view therefore shows `Stock Condition` beside every Unit. Receiving with
+result `Received` makes a Unit `Available` automatically (SAP unrestricted stock, Odoo done
+receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
+the way back from `Cannot sell`.
+
+**UNIT DETAIL — owner rulings 2026-09-25, APPROVED TARGET / NOT BUILT.** Titled `{Unit ID} ·
+{Item}`, `← Inventory` returns to the register with its filters and position. Four sections, one
+scroll, these words: **`Stock Details`** (Inventory Status · Stock Condition · Stock Location ·
+Ownership · Goods Received Date — the receipt date is the proof the Unit was seen; there is no
+separate `Last verified` / `Last counted` field, a later Count shows in History) · **`Documents`**
+(PO No · GRN No · SO No · DO No, each a door; absences `No SO` · `No DO yet`) · **`Current work`**
+(the one shared Work contract for this Unit, or `Nothing to do for this Unit.`) · **`History`**
+(append-only, actual actor and document). The header `⋮` holds exactly `Report a problem` ·
+`Make available for sale` (shown only while the Unit is `Cannot sell`) · `Count again` (shown only
+after a `Not found` report). No Edit, no status selector, no Delete. `Where it is now` and
+`Connected records` are retired heading words.
 
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
@@ -716,6 +874,32 @@ The default includes outstanding loading, missing evidence and unmatched driver 
 Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
 filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
+**OUTBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
+composite `Document` / `Units` cells above as design; the Pickup status rail, the on-row `Loading`
+door, the full-width Loading workspace and the separate `Loaded` / `Driver confirmed` facts stay).**
+One row is one DO + Site scope, 40px, one fact per cell, in the owner's order:
+
+```
+Scheduled handover · Ship Date · DO No · SO No · Pickup By · Delivery Location · Item ·
+Required · Loaded · Driver confirmed · Loading
+```
+
+`Scheduled handover` is Delivery's planned pickup day; `Ship Date` is the day the Warehouse
+recorded the goods loaded (blank until then). `Pickup By` is the company whose driver comes
+(`NETS` · `AL` · `HOUZS`); `Delivery Location` is the customer address or the next Site. Several
+goods print `{n} items ▸` and keep the expansion (each Unit's scanned / checked / packed / loaded /
+driver-confirmed facts). `Required · Loaded · Driver confirmed` are three columns, never one
+number. The `Loading` cell prints `Done` once every required Unit is loaded and driver-confirmed,
+and the row stays under the `Loaded` filter. `Supplier DO No` is never an Outbound column — the
+supplier's delivery note belongs to Inbound. Driver confirmation remains the driver's own act
+through a personal NETS login (§11, NOT BUILT); until then a Carres operator records it on the
+driver's behalf and the record names both (`recorded by {staff} for {driver}`). Workspace: on the
+scheduled day the `warehouse.outbound_handover` rule gives one card — `{DO No} · {SO No} / {n}
+items · pickup by {company} today / Load the goods` — with `Open Outbound` landing on this row;
+**PROPOSAL / NOT LAW:** until NETS personal accounts and Site queues exist, that card resolves to the
+current GRN Duty so the work is visible to a Carres person; falsifier: the owner prefers it hidden
+until NETS logins exist.
+
 **Completion and return — owner approved 2026-09-16; built, production verification pending.** Once all
 required Units are loaded, make outstanding driver confirmation and the owning Delivery Order
 door clear instead of continuing to emphasise scanning as the next act. Warehouse never confirms
@@ -773,6 +957,14 @@ credentials are invalid. Carres staff ownership does not become NETS ownership m
 performed the physical act.
 
 ## 8 · Work and dates
+
+**`Hold delivery` on the Warehouse Schedule and Outbound — owner ruling 2026-09-25 · APPROVED
+TARGET / NOT BUILT.** A scope whose Scheduled delivery exists but whose DO cannot issue (money
+unpaid or a Finance hold — Delivery's one gate predicate) prints `Hold delivery` over
+`Payment incomplete · Do not pack` on its Warehouse Schedule row and in Outbound. The Warehouse
+never sees the amount or the Finance reason; the line is read from Delivery and written by nobody
+here. It leaves when the system issues the DO, which is also when the dated preparation work
+appears. `Do not pack` is the one word for every stage of preparation.
 
 Warehouse uses the one shared Work Engine. Owner and cover are structured metadata, not sentence
 text. The business object has no fake universal Owner. Labels tell a new operator the concrete act;
@@ -1456,7 +1648,7 @@ Supplier Return creates Outbound work; only actual supplier/collection-party acc
 restored.
 
 **OPERATOR JOURNEY →** return receiver opens the expected Inbound work, scans Unit/source,
-condition/components/evidence and submits receipt into `Needs checking`. Supplier-return operator
+condition/components/evidence and submits receipt into `Needs checking`. (Purchasing §9.6, owner-approved 2026-09-25: the Outbound `Return to supplier` work is opened by an issued PRTN naming exact Units; Outbound records collector, time, Units and proof, and Purchasing reads them as `Not picked up` · `Partly picked up` · `Fully picked up`.) Supplier-return operator
 opens Outbound, scans the exact Unit and identifies the actual supplier collector. Repair operator
 records out handover; Portal keeps the repair partner as holder and creates a concrete follow-up if
 the dated return is not submitted; actual return is scanned through Inbound and checked again.
