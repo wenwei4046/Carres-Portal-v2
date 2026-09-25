@@ -622,6 +622,15 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   would push Work under 768px and into the phone layout — measured on production 2026-09-25);
   the person's own collapse is remembered; the bottom block shows the account's name where one
   exists.
+- **THE WORK SHELL IS THE §6.0 LISTING SHELL — owner ruling 2026-09-25 ("why you different from
+  sales order ui").** Work draws the same shell as the Sales Orders Register: the 50px Destination
+  Header (page name + Search · Alerts · Help · Settings, no count), then ONE plain white toolbar
+  row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px · a **Date select**
+  (Missed · the two work weeks with counts and `Today` · No working date) · a **Page select**
+  (`All pages` · each page with its count) · Owner (Team Work) · `Covering`. There is no left
+  rail, no `Filters` button and no compact strip; the list and the detail share the whole width.
+  The 72px header, framed toolbar and rail of the 2026-09-25 morning density ruling are retired.
+  The card list itself keeps its approved 104px cards until the owner rules on the §6.0 table.
 - **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
   sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
   `0 for you · {n} for the team` wraps instead of truncating. An empty list draws no

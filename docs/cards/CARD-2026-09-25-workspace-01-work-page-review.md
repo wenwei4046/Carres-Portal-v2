@@ -44,5 +44,10 @@ below 768px the sidebar is a `Menu` drawer and the right rail is not drawn, so t
 whole width · 27 the header team count wraps instead of truncating · 28 an empty list draws no
 `Select a work item` box · 29 `Covering` keeps the 941px toolbar on one row. **BUILT.**
 
+**Round 3 (Jess, 2026-09-25 — "why you different from sales order ui", "just amend the shell
+first"):** 30 the Work shell is the §6.0 listing shell — 50px Destination Header, one plain
+toolbar row, search 340px, Date and Page as toolbar selects, no rail, no Filters button. The card
+list stays until Jess rules on the §6.0 table for Work. **BUILT.**
+
 **Acceptance for each ticked item:** a rendered walk at 1440×900, 829×900, 743×704 and 390×844
 with the measurement in the PR, and the Workspace MASTER §5 rows overwritten in the same PR.

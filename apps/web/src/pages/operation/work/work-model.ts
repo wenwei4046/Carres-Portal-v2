@@ -207,6 +207,34 @@ export function workRailDates(items: readonly WorkRow[], today: string, week: st
   };
 }
 
+/** The Date select's options (UI MASTER §6.0 shell, owner ruling 2026-09-25):
+ *  Missed first, the two work weeks, No working date last — every option
+ *  prints its count, `0` included, and today says `Today`. */
+export function workDateOptions(dates: WorkRailDates): { value: string; label: string }[] {
+  const n = (count: number) => ` · ${count}`;
+  return [
+    { value: "missed", label: `Missed${n(dates.missed)}` },
+    ...dates.days.map((d) => ({
+      value: d.iso,
+      label: `${d.label}${d.today ? " · Today" : ""}${d.holiday ? ` · ${d.holiday}` : ""}${n(d.count)}`,
+    })),
+    { value: "no_date", label: `No working date${n(dates.noDate)}` },
+  ];
+}
+
+/** The Page select's options: `All pages` first, then every admitted page
+ *  with its count over the chosen Date's rows. */
+export function workPageOptions(
+  modules: readonly { key: OperationWorkModule; label: string }[],
+  counts: Record<OperationWorkModule, number>,
+  total: number,
+): { value: string; label: string }[] {
+  return [
+    { value: "all", label: `All pages · ${total}` },
+    ...modules.map((m) => ({ value: m.key, label: `${m.label} · ${counts[m.key]}` })),
+  ];
+}
+
 /** Module counts over the rows of the chosen Date — before the module choice,
  *  so choosing one module never hides the others' real counts. */
 export function workModuleCounts(items: readonly WorkRow[]): Record<OperationWorkModule, number> {
