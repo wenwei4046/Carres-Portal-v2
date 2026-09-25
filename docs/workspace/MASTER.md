@@ -998,6 +998,13 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
    arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
    check through the one `logisticsCheckDueIso`.
 7. The Ohana supplier-to-customer route.
+9. Closed 2026-09-25 (owner yes, Delivery segment 1): the Work feed's `logisticsAssigned` reads
+   Delivery's arrangement (`ops_delivery_arrangements.partner_id`, leg-aware) — never the `orders`
+   columns alone, which stay a fallback until retired; the Logistics card's progress line reads the
+   same `deliveryWorkStatusOf` as the Monitor register and its words (`Scheduled` · `Transfer
+   scheduled` · `Collected by {company}` · `On the way to customer` · `Delivered to customer` · `Ask
+   {company} for the result`); one delivery-day reader (`confirmedDeliveryOf`: DO → arrangement →
+   legacy booking) serves the rail Calendar, Monitor and the Work feed.
 8. **Two contact days — owner ruling 2026-09-25 (Jess: keep both).** They are two different facts,
    never merged and never printed with the same words:
    - **`3 working days before`** the promised date (Orders Card 3 `T−3`, the `chase` lead

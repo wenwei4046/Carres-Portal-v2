@@ -658,7 +658,10 @@ narrowing and stays on the view. The URL names the whole view in one param (`?vi
 calendar word or a WORK TO DO queue), plus `?date=`, `?region=`, `?logistics=`, `?status=`,
 `?q=`; every retired spelling still resolves. Below 1100px the rail starts collapsed behind a
 44px `Show filters` strip; a remembered choice wins at any width. On a phone the rail becomes the
-filter drawer and the work list becomes one card per delivery carrying the same facts.
+filter drawer and the work list becomes one card per delivery carrying the same facts — the same
+two status lines from the same arithmetic (owner ruling 2026-09-25: a card never prints a queue
+word such as `No confirmed date` where the register prints `Not scheduled`, and never a bare date
+without its act).
 
 **`Call customer` and the contact week.** Under `Call customer`, and under no other queue, a
 Monday-to-Saturday strip lists the six operating days with the count of contact deadlines due on
@@ -903,6 +906,11 @@ same height and reads `{N} selected · Clear · Assign logistics`. Bulk assignme
 while every selected row is unassigned; a row that already carries a partner turns the act into
 `Change logistics`, one row at a time, through the same governed door. Footer: `{n} deliveries`
 or `{n} of {m} deliveries`; empty states `No deliveries` and `No matching deliveries.`.
+**Loading, failed and refused reads are three different pictures (owner ruling 2026-09-25):** 72px
+skeleton rows and `Loading…` in the footer until the read SUCCEEDS — a paused or unfinished read
+never prints `No deliveries` or a count; a failed read prints `Delivery could not be loaded` with
+`Try again` and keeps the last good rows on screen; a refused read prints `You cannot view this
+record` · `Ask an authorised operation user for access.` and no row.
 
 **Required Sales facts and legacy gaps (owner ruling 2026-09-13).** Delivery address, state,
 building type, floor, lift, access and the requested delivery information are required Sales
@@ -1127,24 +1135,12 @@ the structured columns on SO-1217, SO-1225 and SO-1246 are still `NULL`, and all
 last touched **2026-07-23**, seven weeks before this deploy. **That is a statement about writes
 only** — see the derived-interpretation rule above for what the cell is showing.
 
-**🟡 COEXISTENCE FINDING — #1310 AND #1311 BOTH SHIP, AND ONE DOCUMENTED RULE NO LONGER HOLDS.**
-The two Delivery merges do not conflict in code; the address reading, the `State` bucket, the
-filter and the brief all behave as specified above. But §8.4's table says the `Order details
-incomplete` second line is **the missing fact**, and #1310 made line two the contact deadline
-whenever one is owed (`!booked && !settled && contactDueIso !== null`) — a condition that does not
-exclude an incomplete row. **Measured live on `c02cf891`: of 48 `Order details incomplete` rows,
-47 now print a date and 1 still names the fact** (the one owing no deadline). The table row is
-corrected to what ships, and the consequence is recorded rather than hidden:
-
-- **No information is lost.** The missing fact still prints in orange in panel 1 of the brief —
-  verified on SO-1217 (`Building type not recorded`) and SO-1246 (`State not recorded`).
-- **What is lost is the at-a-glance reason.** An operator scanning the list sees *that* an order
-  is incomplete but must expand the row to learn *which* fact is missing.
-- **This is an owner decision, not an engineering one,** because both lines are owner-ruled on the
-  same day: the deadline-on-line-two ruling (#1310) and the missing-fact ruling (2026-09-13). They
-  collide only on this one status. Restoring the fact to the row — by exempting
-  `Order details incomplete` from the deadline line, or by carrying both — is Jess's call and is
-  **not** made here.
+**COEXISTENCE FINDING — CLOSED BY OWNER RULING 2026-09-25.** #1310 made line two of every row
+owing a contact deadline print that deadline, which did not exempt `Order details incomplete`
+(measured live on `c02cf891`: 47 of 48 such rows printed a date, 1 the fact). The owner ruled: line
+two prints the MISSING FACT; the contact deadline, when one is owed, lives in the cell's `title`
+and accessible name, Search and the export. No information is lost and the at-a-glance reason is
+back on the row. §8.4's table row carries the ruling; the build is in §15.1.
 
 **THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
 not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery
@@ -1189,7 +1185,7 @@ line sits beside it and says otherwise.
 ```
 LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
   customer leg          transfer leg             Ready
-  Confirmed             Transfer confirmed       Stock risk
+  Scheduled             Transfer scheduled       Stock risk
   Collected by {p}      Collected for transfer   Hold delivery
   On the way to         In transit to {stop}     Logistics details incomplete
     customer                                     DO not released
@@ -1210,30 +1206,40 @@ Carres records no arrival-at-customer event: `delivery_attempts` holds `delivere
 derived from a time, an ETA or a location. It becomes available only when the crew records a real
 arrival, which is a new capability and its own card.
 
-**Retired by this ruling:** `Scheduled` and `Transfer scheduled` (both banned status words —
-`COPY-STANDARD.md` §"Banned as status words", `01-design-tokens.md` §10, which also ban `Booked`)
-and `Delivery failed` (the governed spelling is `Failed Delivery`, so the card and the rail queue
-say one word for one fact). `Out for delivery` stays retired and is not restored.
+**ONE FUNCTION PRINTS THE WORDS — owner ruling 2026-09-25 (Delivery segment 1).** The Monitor
+register column, the `DELIVERY STATUS` dropdown, the schedule card, the phone card, the Work
+Logistics card's progress line and every report read the same `deliveryWorkStatusOf` and its one
+label function; a second label function (measured 2026-09-25: the register printed the 2026-09-13
+spellings while the card printed these) is a Law D defect, not a variation. The four words the owner
+changed that day: `Operation must assign logistics` → **`Assign logistics`** (the act, not the
+actor); `Transfer confirmed` → **`Transfer scheduled`** (the pair of `Scheduled`); `{partner} must
+record the result` → **`Ask {partner} for the result`**; and `Order details incomplete` prints the
+MISSING FACT on line two, the contact deadline moving to its `title` and accessible name (this
+closes the §8.3.1 coexistence finding). Retired for good: `Scheduled for {date}` (the date is
+column 8's) · `Goods collected by {partner}` · `{partner} is delivering to the customer` · `Confirm
+delivery time` (a day without a time is a complete arrangement; the rung and its kind go) ·
+`Delivery failed` (the governed spelling is `Failed Delivery`). `Out for delivery` stays retired
+and is not restored. `Booked` stays banned.
 
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
-| no partner on the scope | `Operation must assign logistics` | orange | |
+| no partner on the scope | `Assign logistics` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | partner set, no contact record, the partner contacts the customer | `Call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | partner set, no contact record, Carres contacts the customer | `Call customer` — the same act, a different owner | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
 | scheduled date recorded (time optional) — a CUSTOMER leg | `Scheduled` | green | the time, when recorded |
-| scheduled date recorded (time optional) — a TRANSFER leg | `Transfer confirmed` | none | the time, when recorded |
+| scheduled date recorded (time optional) — a TRANSFER leg | `Transfer scheduled` | none | the time, when recorded |
 | DO exists, no handover recorded | `Waiting for {partner} pickup` | none | `Handover {date}` when Warehouse scheduled it |
 | Warehouse handed over and the partner's receipt is recorded — a CUSTOMER leg | `Collected by {partner}` | none | `Collected {date} {time}` |
 | Warehouse handed over and the partner's receipt is recorded — a TRANSFER leg | `Collected for transfer` | none | `Collected {date} {time}` |
 | collected, and the partner recorded departure or an ETA — a CUSTOMER leg | `On the way to customer` | none | `ETA {time}` |
 | collected, and the partner recorded departure or an ETA — a TRANSFER leg | `In transit to {stop}` | none | `ETA {time}` |
-| confirmed day passed with no result | `Overdue` | red | `{partner} must record the result` |
+| confirmed day passed with no result | `Overdue` | red | `Ask {partner} for the result` |
 | attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
 | attempt `delivered` on the CUSTOMER leg | `Delivered to customer` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
 | attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
 | attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |
-| a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the contact deadline when one is owed, otherwise the missing fact — see the coexistence finding in §8.3.1; the fact always prints in panel 1 |
+| a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the missing fact (`Building type not recorded`); the contact deadline, when owed, is the cell's `title` and accessible name (owner ruling 2026-09-25) |
 
 **Retired on Monitor by the 2026-09-14 ruling:** `{partner} must contact the customer` ·
 `Operation must call the customer` · `Call by {date}` on any visible line.
@@ -1846,7 +1852,7 @@ their absence as a design blind spot:
 | `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
 | the `ETA` field in the Logistics Details edit state (§8.6) — the Operation save already accepts `expectedArrival`; the brief has no input for it | `apps/web/src/pages/operation/components/DeliveryBrief.tsx` |
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
-| **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
+| **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; `Order details incomplete` still prints the deadline on line two; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
