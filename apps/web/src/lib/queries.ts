@@ -7087,6 +7087,8 @@ export function useSaveDeliveryArrangement(orderId: string | undefined, leg = 0)
       void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
       void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
       void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      // Refresh the DO list and DO pages: a leg save with a date can issue that leg's DO.
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
     },
   });
 }
