@@ -545,9 +545,13 @@ on-row `Receive`, full-width Receiving Workspace and `Destinations without a Sit
 One row is one arrangement, 40px, one fact per cell, dates first, in the owner's order:
 
 ```
-PO Delivery Date · Supplier Delivery Date · PO No · Supplier · Item · Order Qty · Received Qty ·
-Pending Delivery Qty · Goods Received Date · Receive
+PO Delivery Date · Supplier Delivery Date · Goods Received Date · PO No · Supplier ·
+Supplier DO No · Item · Order Qty · Received Qty · Pending Delivery Qty · Receive
 ```
+
+(owner's order 2026-09-25: the three dates first — planned, supplier-confirmed, actual — then the
+two documents and the supplier, then the goods and the three quantities, `Receive` last.
+`Supplier DO No` opens that delivery's receipt; a PO delivered in two trucks lists two DO numbers.)
 
 `Supplier Delivery Date` prints `Not confirmed` while the supplier has not answered. `Damaged Qty` ·
 `Wrong Item Qty` · `PO Issued` · `SO No` · `To` stay in `Columns`. An arrangement with several
