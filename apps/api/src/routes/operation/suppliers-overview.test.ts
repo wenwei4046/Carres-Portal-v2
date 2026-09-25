@@ -40,11 +40,22 @@ async function makeJwt(role: string) {
   return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-/** Chainable thenable, recording the columns each table was asked for. */
+/** PostgREST in this project hands back at most 1000 rows per read. */
+const PG_MAX_ROWS = 1000;
+
+/** Chainable thenable, recording the columns each table was asked for.
+ *  Like PostgREST, one read returns at most 1000 rows; `.range()` picks which. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function builder(rows: unknown[], selects: string[]): any {
+  let from = 0;
+  let to = PG_MAX_ROWS - 1;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
+    range: vi.fn((a: number, z: number) => {
+      from = a;
+      to = Math.min(z, a + PG_MAX_ROWS - 1);
+      return b;
+    }),
     select: vi.fn((cols: string) => {
       selects.push(cols);
       return b;
@@ -55,7 +66,7 @@ function builder(rows: unknown[], selects: string[]): any {
     eq: vi.fn(() => b),
     in: vi.fn(() => b),
     then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-      Promise.resolve({ data: rows, error: null, count: rows.length }).then(res, rej),
+      Promise.resolve({ data: rows.slice(from, to + 1), error: null, count: rows.length }).then(res, rej),
   };
   return b;
 }
@@ -226,6 +237,59 @@ describe("GET /api/operation/suppliers-overview — the R5 scorecard", () => {
     expect(body.scorecardWindow.days).toBe(365);
     expect(body.scorecardWindow.truncated).toBe(false);
     expect(body.scorecardWindow.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("counts every PO in the window, not just the first 1000 one read returns", async () => {
+    const pos = Array.from({ length: 1500 }, (_, i) => ({
+      id: `P${i}`,
+      supplier_id: "s1",
+      status: "open",
+      sup_status: "delivered",
+      eta_date: "2026-07-20",
+      placed_at: "2026-07-01T00:00:00Z",
+      do_uploaded_at: null,
+    }));
+    mount(pos, [], []);
+    const { body } = await get();
+    expect(body.suppliers[0].totalPos).toBe(1500);
+    expect(body.suppliers[0].openPos).toBe(1500);
+    expect(body.scorecardWindow.truncated).toBe(false);
+  });
+
+  it("says the window was cut short when there are more POs than it will read", async () => {
+    const pos = Array.from({ length: 2500 }, (_, i) => ({
+      id: `P${i}`,
+      supplier_id: "s1",
+      status: "open",
+      sup_status: "delivered",
+      eta_date: "2026-07-20",
+      placed_at: "2026-07-01T00:00:00Z",
+      do_uploaded_at: null,
+    }));
+    mount(pos, [], []);
+    const { body } = await get();
+    expect(body.scorecardWindow.truncated).toBe(true);
+    // The newest 2000 POs it did read are still counted.
+    expect(body.suppliers[0].totalPos).toBe(2000);
+  });
+
+  it("reads every line of a PO batch, even past 1000 lines", async () => {
+    // A has 1000 complete lines plus one short line; B and C have one
+    // complete line each. The short A line and B's and C's lines sit past
+    // the first 1000 rows, so a single read would call A complete and leave
+    // B and C with no lines at all.
+    const { pos } = threeClean("2026-07-18T02:00:00Z");
+    const line = (po_id: string, received_qty: number) => ({
+      po_id,
+      qty: 5,
+      received_qty,
+      damaged_qty: 0,
+      wrong_item_qty: 0,
+    });
+    const aLines = Array.from({ length: 1000 }, () => line("A", 5));
+    mount(pos, [...aLines, line("A", 2), line("B", 5), line("C", 5)], []);
+    const { body } = await get();
+    expect(body.suppliers[0].scorecard.inFull).toEqual({ known: true, pct: 67, hits: 2, of: 3 });
   });
 
   it("asks purchase_order_lines for R1's three numbers", async () => {

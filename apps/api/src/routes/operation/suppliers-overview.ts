@@ -10,6 +10,7 @@ import {
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
+import { readAllPages, type PgErrorish } from "../../lib/route-helpers";
 
 /**
  * /api/operation/suppliers-overview — Phase 10 read-only oversight of the
@@ -58,9 +59,10 @@ const operationSuppliersOverviewRouter = new Hono<AppEnv>();
 /** How far back the scorecard looks. A year of deliveries is what a supplier
  *  negotiation is actually about; older POs describe a different price list. */
 const SCORECARD_WINDOW_DAYS = 365;
-/** Hard ceiling on the PO scan. Reported to the screen when hit — a silent
- *  truncation reads as "we looked at everything" when we did not. */
-const PO_SCAN_LIMIT = 2000;
+/** The PO scan stops at 2 pages (2000 POs). Reported to the screen when hit.
+ *  Each 150 POs costs two more reads (lines, claims), so this also keeps the
+ *  route inside the Worker's subrequest cap. */
+const PO_SCAN_PAGES = 2;
 /** `?po_id=in.(…)` travels in the URL, so the id list is chunked rather than
  *  sent as one request a proxy would refuse. */
 const IN_CHUNK = 150;
@@ -72,6 +74,25 @@ function isoDayMYT(ts: string | null | undefined): string | null {
   const ms = Date.parse(ts);
   if (Number.isNaN(ms)) return null;
   return new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Read every page of a read, 1000 rows at a time, through `readAllPages`.
+ * Past its page ceiling it keeps the rows it already read and says so
+ * (`truncated`), so the screen can report the cut instead of hiding it.
+ */
+async function readPaged(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: PgErrorish | null }>,
+  maxPages?: number,
+): Promise<{ rows: Record<string, unknown>[]; truncated: boolean }> {
+  const seen: Record<string, unknown>[] = [];
+  const read = await readAllPages(async (a, b) => {
+    const res = await page(a, b);
+    if (Array.isArray(res.data)) seen.push(...(res.data as Record<string, unknown>[]));
+    return res;
+  }, maxPages);
+  if ("error" in read) throw new HTTPException(500, { message: read.error.message });
+  return "rows" in read ? { rows: read.rows, truncated: false } : { rows: seen, truncated: true };
 }
 
 function chunk<T>(xs: readonly T[], size: number): T[][] {
@@ -98,23 +119,26 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
     .toISOString()
     .slice(0, 10);
 
-  const [suppliersRes, posRes] = await Promise.all([
+  // POs newest first; `id` breaks ties so paging never skips or repeats one.
+  const [suppliersRes, posRead] = await Promise.all([
     sb
       .from("suppliers")
       .select("id, name, contact, contact_email, lead_time, kind, cat_covered, portal_enabled, slug")
       .order("name"),
-    sb
-      .from("purchase_orders")
-      .select("id, supplier_id, status, sup_status, eta_date, placed_at, do_uploaded_at")
-      .gte("placed_at", windowStart)
-      .order("placed_at", { ascending: false })
-      .limit(PO_SCAN_LIMIT),
+    readPaged((a, b) =>
+      sb
+        .from("purchase_orders")
+        .select("id, supplier_id, status, sup_status, eta_date, placed_at, do_uploaded_at")
+        .gte("placed_at", windowStart)
+        .order("placed_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(a, b),
+      PO_SCAN_PAGES,
+    ),
   ]);
   if (suppliersRes.error) throw new HTTPException(500, { message: suppliersRes.error.message });
-  if (posRes.error) throw new HTTPException(500, { message: posRes.error.message });
 
-  const poRows = posRes.data ?? [];
-  const truncated = poRows.length >= PO_SCAN_LIMIT;
+  const poRows = posRead.rows;
   const poIds = poRows.map((p) => p.id as string);
 
   // The lines and the claims for exactly those POs. Both are read with the
@@ -122,18 +146,26 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
   const [lineChunks, claimChunks] = await Promise.all([
     Promise.all(
       chunk(poIds, IN_CHUNK).map((ids) =>
-        sb
-          .from("purchase_order_lines")
-          .select("po_id, qty, received_qty, damaged_qty, wrong_item_qty")
-          .in("po_id", ids),
+        readPaged((a, b) =>
+          sb
+            .from("purchase_order_lines")
+            .select("po_id, qty, received_qty, damaged_qty, wrong_item_qty")
+            .in("po_id", ids)
+            .order("id", { ascending: true })
+            .range(a, b),
+        ),
       ),
     ),
     Promise.all(
       chunk(poIds, IN_CHUNK).map((ids) =>
-        sb
-          .from("supplier_claims")
-          .select("po_id, claim_type, status, reported_at, closed_at")
-          .in("po_id", ids),
+        readPaged((a, b) =>
+          sb
+            .from("supplier_claims")
+            .select("po_id, claim_type, status, reported_at, closed_at")
+            .in("po_id", ids)
+            .order("id", { ascending: true })
+            .range(a, b),
+        ),
       ),
     ),
   ]);
@@ -168,9 +200,10 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
     posBySupplier.set(sid, arr);
   }
 
+  const truncated = [posRead, ...lineChunks, ...claimChunks].some((r) => r.truncated);
+
   for (const res of lineChunks) {
-    if (res.error) throw new HTTPException(500, { message: res.error.message });
-    for (const l of res.data ?? []) {
+    for (const l of res.rows) {
       const sid = supplierOfPo.get(l.po_id as string);
       if (!sid) continue;
       const arr = linesBySupplier.get(sid) ?? [];
@@ -186,8 +219,7 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
   }
 
   for (const res of claimChunks) {
-    if (res.error) throw new HTTPException(500, { message: res.error.message });
-    for (const cl of res.data ?? []) {
+    for (const cl of res.rows) {
       const sid = supplierOfPo.get(cl.po_id as string);
       if (!sid) continue;
       const arr = claimsBySupplier.get(sid) ?? [];
