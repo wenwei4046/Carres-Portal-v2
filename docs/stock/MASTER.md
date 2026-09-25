@@ -664,6 +664,25 @@ row prints `—` for Unit ID with `×{qty}` beside the product. Measured on prod
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
+**THE WORDS IN `Stock use`, `Site` AND `Who has it` — owner rulings 2026-09-25.**
+
+- `Site` joins the default columns directly after `Stock use`: the PLACE (`Carres Klang Warehouse`
+  · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`), or `On the way to {destination}` while
+  the Unit is in transit. `Who has it` is the ORGANISATION holding the goods, printed as its own
+  actual name and nothing more — `NETS` whether it is acting as warehouse operator at Carres Klang
+  or as the delivery company on the road; `PJ Showroom` for showroom staff. No role word is glued
+  onto a party name (`NETS Warehouse` · `NETS Delivery` are retired as printed values); the role is
+  read from the Site and Stock use beside it. Site, party and role stay separate facts (§3).
+- `Stock use` prints one plain word for what the Unit can do now: `Available` (can be promised) ·
+  `Reserved` (bound to the Sales Order in `SO No`; `Reserved / sold` is retired — a sold Unit is
+  delivered and lives in History) · `In transit` · `Incoming` (never in the default list). A Unit
+  that cannot be promised never prints the vague `Not available`: it prints the actual reason the
+  register holds — `Damaged` · `Wrong item` · `Waiting inspection` · `In repair` · `Customer return ·
+  check required` — so the operator reads what is wrong, not that something is.
+- Absence words: `No SO` (not promised to anyone) · `Not received` (no Receiving record) ·
+  `Not recorded` (the fact was never captured). Required facts (Unit ID · Product · Stock use)
+  never print an absence word; an empty required cell is a defect.
+
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
 Unit; they do not require permanent rail rows. `Needs checking` states the exact observed problem,
