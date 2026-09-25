@@ -204,7 +204,7 @@ describe("Operation Work — one server feed", () => {
   /* THE §6.0 SHELL (owner ruling 2026-09-25): Work follows the Sales Orders
      shell — the 50px Destination Header, one plain toolbar row, search 340px,
      Date and Page as selects, no rail and no Filters button. */
-  it("draws the Sales Orders shell: Destination Header, plain toolbar row, search 340px, Date and Page selects", () => {
+  it("draws the Sales Orders shell with the Payment Monitor rail: Destination Header, plain toolbar row, search 340px, rail", () => {
     show();
     expect(screen.getByTestId("work-destination-header")).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-header")).toBeNull();
@@ -213,13 +213,14 @@ describe("Operation Work — one server feed", () => {
     expect(toolbar.className).toContain("border-b");
     expect(toolbar.className).not.toMatch(/rounded-work|border-work-line/);
     expect(within(toolbar).queryByTestId("work-filters-toggle")).toBeNull();
-    expect(within(toolbar).queryByTestId("work-compact-date")).toBeNull();
     expect(within(toolbar).getByTestId("work-view-mine").className).toContain("h-[34px]");
     expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-[340px]");
-    expect(document.getElementById("work-date")).toBeInTheDocument();
-    expect(document.getElementById("work-page")).toHaveTextContent("All pages");
     expect(within(toolbar).getByRole("button", { name: "Covering" }).className).toContain("h-9");
-    expect(screen.queryByRole("complementary", { name: "Work filters" })).toBeNull();
+    const rail = screen.getByTestId("work-rail");
+    expect(within(rail).getByRole("button", { name: "Hide filters" })).toBeInTheDocument();
+    expect(screen.getByTestId("work-rail-week")).toBeInTheDocument();
+    expect(screen.getByTestId("work-rail-missed")).toBeInTheDocument();
+    expect(screen.getByTestId("work-rail-page-all")).toHaveTextContent("All pages");
   });
 
   it("locks the Team owner line: 32px avatar, 12px initials, 15px name, 12px counts on one 32px line", () => {

@@ -147,18 +147,13 @@ describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
     expect(rail.nextWeek).toBe("2026-09-21");
     expect(rail.missed).toBe(1);
     expect(rail.noDate).toBe(1);
-    /* Two work weeks (owner review 2026-09-25 item 20); the second Monday is marked. */
-    expect(rail.days.map((d) => [d.iso, d.label, d.dayNumber, d.weekday, d.holiday, d.count, d.today, d.weekStart])).toEqual([
-      ["2026-09-14", "Mon, 14 Sep", "14", "MON", null, 0, false, false],
-      ["2026-09-15", "Tue, 15 Sep", "15", "TUE", null, 0, true, false],
-      ["2026-09-16", "Wed, 16 Sep", "16", "WED", "Malaysia Day", 1, false, false],
-      ["2026-09-17", "Thu, 17 Sep", "17", "THU", null, 0, false, false],
-      ["2026-09-18", "Fri, 18 Sep", "18", "FRI", null, 0, false, false],
-      ["2026-09-21", "Mon, 21 Sep", "21", "MON", null, 0, false, true],
-      ["2026-09-22", "Tue, 22 Sep", "22", "TUE", null, 0, false, false],
-      ["2026-09-23", "Wed, 23 Sep", "23", "WED", null, 0, false, false],
-      ["2026-09-24", "Thu, 24 Sep", "24", "THU", null, 0, false, false],
-      ["2026-09-25", "Fri, 25 Sep", "25", "FRI", null, 0, false, false],
+    /* One work week with arrows — the Payment Monitor rail (owner ruling 2026-09-26). */
+    expect(rail.days.map((d) => [d.iso, d.label, d.dayNumber, d.weekday, d.holiday, d.count, d.today])).toEqual([
+      ["2026-09-14", "Mon, 14 Sep", "14", "MON", null, 0, false],
+      ["2026-09-15", "Tue, 15 Sep", "15", "TUE", null, 0, true],
+      ["2026-09-16", "Wed, 16 Sep", "16", "WED", "Malaysia Day", 1, false],
+      ["2026-09-17", "Thu, 17 Sep", "17", "THU", null, 0, false],
+      ["2026-09-18", "Fri, 18 Sep", "18", "FRI", null, 0, false],
     ]);
   });
 
@@ -171,9 +166,7 @@ describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
   it("a week across two months takes the month of its Thursday; the year turns cleanly", () => {
     expect(workRailDates([], "2026-09-17", "2026-09-28").month).toBe("Oct 2026");
     const turn = workRailDates([], "2026-12-30", "2026-12-28");
-    expect(turn.days.slice(0, 5).map((d) => d.iso)).toEqual(["2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"]);
-    expect(turn.days[5]!.iso).toBe("2027-01-04");
-    expect(turn.days).toHaveLength(10);
+    expect(turn.days.map((d) => d.iso)).toEqual(["2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"]);
     expect(turn.days[4]!.dayNumber).toBe("1");
     expect(turn.nextWeek).toBe("2027-01-04");
   });
@@ -203,7 +196,7 @@ describe("the toolbar selects (UI MASTER §6.0 shell, owner ruling 2026-09-25)",
     expect(options[2]).toEqual({ value: "2026-09-15", label: "Tue, 15 Sep · Today · 0" });
     expect(options[3]).toEqual({ value: "2026-09-16", label: "Wed, 16 Sep · Malaysia Day · 1" });
     expect(options.at(-1)).toEqual({ value: "no_date", label: "No working date · 1" });
-    expect(options).toHaveLength(12);
+    expect(options).toHaveLength(7);
   });
   it("Page: All pages first with the list total, then every page with its count", () => {
     const counts = { orders: 1, purchasing: 0, receiving: 0, delivery: 2, payment: 0, issue_tracker: 0 };

@@ -49,5 +49,10 @@ first"):** 30 the Work shell is the §6.0 listing shell — 50px Destination Hea
 toolbar row, search 340px, Date and Page as toolbar selects, no rail, no Filters button. The card
 list stays until Jess rules on the §6.0 table for Work. **BUILT.**
 
+**Round 4 (Jess, 2026-09-26 — "this is my left rail", the Payment Monitor rail):** 31 the Work
+rail is the shared `FilterRail` in the Payment Monitor's grammar — ‹ week › header, one card per
+work day, `Missed` and `No working date` rows, the `Page` group, the `Owner` select in Team Work,
+`Hide filters` / `Show filters` remembered — beside the list and the detail. **BUILT.**
+
 **Acceptance for each ticked item:** a rendered walk at 1440×900, 829×900, 743×704 and 390×844
 with the measurement in the PR, and the Workspace MASTER §5 rows overwritten in the same PR.

@@ -30,7 +30,6 @@ import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
-import Select from "@/components/kit/Select";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
@@ -42,9 +41,7 @@ import {
   WORK_MODULES,
   workFocusDay,
   workLayoutFor,
-  workDateOptions,
   workModuleCounts,
-  workPageOptions,
   workRailDates,
   workSections,
   type WorkWhen,
@@ -56,6 +53,7 @@ import WorkParties, { type MissionReport, type Party } from "./work/WorkParties"
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
 import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
 
 type ViewKey = "mine" | "team";
@@ -109,9 +107,14 @@ export default function OperationWork() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const workAreaRef = useRef<HTMLDivElement>(null);
+  /* On one stage the rail floats over the list only while `Show filters` is
+     pressed; a pick or Hide closes it (the Payment Monitor's own rule). */
+  const [phoneRailOverride, setPhoneRailOverride] = useState(false);
+  const [railOpen, setRailOpen] = useFilterRailOpen("carres.work.rail", workAreaRef);
   const [layout, setLayout] = useState<WorkLayout>(() =>
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
+  const railVisible = layout === "one" ? railOpen && phoneRailOverride : railOpen;
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
   /* §5.10: which party card is open (one at a time) and what the mission
      reports — the summary opens a card and carries the one blue act while
@@ -247,10 +250,6 @@ export default function OperationWork() {
     () => (ownerFocus ? teamGroups.filter((g) => g.key === ownerFocus) : teamGroups),
     [teamGroups, ownerFocus],
   );
-  const ownerOptions = useMemo(() => [
-    { value: "all", label: "All owners" },
-    ...teamGroups.map((group) => ({ value: group.key, label: group.name })),
-  ], [teamGroups]);
 
   const beforeDay = activeView === "mine"
     ? mine
@@ -366,6 +365,9 @@ export default function OperationWork() {
   const openRow = (i: WorkRow) => {
     updateParam("selected", i.id);
     if (layout === "one") setActivePanel("detail");
+    /* At `two` the detail replaces the rail (WorkSplitShell): the pick hides
+       the rail, remembered like Hide filters. */
+    if (layout === "two" && railVisible) setRailOpen(false);
   };
 
   /* Card kit §List states: past 50 cards the list draws 50 more each time its
@@ -429,8 +431,96 @@ export default function OperationWork() {
   /* THE §6.0 SHELL (owner ruling 2026-09-25): Date and Page are two toolbar
      selects — the same facts and counts the rail held, in the register's
      grammar. Every option prints its number, `0` included. */
-  const dateOptions = railDates ? workDateOptions(railDates) : [];
-  const pageOptions = workPageOptions(railModules, moduleCounts, moduleCountRows.length);
+  /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26: the Payment Monitor rail):
+     ‹ week › over one card per work day, then the fixed rows `Missed` and
+     `No working date`, then the Page group and — in Team Work — the Owner
+     select. Hidden, it leaves a 44px `Show filters` strip; the choice is
+     remembered per browser (`useFilterRailOpen`). */
+  const weekLabel = railDates
+    ? `${fmtDate(railDates.days[0]?.iso ?? week)} – ${fmtDate(railDates.days[Math.min(4, railDates.days.length - 1)]?.iso ?? week)}`
+    : "";
+  const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
+  const pickDay = (key: string) => {
+    updateParam("day", key);
+    if (layout === "one") setPhoneRailOverride(false);
+  };
+  const rail = railDates ? (
+    <FilterRail
+      testId="work-rail"
+      ariaLabel="Work filters"
+      onHide={() => { setRailOpen(false); setPhoneRailOverride(false); }}
+      header={(
+        <div data-testid="work-rail-week" className="space-y-1.5 pr-8">
+          <div className="flex items-center gap-1">
+            <button type="button" aria-label="Previous week" title="Previous week" className={weekArrow} onClick={() => updateParam("week", railDates.previousWeek)}>
+              <Icon name="previous" size={16} />
+            </button>
+            <span className="min-w-0 flex-1 break-words text-center text-body font-semibold text-kit-slate-12" data-testid="work-rail-week-label" aria-label={weekLabel}>
+              <span className="whitespace-nowrap">{fmtDate(railDates.days[0]?.iso ?? week)} –</span>{" "}
+              <span className="whitespace-nowrap">{fmtDate(railDates.days[Math.min(4, railDates.days.length - 1)]?.iso ?? week)}</span>
+            </span>
+            <button type="button" aria-label="Next week" title="Next week" className={weekArrow} onClick={() => updateParam("week", railDates.nextWeek)}>
+              <Icon name="forward" size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    >
+      <div className="flex flex-col gap-1 py-3" data-testid="work-rail-days">
+        {railDates.days.map((d) => {
+          const active = railSelected === d.iso;
+          return (
+            <button
+              key={d.iso}
+              type="button"
+              onClick={() => pickDay(d.iso)}
+              aria-pressed={active}
+              aria-label={`${d.label}${d.today ? " · Today" : ""}${d.holiday ? ` · ${d.holiday}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`}
+              data-testid={`work-rail-day-${d.iso}`}
+              data-today={d.today ? "yes" : undefined}
+              className={[
+                "relative flex w-full flex-col items-stretch gap-0.5 rounded-control px-2 py-2 text-left text-body",
+                active ? "bg-kit-blue-3 text-kit-slate-12" : "text-kit-slate-12 hover:bg-kit-slate-3",
+                d.today ? "ring-1 ring-inset ring-kit-blue-9" : "",
+              ].join(" ")}
+            >
+              {active ? <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" /> : null}
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="font-semibold text-kit-slate-12">{d.label}</span>
+                {d.today ? <span className="rounded-full border border-kit-blue-9 px-1.5 text-label font-semibold text-kit-blue-11">Today</span> : null}
+              </span>
+              {d.holiday ? <span className="break-words text-meta text-kit-slate-11">Public holiday · {d.holiday}</span> : null}
+              <span className={`break-words ${d.count > 0 ? "text-body text-kit-slate-12" : "text-meta text-kit-slate-11"}`}>
+                {d.count > 0 ? `${d.count} ${d.count === 1 ? "action" : "actions"} to do` : "No work"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="border-t border-kit-slate-5 py-2">
+        <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
+        <FilterRailRow label="No working date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
+      </div>
+      <FilterRailGroup title="Page" icon="modules" chosen={moduleFilter === "all" ? null : MODULE_LABEL[moduleFilter]}>
+        <FilterRailRow label="All pages" count={moduleCountRows.length} active={moduleFilter === "all"} resets testId="work-rail-page-all" onClick={() => updateParam("module", "all")} />
+        {railModules.map((m) => (
+          <FilterRailRow key={m.key} label={m.label} count={moduleCounts[m.key]} active={moduleFilter === m.key} testId={`work-rail-page-${m.key}`} onClick={() => updateParam("module", m.key)} />
+        ))}
+      </FilterRailGroup>
+      {activeView === "team" ? (
+        <FilterRailGroup title="Owner" icon="people" chosen={ownerFocus ? teamGroups.find((g) => g.key === ownerFocus)?.name ?? null : null}>
+          <FilterRailSelect
+            label="Owner"
+            value={ownerFocus}
+            options={teamGroups.map((g) => ({ value: g.key, label: g.name, count: g.items.length }))}
+            onChange={(next) => updateParam("owner", next)}
+            testId="work-rail-owner"
+            allLabel="All owners"
+          />
+        </FilterRailGroup>
+      ) : null}
+    </FilterRail>
+  ) : null;
 
   /* One toolbar control: 36px from 768px, 40px below; 14/20; 12px sides. */
   const toolbarButton = (active: boolean) =>
@@ -515,6 +605,7 @@ export default function OperationWork() {
             My Work · Team Work · Search (340px) · Date · Page · Owner ·
             Covering. Below 600px the controls wrap. */}
         <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-base-200 bg-white px-2 py-1.5" data-testid="work-toolbar">
+          {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
           <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
             {(
               [
@@ -556,30 +647,6 @@ export default function OperationWork() {
               placeholder="Search work…"
             />
           </div>
-          <Select
-            id="work-date"
-            value={railSelected ?? undefined}
-            onValueChange={(value) => updateParam("day", value)}
-            options={dateOptions}
-            placeholder="Date"
-            toolbar
-          />
-          <Select
-            id="work-page"
-            value={moduleFilter}
-            onValueChange={(value) => updateParam("module", value)}
-            options={pageOptions}
-            toolbar
-          />
-          {activeView === "team" && (
-            <Select
-              id="work-owner"
-              value={ownerFocus ?? "all"}
-              onValueChange={(value) => updateParam("owner", value)}
-              options={ownerOptions}
-              toolbar
-            />
-          )}
           <button
             type="button"
             aria-pressed={covered}
@@ -614,6 +681,19 @@ export default function OperationWork() {
           )}
         </section>
 
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {railVisible
+          ? (layout === "one"
+              ? <div className="absolute inset-y-0 left-0 z-20 flex shadow-lg">{rail}</div>
+              : rail)
+          : layout !== "one"
+            ? (
+              <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="work-rail-collapsed">
+                <ShowFiltersButton onShow={() => setRailOpen(true)} testId="work-show-filters-rail" />
+                <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
+              </aside>
+            )
+            : null}
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
@@ -705,6 +785,7 @@ export default function OperationWork() {
             </WorkSection>
           ) : null /* nothing to select: no box asks for a choice */}
         />
+        </div>
       </div>
       </ListPageShell>
     </>

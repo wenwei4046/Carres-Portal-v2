@@ -63,10 +63,14 @@ export default function WorkSplitShell({
   }
 
   const showRail = rail != null && (layout === "three" || railOpen);
+  /* At `two` the rail and the detail never share the page (Jess, 2026-09-26:
+     a 140px detail is no detail): the rail beside the list, or the list
+     beside the detail. Choosing a card hides the rail. */
+  const hideDetail = layout === "two" && showRail;
   const columns = layout === "three"
     ? showRail ? "grid-cols-[240px_420px_minmax(480px,1fr)]" : "grid-cols-[420px_minmax(480px,1fr)]"
     : showRail
-      ? "grid-cols-[240px_400px_minmax(0,1fr)]"
+      ? "grid-cols-[240px_minmax(0,1fr)]"
       : "grid-cols-[400px_minmax(0,1fr)]";
   return (
     <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 gap-4 ${columns}`}>
@@ -78,9 +82,11 @@ export default function WorkSplitShell({
       <section aria-label="Work actions" className={COLUMN}>
         {list}
       </section>
-      <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto`}>
-        {detail}
-      </section>
+      {hideDetail ? null : (
+        <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto`}>
+          {detail}
+        </section>
+      )}
     </div>
   );
 }
