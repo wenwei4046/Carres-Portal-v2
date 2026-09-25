@@ -502,6 +502,12 @@ lines — four regions and five hierarchy items — and stops. **Three surfaces 
 happens when the law is four lines long.**
 
 ### THE THREE SURFACES, AND THERE IS NO FOURTH
+
+> **Two-column object grammar — second user registered 2026-09-26.** Delivery's DO page (Delivery
+> §9, PR #1650) adopts LEFT = what happened / what to do (scrolls), RIGHT = read-only facts (420px,
+> fixed). The Payment Monitor's row expansion and the Payment Record object adopt the SAME grammar
+> (`payment/MASTER.md` §3, owner approval 2026-09-26). It is the existing Panel arranged in two
+> columns — still one scroll, no tab, no fourth way of opening a record.
 ```
 INSPECT   inside the list      row expand      ↑↓ moves · Esc closes · read to decide
 WORK      full screen          four regions    the job gets done here

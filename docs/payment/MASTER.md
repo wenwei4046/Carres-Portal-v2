@@ -346,24 +346,27 @@ working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
-**Owner approval 2026-09-25 (segments 1 and 4 of the Payment Blueprint review) · APPROVED / NOT
-BUILT.** The row's expansion is COMPACT and uses width, not height (design record
-`docs/payment/design/monitor-status-rail.html`, reviewed by the owner 2026-09-25):
+**Owner approval 2026-09-25 / 2026-09-26 (segments 1, 4 and 6 of the Payment Blueprint review) ·
+APPROVED / NOT BUILT.** The row's expansion is TWO COLUMNS — the same object grammar Delivery's DO
+page adopts (Delivery §9 / UI MASTER §4.1, PR #1650): the LEFT column is what happened and what to
+do, the RIGHT column is the read-only facts. Design record `docs/payment/design/monitor-status-rail.html`.
 
 ```text
-[Record payment] [Ask customer to pay ← blue] [⋯ Statement · Print · Create payment link]   28px doors, right
-Balance due · Total payable · Paid · Payment due · Collection owner                            fact grid, 4 columns
-Customer · phone · Reference · Scheduled delivery · Logistics · Items & Stock · Storage         × 2 rows, 11px label / 13px value
-─────────────────────────────────────────────────────────────────────────────────────────────
-WHAT TO DO              │ DOCUMENTS                                   │ COMMUNICATION HISTORY
-fact · sub-line · door  │ Receipts (No · RM · date · kind · Print/Send)│ answers and sent messages, newest first
-                        │ Invoice (issued at RM 0) · Statement (Print) │
+[Record payment] [Ask customer to pay ← blue] [⋯ Statement · Print · Create payment link]   doors, top right
+LEFT (remainder, ≥ 560px)                      RIGHT (420px, token side-panel-width)
+What to do      fact · one line · one button   Money     Goods · Storage (when any) · Total payable · Paid · Balance due
+Documents       Receipt rows · Invoice ·       Timing    Payment due {day} · Collection owner {name}
+                Statement                      Storage   {Group} · Day {n} · free until {day} · next check {day}
+Communication   newest first, 5, `Show all`    Customer  phone · reference
+History
 ```
 
-Flat: the grey expansion band, one hairline under the fact grid, the three blocks side by side with a
-1px divider between them, no nested cards. Storage's own doors (`Record storage start` · `Request
-more free days` · `Create Storage Invoice` · `Check the stored furniture`) sit under `WHAT TO DO`
-when a case exists (Storage segment to settle the words). The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
+Flat: one hairline between sections, no nested cards; section titles 11px uppercase slate-11; the
+row's own facts (customer, goods, dates, status, owner avatar) are not repeated. Below 1024px the
+right column moves above the left. The Work Customer card renders the same LEFT column (the Payment
+section); its Summary already carries the money. The paid Payment Record object (Payment Records)
+uses the same two columns: left = the Receipt document and History, right = Payment facts and
+Allocated to. The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
 opens the same row; `?invoice=` is retired with the Invoice-keyed row): the fact grid carries Money,
 Delivery Dates, Items & Stock, Storage and Collection owner as facts; the three blocks carry What to
 do, Documents and Communication History; Delivery's `Items, Services & Stock` panel opens from the
