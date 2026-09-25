@@ -17,6 +17,17 @@
     --dial-green: #639922;  --dial-green-soft: #eaf3de;
     --dial-check: #3b6d11;
     --background: 220 23% 97.5%;       /* #F7F8FA — the ONE canvas (UI MASTER §6.7, Jess 2026-09-17); #F3F4F6 retired */
+    /* ===== WORK MIDDLE-CARD KIT (owner-approved Work kit 2026-09-24,
+     * docs/workspace/MASTER.md §5.5) — the Work page's section
+     * edge, card ink ladder and date-status fills. Read ONLY through the
+     * `work-*` Tailwind names; no other page uses them. */
+    --work-line: #ccd7e5;          /* every Work section and card edge */
+    --work-line-hover: #aebfd3;    /* card edge under the pointer */
+    --work-ink: #17243a;           /* card fact · date number */
+    --work-slate: #40516a;         /* card action · module name */
+    --work-muted: #66758b;         /* party · weekday · document number */
+    --work-tabs: #e9eef5;          /* the To do / Waiting / Completed rail */
+    --work-missed-fill: #fff0f1;   --work-missed-line: #efb7bd;   --work-missed-ink: #c62835;
     --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */

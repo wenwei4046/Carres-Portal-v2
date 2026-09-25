@@ -76,7 +76,7 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
     const res = queue.shift() ?? { data: null, error: null };
     const chain: Record<string, unknown> = {};
     const self = () => chain;
-    for (const m of ["select", "eq", "in", "order", "limit", "maybeSingle", "single"]) {
+    for (const m of ["select", "eq", "in", "order", "limit", "maybeSingle", "single", "update", "is", "neq"]) {
       chain[m] = vi.fn().mockImplementation(self);
     }
     chain.insert = vi.fn().mockImplementation((rows: unknown) => {
@@ -665,7 +665,7 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string; error: string };
     expect(body.code).toBe("later_date_needs_reply_proof");
-    expect(body.error).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(body.error).toBe("Save scheduled delivery — upload the WhatsApp reply");
     expect(upserts).toHaveLength(0);
   });
 

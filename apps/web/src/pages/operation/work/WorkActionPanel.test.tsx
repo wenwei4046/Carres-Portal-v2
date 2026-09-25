@@ -52,4 +52,30 @@ describe("WorkActionPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open DO-140926-0007" }));
     expect(open).toHaveBeenCalled();
   });
+
+  /* THE DETAIL DENSITY — owner ruling 2026-09-25, exact values below 960px. */
+  it("below 960px: 12px cards, 16/22 title, 13/18 action, 32px open button beside the result, 36px disclosure", () => {
+    render(<WorkActionPanel item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
+    const header = screen.getByTestId("work-detail-header");
+    expect(header.className).toContain("p-3");
+    expect(header.className).toContain("rounded-work");
+    expect(header.className).not.toMatch(/min-h-/);
+    const title = screen.getByTestId("work-detail-title");
+    expect(title.className).toContain("text-[16px]");
+    expect(title.className).toContain("leading-[22px]");
+    expect(title.className).toContain("font-semibold");
+    expect(screen.getByTestId("work-detail-action").className).toContain("text-body");
+    const task = screen.getByTestId("work-detail-task");
+    expect(task.className).toContain("p-3");
+    expect(task.className).not.toMatch(/min-h-/);
+    const row = screen.getByTestId("work-detail-open-row");
+    expect(row.className).toContain("flex");
+    expect(row).toHaveTextContent("Proof review recorded");
+    const open = screen.getByRole("button", { name: "Open DO-140926-0007" });
+    expect(open.className).toContain("h-8");
+    expect(open.className).toContain("text-body");
+    const summary = screen.getByText("Owner, timing and source");
+    expect(summary.className).toContain("h-9");
+    expect(summary.className).toContain("text-[12px]");
+  });
 });

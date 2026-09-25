@@ -245,7 +245,7 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
         ? <div ref={itemsRef} tabIndex={-1} data-section="items" className="flex flex-col gap-2 outline-none">
             <Facts title="Delivery Dates">
               <p>Requested Delivery Date: {embedded.deliveryLines.requested}</p>
-              <p>Confirmed Delivery: {embedded.deliveryLines.confirmed}</p>
+              <p>Scheduled delivery: {embedded.deliveryLines.confirmed}</p>
               <p>{partner ? `Logistics Partner: ${partner}${contact ? ` · ${contact}` : " · No customer contact on file yet."}` : "No Logistics Partner assigned yet."}</p>
             </Facts>
             {embedded.goodsPanel}

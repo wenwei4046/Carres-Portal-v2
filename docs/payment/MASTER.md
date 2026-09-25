@@ -121,7 +121,7 @@ viewport (like Operation's), so the sheet — not the window — scrolls and the
 Columns, in exactly this order:
 
 ```text
-SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery Date | Confirmed Delivery | Payment timing
+SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing
 ```
 
 - **SO No** — line 1 the SO number, which opens the formal Sales Order; line 2 the customer's own
@@ -146,9 +146,9 @@ SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery 
   it never edits a charge or a balance.
 - **Requested Delivery Date** — Sales' request, in Delivery's words (`Fri, 18 Sep` · `To be
   confirmed` · `No delivery date`). It stays after Delivery confirms a different day.
-- **Confirmed Delivery** — Delivery's fact in Delivery's spelling: `Confirmed` over `Thu, 22 Oct ·
-  2 PM to 5 PM`; `Not confirmed` over `Mon, 14 Sep · No time agreed` when only the day is agreed;
-  `Not confirmed` and nothing beneath while no day is agreed. **ONE FACT (Law D, 2026-09-16):** the
+- **Scheduled delivery** — Delivery's fact in Delivery's spelling (owner ruling 2026-09-24):
+  `Scheduled` over `Thu, 22 Oct · 2 PM to 5 PM`, or over the day alone when no time was recorded
+  (the time is optional); `Not scheduled` and nothing beneath while no day is recorded. **ONE FACT (Law D, 2026-09-16):** the
   row, the workspace, the collection clock and the Work Engine all read `invoiceConfirmedDelivery`,
   Delivery's ladder for the leg that reaches the customer — the live Delivery Order → Delivery's
   arrangement → the booking overlay only while its stage is `confirmed`. Payment used to read the
@@ -249,11 +249,22 @@ Only then does the system create `Ask customer to pay`. Goods not ready and arri
 
 ```text
 Settings → Payments → Collection timing
-Start asking the customer to pay   {n} working days before Confirmed Delivery   (ruled default 3)
-Payment must be complete           {m} working days before Confirmed Delivery   (ruled default 2)
+Start asking the customer to pay   {n} working days before Scheduled delivery   (ruled default 3)
+Payment must be complete           {m} working days before Scheduled delivery   (ruled default 2)
 ```
 
+**Outstation row — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; `../ERP-ARCHITECTURE.md`
+§6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
+Delivery** (the customer's delivery date). Its ask day follows the same n > m rule; the default
+ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
+
 Editable by authorised Manager permission; asking must start earlier than the deadline (n > m).
+
+**The Work right panel reads this clock (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10):**
+the Order Route's one payment line `Payment · RM {amount} to collect by {deadline}` and the Logistics
+card's day-before money gap use the same deadline (`paymentDeadlineOf`, `packages/shared`). Payment is
+never a route point and never `Blocked`. **Gap:** both still use the ruled default m = 2 (3 outstation)
+rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
 existing clock keeps its snapshot by construction and a new rule affects only new clocks from its
@@ -273,7 +284,7 @@ the Work item is due Friday. That is a property of the owner's calendar, not a g
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
 day gives each owner its own governed previous working day. Logistics Partner DO lead time is
 Delivery's own setting (`Delivery Settings → Logistics Partners → Delivery Order needed {n}
-working day(s) before Confirmed Delivery`) and does not live here.
+working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
@@ -576,8 +587,8 @@ Payment reads Calendar, Catalog category, Workspace duty/cover, Delivery/Order f
 Stock/Warehouse facts; it never duplicates them.
 
 Sales Orders owns the hard gate and reads Payment's one answer: the DO requires Amount needed =
-RM0 and no open Finance Exception, beside Delivery's own facts (Confirmed Delivery, Confirmed
-Time, valid scope, goods, Logistics Partner, address and handling). There is no live
+RM0 and no open Finance Exception, beside Delivery's own facts (Scheduled delivery with its
+optional time, valid scope, goods, Logistics Partner, address and handling). There is no live
 unpaid-delivery approval or Payment Exception release door — the 0362 request/decide RPCs lost
 their EXECUTE grant in 0486 and the API answers 410; an approval granted before the door closed is
 honoured as history only. A Finance Exception may hold delivery for review; it cannot authorise
@@ -712,7 +723,7 @@ Owner ruling 2026-09-12, delivered as one slice (migration `0486`):
     account not configured` (now `settled by the payment provider`); an order with no Invoice
     now says so instead of `Amount still needed not available`.
   - `/operation/settings/payment`: the eight sections in the ruled order, then `Changes`;
-    Collection timing `3 · 2 working days before Confirmed Delivery · In effect from Wed, 19
+    Collection timing `3 · 2 working days before Scheduled delivery · In effect from Wed, 19
     Aug`; Mattress / Bedframe `Free storage 7 calendar days … In effect from Sat, 12 Sep`;
     Sofa unchanged; the `Changes` list shows the 0486 storage change with `Staff identity not
     recorded` and `free days 14 → free days 7`.
@@ -2198,7 +2209,7 @@ Upload, Review, Record, Send, Back and recovery remain usable at 390px and 200% 
 recommendation: click a customer or document to inspect the relevant collection object; click a
 date to see its schedule. This supersedes the earlier suggestion that clicking a customer
 automatically switches to Calendar and chooses Delivery before Expected arrival. The Monitor's
-`Confirmed Delivery` cell is the door when a day is agreed (`?calendar=1&date=&so=`); the Calendar is a view of the
+`Scheduled delivery` cell is the door when a day is scheduled (`?calendar=1&date=&so=`); the Calendar is a view of the
 Monitor, never a third destination.
 
 | Selection | Required result |

@@ -14,6 +14,10 @@ import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 const SH = "00000000-0000-4000-8000-0000000000aa";
 let workState: { data: OperationWorkResponse | undefined; isLoading: boolean; isError: boolean };
 
+/* The party cards read Delivery through their own queries; their behaviour is
+   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
+vi.mock("./work/WorkParties", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return { ...actual, useOperationWork: () => ({ ...workState, refetch: vi.fn() }) };

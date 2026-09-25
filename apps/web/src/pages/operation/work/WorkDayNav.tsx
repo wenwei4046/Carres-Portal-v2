@@ -44,7 +44,7 @@ function Count({ value }: { value: number }) {
 function Section({ title, icon, right, children }: { title: string; icon: IconName; right?: ReactNode; children: ReactNode }) {
   const id = `work-rail-${title.toLowerCase()}`;
   return (
-    <section aria-labelledby={id} className="rounded-card border border-kit-slate-5 bg-white">
+    <section aria-labelledby={id} className="shrink-0 rounded-work border border-work-line bg-white">
       <div className="mx-3 flex h-12 items-center gap-2 border-b border-kit-slate-5">
         <h2 id={id} className="flex items-center gap-2 text-strong text-kit-blue-11">
           <Icon name={icon} />
@@ -213,76 +213,9 @@ export function WorkModuleSection({
   );
 }
 
-/**
- * Below 768px the rail cannot stand beside the list (MASTER §5.5): the same
- * Date options sit above it — the week's badges on one line, then `Missed` and
- * `No working date` in words (an icon never carries meaning alone) — wrapping,
- * never scrolling sideways, with the week's holiday named under them. Module
- * moves to the toolbar's Select.
- */
-export function WorkDayStrip({
-  dates,
-  selected,
-  onSelect,
-  onWeek,
-}: {
-  dates: WorkRailDates;
-  selected: string | null;
-  onSelect: (key: string) => void;
-  onWeek: (monday: string) => void;
-}) {
-  const option = (active: boolean) =>
-    `inline-flex min-h-10 items-center gap-1 rounded-control px-1 text-body text-kit-slate-12 ${FOCUS_RING} ${active ? "bg-kit-blue-3 font-semibold" : "hover:bg-kit-slate-3"}`;
-  const arrow = `grid h-10 w-10 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 ${FOCUS_RING}`;
-  const holidays = dates.days.filter((day) => day.holiday);
-  return (
-    <nav aria-label="Date" className="border-b border-kit-slate-5 bg-white px-3 py-2">
-      <div className="flex items-center justify-between">
-        <button type="button" aria-label="Previous week" className={arrow} onClick={() => onWeek(dates.previousWeek)}>
-          <Icon name="previous" />
-        </button>
-        <span data-testid="work-rail-month" className="text-meta font-medium text-kit-slate-11">{dates.month}</span>
-        <button type="button" aria-label="Next week" className={arrow} onClick={() => onWeek(dates.nextWeek)}>
-          <Icon name="forward" />
-        </button>
-      </div>
-      <div className="flex flex-wrap items-center gap-1">
-        {dates.days.map((day) => (
-          <button
-            key={day.iso}
-            type="button"
-            aria-pressed={selected === day.iso}
-            aria-label={`${day.label}${day.holiday ? ` · ${day.holiday}` : ""}${day.today ? " · Today" : ""}${actions(day.count)}`}
-            className={option(selected === day.iso)}
-            onClick={() => onSelect(day.iso)}
-          >
-            <DayBadge dayNumber={day.dayNumber} weekday={day.weekday} today={day.today} />
-            <Count value={day.count} />
-          </button>
-        ))}
-      </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1">
-        <button type="button" aria-pressed={selected === "missed"} aria-label={`Missed${actions(dates.missed)}`} className={`${option(selected === "missed")} pr-2`} onClick={() => onSelect("missed")}>
-          <IconBox name="history" />
-          Missed
-          <Count value={dates.missed} />
-        </button>
-        {dates.noDate > 0 || selected === "no_date" ? (
-          <button type="button" aria-pressed={selected === "no_date"} aria-label={`No working date${actions(dates.noDate)}`} className={`${option(selected === "no_date")} pr-2`} onClick={() => onSelect("no_date")}>
-            <IconBox name="noDate" />
-            No working date
-            <Count value={dates.noDate} />
-          </button>
-        ) : null}
-      </div>
-      {holidays.map((day) => (
-        <p key={day.iso} className="mt-1 text-meta text-kit-slate-11">{day.label} · {day.holiday}</p>
-      ))}
-    </nav>
-  );
-}
-
-/** The rail: the two white sections on the light-grey canvas. */
+/** The rail: two independent white sections straight on the page canvas,
+ *  16px apart — never wrapped in a card of their own (owner correction
+ *  2026-09-24). */
 export default function WorkRail({ children }: { children: ReactNode }) {
-  return <div data-testid="work-rail" className="flex min-h-full flex-col gap-5 bg-kit-canvas p-3">{children}</div>;
+  return <div data-testid="work-rail" className="flex flex-col gap-4">{children}</div>;
 }

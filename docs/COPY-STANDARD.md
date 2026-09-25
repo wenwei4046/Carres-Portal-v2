@@ -530,10 +530,9 @@ Delivery Order document — the DOCUMENT's own life
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
   before the arrangement is agreed — the ACTOR rungs, unchanged:
-    Operation must assign logistics · Call customer · Waiting for customer reply ·
-    Confirm delivery time
-  once it is agreed — the JOURNEY rungs (re-ruled 2026-09-14):
-    customer leg   Confirmed · Waiting for {partner} pickup · Collected by {partner} ·
+    Operation must assign logistics · Call customer · Waiting for customer reply
+  once a date is scheduled (time optional, owner ruling 2026-09-24) — the JOURNEY rungs:
+    customer leg   Scheduled · Waiting for {partner} pickup · Collected by {partner} ·
                    On the way to customer · Delivered to customer · Failed Delivery
     transfer leg   Transfer confirmed · Collected for transfer · In transit to {stop} ·
                    Arrived at {stop} · Transfer failed
@@ -604,11 +603,11 @@ survive only as the recorded handover EVENT words on the DO object page. The ope
 may not appear in the Delivery Orders register, which describes documents.
 
 Banned as status words on either surface, because each names a mood rather than a fact:
-`Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
-**This ban was tested and upheld on 2026-09-14:** a proposed schedule ladder opened with
-`Scheduled` / `Transfer scheduled`, and the owner ruled the governed **`Confirmed`** /
-**`Transfer confirmed`** instead. `Delivery failed` is likewise not a second spelling of
-**`Failed Delivery`**.
+`Pending` · `In progress` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
+**`Scheduled` is the customer-leg word since the owner ruling of 2026-09-24**, which overwrites
+the 2026-09-14 `Confirmed` ruling: the customer's request is `Requested delivery`, the arranged
+day is `Scheduled delivery`, the result is `Delivered`. `Confirmed Delivery` / `Confirmed Time`
+are retired as field words. `Delivery failed` is not a second spelling of **`Failed Delivery`**.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
@@ -616,8 +615,8 @@ governed partner acts are **`Assign logistics`** (first partner on a scope) and 
 logistics`** (replacing one, which requires a governed reason and writes history) — never
 `Reassign`, `Set partner` or `Update logistics`. **`Edit Delivery` and `Save Delivery` are
 RETIRED**: the Delivery-owned writes live inside the Monitor row's expanded panels, and the date
-act is **`Update date and time`** with its save **`Save confirmed delivery`** (owner ruling
-2026-09-13). A wrong Sales fact offers the door **`Open Sales Order to change`**. The Monitor
+act is **`Update date and time`** with its save **`Save scheduled delivery`** (owner rulings
+2026-09-13 / 2026-09-24). A wrong Sales fact offers the door **`Open Sales Order to change`**. The Monitor
 selection bar does not invent a unit word: `1 selected` / `3 selected`. The Delivery Orders
 Register keeps its document count. The disclosure's hover reads **`Show delivery brief`**. A loan
 line inside the expansion reads `Loan {Unit ID} · collect back on delivery day`.
@@ -636,12 +635,13 @@ kit dropdown over the Monitor status words above; it never holds a work queue.
 overwriting the 2026-09-09 `Actions` column ruling.** The Monitor register carries twelve
 columns and no action column; the row's acts live inside its expanded panels
 (`delivery/MASTER.md` §8.3 to §8.6). The customer's date keeps its governed word **`Requested
-Delivery Date`** beside Delivery's own **`Confirmed Delivery`** / **`Confirmed Time`**; **`DO
-date`** names the day the document issued and is never either of them. Its three absences are
-`To be confirmed` (the customer has asked, the day is not settled) and `No delivery date` (none
-asked for) for the request, and `Not confirmed` for the answer (the Monitor cell word; `No
-confirmed date` remains the rail and calendar absence) — one spelling each, on screen and in the
-export alike.
+Delivery Date`** beside Delivery's own **`Scheduled delivery`** / optional **`Scheduled time`**
+(owner ruling 2026-09-24); **`DO date`** names the day the document issued and is never either of
+them. Its absences are `To be confirmed` (the customer has asked, the day is not settled) and `No
+delivery date` (none asked for) for the request, and `Not scheduled` for the answer (the Monitor
+cell and register word; `No confirmed date` remains the rail queue's word). An empty optional
+`Scheduled time` prints nothing on a Monitor cell and `Not recorded` in a register cell — never
+`No time agreed`.
 
 ### The Monitor register, status and Payment words — owner rulings 2026-09-12 / 2026-09-13
 
@@ -650,8 +650,8 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 
 | Where | The words |
 |---|---|
-| Column headings, in order | `Delivery Status` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Confirmed Delivery` · `Logistics` · `Items & Stock` · `Payment` · `DO No` (after the checkbox and expand columns) |
-| `Confirmed Delivery` | `Confirmed` · `Not confirmed` on line one; the day, then the window (`Thu, 22 Oct` · `2 PM to 5 PM`) or `Mon, 14 Sep · No time agreed` on line two — and NOTHING on line two while unconfirmed (owner ruling 2026-09-14: the contact deadline is stated once, in `Delivery Status`) |
+| Column headings, in order | `Delivery Status` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Scheduled delivery` · `Logistics` · `Items & Stock` · `Payment` · `DO No` (after the checkbox and expand columns) |
+| `Scheduled delivery` | `Scheduled` · `Not scheduled` on line one; the day, then the time when one was recorded (`Thu, 22 Oct · 2 PM to 5 PM`) or the day alone — and NOTHING on line two while unscheduled (the contact deadline is stated once, in `Delivery Status`) |
 | `Items & Stock` | `Ready` · `Not ready` on line one; `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` on line two |
 | Monitor Payment when valuation is unknown | `No price yet` — the existing Sales wording; never infer `Paid` from absent prices |
 | `Payment`, paid | **`Paid`** |
@@ -659,7 +659,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | `Payment`, authoritative COD | **`Collect RM {amount}`** over **`Cash on delivery`** |
 | A required Sales fact missing on a Monitor row | **`Order details incomplete`** as the status word; the panel names the fact, for example `Building type not recorded`, with the door `Open Sales Order to change` |
 | The expanded panels, in order | `Customer, Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock` |
-| Delivery Dates edit state | `Update date and time` · `Confirmed date` · `Confirmed time` · `Information received from` · `WhatsApp proof` · `Save confirmed delivery` · disabled form `Save confirmed delivery — upload the WhatsApp reply` |
+| Delivery Dates edit state | `Update date and time` · `Scheduled date` · `Scheduled time (optional)` · `Information received from` · `WhatsApp proof` · `Save scheduled delivery` · disabled form `Save scheduled delivery — upload the WhatsApp reply` |
 | `Information received from` choices | `{partner}` · `Customer` · `Operation on behalf of {partner}` |
 | Items panel grid | `Item` · `Qty` · `Source` · `Status` · `Location` |
 | Items panel Source | the Unit ID on line one; the clickable PO No, or `Counted stock`, on line two; never an invented PO number |
@@ -673,7 +673,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 Action` · `Priority` · `Ready at {place}` · `Edit Delivery` · `Save Delivery`.
 
 **Colour and icons (owner ruling 2026-09-13).** Semantic status uses clear words and text colour:
-green for `Paid`, `Ready`, `Confirmed`, `Delivered`; orange for a specific fact that needs an act
+green for `Paid`, `Ready`, `Scheduled`, `Delivered`; orange for a specific fact that needs an act
 and is not yet late; red for `Overdue`, `Failed Delivery`, `Do not deliver` and a passed contact
 deadline. Colour never replaces the word. No emoji, tick, checkmark, warning mark or decorative
 progress icon appears inside a status fact. Governed functional icons remain: Search, Export,
@@ -684,15 +684,14 @@ the existing Carres utility set.
 act with its recipient; line two is the required result. Owner, source object and the actual
 working date are structured metadata beside the sentence, never joined into it, and no `—`
 appears in either line. The row's status word carries the fact. The complete table is
-`delivery/MASTER.md` §10; the load-bearing pairs are `Call NETS` over `Confirm the delivery
-date`, `Call NETS` over `Confirm the delivery time`, `Call the customer` over `Confirm the
-delivery date`, `Ask NETS` over `Record the delivery result`, `Upload the delivery photo` over
+`delivery/MASTER.md` §10; the load-bearing pairs are `Call NETS` over `Get the scheduled
+delivery date`, `Call the customer` over `Get the scheduled delivery date`, `Ask NETS` over `Record the delivery result`, `Upload the delivery photo` over
 `Attach the photo from NETS`, `Check the delivery proof` over `Accept it, ask for more, or reject
 it`, and `Collect the loan item` over `Bring back {Unit ID} on the delivery day`.
 
 **THE MONITOR `Delivery Status` CELL — owner ruling 2026-09-14.** The same law, applied to the
-register column that used to name a party: line one is the ACT — **`Call customer`**, or
-**`Confirm delivery time`** when the day is agreed and only the window is missing — and line two
+register column that used to name a party: line one is the ACT — **`Call customer`** (a day
+without a time is a complete arrangement since 2026-09-24, so no time-only rung exists) — and line two
 is the CONTACT DEADLINE, drawn as a kit glyph and a day (`call` while there is time, `late` in red
 once there is not). **`{partner} must contact the customer` and `Operation must call the customer`
 are retired on Monitor**: the party is the `Logistics` column's own fact and may not re-enter the
@@ -856,8 +855,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 |---|---|---|---|---|
 | `Issue PO` · `Confirm ready date` | **→ defined once in the PURCHASING table below.** The Orders ladder DISPLAYS these two; it does not respell them. *(This row replaces the old `Send PO` entry — `Send PO` is retired, and so are `Prepare PO` and the Draft PO it produced.)* | | | |
 | `Assign logistics` | `Assign logistics` | `Assign logistics` | `{logistics} assigned` | `Every order has a logistics company.` |
-| `Confirm delivery date` | `Call {logistics}` over `Confirm the delivery date` (two lines, owner ruling 2026-09-13) | `Save confirmed delivery` | `Delivery confirmed {date} · {slot}` | `0 calls to make · everything on track.` |
-| `Confirm delivery date` — **the day is agreed, the window is not** (owner ruling 2026-09-12) | `Call {logistics}` over `Confirm the delivery time` | `Save confirmed delivery` | `Delivery confirmed {date} · {slot}` | *(same queue — a delivery is booked only with a day AND a window, so the row does not leave until both are recorded)* |
+| `Confirm delivery date` | `Call {logistics}` over `Get the scheduled delivery date` (two lines; result words owner ruling 2026-09-24) | `Save scheduled delivery` | `Delivery scheduled {date}` · `Delivery scheduled {date} · {time}` | `0 calls to make · everything on track.` |
 | *(retired 2026-08-16 — the SYSTEM issues the DO; no tile, no button)* | — | — | `Delivery order issued` (history line only) | `Nothing waiting for a delivery order.` |
 | `Deliver on {weekday, date}` | `Deliver on {weekday, date}` | `Record Delivery Result` | `Delivered` | `No deliveries on {weekday, date}.` |
 | `Upload delivery photo` | `Upload the delivery photo` over `Attach the photo from {logistics}` (two lines, owner ruling 2026-09-13) | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
@@ -1719,9 +1717,8 @@ anything at all, so there is no promise to confirm and no named party who is kno
 answer. `Confirm` presumes something was said; `Call` presumes we know whom to ask.
 
 Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
-`Call {supplier} — confirm ready date` · the Delivery pairs `Call {logistics}` over `Confirm the
-delivery date` · `Call {logistics}` over `Confirm the delivery time` · `Call {logistics}` over
-`Arrange a new delivery date` ·
+`Call {supplier} — confirm ready date` · the Delivery pairs `Call {logistics}` over `Get the scheduled
+delivery date` · `Call {logistics}` over `Arrange a new delivery date` ·
 `Issue invoice` · `Issue credit note` ·
 `Upload delivery photo` · `Upload payment proof` · `Return count to Carres` ·
 `Return count to {warehouse}`.
@@ -2303,8 +2300,8 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | An SO edit because the CUSTOMER asked for something different | **Customer change** | Amendment · Change request (that is the pending ASK, not the applied change) · Revision (that is the record it mints) |
 | A fulfilment-side substitution/recovery that does not create a new customer transaction | **Fulfilment replacement** | Customer change · Staff correction · Cancel and reorder |
 | The date the customer is asking Carres to deliver on | **`Requested Delivery Date`** | **`Customer Delivery`** · **`Deliver By`** · **`Promised Delivery`** · **`Customer 1st Requested Delivery`** — all four RETIRED 2026-08-27 and banned from reuse · `Delivery Window` (that word belongs to Delivery) · `Promised` · `Current` |
-| The delivery day Logistics and the customer agreed | **`Confirmed Delivery`** | Logistic delivery date · Final delivery date · Deliver by · Booked date — Delivery owns this word and this ruling does not rename it |
-| The time range Logistics and the customer agreed | **`Confirmed Time`** | Slot · Time window · Delivery window (that is the half-day/full-day fact) |
+| The delivery day Logistics arranged (owner ruling 2026-09-24) | **`Scheduled delivery`** — REQUIRED once arranged | `Confirmed Delivery` (retired 2026-09-24) · Logistic delivery date · Final delivery date · Deliver by · Booked date |
+| The time Logistics arranged, when there is one | **`Scheduled time`** — OPTIONAL; printed only when recorded, never `No time agreed` | `Confirmed Time` (retired 2026-09-24) · Slot · Time window · Delivery window (that is the half-day/full-day fact) |
 | The goods actually reached the customer | **`Delivered`** | Completed · Closed · Done |
 | Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
 | A money cell on an order that is fully settled | **`Paid in full`** | Settled · Cleared · Fully paid · Nil outstanding — registered 2026-09-02 (D7): it has been on the SO register and the workspace MONEY card since they were written and was in no dictionary, so the rule it was breaking was this one. Registered rather than reverted, on the `SO Date` precedent (2026-09-01). ⚠️ **The DELIVERY GATE says `Money in full` for the same arithmetic** (outstanding = 0, ruled 2026-09-01, two tables below). Two words, one fact, two surfaces — left as it is deliberately, because unifying them is an owner's call and not a tidy-up. Do not swap one for the other without one. |
@@ -2362,11 +2359,11 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The module heading and its two destinations | **`Payments`** · **`Monitor`** · **`Payment Records`** | Finance Portal · Invoices · Receipts · Order Payments · Collections desk |
-| Monitor columns, in order (owner ruling 2026-09-16) | **`SO No · Customer · Amount needed · Items & Stock · Storage · Requested Delivery Date · Confirmed Delivery · Payment timing`** — on a fixed 72px row, one fact and one supporting line per cell | Goods · Customer delivery (both RETIRED 2026-09-16) · Stock readiness · Stock arrival · Next step · Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
+| Monitor columns, in order (owner ruling 2026-09-16) | **`SO No · Customer · Amount needed · Items & Stock · Storage · Requested Delivery Date · Scheduled delivery · Payment timing`** — on a fixed 72px row, one fact and one supporting line per cell | Goods · Customer delivery (both RETIRED 2026-09-16) · Stock readiness · Stock arrival · Next step · Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
 | SO No and Customer cells | line 1 **`SO-{n}`** (opens the Sales Order) over the customer's reference(s) **`TCF0541 · CR1122`**, nothing when none; line 1 the customer name over the phone. A cut value opens whole by click or keyboard | `SO-1217 TCF0541` on one line · a hover-only full value |
 | Items & Stock cell (Delivery's words) | **`Ready`** · **`Not ready`** over **`2 of 2`** · **`1 of 2 · 1 short`** · **`Arriving after the requested date`**; **`Delivered`** for a delivered order still owing; Finance reader **`Stock facts are Operation's.`**; a failed stock read **`Stock facts could not be loaded.`** The cell opens Delivery's **`Items, Services & Stock`** panel (`Item` · `Qty` · `Source` · `Status` · `Location`) | Goods ready · Received (for Ready) · Stock readiness · In stock · ETA |
 | Storage cell | **`No storage charge`** · **`Free until {day}`** · **`{Group} · Day {n} · RM {x} so far`** · **`Free request waiting for approval · Estimated charge RM {x}`** · **`Free storage approved until {day}`** · **`Storage Invoice issued · RM {x} not paid`** — on the 72px row the same words break onto two lines after the state (`Sofa · Day 15` / `RM 200.00 so far` · `Free storage approved` / `until {day}`); Search and Export keep the one sentence | Storage fee · Accrued · Pending waiver |
-| Requested Delivery Date and Confirmed Delivery cells | the request in Delivery's words **`{Weekday}, {d} {Mon}`** · **`To be confirmed`** · **`No delivery date`**; the confirmed fact **`Confirmed`** over **`{day} · {window}`**, **`Not confirmed`** over **`{day} · No time agreed`**, or **`Not confirmed`** alone | Customer delivery · Not confirmed yet (retired 2026-09-16) · Logistics ETA · TBD |
+| Requested Delivery Date and Scheduled delivery cells | the request in Delivery's words **`{Weekday}, {d} {Mon}`** · **`To be confirmed`** · **`No delivery date`**; the scheduled fact **`Scheduled`** over **`{day}`** or **`{day} · {time}`**, or **`Not scheduled`** alone | Customer delivery · Not confirmed yet (retired 2026-09-16) · Logistics ETA · TBD |
 | Payment timing — the fact (line 1) | **`Payment due today`** · **`Ask customer today`** · **`Customer promised to pay today`** · **`Payment should have been received`** · **`Arrival not confirmed`** · **`Storage Invoice not paid`** · **`No delivery date`** · **`Payment due {day}`** | Overdue · Late · Due T−2 |
 | Payment timing — the action (line 2) | **`Ask customer to pay`** · **`Wait`** · **`Send the invoice and collect payment`** | Ask the customer to pay · Chase · Remind · Collect |
 | The owner on the action | line 2 is the shared Work item's OWN action beside the avatar chip — no Work item, no action and no person (only **`Wait`** stands alone); accessible name = the acting person; hover **`Normal owner: {name} · Today's cover: {name}`** when covered; no owner resolved → **`Not assigned`**, named **`Nobody is assigned to this order. Assign it in Sales Orders → Team`**, door the Sales Orders Team; the workspace prints **`Nobody is assigned to this order.`** + **`Assign it in Sales Orders → Team`** (owner instruction 2026-09-16) | a name inside the sentence · `Nobody holds Delivery Duty.` / `Staff & Duties` for a collection owner (retired 2026-09-16) |
@@ -2383,7 +2380,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | Payment Record sections, in order | **`Payment facts · Allocated to · Evidence · Actions · Receipt · History`** | — |
 | Evidence door · the two rare doors | **`View`** · **`Correct allocation`** · **`Void payment`** (overflow, authorised only) | Open slip · Edit · Delete · Reverse |
 | Settings → Payments sections, in order | **`Receiving bank accounts · Which bank to use · Payment methods · Collection timing · WhatsApp templates · Invoice and Receipt numbers · Storage charges · Online payment provider`** | — |
-| Collection timing fields | **`Start asking the customer to pay`** · **`Payment must be complete`** — each `{n} working days before Confirmed Delivery` | T−3 · T−2 · Chase window |
+| Collection timing fields | **`Start asking the customer to pay`** · **`Payment must be complete`** — each `{n} working days before Scheduled delivery` | T−3 · T−2 · Chase window |
 | Storage rule card lines | **`Free storage {n} calendar days`** · **`Charge RM {x}`** · **`Charge every {n} calendar days`** · **`Operation may approve until Day {n}`** · **`Approver may approve until Day {n}`** · **`Extra free storage Not allowed`** · **`Check stored goods every {n} calendar days`** | Free days: · Rate · Cycle |
 | The settings change record | **`Changes`** — `{what}` / `{who} · {when} · effective from {date}` / `{old} → {new} · {reason}` | Audit log · History (as the section name) |
 | The retired approval door's refusal | **`Money must be in full before delivery. There is no approval that releases a delivery while money is owed. Collect the balance in Payments → Monitor.`** | Request payment approval |
@@ -2559,10 +2556,10 @@ to point at one of them and be wrong about the others.
 | Goods partly ready | **`Goods not ready ({n} of {m})`** | Partial · Incomplete · Some ready |
 | Goods all ready | **`Goods ready ({n} Units)`** | Ready (alone) |
 | Goods ready for a scoped partial trip | **`Goods ready for this delivery ({n} Units in, {m} Units still open)`** | Ready (alone) — a met requirement on partial goods must show its scope |
-| No company chosen | **`No logistics chosen`** | No carrier · Unassigned · TBC |
+| No company chosen | **`Logistics not assigned`** (owner ruling 2026-09-24 — one word everywhere) | `No logistics chosen` · `No logistics picked` (both retired) · No carrier · Unassigned · TBC |
 | A company is chosen | **`Logistics chosen ({name})`** | Assigned · Booked |
-| No agreed day | **`Date + slot not confirmed`** | No booking · Unscheduled · TBC · Appointment not confirmed |
-| An agreed day | **`Date + slot confirmed`** | Booked · Scheduled |
+| No scheduled day | **`Scheduled delivery not recorded`** | `Date + slot not confirmed` (retired 2026-09-24) · No booking · Unscheduled · TBC |
+| A scheduled day (time optional) | **`Scheduled delivery recorded`** | `Date + slot confirmed` (retired) · Booked |
 | Finance is not holding the delivery | **`No Finance hold`** | Money cleared · Paid enough |
 | An OPEN Finance exception holds it | **`Finance is holding this delivery: {reason} — Finance clears it`** | Payment outstanding · Unpaid · On hold · a derived balance sentence |
 | Nobody has priced the order | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced · — |
@@ -2587,8 +2584,8 @@ what has not happened yet, in the plainest words available:
 | Nothing has been received against the PO | **`Not received yet`** | Not received · GRN: — · Outstanding |
 | Part of the PO arrived | **`{n} of {m} received`** | Partial · {n}/{m} |
 | Units are short on the line | **`{n} of {m} Units ready`** + **`Waiting for purchase`** | Units not created yet · No stock · Not allocated |
-| No company chosen yet | **`No logistics chosen yet`** | No carrier · Unassigned |
-| Nobody has agreed a delivery day | **`Date + slot not confirmed`** | Appointment not confirmed · No booking · TBC |
+| No company chosen yet | **`Logistics not assigned`** | `No logistics chosen yet` (retired 2026-09-24) · No carrier · Unassigned |
+| Nobody has scheduled a delivery day | **`Not scheduled yet`** | `Date + slot not confirmed` (retired) · Appointment not confirmed · No booking · TBC |
 | Not delivered | **`Not delivered yet`** | Pending · Open · In progress |
 | No photo on file | **`No delivery photo yet`** | No photo · Missing · — |
 | The photo is on file | **`Uploaded by {name}`** + **`Uploaded: {date}`** | Done · Complete |
@@ -2989,10 +2986,10 @@ split them.
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
 | The three calendar views | **`Sat, 15 Aug` · `Sun, 16 Aug` · `This week`** — the two single-day views name their day (owner, 2026-08-15; this row read `Today · Tomorrow · This week` until then) | `Today` · `Tomorrow` · Next 7 days · Week view · Upcoming |
-| The customer said yes to this date | **Confirmed** (+ the slot, e.g. `12pm–3pm`) | Booked · Locked · Scheduled |
+| The arranged delivery date | **Scheduled** (+ the time when recorded, e.g. `12pm–3pm`) — owner ruling 2026-09-24 | Booked · Locked · Confirmed (retired for this fact) |
 | Only logistics have named this date | **Logistics' date** | Provisional · Tentative · ETA · Pencilled in · Carrier's date |
 | Promised on this day, no booking yet | **Promised this day, no date yet** | Unscheduled · Not booked · Unbooked · Pending · anything with "needs" |
-| No logistics picked yet | **No logistics picked** | Unassigned · TBD · No carrier · — |
+| No logistics company yet | **Logistics not assigned** | `No logistics picked` (retired 2026-09-24) · Unassigned · TBD · No carrier · — |
 | Nothing booked on a day | **No deliveries booked this day.** | Empty · Free · Nothing |
 
 - **"This week" means the REST of this week** — today through Saturday. Sunday
@@ -3107,7 +3104,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Day` · `Week` · `Month` | Monitor's calendar-view control in the page toolbar; `Week` is the desktop default | **RULED 2026-09-07** |
 | `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
 | `STATE` · `LOGISTICS` | Monitor's second and third rail groups. The State dropdown offers **All states**; the Logistics dropdown offers **All** under its visible **LOGISTICS** heading. Each clears only that filter. | `REGION` · `LOGISTICS PARTNER` · `All partners` |
-| `Deliveries {n}` · `Exceptions {n}` · `No logistics picked {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **RULED 2026-09-07** (`Unassigned` stays banned — the third line reuses `No logistics picked`) |
+| `Deliveries {n}` · `Exceptions {n}` · `Logistics not assigned {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **RULED 2026-09-07** (`Unassigned` stays banned — the third line reuses `Logistics not assigned`) |
 | `{n} deliveries` / `{n} of {m} deliveries` · `No deliveries` · `No matching deliveries.` | Monitor's work-list footer and empty states; `1 delivery` / `{n} deliveries` on the Assign logistics door | **RULED 2026-09-07** (`delivery scope(s)` RETIRED from every employee surface) |
 | `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
 | `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **RULED 2026-09-06** (month-calendar correction) |
@@ -3174,9 +3171,9 @@ result and its whole history.
 | `Previous days` · `Next days` | the range arrows' accessible labels | kept |
 
 Already governed and merely REUSED (not new words): `No confirmed date` · `Overdue` ·
-`No delivery order yet` · `No logistics picked` · `Hide filters` /
+`No delivery order yet` · `Logistics not assigned` · `Hide filters` /
 `Show filters` · `Requested Delivery Date` ·
-`Confirmed Delivery` · `Confirmed Time` ·
+`Scheduled delivery` · `Scheduled time` ·
 `Not delivered yet` · `No delivery photo yet` · `Delivery photo saved` ·
 `Signed document on file` / `No signed document yet` (the DO object's own shipped pair).
 
@@ -3294,7 +3291,7 @@ an Activity feed renders `status` and `payment_status` side by side, and a bare 
 on both would be ambiguous on its own screen.
 
 This does not replace the ruled absence FACTS that already exist and name their own subject —
-`Address not set` · `No logistics picked` · `Supplier not assigned` · `No date`. Those stay.
+`Address not set` · `Logistics not assigned` · `Supplier not assigned` · `No date`. Those stay.
 This rule covers the generic case: a change event whose before or after simply did not exist.
 
 **And a `—` standing in for a whole missing record gets words too**: an activity row with no
@@ -3366,6 +3363,66 @@ roster holder yet shows its DUTY WORD where a name cannot stand — never a hand
 **System work has NO Done button** — an item leaves when its owning module
 records the completion fact. A human follow-up stays `ops_tasks`, labelled
 human, and is the only explicitly completable thing.
+
+## The Work Logistics card and external link words — owner rulings 2026-09-24 · BUILT
+
+The Work right panel's party cards (`workspace/MASTER.md` §5.9) and the external logistics link
+(`delivery/MASTER.md` §5.5). The owner's own words are marked ⭐ and are not open to re-wording.
+One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics-card.ts`).
+
+| Where | The words |
+|---|---|
+| Delivery date facts | ⭐ `Requested delivery` · ⭐ `Scheduled delivery` · ⭐ `Delivered` — the time prints only when recorded: `Scheduled delivery · 27 Oct` / `27 Oct · 3:00 PM` |
+| No company | ⭐ `Logistics not assigned` (every surface; `No logistics picked` / `No logistics chosen` are retired) |
+| Card heading | `Logistics · {company}` · `Customer · {name}` · `Supplier · {names}` |
+| Progress | `Checks {n} of 3` |
+| The three checks | ⭐ `3 working days before · {date}` · ⭐ `2 working days before · {date}` · ⭐ `1 working day before · {date}`; not yet due `Opens {date}`; a check whose date was already behind the start `Passed before this delivery started` |
+| Check facts | `{company} has the delivery details` · `Details not received yet` · `Scheduled {date}` · `Not scheduled yet` · `No answer` · `Requested another date · {date}` · `Cannot deliver · {reason}` · `Nothing missing` |
+| Current action (line 1 · line 2) | `Assign logistics` · `Choose the company that carries this delivery` — ⭐ `Contact logistics today` (on or after the 3-day check; before it `Contact logistics`) · `Share the delivery details with {company}` — `Call {company}` · `Get the scheduled delivery date` — `Call the customer` · `Agree {date} with the customer, then record it` — `Decide the next step for this delivery` · `Keep {company} with a new date, or change logistics` — `Ask {company}` · `Record the driver and vehicle` / `Record the condo registration`; due `due {date}` · `Late — was due {date}` |
+| Day-before gaps (exceptions only) | `Goods not ready · {n of m}` · `Delivery Order not issued yet` · `Not received at {site} yet` · `Driver and vehicle not recorded` · `Condo registration not recorded` · ⭐ `RM {amount} still to collect` (only once money affects this delivery) · `Finance is holding this delivery` |
+| Expanded section headings, in order | `Current action` · `Checks` · `Scheduled delivery` · `Assignment` · `Stock route` · `External link` · `Communication` · `Evidence and recent history` |
+| Stock route | ⭐ `Pickup from Carres Klang Warehouse` · ⭐ `Pickup from supplier` · ⭐ `Supplier sends directly to logistics` · `Supplier delivers to the customer` (the separate Ohana flow) · `Stock route not known yet`; lines `{PO No} · {supplier} · PO Delivery Date {date} · Received {date}` / `Not received yet` · `{n} Units reserved at {site}`; door `Open Purchasing` |
+| External link — Carres side | `External link` · `No link yet` · `Active link` · `Link revoked · {date}` · ⭐ `Create link` (only when none is active) · ⭐ `Copy link` · ⭐ `Revoke link` (only while active) · `Created {date} · {name}` · `Opened by {company} via external link · {date}` · `Not opened yet` · `{company} answers in its own portal.` · `{company} answers through the external link.` · `Assign logistics first.` · toasts `Link created` · `Link revoked` · `Link copied` |
+| The actor a link writes | ⭐ `{company} via external link` — a company, never a person |
+| Communication | `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Copying or opening WhatsApp confirms nothing. Record the answer when it comes.`; the prepared message leads with the customer's reference, never the SO number, and ends `Answer here: {link}` |
+| History titles | `Logistics assigned` · `Logistics changed` · `Logistics removed` · `Scheduled delivery saved` · `Requested another date` · `Cannot deliver` |
+| External link page | `Delivery for` {company} · `Reference` · `Customer` · `Phone` · `Delivery address` · `Goods` · `Pickup` · `Requested delivery` · `Scheduled delivery`; answers `Scheduled date` · `Another date` · `Cannot deliver`; fields `Scheduled date` · `Scheduled time (optional)` · `Date you can deliver` · `Reason` · `Tell us more (optional)`; buttons `Save scheduled delivery` · `Save another date` · `Cannot deliver` |
+| Link page results and refusals | `Saved. Carres can see your scheduled delivery.` · `Saved. Carres will call the customer about your date.` · `Saved. Carres will decide the next step.` · `This link no longer works. Ask Carres for a new link.` · `The delivery could not be loaded. Try again.` · `Sunday is not a delivery day. Pick another date.` · `This date is a public holiday. Pick another date.` · `This date has passed. Pick another date.` |
+| `Requested another date` reasons | `The customer asked for another date` · `We are full on that date` · `We do not go to that area on that date` · `The goods are not ready for pickup` |
+| Carres refusals | `Assign logistics before you create a link` · `{company} answers in its own portal.` · `This delivery already has an active link. Revoke it first.` · `This delivery has no active link.` |
+
+**`Contact logistics today` is the owner's exact phrase** and is the one admitted use of `today` in
+an action line: it prints only on or after the check's own date, beside that date.
+
+## The complete Work right panel words — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT
+
+Workspace MASTER §5.10 owns composition, source boundaries, interaction and responsive law. This
+table freezes the new visible words; §5.9's Logistics vocabulary remains built and unchanged.
+
+| Meaning | Use exactly | Do not use |
+|---|---|---|
+| Layer order | selected work summary · `Order Route` · `Logistics` · `Customer` · `Supplier` · `Owner, timing and source` | duplicate task messages above every card · Journey · Steps |
+| Route points | `Proceed` · optional `Loan` · `PO` · `GRN` · `Contact` · `Delivery` | Stock received as a second GRN point · permanent Payment/Logistics circles |
+| Route progress | `{n} of {total}` · `{n} of {total} confirmed` · `Scheduled delivery · {date}` · `Delivered · {date}` | repeating `1 pending` beside equivalent progress |
+| Customer collapsed states | `{company} contacts the customer · by {date}` · `Scheduled {date}` · `Customer requested another date · {date}` · `Customer refused delivery` · `Phone number is wrong` · `Delivery delayed · customer notice required` | routine Carres `Contact due today` · routine `Waiting for customer` · Customer confirmed |
+| Customer normal state | read-only partner contact/deadline/result from Delivery; no Carres action | a routine Carres date-agreement checklist · `Accepted date` as a second scheduling workflow |
+| Customer exception actions | `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` | routine Carres scheduling · Follow up (alone) |
+| Supplier mission progress | `{n} of {total} POs issued` · `{n} of {total} dates ready` · `{n} of {total} received` · `{n} delayed` · `No purchase order for this Sales Order` | supplier names/PO numbers/owner in the collapsed group summary |
+| Supplier states | `PO not issued` · `Expected` · `Confirmation needed` · `Delayed` · `Arriving today` · `Received` · `Short received` | Ready without the exact fact · Stock received |
+| Supplier follow-up | `Confirmation needed today` · `Waiting for supplier` · `Arrival missed · Follow up supplier` · `Record supplier delay` | default-date confirmation immediately after PO issue |
+| Communication receipt | `Record as sent` · `Not sent` · `Waiting for customer` · `Waiting for supplier` · `No answer · Follow up today` | treating Copy/Open WhatsApp as sent or complete |
+| Missing contact | `WhatsApp unavailable · No phone number` · `Open customer record` (equivalent exact party door) | unexplained disabled control |
+| Refresh failure | `Some information could not be refreshed.` · `Try again` while the last good mission stays visible | replacing the mission with a generic error |
+| No selection / missing order | `Select a work item` · `Choose an item from the Work list to see its mission.` · `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` | empty fake Route · guessed `Logistics not assigned` |
+| Customer stored-result and partner lines | `Customer refused delivery` · `Phone number is wrong` · `Contact missed {date}` · `Contact due {date}` · `{company} contacts the customer · by {date}` · `Carres contacts this customer` · `{company} contacts this customer` · `No email recorded` · `No contact recorded yet` | a guessed reply |
+| Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
+| Record the reply | `Record reply` · `Channel` · `WhatsApp` · `Call` · `Email` · `Date the customer asked for` · `WhatsApp reply` · `Save reply` · `Cancel` · `Change the address in the Sales Order, then record the reply.` · `Reply recorded` · `The reply could not be recorded. Try again.` · `Upload the customer's WhatsApp reply first.` | free-text outcome |
+| Customer communication preview | only for a governed Carres exception or ERP-ARCHITECTURE §6.5 outstation release: `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
+| Route statuses and payment line | `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · RM {amount} to collect by {date}` · `Payment · Finance is holding this delivery` | Blocked · a Payment circle |
+| Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
+| Customer card extras | `Reply due {date}` · `Name not recorded` · `No phone recorded` · `WhatsApp reply · 1 photo` · `Evidence and communication history` · `Checklist` · `Response` · `Delivery` | — |
+| Supplier row labels | `PO Delivery Date` · `Latest date` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `Supplier details could not be loaded.` · `Try again` | Stock received |
+| Permission | `You cannot view this record` · `Ask an authorised operation user for access.` | leaked party or money facts |
 
 ## Numbers, dates, money
 

@@ -186,7 +186,7 @@ describe("carrierDayLoads — who is carrying what on the day", () => {
 
   it("names the no-carrier group instead of hiding it — the day is not emptier than it is", () => {
     const loads = carrierDayLoads([booking({ partnerId: null, partnerName: null })], MON);
-    expect(loads[0]).toMatchObject({ partnerId: null, partnerName: "No logistics picked", confirmed: 1 });
+    expect(loads[0]).toMatchObject({ partnerId: null, partnerName: "Logistics not assigned", confirmed: 1 });
   });
 
   it("busiest carrier first", () => {

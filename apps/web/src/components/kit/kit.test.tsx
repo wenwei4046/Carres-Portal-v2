@@ -103,9 +103,11 @@ describe("closed sets", () => {
     expect(document.querySelector('[data-icon="on-hold"]')).toBeInTheDocument();
   });
 
-  it("has six type tokens and no seventh", () => {
-    expect(TYPE_TOKENS).toHaveLength(6);
-    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11]);
+  // The seventh, `control` (14/20), is the owner's Work toolbar ruling
+  // 2026-09-25 — an eighth still means editing this line.
+  it("has seven type tokens and no eighth", () => {
+    expect(TYPE_TOKENS).toHaveLength(7);
+    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11, 14]);
   });
 
   it("has one class pair per tone and no more", () => {

@@ -110,19 +110,17 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(s.second).toBe("Asked D(2026-09-08)");
   });
 
-  it("⭐ a DAY without a WINDOW is still contact work — and it names the HALF that is missing", () => {
+  it("⭐ a SCHEDULED DATE alone completes the arrangement — the time is optional (owner ruling 2026-09-24)", () => {
     const s = status({ confirmedDate: "2026-09-14" });
-    /* Never `Confirmed` — and never `Call customer` either, which would send
-       the operator to re-open a day the customer already agreed. */
-    expect(s.kind).toBe("confirm_time");
-    expect(s.label).toBe("Confirm delivery time");
-    expect(s.tone).toBe("orange");
+    expect(s.kind).toBe("confirmed");
+    expect(s.label).toBe("Scheduled for D(2026-09-14)");
+    expect(s.tone).toBe("green");
     expect(s.second).toBeNull();
   });
 
-  it("a day AND a window → Confirmed for the day, green, the window beneath", () => {
+  it("a day AND a time → Scheduled for the day, green, the time beneath", () => {
     const s = status({ confirmedDate: "2026-09-14", confirmedTime: "2 PM to 5 PM" });
-    expect(s.label).toBe("Confirmed for D(2026-09-14)");
+    expect(s.label).toBe("Scheduled for D(2026-09-14)");
     expect(s.second).toBe("2 PM to 5 PM");
     expect(s.tone).toBe("green");
   });
@@ -183,7 +181,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
 
   it("without today handed in, no row is ever Overdue — the arithmetic keeps no clock", () => {
     expect(status({ confirmedDate: "2026-09-10", confirmedTime: "9 AM to 12 PM" }).label).toBe(
-      "Confirmed for D(2026-09-10)",
+      "Scheduled for D(2026-09-10)",
     );
   });
 
@@ -314,7 +312,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       expect(every).not.toContain(retired);
     }
     for (const label of every) {
-      expect(label).not.toMatch(/pending|awaiting|in progress|scheduled|booked|unscheduled/i);
+      expect(label).not.toMatch(/pending|awaiting|in progress|booked|unscheduled/i);
       expect(label).not.toMatch(/^Waiting$/);
     }
     /* And no label joins an act to a party or an explanation with a dash
