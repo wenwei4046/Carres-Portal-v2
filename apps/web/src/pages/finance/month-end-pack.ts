@@ -92,8 +92,9 @@ const noOpening = (goLive: string) => `Since ${day(goLive)} · No opening balanc
 export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
   const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on)], []];
   if (tb.status === "before_go_live") return { name: "Trial Balance", rows: [...head, [beforeGoLive(tb.go_live_on)]] };
-  // The rows the page prints: headings with their subtotals, and the accounts
-  // anything was posted to. The total counts each account once.
+  // The rows the page's Export Excel writes: headings by name with their Debit
+  // and Credit left empty, and the accounts anything was posted to, so adding
+  // up a column counts each account once and matches the Total line.
   const lines = trialBalanceLines(tb);
   const sum = (side: "debit" | "credit") =>
     Math.round(lines.reduce((s, r) => (r.heading ? s : s + r[side]), 0) * 100) / 100;
@@ -102,7 +103,7 @@ export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
     rows: [
       ...head,
       ["Account", "Kind", "Debit", "Credit"],
-      ...lines.map((r) => [trialBalanceLabel(r), ledgerKindWord(r.kind), r.debit, r.credit]),
+      ...lines.map((r) => [trialBalanceLabel(r), ledgerKindWord(r.kind), r.heading ? "" : r.debit, r.heading ? "" : r.credit]),
       ["Total", "", sum("debit"), sum("credit")],
     ],
   };

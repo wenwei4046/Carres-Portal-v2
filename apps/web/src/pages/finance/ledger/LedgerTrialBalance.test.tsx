@@ -252,13 +252,13 @@ describe("Trial Balance headings", () => {
     expect(api.fetch).toHaveBeenCalledWith("/api/finance/ledger/trial-balance?asOf=2026-09-11&departmentType=SHOWROOM");
   });
 
-  it("the month-end pack prints the same rows, indented, with the total counting each account once", () => {
+  it("the month-end pack prints the same rows as Export Excel, indented, with the heading lines' Debit and Credit empty", () => {
     const rows = trialBalanceSheet(NESTED as never).rows.slice(3);
     expect(rows).toEqual([
       ["Account", "Kind", "Debit", "Credit"],
-      ["Assets", "Asset", 520, 30],
-      ["  Current assets", "Asset", 520, 30],
-      ["    Bank", "Asset", 500, 30],
+      ["Assets", "Asset", "", ""],
+      ["  Current assets", "Asset", "", ""],
+      ["    Bank", "Asset", "", ""],
       ["      CA-B1 Maybank", "Asset", 500, 0],
       ["      CA-B2 Public Bank", "Asset", 0, 30],
       ["    CA-C Cash in hand", "Asset", 20, 0],
@@ -267,6 +267,14 @@ describe("Trial Balance headings", () => {
       ["EX-P Purchases", "Expense", 50, 0],
       ["Total", "", 570, 570],
     ]);
+  });
+
+  it("in the month-end pack, the Debit column and the Credit column each add up to the Total line", () => {
+    const rows = trialBalanceSheet(NESTED as never).rows.slice(4);
+    const total = rows.pop()!;
+    const sum = (col: number) => rows.reduce((s, r) => s + Number(r[col] || 0), 0);
+    expect([sum(2), sum(3)]).toEqual([total[2], total[3]]);
+    expect(total[2]).toBe(total[3]);
   });
 });
 
