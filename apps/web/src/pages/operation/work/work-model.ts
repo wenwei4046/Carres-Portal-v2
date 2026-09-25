@@ -269,3 +269,14 @@ export function myMissedAndToday(
   }
   return { missed, today };
 }
+
+/**
+ * WHICH MIDDLE TAB A ROW BELONGS TO (Workspace §5.10). `Waiting` only when the
+ * owning module RECORDED that we are waiting on the party (the feed's
+ * `communication.replyState`, from Delivery's contact record) — silence is
+ * never waiting. A missed row is always `To do`: Waiting never hides a
+ * deadline. `Completed` needs source-owned closure receipts (§5.2.1).
+ */
+export function workListTabOf(row: WorkRow): "todo" | "waiting" {
+  return row.source.communication?.replyState === "waiting" && row.timingBucket !== "overdue" ? "waiting" : "todo";
+}

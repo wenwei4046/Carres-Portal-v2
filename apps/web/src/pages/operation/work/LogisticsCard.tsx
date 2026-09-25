@@ -21,7 +21,7 @@
  * (`LogisticsDetailsEdit`, `DeliveryDatesEdit`) or a Delivery door (link). The
  * one arithmetic is `logisticsCardModel` in @carres/shared.
  */
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -129,18 +129,17 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; leg?: number }) {
-  const bodyId = useId();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<null | "logistics" | "schedule">(null);
+/**
+ * THE LOGISTICS MODEL, as one hook — the card, the Order Route's `Contact`
+ * point and the Customer card all read the SAME `logisticsCardModel` answer
+ * (Law D: the contact checkpoint is not a second clock).
+ */
+export function useLogisticsModel(orderId: string, leg = 0) {
   const scope = useDeliveryScopeCard(orderId, leg);
   const factsQ = useLogisticsCardFacts(orderId, leg);
-  const partnersQ = useDeliveryPartners();
-  const acts = useDeliveryLinkActs(orderId, leg);
   const card = scope.card;
   const facts = factsQ.data ?? null;
   const today = appTodayIso();
-
   const partnerName = card?.logisticsPartnerName ?? facts?.partner?.name ?? null;
   const o = card?.scope.o ?? null;
   const linkUrl = facts?.link ? `${window.location.origin}/delivery-link/${facts.link.token}` : null;
@@ -203,6 +202,38 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
       spell,
     });
   }, [card, o, facts, partnerName, today]);
+  return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model };
+}
+
+export default function LogisticsCard({
+  orderId,
+  leg = 0,
+  open: openProp,
+  onToggle,
+  primary = true,
+}: {
+  orderId: string;
+  leg?: number;
+  /** Controlled by the right panel: one party card open at a time (§5.10). */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
+  /** Whether this card holds the panel's ONE blue action (§5.10). */
+  primary?: boolean;
+}) {
+  const bodyId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const [openLocal, setOpenLocal] = useState(false);
+  const open = openProp ?? openLocal;
+  const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === "function" ? next(open) : next;
+    if (onToggle) onToggle(value);
+    else setOpenLocal(value);
+  };
+  const [editing, setEditing] = useState<null | "logistics" | "schedule">(null);
+  const partnersQ = useDeliveryPartners();
+  const acts = useDeliveryLinkActs(orderId, leg);
+  const { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model } = useLogisticsModel(orderId, leg);
+  void today;
 
   if (scope.loading && !card) {
     return <WorkSection className="p-4 text-body text-kit-slate-11" data-testid="logistics-card">{PARTY_COPY.loading}</WorkSection>;
@@ -251,25 +282,25 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
   const doorFor = (door: LogisticsAction["door"]): ReactNode => {
     if (door === "assign" || door === "decide") {
       return (
-        <Button size="touch" variant="primary" onClick={() => setEditing("logistics")} data-testid="logistics-card-edit-logistics">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} onClick={() => setEditing("logistics")} data-testid="logistics-card-edit-logistics">
           {partnerName ? PARTY_COPY.changeLogistics : PARTY_COPY.assignLogistics}
         </Button>
       );
     }
     if (door === "schedule") {
       return (
-        <Button size="touch" variant="primary" onClick={() => setEditing("schedule")} data-testid="logistics-card-edit-schedule">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} onClick={() => setEditing("schedule")} data-testid="logistics-card-edit-schedule">
           {PARTY_COPY.recordScheduled}
         </Button>
       );
     }
     if (door === "contact") {
       return partner && !partner.hasPortal && !facts?.link ? (
-        <Button size="touch" variant="primary" disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} disabled={acts.create.isPending} onClick={() => void createLink()} data-testid="logistics-card-create-link">
           {LINK_COPY.createLink}
         </Button>
       ) : (
-        <Button size="touch" variant="primary" onClick={() => void copy(message, PARTY_COPY.copied, true)} data-testid="logistics-card-copy-message">
+        <Button size="touch" variant={primary ? "primary" : "neutral"} onClick={() => void copy(message, PARTY_COPY.copied, true)} data-testid="logistics-card-copy-message">
           {PARTY_COPY.copyMessage}
         </Button>
       );
@@ -298,10 +329,23 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
   const timingTone = action?.timing === "missed" ? "text-kit-red-11" : action?.timing === "today" ? "text-kit-blue-11" : "text-kit-slate-11";
 
   return (
-    <WorkSection className="shrink-0" data-testid="logistics-card" aria-label={LOGISTICS_COPY.heading}>
+    <WorkSection
+      className="shrink-0"
+      data-testid="logistics-card"
+      aria-label={LOGISTICS_COPY.heading}
+      onKeyDown={(event) => {
+        /* §5.10: Escape collapses the open card and returns focus to its heading. */
+        if (event.key === "Escape" && open) {
+          event.stopPropagation();
+          setOpen(false);
+          toggleRef.current?.focus();
+        }
+      }}
+    >
       {/* ── COLLAPSED: at most five facts, one obvious control ───────────── */}
       <button
         type="button"
+        ref={toggleRef}
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((v) => !v)}
