@@ -132,8 +132,8 @@ export default function ListPageShell({
           <h1 className="min-w-0 truncate text-[24px] font-semibold leading-[30px] text-base-900 min-[960px]:text-[28px] min-[960px]:leading-[34px]">
             {title}
           </h1>
-          {titleRight && <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">{titleRight}</div>}
-          {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
+          {titleRight && <div className="ml-auto flex min-w-0 items-center gap-1.5">{titleRight}</div>}
+          {actions && <div className={`${titleRight ? "" : "ml-auto "}shrink-0 flex items-center gap-1`}>{actions}</div>}
         </div>
       )}
       {hasHeader && !workspace && (

@@ -21,8 +21,8 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
     <>
       <header className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-6 min-[960px]:py-4" data-testid="work-detail-header">
         <p className="text-label font-medium text-kit-slate-11">{item.object.label} · {MODULE[item.module]}</p>
-        <h2 className="mt-1 text-[16px] font-semibold leading-[22px] text-kit-slate-12 min-[960px]:text-section" data-testid="work-detail-title">{item.problem}</h2>
-        <p className="mt-1 text-body text-kit-slate-11" data-testid="work-detail-action">{action}</p>
+        <h2 className="text-[16px] font-semibold leading-[22px] text-kit-slate-12" data-testid="work-detail-title">{item.problem}</h2>
+        <p className="text-body text-kit-slate-11" data-testid="work-detail-action">{action}</p>
       </header>
       <section aria-label="What to do" className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-6 min-[960px]:py-4" data-testid="work-detail-task">
         <div className="max-w-[760px]">

@@ -32,6 +32,7 @@ import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import Icon from "@/components/kit/Icon";
+import { TopBarIcons } from "./components/GlobalTopBar";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 import {
   filterWork,
@@ -475,9 +476,10 @@ export default function OperationWork() {
       title="Work"
       testId="operation-work"
       workspace
+      actions={<TopBarIcons />}
       titleRight={
         // Every count says WHAT it counts (card §7 — supersedes `open · overdue`).
-        <span className="text-[12px] font-normal leading-4 text-base-400 min-[960px]:text-[13px] min-[960px]:leading-[18px]" data-testid="work-header-count">
+        <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[960px]:text-[13px] min-[960px]:leading-[18px]" data-testid="work-header-count">
           {visible.length} action{visible.length === 1 ? "" : "s"} to do
           {lateCount > 0 ? ` · ${lateCount} missed` : ""}
         </span>

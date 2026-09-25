@@ -324,12 +324,12 @@ export default function LogisticsCard({ orderId, leg = 0 }: { orderId: string; l
             </div>
           ) : null}
           {scheduledLine ? (
-            <div className="mt-1 text-body text-kit-slate-12" data-testid="logistics-card-scheduled">
+            <div className="text-[12px] leading-4 text-kit-slate-12 min-[960px]:mt-1 min-[960px]:text-body" data-testid="logistics-card-scheduled">
               {LOGISTICS_COPY.scheduled} · {scheduledLine}
             </div>
           ) : null}
           {model.exception ? (
-            <div className="mt-1 flex items-center gap-1 text-body text-kit-amber-11" data-testid="logistics-card-exception">
+            <div className="flex items-center gap-1 text-[12px] leading-4 text-kit-amber-11 min-[960px]:mt-1 min-[960px]:text-body" data-testid="logistics-card-exception">
               <Icon name="late" size={14} />
               <span>{model.exception}</span>
             </div>
