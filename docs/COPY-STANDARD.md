@@ -2032,6 +2032,28 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | One saved evidence file that could not be read | `Photo {n} could not be loaded` + `Try again` | A file the record HAS but the viewer could not read. A file the record never had is absent, not failed — the two never render alike |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
+<a id="record-supplier-answer-words"></a>
+### Record supplier answer words — APPROVED (Jess, 2026-09-25) · NOT BUILT
+
+The PO object page's per-item supplier answer (Purchasing MASTER §5.7, Blueprint segment 1).
+Retired with it: the section heading `Supplier has not confirmed the PO date` and the rail row of
+the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`).
+
+| Where | Exact wording |
+|---|---|
+| Section · button | `SUPPLIER REPLY` · `Record supplier answer` |
+| Supplier DO at the top of the form | `Supplier DO received` · `Supplier DO No` · `DO file` |
+| Per-line answer, four radios | `No change` · `Confirmed` · `New date` · `Split delivery` |
+| Split batches | `{n} pcs · {date}` · `+ Add another date` · `Total {n} of {m}` |
+| Table heads | `Item` · `Qty` · `To deliver` · `Answer` · `Date` · `Reason` · `Supplier Confirmed Delivery Date` · `Last answer` |
+| Bulk answer bar | `{n} selected · Apply to selected` |
+| Delay reasons (the eight, shown only when the date is later than PO Delivery Date) | `Production delay` · `Material unavailable` · `Capacity / scheduling delay` · `Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` · `Partial quantity ready` · `Other` (`Note` required) |
+| Dates and people | `Answered by supplier on` · `Recorded by {name}` |
+| Result lines | `Delayed` · `Earlier` · `Reported` (no original date) · `Supplier changed from {date}` · `All received` · `Received · {GRN No}` |
+| Last answer | `Last answer · {date} · recorded by {name} · Evidence {n}` · `None recorded yet` |
+| Save blockers | `Save — add a WhatsApp screenshot` · `Save — upload the Supplier DO` · `Save — the batches must total {m}` |
+| Read failure | `Supplier answers could not be loaded` + `Try again` |
+
 <a id="purchasing-ui-dictionary"></a>
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
