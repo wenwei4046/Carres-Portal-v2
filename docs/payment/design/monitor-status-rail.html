@@ -64,16 +64,17 @@
   .doors{display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px}
   .btn{height:28px;padding:0 10px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
-  .facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 16px;padding:4px 0 10px;border-bottom:1px solid var(--border);margin-bottom:8px}
-  .facts .k{font-size:11px;line-height:14px;color:var(--ink-2)}.facts .v{font-size:13px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.facts .v small{font-weight:400;color:var(--ink-2);font-size:12px}
-  .blocks{display:grid;grid-template-columns:minmax(220px,1fr) minmax(480px,1.8fr) minmax(220px,1fr);gap:8px}
-  .blk{padding:4px 12px 0 0;min-width:0}.blk+.blk{border-left:1px solid var(--border);padding-left:12px}
-  .blk h3{margin:0 0 4px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
-  .blk p{margin:0}.blk .fact{font-weight:600}.blk .sub{font-size:12px;line-height:16px;color:var(--ink-2);margin:0 0 6px}
-  table.docs{border-collapse:collapse;width:100%}.docs td{padding:0 12px 0 0;height:26px;white-space:nowrap;font-size:12px;line-height:16px;border-bottom:1px solid var(--surface-alt)}.docs tr:last-child td{border-bottom:0}
-  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500;font-size:12px}.docs td.m{white-space:normal}
-  .link{background:none;border:0;color:var(--blue-11);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
-  .hist p{font-size:12px;line-height:16px;margin:0 0 3px}.hist .t{color:var(--ink-2);margin-left:6px}
+  .cols{display:grid;grid-template-columns:minmax(260px,1fr) minmax(260px,1fr) minmax(320px,1.3fr);gap:0}
+  .col{min-width:0;padding:0 16px 4px 0}.col+.col{border-left:1px solid var(--border);padding-left:16px}
+  .col h3{margin:0 0 6px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+  .col h3.sub2{margin-top:12px}
+  .col p{margin:0 0 4px}.col .fact{font-weight:600}.col .meta{font-size:12px;line-height:16px;color:var(--ink-2)}
+  .col .btns{display:flex;flex-wrap:wrap;gap:6px}
+  table.money{border-collapse:collapse;width:100%;max-width:300px}.money td{height:24px;padding:0;font-size:13px;line-height:18px;border-bottom:1px solid var(--surface-alt)}
+  .money .num{text-align:right}.money tr.sum td{border-top:1px solid var(--divider);font-weight:600}.money tr.due td{font-weight:600;border-bottom:0}
+  table.docs{border-collapse:collapse;width:100%}.docs td{padding:0 12px 0 0;height:24px;white-space:nowrap;font-size:12px;line-height:16px;border-bottom:1px solid var(--surface-alt)}.docs tr:last-child td{border-bottom:0}
+  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}.docs td.m{white-space:normal}.docs td.num{text-align:right}
+  .hl{font-size:12px;line-height:16px}.hl .t{color:var(--ink-2);margin-left:6px}
   footer.ft{height:32px;display:flex;align-items:center;padding:0 12px;border-top:1px solid var(--border);color:var(--ink-2);font-size:12px}
   @media (max-width:1100px){.side{display:none}.shell{grid-template-columns:1fr}}
   @media (prefers-reduced-motion:no-preference){.xchev svg{transition:transform 150ms}}
@@ -130,21 +131,39 @@
               <tr data-d="2026-09-17" data-k="promised"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1405</span></td><td class="s3">SITI AMINAH</td><td class="num">RM 2,500.00</td><td>Ready · 1 of 1</td><td>Sofa · Day 29 · RM 400.00 so far</td><td>Thu, 24 Sep</td><td>Scheduled · Thu, 24 Sep</td><td class="o">Customer promised to pay today</td><td><span class="av">SH</span>Shasha</td></tr>
               <tr class="exp" data-d="2026-09-17" data-k="promised"><td colspan="10"><div class="expbox">
                 <div class="doors"><button class="btn">Record payment</button><button class="btn p">Ask customer to pay</button><button class="btn" aria-label="More actions" title="Statement · Print · Create payment link">⋯</button></div>
-                <div class="facts">
-                  <div><div class="k">Balance due</div><div class="v">RM 2,500.00 unpaid <small>· includes storage RM 400.00</small></div></div>
-                  <div><div class="k">Total payable · Paid</div><div class="v">RM 3,400.00 <small>· Goods RM 3,000.00 · Storage RM 400.00 · Paid RM 900.00</small></div></div>
-                  <div><div class="k">Payment due</div><div class="v">Tue, 22 Sep <small>· customer promised today</small></div></div>
-                  <div><div class="k">Collection owner</div><div class="v">Shasha <small>· No cover today</small></div></div>
-                  <div><div class="k">Customer</div><div class="v">SITI AMINAH <small>· 0133332211</small></div></div>
-                  <div><div class="k">Reference</div><div class="v m">No reference</div></div>
-                  <div><div class="k">Scheduled delivery</div><div class="v">Thu, 24 Sep <small>· NETS</small></div></div>
-                  <div><div class="k">Items &amp; Stock · Storage</div><div class="v">Ready <small>· 1 of 1 · Carres Klang</small> · Sofa · Day 29 <small>· RM 400.00 so far · started Wed, 19 Aug · free until Tue, 1 Sep</small></div></div>
-                </div>
-                <div class="blocks">
-                  <div class="blk"><h3>What to do</h3><p class="fact o">Customer promised to pay today</p><p class="sub">Ask customer to pay · Record the result.</p><button class="btn">Record the result</button><p class="sub" style="margin-top:10px">Storage · Sofa · Day 29 · next check due Fri, 18 Sep</p><span style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn">Request more free days</button><button class="btn">Check the stored furniture</button></span></div>
-                  <div class="blk"><h3>Documents</h3><table class="docs"><tr><td>RC2609-4830</td><td>RM 900.00</td><td>Mon, 7 Sep</td><td>Deposit</td><td><button class="link">Print</button> · <button class="link">Send</button></td></tr>
-                  <tr><td>Invoice</td><td colspan="3" class="m">Issued at Balance due RM 0 · Goods RM 3,000.00 · Storage 29 days RM 400.00 · Total RM 3,400.00</td><td></td></tr><tr><td>Statement</td><td colspan="3"></td><td><button class="link">Print</button></td></tr></table></div>
-                  <div class="blk hist"><h3>Communication History</h3><p><b>Customer will pay on a date</b><span class="t">promised Thu, 17 Sep · Tue, 15 Sep 3:20 PM · Shasha</span></p><p><b>Payment message sent</b><span class="t">Tue, 15 Sep 10:02 AM · Shasha</span></p></div>
+                <div class="cols">
+                  <section class="col">
+                    <h3>Money</h3>
+                    <table class="money">
+                      <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
+                      <tr><td>Storage · Sofa · 29 days</td><td class="num">RM 400.00</td></tr>
+                      <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
+                      <tr><td>Paid</td><td class="num">RM 900.00</td></tr>
+                      <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
+                    </table>
+                    <p class="meta">Payment due Tue, 22 Sep · Collection owner Shasha</p>
+                    <p class="meta">SITI AMINAH · 0133332211 · No reference</p>
+                  </section>
+                  <section class="col">
+                    <h3>What to do</h3>
+                    <p class="fact o">Customer promised to pay today</p>
+                    <p class="meta">Ask customer to pay, then record the answer.</p>
+                    <p><button class="btn">Record the result</button></p>
+                    <h3 class="sub2">Storage</h3>
+                    <p class="meta">Sofa · Day 29 · started Wed, 19 Aug · free until Tue, 1 Sep · next check Fri, 18 Sep</p>
+                    <p class="btns"><button class="btn">Request more free days</button><button class="btn">Check the stored furniture</button></p>
+                  </section>
+                  <section class="col">
+                    <h3>Documents</h3>
+                    <table class="docs">
+                      <tr><td>RC2609-4830</td><td class="num">RM 900.00</td><td>Mon, 7 Sep</td><td><button class="link">Print</button> · <button class="link">Send</button></td></tr>
+                      <tr><td>Invoice</td><td colspan="2" class="m">Issued when Balance due is RM 0</td><td></td></tr>
+                      <tr><td>Statement</td><td colspan="2"></td><td><button class="link">Print</button></td></tr>
+                    </table>
+                    <h3 class="sub2">Communication History</h3>
+                    <p class="hl"><b>Customer will pay on a date</b> · promised Thu, 17 Sep<span class="t">Tue, 15 Sep · Shasha</span></p>
+                    <p class="hl"><b>Payment message sent</b><span class="t">Tue, 15 Sep · Shasha</span></p>
+                  </section>
                 </div>
               </div></td></tr>
               <tr data-d="2026-09-17" data-k="ask"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1406</span></td><td class="s3">CHONG WEI JIE</td><td class="num">RM 1,000.00</td><td>Ready · 1 of 1</td><td>Free until Sun, 27 Sep</td><td>Fri, 25 Sep</td><td>Scheduled · Fri, 25 Sep · 10 AM</td><td>Ask customer today</td><td><span class="av">SH</span>Shasha</td></tr>
