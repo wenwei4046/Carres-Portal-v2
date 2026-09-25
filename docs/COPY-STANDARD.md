@@ -3370,6 +3370,11 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | A row's due date, on line 2 | **due {fmtDate}** (`due Wed, 20 Aug`) | Today · Tomorrow · a bare date |
 | A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
 | The clear state | **No open work — every track is clear.** | All done · Empty |
+| Empty My Work while the team has work (owner review 2026-09-25) | header **`0 for you · {n} for the team`** · list door **`See Team Work`** | a bare `0 actions to do` |
+| The cover filter (owner review 2026-09-25 item 16) | **Covering for others** | Covered (alone) |
+| The page filter (owner review 2026-09-25 item 17) | rail section **Page** · **All pages** | Module · All modules |
+| The Date rail (owner review 2026-09-25 items 19–22) | every row prints its count, `0` included · `Today` beside today's date · `No working date` always listed · two work weeks | a hidden `0` · a blue badge alone as "today" |
+| The header search (owner review 2026-09-25 item 12) | **Search** | Jump to… · a printed ⌘K |
 
 > **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
 > OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a

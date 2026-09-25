@@ -89,7 +89,8 @@ export default function OperationRightRail() {
       )}
 
       {/* Icon strip */}
-      <div className="w-[52px] flex flex-col items-center py-3 gap-1 border-l border-base-200 bg-white">
+      {/* Each icon carries its name (owner review 2026-09-25 item 14). */}
+      <div className="w-[64px] flex flex-col items-center py-3 gap-2 border-l border-base-200 bg-white">
         {TABS.map((t) => {
           const isActive = active === t.key;
           const badge = badgeFor(t.key);
@@ -100,14 +101,16 @@ export default function OperationRightRail() {
               onClick={() => setActive(isActive ? null : t.key)}
               title={t.label}
               aria-label={nameFor(t)}
-              className={`relative w-9 h-9 rounded-full grid place-items-center transition-colors ${
+              className={`relative w-[60px] rounded-md flex flex-col items-center gap-0.5 py-1.5 transition-colors ${
                 isActive ? t.active : "text-base-500 hover:bg-hovertint"
               }`}
             >
               <t.icon size={18} strokeWidth={2} />
+              <span className="text-[10px] font-medium leading-3">{t.label}</span>
               {badge && (
                 <span
-                  className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full ${badge.tone} text-white text-label font-semibold leading-[16px] text-center`}
+                  data-rail-badge
+                  className={`absolute -top-0.5 right-1 min-w-[16px] h-[16px] px-1 rounded-full ${badge.tone} text-white text-label font-semibold leading-[16px] text-center`}
                 >
                   {badge.n > 99 ? "99+" : badge.n}
                 </span>

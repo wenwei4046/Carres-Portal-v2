@@ -126,7 +126,7 @@ function show(url = "/operation?tab=work") {
 }
 
 const dateSection = () => screen.getByRole("region", { name: "Date" });
-const moduleSection = () => screen.getByRole("region", { name: "Module" });
+const moduleSection = () => screen.getByRole("region", { name: "Page" });
 const day = (name: RegExp) => within(dateSection()).getByRole("button", { name });
 const listRows = () => within(screen.getByTestId("work-list")).queryAllByRole("button", { name: /Ask customer/ });
 const countOf = (el: HTMLElement) => el.querySelector("[data-rail-count]")?.textContent ?? null;
@@ -178,7 +178,7 @@ describe("【WORK】 left rail · Date", () => {
     expect(within(dateSection()).getByTestId("work-rail-month")).toHaveTextContent("Sep 2026");
   });
 
-  it("2 · today's badge stays solid blue while another date is selected, and never says Today", () => {
+  it("2 · today's badge stays solid blue while another date is selected, and says Today in words (owner review 2026-09-25 item 21)", () => {
     show("/operation?tab=work&day=2026-09-15");
     const today = day(/^Fri, 18 Sep/);
     const todayBadge = today.querySelector("[data-rail-badge]") as HTMLElement;
@@ -187,7 +187,7 @@ describe("【WORK】 left rail · Date", () => {
     expect(todayBadge.className).toMatch(/text-white/);
     expect(today).toHaveAttribute("aria-pressed", "false");
     expect(day(/^Tue, 15 Sep/).querySelector("[data-rail-badge]")).not.toHaveAttribute("data-today");
-    expect(dateSection()).not.toHaveTextContent("Today");
+    expect(today).toHaveTextContent("Today");
   });
 
   it("3 · the selected date carries the pale-blue full-row highlight; no other row does", () => {
@@ -211,21 +211,21 @@ describe("【WORK】 left rail · Date", () => {
     expect(listRows()).toHaveLength(1);
   });
 
-  it("5 · a zero count is not printed on a date or a module", () => {
+  it("5 · a zero count is printed on a date and a page — `0` is an answer (owner review 2026-09-25 items 19/22)", () => {
     workState.data = feed("2026-09-18", [item("2026-09-18", "delivery"), item("2026-09-18", "delivery")]);
     show();
-    expect(countOf(day(/^Mon, 14 Sep/))).toBeNull();
-    expect(countOf(day(/^Missed/))).toBeNull();
+    expect(countOf(day(/^Mon, 14 Sep/))).toBe("0");
+    expect(countOf(day(/^Missed/))).toBe("0");
     expect(countOf(day(/^Fri, 18 Sep/))).toBe("2");
     const modules = moduleSection();
-    expect(countOf(within(modules).getByRole("button", { name: /^Payment/ }))).toBeNull();
+    expect(countOf(within(modules).getByRole("button", { name: /^Payment/ }))).toBe("0");
     expect(countOf(within(modules).getByRole("button", { name: /^Delivery/ }))).toBe("2");
     expect(within(modules).getByRole("button", { name: /^Payment$/ })).toBeInTheDocument();
   });
 
-  it("6 · No working date appears only while it has work", () => {
+  it("6 · No working date is always listed, `0` included (owner review 2026-09-25 item 22)", () => {
     const first = show();
-    expect(within(dateSection()).queryByRole("button", { name: /^No working date/ })).toBeNull();
+    expect(countOf(within(dateSection()).getByRole("button", { name: /^No working date/ }))).toBe("0");
     first.unmount();
     workState.data = feed("2026-09-18", [item(null)]);
     show();
@@ -256,21 +256,21 @@ describe("【WORK】 left rail · Module", () => {
     ]);
     show("/operation?tab=work&day=missed");
     const modules = moduleSection();
-    const all = within(modules).getByRole("button", { name: /^All modules/ });
+    const all = within(modules).getByRole("button", { name: /^All pages/ });
     expect(countOf(all)).toBe("3");
     expect(countOf(within(modules).getByRole("button", { name: /^Delivery/ }))).toBe("2");
     expect(countOf(within(modules).getByRole("button", { name: /^Payment/ }))).toBe("1");
-    expect(countOf(within(modules).getByRole("button", { name: /^Purchasing/ }))).toBeNull();
+    expect(countOf(within(modules).getByRole("button", { name: /^Purchasing/ }))).toBe("0");
     expect(listRows()).toHaveLength(3);
 
     fireEvent.click(within(modules).getByRole("button", { name: /^Delivery/ }));
     expect(url().get("module")).toBe("delivery");
     expect(listRows()).toHaveLength(2);
-    expect(countOf(within(moduleSection()).getByRole("button", { name: /^All modules/ }))).toBe("3");
+    expect(countOf(within(moduleSection()).getByRole("button", { name: /^All pages/ }))).toBe("3");
     expect(countOf(within(moduleSection()).getByRole("button", { name: /^Payment/ }))).toBe("1");
     expect(within(moduleSection()).getByRole("button", { name: /^Delivery/ })).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(within(moduleSection()).getByRole("button", { name: /^All modules/ }));
+    fireEvent.click(within(moduleSection()).getByRole("button", { name: /^All pages/ }));
     expect(url().get("module")).toBeNull();
     expect(listRows()).toHaveLength(3);
   });
@@ -278,9 +278,9 @@ describe("【WORK】 left rail · Module", () => {
   it("module rows carry the name and count only — no icon on each row", () => {
     show();
     const rows = within(moduleSection()).getAllByRole("button");
-    expect(rows[0]).toHaveAccessibleName(/^All modules/);
+    expect(rows[0]).toHaveAccessibleName(/^All pages/);
     for (const row of rows) expect(row.querySelector("svg")).toBeNull();
-    expect(within(moduleSection()).getByRole("heading", { name: "Module" }).querySelector("svg")).not.toBeNull();
+    expect(within(moduleSection()).getByRole("heading", { name: "Page" }).querySelector("svg")).not.toBeNull();
     expect(within(dateSection()).getByRole("heading", { name: /^Date/ }).querySelector("svg")).not.toBeNull();
   });
 });
@@ -292,7 +292,7 @@ describe("【WORK】 left rail · URL and keyboard", () => {
     expect(day(/^Mon, 21 Sep/)).toBeInTheDocument();
     // The Date counts follow the chosen module; the Module counts do not.
     expect(day(/^Tue, 22 Sep · 1 action$/)).toHaveAttribute("aria-pressed", "true");
-    expect(countOf(within(moduleSection()).getByRole("button", { name: /^All modules/ }))).toBe("2");
+    expect(countOf(within(moduleSection()).getByRole("button", { name: /^All pages/ }))).toBe("2");
     expect(within(moduleSection()).getByRole("button", { name: /^Delivery/ })).toHaveAttribute("aria-pressed", "true");
     expect(listRows()).toHaveLength(1);
 
@@ -328,8 +328,13 @@ describe("【WORK】 left rail · URL and keyboard", () => {
       "Wed, 16 Sep · Malaysia Day",
       "Thu, 17 Sep",
       "Fri, 18 Sep · Today",
+      "Mon, 21 Sep",
+      "Tue, 22 Sep",
+      "Wed, 23 Sep",
+      "Thu, 24 Sep",
+      "Fri, 25 Sep",
       "No working date · 1 action",
-      "All modules · 1 action",
+      "All pages · 1 action",
       "Sales Orders",
       "Purchasing",
       "Receiving",

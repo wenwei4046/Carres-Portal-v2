@@ -242,6 +242,10 @@ export default function OperationWork() {
     );
   }, [filteredTeamItems, staffById]);
 
+  /* The whole team's open set, before any filter — the header's answer when
+     My Work is empty (owner review 2026-09-25 item 5). */
+  const teamTotal = teamGroups.reduce((n, g) => n + g.items.length, 0);
+
   const visibleTeamGroups = useMemo(
     () => (ownerFocus ? teamGroups.filter((g) => g.key === ownerFocus) : teamGroups),
     [teamGroups, ownerFocus],
@@ -268,7 +272,6 @@ export default function OperationWork() {
   const todoRows = inDaySet.filter((item) => workListTabOf(item) === "todo");
   const waitingRows = inDaySet.filter((item) => workListTabOf(item) === "waiting");
   const visible = listTab === "waiting" ? waitingRows : listTab === "completed" ? [] : todoRows;
-  const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
 
   /** Module counts ignore the module filter and nothing else: scope · owner ·
    *  search · the other filters · the current list. With all modules they add
@@ -317,8 +320,10 @@ export default function OperationWork() {
     return next;
   }, { replace: true });
   const emptyButton = "mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700";
+  /* The empty list is one white section that ends where its words end
+     (item 24), never a canvas-long blank. */
   const emptyBody = emptyState === "failed" ? null : (
-    <div className="text-body text-base-400 py-8" data-testid="work-empty">
+    <div className="rounded-work border border-work-line bg-white px-4 py-5 text-body text-base-400" data-testid="work-empty">
       {emptyState === "no_match" ? (
         <>
           <p>No work matches these filters</p>
@@ -334,7 +339,15 @@ export default function OperationWork() {
           ) : null}
         </>
       ) : (
-        <p>{activeView === "mine" ? "Nothing assigned to you" : "No open work — every track is clear."}</p>
+        <>
+          <p>{activeView === "mine" ? "Nothing assigned to you" : "No open work — every track is clear."}</p>
+          {activeView === "mine" && teamTotal > 0 ? (
+            /* The door out of an empty My Work (item 6 of the review). */
+            <button type="button" onClick={() => updateParam("scope", "team")} className={emptyButton} data-testid="work-empty-team-door">
+              See Team Work
+            </button>
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -397,7 +410,7 @@ export default function OperationWork() {
       : isWorkDate(selectedDay)
         ? fmtDate(selectedDay)
         : "Work";
-  const moduleWord = moduleFilter === "all" ? "All modules" : MODULE_LABEL[moduleFilter];
+  const moduleWord = moduleFilter === "all" ? "All pages" : MODULE_LABEL[moduleFilter];
 
   const card = (i: WorkRow) => (
     <WorkCard
@@ -417,8 +430,9 @@ export default function OperationWork() {
     />
   );
 
-  const dateSection = railDates ? (
+  const dateSectionFor = (compactStrip: boolean) => railDates ? (
     <WorkDateSection
+      compact={compactStrip}
       dates={railDates}
       selected={railSelected}
       onSelect={(key) => {
@@ -520,11 +534,14 @@ export default function OperationWork() {
       workspace
       actions={<TopBarIcons />}
       titleRight={
-        // Every count says WHAT it counts (card §7 — supersedes `open · overdue`).
-        <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[768px]:text-[13px] min-[768px]:leading-[18px]" data-testid="work-header-count">
-          {visible.length} action{visible.length === 1 ? "" : "s"} to do
-          {lateCount > 0 ? ` · ${lateCount} missed` : ""}
-        </span>
+        /* The list heading carries the count (owner review 2026-09-25 item 4);
+           the header speaks only when My Work is empty while the team is not
+           (item 5), so a new hire never reads `0` as a free day. */
+        activeView === "mine" && !loading && beforeDay.length === 0 && teamTotal > 0 ? (
+          <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[768px]:text-[13px] min-[768px]:leading-[18px]" data-testid="work-header-count">
+            0 for you · {teamTotal} for the team
+          </span>
+        ) : null
       }
     >
       <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
@@ -554,7 +571,8 @@ export default function OperationWork() {
                   aria-expanded={compact === "date"}
                   data-testid="work-compact-date"
                   onClick={() => setCompact((open) => (open === "date" ? null : "date"))}
-                  className={toolbarButton(compact === "date")}
+                  /* Only the chosen day is blue while the strip is open (item 3). */
+                  className={toolbarButton(false)}
                 >
                   <Icon name="date" />
                   {listHeading}
@@ -564,7 +582,7 @@ export default function OperationWork() {
                   aria-expanded={compact === "module"}
                   data-testid="work-compact-module"
                   onClick={() => setCompact((open) => (open === "module" ? null : "module"))}
-                  className={toolbarButton(compact === "module")}
+                  className={toolbarButton(false)}
                 >
                   <Icon name="modules" />
                   {moduleWord}
@@ -596,7 +614,7 @@ export default function OperationWork() {
                   }}
                   className={`h-[38px] px-3 text-control min-[768px]:h-[34px] max-[599px]:flex-1 ${
                     activeView === k
-                      ? "bg-kit-slate-12 font-semibold text-white"
+                      ? "bg-kit-blue-9 font-semibold text-white"
                       : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
                   }`}
                 >
@@ -606,7 +624,9 @@ export default function OperationWork() {
             </div>
           </div>
           <div className={toolbarRow} data-testid="work-toolbar-row-2">
-            <div className={layout === "one" ? "min-w-[160px] flex-1 max-[599px]:basis-full" : "w-60 shrink-0"}>
+            {/* Search is 240px beside `Covering for others` (item 8); only a
+                phone gives it the whole row. */}
+            <div className={layout === "one" ? "w-60 shrink-0 max-[599px]:w-auto max-[599px]:basis-full" : "w-60 shrink-0"}>
               <SearchInput
                 toolbar
                 id="work-search"
@@ -630,7 +650,7 @@ export default function OperationWork() {
               onClick={() => updateParam("covered", covered ? null : "1")}
               className={toolbarButton(covered)}
             >
-              Covered
+              Covering for others
             </button>
             {activeView === "team" && ownerFocus && (
               <button
@@ -662,7 +682,7 @@ export default function OperationWork() {
         {/* Below 768px the chosen compact control opens its section here. */}
         {layout === "one" && compact ? (
           <div className="shrink-0" data-testid={`work-compact-${compact}-panel`}>
-            {compact === "date" ? dateSection : moduleSection}
+            {compact === "date" ? dateSectionFor(true) : moduleSection}
           </div>
         ) : null}
 
@@ -673,7 +693,7 @@ export default function OperationWork() {
           rail={(
             <div id="work-filters">
               <WorkRail>
-                {dateSection}
+                {dateSectionFor(false)}
                 {moduleSection}
               </WorkRail>
             </div>
@@ -683,14 +703,17 @@ export default function OperationWork() {
               {/* The heading and tabs stay put; the cards scroll beneath them. */}
               <div className="shrink-0">
                 <h2 className="mb-2 flex min-h-6 flex-wrap items-baseline gap-x-1.5 text-[16px] font-semibold leading-[22px] text-work-ink" data-testid="work-list-heading">
-                  {listHeading}
-                  <span className="text-[13px] font-medium leading-[18px] text-work-muted">
+                  {/* Below 768px the toolbar's Date button already names the
+                      day, so the heading says only the count (item 25). */}
+                  {layout === "one" ? null : listHeading}
+                  <span className={layout === "one" ? "text-[16px] font-semibold leading-[22px] text-work-ink" : "text-[13px] font-medium leading-[18px] text-work-muted"}>
                     {todoRows.length} action{todoRows.length === 1 ? "" : "s"} to do
                   </span>
                 </h2>
+                {/* Every tab carries its number, `0` included (item 23). */}
                 <WorkListTabs
                   value={listTab}
-                  counts={{ todo: todoRows.length, ...(waitingRows.length > 0 ? { waiting: waitingRows.length } : {}) }}
+                  counts={{ todo: todoRows.length, waiting: waitingRows.length, completed: 0 }}
                   onChange={(tab) => updateParam("list", tab === "todo" ? null : tab)}
                 />
               </div>

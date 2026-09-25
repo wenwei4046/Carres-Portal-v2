@@ -237,9 +237,10 @@ export function TopBarIcons() {
           title="Help"
           aria-haspopup="menu"
           aria-expanded={open === "help"}
-          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="flex items-center gap-1.5 p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
           <HelpCircle size={18} />
+          <span className="hidden sm:inline text-meta">Help</span>
         </button>
         {open === "help" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg py-1">
@@ -327,9 +328,10 @@ export function TopBarIcons() {
           title="Settings"
           aria-haspopup="menu"
           aria-expanded={open === "settings"}
-          className="p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="flex items-center gap-1.5 p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
           <Settings size={18} />
+          <span className="hidden sm:inline text-meta">Settings</span>
         </button>
         {open === "settings" && (
           <div

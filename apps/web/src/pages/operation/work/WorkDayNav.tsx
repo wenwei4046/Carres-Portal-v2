@@ -32,8 +32,9 @@ function actions(count: number): string {
   return count > 0 ? ` · ${count} ${count === 1 ? "action" : "actions"}` : "";
 }
 
+/* Every row prints its number, `0` included (owner review 2026-09-25,
+   items 19/22): a missing number read as "not counted". */
 function Count({ value }: { value: number }) {
-  if (value <= 0) return null;
   return (
     <span data-rail-count className="shrink-0 text-meta tabular-nums text-kit-slate-11">
       {value}
@@ -46,7 +47,7 @@ function Section({ title, icon, right, children }: { title: string; icon: IconNa
   return (
     <section aria-labelledby={id} className="shrink-0 rounded-work border border-work-line bg-white">
       <div className="mx-3 flex h-12 items-center gap-2 border-b border-kit-slate-5">
-        <h2 id={id} className="flex items-center gap-2 text-strong text-kit-blue-11">
+        <h2 id={id} className="flex items-center gap-2 text-strong text-kit-slate-12">
           <Icon name={icon} />
           {title}
         </h2>
@@ -112,19 +113,70 @@ function DayBadge({ dayNumber, weekday, today }: { dayNumber: string; weekday: s
   );
 }
 
+/** One chip of the compact strip (below 768px): 40px tall, the count beside
+ *  the word, the chosen one blue — never a full-width row. */
+function Chip({ selected, label, onClick, children }: { selected: boolean; label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-label={label}
+      onClick={onClick}
+      className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-control border px-2.5 text-control ${FOCUS_RING} ${selected ? "border-kit-blue-9 bg-kit-blue-3 font-semibold text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function WorkDateSection({
   dates,
   selected,
   onSelect,
   onWeek,
+  compact = false,
 }: {
   dates: WorkRailDates;
   /** `missed` · `no_date` · one `YYYY-MM-DD`, or null when none is chosen. */
   selected: string | null;
   onSelect: (key: string) => void;
   onWeek: (monday: string) => void;
+  /** Below 768px: one horizontal strip of chips instead of the rows (owner
+   *  review 2026-09-25 item 2). */
+  compact?: boolean;
 }) {
   const arrow = `grid h-7 w-7 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12 ${FOCUS_RING}`;
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-work border border-work-line bg-white p-2.5" data-testid="work-date-strip">
+        <Chip selected={selected === "missed"} label={`Missed${actions(dates.missed)}`} onClick={() => onSelect("missed")}>
+          <Icon name="history" size={16} />Missed<Count value={dates.missed} />
+        </Chip>
+        {dates.days.map((day) => (
+          <span key={day.iso} className={`inline-flex items-center gap-2 ${day.weekStart ? "ml-2 border-l border-kit-slate-5 pl-2" : ""}`}>
+            <Chip
+              selected={selected === day.iso}
+              label={`${day.label}${day.holiday ? ` · ${day.holiday}` : ""}${day.today ? " · Today" : ""}${actions(day.count)}`}
+              onClick={() => onSelect(day.iso)}
+            >
+              <span className="tabular-nums">{day.dayNumber}</span>
+              <span className="text-label text-kit-slate-11">{day.weekday}</span>
+              {day.today ? <span className="text-label text-kit-blue-11">Today</span> : null}
+              <Count value={day.count} />
+            </Chip>
+          </span>
+        ))}
+        <Chip selected={selected === "no_date"} label={`No working date${actions(dates.noDate)}`} onClick={() => onSelect("no_date")}>
+          <Icon name="noDate" size={16} />No date<Count value={dates.noDate} />
+        </Chip>
+        <span className="ml-auto inline-flex items-center gap-1">
+          <button type="button" aria-label="Previous week" className={arrow} onClick={() => onWeek(dates.previousWeek)}><Icon name="previous" /></button>
+          <span className="text-meta font-medium text-kit-slate-11">{dates.month}</span>
+          <button type="button" aria-label="Next week" className={arrow} onClick={() => onWeek(dates.nextWeek)}><Icon name="forward" /></button>
+        </span>
+      </div>
+    );
+  }
   return (
     <Section
       title="Date"
@@ -151,30 +203,29 @@ export function WorkDateSection({
         Missed
       </Option>
       {dates.days.map((day) => (
-        <Option
-          key={day.iso}
-          selected={selected === day.iso}
-          // `Today` is a marker beside the printed date (COPY-STANDARD §Dates);
-          // on screen the blue badge carries it, so only the name says it.
-          label={`${day.label}${day.holiday ? ` · ${day.holiday}` : ""}${day.today ? " · Today" : ""}${actions(day.count)}`}
-          onClick={() => onSelect(day.iso)}
-          lead={<DayBadge dayNumber={day.dayNumber} weekday={day.weekday} today={day.today} />}
-          count={day.count}
-        >
-          {day.holiday}
-        </Option>
+        <div key={day.iso} className={day.weekStart ? "mt-1 border-t border-kit-slate-5 pt-1" : undefined}>
+          <Option
+            selected={selected === day.iso}
+            // `Today` is printed beside the day (owner review 2026-09-25 item 21).
+            label={`${day.label}${day.holiday ? ` · ${day.holiday}` : ""}${day.today ? " · Today" : ""}${actions(day.count)}`}
+            onClick={() => onSelect(day.iso)}
+            lead={<DayBadge dayNumber={day.dayNumber} weekday={day.weekday} today={day.today} />}
+            count={day.count}
+          >
+            {[day.today ? "Today" : null, day.holiday].filter(Boolean).join(" · ")}
+          </Option>
+        </div>
       ))}
-      {dates.noDate > 0 || selected === "no_date" ? (
-        <Option
-          selected={selected === "no_date"}
-          label={`No working date${actions(dates.noDate)}`}
-          onClick={() => onSelect("no_date")}
-          lead={<IconBox name="noDate" />}
-          count={dates.noDate}
-        >
-          No working date
-        </Option>
-      ) : null}
+      {/* Always shown, `0` included (owner review 2026-09-25 item 22). */}
+      <Option
+        selected={selected === "no_date"}
+        label={`No working date${actions(dates.noDate)}`}
+        onClick={() => onSelect("no_date")}
+        lead={<IconBox name="noDate" />}
+        count={dates.noDate}
+      >
+        No working date
+      </Option>
     </Section>
   );
 }
@@ -194,9 +245,9 @@ export function WorkModuleSection({
   onSelect: (module: OperationWorkModule | "all") => void;
 }) {
   return (
-    <Section title="Module" icon="modules">
-      <Option selected={selected === "all"} label={`All modules${actions(total)}`} onClick={() => onSelect("all")} count={total}>
-        All modules
+    <Section title="Page" icon="modules">
+      <Option selected={selected === "all"} label={`All pages${actions(total)}`} onClick={() => onSelect("all")} count={total}>
+        All pages
       </Option>
       {modules.map((module) => (
         <Option
