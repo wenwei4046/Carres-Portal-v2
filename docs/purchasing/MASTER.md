@@ -696,6 +696,16 @@ JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot f
 date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
 Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
 
+**Who may record a supplier answer — OWNER RULING (Jess, 2026-09-25) · NOT BUILT.** Any active
+Operation person may record what the supplier answered — on a PO (`Record supplier answer`) and on
+a Supplier Claim (`Record supplier reply`, §9.5) — because the holder may be on medical leave or the
+job not yet handed to the buddy. The record stores the actual recorder and server time as its own
+fact; normal PO Duty and any dated cover are shown and stored separately and are never rewritten
+by who recorded. This widens RECORDING only: issuing a PO, `Change Deliver To`, revising or
+cancelling a PO, and authorising a claim outcome stay with PO Duty, dated cover and the Operations
+Superuser (§5.3), because those are Carres commitments to the supplier. The Work occurrence still
+routes to PO Duty; anyone's recorded answer closes it.
+
 **Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The eight reasons
 above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
 Material Shortage · Transport Delay · Waiting Customer Confirmation · Factory Closed · Other).
@@ -4995,6 +5005,7 @@ are snapshots, not editable truth or a second settlement ledger.
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
+| Any active Operation person (owner ruling 2026-09-25) | record a supplier's answer on a PO or a supplier's reply on a Claim, with evidence; the recorder is stored as actual actor | issue, revise or cancel a PO; `Change Deliver To`; authorise a claim outcome; become the duty holder by recording |
 | Operations Superuser (`operation@carres.com` by its flag; Jess as a principal person — never the shared `principal@` login) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
