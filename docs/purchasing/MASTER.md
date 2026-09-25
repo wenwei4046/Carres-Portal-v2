@@ -7,7 +7,23 @@ control types, special schedules and business behavior; no page-local appearance
 
 
 Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29; Supplier Claims stock-claim boundary and Problems UX owner-approved 2026-09-14**
-Lane: **PLAN COMPLETE**
+Lane: **PLAN COMPLETE for the 2026-08-29 blueprint · PLAN / DESIGN IN PROGRESS 2026-09-25 (page-by-page UI review)**
+
+**RESUME HERE — handoff 2026-09-25 (office desktop → MacBook chat).** Owner approved, all on `main`:
+flows 1–5 (§5.6.1 PO windows · §5.7 per-item supplier answer + evidence + reasons + any-person
+recording · §5.4 `Change Deliver To` build boundary · §9.5 Claim reply recording · §9.6 Purchase
+Return creation door) and **page 1 — the PO object page composition (§9.3)**. Workspace §5.10/§6.1
+mirror every flow. **Pending owner `yes`:** flow 6 (Receiving/Stock → Claim; proposed in chat,
+not persisted). **Next, in order, one page at a time, UI-kit geometry and exact words, owner
+agreement before any Card:** page 2 SO Batch Purchase (window-scoped entry, pre-tick, toolbar) ·
+page 3 Supplier Claim record · page 4 Purchase Return document + send · page 5 Settings →
+Purchasing · page 6 Work right-panel Purchasing cards (Workspace template) · page 7 Stock Unit
+Detail `Report a problem` (Stock lane). Cards are authored only after the owner agrees every
+page; recommended Card order A Settings · B shared send ledger · C PO window Work + SO Batch ·
+D per-item answer + day-before Work · E Change Deliver To · F Claim reply → decision → PRTN.
+Restart prompt: `Purchasing — PLAN / DESIGN, page-by-page UI review. Read CLAUDE.md, this
+RESUME block, UI MASTER §4.1/§6.7–6.10, tokens; continue at the next unapproved page; persist
+each owner-approved page to this MASTER + COPY + Workspace before moving on.`
 
 This file is the only canonical Purchasing Blueprint. It owns Purchasing and the governed
 Purchasing → Receiving seam. Receiving owns its physical-receipt workspace and GRN facts under
@@ -2924,6 +2940,52 @@ sideways under the pinned `PO Date · PO No` (`PO No` alone below 768px) rather 
 column. **Owed:** the same measurement signed in on production, where JetBrains Mono renders
 document numbers wider than the fixture font.
 
+**PO OBJECT PAGE COMPOSITION — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The page a PO
+number opens. It follows UI MASTER §4.1 (Object Header → one scroll; tabs only `Document ·
+Revisions · History · Order Route`; viewing never splits, `Edit` does) and shares the Portal shell
+(sidebar + content + right rail); it has no local filter rail. Measured on `main` before this
+ruling: the reply form was one date per PO, the send area appeared only in issue/edit mode, no
+"what to do now" block existed, `Status` and `PO Version` split one state across two facts, the
+PDF sat in a right pane during viewing, and `Change Deliver To` had no door.
+
+```text
+Object Header · 50px   ← Purchase Orders   PO260925-4827(1) · Ohana   {state word}
+                       [Download PDF] [Edit ▾]  ‹ i of n ›     Document · Revisions · History · Order Route
+CURRENT ACTION         [avatar] fact line (15/600) · action line (11 slate-11)
+                       [Copy message] [Open WhatsApp group]      [ONE primary button]
+Purchase order         Supplier · Supplier Deliver To · Source · PO Doc Date · PO {n}-Day Delivery Date ·
+                       Sent (PO sent to supplier · channel · time · actor / Sending not confirmed)
+Goods lines            Item · Qty · Deliver To · Unit ID · Supplier Confirmed Delivery Date (per batch)
+Receiving              connected GRNs, read-only doors
+Claims and returns     connected records, read-only doors
+Document               the current version's PDF, full width, last
+```
+
+- **One primary button, and it is the Work sentence.** `CURRENT ACTION` prints the same fact/action
+  lines the Work card prints (§8.3, Workspace §5.10) and hosts the one governed act for the PO's
+  state: `Sending not confirmed` → `PoIssueEvidence`; day-before → `Record supplier answer`;
+  date passed → `Ask {Supplier} when the goods will arrive`; short receipt → `Ask {Supplier} for the
+  balance delivery date`. Waiting with nothing due prints `Nothing to do until {date}` and no
+  button. `Completed` / `Cancelled` hide the block. Recording buttons are open to any Operation
+  person (§5.7); issue/edit buttons follow §5.3 and say `Only PO Duty can issue POs` otherwise.
+- **State lives in the header**, next to `number · party`, in the §5.8 vocabulary; the `Status`
+  and `PO Version` facts are retired from the fact grid; the version is the number's `(n)` and the
+  send record is the `Sent` fact.
+- **`Edit ▾`** holds `Revise quantity or Deliver To` · `Change Deliver To` (§5.4) · `Cancel purchase
+  order` last (destructive). Each opens the 50/50 edit split; `Record supplier answer` opens the
+  560px right panel of §5.7 instead.
+- **Geometry (tokens only):** header 50px, title `text-page`, state `text-body` slate-11; view strip
+  36px with a 2px blue-9 underline; blocks white, 1px slate-5, `rounded-card`, 16px padding, 24px
+  between blocks; fact grid two columns of 40px rows (label `text-label` slate-11, value
+  `text-body`), one column ≤820; goods table §6.8 two-line 54px rows; buttons md 32px, exactly one
+  blue-9; focus ring 2px; touch ≥40px.
+- **Widths:** 1440 content ≤1280, goods table fits; 1180 goods table scrolls under a pinned `Item`;
+  820 single-column facts, header actions on a second row, panel full width; 743 view strip
+  scrolls; 390 everything single column, `‹ i of n ›` inside `⋮`, 40px full-width primary, PDF
+  becomes `Open PDF`.
+- **Words:** all existing (§5.8, COPY Purchasing dictionary) plus `Nothing to do until {date}` and
+  the menu item `Revise quantity or Deliver To`.
+
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
@@ -4143,9 +4205,12 @@ Completion:   supplier_response stored with scope, date and evidence; the Work o
   the seed for the day-before check and any RO/PRTN) · `Evidence` (the shared uploader: photo, video,
   PDF; a phone answer records who spoke, what and when) · `Note` (required for `Reject` and `Other
   agreement`). `POST /:id/response` is extended with scope, date and evidence; no parallel endpoint.
-- **Timing (§9.5 "2 + 2", now stated):** `Reply expected` = ask + **2** Office working days; **2**
-  more without a reply escalates to supervision. Both numbers are `Settings → Purchasing → Supplier
-  claims` values with those starting values — they exist nowhere today.
+- **Timing:** the owner-approved / LOCKED 2026-09-06 rule below (`Reply waiting days` = 2 ·
+  `Extra days before escalation` = 2, Office working days, `Settings → Purchasing → Supplier
+  Claims`). `Reply expected` = ask + `Reply waiting days`; the extra days raise Purchasing Approver
+  decision work while PO Duty keeps the chase. The two settings are APPROVED TARGET / NOT BUILT —
+  no code or table holds them today. (Corrected 2026-09-25: an earlier line here invented other
+  setting names.)
 - **Who:** any active Operation person records; the recorder is stored (§5.7 ruling). Authorised
   Outcome stays PO Duty/cover/superuser.
 - **Sending evidence (`Claim sent · {channel} · {recipient} · {time} · {actor}`)** needs the
