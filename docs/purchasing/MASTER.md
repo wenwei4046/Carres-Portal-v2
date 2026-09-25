@@ -882,6 +882,10 @@ request has one; CO, RO and other documents keep their own numbers. Historical `
 
 ### 6.2 Unit ID
 
+**Labels are printed at the warehouse — owner ruling 2026-09-25 (Stock §3, APPROVED TARGET / NOT
+BUILT).** The PO object gains `Print Unit ID labels` (one 50 × 30 mm QR label per minted Unit ID);
+suppliers are not required to label. Purchasing mints the IDs; the label is only their carrier.
+
 The locked human-readable format is:
 
 ```text

@@ -94,10 +94,19 @@ counted goods; `null` prints `—`. A counted row cannot be reached by scanning,
 ever printed for it.
 Receiving verifies the identities Purchasing issued and never creates, replaces or renumbers one.
 
-The supplier currently adds `CARRES UNIT ID: U1-000-001` only to its own package label. A supplier
-physical-Unit label, QR, barcode and Carres template are not required now. Carres Operations attaches
-the same text ID to the physical Unit at the showroom. Future supplier labelling or QR/barcode is
-only a carrier for the same Unit ID. A wrong or unreadable label starts a controlled issue, never a
+**THE WAREHOUSE PRINTS AND STICKS THE LABEL — owner ruling 2026-09-25, APPROVED TARGET / NOT
+BUILT.** Suppliers do not label Units yet, so the label is applied at receipt, exactly as serial
+capture at goods receipt works in SAP/Dynamics. `Print Unit ID labels` on the PO and on the Inbound
+row produces one label per Unit ID for a thermal label printer (50 × 30 mm roll; the warehouse buys
+a Brother QL / TSC / Zebra class printer, ~RM 400–900 once, labels ~3 sen each): a QR code holding
+only the Unit ID, `CARRES UNIT ID` small, `U1-000-091` large (readable at 2 m), the item name small.
+QR, not a barcode — smaller and any phone camera reads it. Two labels per Unit: one on the packaging
+(scanned at receipt) and one on the goods themselves (the packaging is thrown away). Receiving lists
+the PO's expected Unit IDs; which identical piece gets which ID does not matter — the receiver sticks
+a label, ticks `Received`, and that label is what every later scan reads. A NETS login may print
+labels (printing changes no record). The Receiving and Loading scan boxes accept the phone camera
+reading the QR as well as typed input. When a supplier later prints `CARRES UNIT ID: U1-000-001`
+on its own packaging, the receiver only verifies; the screens do not change. A wrong or unreadable label starts a controlled issue, never a
 second Unit. Replacement labels keep the original ID and full evidence.
 
 Every active Unit has Catalog identity, source order, ownership, **Where**, **Who has it**,
@@ -391,7 +400,10 @@ column, and previous/next page the whole week at every width. The date sequence 
 projection's; this law fixes presentation only and hardcodes no weekday.
 
 Cards preserve the owning document and Site, use quiet Expected/Scheduled badges, and show real
-loading separately from driver acceptance. Delayed and undated work stays reachable under its real
+loading separately from driver acceptance. **A card names its Units — owner ruling 2026-09-25:** one
+to three exact Units print their Unit IDs on the card (`U1-000-082 · U1-000-083 · U1-000-084`);
+more than three print `{n} Units` and the IDs are on the Inbound/Outbound row; counted goods print
+`{item} ×{qty}`. A pickup card prints `Pickup By {company}`. Delayed and undated work stays reachable under its real
 dates; no automatic rescheduling occurs.
 
 The daily journey is: open the appropriate schedule, follow its exact Inbound or Outbound entry,
