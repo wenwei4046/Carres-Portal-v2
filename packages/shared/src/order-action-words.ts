@@ -75,6 +75,10 @@ export type OrderActionKey =
 /** The real names this order knows. Absent / blank → the role word. */
 export interface OrderActionParties {
   supplier?: string | null;
+  /** `Confirm tomorrow's supplier delivery` — the PO the Supplier DO is for,
+   *  and the supplier's recorded channel (Purchasing §5.7, owner 2026-09-25). */
+  poNo?: string | null;
+  channel?: "whatsapp" | "email" | "phone" | "in_person" | null;
   logistics?: string | null;
   customer?: string | null;
   /** `Confirm delivery date` — the DAY is agreed and only the WINDOW is
@@ -570,10 +574,17 @@ const PURCHASING_ONLY: Record<
     // P3 · §3's "the action the portal is missing today". The day before the
     // goods are due, somebody asks the factory whether the van goes tomorrow —
     // and that is when they say it will be late.
+    // Owner wording 2026-09-25 (Purchasing §5.7): the card says which app to
+    // click and what to ask for — the Supplier DO for THIS PO — by the
+    // supplier's recorded channel. No channel on file: just ask.
     queue: "Confirm tomorrow's delivery",
-    line: (p) =>
-      `Call ${party(p.supplier, "supplier")} — confirm tomorrow's delivery`,
-    button: "Record answer",
+    line: (p) => {
+      const ask = `ask ${party(p.supplier, "the supplier")} for the Supplier DO for ${party(p.poNo, "the PO")}`;
+      return p.channel === "whatsapp" ? `Click WhatsApp, ${ask}`
+        : p.channel === "email" ? `Click Email, ${ask}`
+        : ask.charAt(0).toUpperCase() + ask.slice(1);
+    },
+    button: "Record supplier answer",
     done: "Answer recorded",
     empty: "Nothing arriving tomorrow.",
   },

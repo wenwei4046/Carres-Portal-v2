@@ -326,6 +326,10 @@ export function purchaseOrderArrivalCheckWorkItems(
      *  the call reopens — that rule lives in `tomorrowDeliveryCallOf`. */
     tomorrowAnswerAboutDateIso: string | null;
     lines: readonly { qty: number; receivedQty: number }[];
+    /** 0587 · the card names the PO the Supplier DO is for, by the supplier's
+     *  recorded channel (owner wording 2026-09-25). */
+    poNo?: string | null;
+    channel?: "whatsapp" | "email" | "phone" | "in_person" | null;
   },
   owner: WorkspaceDutyResolution | null,
   today: string,
@@ -365,6 +369,8 @@ export function purchaseOrderArrivalCheckWorkItems(
      * name is missing. */
     action: purchasingActionLine("confirm_tomorrows_delivery", {
       supplier: input.supplierName,
+      poNo: input.poNo ?? input.id,
+      channel: input.channel ?? null,
     }),
     ownerRule: "po_duty",
     ownerDutyKey: "po_duty",

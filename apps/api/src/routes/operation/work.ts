@@ -53,7 +53,7 @@ import {
   workLifecycleOf,
   workOccurrenceEventSchema,
   workOccurrenceGenerationId,
-  effectivePoArrivalOf,
+  poExpectedArrivalsOf,
   parseWorkOccurrenceId,
   type OperationWorkCompleted,
   workReplyDueOn,
@@ -419,7 +419,7 @@ interface PurchaseOrderWorkSource {
     duty_name?: string | null;
     acting_name?: string | null;
   }>;
-  purchase_order_lines: Array<{ qty: number; received_qty: number }>;
+  purchase_order_lines: Array<{ id?: string; qty: number; received_qty: number }>;
 }
 
 export function projectPurchaseOrderReplyWork(input: {
@@ -495,46 +495,60 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
   const holidays = myHolidaySet();
   return input.pos.flatMap((po) => {
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
-    /* Owner ruling 2026-09-24 (Purchasing MASTER §5.7): the check opens one
-       Office working day before the EFFECTIVE arrival — the latest evidenced
-       answer on the current version, else the original PO Delivery Date —
-       never our own planning estimate. It closes only on the Supplier DO or an
-       evidenced confirmation for THAT date and the PO's own Warehouse. The
-       open/late arithmetic stays `tomorrowDeliveryCallOf`'s (Law D). */
+    /* Owner ruling 2026-09-24 / 2026-09-25 (Purchasing MASTER §5.7): the check
+       opens one Office working day before EACH expected arrival — one
+       occurrence per line / split batch date (`poExpectedArrivalsOf`, the same
+       ladder the SQL and the Register read) — never our own planning estimate.
+       It closes only on the Supplier DO or an evidenced confirmation for THAT
+       date and the PO's own Warehouse. The open/late arithmetic stays
+       `tomorrowDeliveryCallOf`'s (Law D). */
     const version = po.version ?? 1;
-    const effective = effectivePoArrivalOf({
+    const lines = po.purchase_order_lines.map((line, i) => ({
+      id: line.id ?? `${po.id}#${i}`, qty: line.qty, receivedQty: line.received_qty,
+    }));
+    const arrivals = poExpectedArrivalsOf({
       version,
       officialDeliveryDate: po.official_delivery_date ?? null,
       etaDate: po.eta_date ?? null,
       promises: (po.promises ?? []) as never,
+      lines,
     });
-    const confirmedFor = effective && (po.arrival_confirmations ?? []).some((c) =>
-      c.po_version === version && c.for_date === effective && !!po.destination_id && c.destination_id === po.destination_id)
-      ? effective
-      : null;
-    const items = purchaseOrderArrivalCheckWorkItems({
-      id: po.id,
-      supplierId: po.supplier_id,
-      supplierName,
-      status: po.status,
-      etaDateIso: effective,
-      tomorrowAnswerAboutDateIso: confirmedFor,
-      lines: po.purchase_order_lines.map((line) => ({
-        qty: line.qty,
-        receivedQty: line.received_qty,
-      })),
-    }, input.poDuty, input.today, holidays);
-    return items.map((item) => operationWorkItemFromProjection(item, {
-      object: { kind: "purchase_order", id: po.id, label: po.id },
-      problem: "The goods are expected and the supplier has not confirmed the day",
-      recipient: supplierName,
-      requiredResult: "Supplier DO or evidenced confirmation for this date and Warehouse recorded",
-      destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
-      today: input.today,
-      // One occurrence per effective date: a delay retires this date's check
-      // and derives a new one for the new date.
-      occurrenceKey: effective,
-    }));
+    const dates = [...new Set(arrivals.map((a) => a.arrival))].sort();
+    /* The supplier's recorded channel: the one the current version was sent on. */
+    const currentSend = (po.sends ?? []).find((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === version);
+    const channel = currentSend?.channel === "whatsapp" || currentSend?.channel === "email" ? currentSend.channel : null;
+    return dates.flatMap((date) => {
+      const confirmedFor = (po.arrival_confirmations ?? []).some((c) =>
+        c.po_version === version && c.for_date === date && !!po.destination_id && c.destination_id === po.destination_id)
+        ? date
+        : null;
+      const batchLines = arrivals.filter((a) => a.arrival === date).map((a) => ({ qty: a.qty, receivedQty: 0 }));
+      const items = purchaseOrderArrivalCheckWorkItems({
+        id: po.id,
+        supplierId: po.supplier_id,
+        supplierName,
+        status: po.status,
+        etaDateIso: date,
+        tomorrowAnswerAboutDateIso: confirmedFor,
+        lines: batchLines,
+        poNo: po.id,
+        channel,
+      }, input.poDuty, input.today, holidays);
+      return items.map((item) => operationWorkItemFromProjection(item, {
+        object: { kind: "purchase_order", id: po.id, label: po.id },
+        /* The card's own date badge and party line carry the date and the
+           supplier; the fact names the obligation (Purchasing §5.7 wording). */
+        problem: "Confirm tomorrow's supplier delivery",
+        recipient: supplierName,
+        requiredResult: "Supplier DO or evidenced confirmation for this date and Warehouse recorded",
+        destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
+        today: input.today,
+        // One occurrence per expected arrival: a delay retires this date's
+        // check and derives a new one for the new date; a split derives one
+        // per batch.
+        occurrenceKey: date,
+      }));
+    });
   });
 }
 
@@ -862,7 +876,11 @@ export function receivingWorkSourceFromModuleFacts(data: {
     status: string;
     supplier_id: string | null;
     eta_date: string | null;
-    purchase_order_lines?: Array<{ qty: number; received_qty: number }>;
+    version?: number | null;
+    official_delivery_date?: string | null;
+    promises?: unknown[];
+    sends?: Array<{ kind?: string | null; po_version?: number | null }>;
+    purchase_order_lines?: Array<{ id?: string; qty: number; received_qty: number }>;
   }>;
   suppliers: Array<{ id: string; name: string | null }>;
 }): ReceivingWorkSource {
@@ -879,18 +897,34 @@ export function receivingWorkSourceFromModuleFacts(data: {
       })),
     arrivalsDue: data.pos
       .filter((row) => row.status === "open")
-      .map((row) => ({
-        po_id: row.id,
-        supplier_name: row.supplier_id
-          ? (supplier.get(row.supplier_id) ?? null)
-          : null,
-        eta_date: row.eta_date,
-        pending_qty: (row.purchase_order_lines ?? []).reduce(
-          (total, line) =>
-            total + Math.max(0, Number(line.qty) - Number(line.received_qty)),
-          0,
-        ),
-      })),
+      /* Purchasing §9.4 / Blueprint segment 2 (2026-09-25): a PO the supplier
+         never received cannot arrive. Only a PO whose CURRENT version is marked
+         `PO sent to supplier` derives an arrival; outstanding quantity alone
+         never makes a row. */
+      .filter((row) => (row.sends ?? []).some((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === (row.version ?? 1)))
+      .map((row) => {
+        const lines = (row.purchase_order_lines ?? []).map((line, i) => ({
+          id: line.id ?? `${row.id}#${i}`, qty: Number(line.qty), receivedQty: Number(line.received_qty),
+        }));
+        /* The EARLIEST expected arrival (per line / batch) — the same ladder
+           the day-before check and the Register read — never the planning
+           estimate alone. */
+        const arrivals = poExpectedArrivalsOf({
+          version: row.version ?? 1,
+          officialDeliveryDate: row.official_delivery_date ?? null,
+          etaDate: row.eta_date,
+          promises: (row.promises ?? []) as never,
+          lines,
+        });
+        return {
+          po_id: row.id,
+          supplier_name: row.supplier_id
+            ? (supplier.get(row.supplier_id) ?? null)
+            : null,
+          eta_date: arrivals.map((a) => a.arrival).sort()[0] ?? row.eta_date,
+          pending_qty: lines.reduce((total, line) => total + Math.max(0, line.qty - line.receivedQty), 0),
+        };
+      }),
   };
 }
 
@@ -1169,7 +1203,10 @@ export function projectReceivingWork(input: {
         id: item.receiptId ?? item.poId,
         label: item.poId,
       },
-      problem: "Goods arrived · GRN not posted",
+      /* A submitted Warehouse count means goods ARRIVED. A passed supplier
+         date with nothing counted means only that the date passed — the card
+         never claims an arrival nobody recorded (Blueprint segment 2). */
+      problem: item.receiptId ? "Goods arrived · GRN not posted" : "Supplier date passed · nothing received yet",
       recipient: supplier,
       requiredResult: "GRN posted",
       destination: item.receiptId

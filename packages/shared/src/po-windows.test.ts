@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   effectivePoArrivalOf,
+  poExpectedArrivalsOf,
   poDateForIssue,
   poWindowFor,
   poWindowCalendarOf,
@@ -97,6 +98,32 @@ describe("effectivePoArrivalOf — one definition of the effective arrival", () 
   });
   it("an unknown original falls back to the live planning date", () => {
     expect(effectivePoArrivalOf({ version: 1, officialDeliveryDate: null, etaDate: "2026-10-09", promises: [] })).toBe("2026-10-09");
+  });
+});
+
+describe("poExpectedArrivalsOf — one expected arrival per line / batch (0587)", () => {
+  const evidenced = { kind: "tomorrow_delivery", po_version: 1, channel: "whatsapp", recipient: "g", evidence: "PO-1/a.png", reported_by: "Ah Hock", reported_at: "2026-09-20T02:00:00Z", recorded_by: "u", recorded_at: "2026-09-20T02:05:00Z", about_date: "2026-10-12", previous_date: null, reason: null, answer: "confirmed" };
+  const lines = [{ id: "L1", qty: 4, receivedQty: 0 }, { id: "L2", qty: 2, receivedQty: 0 }, { id: "L3", qty: 1, receivedQty: 1 }];
+  it("no answer → every open line arrives on the original; a received line is absent", () => {
+    expect(poExpectedArrivalsOf({ version: 1, officialDeliveryDate: "2026-10-12", etaDate: null, promises: [], lines })).toEqual([
+      { poLineId: "L1", qty: 4, arrival: "2026-10-12", answer: null, reason: null },
+      { poLineId: "L2", qty: 2, arrival: "2026-10-12", answer: null, reason: null },
+    ]);
+  });
+  it("a line's newest answer group gives its batches; a line without one takes the PO-level answer; the PO-level arrival is the LAST", () => {
+    const promises = [
+      { ...evidenced, new_date: "2026-10-16", answer: "delayed", reason: "Transport delay", recorded_at: "2026-09-19T00:00:00Z" },
+      { ...evidenced, po_line_id: "L1", about_qty: 3, answer_group: "g1", new_date: "2026-10-12" },
+      { ...evidenced, po_line_id: "L1", about_qty: 1, answer_group: "g1", new_date: "2026-10-19", answer: "delayed", reason: "Partial quantity ready" },
+      { ...evidenced, po_line_id: "L1", about_qty: 4, answer_group: "g0", new_date: "2026-10-30", answer: "delayed", reason: "Other", recorded_at: "2026-09-18T00:00:00Z" },
+    ];
+    const po = { version: 1, officialDeliveryDate: "2026-10-12", etaDate: null, promises, lines };
+    expect(poExpectedArrivalsOf(po)).toEqual([
+      { poLineId: "L1", qty: 3, arrival: "2026-10-12", answer: "confirmed", reason: null },
+      { poLineId: "L1", qty: 1, arrival: "2026-10-19", answer: "delayed", reason: "Partial quantity ready" },
+      { poLineId: "L2", qty: 2, arrival: "2026-10-16", answer: "delayed", reason: "Transport delay" },
+    ]);
+    expect(effectivePoArrivalOf(po)).toBe("2026-10-19");
   });
 });
 
