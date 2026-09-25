@@ -104,22 +104,19 @@ Every active Unit has Catalog identity, source order, ownership, **Where**, **Wh
 condition, calculated availability, reservation connection, last verified date, evidence and
 append-only history.
 
-| Where (Site) | Who has it |
+| Stock Location | Meaning |
 |---|---|
-| Carres Klang Warehouse | Carres Klang |
-| PJ Showroom | PJ Showroom |
-| On the way to PJ Showroom | NETS |
-| AL Sungai Buloh · HOUZS Balakong | AL · HOUZS |
-| selected JB partner warehouse | JB partner |
-| On the way to the Singapore customer | EU or SSY |
+| `Carres Klang` | inside Carres's own Klang warehouse (NETS operates it; NETS is never printed as the place) |
+| `PJ Showroom` | inside the showroom |
+| `With NETS Delivery` | the driver has taken the goods and no Site has received them yet |
+| `AL Sungai Buloh` · `HOUZS Balakong` | inside a partner Site |
+| the selected JB partner warehouse · EU or SSY on the Singapore leg | partner custody on a Journey leg |
 
-**Owner correction 2026-09-25: Carres Klang Warehouse is Carres's own Site and NETS only operates
-it.** `Who has it` is who is responsible for the goods, printed short and clear: the Carres place itself
-(`Carres Klang` · `PJ Showroom`) while the Unit is inside a Carres-owned Site, the logistics company
-(`NETS`) only once its driver has taken the goods, and the partner (`AL` · `HOUZS`) inside a partner
-Site. A Carres warehouse never prints `NETS`, even though NETS operates it.
-`Operated by NETS` is a Warehouse Settings fact about the Site, never a holder value on a Unit. NETS
-is not a Site. Site, operating party and role are separate. Independently saleable or
+**Owner correction 2026-09-25: there is no `Who has it` fact on screen.** Carres owns the goods and
+sells them to the customer; the one place column `Stock Location` (COPY-STANDARD's existing heading
+and place words) already says where the Unit stands and, on the road, that the driver has it.
+Ownership (`Carres Owned` · `Supplier Consignment`) is a separate optional column. `Operated by NETS`
+is a Warehouse Settings fact about the Site, never a value on a Unit. NETS is not a Site. Independently saleable or
 replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
 Missing required modules, components or packages prevents Ready stock eligibility.
 
@@ -616,13 +613,14 @@ arrival as physical Stock.
 Inventory is the one current list. Its left rail filters the same Unit authority:
 
 ```
-STOCK                         WHO HAS IT               OWNERSHIP
-All Stock                     NETS Warehouse           Carres Owned
-Reserved for Sales Orders     NETS Delivery            Supplier Consignment
-Ready Stock                   PJ Showroom
-Showroom Display              Other outlets            CONTROL
-Service Case                                            Counts & Adjustments
-Needs checking                                          History
+STOCK                         OWNERSHIP                CONTROL
+All stock                     Carres Owned             Counts & Adjustments
+Reserved                      Supplier Consignment     History
+Ready Stock
+Showroom Display
+Service Case
+Needs checking
+Available · Damaged · In repair · In transit · Incoming   (physical-state rows, same group)
 ```
 
 The dated work strip remains above the Register. For the selected actual date it shows only the
@@ -635,7 +633,7 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-Unit ID · Product · Stock use · Who has it · SO No · SO date ·
+Unit ID · Product · Stock use · Stock Location · SO No · SO date ·
 PO/Source No · PO/Source date · Received
 ```
 
@@ -673,13 +671,11 @@ screen shows fifteen.
 
 **THE WORDS IN `Stock use`, `Site` AND `Who has it` — owner rulings 2026-09-25.**
 
-- `Site` joins the default columns directly after `Stock use`: the PLACE (`Carres Klang Warehouse`
-  · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`), or `On the way to {destination}` while
-  the Unit is in transit. `Who has it` is the ORGANISATION responsible for the goods, printed as its
-  own actual name and nothing more — `Carres Klang` / `PJ Showroom` inside a Carres-owned Site, `NETS`
-  once the driver has taken the goods, `AL` / `HOUZS` inside a partner Site (owner correction
-  2026-09-25: Klang is Carres's; NETS only operates it and is never printed as the warehouse). No role word is glued onto a party name (`NETS Warehouse` ·
-  `NETS Delivery` are retired as printed values). Site, party and role stay separate facts (§3).
+- `Stock Location` joins the default columns directly after `Stock use` and replaces `Who has it`
+  (owner correction 2026-09-25). It prints COPY-STANDARD's existing place words — `Carres Klang` ·
+  `PJ Showroom` · `With NETS Delivery` · `AL Sungai Buloh` · `HOUZS Balakong` — and never a holder,
+  role or carrier-as-place word. The rail has no `WHO HAS IT` group; it is `STOCK · OWNERSHIP ·
+  CONTROL`.
 - `Stock use` prints one plain word for what the Unit can do now: `Available` (can be promised) ·
   `Reserved` (bound to the Sales Order in `SO No`; `Reserved / sold` is retired — a sold Unit is
   delivered and lives in History) · `In transit` · `Incoming` (never in the default list). A Unit
