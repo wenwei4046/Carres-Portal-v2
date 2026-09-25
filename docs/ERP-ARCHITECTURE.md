@@ -290,7 +290,8 @@ SUPPLY CHAIN
 │       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
-│   ├── Monitor
+│   ├── Arrival Schedule
+│   ├── Pickup Schedule
 │   ├── Inbound
 │   ├── Inventory
 │   └── Outbound

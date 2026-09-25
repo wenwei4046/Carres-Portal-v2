@@ -630,6 +630,26 @@ is a gate. The UI offers the `Receive` control on exactly the same global answer
 server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
 decision and is not assumed here.**
 
+**EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT.**
+Receiving is never blocked because the GRN Duty holder is on MC or busy: every active Carres
+Operation staff member (and the Principal) sees `Receive` on the row and may post a receipt. GRN Duty
+still OWNS the Work card (`Receive the goods`) and its lateness; the actual receiver is recorded on
+the GRN as the person who did it, and the two identities stay separate (Architecture Law F: owner
+and capability are different facts). `Not your duty today` is retired as a refusal on Inbound; the
+only refusals left are `No Site linked` and a Site that is not a Carres or transit Site. Warehouse
+Settings → `Access` shows this as `Receive goods · Everyone in Operation` by default, with the option
+to narrow it later. The database gate `receiving_require_post_authority` (GRN Duty · cover ·
+Operations Superuser) is overwritten by this ruling and must widen to active Operation staff in the
+same build.
+
+**SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
+BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres
+showroom · Logistics transit point) · Operated by · Full address · Active` and offers `Add Site`.
+`PJ Showroom` (Carres showroom, operated by Carres) is added first; `HOUZS Penang` is added the day
+it is used. `Access` keeps `Manage Warehouse Settings` and `Receive goods` only; `Perform stock
+count` and `Confirm collection from Warehouse` return when Counts and NETS logins are built — no
+switch for a capability that does not exist.
+
 **COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
 mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of
 a gap that does not exist. Only an `exact_unit` scope missing its minted identities is incomplete,

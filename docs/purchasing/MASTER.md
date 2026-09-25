@@ -1047,8 +1047,9 @@ formal Receiving Record number and exists from the posted session; a draft/submi
 formal GRN.
 
 Normal GRN Duty, dated cover and actual actor remain separate evidence. Jess and the governed
-Operations Superuser may perform the operational act without becoming GRN Duty. An ordinary person
-outside duty/cover/capability is refused by the same web, API and SQL authority.
+Operations Superuser may perform the operational act without becoming GRN Duty. **Owner ruling 2026-09-25 (Stock §7): every active Operation staff member may post a
+receipt** — receiving is never blocked by the GRN Duty holder's absence; GRN Duty keeps the Work
+card, the GRN records the actual receiver. The former duty/cover-only refusal is overwritten.
 
 The user-facing gate uses two lines:
 
