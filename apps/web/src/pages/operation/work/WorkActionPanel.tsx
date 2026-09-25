@@ -29,7 +29,8 @@ export default function WorkActionPanel({
   /** The mission's party cards carry the result; the summary stays compact. */
   hasParties?: boolean;
 }) {
-  const action = `${item.action}${item.recipient ? ` · ${item.recipient}` : ""}`;
+  /* The party is said once: `Call AL Logistics`, never `Call AL Logistics · AL Logistics`. */
+  const action = `${item.action}${item.recipient && !item.action.includes(item.recipient) ? ` · ${item.recipient}` : ""}`;
   const owningForm = item.interaction.mode === "embedded" && item.interaction.componentKey === "delivery.proof_review"
     ? <DeliveryProofReviewWork doNumber={item.object.id} />
     : null;
