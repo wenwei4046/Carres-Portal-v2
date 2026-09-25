@@ -633,7 +633,7 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-PO Doc Date · Goods Received Date · Handed over · Unit ID · Item · Inventory Status · Condition ·
+PO Doc Date · Goods Received Date · Handed over · Unit ID · Item · Inventory Status · Stock Condition ·
 Stock Location · Logistics · Delivery Location · SO Date · SO No · PO No / Ref No
 ```
 
@@ -684,7 +684,7 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 | `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
 | `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
-| `Condition` | the physical state, the stock picker's existing head: `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
+| `Stock Condition` | the physical state (owner rename 2026-09-25; the stock picker's `Condition` head follows so the portal keeps one word): `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
 | `Stock Location` | the Carres or partner Site the Unit stands in or last stood in: `Carres Klang` · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`. Never a company, never NETS | — |
 | `Logistics` | the company whose driver took the goods (`NETS` · `AL` · `HOUZS`); filled only after OUT | blank |
 | `Delivery Location` | where the goods are going (the DO's customer address, or the next Site on a Journey leg); filled only after OUT | blank |
