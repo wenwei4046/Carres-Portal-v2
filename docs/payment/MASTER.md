@@ -409,6 +409,18 @@ evidence. A voided Receipt cannot be sent as a valid Receipt.
 
 ## 4 · Documents
 
+**THE CUSTOMER MONEY DOCUMENTS — OWNER CONFIRMED 2026-09-25 (Payment Blueprint review).**
+
+| Document | State | What was confirmed |
+|---|---|---|
+| Receipt — one per payment received, the deposit included | BUILT (0449 snapshot) · **no document standard** | keep; write its standard in `docs/pdf/DOCUMENT-KIT.md` |
+| Invoice — ONE per Sales Order, issued by the system when `Balance due` reaches RM 0, sent with the Receipt | BUILT as a template · **must change** | no SST rows and no `TAX INVOICE` mode (Carres is not SST-registered); the `Payment request` mode is RETIRED (an Invoice never asks for money); write its standard |
+| Customer Statement | read BUILT, **PDF MISSING** | build the printed statement (`GET /invoices/statement/:orderId` already derives it) |
+| Credit Note | numbering approved (`CN2609-4827`), **NOT BUILT** | build it: an amendment that lowers the price after money was paid, and the exceptional refund, need it |
+| Sales Order document (prints `Balance due`) | Sales Orders' | the paper the customer pays against; Payment references it, never re-prints it |
+| Storage Invoice · Additional Storage Invoice | BUILT | PROPOSAL / NOT LAW: folded into `Balance due` under the 2026-09-25 money rule — settled in the Storage segment |
+
+
 - Receipt proves money was recorded; the Invoice is the closing document issued at `Balance due`
   RM 0 and sent with the Receipt (owner ruling 2026-09-25). Neither asks for money.
 - Sales Invoice, Storage Invoice and Additional Storage Invoice use one governed numbering and
