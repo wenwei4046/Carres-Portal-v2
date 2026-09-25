@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
 import {
   countWorkingDays,
@@ -41,6 +42,22 @@ import {
   type OrderActionKey,
 } from "@carres/shared";
 import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
+import {
+  WORK_CHANNELS,
+  WORK_CONTACT_KINDS,
+  workLifecycleOf,
+  workOccurrenceEventSchema,
+  workOccurrenceGenerationId,
+  effectivePoArrivalOf,
+  parseWorkOccurrenceId,
+  type OperationWorkCompleted,
+  workReplyDueOn,
+  type OperationWorkLifecycle,
+  type WorkChannel,
+  type WorkContactKind,
+  type WorkOccurrenceEvent,
+} from "@carres/shared";
+import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { chunk } from "../../lib/purchase-demand-read";
@@ -363,6 +380,15 @@ interface ManualPurchaseRegisterSource {
  *  internal `/pos` read — no new query, no second arithmetic. */
 interface PurchaseOrderArrivalSource extends PurchaseOrderWorkSource {
   tomorrow_answer_about_date?: string | null;
+  official_delivery_date?: string | null;
+  destination_id?: string | null;
+  /** 0582 · the day-before check's evidence. */
+  arrival_confirmations?: Array<{
+    po_version: number;
+    for_date: string;
+    destination_id: string;
+    kind: "supplier_do" | "supplier_confirmation";
+  }>;
 }
 
 interface PurchaseOrderWorkSource {
@@ -420,7 +446,13 @@ export function projectPurchaseOrderReplyWork(input: {
         dutyName: send.duty_name,
         actingName: send.acting_name,
       })),
-    }, input.poDuty, input.today, holidays);
+    }, input.poDuty, input.today, holidays)
+      /* ⛔ RETIRED 2026-09-24 (Purchasing MASTER §5.7, Workspace §6.1): a PO
+         the supplier has not answered since it was sent is NOT work — it is
+         `Waiting for goods from supplier`. Only the passed-date follow-up and
+         the exact-date day-before check remain supplier-contact Work. The
+         register's own facts are untouched; only Work stops admitting it. */
+      .filter((item) => item.ruleKey !== "purchasing.supplier_reply");
     return items.map((item) => operationWorkItemFromProjection(item, {
       object: { kind: "purchase_order", id: po.id, label: po.id },
       problem: item.ruleKey === "purchasing.supplier_date_passed"
@@ -455,13 +487,30 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
   const holidays = myHolidaySet();
   return input.pos.flatMap((po) => {
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
+    /* Owner ruling 2026-09-24 (Purchasing MASTER §5.7): the check opens one
+       Office working day before the EFFECTIVE arrival — the latest evidenced
+       answer on the current version, else the original PO Delivery Date —
+       never our own planning estimate. It closes only on the Supplier DO or an
+       evidenced confirmation for THAT date and the PO's own Warehouse. The
+       open/late arithmetic stays `tomorrowDeliveryCallOf`'s (Law D). */
+    const version = po.version ?? 1;
+    const effective = effectivePoArrivalOf({
+      version,
+      officialDeliveryDate: po.official_delivery_date ?? null,
+      etaDate: po.eta_date ?? null,
+      promises: (po.promises ?? []) as never,
+    });
+    const confirmedFor = effective && (po.arrival_confirmations ?? []).some((c) =>
+      c.po_version === version && c.for_date === effective && !!po.destination_id && c.destination_id === po.destination_id)
+      ? effective
+      : null;
     const items = purchaseOrderArrivalCheckWorkItems({
       id: po.id,
       supplierId: po.supplier_id,
       supplierName,
       status: po.status,
-      etaDateIso: po.eta_date ?? null,
-      tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
+      etaDateIso: effective,
+      tomorrowAnswerAboutDateIso: confirmedFor,
       lines: po.purchase_order_lines.map((line) => ({
         qty: line.qty,
         receivedQty: line.received_qty,
@@ -471,9 +520,12 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
       object: { kind: "purchase_order", id: po.id, label: po.id },
       problem: "The goods are expected and the supplier has not confirmed the day",
       recipient: supplierName,
-      requiredResult: "Supplier answer recorded about this arrival date",
+      requiredResult: "Supplier DO or evidenced confirmation for this date and Warehouse recorded",
       destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
       today: input.today,
+      // One occurrence per effective date: a delay retires this date's check
+      // and derives a new one for the new date.
+      occurrenceKey: effective,
     }));
   });
 }
@@ -1581,11 +1633,394 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   );
 }
 
+// ── THE WORK LIFECYCLE LEDGER (0581, owner rulings 2026-09-24) ──────────────
+//
+// To do · Waiting are DERIVED from `work_occurrence_events`; Completed is
+// written only by the owning module's completion fact (service role). The
+// read attaches each open occurrence's lifecycle; the two staff doors record a
+// send made outside the ERP (or a provider-ACCEPTED send) and a reply, always
+// against the CURRENT open occurrence and source version. Opening or copying a
+// message never reaches these doors.
+
+/** A refusal the ledger names (the 0581 doors' `detail`). */
+export class WorkLedgerRefusal extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
+export interface WorkLedgerWrite {
+  occurrenceId: string;
+  channel: WorkChannel;
+  contactKind: WorkContactKind | null;
+  contactId: string | null;
+  sourceVersion: string;
+  idempotencyKey: string;
+}
+
+export interface WorkLedger {
+  read(c: Context<AppEnv>, occurrenceIds: readonly string[]): Promise<WorkOccurrenceEvent[]>;
+  /** Every `completed` event recorded on or after `sinceIso` (a Malaysia date). */
+  readCompleted(c: Context<AppEnv>, sinceIso: string): Promise<WorkOccurrenceEvent[]>;
+  recordRequestSent(c: Context<AppEnv>, args: WorkLedgerWrite & { replyDueOn: string }): Promise<string>;
+  recordReplyReceived(c: Context<AppEnv>, args: WorkLedgerWrite): Promise<string>;
+}
+
+const LEDGER_CHUNK = 200;
+const LEDGER_COLUMNS =
+  "id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version, action_on, object_label";
+/** `YYYY-MM-DD` moved by whole days — string arithmetic, no clock. */
+function addDaysIsoUtc(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** How far back the Completed read reaches, in calendar days. */
+export const WORK_COMPLETED_WINDOW_DAYS = 60;
+
+function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
+  return workOccurrenceEventSchema.parse({
+    id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
+    channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
+    replyDueOn: r.reply_due_on, resultReference: r.result_reference, sourceVersion: r.source_version,
+    actionOn: r.action_on, objectLabel: r.object_label,
+  });
+}
+
+/** One ledger completion as Work shows it, with the recorder's name from the
+ *  feed's own staff list (a person outside it keeps their id, name null). */
+export function workCompletedOf(
+  event: WorkOccurrenceEvent,
+  staff: OperationWorkResponse["staff"],
+): OperationWorkCompleted | null {
+  const parsed = parseWorkOccurrenceId(event.occurrenceId);
+  if (!parsed || !event.objectLabel || !event.resultReference) return null;
+  return {
+    occurrenceId: event.occurrenceId,
+    module: parsed.module,
+    ruleKey: parsed.ruleKey,
+    actionOn: event.actionOn,
+    objectLabel: event.objectLabel,
+    completedAt: event.at,
+    completedBy: event.actorId
+      ? { userId: event.actorId, name: staff.find((person) => person.userId === event.actorId)?.name ?? null }
+      : null,
+    resultReference: event.resultReference,
+  };
+}
+
+function refusalOf(error: { code?: string; details?: string | null; message: string }): WorkLedgerRefusal {
+  const detail = String(error.details ?? "").trim();
+  if (detail && !detail.includes(" ")) return new WorkLedgerRefusal(detail, error.message);
+  if (error.code === "23514" || error.code === "22023") return new WorkLedgerRefusal("invalid", error.message);
+  if (error.code === "42501") return new WorkLedgerRefusal("forbidden", error.message);
+  return new WorkLedgerRefusal("ledger_failed", error.message);
+}
+
+/** The Supabase ledger: reads under the caller's RLS, writes through 0581's doors. */
+export const supabaseWorkLedger: WorkLedger = {
+  async read(c, occurrenceIds) {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const rows: WorkOccurrenceEvent[] = [];
+    for (let i = 0; i < occurrenceIds.length; i += LEDGER_CHUNK) {
+      const ids = occurrenceIds.slice(i, i + LEDGER_CHUNK);
+      const { data, error } = await sb
+        .from("work_occurrence_events")
+        .select(LEDGER_COLUMNS)
+        .in("occurrence_id", ids)
+        .order("at", { ascending: true });
+      if (error) throw new Error(`work ledger read failed: ${error.message}`);
+      for (const r of (data ?? []) as Array<Record<string, unknown>>) rows.push(ledgerRow(r));
+    }
+    return rows;
+  },
+  async readCompleted(c, sinceIso) {
+    // `at` is compared at Malaysian midnight, the same day the feed names.
+    const { data, error } = await userClient(c.env, c.var.auth.jwt)
+      .from("work_occurrence_events")
+      .select(LEDGER_COLUMNS)
+      .eq("event", "completed")
+      .gte("at", `${sinceIso}T00:00:00+08:00`)
+      .order("at", { ascending: false })
+      .limit(2000);
+    if (error) throw new Error(`work ledger completed read failed: ${error.message}`);
+    return ((data ?? []) as Array<Record<string, unknown>>).map(ledgerRow);
+  },
+  async recordRequestSent(c, args) {
+    const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("work_record_request_sent", {
+      p_occurrence_id: args.occurrenceId,
+      p_channel: args.channel,
+      p_contact_kind: args.contactKind,
+      p_contact_id: args.contactId,
+      p_reply_due_on: args.replyDueOn,
+      p_source_version: args.sourceVersion,
+      p_idempotency_key: args.idempotencyKey,
+    });
+    if (error) throw refusalOf(error);
+    return String(data);
+  },
+  async recordReplyReceived(c, args) {
+    const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("work_record_reply_received", {
+      p_occurrence_id: args.occurrenceId,
+      p_channel: args.channel,
+      p_contact_kind: args.contactKind,
+      p_contact_id: args.contactId,
+      p_source_version: args.sourceVersion,
+      p_idempotency_key: args.idempotencyKey,
+    });
+    if (error) throw refusalOf(error);
+    return String(data);
+  },
+};
+
+/** How many generations one read will walk before it stops (a problem that
+ *  recurred more often than this is still listed, on its latest known id). */
+const MAX_WORK_GENERATIONS = 20;
+
+/**
+ * Resolve each open item's CURRENT occurrence identity and read its ledger.
+ * An identity whose ledger already holds `completed` is history: the same
+ * problem open again is the next generation.
+ */
+export async function readWorkLedger(
+  c: Context<AppEnv>,
+  ledger: WorkLedger,
+  baseIds: readonly string[],
+): Promise<{ currentId: Map<string, string>; events: WorkOccurrenceEvent[] }> {
+  const currentId = new Map(baseIds.map((id) => [id, id]));
+  const generation = new Map(baseIds.map((id) => [id, 1]));
+  const events = [...await ledger.read(c, baseIds)];
+  for (let step = 1; step < MAX_WORK_GENERATIONS; step += 1) {
+    const completed = new Set(events.filter((e) => e.event === "completed").map((e) => e.occurrenceId));
+    const advancing = baseIds.filter((base) => completed.has(currentId.get(base)!));
+    if (advancing.length === 0) break;
+    for (const base of advancing) {
+      const next = generation.get(base)! + 1;
+      generation.set(base, next);
+      currentId.set(base, workOccurrenceGenerationId(base, next));
+    }
+    events.push(...await ledger.read(c, advancing.map((base) => currentId.get(base)!)));
+  }
+  return { currentId, events };
+}
+
+/** Attach each open occurrence's current identity and its To do / Waiting. */
+export function withWorkLifecycle(
+  response: OperationWorkResponse,
+  events: readonly WorkOccurrenceEvent[],
+  currentId: ReadonlyMap<string, string> = new Map(),
+): OperationWorkResponse {
+  const byOccurrence = new Map<string, WorkOccurrenceEvent[]>();
+  for (const e of events) {
+    const list = byOccurrence.get(e.occurrenceId) ?? [];
+    list.push(e);
+    byOccurrence.set(e.occurrenceId, list);
+  }
+  return {
+    ...response,
+    items: response.items.map((item) => {
+      const id = currentId.get(item.id) ?? item.id;
+      return {
+        ...item,
+        id,
+        lifecycle: workLifecycleOf(byOccurrence.get(id) ?? [], response.generatedOn),
+      };
+    }),
+  };
+}
+
+const workLedgerBodySchema = z.object({
+  channel: z.enum(WORK_CHANNELS),
+  contactKind: z.enum(WORK_CONTACT_KINDS).nullable().default(null),
+  contactId: z.string().uuid().nullable().default(null),
+  sourceVersion: z.string().min(1),
+  idempotencyKey: z.string().min(8).max(200),
+}).strict().refine((b) => (b.contactKind === null) === (b.contactId === null), {
+  message: "A contact is a kind and an id, or neither",
+});
+
+const REFUSAL_STATUS: Record<string, 403 | 409 | 422 | 502> = {
+  forbidden: 403,
+  work_occurrence_completed: 409,
+  work_occurrence_not_waiting: 409,
+  work_event_key_reused: 409,
+  reply_due_not_a_working_day: 422,
+  invalid: 422,
+};
+
+/**
+ * ⭐ ONE ORDER, ONE PROJECTOR (owner correction 2026-09-24). A completion
+ * writer asks "is THIS order's occurrence of THIS rule open?" without reading
+ * the whole Work feed: the same `projectSalesOrdersFromModuleFacts` over the
+ * Operation order-list row (the list route narrowed by `orderId`, so every
+ * enrichment is the same), with the stock of this order's own SKUs and the same
+ * Purchasing safety days. Owner and duty facts decide WHO, never WHETHER, so
+ * they are not read here. Each occurrence is returned on its CURRENT
+ * generation identity. `null` = not an order Work admits (another status).
+ */
+export async function probeOrderWork(
+  c: Context<AppEnv>,
+  orderId: string,
+  ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/orders", operationOrdersRouter);
+  const { orders } = await readInternal<{ orders: SalesOrderModuleRow[] }>(
+    internal,
+    `/orders?orderId=${encodeURIComponent(orderId)}`,
+    c,
+  );
+  const order = orders.find((row) => row.id === orderId);
+  if (!order) return null;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const skus = [...new Set((order.order_lines ?? []).map((line) => line.sku).filter(Boolean))];
+  const [stock, settings] = await Promise.all([
+    skus.length === 0
+      ? Promise.resolve({ data: [] as Array<{ sku: string; sellable: number | null }>, error: null })
+      : sb.from("stock_sku_availability").select("sku, sellable").in("sku", skus),
+    loadPurchasingSettings(sb),
+  ]);
+  if (stock.error) throw new Error(`stock read failed: ${stock.error.message}`);
+  const bySku = new Map<string, Array<{ sellable: number | null }>>();
+  for (const r of (stock.data ?? []) as Array<{ sku: string; sellable: number | null }>) {
+    bySku.set(r.sku, [...(bySku.get(r.sku) ?? []), r]);
+  }
+  const items = projectSalesOrdersFromModuleFacts({
+    orders: [order],
+    stock: skus.map((sku) => ({ sku, available: sellableOf(bySku.get(sku) ?? []) })),
+    staff: [],
+    dutyResolutions: {},
+    today: todayIsoMYT(),
+    safetyDays: settings.orderByBufferDays,
+  });
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+/**
+ * ONE PURCHASE ORDER, ONE PROJECTOR: the same reply projector the Work feed
+ * runs, over the PO register row narrowed by `poId` (so promises, sends and
+ * lines are read exactly as the feed reads them). Supplier names and PO Duty
+ * decide the words and WHO, never WHETHER, so they are not read here.
+ */
+export async function probePurchaseOrderWork(
+  c: Context<AppEnv>,
+  poId: string,
+  ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/pos", operationPosRouter);
+  const { pos } = await readInternal<{ pos: PurchaseOrderWorkSource[] }>(
+    internal,
+    `/pos?status=all&poId=${encodeURIComponent(poId)}`,
+    c,
+  );
+  const po = pos.find((row) => row.id === poId);
+  if (!po) return null;
+  const today = todayIsoMYT();
+  const items = [
+    ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today }),
+    ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today }),
+  ];
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+/**
+ * THE Work read with its ledger: the composed open set, each item on its
+ * current occurrence identity with To do / Waiting, and the recent Completed.
+ * The page, the staff doors and the module completion writers all read this
+ * one function — so "was it open, and which occurrence" has one answer.
+ */
+export async function readOperationWorkWithLedger(
+c: Context<AppEnv>,
+loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
+ledger: WorkLedger = supabaseWorkLedger,
+): Promise<{ response: OperationWorkResponse; events: WorkOccurrenceEvent[] }> {
+  const response = await loader(c);
+  let read: Awaited<ReturnType<typeof readWorkLedger>>;
+  let completedEvents: WorkOccurrenceEvent[];
+  try {
+    [read, completedEvents] = await Promise.all([
+      readWorkLedger(c, ledger, response.items.map((item) => item.id)),
+      ledger.readCompleted(c, addDaysIsoUtc(response.generatedOn, -WORK_COMPLETED_WINDOW_DAYS)),
+    ]);
+  } catch {
+    // Never pretend every item is To do, and never print a Completed count
+    // that is really "could not read": a Waiting item shown as To do would
+    // send a second request to someone already asked.
+    throw new HTTPException(503, { message: "Work status could not be loaded. Try again." });
+  }
+  const completed = completedEvents
+    .map((event) => workCompletedOf(event, response.staff))
+    .filter((row): row is OperationWorkCompleted => row !== null);
+  return {
+    response: { ...withWorkLifecycle(response, read.events, read.currentId), completed },
+    events: read.events,
+  };
+};
+
 export function createOperationWorkRouter(
   loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
+  ledger: WorkLedger = supabaseWorkLedger,
 ): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
-  router.get("/", requireOperation, async (c) => c.json(await loader(c)));
+
+  const readWithLifecycle = (c: Context<AppEnv>) => readOperationWorkWithLedger(c, loader, ledger);
+
+  router.get("/", requireOperation, async (c) => c.json((await readWithLifecycle(c)).response));
+
+  const door = (kind: "request_sent" | "reply_received") => async (c: Context<AppEnv>) => {
+    const occurrenceId = c.req.param("occurrenceId") ?? "";
+    const parsed = workLedgerBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) {
+      return c.json({ code: "invalid", message: parsed.error.issues[0]?.message ?? "Invalid request" }, 422);
+    }
+    const body = parsed.data;
+    const { response } = await readWithLifecycle(c);
+    const item = response.items.find((candidate) => candidate.id === occurrenceId);
+    if (!item) {
+      // Completed or never open: a completed occurrence is never reopened.
+      return c.json({ code: "work_occurrence_not_open", message: "This work is no longer open." }, 409);
+    }
+    if (item.sourceVersion !== body.sourceVersion) {
+      return c.json({ code: "work_stale", message: "This work changed. Refresh and try again." }, 409);
+    }
+    const write: WorkLedgerWrite = {
+      occurrenceId,
+      channel: body.channel,
+      contactKind: body.contactKind as WorkContactKind | null,
+      contactId: body.contactId,
+      sourceVersion: body.sourceVersion,
+      idempotencyKey: body.idempotencyKey,
+    };
+    let id: string;
+    try {
+      id = kind === "request_sent"
+        ? await ledger.recordRequestSent(c, { ...write, replyDueOn: workReplyDueOn(response.generatedOn, item.ruleKey) })
+        : await ledger.recordReplyReceived(c, write);
+    } catch (e) {
+      if (e instanceof WorkLedgerRefusal) {
+        return c.json({ code: e.code, message: e.message }, REFUSAL_STATUS[e.code] ?? 502);
+      }
+      throw e;
+    }
+    const events = await ledger.read(c, [occurrenceId]);
+    const lifecycle: OperationWorkLifecycle = workLifecycleOf(events, response.generatedOn);
+    return c.json({ id, occurrenceId, lifecycle }, 201);
+  };
+
+  router.post("/:occurrenceId/request-sent", requireOperation, door("request_sent"));
+  router.post("/:occurrenceId/reply-received", requireOperation, door("reply_received"));
   return router;
 }
 

@@ -101,12 +101,18 @@ export const PO_STATE_ACTION_SHORT = {
  * ledger can be counted ("这年 Production Delay 几次?"); the real story goes
  * in the free-text Remarks beside it, never inside the category.
  */
+/** The eight governed supplier delay reasons (owner ruling 2026-09-24,
+ *  Purchasing MASTER §5.7; `purchasing_supplier_delay_reasons()` in 0582).
+ *  `Other` alone requires a short note. Rows recorded before keep their
+ *  earlier words. */
 export const PO_DELAY_REASONS = [
-  "Production Delay",
-  "Material Shortage",
-  "Transport Delay",
-  "Waiting Customer Confirmation",
-  "Factory Closed",
+  "Production delay",
+  "Material unavailable",
+  "Capacity / scheduling delay",
+  "Quality issue / remake",
+  "Transport delay",
+  "Supplier closed / holiday",
+  "Partial quantity ready",
   "Other",
 ] as const;
 

@@ -10,6 +10,15 @@ vi.mock("../../lib/supabase", () => ({
 
 import { userClient } from "../../lib/supabase";
 
+// The Work Completed writer (0581) observes this door from a middleware and is
+// proven in lib/sales-order-work-completion*.test.ts; here it passes through,
+// so these tests keep asserting only what the door itself writes.
+vi.mock("../../lib/sales-order-work-completion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/sales-order-work-completion")>()),
+  salesOrderWorkCompletion: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
+
+
 const SUPABASE_URL = "https://test.supabase.co";
 
 const env = {
@@ -514,6 +523,23 @@ describe("GET /api/operation/orders", () => {
       env,
     );
     expect(eq).toHaveBeenCalledWith("operation_stage", "ready_to_dispatch");
+  });
+
+  it("0581 · narrows to one order for the Work completion probe, and refuses a malformed id", async () => {
+    const { eq } = mockOrdersList([ORDER_ROW]);
+    const jwt = await makeJwt("operation");
+    const id = "11111111-0000-4000-8000-000000000001";
+    const ok = await app.fetch(
+      new Request(`http://t/api/operation/orders?orderId=${id}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("id", id);
+    const bad = await app.fetch(
+      new Request("http://t/api/operation/orders?orderId=not-an-id", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(bad.status).toBe(422);
   });
 
   it("filters by channel=dealers excludes showroom orders (outlet_id IS NULL)", async () => {

@@ -198,6 +198,8 @@ describe("GET /api/operation/pos", () => {
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === "po_supplier_promises") return { select: promiseSelect };
+        // 0582 · the day-before check's evidence rides the register read.
+        if (table === "po_arrival_confirmations") return { select: vi.fn(() => ({ in: vi.fn(() => paged([])) })) };
         if (table === "orders") return { select: ordersSelect };
         if (table === "product_skus") return { select: skusSelect };
         if (table === "order_lines") return { select: solSelect };
@@ -639,6 +641,22 @@ describe("GET /api/operation/pos", () => {
       env,
     );
     expect(eq).toHaveBeenCalledWith("supplier_id", supId);
+  });
+
+  it("0581 · narrows to one PO for the Work completion probe, and refuses a blank one", async () => {
+    const { eq } = mockPosList([PO_ROW]);
+    const jwt = await makeJwt("operation");
+    const ok = await app.fetch(
+      new Request("http://t/api/operation/pos?status=all&poId=PO2609-4827", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("id", "PO2609-4827");
+    const bad = await app.fetch(
+      new Request("http://t/api/operation/pos?poId=%20", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(bad.status).toBe(422);
   });
 
   it("returns 422 for invalid status", async () => {
@@ -2842,6 +2860,52 @@ describe("opening an app records an OPEN, and completes nothing", () => {
   });
 });
 
+
+describe("POST day-before arrival confirmation (0582)", () => {
+  const DEST = "11111111-0000-4000-8000-00000000d001";
+  const confirmation = {
+    poVersion: 2, forDate: "2026-10-20", destinationId: DEST, kind: "supplier_confirmation",
+    evidence: ["PO-TEST/confirm.png"], channel: "whatsapp", recipient: "Factory group",
+    reportedBy: "Factory staff", reportedAt: "2026-10-19T01:00:00Z",
+  };
+  const supplierDo = { poVersion: 2, forDate: "2026-10-20", destinationId: DEST, kind: "supplier_do", supplierDoNo: "NF-DO-8812", evidence: ["PO-TEST/do.jpg"] };
+  async function post(body: unknown, role = "operation") {
+    return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/arrival-confirmation", {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }), env as never, { waitUntil() {}, passThroughException() {} } as never);
+  }
+  it("records an evidenced confirmation or a Supplier DO through the one caller-authenticated RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { confirmation_id: "cf" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    expect((await post(confirmation)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_arrival_confirmation", { p_po_id: "PO-TEST", p: confirmation });
+    expect((await post(supplierDo)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_arrival_confirmation", { p_po_id: "PO-TEST", p: supplierDo });
+  });
+  it("refuses an incomplete body before any database call", async () => {
+    for (const body of [
+      { ...confirmation, evidence: [] },
+      { ...confirmation, channel: undefined },
+      { ...confirmation, destinationId: "not-a-uuid" },
+      { ...supplierDo, supplierDoNo: undefined },
+      { ...confirmation, kind: "promise" },
+    ]) {
+      expect((await post(body)).status).toBe(422);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("names the database's refusal: wrong date or wrong Warehouse", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "arrival_date_mismatch", message: "The supplier must confirm the expected arrival date." } }) } as any);
+    const response = await post(confirmation);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "arrival_date_mismatch" });
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "wrong_warehouse", message: "x" } }) } as any);
+    expect(await (await post(confirmation)).json()).toMatchObject({ code: "wrong_warehouse" });
+  });
+  it("rejects a dealer", async () => {
+    expect((await post(confirmation, "dealer")).status).toBe(403);
+  });
+});
 
 describe("POST evidenced supplier reply", () => {
   /* 0430 — ONE date on the wire; the server classifies it. `answer` and the

@@ -32,6 +32,11 @@ describe("evidenced current-version supplier reply", () => {
     expect(recordSupplierReplyInput.safeParse({ ...input, answer: "shipping" }).success).toBe(false);
     expect(recordSupplierReplyInput.safeParse({ ...input, newDate: "2026-09-15" }).success).toBe(false);
     expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Anything" }).success).toBe(false);
-    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Material Shortage" }).success).toBe(true);
+    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Material unavailable" }).success).toBe(true);
+    /* 0582 · the pre-2026-09-24 words are no longer choices; Other needs a note. */
+    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Material Shortage" }).success).toBe(false);
+    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Other" }).success).toBe(false);
+    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Other", remarks: "Fabric batch rejected" }).success).toBe(true);
+    expect(recordSupplierReplyInput.safeParse({ ...input, screenshots: ["PO-TEST/second.png"] }).success).toBe(true);
   });
 });
