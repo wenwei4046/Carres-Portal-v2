@@ -114,15 +114,15 @@ export default function OperationWork() {
   useEffect(() => {
     if (activePanel === "detail") backRef.current?.focus();
   }, [activePanel]);
-  /** 960–1279px: the rail is collapsed until the toolbar's `Filters` opens it. */
+  /** 768–1279px: the rail is collapsed until the toolbar's `Filters` opens it. */
   const [railOpen, setRailOpen] = useState(false);
-  /** Below 960px: which compact filter control is open. */
+  /** Below 768px: which compact filter control is open. */
   const [compact, setCompact] = useState<"date" | "module" | null>(null);
 
   // The PAGE decides the panels, not the window: with the portal sidebar open
   // a 1440px window leaves ~1200px of page. The page is this page's own
   // full-width frame (canvas padding included), so the owner's breakpoints
-  // (1280 · 960) read exactly as written when no sidebar is drawn. A width of
+  // (1280 · 768) read exactly as written when no sidebar is drawn. A width of
   // 0 means the page is not laid out yet — the window is the only honest
   // estimate until it is.
   useLayoutEffect(() => {
@@ -428,10 +428,10 @@ export default function OperationWork() {
     />
   );
 
-  /* One toolbar control: 36px from 960px, 40px below; 14/20; 12px sides. */
+  /* One toolbar control: 36px from 768px, 40px below; 14/20; 12px sides. */
   const toolbarRow = layout === "one" ? "flex flex-wrap items-center gap-2" : "contents";
   const toolbarButton = (active: boolean) =>
-    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[960px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
+    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[768px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
 
   const listBody = listTab === "completed" || (listTab === "waiting" && !loading && visible.length === 0) ? (
     <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
@@ -508,7 +508,7 @@ export default function OperationWork() {
       actions={<TopBarIcons />}
       titleRight={
         // Every count says WHAT it counts (card §7 — supersedes `open · overdue`).
-        <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[960px]:text-[13px] min-[960px]:leading-[18px]" data-testid="work-header-count">
+        <span className="block truncate text-[12px] font-normal leading-4 text-base-400 min-[768px]:text-[13px] min-[768px]:leading-[18px]" data-testid="work-header-count">
           {visible.length} action{visible.length === 1 ? "" : "s"} to do
           {lateCount > 0 ? ` · ${lateCount} missed` : ""}
         </span>
@@ -516,7 +516,7 @@ export default function OperationWork() {
     >
       <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
         {/* The toolbar: ONE independent white section (owner density ruling
-            2026-09-25). Below 960px it is exactly two rows — Date · Module ·
+            2026-09-25). Below 768px it is exactly two rows — Date · Module ·
             My/Team, then Search · Owner · Covered — and below 600px four:
             Date · Module / My/Team / Search / Owner · Covered. */}
         <WorkSection aria-label="Work toolbar" className={`flex shrink-0 gap-2 p-2.5 min-[600px]:p-3 ${layout === "one" ? "flex-col" : "flex-wrap items-center"}`} data-testid="work-toolbar">
@@ -581,7 +581,7 @@ export default function OperationWork() {
                       return next;
                     }, { replace: true });
                   }}
-                  className={`h-[38px] px-3 text-control min-[960px]:h-[34px] max-[599px]:flex-1 ${
+                  className={`h-[38px] px-3 text-control min-[768px]:h-[34px] max-[599px]:flex-1 ${
                     activeView === k
                       ? "bg-kit-slate-12 font-semibold text-white"
                       : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
@@ -638,7 +638,7 @@ export default function OperationWork() {
                   for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
                   return next;
                 }, { replace: true })}
-                className="h-10 px-2 text-control text-kit-blue-11 min-[960px]:h-9"
+                className="h-10 px-2 text-control text-kit-blue-11 min-[768px]:h-9"
               >
                 Clear all
               </button>
@@ -646,7 +646,7 @@ export default function OperationWork() {
           </div>
         </WorkSection>
 
-        {/* Below 960px the chosen compact control opens its section here. */}
+        {/* Below 768px the chosen compact control opens its section here. */}
         {layout === "one" && compact ? (
           <div className="shrink-0" data-testid={`work-compact-${compact}-panel`}>
             {compact === "date" ? dateSection : moduleSection}

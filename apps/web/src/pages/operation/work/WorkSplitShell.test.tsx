@@ -11,7 +11,7 @@ describe("WorkSplitShell — the unframed workspace (owner correction 2026-09-24
     expect(shell.className).not.toMatch(/\b(border|bg-white|rounded|shadow)/);
   });
 
-  it("collapses only the rail at 960–1279px; the list can never be collapsed", () => {
+  it("collapses only the rail at 768–1279px; the list can never be collapsed", () => {
     const first = render(<WorkSplitShell layout="two" rail="Days" list="Actions" detail="Detail" />);
     expect(screen.queryByText("Days")).not.toBeInTheDocument();
     expect(screen.getByText("Actions")).toBeInTheDocument();
@@ -22,7 +22,7 @@ describe("WorkSplitShell — the unframed workspace (owner correction 2026-09-24
     expect(screen.getByText("Actions")).toBeInTheDocument();
   });
 
-  it("below 960px the list and the detail share one stage", () => {
+  it("below 768px the list and the detail share one stage", () => {
     const first = render(<WorkSplitShell layout="one" activePanel="list" rail="Days" list="Actions" detail="Detail" />);
     expect(screen.getByText("Actions")).toBeInTheDocument();
     expect(screen.queryByText("Detail")).not.toBeInTheDocument();
@@ -33,7 +33,7 @@ describe("WorkSplitShell — the unframed workspace (owner correction 2026-09-24
     expect(screen.getByText("Detail")).toBeInTheDocument();
   });
 
-  it("below 960px the detail stage stacks its sections 8px apart", () => {
+  it("below 768px the detail stage stacks its sections 8px apart", () => {
     render(<WorkSplitShell layout="one" activePanel="detail" rail="Days" list="Actions" detail="Detail" />);
     expect(screen.getByRole("region", { name: "Selected work" }).className).toContain("gap-2");
   });

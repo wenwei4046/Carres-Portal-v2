@@ -100,7 +100,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => onToggle(!open)}
-        className="flex h-[70px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:px-4"
+        className="flex h-[70px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:px-4"
         data-testid={`${testId}-toggle`}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -122,7 +122,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         </span>
       </button>
       {open ? (
-        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[960px]:px-4" data-testid={`${testId}-body`}>
+        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[768px]:px-4" data-testid={`${testId}-body`}>
           {children}
         </div>
       ) : null}

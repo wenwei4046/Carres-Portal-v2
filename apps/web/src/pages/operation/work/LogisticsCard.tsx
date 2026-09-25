@@ -349,7 +349,7 @@ export default function LogisticsCard({
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-[72px] w-full min-[960px]:min-h-0 items-center gap-2 rounded-work px-3 py-[9px] text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:items-start min-[960px]:gap-3 min-[960px]:px-4 min-[960px]:py-3"
+        className="flex min-h-[72px] w-full min-[768px]:min-h-0 items-center gap-2 rounded-work px-3 py-[9px] text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:items-start min-[768px]:gap-3 min-[768px]:px-4 min-[768px]:py-3"
         data-testid="logistics-card-toggle"
       >
         <div className="min-w-0 flex-1">
@@ -361,37 +361,37 @@ export default function LogisticsCard({
           </div>
           {action ? (
             <div data-testid="logistics-card-action">
-              <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[960px]:mt-1 min-[960px]:text-[14px] min-[960px]:leading-5">{action.act}</div>
+              <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[768px]:mt-1 min-[768px]:text-[14px] min-[768px]:leading-5">{action.act}</div>
               <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>
                 {[action.result, dueText(action)].filter(Boolean).join(" · ")}
               </div>
             </div>
           ) : null}
           {scheduledLine ? (
-            <div className="text-[12px] leading-4 text-kit-slate-12 min-[960px]:mt-1 min-[960px]:text-body" data-testid="logistics-card-scheduled">
+            <div className="text-[12px] leading-4 text-kit-slate-12 min-[768px]:mt-1 min-[768px]:text-body" data-testid="logistics-card-scheduled">
               {LOGISTICS_COPY.scheduled} · {scheduledLine}
             </div>
           ) : null}
           {model.exception ? (
-            <div className="flex items-center gap-1 text-[12px] leading-4 text-kit-amber-11 min-[960px]:mt-1 min-[960px]:text-body" data-testid="logistics-card-exception">
+            <div className="flex items-center gap-1 text-[12px] leading-4 text-kit-amber-11 min-[768px]:mt-1 min-[768px]:text-body" data-testid="logistics-card-exception">
               <Icon name="late" size={14} />
               <span>{model.exception}</span>
             </div>
           ) : null}
         </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11 min-[960px]:h-auto min-[960px]:w-auto min-[960px]:mt-0.5" data-testid="logistics-card-chevron"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11 min-[768px]:h-auto min-[768px]:w-auto min-[768px]:mt-0.5" data-testid="logistics-card-chevron"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
       </button>
 
       {/* ── EXPANDED: eight sections in the owner's order ─────────────────── */}
       {open ? (
-        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[960px]:gap-4 min-[960px]:px-4 min-[960px]:py-4" data-testid="logistics-card-body">
+        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[768px]:gap-4 min-[768px]:px-4 min-[768px]:py-4" data-testid="logistics-card-body">
           {/* 1 · Current action */}
           <section aria-label={PARTY_COPY.currentAction} className="flex flex-col gap-2">
             <SectionTitle>{PARTY_COPY.currentAction}</SectionTitle>
             {action ? (
               <>
                 <div>
-                  <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[960px]:text-[14px] min-[960px]:leading-5">{action.act}</div>
+                  <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[768px]:text-[14px] min-[768px]:leading-5">{action.act}</div>
                   <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
                 </div>
                 {editing === null ? (
