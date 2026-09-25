@@ -18,6 +18,7 @@
  * PURE — no clock, no I/O. Dates are ISO `YYYY-MM-DD`; `spell` prints them.
  */
 import { myHolidaySet } from "./my-holidays";
+import { normalizeSkuKey } from "./sku-code";
 import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
 import type { WorkingDayOptions } from "./working-days";
 import type { PartyTone } from "./customer-card";
@@ -27,6 +28,8 @@ export const SUPPLIER_CARD_COPY = {
   one: (name: string) => `Supplier · ${name}`,
   many: (n: number) => `Supplier · ${n} suppliers`,
   none: "No purchase order for this Sales Order",
+  needPo: (n: number) => `No purchase order for this Sales Order · ${n} ${n === 1 ? "item needs" : "items need"} one`,
+  fromStock: (ready: number, total: number) => `From stock · ${ready} of ${total} ready`,
   issued: (i: number, n: number) => `${i} of ${n} POs issued`,
   datesReady: (d: number, n: number) => `${d} of ${n} dates ready`,
   received: (r: number, n: number) => `${r} of ${n} received`,
@@ -50,7 +53,7 @@ export const SUPPLIER_CARD_COPY = {
   complete: (n: number) => `${n} of 4 complete`,
   /* row facts */
   poDate: "PO Delivery Date",
-  latest: "Latest date",
+  latest: "Expected arrival",
   delayReason: "Delay reason",
   evidence: "Evidence",
   supplierDo: "Supplier DO",
@@ -117,6 +120,11 @@ export interface SupplierCardModel {
   latestGrnIso: string | null;
   /** POs whose arrival passed without a GRN — the Route's GRN tone reads it. */
   arrivalMissedCount: number;
+  /** Goods served from stock (lines no PO of this order carries) — owner
+   *  decision 2026-09-25: the Supplier card counts every goods need. */
+  stock: { ready: number; total: number; site: string | null } | null;
+  /** Pieces short on those stock-served lines — goods that need a PO. */
+  needPoCount: number;
 }
 
 const RANK: Record<SupplierRowState, number> = {
@@ -134,6 +142,11 @@ export function supplierCardModel(input: {
   todayIso: string;
   holidays?: WorkingDayOptions["holidays"];
   pos: ReadonlyArray<SupplierPoFact>;
+  /** The Sales Order's goods lines (Delivery's readiness: qty and pieces the
+   *  register does not hold). Omitted ⇒ no stock row is drawn. */
+  goods?: ReadonlyArray<{ sku: string; qty: number; shortQty: number }>;
+  /** Where the reserved Units sit (Stock's Site), when known. */
+  stockSite?: string | null;
   spell: (iso: string) => string;
 }): SupplierCardModel {
   const today = input.todayIso.slice(0, 10);
@@ -216,8 +229,18 @@ export function supplierCardModel(input: {
   const grns = rows.map((r) => r.grnIso).filter((v): v is string => Boolean(v)).map((v) => v.slice(0, 10)).sort();
   const count = (s: SupplierRowState) => rows.filter((r) => r.state === s).length;
 
+  /* Every goods need of the order: a line no PO of this order carries is
+     served from stock; its short pieces are goods that need a PO. */
+  const poSkus = new Set(rows.flatMap((r) => (r.lines ?? []).map((l) => normalizeSkuKey(l.sku) || l.sku)));
+  const stockLines = (input.goods ?? []).filter((g) => !poSkus.has(normalizeSkuKey(g.sku) || g.sku));
+  const stockTotal = stockLines.reduce((n, g) => n + Math.max(0, g.qty), 0);
+  const needPoCount = stockLines.reduce((n, g) => n + Math.max(0, g.shortQty), 0);
+  const stock = stockTotal > 0 ? { ready: Math.max(0, stockTotal - needPoCount), total: stockTotal, site: input.stockSite ?? null } : null;
+
   let status: SupplierCardModel["status"];
-  if (total === 0) status = { text: SUPPLIER_CARD_COPY.none, tone: "future" };
+  if (total === 0 && needPoCount > 0) status = { text: SUPPLIER_CARD_COPY.needPo(needPoCount), tone: "attention" };
+  else if (total === 0 && stock) status = { text: SUPPLIER_CARD_COPY.fromStock(stock.ready, stock.total), tone: stock.ready === stock.total ? "done" : "future" };
+  else if (total === 0) status = { text: SUPPLIER_CARD_COPY.none, tone: "future" };
   else {
     /* Group progress, then the highest-material exception — never a name. */
     const progress =
@@ -261,5 +284,7 @@ export function supplierCardModel(input: {
     arrivalRange: dates.length ? { fromIso: dates[0], toIso: dates[dates.length - 1] } : null,
     latestGrnIso: grns.length ? grns[grns.length - 1] : null,
     arrivalMissedCount: count("arrivalMissed"),
+    stock,
+    needPoCount,
   };
 }

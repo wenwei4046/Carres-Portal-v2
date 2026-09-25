@@ -195,3 +195,32 @@ describe("review fix (#1613): Purchasing anchors on the ETA only", () => {
   });
 });
 
+describe("owner decisions 2026-09-25 — Expected arrival, and every goods need counts", () => {
+  it("the supplier's newest promised date is labelled Expected arrival", async () => {
+    const { SUPPLIER_CARD_COPY } = await import("./supplier-card");
+    expect(SUPPLIER_CARD_COPY.latest).toBe("Expected arrival");
+    expect(SUPPLIER_CARD_COPY.poDate).toBe("PO Delivery Date");
+  });
+
+  it("goods short with no PO (production SO-1222: 0 of 5, 5 short) → the Sales Order must issue one", () => {
+    const m = supplierCardModel({ todayIso: "2026-07-16", pos: [], goods: [{ sku: "M1", qty: 5, shortQty: 5 }], spell });
+    expect(m.status).toEqual({ text: "No purchase order for this Sales Order · 5 items need one", tone: "attention" });
+    expect(m.needPoCount).toBe(5);
+    expect(m.stock).toEqual({ ready: 0, total: 5, site: null });
+  });
+
+  it("goods served from stock print their own row; a PO line is not stock", () => {
+    const m = supplierCardModel({
+      todayIso: "2026-10-16",
+      pos: [po({ lines: [{ sku: "mattress:M1401F-K", qty: 1 }] })],
+      goods: [{ sku: "mattress:M1401F-K", qty: 1, shortQty: 1 }, { sku: "pillow:P01", qty: 2, shortQty: 0 }],
+      stockSite: "Carres Klang Warehouse",
+      spell,
+    });
+    expect(m.stock).toEqual({ ready: 2, total: 2, site: "Carres Klang Warehouse" });
+    expect(m.needPoCount).toBe(0);
+    const all = supplierCardModel({ todayIso: "2026-10-16", pos: [], goods: [{ sku: "P01", qty: 2, shortQty: 0 }], spell });
+    expect(all.status.text).toBe("From stock · 2 of 2 ready");
+  });
+});
+

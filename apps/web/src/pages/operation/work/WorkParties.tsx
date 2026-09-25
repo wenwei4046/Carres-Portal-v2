@@ -159,7 +159,9 @@ function Mission({
   /* The supplier competes for the blue only with a row that draws a button —
      the same predicate the card uses (`supplierActRowOf`). */
   const actRow = supplier.model ? supplierActRowOf(supplier.model.rows) : null;
-  const supplierTiming: Timing = actRow ? (actRow.tone === "missed" ? "missed" : actRow.tone === "current" ? "today" : "ahead") : null;
+  const supplierTiming: Timing = actRow
+    ? actRow.tone === "missed" ? "missed" : actRow.tone === "current" ? "today" : "ahead"
+    : (supplier.model?.needPoCount ?? 0) > 0 ? "ahead" : null;
   const logisticsAct = lm.model?.currentAction ?? null;
   const customerAct = customer.model?.action ?? null;
   const primary = embedded
@@ -176,7 +178,7 @@ function Mission({
   const openHasAct =
     openParty === "logistics" ? Boolean(logisticsAct)
     : openParty === "customer" ? Boolean(customerAct)
-    : openParty === "supplier" ? actRow !== null
+    : openParty === "supplier" ? actRow !== null || (supplier.model?.needPoCount ?? 0) > 0
     : false;
   /* One visible blue: the open card's act when it has one; with every card
      collapsed the summary's button carries it (reported below). */

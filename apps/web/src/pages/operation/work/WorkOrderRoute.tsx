@@ -92,7 +92,8 @@ export function useMissionRoute(orderId: string) {
       proceededIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : o.proceed_date ? o.proceed_date.slice(0, 10) : null,
       loan,
       supplier: supplier ?? null,
-      fromStock: Boolean(supplier && supplier.total === 0 && card.stock.ready),
+      /* From stock only when no goods still need a PO (owner decision 2026-09-25). */
+      fromStock: Boolean(supplier && supplier.total === 0 && supplier.needPoCount === 0 && (supplier.stock || card.stock.ready)),
       contact: { dueIso: lm.model.rows[1].dueIso, state: lm.model.rows[1].state },
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,

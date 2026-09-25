@@ -12,13 +12,14 @@
  * rule is admitted as an embedded action (§5.1).
  */
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { SUPPLIER_CARD_COPY as S, myHolidaySet, supplierCardModel, type SupplierRow } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
-import { useOperationSuppliers, useSupplierCardFacts } from "@/lib/queries";
+import { useLogisticsCardFacts, useOperationSuppliers, useSupplierCardFacts } from "@/lib/queries";
+import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { buildSupplierChase, buildSupplierReminder } from "@/lib/wa-templates";
 import { Fact, PartyCardShell, ToneLine } from "./PartyCardShell";
 
@@ -41,12 +42,21 @@ const poHref = (po: string) => `/operation/procurement?po=${encodeURIComponent(p
 
 export function useSupplierCard(orderId: string) {
   const factsQ = useSupplierCardFacts(orderId);
+  /* Every goods need of the order (owner decision 2026-09-25): Delivery's own
+     readiness per line, and the Site Stock names for the reserved Units. */
+  const scope = useDeliveryScopeCard(orderId);
+  const logisticsQ = useLogisticsCardFacts(orderId);
+  const goods = useMemo(
+    () => (scope.card?.items ?? []).map((l) => ({ sku: l.sku, qty: l.qty, shortQty: l.shortQty })),
+    [scope.card],
+  );
+  const stockSite = (logisticsQ.data?.routes ?? []).find((r) => r.readyUnits > 0)?.place ?? null;
   const model = useMemo(
     () =>
       factsQ.data
-        ? supplierCardModel({ todayIso: appTodayIso(), holidays: myHolidaySet(), pos: factsQ.data.purchaseOrders, spell })
+        ? supplierCardModel({ todayIso: appTodayIso(), holidays: myHolidaySet(), pos: factsQ.data.purchaseOrders, goods, stockSite, spell })
         : null,
-    [factsQ.data],
+    [factsQ.data, goods, stockSite],
   );
   return { factsQ, model };
 }
@@ -65,6 +75,7 @@ export default function SupplierCard({
   onToggle: (open: boolean) => void;
   primary: boolean;
 }) {
+  const navigate = useNavigate();
   const { factsQ, model } = useSupplierCard(orderId);
   const suppliersQ = useOperationSuppliers();
   const groupOf = (name: string | null) =>
@@ -97,13 +108,30 @@ export default function SupplierCard({
           <Button size="touch" onClick={() => void factsQ.refetch()}>Try again</Button>
           <OpenPurchasing />
         </div>
-      ) : model.rows.length === 0 ? (
+      ) : model.rows.length === 0 && !model.stock ? (
         <div className="flex flex-col gap-2">
           <p className="text-body text-kit-slate-11">{S.none}</p>
           <OpenPurchasing />
         </div>
       ) : (
         <>
+          {model.needPoCount > 0 ? (
+            <section aria-label={S.needPo(model.needPoCount)} className="flex flex-col gap-1 border-b border-kit-slate-4 pb-3" data-testid="party-supplier-need-po">
+              <ToneLine tone="attention">{S.needPo(model.needPoCount)}</ToneLine>
+              <span className="self-start">
+                <Button size="touch" icon="open" variant={primary && !firstActionable ? "primary" : "neutral"} onClick={() => navigate(`/operation/orders/so/${encodeURIComponent(orderId)}`)}>
+                  Open Sales Order
+                </Button>
+              </span>
+            </section>
+          ) : null}
+          {model.stock ? (
+            <section aria-label="From stock" className="flex flex-col gap-1 border-b border-kit-slate-4 pb-3 last:border-b-0 last:pb-0" data-testid="party-supplier-stock">
+              <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">
+                {[S.fromStock(model.stock.ready, model.stock.total), model.stock.site].filter(Boolean).join(" · ")}
+              </span>
+            </section>
+          ) : null}
           {model.rows.map((row) => (
             <SupplierRowView
               key={row.poNo}

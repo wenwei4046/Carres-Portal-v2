@@ -4,7 +4,7 @@
  * and never repeated inside a party card. Every value is the feed's own fact.
  */
 import type { OperationWorkItem } from "@carres/shared";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate } from "@/lib/fmt-date";
 import { WORK_MODULE_WORD } from "./module-word";
 import { WorkSection } from "./WorkCard";
 
@@ -29,17 +29,17 @@ export default function WorkOwnerSource({ item }: { item: OperationWorkItem }) {
             </>
           ) : null}
           <dt className="text-kit-slate-11">Action day</dt>
-          <dd className="text-kit-slate-12">{item.timing.actionOn ? fmtDateShort(item.timing.actionOn) : item.timing.noDateReason ?? "No working date"}</dd>
+          <dd className="text-kit-slate-12">{item.timing.actionOn ? fmtDate(item.timing.actionOn) : item.timing.noDateReason ?? "No working date"}</dd>
           {item.timing.businessDueOn && item.timing.businessDueOn !== item.timing.actionOn ? (
             <>
               <dt className="text-kit-slate-11">Due</dt>
-              <dd className="text-kit-slate-12">{fmtDateShort(item.timing.businessDueOn)}</dd>
+              <dd className="text-kit-slate-12">{fmtDate(item.timing.businessDueOn)}</dd>
             </>
           ) : null}
           <dt className="text-kit-slate-11">Source</dt>
           <dd className="text-kit-slate-12">{WORK_MODULE_WORD[item.module]} · {item.object.label}</dd>
           <dt className="text-kit-slate-11">Read</dt>
-          <dd className="text-kit-slate-12">{`${fmtDateShort(read)}, ${fmtDate(read, { timeOnly: true })}`}</dd>
+          <dd className="text-kit-slate-12">{fmtDate(read, { time: true })}</dd>
         </dl>
       </details>
     </WorkSection>
