@@ -349,6 +349,8 @@ export function projectSalesOrdersFromModuleFacts(input: {
 interface ManualPurchaseRegisterSource {
   requests: Array<{
     id: string;
+    /** `MPR250924-4827` (0546); absent on an older API. */
+    req_no?: string | null;
     purpose: string;
     destination_id: string | null;
     why: string | null;
@@ -909,6 +911,7 @@ export function manualPurchaseWorkInputsFromRegister(
     );
     return {
       requestId: request.id,
+      reference: request.req_no ?? null,
       context: manualPurchaseWorkContext({
         purposeLabel: demandPurposeLabelOf(request.purpose) ?? request.purpose,
         forText: manualPurchaseForOf({
@@ -1094,7 +1097,10 @@ export function projectManualPurchaseWork(input: {
         object: {
           kind: "manual_purchase",
           id: request.requestId,
-          label: request.context,
+          /* The document number is the reference (owner review 2026-09-25
+             item 6/7): the composed context read `Manual Purchase Request ·
+             Ready Stock · Ohana · Ohana` and overflowed the panel's button. */
+          label: request.reference ?? request.context,
         },
         problem: approval ? "Approval required" : "Purchase order required",
         recipient: request.recipient ?? null,

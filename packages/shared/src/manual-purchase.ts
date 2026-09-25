@@ -1357,6 +1357,9 @@ export interface ManualPurchaseWorkInput {
   /** The composed business context (`manualPurchaseWorkContext`) — the
    *  visible reference the Work row prints instead of a document number. */
   context: string;
+  /** The MPR number (`req_no`, 0546) — the Work row's document reference
+   *  when it exists; the context stands in only while it does not. */
+  reference?: string | null;
   status: ManualPurchaseStatusKind;
   /** Live remainder still issuable (`manualPurchaseLineRemainingOf` summed). */
   remainingQty: number;

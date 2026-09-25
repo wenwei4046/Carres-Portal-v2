@@ -288,6 +288,14 @@ describe("operation Work response composition", () => {
       "/operation?tab=manual-purchase&mp=request-1",
     );
     expect(issuance[0]?.requiredResult).toBe("Purchase order issued");
+    /* Owner review 2026-09-25 (items 6/7): the document number is the
+       reference; the composed context stands in only while none exists. */
+    expect(issuance[0]?.object.label).toBe("Manual Purchase · Office use · Klang · Nice Future");
+    const numbered = projectManualPurchaseWork({
+      requests: [{ ...common, reference: "MPR250924-4827", status: "ready_to_order" }],
+      approver: null, poDuty, today: "2026-09-06",
+    });
+    expect(numbered[0]?.object.label).toBe("MPR250924-4827");
   });
 
   it("an ISSUED Manual Purchase raises no work for a missing send confirmation", () => {
