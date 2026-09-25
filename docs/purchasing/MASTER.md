@@ -4489,6 +4489,46 @@ the REGISTER, not a creation screen, so the screen that calls it is a later scop
 owner decision. The evidence viewer is not wired either: the entries carry the door and say
 why they are inactive. The populated-record and physical lifecycle walk remains owed.
 
+**CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Measured the same day: all 71
+claims carry no `carres_execution`; `POST /:id/carres-execution` exists with no web caller; the
+returns API has only `GET /`; `purchasing_issue_purchase_return` (0548) has no screen; the record
+offers `Plan Repair` / `Plan Supplier replacement` links and nothing for a return. The approved
+chain lives on the ONE claim record, both ways to the same facts:
+
+```text
+From Work:    `Issue the purchase return to {Supplier}` → claim record
+From module:  Supplier Claims → Supplier Claim No → the same record
+Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Issue Purchase Return`
+              → send (shared send area) → Confirm tomorrow's pickup → Outbound handover (Stock)
+              → Supplier Received Date
+```
+
+- **`Record what Carres does next`** on the record's Result section writes `carres_execution`
+  through the existing route; options are the five stored values, displayed `Return to supplier` ·
+  `Collect defective item` · `Replace first` · `Collect first` · `Exchange on collection`. It is
+  a Carres commitment: PO Duty, dated cover or Operations Superuser only.
+- **`Issue Purchase Return`** appears once `Return to supplier` is recorded and calls the 0548 door
+  through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
+  held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
+  (defaults from each Unit's current Stock Location; editing moves nothing) · `Return To` (the
+  supplier's recorded return address from Supplier Master; absent → `Add the return address of
+  {Supplier}`, never the registered address by assumption) · `Confirmed Pickup` (optional at
+  issue). Issue writes the PRTN row and its Units and moves no stock. A Unit changed under the
+  form is refused by name; `No return was issued.`
+- **Sending** uses the shared document send area (`Return document sent to supplier`; the
+  document-agnostic send ledger §9.7 requires); 50/50 during issue/revision, full width after.
+- **Pickup:** one Office working day before `Confirmed Pickup Date`, Work
+  `Confirm tomorrow's pickup · {Supplier}` (same rule as the PO day-before check); a passed date
+  with nothing collected reads `Pickup missed · Follow up supplier`. The physical handover is
+  Stock's Outbound `Return to supplier` (Stock §12.8) — collector, time, exact Units, proof —
+  read here as `Not picked up` · `Partly picked up` · `Fully picked up`. `Supplier Received Date`
+  is recorded from supplier evidence; fully picked up never implies it.
+- **Record states:** `What Carres does · Not recorded` → `Return to supplier` (Issue available) →
+  `Return document not sent` → `Return document sent · {channel} · {date}` → `Pickup date not
+  confirmed` / confirmed → picked-up facts → `Supplier Received Date`.
+- **Responsive:** ≥1180 form + PDF side by side; 820/743 stacked, PDF below; 390 full width, one
+  Unit tick per row, 40px bottom actions.
+
 **Authenticated readback — 2026-09-24, existing register only.** On production
 `893b7f33d54ecd3c0ab51755d6d98d09f47407d2`, principal opened Purchase Returns from its
 existing route. Loading resolved to `No purchase returns.` and `0 returns · 0 Units`,
