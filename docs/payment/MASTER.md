@@ -271,8 +271,15 @@ Customer card         collapsed: Delivery's own line, unchanged (no money repeat
                       · Last answer {result · day} · Payment's Communication History (read, not copied)
 ```
 
-The three doors open Payment's own compositions in place (the way the Logistics card embeds
-Delivery's forms); Work draws no form and stores nothing. The card and the Summary print the
+**ONE PAYMENT SECTION, TWO FRAMES — owner approval 2026-09-25.** The three doors, the Documents
+list (Receipts · Invoice · Statement) and Communication History are ONE shared component, the
+`Payment section`: the Work Customer card renders it when expanded, and the Monitor row renders it
+below its fact grid. Same Work item, same completion fact (`Balance due` RM 0), same forms; only
+the frame differs — Work is the mission view of one Sales Order (all parties), the Monitor is the
+money view (status rail + fact grid). The doors open Payment's own compositions in place (the way
+the Logistics card embeds Delivery's forms); Work draws no form and stores nothing. The Monitor's
+door strip is `Record payment` · `Ask customer to pay` (the blue) · `⋯` (Statement · Print ·
+Create payment link); the rail group `Someone else's` is spelt `Other owners`. The card and the Summary print the
 Monitor's `Payment timing` fact family and the one money spelling `RM {amount} unpaid` (#1635) — one dictionary.
 
 ### Collection admission — 催钱前先看货
