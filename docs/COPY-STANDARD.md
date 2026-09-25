@@ -3426,7 +3426,7 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Supplier row labels | `PO Delivery Date` (the original, never changes) · ⭐ `Expected arrival` (the supplier's newest promised date) · `From stock · {ready} of {total} ready` · `No purchase order for this Sales Order · {n} items need one` · `{n} items need a PO` · `Open Sales Order` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Not needed yet` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Message copied` · `The message could not be copied. Try again.` · `Supplier details could not be loaded.` · `Try again` | Stock received · `Latest date` |
 | Permission | `You cannot view this record` · `Ask an authorised operation user for access.` | leaked party or money facts |
 
-## The PO window card words — owner rulings 2026-09-24/25 · BUILT, awaiting owner review (not live)
+## The PO window card words — owner rulings 2026-09-24/25, card words chosen by Jess 2026-09-25 · BUILT, not live
 
 Purchasing §5.6.1 owns the window law; Workspace §6.1 owns the card. One Work card per PO window —
 never one `Issue PO` card per Sales Order. The send lines are Jess's own wording (2026-09-25).
