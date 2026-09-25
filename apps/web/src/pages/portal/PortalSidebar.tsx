@@ -157,7 +157,11 @@ const PAYMENTS: PortalSection = "Payments";
  * each gated by role so an operation user never calls the principal dashboard
  * API (and vice-versa).
  */
-export default function PortalSidebar() {
+export default function PortalSidebar({ drawer = false }: {
+  /** Below 768px the rail is a slide-in drawer (owner review 2026-09-25):
+   *  always the named rail, no collapse toggle of its own. */
+  drawer?: boolean;
+} = {}) {
   const role = useAuth((s) => s.role);
   const session = useAuth((s) => s.session);
   const email = session?.user?.email ?? "";
@@ -185,7 +189,7 @@ export default function PortalSidebar() {
   // Collapse — self-owned, persisted. Icon rail = more room for wide tables.
   /* Names by default from 1280px (owner review 2026-09-25 item 9); a narrower
      window starts as icons so Work keeps its two panels. */
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
+  const [storedCollapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return (
         localStorage.getItem(COLLAPSE_KEY) === "1" ||
@@ -204,6 +208,8 @@ export default function PortalSidebar() {
     media.addEventListener("change", collapseAtNarrowDesktop);
     return () => media.removeEventListener("change", collapseAtNarrowDesktop);
   }, []);
+  /* A drawer is always the named rail. */
+  const collapsed = drawer ? false : storedCollapsed;
   const toggleCollapse = () =>
     setCollapsed((c) => {
       const next = !c;

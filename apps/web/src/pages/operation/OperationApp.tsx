@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
 import {
   Navigate,
   Route,
@@ -121,6 +122,12 @@ import type { MovementsFilters } from "@/lib/queries";
  */
 export default function OperationApp() {
   const location = useLocation();
+  const phone = usePhone();
+  const [menuOpen, setMenuOpen] = useState(false);
+  /* A chosen page closes the drawer. */
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname, location.search]);
   const navigate = useNavigate();
   // Presence heartbeat (0235, Jess: opens portal = came to work = available
   // for auto-assign; MC/no-show = never stamped = skipped). Stamps the
@@ -332,11 +339,48 @@ export default function OperationApp() {
       style={{
         // PortalSidebar owns its own collapse state + intrinsic width (232px
         // expanded ⇄ icon rail collapsed), so the grid column just follows it.
-        gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        // On a phone (owner review 2026-09-25) the page has the whole width:
+        // the rail is a drawer behind `Menu`, and the right rail is not drawn.
+        gridTemplateColumns: phone ? "minmax(0, 1fr)" : "auto minmax(0, 1fr) auto",
       }}
     >
-      <PortalSidebar />
+      {phone ? (
+        <>
+          {menuOpen ? (
+            <button
+              type="button"
+              aria-label="Close menu"
+              data-testid="phone-menu-backdrop"
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-40 bg-base-900/40"
+            />
+          ) : null}
+          <div
+            data-testid="phone-menu"
+            aria-hidden={!menuOpen}
+            className={`fixed inset-y-0 left-0 z-50 shadow-lg transition-transform duration-[180ms] motion-reduce:transition-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+          >
+            <PortalSidebar drawer />
+          </div>
+        </>
+      ) : (
+        <PortalSidebar />
+      )}
       <main className="min-w-0 bg-base-50 flex flex-col overflow-hidden">
+        {phone ? (
+          <div className="flex h-11 shrink-0 items-center border-b border-base-200 bg-white px-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-expanded={menuOpen}
+              data-testid="phone-menu-button"
+              className="inline-flex h-9 items-center gap-2 rounded-control px-2 text-control text-base-900 hover:bg-hovertint"
+            >
+              <Menu size={18} />
+              Menu
+            </button>
+          </div>
+        ) : null}
         {/* Site-wide utility bar (Alerts · Help · Settings) — pinned above the
             routed page on every operation screen. The Orders list is the ONE
             exception: its own white header surface embeds <TopBarIcons />, so
@@ -661,7 +705,27 @@ export default function OperationApp() {
           the Sales Orders routes, same as every other operation page. This
           supersedes SO-1's "rail not mounted" ruling — later owner statement
           wins (BUILD-QUEUE governance). */}
-      <OperationRightRail />
+      {phone ? null : <OperationRightRail />}
     </div>
   );
+}
+
+/** Below 768px the shell is the phone shell (owner review 2026-09-25). */
+function usePhone(): boolean {
+  const query = "(max-width: 767px)";
+  const [phone, setPhone] = useState<boolean>(() => {
+    try {
+      return window.matchMedia?.(query).matches === true;
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    const media = window.matchMedia?.(query);
+    if (!media) return;
+    const onChange = (event: MediaQueryListEvent) => setPhone(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+  return phone;
 }

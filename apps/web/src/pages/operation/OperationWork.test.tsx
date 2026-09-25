@@ -247,11 +247,11 @@ describe("Operation Work — one server feed", () => {
       expect(within(rows[0]).getByTestId("work-compact-module")).toBeInTheDocument();
       expect(within(rows[0]).getByTestId("work-view-mine")).toBeInTheDocument();
       expect(within(rows[1]).getByRole("searchbox")).toBeInTheDocument();
-      expect(within(rows[1]).getByRole("button", { name: "Covering for others" })).toBeInTheDocument();
+      expect(within(rows[1]).getByRole("button", { name: "Covering" })).toBeInTheDocument();
       for (const control of [
         screen.getByTestId("work-compact-date"),
         screen.getByRole("searchbox"),
-        screen.getByRole("button", { name: "Covering for others" }),
+        screen.getByRole("button", { name: "Covering" }),
       ]) {
         // 40px below 768px, 36px from 768px; 14/20 type.
         expect(control.className).toContain("h-10");
@@ -277,7 +277,7 @@ describe("Operation Work — one server feed", () => {
       expect(toolbar.className).toContain("flex-wrap");
       for (const row of within(toolbar).getAllByTestId(/^work-toolbar-row-/)) expect(row.className).toBe("contents");
       expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-60");
-      expect(screen.getByRole("button", { name: "Covering for others" }).className).toContain("min-[768px]:h-9");
+      expect(screen.getByRole("button", { name: "Covering" }).className).toContain("min-[768px]:h-9");
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
     }

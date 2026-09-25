@@ -492,3 +492,48 @@ describe("OperationApp — the retired Payments desk", () => {
     expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
   });
 });
+
+describe("OperationApp — the phone shell (owner review 2026-09-25, round 2)", () => {
+  function phoneMedia(matches: boolean) {
+    const previous = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: matches && query === "(max-width: 767px)",
+        media: query, onchange: null,
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+      })),
+    });
+    return () => Object.defineProperty(window, "matchMedia", { configurable: true, value: previous });
+  }
+
+  it("below 768px: no right rail, the sidebar waits behind Menu, and a chosen page closes it", () => {
+    const restore = phoneMedia(true);
+    try {
+      renderApp("/operation?tab=dashboard");
+      expect(screen.queryByTestId("right-rail-stub")).toBeNull();
+      const drawer = screen.getByTestId("phone-menu");
+      expect(drawer.className).toContain("-translate-x-full");
+      fireEvent.click(screen.getByTestId("phone-menu-button"));
+      expect(drawer.className).toContain("translate-x-0");
+      expect(screen.getByTestId("phone-menu-backdrop")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("phone-menu-backdrop"));
+      expect(drawer.className).toContain("-translate-x-full");
+    } finally {
+      restore();
+    }
+  });
+
+  it("from 768px the shell is unchanged: sidebar column, right rail, no Menu", () => {
+    const restore = phoneMedia(false);
+    try {
+      renderApp("/operation?tab=dashboard");
+      expect(screen.getByTestId("right-rail-stub")).toBeInTheDocument();
+      expect(screen.queryByTestId("phone-menu-button")).toBeNull();
+      expect(screen.getByTestId("sidebar-stub")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+});
