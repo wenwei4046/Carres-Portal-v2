@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -30,32 +31,45 @@ operationStockRouter.use("*", async (c, next) => {
 operationStockRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
+  // Every list read is paged: PostgREST stops a read at 1000 rows, and past
+  // that the catalog silently lost SKUs. Each page orders by a unique key so
+  // no row is skipped or repeated between pages.
   const [warehousesRes, balancesRes, thresholdsRes, skusRes, poLinesRes] = await Promise.all([
     sb.from("warehouses").select("id, name").order("name"),
     // 0366 — availability comes from the UNIT REGISTER through the one
     // authority. `stock_balances` supplies only its alert threshold, which is
     // Settings; it may not answer how much we can offer.
-    sb
+    readAllPages((a, b) => sb
       .from("stock_sku_availability")
-      .select("sku, warehouse_id, on_hand, sellable, reserved"),
-    sb.from("stock_balances").select("sku, low_threshold"),
-    sb
+      .select("sku, warehouse_id, on_hand, sellable, reserved")
+      .order("sku").order("warehouse_id")
+      .range(a, b)),
+    readAllPages((a, b) => sb
+      .from("stock_balances")
+      .select("sku, low_threshold")
+      .order("sku").order("warehouse_id")
+      .range(a, b)),
+    readAllPages((a, b) => sb
       .from("product_skus")
       .select("sku, price, product_models(name, category)")
-      .is("discontinued_at", null),
+      .is("discontinued_at", null)
+      .order("sku")
+      .range(a, b)),
     // `purchase_orders.sku/qty` was retired in Phase 4.5 Chunk 2; the live
     // shape is per-line via `purchase_order_lines`. Outstanding = qty -
     // received_qty so partially-received POs still count their remainder.
-    sb
+    readAllPages((a, b) => sb
       .from("purchase_order_lines")
       .select("sku, qty, received_qty, purchase_orders!inner(status)")
-      .eq("purchase_orders.status", "open"),
+      .eq("purchase_orders.status", "open")
+      .order("id")
+      .range(a, b)),
   ]);
   if (warehousesRes.error) throw new HTTPException(500, { message: warehousesRes.error.message });
-  if (balancesRes.error) throw new HTTPException(500, { message: balancesRes.error.message });
-  if (thresholdsRes.error) throw new HTTPException(500, { message: thresholdsRes.error.message });
-  if (skusRes.error) throw new HTTPException(500, { message: skusRes.error.message });
-  if (poLinesRes.error) throw new HTTPException(500, { message: poLinesRes.error.message });
+  const balances = rowsOrThrow(balancesRes);
+  const thresholds = rowsOrThrow(thresholdsRes);
+  const skuRows = rowsOrThrow(skusRes);
+  const poLines = rowsOrThrow(poLinesRes);
 
   const warehouses = (warehousesRes.data ?? []).map((w) => ({ id: w.id, name: w.name }));
 
@@ -63,7 +77,7 @@ operationStockRouter.get("/", async (c) => {
   const balanceMap = new Map<string, Map<string, Balance>>();
   const lowThresholdMap = new Map<string, number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ((balancesRes.data ?? []) as any[]).forEach((b) => {
+  (balances as any[]).forEach((b) => {
     if (!b.sku || !b.warehouse_id) return;
     let perSku = balanceMap.get(b.sku);
     if (!perSku) {
@@ -77,14 +91,15 @@ operationStockRouter.get("/", async (c) => {
     });
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ((thresholdsRes.data ?? []) as any[]).forEach((t) => {
+  (thresholds as any[]).forEach((t) => {
     if (!t.sku) return;
     lowThresholdMap.set(t.sku, Number(t.low_threshold ?? 0));
   });
 
   const incomingMap = new Map<string, number>();
   let openPoLineCount = 0;
-  (poLinesRes.data ?? []).forEach((l) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (poLines as any[]).forEach((l) => {
     if (!l.sku) return;
     const outstanding = Math.max(Number(l.qty ?? 0) - Number(l.received_qty ?? 0), 0);
     if (outstanding > 0) {
@@ -93,7 +108,8 @@ operationStockRouter.get("/", async (c) => {
     }
   });
 
-  const skus = (skusRes.data ?? []).map((s) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skus = (skuRows as any[]).map((s) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = Array.isArray((s as any).product_models) ? (s as any).product_models[0] : (s as any).product_models;
     const perWh = balanceMap.get(s.sku) ?? new Map<string, Balance>();
@@ -135,6 +151,13 @@ operationStockRouter.get("/", async (c) => {
 });
 
 export default operationStockRouter;
+
+/** The rows of a paged read, or a 500 — never a silently shorter list. */
+function rowsOrThrow(read: Awaited<ReturnType<typeof readAllPages>>) {
+  if ("error" in read) throw new HTTPException(500, { message: read.error.message });
+  if ("tooMany" in read) throw new HTTPException(500);
+  return read.rows;
+}
 
 /** A SKU's sellable total across warehouses (0368 — summed from the
  *  authority). The stock page and the one-order Work probe use this one sum. */
