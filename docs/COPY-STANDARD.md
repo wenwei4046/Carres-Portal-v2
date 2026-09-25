@@ -3394,6 +3394,37 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 **`Contact logistics today` is the owner's exact phrase** and is the one admitted use of `today` in
 an action line: it prints only on or after the check's own date, beside that date.
 
+## The Work right panel words — owner approval 2026-09-25 · APPROVED (build in progress)
+
+The rest of the right panel (`workspace/MASTER.md` §5.9). Owner words are marked ⭐. Where an older
+ban in this file disagrees, these exact phrases win for THIS surface only: ⭐ `Contact due today`,
+⭐ `No answer · Follow up today` and ⭐ `Waiting for customer` are admitted status lines on the
+Customer card and nowhere else; `Follow up` alone, `Send` and a bare `Waiting` stay banned.
+
+| Where | The words |
+|---|---|
+| Work summary | `{object} · {module}` · the feed's problem · the feed's action · `Open {object}` |
+| Order Route heading | `Order Route` · `{n} days left` · `Due today` · `{n} days late` |
+| Route points | ⭐ `Proceed` · ⭐ `Loan` · ⭐ `PO` · ⭐ `GRN` · ⭐ `Contact` · ⭐ `Delivery` |
+| Route statuses | `Done` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `Not issued` · `{n} of {m} issued` · `Issued` · `{n} delayed` · `From stock` · `{r} of {m} received` · `Received` · `In stock` · `Due today` · `Due {date}` · `Missed` · `Delivered` · `Scheduled` · `Requested` · `No date` |
+| Route payment line | `Payment · RM {amount} to collect by {date}` · `Payment · Finance is holding this delivery` |
+| Route detail row | `{supplier}  Issued · Expected {date}` · `{supplier}  Not issued` · `{supplier}  Received {date}` / `Not received yet` · `Customer` · `Logistics` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` |
+| Party progress | Logistics `Checks {n} of 3` · Customer and Supplier `{n} of {m}` |
+| Customer status (one line, collapsed) | `Delivered {date}` · `Customer refused delivery` · `Phone number is wrong` · ⭐ `Customer requested another date · {date}` · ⭐ `No answer · Follow up today` · ⭐ `Waiting for customer · reply due {date}` · `Contact missed {date}` · ⭐ `Scheduled {date}` (· ⭐ `Contact due today`) · ⭐ `Contact due today` · `Contact due {date}` · `{company} contacts the customer · by {date}` |
+| Customer current action | ⭐ `Contact customer today` · `Contact customer by {date}` · `Agree the delivery date, then record the reply` · `{company} contacts the customer.` |
+| Customer checks | `Customer contacted` · `Delivery date agreed` · `Address and access checked` |
+| Customer sections | `Current action` · `Checks` · `Delivery` · `Contact` · `Evidence and recent history` · `Carres contacts this customer` · `{company} contacts this customer` · `No email recorded` · `No contact recorded yet` |
+| Customer buttons | `WhatsApp` · `Email` · `Record reply` · `Open Sales Order` |
+| Record reply | `Channel` · `WhatsApp` · `Call` · `Email` · ⭐ `Accepted date` · ⭐ `Requested another date` · ⭐ `No answer` · ⭐ `Delivery details changed` · `Phone number is wrong` · `Customer refused delivery` · `Date the customer asked for` · `WhatsApp reply` · `Address and access checked with the customer` · `Save reply` · `Cancel` · `Change the address in the Sales Order, then record the reply.` · toasts `Reply recorded` · `The reply could not be recorded. Try again.` · refusal `Upload the customer's WhatsApp reply first.` |
+| Contact result words (history) | `Accepted date` · `Waiting for customer` · `No answer` · `Asked to call again` · `Requested another date` · `Phone number is wrong` · `Customer refused delivery` |
+| Supplier status (collapsed) | `{i} of {n} POs issued` · `{d} of {n} dates ready` · `{k} supplier delayed` · `{name} delayed to {date}` · `GRN received for {r} of {n}` · `No purchase order for this Sales Order`; heading `Supplier · {name}` / `Supplier · {n} suppliers` |
+| Supplier rows | `PO Delivery Date` · `Latest date` · `Confirmed` · `Earlier` · `Delayed · {reason}` · `Reported` · `Not confirmed` · `Evidence` · `Supplier DO` · `Needed by {date}` · `Not needed yet` · `Deliver to` · `GRN` · `Received {date}` · `Not received yet` · `Not issued` · `Open {PO No}` |
+| Communication | ⭐ `WhatsApp` · `Email` · `To {name} · {phone}` · `Template` · `Confirm delivery date` · `Copy message` · `Open WhatsApp` · ⭐ `Was this message sent?` · ⭐ `Record as sent` · ⭐ `Not sent` · `WhatsApp unavailable · No phone number` · `Email unavailable · No email recorded` |
+| Customer message | ⭐ `Hello {Name}, this is Carres about your order {REF}. We are arranging your delivery for {date}. Please reply to confirm this date, or tell us a date that suits you.` |
+| Owner, timing and source | `Owner, timing and source` · `Normal owner` · `Acting today` · `Action day {date}` · `No working date` · `Due {date}` · `Source` · `Read {date, time}` |
+| Panel states | `Select a work item` · `Choose an item from the Work list to see its mission.` · `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` · `Some information could not be refreshed.` · `Try again` · `Customer contact unavailable` · `Scheduled delivery unavailable` · `You do not have access to this work` |
+| Tabs | ⭐ `To do` · ⭐ `Waiting` · ⭐ `Completed` (tab names only — never a row status) · `No work waiting for this selection.` · `No work completed for this selection.` |
+
 ## Numbers, dates, money
 
 - **Numbers**: tabular-nums font (`tabular-nums` class). `3 units` / `12 orders`.

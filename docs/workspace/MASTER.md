@@ -685,8 +685,8 @@ the same group and item grammar; zero matches is not the same as zero work.
   and the 32×32 open button with a 14px icon — it may overhang the footer by 2px; the card never
   grows for it. The loading skeleton is the same 104px / 60px geometry. In a 704px list viewport
   six cards show whole (6 × 104 + 5 × 8 = 664px). At 743px the card keeps exactly this geometry.
-- The detail column stacks independent white sections: the selected action's header, its action
-  section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order.
+- The detail column is the right panel (§5.9): Work summary → Order Route → Logistics → Customer →
+  Supplier → Owner, timing and source, each its own white section 8px apart.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
@@ -726,7 +726,8 @@ Status text that must wrap does not use the truncating `StatusPill`. A shared `A
 govern one initials algorithm plus full-name hover/focus/tap behaviour; Work may not choose among
 page-local avatar recipes. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
 (provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (structured detail and
-host for an admitted owning-module component). None calculates business dates, ownership, severity, completion or source health. They are
+host for an admitted owning-module component), and the right-panel pieces `PartyCardShell`,
+`CustomerCard`, `SupplierCard`, `LogisticsCard`, `WorkOrderRoute` and `WorkOwnerSource` (§5.9). None calculates business dates, ownership, severity, completion or source health. They are
 not promoted into the global kit until a separately governed second use exists.
 
 ### 5.6 · Priority, due and SLA law
@@ -801,8 +802,8 @@ Work is ready for owner acceptance only when all are demonstrable:
   job stays in its own group with `Blocked by {dependency}`;
 - rows are at least 64px and never truncate; after a confirmed completion the receipt stays in place,
   the next row is selected with focus on it, `Enter` moves into Panel 3 and `O` opens the object;
-- at a 768–1103px canvas Panel 1 plus one work column shows; choosing a job replaces the column and
-  `Back to work` returns focus to the same row;
+- below a 960px Work page the list and the detail share one stage; choosing a job replaces the list
+  and `Back to work` returns focus to the same row (§5.5);
 - a communication job renders only the owning module's `Open WhatsApp group` / `Open WhatsApp` /
   `Copy message` controls and records nothing when they are used;
 - each occurrence's interaction mode is explicit; an embedded action uses the owning component/API,
@@ -818,40 +819,143 @@ Work is ready for owner acceptance only when all are demonstrable:
 - later holder/cover changes cannot rewrite completed actor evidence. Site-queue race acceptance is
   deferred with Warehouse Outbound and is not a Work v1 acceptance condition.
 
-### 5.9 · Party cards — Logistics · Customer · Supplier (owner rulings 2026-09-24, APPROVED / BUILT)
+### 5.9 · The right panel — owner approval 2026-09-25, APPROVED (Logistics BUILT 2026-09-24 · the rest APPROVED TARGET, build in progress)
 
-When the selected work names exactly ONE Sales Order (a `sales_order` / `delivery_scope` object,
-a Delivery Order, or an `SO-{n}` label), the detail column adds one white section per outside
-party: **Logistics** (the one card with an approved specification and its own acts), **Customer**
-and **Supplier** (the same stable shell, existing facts only, one door to their owner, no new SOP).
-A work item that names several orders, or an order Delivery cannot read, draws no party card —
-never a guessed `Logistics not assigned`. Loan appears only when a loan record exists (not built).
+**Scope.** Left (Date · Module) and middle (`To do · Waiting · Completed` cards) are the approved,
+deployed baseline (§5.1, §5.5) and are not redesign targets. This section is the whole right panel.
 
-**THE CARD OWNS NO FACT.** Every write goes through a Delivery-owned component or door; the one
-arithmetic is `logisticsCardModel` (`packages/shared/src/logistics-card.ts`); the order's Delivery
-facts come from the Monitor card's own builder (`delivery-scope-card.ts`), the rest from Delivery's
-`GET …/delivery-arrangements/:orderId/logistics-card`.
-
-#### Collapsed — at most five facts
-
+```text
+┌────────────────────────────────────────────┐
+│ ‹ Back to work          (below 960px only) │
+├────────────────────────────────────────────┤
+│ SO-1239 · Delivery                         │  WORK SUMMARY
+│ Customer delivery booking not confirmed    │  what is wrong
+│ Call NETS                     [Open SO-1239]│  what to do · the source door
+├────────────────────────────────────────────┤
+│ ORDER ROUTE                   12 days left │
+│ 18 Sep   20–24 Oct  24 Oct   25 Oct  27 Oct│
+│   ●────────●─────────○────────◉───────◎    │
+│ Proceed   PO        GRN     Contact Delivery│
+│ Done      2 of 3    0 of 3  Due today Sched│
+│ Payment · RM 1,250.00 to collect by 23 Oct │  exception line, only when owed
+├────────────────────────────────────────────┤
+│ Logistics · NETS               Checks 1 of 3 ˅│  72px collapsed
+│ Call NETS                                  │
+│ Get the scheduled delivery date · due 25 Oct│
+├────────────────────────────────────────────┤
+│ Customer · Lim Kuan Yang            1 of 3 ˅│  72px collapsed
+│ Contact due today                          │
+├────────────────────────────────────────────┤
+│ Supplier · 3 suppliers              2 of 3 ˅│  72px collapsed
+│ 2 of 3 dates ready · 1 delayed             │
+├────────────────────────────────────────────┤
+│ Owner, timing and source                 › │
+└────────────────────────────────────────────┘
 ```
-Logistics · AL Logistics                         Checks 1 of 3   ▾   ← heading 15/20/600
-Call AL Logistics                                  ← the ONE current action (14/20/600)
-Get the scheduled delivery date · due 24 Oct       ← result · due (12/16/400; red once missed)
-Scheduled delivery · 27 Oct                        ← only when scheduled; time only when recorded
-⚠ RM 1,250.00 still to collect                     ← ONE exception, only when it affects delivery
+
+**Order at every width:** `Back to work` (below 960px) → Work summary → Order Route → Logistics →
+Customer → Supplier → Owner, timing and source. The route and the party cards appear only when the
+selected work names exactly ONE Sales Order (a `sales_order` / `delivery_scope` object, a Delivery
+Order, or an `SO-{n}` label); a work item naming several orders, or an order Delivery cannot read,
+draws neither — never a guessed state. Loan appears on the route only when a loan record exists.
+
+**THE PANEL OWNS NO FACT.** Every fact is read from its owner and every write goes through the
+owning module's component or door (Architecture Laws A–D). Workspace keeps no copy.
+
+| Fact | Owner | Right-panel treatment |
+|---|---|---|
+| Customer name, phone, email, address, building, Requested delivery, proceed date | Sales Orders | read; changes through `Open Sales Order` |
+| Scheduled delivery (date required, time optional), Delivered, company, link, driver, customer and partner contact records (`ops_delivery_contacts` 0487), who calls the customer (`delivery_partners.customer_contact_by` 0488) | Delivery | read; written only through Delivery components/doors |
+| PO, supplier, original PO Delivery Date, supplier replies/delay reason/evidence, effective arrival (`effectiveArrivalOf`), Supplier DO, Deliver To | Purchasing | read; `Open {PO No}` / `Open Purchasing` |
+| GRN / Goods received date | Receiving / Stock | read |
+| Money owed, payment deadline | Payment (collection clock; Sales Orders owns the DO money gate) | exception line on the route and the Logistics day-before check |
+| Finance hold | Finance | fact only |
+| Loan offer / loan out | Sales Orders (`ops_loan_offers` 0492, `ops_sofa_loans`) | read-only route point |
+| Checks, current lines, route points, waiting state | derived, never stored | `logisticsCardModel` · `customerCardModel` · `supplierCardModel` · `missionRouteModel` (`packages/shared`) |
+
+**Duplication rule.** One sentence lives in one layer. Summary = the selected problem and act
+(`Customer delivery booking not confirmed` · `Call NETS`); route = mission health (`Contact · Due
+today`); a party card = that party's position (`Contact due today`). The route never prints the
+Logistics line; the Customer card never repeats the Logistics scheduled line.
+
+**One primary action.** Across the whole panel exactly ONE button is blue (`primary`). Priority:
+1 missed/urgent act → 2 act due today → 3 the selected work's act → 4 future follow-up. Every other
+act is a secondary button or a link. An admitted embedded action (§5.1) is always the primary.
+
+**One card open at a time.** Opening Logistics collapses Customer and Supplier, and so on. The open
+card stays open after a save or a refresh of the same order. `Escape` collapses the open card and
+returns focus to its heading; opening a card from a route point scrolls it into view.
+
+**Colour.** Done: neutral dark tick (`slate-12`). Current action: blue. Attention: amber. Missed or
+urgent: red. Future or unavailable: grey. No card is coloured green when complete and no card
+carries a coloured border; colour always sits beside words and an icon.
+
+**Dates.** One spelling everywhere in the panel: `27 Oct` (year only when not the current year),
+`18–20 Oct`, `25 Sep, 10:42`. A date never splits over two lines. `Requested delivery` ·
+`Scheduled delivery` · `Delivered` keep their three meanings.
+
+#### Work summary
+
+One white section: `{object} · {module}` 11/14/500 grey · the problem 16/22/600 · the action 13/18
+(`· {recipient}` when the feed carries one) · the secondary `Open {object}` door on the right. When no
+party card exists the required result prints beneath the action (13/18 grey). An admitted embedded
+action (Delivery proof review) renders beneath, with `Finish when: {statement}`, as §5.1 governs.
+
+#### Order Route — one compact line (`missionRouteModel`)
+
+One horizontal line, 88px tall, never a wizard: several modules move at once. Points, left to right,
+each only when it applies:
+
+| Point | Date (top line) | Status (bottom line) | Done when |
+|---|---|---|---|
+| `Proceed` | proceed date | `Done` | the order proceeded |
+| `Loan` (only with a loan record) | latest loan event | `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` | returned or declined |
+| `PO` | effective arrival, one date or `20–24 Oct` range | `Not issued` · `{n} of {m} issued` · `Issued` · `1 delayed` · `From stock` | every PO for the order issued (or the goods are reserved stock) |
+| `GRN` | latest Goods received date | `{r} of {m} received` · `Received` · `In stock` | every PO received at its Warehouse (a Warehouse fact) |
+| `Contact` | the `2 working days before` check date | `Due today` · `Due {date}` · `Missed` · `Done` | Scheduled delivery recorded (the same fact as Logistics check 2) |
+| `Delivery` (final, strongest emphasis) | Delivered, else Scheduled, else Requested | `Delivered` · `Scheduled` · `Requested` · `No date` | Delivered recorded |
+
+There is no `Stock received` point beside GRN and no generic `Receive` point. The top-right reads
+`{n} days left` (calendar days to the Delivery point's date), `Due today`, or `{n} days late` in red;
+nothing once delivered or without a date. Payment is not a point: when money is owed and the order
+is not delivered, one line beneath the route reads `Payment · RM {amount} to collect by {deadline}`
+(the Payment deadline: 2 working days before the delivery date, 3 for outstation), amber once the
+deadline is reached; `Payment · Finance is holding this delivery` when an open Finance exception
+exists. Never `Blocked`.
+
+Exactly one point may be blue (the first actionable point); done is a dark tick, attention amber,
+missed red, future grey. Every point is a keyboard button (`aria-expanded`); pressing one opens ONE
+compact detail row under the route — not a second timeline — with its facts and doors:
+
+```text
+PO · 2 of 3 issued                      Contact
+Sleepwell      Issued · Expected 27 Oct  Customer    Contact due today
+ABC Furniture  Issued · Expected 28 Oct  Logistics   NETS · Not scheduled yet
+XYZ Bedding    Not issued                [Open Customer card] [Open Logistics card]
+[Open Purchasing]
 ```
 
-**Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
-redesigned):** party heading 15/20/600 · current action 14/20/600 · secondary fact 12/16/400 ·
-section label 11/14/600 uppercase · check row 13/18/400 · history row 12/16/400 · button 13/18/500,
-at least 36px tall (40px below 960px). Customer and Supplier headings use the same 15/20/600.
+Narrow screens keep ONE line; when the points do not fit it scrolls sideways inside the route only
+(never the page), the current point is scrolled into view, the first and final points stay
+identifiable, and the detail row opens beneath.
 
-`Logistics not assigned` replaces the heading when no company carries the delivery. Requested
-date, PO, GRN, DO, money-in-general and the check rows never sit on the collapsed card.
-Exception precedence: `Cannot deliver` → Finance hold → money owed → the first day-before gap.
+#### Party cards — the shared shell
 
-#### Expanded — in this order
+Collapsed card: **72px**, 12px sides, heading row `{Party} · {name}` 15/20/600 with its progress on the
+right (12/16) and the ▾ control; then at most two lines — the current act 14/20/600 and one status
+line 12/16 (red when missed). Expanded: sections headed 11/14/600 uppercase, check rows 13/18,
+history rows 12/16, buttons 13/18/500 at least 36px tall (40px below 960px). The whole heading row is
+one button with `aria-expanded`/`aria-controls` and the accessible name `Show {party} details` /
+`Hide {party} details`.
+
+#### Logistics card (BUILT 2026-09-24 — approved; collapsed state reconciled 2026-09-25)
+
+Collapsed (72px): `Logistics · {company}` (or `Logistics not assigned`) · `Checks {n} of 3` · the ONE
+current act · one status line = the exception when one exists (precedence `Cannot deliver` → Finance
+hold → money owed → the first day-before gap), else `{result} · due {date}` (red once missed). The
+scheduled date moved to the route's Delivery point.
+
+Expanded — in this order:
 
 1. **Current action** — the act, its result and due date; the Delivery-owned door opens IN PLACE:
    `Assign logistics` / `Change logistics` (Delivery's `LogisticsDetailsEdit`), `Record scheduled
@@ -859,7 +963,7 @@ Exception precedence: `Cannot deliver` → Finance hold → money owed → the f
    `Open in Delivery` beside it. Work draws no form of its own.
 2. **Checks** — the three fixed rows (below).
 3. **Scheduled delivery** — `Requested delivery` · `Scheduled delivery` (`Not scheduled yet`) ·
-   `Delivered` once recorded. Words, not identical calendar icons, tell the three dates apart.
+   `Delivered` once recorded.
 4. **Assignment** — the company, and whether it answers in its own portal or through the external
    link; `Change logistics`.
 5. **Stock route** — read-only summary (below) with `Open Purchasing`.
@@ -869,11 +973,9 @@ Exception precedence: `Cannot deliver` → Finance hold → money owed → the f
    opening WhatsApp confirms nothing.
 8. **Evidence and recent history** — three-rank lines; a link actor reads `{company} via external link`.
 
-#### The three checks
-
-Anchor: the **Scheduled delivery** date when recorded, else the **Requested delivery** date,
-counted back on the Delivery week (Mon–Sat + Malaysian public holidays). Screen labels only —
-internal keys `t3 · t2 · t1`.
+**The three checks.** Anchor: the **Scheduled delivery** date when recorded, else the **Requested
+delivery** date, counted back on the Delivery week (Mon–Sat + Malaysian public holidays). Screen
+labels only — internal keys `t3 · t2 · t1`.
 
 | Check | Done when (a stored fact) | Not due | Due / missed | The action |
 |---|---|---|---|---|
@@ -882,69 +984,189 @@ internal keys `t3 · t2 · t1`.
 | `1 working day before · {date}` | on its date, NOTHING is missing — then it shows `Nothing missing` and creates no call | `Opens {date}` | one line per gap: DO gate (`Goods not ready`, `Delivery Order not issued yet`), pickup/handover (`Not received at {site} yet`, `Driver and vehicle not recorded`, `Condo registration not recorded`), money (`RM {amount} still to collect`, `Finance is holding this delivery`) | only a gap that logistics can close carries an act (`Ask {company}` / `Record the driver and vehicle`); Payment, Finance and Warehouse gaps are facts with their owner's door |
 
 A check whose date was already behind the day the order proceeded is `Passed before this delivery
-started` (Q3: no impossible past step); the nearest still-possible check carries the action. A done
-or missed check keeps the date it had.
+started`; the nearest still-possible check carries the action. A done or missed check keeps the date
+it had. **Reschedule example** (requested Tue 27 Oct): checks Fri 23 · Sat 24 · Mon 26. AL saves
+Scheduled Tue 27 on Thu 22 → the first two are done, their dates kept. On Sat 24 AL moves it to Thu
+29 → the two done checks still read 23 and 24 Oct; `1 working day before` moves to Wed 28. Had the
+2-day check been missed on Sat 24, it would keep `2 working days before · 24 Oct` in red with
+`No answer`.
 
-**Reschedule example** (requested Tue 27 Oct): checks Fri 23 · Sat 24 · Mon 26. AL saves Scheduled
-Tue 27 on Thu 22 → the first two are done, their dates kept. On Sat 24 AL moves it to Thu 29 → the
-two done checks still read 23 and 24 Oct; `1 working day before` moves to Wed 28; the collapsed card
-reads `Scheduled delivery · 29 Oct`. Had the 2-day check been missed on Sat 24, it would keep
-`2 working days before · 24 Oct` in red with `No answer`.
-
-#### The three stock routes (Purchasing / Stock own them; Work reads them)
+**The three stock routes** (Purchasing / Stock own them; Work reads them):
 
 | Route | Derived from | Event chain | Logistics responsible from |
 |---|---|---|---|
-| `Pickup from Carres Klang Warehouse` | `Supplier Deliver To` → a Site of kind `own`, or Units reserved at an own Site | PO → supplier delivers + Supplier DO → GRN at Carres Klang (Goods Received Date) → pick · check · pack → Outbound `Warehouse loaded` + `Driver collected` | `Driver collected` |
+| `Pickup from Carres Klang Warehouse` | `Supplier Deliver To` → a Site of kind `own`, or Units reserved at an own Site | PO → supplier delivers + Supplier DO → GRN at Carres Klang → pick · check · pack → Outbound `Warehouse loaded` + `Driver collected` | `Driver collected` |
 | `Pickup from supplier` | **NOT DERIVABLE YET** — no Purchasing fact records "logistics collects for the customer" | PO → supplier prepares + Supplier DO → `Collected from supplier` (APPROVED TARGET / NOT BUILT) — no GRN | `Collected from supplier` |
-| `Supplier sends directly to logistics` | `Supplier Deliver To` → a Site of kind `operation_partner` (AL Sungai Buloh, HOUZS Balakong — 0509) | PO → supplier delivers + Supplier DO → that Site's Inbound receipt/GRN → the Site's own outbound to the customer | the Site's receipt |
-| `Supplier delivers to the customer` (Ohana) | a destination with no Site | a separate route, outside the three; not solved by this card | — |
+| `Supplier sends directly to logistics` | `Supplier Deliver To` → a Site of kind `operation_partner` (AL Sungai Buloh, HOUZS Balakong — 0509) | PO → supplier delivers + Supplier DO → that Site's Inbound receipt/GRN → the Site's own outbound | the Site's receipt |
+| `Supplier delivers to the customer` (Ohana) | a destination with no Site | a separate route, outside the three | — |
 
-#### External link states
+**External link states.** Portal company (NETS): `{company} answers in its own portal.`, no acts.
+No company: `Assign logistics first.` No link yet / revoked: `No link yet` · `Link revoked · {date}`
+with `Create link` (one button per card). Active: the link · `Created {date} · {name}` · `Opened by
+{company} via external link · {date}` / `Not opened yet` with `Copy link` · `Revoke link`. A company
+change revokes the old link automatically (`logistics_changed`).
 
-| State | Shown | Acts |
+#### Customer card (`customerCardModel`)
+
+**Who calls the customer** is Delivery's per-company setting `customer_contact_by` (0488):
+`operation` — Carres staff agree the date with the customer; `partner` — the logistics company
+does, and the card shows the customer's position while Carres acts only on exceptions. The card and
+its words are the same in both modes; only the current act changes.
+
+Collapsed (72px): `Customer · {Name}` (Title Case display) · `{n} of 3` · ONE status line, in this
+precedence:
+
+| # | Line | Tone |
 |---|---|---|
-| Portal company (NETS) | `{company} answers in its own portal.` | none |
-| No company | `Assign logistics first.` | none |
-| No link yet / revoked | `No link yet` · `Link revoked · {date}` | `Create link` (one button per card: the contact step's action carries it) |
-| Active | the link · `Created {date} · {name}` · `Opened by {company} via external link · {date}` / `Not opened yet` | `Copy link` · `Revoke link` |
-| Company changed | the old link is revoked automatically (`logistics_changed`) | `Create link` for the new company |
+| 1 | `Delivered {date}` | neutral |
+| 2 | `Customer refused delivery` | red |
+| 3 | `Phone number is wrong` | amber |
+| 4 | `Customer requested another date · {date}` | amber |
+| 5 | `No answer · Follow up today` (the follow-up day has come) | amber |
+| 6 | `Waiting for customer · reply due {date}` | grey |
+| 7 | `Contact missed {date}` | red |
+| 8 | `Scheduled {date}` · plus `· Contact due today` when the check is still open | neutral / blue |
+| 9 | `Contact due today` · `Contact due {date}` | blue / grey |
+| 10 | `{company} contacts the customer · by {date}` (partner mode, nothing for Carres) | grey |
 
-#### Source of truth
+Expanded — in this order:
 
-| Fact | Owner | Work's treatment |
-|---|---|---|
-| Company, Scheduled date/time, driver, vehicle, condo registration, answers, link | Delivery (`ops_delivery_arrangements`, `…_events`, `ops_delivery_partner_links`) | read; written only through Delivery's components/doors |
-| Requested delivery, customer, address, building | Sales Orders | read-only |
-| Stock route, PO, Supplier Deliver To, PO Delivery Date | Purchasing | read-only; `Open Purchasing` |
-| GRN / Goods Received Date, Unit Site | Receiving / Stock | read-only |
-| Money owed, Finance hold | Payment / Finance | fact only, from its clock (2 working days KV, 3 outstation) |
-| DO | Delivery (system-issued) | fact only |
-| Checks, current action, exception | derived — never stored | `logisticsCardModel` |
+1. **Current action** — `Contact customer today` / `Contact customer by {date}` · `Agree the delivery
+   date, then record the reply`; buttons `WhatsApp` · `Email` (only when an email is recorded) ·
+   `Record reply`; `Open Sales Order` link. Partner mode: `{company} contacts the customer.` and only
+   `Record reply` (a customer who calls Carres directly is still recorded).
+2. **Checks** — three rows, each a stored fact:
+   `Customer contacted` (a customer contact record exists for this delivery) ·
+   `Delivery date agreed` (a Scheduled delivery date is recorded) ·
+   `Address and access checked` (a customer contact with purpose `Confirm Delivery Address` and result
+   `Confirmed` exists, and a condominium's registration is recorded).
+3. **Delivery** — `Requested delivery` · `Scheduled delivery` (`Not scheduled yet`) · `Delivered`.
+4. **Contact** — phone · email (`No email recorded`) · the delivery address (wraps) · who calls:
+   `Carres contacts this customer` / `{company} contacts this customer`.
+5. **Evidence and recent history** — the customer's contact records, newest first:
+   `{date, time} · {result} · {channel} · {person}` and the reply file when one is stored.
 
-#### 390px order
+`Record reply` opens Delivery's contact door in place: `Channel` (`WhatsApp` · `Call` · `Email`), and
+one reply: `Accepted date` (opens Delivery's `DeliveryDatesEdit` — `Information received from:
+Customer`, WhatsApp proof when the date is later than the requested one) · `Requested another date`
+(date + the customer's WhatsApp reply; recorded as the contact result `Requested Another Date` and as
+Delivery's `another_date_requested` answer with reason `The customer asked for another date`) ·
+`No answer` · `Delivery details changed` (no record — `Change the address in the Sales Order, then
+record the reply.` with `Open Sales Order`) · `Phone number is wrong` · `Customer refused delivery`
+(WhatsApp reply required); plus the tick `Address and access checked with the customer`. `Save reply`.
+No free-text outcome.
 
-The collapsed card first (company · action · checks · scheduled · exception), then Customer and
-Supplier collapsed. Expanded, the eight sections stack in the order above in one column; buttons
-keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll (measured 0px at
-1440 · 1180 · 820 · 390, `docs/evidence/workspace-work/logistics-2026-09-25/`).
+#### Supplier card (`supplierCardModel`)
+
+One mission-level card for every supplier of the order; it never pretends there is one supplier.
+Collapsed (72px): `Supplier · {name}` (one supplier) or `Supplier · {n} suppliers` · `{dated} of {n}`
+· ONE status line joining at most two facts: `{i} of {n} POs issued` · `{d} of {n} dates ready` ·
+`{k} supplier delayed` · `GRN received for {r} of {n}` · `No purchase order for this Sales Order`.
+A supplier name or PO number appears collapsed only to name the single exception
+(`Sleepwell delayed to 30 Oct`).
+
+Expanded — one row per PO, the delayed one first with an amber edge-free `Delayed` word (no coloured
+card):
+
+```text
+Sleepwell · PO260924-4827                          [Open PO]
+PO Delivery Date     24 Oct          (original — never changes)
+Latest date          30 Oct · Delayed · Production delay
+Evidence             WhatsApp · 22 Oct
+Supplier DO          DO-5531 · 26 Oct   /  Needed by 29 Oct  /  Not needed yet
+Deliver to           Carres Klang Warehouse
+GRN                  Received 30 Oct (Warehouse)   /  Not received yet
+```
+
+Facts: original `PO Delivery Date` (immutable, 0428); `Latest date` = Purchasing's
+`effectiveArrivalOf` with the reply word (`Confirmed` · `Earlier` · `Delayed · {reason}` ·
+`Reported`); the stored evidence; `Supplier DO` from the PO (`do_number` · `do_uploaded_at`), and when
+absent `Needed by {date}` from one Office working day before the latest date; `Deliver to`; GRN as a
+Warehouse fact. A PO not yet issued reads `Not issued`. Communication: the supplier message leads with
+the PO number (`Copy message`, `Open WhatsApp group` when the supplier has one). Recording a supplier
+answer stays `Open {PO No}` until Purchasing's reply rule is admitted as an embedded action (§5.1).
+
+#### Communication — the same pattern on every card
+
+- Only channels with valid details show. A missing one says why with its door:
+  `WhatsApp unavailable · No phone number` + `Open Sales Order`; never a silent disabled button.
+- `WhatsApp` opens a compact preview: `To {name} · {phone}`, the governed template (`Confirm delivery
+  date` for the customer), the message, then `Copy message` · `Open WhatsApp`. Staff cannot rewrite
+  the operational facts in the message.
+- Opening WhatsApp or copying is never sent evidence. After `Open WhatsApp` the card asks
+  `Was this message sent?` · `Record as sent` · `Not sent`. `Record as sent` stores Delivery's contact
+  record (party, recipient, channel, template in the note, staff, time) with result `Waiting for
+  Customer Reply`; the reply is due on the next Delivery working day.
+- Message references: customer — the CR/TCF reference; supplier — the PO number; logistics — the
+  customer reference. Never the SO number to an outside party; no money unless the template is the
+  approved payment or outstation message.
+- A customer message may state the date Carres is agreeing (owner approval 2026-09-25, supersedes the
+  older "a customer message never carries a delivery date"): `Hello {Name}, this is Carres about your
+  order {REF}. We are arranging your delivery for {date}. Please reply to confirm this date, or tell
+  us a date that suits you.`
+- Sending never completes the work. Completion is the owning module's fact: Scheduled delivery saved ·
+  supplier delay recorded with evidence · Supplier DO received · logistics assigned · GRN recorded.
+
+#### To do · Waiting · Completed (the middle tabs, fed by the same facts)
+
+The feed sets `communication.replyState = waiting` and `replyDueOn` on a Delivery date item when the
+latest customer contact is `Waiting for Customer Reply` or `No Answer` and its follow-up day (the next
+Delivery working day after the contact) is still ahead; the item lists under `Waiting` with
+`Waiting for customer · reply due {date}`. On the follow-up day it returns to `To do`
+(`No answer · Follow up today`). Waiting never hides a deadline: an item whose governed action day
+has passed is `To do` and red (`Missed`). A recorded Scheduled delivery closes the item (source
+completion). `Completed` shows source-owned closure receipts only (§5.2.1); until they exist it says
+`No work completed for this selection.`
+
+#### Owner, timing and source
+
+The last section, collapsed to one row `Owner, timing and source ›`: `Normal owner` · `Acting today`
+(only when cover acts) · `Action day {date}` / `No working date` · `Due {date}` · `Source {module}` ·
+`Read {date, time}`. Audit only; never a working control.
+
+#### Responsive, states and accessibility
+
+| Width (Work page) | Layout |
+|---|---|
+| ≥1280px | `240 · 420 · remainder`; panel padding 16px, 8px between sections |
+| 960–1279px | `400 · remainder`; Filters from the toolbar; the panel unchanged |
+| <960px | list and detail share one stage; detail opens with `‹ Back to work` (focus lands on it); padding 12px, 8px between sections |
+
+Compact sizes: summary title 16/22 · supporting text 13/18 · route 88px · collapsed party card 72px ·
+party heading 15/20 · party status 12/16 · expanded section padding 10px · buttons 36px (40px below
+960px) · touch targets ≥40×40 below 960px. **At a 743×704 window** Back, summary, route and the three
+collapsed cards show without scrolling. At 390px the order is identical; the primary action fills its
+row and secondary actions share the next; the route stays one line; no page-level sideways scroll.
+
+| State | Shown |
+|---|---|
+| Loading | skeletons at final heights: summary, 88px route, 3 × 72px cards — never a page spinner |
+| Refresh failed | the last good mission stays · `Some information could not be refreshed.` · `Try again` |
+| No selection | `Select a work item` · `Choose an item from the Work list to see its mission.` — no empty route or cards |
+| Sales Order unreadable | `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` · `Try again` |
+| Party empty | `Logistics not assigned` + `Assign logistics` · `Customer contact unavailable` + `Open Sales Order` · `No purchase order for this Sales Order` + `Open Purchasing` |
+| Partial | only the missing part is named (`Scheduled delivery unavailable`); every other fact still shows |
+| Permission | `You do not have access to this work` — no customer, supplier or money fact leaks |
+
+Focus follows the visual order; route points and card headings are buttons; `Escape` collapses the
+open card; status is text + icon, never colour alone; loading and refresh failure announce politely.
 
 #### Gaps for later architecture work (not built)
 
-1. `Collected from supplier` — a Stock custody event (PO/source lines · supplier · company · date and
-   time · qty · Supplier DO or collection evidence · source · actor), the Purchasing fact that
-   selects the route, and the DO gate reading it instead of a reservation.
-2. Receiving at a partner Site — who records AL/HOUZS receipts (the partner, through the link or a
-   login, or Operation on its behalf) and the Site receiving authority (Stock MASTER open item);
-   non-Site partners (TT, TEOW, EU, SSY) need location ownership before any receipt exists.
-3. Which delivery requirement makes a time mandatory (building types) — its own missing item.
-4. The Delivery Order download through the link — the governed DO prints `SO No`, which the link may
-   not show; decide the paper or the rule.
-5. The legacy Orders booking door (`ops_order_control`) still requires a time slot for leg 0; the
-   Delivery arrangement no longer does. Converge the whole-order DO issue onto the arrangement.
-6. The Work feed's `confirm_delivery_date` row still reads the legacy booking signal; the card reads
-   the arrangement. Converge the projector.
+1. `Collected from supplier` — a Stock custody event and the Purchasing fact that selects the route.
+2. Receiving at a partner Site — who records AL/HOUZS receipts; non-Site partners need locations.
+3. Which delivery requirement makes a time mandatory (building types).
+4. The Delivery Order download through the link — the governed DO prints `SO No`.
+5. The legacy Orders booking door still requires a time slot for leg 0; converge onto the arrangement.
+6. The Work feed's `confirm_delivery_date` row still reads the legacy booking signal; converge.
 7. The Ohana supplier-to-customer route.
+8. Outstation customer confirmation before the first leg (ERP-ARCH §6.5) is not a Customer-card check
+   until Delivery builds the first-leg gate.
+9. Supplier reply recording in Work (embedded) waits for Purchasing's reply-rule admission; the
+   2026-09-24 eight-reason delay list and multi-screenshot evidence are NOT BUILT (the stored list is
+   the 0432 six).
+10. `Completed` needs source-owned closure receipts (§5.2.1).
+11. Customer chase answer link (ERP-ARCH §6.4, "customer later").
 
 ## 6 · Module admission gate
 
