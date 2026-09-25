@@ -179,7 +179,7 @@ export default function WorkOrderRoute({
         <ul className="mb-0.5 flex flex-col" data-testid="work-route-exceptions">
           {exceptions.map((e) => (
             <li key={e.text} className={`flex items-center gap-1 text-[12px] leading-4 ${STATUS_TEXT[e.tone]}`}>
-              <Icon name="late" size={12} />
+              <Icon name="late" size={14} />
               <span>{e.text}</span>
             </li>
           ))}
@@ -227,7 +227,6 @@ function PointButton({
         <span
           className={`grid place-items-center rounded-full border-2 ${DOT[point.tone]} ${point.final ? "h-3 w-3 ring-2 ring-offset-1 ring-kit-slate-6" : "h-2.5 w-2.5"}`}
         >
-          {point.tone === "done" ? <Icon name="ready" size={8} /> : null}
         </span>
       </span>
       <span className="h-4 whitespace-nowrap text-[12px] font-semibold leading-4 text-kit-slate-12">{point.label}</span>

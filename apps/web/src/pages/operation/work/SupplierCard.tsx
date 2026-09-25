@@ -20,7 +20,7 @@ import Icon from "@/components/kit/Icon";
 import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
 import { useOperationSuppliers, useSupplierCardFacts } from "@/lib/queries";
 import { buildSupplierReminder } from "@/lib/wa-templates";
-import { Fact, PartyCardShell, SectionTitle, ToneLine } from "./PartyCardShell";
+import { Fact, PartyCardShell, ToneLine } from "./PartyCardShell";
 
 const spell = (iso: string) => fmtDateShort(iso);
 const poHref = (po: string) => `/operation/procurement?po=${encodeURIComponent(po)}`;
