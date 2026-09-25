@@ -49,6 +49,7 @@
   .grid th:last-child,.grid td:last-child{border-right:0}
   .grid tbody td{height:40px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
   .grid td.ctl,.grid th.ctl{width:32px;padding:0 8px;border-right:0;max-width:none}
+  .grid td.s2{max-width:none;min-width:110px}
   .grid td.ctl+td,.grid th.ctl+th{border-left:1px solid var(--border)}
   .s1{position:sticky;left:0;background:#fff;z-index:1}.s2{position:sticky;left:32px;background:#fff;z-index:1}.s3{position:sticky;left:142px;background:#fff;z-index:1;box-shadow:1px 0 0 var(--border)}
   .so{color:var(--blue-11);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
@@ -64,12 +65,12 @@
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
   .facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 16px;background:#fff;border:1px solid var(--border);border-radius:var(--r-control);padding:8px 12px;margin-bottom:8px}
   .facts .k{font-size:11px;line-height:14px;color:var(--ink-2)}.facts .v{font-size:13px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.facts .v small{font-weight:400;color:var(--ink-2);font-size:12px}
-  .blocks{display:grid;grid-template-columns:minmax(220px,1fr) minmax(360px,1.4fr) minmax(220px,1fr);gap:8px}
+  .blocks{display:grid;grid-template-columns:minmax(220px,1fr) minmax(480px,1.8fr) minmax(220px,1fr);gap:8px}
   .blk{background:#fff;border:1px solid var(--border);border-radius:var(--r-control);padding:8px 12px;min-width:0}
   .blk h3{margin:0 0 4px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
   .blk p{margin:0}.blk .fact{font-weight:600}.blk .sub{font-size:12px;line-height:16px;color:var(--ink-2);margin:0 0 6px}
   table.docs{border-collapse:collapse;width:100%}.docs td{padding:0 12px 0 0;height:26px;white-space:nowrap;font-size:12px;line-height:16px;border-bottom:1px solid var(--surface-alt)}.docs tr:last-child td{border-bottom:0}
-  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500;font-size:12px}
+  .docs td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500;font-size:12px}.docs td.m{white-space:normal}
   .link{background:none;border:0;color:var(--blue-11);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
   .hist p{font-size:12px;line-height:16px;margin:0 0 3px}.hist .t{color:var(--ink-2);margin-left:6px}
   footer.ft{height:32px;display:flex;align-items:center;padding:0 12px;border-top:1px solid var(--border);color:var(--ink-2);font-size:12px}
@@ -121,7 +122,7 @@
           <div class="util"><button><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</button><button><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 21h16"/></svg>Export</button><button><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Columns</button></div></div>
         <div class="sheet">
           <table class="grid">
-            <thead><tr><th class="ctl s1"></th><th class="s2">SO No</th><th class="s3" style="min-width:220px">Customer</th><th class="num" style="min-width:120px">Balance due</th><th style="min-width:140px">Items &amp; Stock</th><th style="min-width:250px">Storage</th><th style="min-width:170px">Requested Delivery Date</th><th style="min-width:210px">Scheduled delivery</th><th style="min-width:250px">Payment timing</th><th style="min-width:250px">Owner</th></tr></thead>
+            <thead><tr><th class="ctl s1"></th><th class="s2" style="min-width:110px">SO No</th><th class="s3" style="min-width:220px">Customer</th><th class="num" style="min-width:120px">Balance due</th><th style="min-width:140px">Items &amp; Stock</th><th style="min-width:250px">Storage</th><th style="min-width:170px">Requested Delivery Date</th><th style="min-width:210px">Scheduled delivery</th><th style="min-width:250px">Payment timing</th><th style="min-width:250px">Owner</th></tr></thead>
             <tbody id="rows">
               <tr data-d="missed" data-k="missed"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1401</span></td><td class="s3">TAN SRI DATO' SERI MUHAMMAD</td><td class="num">RM 1,700.00</td><td><span class="g">Ready</span> · 1 of 1</td><td>No storage charge</td><td>Fri, 18 Sep</td><td><span class="g">Scheduled</span> · Fri, 18 Sep · 2 PM</td><td class="r">Payment should have been received</td><td><span class="av">SH</span>Ask customer to pay</td></tr>
               <tr data-d="2026-09-18" data-k="storage"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1404</span></td><td class="s3">WONG MEI LING</td><td class="num">RM 1,800.00</td><td><span class="g">Ready</span> · 1 of 1</td><td class="o">Storage Invoice issued · RM 200.00 not paid</td><td>Wed, 23 Sep</td><td><span class="g">Scheduled</span> · Wed, 23 Sep</td><td>Storage Invoice not paid</td><td><span class="av">YJ</span>Send the invoice and collect payment</td></tr>
