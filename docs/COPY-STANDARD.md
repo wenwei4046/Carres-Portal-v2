@@ -59,6 +59,13 @@ English; complexity is never used to make an instruction sound official.
 - **A screen line is at most 6 words (owner ruling 2026-09-25).** The first line names the fact
   or the act; the second line gives the one reason. On a delivery hold, money says `Paid` or
   `RM {amount} unpaid` — never `still to collect`, `outstanding` or `Money in full`.
+- **WHO + ACTION + OBJECT (owner ruling 2026-09-25).** A status or action line says who does what
+  to what: `Get delivery date from NETS` · `Ask NETS for the result` · `Record payment`; a fact
+  line says who and what: `Collected by NETS` · `Customer refused delivery`; a gap line says what
+  is missing: `Driver and vehicle not recorded` · `Building type not recorded`. `Open`, `Show`,
+  `Process`, `Handle` never label an act — a door is the document number or the sentence itself.
+  (The Work two-line pair `Call {company}` over `Get the scheduled delivery date` is already two
+  lines and stays.)
 - A button says what pressing it does: verb plus object.
 - Keep necessary business nouns (`Purchase Order`, `Supplier`, `Deliver To`, `Unit ID`, `Invoice`,
   `Credit Note`, `Claim`, `Consignment`) and provide a simple first-use explanation through Help.
@@ -540,7 +547,8 @@ Delivery Order document — the DOCUMENT's own life
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
   before the arrangement is agreed — the ACTOR rungs, unchanged:
-    Assign logistics · Call customer · Waiting for customer reply
+    Assign logistics · Get delivery date from {partner} · Get delivery date from customer ·
+    Waiting for customer reply
   once a date is scheduled (time optional, owner ruling 2026-09-24) — the JOURNEY rungs:
     customer leg   Scheduled · Waiting for {partner} pickup · Collected by {partner} ·
                    On the way to customer · Delivered to customer · Failed Delivery
@@ -581,8 +589,8 @@ tab count and split, following the SELECTED RANGE and every active filter:
   {c} customer deliveries · {t} transfers          e.g. `0 customer deliveries · 2 transfers`
 
 LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
-  customer leg        transfer leg           Ready · Stock risk · Hold delivery ·
-  Scheduled           Transfer scheduled     Logistics details incomplete · DO not released
+  customer leg        transfer leg           Ready · Goods not ready · Hold delivery ·
+  Scheduled           Transfer scheduled     Driver and vehicle not recorded
   Collected by {p}    Collected for transfer
   On the way to       In transit to {stop}
     customer
@@ -603,7 +611,7 @@ may never be inferred from a time, an ETA or a location.
 The schedule boundary is **`Confirmed dates only`**: a date can be confirmed while its time
 still needs agreeing. It applies equally to customer deliveries and transfers.
 
-**Expanded-row words:** **`Logistics details incomplete`** · **`DO not released`** ·
+**Expanded-row words:** **`Driver and vehicle not recorded`** (owner ruling 2026-09-25; `Logistics details incomplete` and `DO not released` retired) ·
 **`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
 
 ⛔ **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
@@ -634,7 +642,7 @@ RETIRED**: the Delivery-owned writes live inside the Monitor row's expanded pane
 act is **`Update date and time`** with its save **`Save scheduled delivery`** (owner rulings
 2026-09-13 / 2026-09-24). A wrong Sales fact is corrected through the row's `SO No` door; the brief's first panel carries **`View Sales Order`**, which unfolds the read-only Sales Order document in place (owner ruling 2026-09-25 — `Open Sales Order to change` is retired from the brief). The Monitor
 selection bar does not invent a unit word: `1 selected` / `3 selected`. The Delivery Orders
-Register keeps its document count. The disclosure's hover reads **`Show delivery brief`**. A loan
+Register keeps its document count. The disclosure's hover and the phone card's button read **`See delivery details`** (owner ruling 2026-09-25; `Show delivery brief` retired). A loan
 line inside the expansion reads `Loan {Unit ID} · collect back on delivery day`.
 
 **Monitor rail and calendar words — owner correction 2026-09-07.** `Calendar` is a view, never a
@@ -708,7 +716,7 @@ delivery date`, `Call the customer` over `Get the scheduled delivery date`, `Ask
 it`, and `Collect the loan item` over `Bring back {Unit ID} on the delivery day`.
 
 **THE MONITOR `Delivery Status` CELL — owner ruling 2026-09-14.** The same law, applied to the
-register column that used to name a party: line one is the ACT — **`Call customer`** (a day
+register column that used to name a party: line one is the ACT with its object and party — **`Get delivery date from {partner}`**, or **`Get delivery date from customer`** in the Carres-contacts case (owner ruling 2026-09-25, overwriting the 2026-09-14 `Call customer`: it said neither what to get nor from whom; a day
 without a time is a complete arrangement since 2026-09-24, so no time-only rung exists) — and line two
 is the CONTACT DEADLINE, drawn as a kit glyph and a day (`call` while there is time, `late` in red
 once there is not). **`{partner} must contact the customer` and `Operation must call the customer`
@@ -3137,7 +3145,7 @@ door.
 | Confirmed date is behind today with no result | **Overdue** | Date passed · Late delivery |
 | Calendar product receipt evidence (2026-09-14) | **Received Qty**; unknown **Receipt not verified**. Details: **Receipt for this product line. Delivery and current location are separate.** These refer to explicitly bound stock records, not SKU-pooled availability or payment release. | assuming an unbound or missing row means not received |
 | No formal DO exists yet | **DO** in the Monitor DO No cell (owner correction 2026-09-14), muted and non-interactive; tooltip and accessible name **No delivery order yet**. Detail explanations keep the full absence wording. | Not issued · Create DO · Issue DO |
-| Compact calendar card's existing-DO door | **Open DO**. The accessible name includes the actual DO number; the full number remains at the top of the card. Without a DO, keep **Edit Delivery** and the existing arrangement route. | repeating the entire DO number in the visible footer |
+| Compact calendar card's doors (owner ruling 2026-09-25) | the **DO number** at the top of the card is the door to the Delivery Order — no footer button; a card without a DO carries one footer link **`See delivery details`**, which reveals and expands the Monitor row | Open DO · Edit Delivery · Show delivery brief · any `Open …` label on an act |
 | Open the formal document | the actual **DO number** | View DO · Details |
 
 A Monitor card carries the arrangement facts, DO number and Delivery Status in one place. This
@@ -3161,9 +3169,9 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
 | `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **RULED 2026-09-06** (month-calendar correction) |
 | `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
-| `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
-| `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |
-| `Open No confirmed date` | that state's one door | **RULED 2026-09-06** |
+| `No delivery scheduled this week.` · `No delivery scheduled on {day}.` · `No delivery scheduled this month.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-25** (replaces `No deliveries are scheduled from {first} to {last}.`) |
+| `{n} orders still need a delivery date.` / `1 order still needs a delivery date.` | under the spanning state, from the REAL count only; the sentence is the link (blue) to the `Get delivery date` queue — no `Open …` button | **RULED 2026-09-25** (replaces `{n} deliveries need a confirmed date.` and `Open No confirmed date`) |
+| `Get delivery date` | Monitor's WORK TO DO queue for scopes with a company but no Scheduled delivery | **RULED 2026-09-25** (replaces `Call customer`) |
 | `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
 | `{N} selected` · `{N} delivery orders selected` | the Monitor and Delivery Orders selection toolbars respectively | **RULED 2026-09-07** |
 | `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |

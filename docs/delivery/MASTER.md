@@ -639,8 +639,8 @@ DELIVERY STATUS narrowing.
 **The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
 counts computed over the rows the other groups already narrowed (Law D):
 
-- **`WORK TO DO`**, rows in this order: `All delivery work` · `Logistics not assigned` · `Call
-  customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
+- **`WORK TO DO`**, rows in this order: `All delivery work` · `Logistics not assigned` · `Get
+  delivery date` (owner ruling 2026-09-25; `Call customer` retired) · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
   proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
   2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
   to `Work to do` and is not drawn on the schedule tab.
@@ -664,15 +664,15 @@ calendar word or a WORK TO DO queue), plus `?date=`, `?region=`, `?logistics=`, 
 filter drawer and the work list becomes one card per delivery carrying the same facts — the same
 two status lines from the same arithmetic (owner ruling 2026-09-25: a card never prints a queue
 word such as `No confirmed date` where the register prints `Not scheduled`, and never a bare date
-without its act).
+without its act); its one button is `See delivery details`.
 
-**`Call customer` and the contact week.** Under `Call customer`, and under no other queue, a
+**`Get delivery date` and the contact week.** Under `Get delivery date`, and under no other queue, a
 Monday-to-Saturday strip lists the six operating days with the count of contact deadlines due on
 each, its own arrows, and the caption `Contact deadlines — not supplier or delivery dates`. An
 `Overdue contact` chip beside the six days answers across every date. `Overdue delivery` (the rail
 queue: a confirmed trip whose day has passed with no result) and `Overdue contact` (a conversation
-that missed its deadline) are two populations and never share one bare `Overdue` count. `Call
-customer` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
+that missed its deadline) are two populations and never share one bare `Overdue` count. `Get
+delivery date` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
 
 **The calendar writes nothing.** The four view words are governed and a layout NEVER wears a word
 it does not honour (owner ruling 2026-09-14):
@@ -702,8 +702,10 @@ it already sits in, and it is a text line, never a pill that can truncate. A tra
 visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
 never the customer's town**. Never a phone, money detail, employee name, driver, vehicle,
 expected arrival or upload time. An unconfirmed delivery never enters a date cell. A fully empty
-range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
-`{n} deliveries need a confirmed date.` count and its door.
+range shows one spanning state in two lines (owner ruling 2026-09-25): `No delivery scheduled this
+week.` (`… on {day}.` in Day view, `… this month.` in Month) and, beneath it, the real count as
+the door itself — `{n} orders still need a delivery date.` in link blue, opening the `Get
+delivery date` queue; no `Open …` button and no second verb.
 
 **Compact calendar — deployed and observed (2026-09-14).**
 The owner-approved compact composition is implemented in the shared `ScheduleCard`:
@@ -711,8 +713,11 @@ DO number when present, SO number on its own line, no legacy reference or custom
 the face; every physical product line has its own category icon and quantity, with its full
 name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
 appears only for an explicit assignment. A real journey uses its actual From and To; no fixed
-transit stop is inferred. The one footer is `Open DO` or the existing `Edit Delivery` door.
-An unissued DO is omitted from the calendar card; the register's absence is the owner's `DO`.
+transit stop is inferred. **The card's doors (owner ruling 2026-09-25):** the DO number at the top
+of the card is the door to the Delivery Order — no `Open DO` footer; a card without a DO carries
+one footer link, `See delivery details`, which reveals and expands the Monitor row (`Edit Delivery`
+and `Show delivery brief` are retired). An unissued DO is omitted from the calendar card; the
+register's absence is the owner's `DO`.
 
 Receipt marks currently require exact `reserved_order_line_id` bindings in reserved/sold
 stock records. Same-SKU pooling cannot light two product lines green. Missing, invalid or
@@ -839,12 +844,21 @@ Delivery Orders register offers from the same menu.
 the contact deadline as a glyph and a day:
 
 ```
-Call customer                 nothing has been scheduled yet
+Get delivery date from NETS   nothing has been scheduled yet; NETS contacts the customer
 [call] Fri, 18 Sep
 
-Call customer                 the deadline has passed
+Get delivery date from NETS   the deadline has passed
 [late] Fri, 18 Sep            red, and it keeps the day it missed
+
+Get delivery date from customer   the one Carres-contacts case (Workspace §5.10 exceptions)
 ```
+
+**WHO + ACTION + OBJECT — owner ruling 2026-09-25.** Every status line says who does what to
+what, in at most six words: `Get delivery date from NETS` · `Ask NETS for the result` ·
+`Collected by NETS` · `Driver and vehicle not recorded`. This overwrites the 2026-09-14 "the
+party leaves the sentence" half below: the company is named again, because `Call customer` did
+not say what to get or from whom. `Open` / `Show` never label an act; a door is the number or the
+sentence itself.
 
 The glyphs are the kit's own (`components/kit/Icon`: `call` and `late`) at the row size. No glyph
 replaces the action text and the action text never becomes an icon. **The party leaves the
@@ -861,9 +875,9 @@ not move` once it has passed, are the cell's `title` and its accessible name, an
 Search matches and what the Excel export prints. A row whose customer named no day owes no
 deadline and shows none: a step with no anchor can never be late.
 
-**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS, so
-the two contact rungs — which now print one sentence — are ONE option, and the pick narrows by
-the label rather than by the internal key.
+**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS; the
+two contact rungs print two sentences since 2026-09-25 (`… from {partner}` · `… from customer`)
+and are two options, and a pick narrows by the label rather than by the internal key.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
@@ -1188,10 +1202,10 @@ line sits beside it and says otherwise.
 ```
 LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
   customer leg          transfer leg             Ready
-  Scheduled             Transfer scheduled       Stock risk
+  Scheduled             Transfer scheduled       Goods not ready
   Collected by {p}      Collected for transfer   Hold delivery
-  On the way to         In transit to {stop}     Logistics details incomplete
-    customer                                     DO not released
+  On the way to         In transit to {stop}     Driver and vehicle not recorded
+    customer
   Delivered to          Arrived at {stop}
     customer
   Failed Delivery       Transfer failed
@@ -1199,8 +1213,11 @@ LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
 
 **The two ladders share no word,** so `Delivered to customer` can never be reached by a warehouse
 leg and `Arrived at {stop}` never claims a customer received anything. Readiness precedence when
-more than one applies: `Hold delivery` → `Stock risk` → `Logistics details incomplete` →
-`DO not released` → `Ready`; money first, because a trip that may not legally go is the harder stop.
+more than one applies: `Hold delivery` → `Goods not ready` → `Driver and vehicle not recorded` →
+`Ready`; money first, because a trip that may not legally go is the harder stop. `Stock risk`,
+`Logistics details incomplete` and `DO not released` are retired (owner ruling 2026-09-25): the
+first two did not say what was missing, and the third named a consequence whose cause the line
+already prints — a card with no DO number shows the reason, never the absence.
 
 **`Arrived at customer` does not exist and may not be added by inference (owner ruling 2026-09-14).**
 Carres records no arrival-at-customer event: `delivery_attempts` holds `delivered` / `partial` /
@@ -1227,8 +1244,8 @@ and is not restored. `Booked` stays banned.
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
 | no partner on the scope | `Assign logistics` | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, no contact record, the partner contacts the customer | `Call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, no contact record, Carres contacts the customer | `Call customer` — the same act, a different owner | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, the partner contacts the customer | `Get delivery date from {partner}` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, Carres contacts the customer | `Get delivery date from customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
 | scheduled date recorded (time optional) — a CUSTOMER leg | `Scheduled` | green | the time, when recorded |
 | scheduled date recorded (time optional) — a TRANSFER leg | `Transfer scheduled` | none | the time, when recorded |
@@ -1324,7 +1341,7 @@ The four panels and their inline doors are unchanged. Six corrections bind:
 5. **`Access not recorded` is an actionable alert,** printed in the orange problem treatment with
    the row's `SO No` door — never the neutral grey absence word.
 6. **Logistics completeness is stated once.** When a delivery is confirmed and driver, vehicle
-   plate, pickup or ETA is missing, Panel 3 prints **`Logistics details incomplete`** above the
+   plate, pickup or ETA is missing, Panel 3 prints **`Driver and vehicle not recorded`** above the
    facts. The individual `Not recorded` lines remain; the verdict is what stops the operator
    having to notice five absences. The emergency contact prints **name, relationship and phone**
    as three distinct facts.
@@ -1832,6 +1849,7 @@ only when a real vehicle-level fact exists.
 | Paid in full · Payment pending · Needs attention, on Monitor | `Paid` · `Hold delivery` over `RM {amount} unpaid` · a specific fact word |
 | Do not deliver · still to collect · Finance is holding this delivery · Payment blocked · Money in full | `Hold delivery` over `RM {amount} unpaid` or `Finance hold · {reason}`; the gate's met word is `Paid` (owner ruling 2026-09-25, §3) |
 | Open Sales Order to change, inside the brief | `View Sales Order` (read-only, in place); the row's `SO No` opens the order to change |
+| Call customer · Stock risk · Logistics details incomplete · DO not released · Open DO · Show delivery brief · `{n} deliveries need a confirmed date.` · Open No confirmed date | `Get delivery date from {partner}` / `… from customer` · `Goods not ready` · `Driver and vehicle not recorded` · (nothing — the reason prints) · the DO number · `See delivery details` · `No delivery scheduled this week.` over the link `{n} orders still need a delivery date.` (owner ruling 2026-09-25) |
 | Ready at Carres Klang Warehouse | `Ready` in Status and `Carres Klang` in Location |
 | Edit Delivery · Save Delivery | `Update date and time` · `Save scheduled delivery`; the other panel acts by their own names |
 | `Call {partner} — confirm delivery date` | `Call NETS` over `Confirm the delivery date` |
