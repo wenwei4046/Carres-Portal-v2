@@ -131,7 +131,8 @@ export type DataGridColumn<T> = {
       - 'enum' | 'text' | undefined → the classic checkbox value list. */
   filterType?: "date" | "number" | "numbering" | "enum" | "text";
   dateValue?: (row: T) => string | null | undefined;
-  /** Raw numeric value for `filterType: 'number'` min/max matching. */
+  /** Raw numeric value for `filterType: 'number'` min/max matching. The
+      column also sorts by it (blanks last) unless it has a `sortFn`. */
   numberValue?: (row: T) => number | null | undefined;
   /**
    * HOUZS port (so-list-houzs-port) — when true and the user hasn't manually
@@ -1374,6 +1375,22 @@ function DataGridInner<T>({
     if (!layout.sort) return filteredRows;
     const col = columns.find((c) => c.key === layout.sort!.key);
     if (!col) return filteredRows;
+    const dir = layout.sort.dir === "asc" ? 1 : -1;
+    // A column that declares its number sorts by it: the cell reads
+    // "RM 2,400.00", which would sort as text (900 after 6,334). A blank
+    // ("Not recorded") goes last either way.
+    const num = !col.sortFn && col.numberValue;
+    if (num) {
+      const n = (r: T) => {
+        const v = num(r);
+        return v == null || !Number.isFinite(v) ? null : v;
+      };
+      return [...filteredRows].sort((a, b) => {
+        const x = n(a), y = n(b);
+        if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+        return (x - y) * dir;
+      });
+    }
     const cmp =
       col.sortFn ??
       ((a: T, b: T) => {
@@ -1388,7 +1405,6 @@ function DataGridInner<T>({
         if (Number.isFinite(na) && Number.isFinite(nb) && va !== "" && vb !== "") return na - nb;
         return va.localeCompare(vb);
       });
-    const dir = layout.sort.dir === "asc" ? 1 : -1;
     return [...filteredRows].sort((a, b) => cmp(a, b) * dir);
   }, [filteredRows, columns, layout.sort, colValue]);
 
