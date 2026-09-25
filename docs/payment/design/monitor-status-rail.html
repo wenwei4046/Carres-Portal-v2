@@ -99,11 +99,12 @@
   .link{background:none;border:0;color:var(--blue-11);font:inherit;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
   .hist p{margin:0 0 4px}.hist .t{font-size:12px;color:var(--ink-2);margin-left:8px}
   footer.ft{height:32px;display:flex;align-items:center;padding:0 16px;border-top:1px solid var(--border);color:var(--ink-2);font-size:12px}
-  @media (max-width:1100px){.stage{grid-template-columns:1fr}.rail{display:none}.side{display:none}.shell{grid-template-columns:1fr}.facts{grid-template-columns:repeat(2,minmax(0,1fr))}tr.exp td{padding-left:16px}}
+  .main{overflow-x:auto}.stage{min-width:1100px}
+  @media (max-width:1100px){.side{display:none}.shell{grid-template-columns:1fr}.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media (max-width:600px){.facts{grid-template-columns:1fr}.tb .picked{font-size:12px}}
   @media (prefers-reduced-motion:no-preference){.chev svg{transition:transform 150ms}}
 </style>
-<div class="note">Design mock · Payment Monitor with the STATUS rail (owner approval 2026-09-25, segment 2) · fixture data, not customer data</div>
+<div class="note">Design mock (the page keeps its 1440 layout; scroll sideways in a narrow window) · Payment Monitor with the STATUS rail (owner approval 2026-09-25, segment 2) · fixture data, not customer data</div>
 <div class="shell">
   <aside class="side" aria-label="Portal rail">
     <div class="logo">CARRES</div>
