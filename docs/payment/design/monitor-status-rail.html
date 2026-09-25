@@ -64,7 +64,8 @@
   .doors{display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px}
   .btn{height:28px;padding:0 10px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
-  .cols{display:grid;grid-template-columns:minmax(260px,1fr) minmax(260px,1fr) minmax(320px,1.3fr);gap:0}
+  .grid .money td,.grid .docs td{border-right:0;height:24px;max-width:none;padding:0 12px 0 0;white-space:nowrap}.grid .money td:last-child{padding-right:0}
+  .cols{display:grid;grid-template-columns:minmax(300px,1fr) minmax(260px,1fr) minmax(380px,1.4fr);gap:0}
   .col{min-width:0;padding:0 16px 4px 0}.col+.col{border-left:1px solid var(--border);padding-left:16px}
   .col h3{margin:0 0 6px;font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
   .col h3.sub2{margin-top:12px}
