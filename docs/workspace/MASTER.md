@@ -818,7 +818,7 @@ Work is ready for owner acceptance only when all are demonstrable:
 - later holder/cover changes cannot rewrite completed actor evidence. Site-queue race acceptance is
   deferred with Warehouse Outbound and is not a Work v1 acceptance condition.
 
-### 5.9 · Party cards — Logistics · Customer · Supplier (owner rulings 2026-09-24, APPROVED / BUILT)
+### 5.9 · Party cards — Logistics · Customer · Supplier (owner rulings 2026-09-24, Logistics BUILT; Customer/Supplier shell only)
 
 When the selected work names exactly ONE Sales Order (a `sales_order` / `delivery_scope` object,
 a Delivery Order, or an `SO-{n}` label), the detail column adds one white section per outside
@@ -945,6 +945,161 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
 6. The Work feed's `confirm_delivery_date` row still reads the legacy booking signal; the card reads
    the arrangement. Converge the projector.
 7. The Ohana supplier-to-customer route.
+
+### 5.10 · Complete Work right panel — owner-approved target 2026-09-25 / NOT BUILT
+
+This section is the canonical continuation of §5.9. It freezes the complete selected-mission
+composition so a later chat reads it from the repository rather than reconstructing it from chat.
+The deployed left Date/Module rail, middle To do/Waiting/Completed cards, density contract in §5.5
+and Logistics behaviour in §5.9 are preserved. The build scope is the missing Customer card,
+multi-supplier Supplier card, compact Order Route and their shared communication/state behaviour.
+
+#### One fixed top-to-bottom composition
+
+1. **Selected work summary** — the problem, the one immediate action and the owning record door.
+2. **Order Route** — one compact horizontal mission-health line; it is not a wizard or sequence.
+3. **Logistics card** — §5.9's deployed component and eight-section expansion, unchanged.
+4. **Customer card** — mission-relevant dates, contact checkpoint and structured answer only.
+5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
+6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
+
+The same sentence never appears in all three layers. The summary says what is wrong and what to do;
+the Route says which mission obligation needs attention; the party card says who must answer and
+exposes the owning action. Only one party card expands at a time, and it remains expanded after a
+save or refresh. On a screen below 960px `Back to work` restores the same list position and filters.
+
+#### Order Route — one line, concurrent facts
+
+The default points are **Proceed · PO · GRN · Contact · Delivery**. **Loan** appears between Proceed
+and PO only when a real loan record exists. The route does not force the modules into Step 1/2/3:
+PO, customer, payment and logistics work may progress concurrently. Payment and Logistics render as
+contextual exceptions beneath the applicable point rather than two extra permanent circles.
+
+Each point derives `{label, date_or_range, summary, state, source_module, details, source_link}` from
+its owning module. Nothing is stored as a Workspace route status. States are `complete · current ·
+attention · urgent · future · unavailable`: complete uses neutral dark/check, current blue,
+attention amber, urgent/missed red and future/unavailable grey. Normally only one point is blue.
+
+- **Proceed** — the recorded order-to-proceed fact/date.
+- **Loan** — optional; current loan fact/date only, never hidden under Payment.
+- **PO** — `{issued} of {total}` and the applicable supplier date or date range.
+- **GRN** — Warehouse receipt progress/date. There is no duplicate `Stock received` point.
+- **Contact** — the customer/logistics contact checkpoint protecting delivery.
+- **Delivery** — the final mission deadline: `Scheduled delivery · {date}`, then `Delivered · {date}`.
+
+Dates use `27 Oct`, a range `18–20 Oct`, and a compact progress line such as `2 of 3 confirmed`.
+Do not add `1 pending` when that progress already communicates the same fact. Clicking a point
+reveals a compact detail row below the route and the owning-module door; it does not create a second
+large timeline. On narrow screens the same line scrolls horizontally, auto-reveals the current
+point and never wraps into two route rows.
+
+#### Customer card
+
+Collapsed height is exactly **72px**. It prints `Customer · {name}` and one mission state:
+`Contact due today` · `Waiting for customer` · `Scheduled {date}` ·
+`Customer requested another date` · `No answer — follow up` · `Delivered {date}`. Phone, email,
+owner and history do not appear collapsed.
+
+Expanded order:
+
+1. **Current action** — governed `WhatsApp` / `Email` doors when contact data exists.
+2. **Delivery** — `Requested delivery` · `Scheduled delivery` · `Delivered`.
+3. **Checklist** — `Customer contacted` · `Delivery date agreed` · `Address/access checked`.
+4. **Response** — `Accepted date` · `Requested another date` · `No answer` ·
+   `Delivery details changed`; no unrestricted outcome field.
+5. **Evidence and communication history** — source event, actor and time.
+
+`Accepted date` records Scheduled delivery through Delivery. `Requested another date` records the
+proposed date and returns planning to the owning module. `No answer` records Waiting with a governed
+reply-due/follow-up date. Sending a message never completes the operational work: the module's
+required fact does. Facts remain owned by Sales Orders (customer/requested date), Delivery
+(scheduled/delivered), the appropriate Sales Orders/Delivery address authority, and the shared
+source communication event.
+
+#### Supplier card
+
+One mission has one Supplier card even when it has several suppliers. Collapsed height is exactly
+**72px**. It prints only group progress plus the highest-material exception, for example
+`2 of 3 POs issued` · `2 of 3 dates ready · 1 delayed` · `2 of 3 received · 1 arriving 27 Oct` ·
+`No purchase order for this Sales Order`. It does not print owner, supplier names or PO numbers
+unless one is required to identify the exception.
+
+Expanded, show one compact row per supplier/PO with applicable facts only:
+
+- supplier and state: `PO not issued · Expected · Confirmation needed · Delayed · Arriving today ·
+  Received · Short received`;
+- original PO Delivery Date, preserved forever;
+- effective/latest promised arrival date;
+- governed delay reason and required WhatsApp evidence;
+- warehouse destination;
+- Supplier DO or exact-date/warehouse arrival confirmation;
+- GRN date and received quantity from Warehouse, never a supplier claim;
+- `Open PO`, `View evidence`, `View DO` or `Open GRN` owning doors as applicable.
+
+Per-supplier checks are PO issued · delivery date known · pre-arrival confirmation · GRN received,
+summarised as `{n} of 4 complete`, with detailed rows only on expansion. `Record supplier delay`
+requires a new date, governed reason and WhatsApp screenshot; it appends evidence, preserves the
+original date and updates Purchasing, Work and Route from the same source facts. One Office working
+day before arrival, missing Supplier DO/confirmation yields `Confirmation needed today`; a sent
+request yields `Waiting for supplier`; a passed arrival without receipt yields
+`Arrival missed · Follow up supplier`.
+
+#### Shared communication and Work states
+
+Applicable expanded cards show the valid source-owned channels, latest event and `View history`.
+The preview selects a governed template and inserts only module-owned facts. Staff may `Copy message`
+or open WhatsApp/email; opening a channel is not sent evidence. On return, `Record as sent` stores
+party, recipient, channel, template, source object, actor/time and reply due date. The transitions are:
+
+`To do → recorded sent → Waiting` · `Waiting → reply → To do or source-fact Completed` ·
+`Waiting → reply due passes → To do (`No answer · Follow up today`)`.
+
+Evidence belongs to the source communication event: WhatsApp screenshot, email record, Supplier DO,
+external-link answer or governed phone outcome. Customer messages use the customer/order reference;
+Supplier uses the PO reference; Logistics uses CR/TCF and never exposes internal SO number through
+the external link. Missing contact data prints the reason plus `Open {party} record`, not an
+unexplained disabled button.
+
+#### Payment, Warehouse, loan and after-sales boundaries
+
+Payment is a Route/party exception only when it materially affects delivery; it is not another
+calendar card. Use the Payment MASTER's governed collection/approval action and do not invent
+`Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
+Purchasing; GRN/received quantity belongs to Warehouse. Loan is its optional independent point.
+After-sales starts a separate mission after delivery unless its own MASTER explicitly connects it.
+
+#### Exact responsive and state contract
+
+- ≥1280px: `240px rail · 420px list · remainder detail`; detail padding 16px, section gap 8px.
+- 960–1279px: 400px list plus detail; filters are behind the toolbar control.
+- <960px: list/detail share one stage; detail padding 12px; `Back to work` first.
+- Route is 88px and one horizontally scrollable line. Collapsed party card is exactly 72px.
+- Summary title 16/22/600; supporting 13/18; party heading 15/20/600; state 12/16;
+  expanded-section padding 10px; action buttons 36px; every touch target at least 40×40px.
+- At 743×704, Back, summary, Route and all three collapsed party headings are visible before any
+  party expansion. At 390px facts keep the same order, `27 Oct` never splits and the page never
+  scrolls sideways.
+
+No selection shows one `Select a work item` empty state and no fake route/cards. A missing Sales
+Order shows `Order details unavailable` and no guessed party state. A refresh failure keeps the last
+good mission with `Some information could not be refreshed. Try again.` Partial facts remain visible
+with the exact missing source named. Permission refusal reveals no restricted party/payment data.
+Skeletons use the final summary/88px Route/three 72px card geometry. Focus follows visual order;
+Enter/Space opens a card, Escape collapses it, focus returns correctly, and text/icons—not colour
+alone—announce every status.
+
+#### Build and acceptance contract
+
+Build order: persist this authority → shared party shell → Customer → Supplier aggregation → Route
+projection → communication events → responsive/error/accessibility states. Preserve §5.9 Logistics,
+§5.5 left/middle shell and the deployed density fix. Representative fixtures must cover: no PO;
+one supplier; three suppliers with missing PO, delay and partial GRN; logistics unassigned/assigned
+unscheduled; customer waiting/no answer/rescheduled; payment exception; loan; delivered; missing
+contact; partial failure; permission refusal.
+
+Acceptance measures 1440, 1180, 820, 743 and 390: no horizontal page scroll, 72px collapsed cards,
+one-line Route, one primary blue action, unwrapped `27 Oct`, correct keyboard/screen-reader behaviour,
+no console error, and no regression to Logistics, left rail, middle cards or list restoration.
 
 ## 6 · Module admission gate
 

@@ -271,6 +271,12 @@ The maintained mission state above and these transitions are part of every Plan/
    concise Constitution starters; do not make Jess reconstruct lane law in a giant prompt.
 
 Plan Decision Persistence makes the authoritative MASTER—not chat length—the memory mechanism.
+
+For Workspace Work, the complete owner-approved right-panel composition, exact 72px party-card
+geometry, one-line concurrent Order Route, Customer/Supplier states, shared communication behaviour
+and responsive acceptance are governed by `workspace/MASTER.md` §5.10. UI work must preserve the
+deployed §5.5 left/middle density and §5.9 Logistics behaviour; existing Customer/Supplier shells are
+implementation evidence, not proof that the approved target is complete.
 PLAN mode blocks application implementation but requires governing-document updates for approved
 truth. Once an approved READY scope is handed to BUILD/DELIVERY mode, §1.1 and the Constitution's
 Engineer-Owned Delivery law apply: engineering chooses its own compliant execution method and owns
