@@ -865,8 +865,8 @@ Current implementation differences from the above target are build gaps, not a c
   second action. It is a status word, not an action sentence.
   **THE DELIVERY SCHEDULE CARD CARRIES TWO FACTS ON TWO LINES — owner ruling 2026-09-14
   (`../delivery/MASTER.md` §8.2 · §8.4):** line 1 the journey progress, line 2 the readiness or
-  blocker (`Ready` · `Stock risk` · `Hold delivery` · `Logistics details incomplete` ·
-  `DO not released`). The two never merge into one status, because a progress rung and a
+  blocker (`Ready` · `Goods not ready` · `Hold delivery` · `Driver and vehicle not recorded`;
+  owner ruling 2026-09-25). The two never merge into one status, because a progress rung and a
   readiness fact answer different questions and come from different arithmetics. Every card also
   wears a TYPE label (`DELIVERY` · `TRANSFER`) whose two populations are never summed into one
   total. No other surface adopts this grammar without its own owner ruling.
