@@ -772,6 +772,9 @@ Evidence [Upload]  ≥1 WhatsApp screenshot · photo · video · PDF        Answ
 2 selected · Apply to selected  [Choose answer ▾]                   ← bulk answer, one bar, never per row
 ```
 
+- **Every Unit ID prints in full under its item** (owner 2026-09-26, the same rule as the Register
+  expansion, Warehouse Inbound and Repair Orders): never `{n} Units`, never a `…` range; the row
+  grows. The answer itself stays per line and quantity — Receiving verifies which Units arrive.
 - `Answer` is ONE kit Select in the row (owner choice 2026-09-26: a dropdown, not a four-segment
   control — 140px instead of 330px, and the same control the rails and `Reason` already use). `Date` and
   `Reason` appear in the row only when the answer needs them (`New date`; `Reason` only when the
