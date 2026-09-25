@@ -633,8 +633,8 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-Unit ID · Product · Stock use · Stock Location · SO No · SO date ·
-PO/Source No · PO/Source date · Received
+Unit ID · Item · Stock use · Stock Location · SO No · SO Date ·
+PO No / Ref No · PO Doc Date · Goods Received Date
 ```
 
 `Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
@@ -668,6 +668,13 @@ form — `U1-000-084` · `SO2609-4827` · `PO260924-4827` · a five-digit `DO`/`
 row prints `—` for Unit ID with `×{qty}` beside the product. Measured on production 2026-09-25:
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
+
+**EVERY COLUMN HEAD IS A WORD THE DICTIONARY ALREADY RULES — owner correction 2026-09-25.** The
+nine heads are `Unit ID` · `Item` · `Stock use` (this MASTER's approved availability word since
+2026-09-04) · `Stock Location` · `SO No` · `SO Date` · `PO No / Ref No` (the stock picker's
+provenance head: the document the goods came in on — a PO, or a Transfer/Repair/Claim number) ·
+`PO Doc Date` · `Goods Received Date`. `Product`, `PO/Source No`, `PO/Source date`, `Received`,
+`Site` and `Who has it` are retired as Inventory heads; no new head may be minted for this page.
 
 **THE WORDS IN `Stock use` AND `Stock Location` — owner rulings 2026-09-25.**
 
