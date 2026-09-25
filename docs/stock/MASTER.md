@@ -108,7 +108,7 @@ append-only history.
 |---|---|
 | `Carres Klang` | inside Carres's own Klang warehouse (NETS operates it; NETS is never printed as the place) |
 | `PJ Showroom` | inside the showroom |
-| `With NETS Delivery` | the driver has taken the goods and no Site has received them yet |
+| `{Logistics} · {Delivery Location}` (e.g. `NETS Logistics · PJ Showroom`) | the Logistics company has taken the goods (Warehouse posted OUT) and no Site has posted IN yet: the cell names who picked up and where it is going, nothing else (owner ruling 2026-09-25) |
 | `AL Sungai Buloh` · `HOUZS Balakong` | inside a partner Site |
 | the selected JB partner warehouse · EU or SSY on the Singapore leg | partner custody on a Journey leg |
 
@@ -620,7 +620,7 @@ Ready Stock
 Showroom Display
 Service Case
 Needs checking
-Available · Damaged · In repair · In transit · Incoming   (physical-state rows, same group)
+Available · Damaged · In repair · Incoming   (physical-state rows, same group)
 ```
 
 The dated work strip remains above the Register. For the selected actual date it shows only the
@@ -684,12 +684,17 @@ provenance head: the document the goods came in on — a PO, or a Transfer/Repai
 
 - `Stock Location` joins the default columns directly after `Stock use` and replaces `Who has it`
   (owner correction 2026-09-25). It prints COPY-STANDARD's existing place words — `Carres Klang` ·
-  `PJ Showroom` · `With NETS Delivery` · `AL Sungai Buloh` · `HOUZS Balakong` — and never a holder,
-  role or carrier-as-place word. The rail has no `WHO HAS IT` group; it is `STOCK · OWNERSHIP ·
+  `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong` — while the Unit stands in a Site; once the
+  Warehouse has posted OUT and no Site has posted IN, it prints `{Logistics} · {Delivery Location}`
+  (`NETS Logistics · PJ Showroom` · `NETS Logistics · 12 Jalan SS2, PJ`): who picked up and where it
+  is going, nothing else. Nobody records the road — OUT at origin and IN at destination are the only
+  two events, exactly as SAP/Odoo stock-in-transit works (owner ruling 2026-09-25). `With NETS
+  Delivery`, `In transit` and `On the way` are not Inventory words. The rail has no `WHO HAS IT` group; it is `STOCK · OWNERSHIP ·
   CONTROL`.
 - `Stock use` prints one plain word for what the Unit can do now: `Available` (can be promised) ·
   `Reserved` (bound to the Sales Order in `SO No`; `Reserved / sold` is retired — a sold Unit is
-  delivered and lives in History) · `In transit` · `Incoming` (never in the default list). A Unit
+  delivered and lives in History) · `Incoming` (never in the default list). A Unit on the road keeps
+  its `Available`/`Reserved` word; the road shows in `Stock Location`. A Unit
   that cannot be promised never prints the vague `Not available`: it prints the actual reason the
   register holds — `Damaged` · `Wrong item` · `Waiting inspection` · `In repair` · `Customer return ·
   check required` — so the operator reads what is wrong, not that something is.
