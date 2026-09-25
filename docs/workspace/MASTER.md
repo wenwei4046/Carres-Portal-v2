@@ -725,8 +725,9 @@ The implementation reuses `PageShell`, `Tabs`, `SearchInput`, `Select`, `Button`
 Status text that must wrap does not use the truncating `StatusPill`. A shared `Avatar` must first
 govern one initials algorithm plus full-name hover/focus/tap behaviour; Work may not choose among
 page-local avatar recipes. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
-(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (structured detail and
-host for an admitted owning-module component). None calculates business dates, ownership, severity, completion or source health. They are
+(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (the §5.10 summary and
+host for an admitted owning-module component), and the §5.10 right-panel pieces `PartyCardShell`,
+`CustomerCard`, `SupplierCard`, `LogisticsCard`, `WorkOrderRoute` and `WorkOwnerSource`. None calculates business dates, ownership, severity, completion or source health. They are
 not promoted into the global kit until a separately governed second use exists.
 
 ### 5.6 · Priority, due and SLA law
@@ -1137,6 +1138,11 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
 - **Logistics collapsed stays as deployed** (§5.9, up to five facts); `exactly 72px` binds the
   Customer and Supplier cards, and the 743×704 acceptance requires all three headings visible.
 - **Permission state:** `You cannot view this record` · `Ask an authorised operation user for access.`
+- **One visible blue.** The blue goes to the most urgent party (missed → due today → the selected
+  work's party → future); when the operator opens a different card that has an act, the blue moves to
+  the open card, so exactly one blue is visible. An admitted embedded action is always the blue.
+- **An order outside the Operation list** (the read returns the latest 500) draws no route or cards;
+  only a FAILED read prints `Order details unavailable` (gap: a per-order read).
 - **Customer message** (Orders §9, owner approval 2026-09-25): `Hello {Name}, this is Carres about your
   order {REF}. We are arranging your delivery for {date}. Please reply to confirm this date, or tell us
   a date that suits you.`
