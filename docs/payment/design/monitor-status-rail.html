@@ -27,20 +27,20 @@
   header.dest .util{margin-left:auto;display:flex;gap:10px;color:var(--ink-2)}
   .stage{display:grid;grid-template-columns:240px 1fr;gap:16px;padding:16px;min-width:0}
   /* Rail — Work's white section recipe (§5.5): 1px work-line, 9px radius, no shadow */
-  .rail{background:#fff;border:1px solid var(--work-line);border-radius:var(--r-work);align-self:start}
-  .rail h2{margin:0 12px;height:48px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);font-size:15px;line-height:22px;font-weight:600}
+  .rail{background:#fff;border-right:1px solid var(--border);padding:4px 12px 12px;position:relative;align-self:stretch;margin:-16px 0 -16px -16px}
+  .rail h2{display:none}.hide{position:absolute;right:8px;top:8px;width:28px;height:28px;border:1px solid var(--divider);border-radius:var(--r-control);background:#fff;color:var(--ink-2);display:grid;place-items:center;cursor:pointer}.hide svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .rail h2 svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:2}
-  .group{padding:6px}
+  .group{padding:8px 0}
   .group+.group{border-top:1px solid var(--border)}
-  .group .gh{font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);padding:6px 8px 2px}
-  .row{display:flex;align-items:center;gap:8px;min-height:40px;width:100%;border:0;background:none;text-align:left;padding:3px 8px;border-radius:var(--r-control);font:inherit;color:var(--ink);cursor:pointer}
+  .group .gh{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 6px;font-size:13px;line-height:18px;font-weight:600;color:var(--ink);border-radius:var(--r-control)}.gh svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.gh .chev{margin-left:auto;color:var(--ink-2)}
+  .row{display:flex;align-items:center;gap:8px;min-height:36px;width:100%;border:0;background:none;text-align:left;padding:3px 6px;border-radius:var(--r-control);font:inherit;color:var(--ink);cursor:pointer}
   .row:hover{background:var(--surface-alt)}
   .row[aria-pressed="true"]{background:var(--blue-3);font-weight:600}
   .row .w{flex:1;min-width:0}
-  .row .n{font-size:13px;line-height:18px;font-weight:600;color:var(--ink)}
-  .row .n.z{font-size:12px;line-height:16px;font-weight:400;color:var(--ink-2)}
-  .row .n.red{color:var(--red-11)}
-  .row.all{border-top:1px solid var(--border);border-radius:0;margin-top:4px;padding-top:8px}
+  .row .n{font-size:12px;line-height:16px;font-weight:400;color:var(--ink-2)}
+  .row .n.z{color:var(--ink-2)}
+  .row .n.red{color:var(--red-11);font-weight:600}
+  .row.all{font-weight:600}
   .row:focus-visible,.chev:focus-visible,.btn:focus-visible,.link:focus-visible{outline:2px solid var(--blue-9);outline-offset:2px}
   /* Register */
   .reg{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);display:flex;flex-direction:column;min-width:0;overflow:hidden}
@@ -111,9 +111,10 @@
       <div class="util"><span>Jump to… ⌘K</span><span>🔔</span><span>?</span><span>⚙</span></div></header>
     <div class="stage">
       <nav class="rail" aria-label="Status">
-        <h2><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Status</h2>
+        <button class="hide" aria-label="Hide filters" title="Hide filters"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M16 15l-3-3 3-3"/></svg></button>
+        <div class="group"><button class="row all" data-k="all"><span class="w">All unpaid orders</span><span class="n">7</span></button></div>
         <div class="group">
-          <div class="gh">Needs action</div>
+          <div class="gh"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Needs action<span class="chev">˄</span></div>
           <button class="row" data-k="missed" aria-pressed="true"><span class="w">Missed</span><span class="n red">1</span></button>
           <button class="row" data-k="ask"><span class="w">Ask customer today</span><span class="n">2</span></button>
           <button class="row" data-k="due"><span class="w">Payment due today</span><span class="n">1</span></button>
@@ -121,20 +122,19 @@
           <button class="row" data-k="storage"><span class="w">Storage Invoice not paid</span><span class="n">1</span></button>
         </div>
         <div class="group">
-          <div class="gh">Waiting</div>
+          <div class="gh"><svg viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M8 3c0 6 8 6 8 12M16 3c0 6-8 6-8 12"/></svg>Waiting<span class="chev">˄</span></div>
           <button class="row" data-k="later"><span class="w">Payment due later</span><span class="n">1</span></button>
           <button class="row" data-k="nodate"><span class="w">No delivery date</span><span class="n z">0</span></button>
           <button class="row" data-k="goods"><span class="w">Waiting for goods</span><span class="n">1</span></button>
         </div>
         <div class="group">
-          <div class="gh">Other owners</div>
+          <div class="gh"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-5-6.3"/></svg>Other owners<span class="chev">˄</span></div>
           <button class="row" data-k="hold"><span class="w">Finance hold</span><span class="n z">0</span></button>
           <button class="row" data-k="review"><span class="w">Needs review</span><span class="n z">0</span></button>
         </div>
         <div class="group">
-          <div class="gh">Done</div>
+          <div class="gh"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Done<span class="chev">˄</span></div>
           <button class="row" data-k="paid"><span class="w">Paid orders</span><span class="n">2</span></button>
-          <button class="row all" data-k="all"><span class="w">All unpaid orders</span><span class="n">7</span></button>
         </div>
       </nav>
       <section class="reg" aria-label="Payment Monitor register">
