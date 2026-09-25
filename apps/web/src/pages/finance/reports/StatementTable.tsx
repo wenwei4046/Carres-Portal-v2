@@ -68,13 +68,14 @@ export type StatementRow =
   | { id: string; section: string; kind: "nothing" };
 
 /**
- * The rows the table prints. A header line comes first, then its own
- * accounts, then the headers under it, each with its own subtotal, down to
- * any depth (0579). An account at RM 0.00 is left out, as the Trial Balance
- * does, and so is a header with nothing but RM 0.00 under it. A section where
- * every account is at RM 0.00 keeps its band and gets one line saying so
- * (`No income in this period.`). So even when every section is at zero, the
- * bands stay, and so does the bottom strip under them.
+ * The rows the table prints. A header line comes first, then everything
+ * under it in the chart's order: its own accounts and the headers under it
+ * mixed together, as the Chart of accounts lists them. Each header keeps its
+ * own subtotal, down to any depth (0579). An account at RM 0.00 is left out,
+ * as the Trial Balance does, and so is a header with nothing but RM 0.00
+ * under it. A section where every account is at RM 0.00 keeps its band and
+ * gets one line saying so (`No income in this period.`). So even when every
+ * section is at zero, the bands stay, and so does the bottom strip under them.
  */
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
@@ -96,14 +97,23 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
       if (headed) {
         out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal, depth });
       }
-      for (const l of g.lines.filter((x) => !isZeroMoney(x.amount))) {
+      // Accounts and sub-headers in the database's row order. A sub-header's
+      // row is its subtotal, served right after everything under it, so it
+      // sorts against the accounts beside it the way the chart does.
+      const under: ({ line: StatementLine } | { sub: StatementGroup })[] = [
+        ...g.lines.filter((x) => !isZeroMoney(x.amount)).map((line) => ({ line })),
+        ...(children.get(g.code) ?? []).filter(shown).map((sub) => ({ sub })),
+      ];
+      const at = (x: (typeof under)[number]) => ("sub" in x ? x.sub.ordinal : x.line.ordinal);
+      for (const x of under.sort((a, b) => at(a) - at(b))) {
+        if ("sub" in x) { emit(x.sub, depth + 1); continue; }
+        const l = x.line;
         out.push({
           id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
           amount: l.amount, nested: headed, depth: headed ? depth + 1 : depth,
           reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
         });
       }
-      for (const c of (children.get(g.code) ?? []).filter(shown)) emit(c, depth + 1);
     };
     for (const g of roots) emit(g, 1);
     if (s.unclosedResult !== null && !isZeroMoney(s.unclosedResult)) {

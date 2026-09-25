@@ -343,8 +343,10 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
   const [accounts, config] = await Promise.all([
     // 0557: the order Finance dragged, then the code. sort_order is 0 on every
     // account nobody has dragged, so the tiebreak keeps the by-code order.
+    // "*" so the chart still reads in the minutes between the deploy and
+    // 0580's SQL, when is_heading is not there yet.
     sb.from("gl_accounts")
-      .select("code,name,kind,parent_code,is_control,control_for,is_active,sort_order")
+      .select("*")
       .order("sort_order", { ascending: true })
       .order("code", { ascending: true }),
     sb.from("gl_config").select("go_live_on").limit(1).maybeSingle(),
@@ -352,8 +354,9 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
   if (accounts.error) return { error: accounts.error };
   if (config.error) return { error: config.error };
   const rows = (accounts.data ?? []) as Json[];
-  // A header is derived, never declared (0461): any account another row names
-  // as its parent.
+  // 0580: a heading is stored (is_heading), so a heading whose last account
+  // left is still a heading. Before 0580 is applied: any account another row
+  // names as its parent.
   const parents = new Set(rows.map((r) => r.parent_code).filter((p): p is string => typeof p === "string"));
   return {
     chart: {
@@ -366,7 +369,7 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
         is_control: r.is_control === true,
         control_for: (r.control_for as string | null) ?? null,
         is_active: r.is_active === true,
-        is_header: parents.has(String(r.code)),
+        is_header: typeof r.is_heading === "boolean" ? r.is_heading : parents.has(String(r.code)),
         sort_order: Number(r.sort_order ?? 0),
       })),
     },

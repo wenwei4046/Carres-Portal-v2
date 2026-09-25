@@ -2,8 +2,9 @@
  * Finance Settings → Chart of accounts (migrations 0539, 0550, 0557).
  *
  * Every account in the chart as a tree: each account under its parent,
- * indented by depth. A heading account (one another account names as parent)
- * is bold; the ledger never posts to it. A row click opens the account's name
+ * indented by depth. A heading account (`is_header`, stored since 0580, so a
+ * heading with nothing under it is still one) is bold; the ledger never posts
+ * to it. A row click opens the account's name
  * and its number. Since 0550 the number can change: every key that names the
  * chart cascades, so posted lines follow the account to its new number rather
  * than being left pointing at nothing.
@@ -35,16 +36,19 @@
  *
  * A DROP ON A HEADING PUTS THE ACCOUNT UNDER IT (0570), a sibling heading
  * included. The number and name stay; the parent changes, so the P&L and
- * Balance Sheet print it under the new heading on their next read. Only a
- * POSTING account goes under another heading: a heading keeps its place among
- * its siblings, because the reports group by the immediate parent only. The
- * screen offers only what `gl_account_move` takes — a heading of the same
- * kind, not the one it is under, never into or out of a heading
- * `rule_headings` names, and never the last account under a heading — so it
- * never offers a move the database would refuse. A drop on an account beside
- * it reorders (0557). Alt + up/down only reorders (`canStep`, `onStep`), so a
- * sibling heading can still be stepped past; the keyboard way under another
- * heading is the row menu (Shift+F10, the Menu key or a right-click).
+ * Balance Sheet print it under the new heading on their next read. The screen
+ * offers only what `gl_account_move` takes (0580), so it never offers a move
+ * the database would refuse: a heading of the same kind, not the one it is
+ * under, not itself or a heading inside it, never into or out of a heading
+ * `rule_headings` names or one inside it, and nothing but bank and cash
+ * accounts (`money_accounts`) into the money accounts heading or a heading
+ * inside it. The last account may leave its heading; the heading stays bold
+ * and still takes a drop. Two headings side by side reorder on a drop; a
+ * heading goes under another through the row menu. A drop on an account
+ * beside it reorders (0557). Alt + up/down only reorders (`canStep`,
+ * `onStep`), so a sibling heading can still be stepped past; the keyboard way
+ * under another heading is the row menu (Shift+F10, the Menu key or a
+ * right-click).
  *
  * THE ORDER IT READ AND THE ORDER IT WANTS BOTH GO UP. `was` is built from the
  * chart as it stands on screen, `now` from the move; they are never the same
@@ -111,28 +115,36 @@ export default function ChartOfAccounts() {
   /** Bank and cash accounts are added in Money accounts, so the Add account
       form never offers this heading or one inside it (0577). */
   const moneyHeading = query.data?.roles?.MONEY_ACCOUNTS_HEADING;
+  const moneyAccounts = useMemo(() => new Set(query.data?.money_accounts ?? []), [query.data]);
 
+  /** `code` and every heading above it, nearest first. */
+  const upFrom = (code: string | null) => {
+    const parentOf = new Map(accounts.map((x) => [x.code, x.parent_code]));
+    const chain: string[] = [];
+    for (let c: string | null | undefined = code; c; c = parentOf.get(c)) chain.push(c);
+    return chain;
+  };
   /** True when `h` is `a` or sits anywhere under it (0577: a heading never
       goes under a heading inside it). */
-  const isInside = (h: LedgerAccount, a: LedgerAccount) => {
-    const parentOf = new Map(accounts.map((x) => [x.code, x.parent_code]));
-    for (let c: string | null | undefined = h.code; c; c = parentOf.get(c)) if (c === a.code) return true;
-    return false;
-  };
+  const isInside = (h: LedgerAccount, a: LedgerAccount) => upFrom(h.code).includes(a.code);
+  const inMoneyHeading = (code: string) => !!moneyHeading && upFrom(code).includes(moneyHeading);
+  const underRuleHeading = (code: string | null) => upFrom(code).some((c) => ruleHeadings.has(c));
 
   /** A heading account `a` may go under — gl_account_move's own refusals, so
       the screen never offers one: `h` is a heading of the same kind and not
       the one `a` is under, not `a` itself or inside it (a heading moves too
-      since 0577), neither heading decides how money may be recorded, and `a`
-      is not the last account under its heading (active or retired). */
+      since 0577), no heading that decides how money may be recorded sits at
+      or above either end, and inside the money accounts heading `a` and
+      everything under it is a bank or cash account or a heading (0580). An
+      empty heading counts, and the last account may leave its heading. */
   const canGoUnder = (a: LedgerAccount, h: LedgerAccount) =>
     h.is_header &&
     !isInside(h, a) &&
     h.kind === a.kind &&
     h.code !== a.parent_code &&
-    !ruleHeadings.has(h.code) &&
-    !(a.parent_code !== null && ruleHeadings.has(a.parent_code)) &&
-    (a.parent_code === null || accounts.some((o) => o.parent_code === a.parent_code && o.code !== a.code));
+    !underRuleHeading(h.code) &&
+    !underRuleHeading(a.parent_code) &&
+    !(inMoneyHeading(h.code) && accounts.some((x) => !x.is_header && !moneyAccounts.has(x.code) && isInside(x, a)));
 
   const move = (dragged: Row, target: Row) => {
     const was = childrenOf(dragged.parent_code);
@@ -273,7 +285,7 @@ export default function ChartOfAccounts() {
       {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
       {adding && (
         <AddAccountModal
-          headings={rows.filter((r) => r.is_header && !(moneyHeading && isInside(r, { code: moneyHeading } as LedgerAccount)))}
+          headings={rows.filter((r) => r.is_header && !inMoneyHeading(r.code))}
           onClose={() => setAdding(false)}
         />
       )}

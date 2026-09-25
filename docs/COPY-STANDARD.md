@@ -3414,14 +3414,15 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Missing contact | `WhatsApp unavailable · No phone number` · `Open customer record` (equivalent exact party door) | unexplained disabled control |
 | Refresh failure | `Some information could not be refreshed.` · `Try again` while the last good mission stays visible | replacing the mission with a generic error |
 | No selection / missing order | `Select a work item` · `Choose an item from the Work list to see its mission.` · `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` | empty fake Route · guessed `Logistics not assigned` |
-| Customer stored-result and partner lines | `Customer refused delivery` · `Phone number is wrong` · `Contact missed {date}` · `Contact due {date}` · `{company} contacts the customer · by {date}` · `Carres contacts this customer` · `{company} contacts this customer` · `No email recorded` · `No contact recorded yet` | a guessed reply |
+| Customer stored-result and partner lines | `Customer refused delivery` · `Phone number is wrong` · `Customer requested another date` · `{company} contacts the customer · by {date}` · `{company} contacts the customer.` · `Logistics not assigned` · `Delivered · {date}` · `No email recorded` · `No phone recorded` · `No contact recorded yet` | a guessed reply · a Carres calling line |
 | Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
-| Record the reply | `Record reply` · `Channel` · `WhatsApp` · `Call` · `Email` · `Date the customer asked for` · `WhatsApp reply` · `Save reply` · `Cancel` · `Change the address in the Sales Order, then record the reply.` · `Reply recorded` · `The reply could not be recorded. Try again.` · `Upload the customer's WhatsApp reply first.` | free-text outcome |
+| Customer card sections | `Current action` · `Delivery` · `Partner contact` · `Contact by` · `Latest result` · `Open in Delivery` · `Exception` · `Evidence and communication history` · `Name not recorded` · `WhatsApp reply · 1 photo` · `In person` | Record reply · Accepted date |
 | Customer communication preview | only for a governed Carres exception or ERP-ARCHITECTURE §6.5 outstation release: `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
-| Route statuses and payment line | `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · RM {amount} to collect by {date}` · `Payment · Finance is holding this delivery` | Blocked · a Payment circle |
+| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · RM {amount} to collect by {date}` · `Payment · Finance is holding this delivery` | Blocked · a Payment circle |
 | Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
-| Customer card extras | `Reply due {date}` · `Name not recorded` · `No phone recorded` · `WhatsApp reply · 1 photo` · `Evidence and communication history` · `Checklist` · `Response` · `Delivery` | — |
-| Supplier row labels | `PO Delivery Date` · `Latest date` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `Supplier details could not be loaded.` · `Try again` | Stock received |
+| Customer exception doors | `Open Sales Order` (a known delay · a wrong phone number) · `Open in Delivery` (another date · a refusal) | a Work form |
+| Customer card read failure | `Customer contact unavailable` + `Open Sales Order` | a guessed partner state |
+| Supplier row labels | `PO Delivery Date` · `Latest date` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Not needed yet` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Message copied` · `The message could not be copied. Try again.` · `Supplier details could not be loaded.` · `Try again` | Stock received |
 | Permission | `You cannot view this record` · `Ask an authorised operation user for access.` | leaked party or money facts |
 
 ## Numbers, dates, money
@@ -4317,7 +4318,7 @@ is the proposal. No new sentence is added.
   about money still in the account comes before the number is touched. If the chart then refuses,
   `Active` stays saved, and the sentence says why the name or number did not change.
 
-## PROPOSAL — PENDING APPROVAL (0576, Approve day pays from the day's card account)
+## APPROVED by YH on 25 Sep 2026, as written (0576, Approve day pays from the day's card account)
 
 - The sales on this day were paid into more than one card account ({codes}), so one payout cannot cover them. Check the payment method of each sale.
 - The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each sale.
@@ -4344,3 +4345,44 @@ Database sentences (shown as written):
 ### Sales Order existing-reference revisions and delivery Activity
 
 SO revision records display `<existing reference>(n)` with no space; the current version appends ` · Current`. Preserve the saved base reference and historical issued documents. Parenthesized revisions are presentation, not a new allocated number. Delivery Activity names `confirmed_date` as **Confirmed date**, `confirmed_time_slot` as **Confirmed time**, and `confirmed_partner` as **Logistics**; stored events remain unchanged.
+
+## PROPOSAL — PENDING APPROVAL · Chart of accounts: any move between headings of the same kind (0580)
+
+YH's rulings of 24 Sep 2026: a drag works for every move between headings of the same kind; the last
+account under a heading may leave it, and the emptied heading stays a heading (bold, never posted to,
+never offered in an account picker, still takes accounts); an account that is not a bank or cash
+account never goes under the money accounts heading or a heading inside it, while a bank or cash
+account still moves out and back in. Rule headings stay locked, a heading never goes under itself or
+a heading inside it, and the staleness check stays.
+
+New database sentences (the screen prints them as written):
+
+| Word | Meaning |
+|---|---|
+| `{code} {name} is not a bank or cash account. Only bank and cash accounts go under {code} {name}.` | An account with no bank or cash row, moved under the money accounts heading or a heading inside it. The second `{code} {name}` is the money accounts heading. Tag `move_into_money_heading`. |
+| `{code} {name} holds {code} {name}, which is not a bank or cash account. Only bank and cash accounts go under {code} {name}.` | The same for a heading: it names the first account under it (by number) that is not a bank or cash account. A heading holding only bank and cash accounts, or nothing, may go in. |
+
+Retired by 0580 (never raised again, so never on screen):
+
+- `{code} {name} is the last account under {code} {name}. Move another account under that heading first.`
+  (approved 23 Sep, tag `move_last_child`). The last account may now leave; its heading stays a heading.
+
+Same words, new meaning:
+
+- `Move under {code} {name}`: the row menu now also lists a heading with nothing under it, and no longer
+  leaves out the heading when the account is the last one under its own heading. It lists the money
+  accounts heading, or a heading inside it, only for a bank or cash account, or for a heading that holds
+  nothing else.
+- `{code} {name} is not a heading. Move the account under a heading.` and
+  `{code} {name} is not a heading. Add the account under a heading.`: "a heading" is now the stored flag,
+  so a heading whose last account left is still a heading and takes a move or an add.
+- `Account {code} {name} is a group heading. Pick an account under it.` and
+  `{code} {name} is a heading. Choose one of the accounts under it.`: now also said for a heading with
+  nothing under it. The pickers never offer one, so a person meets these only from a form opened before
+  the heading was emptied.
+- Balance Sheet and Profit and Loss: a heading with nothing printed under it prints no line, not a `0.00`
+  line. This also covers a heading whose accounts are all retired and have never moved.
+
+Not screen words (a direct database change only, never raised by a screen): the flag guards
+`account {code} has accounts under it and stays a heading` and
+`account {code} has {n} posted line(s) and cannot become a header`.

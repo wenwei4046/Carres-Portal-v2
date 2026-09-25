@@ -5772,9 +5772,9 @@ delivery order MUST still be stated as missing, because **nobody can DO a missin
 Most actions are performed by sending a message, so the message is part of the action. The
 bodies live in `apps/web/src/lib/wa-templates.ts`; **the rules live here.**
 
-- **A customer message carries a delivery date only when Carres itself is agreeing it** (owner
-  approval 2026-09-25 — the Work Customer card's `Confirm delivery date` template, and the approved
-  outstation confirmation). Otherwise the logistics company agrees the day; if a customer asks us,
+- **A customer message never carries a delivery date** except the governed exceptions: the
+  approved outstation confirmation (ERP-ARCH §6.5) and a Carres notice of a known delay (Workspace
+  §5.10). The logistics company agrees the day (owner correction 2026-09-25); if a customer asks us,
   we give them the logistics company's contact. The delivery-eve reminder on an order still owing
   money may say `today` / `tomorrow`.
 - **No pressure phrasing to a customer** — never *"settle by"*, never *"deliver on time"*.
