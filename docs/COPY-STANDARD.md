@@ -2662,9 +2662,27 @@ what has not happened yet, in the plainest words available:
 | A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
 | A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
 | A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · ({n})`** | Removed · Deleted · Void |
+| MONEY node, money owed (owner ruling 2026-09-26) | **`Hold delivery`** over **`RM {amount} unpaid · by {weekday, date}`** | `RM {amount} still to collect` (retired 2026-09-26) · Outstanding · Balance |
+| MONEY node, paid | **`Paid`** | `Paid in full` (retired 2026-09-26) · Settled · Cleared |
+| MONEY node, an OPEN Finance exception | **`Hold delivery`** over **`Finance hold · {reason}`** | Finance is holding this delivery |
+| MONEY node, no price | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced |
+| A DELIVERY lane's plate — a Journey leg | **`Leg {n} · {from} → {to}`** (`Leg 1 · Carres Klang → JB transit warehouse`) | Stage · Hop · Segment |
+| A DELIVERY lane's plate — a split trip | **`Trip {n} · {goods, e.g. Sofa, 2 items}`** · a trip with no Delivery Order yet **`Trip {n} · not booked yet`** | Batch · Part · Shipment |
+| Leg 2's extra gate requirement | **`Leg 1 arrived at {stop}`** met · **`Leg 1 not arrived yet`** unmet | Leg 1 complete · Transit done |
+| DELIVER node, a scope with a Delivery Order | line 1 = Delivery's §8.4 rung through its ONE label function (`Scheduled` · `Waiting for {partner} pickup` · `Collected by {partner}` · `On the way to customer` · `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Overdue`); line 2 = `Arrived: {date}` · `Delivered: {date}` · `ETA {time}` · the one reason | a second spelling written on this surface — `Delivered` alone · `In transit` |
+| DELIVER node, no Delivery Order yet | **`Not delivered yet`** (dashed future node) | Pending |
+| A read failed — Delivery | **`Could not read Delivery for this order.`** / **`This does not mean nothing is arranged.`** + **`Try again →`** | `Logistics not assigned` printed from a thrown read |
+| A read failed — Payments | **`Could not read Payments for this order.`** / **`This does not mean the order is unpaid.`** + **`Try again →`** | a balance sentence from a thrown read |
+| A read failed — Purchasing | **`Could not read Purchasing for this line.`** / **`This does not mean there is no purchase order.`** + **`Try again →`** | `No Purchase Order yet` from a thrown read |
+| A read failed — the change requests (the banner) | **`Could not read the change requests for this order.`** + **`Try again →`** | drawing no banner as if none were waiting |
 
 **BANNED on this surface, as everywhere:** `No data` · `No results` · `Not available`. Every empty
 state answers three things — what is missing, why, and who does what next.
+
+**RETIRED FROM THE ROUTE 2026-09-26 (owner ruling):** `still to collect` · `still outstanding —
+collect, or request a payment approval` · `still outstanding — approval waiting for decision` ·
+`Money in full` · `COD approved — collect before unloading` · `Payment approval waiting for decision`.
+The Delivery Payment Approval door closed on 2026-09-01; no surface invites one.
 
 **THE NODE ACTION LINE USES THE QUEUE WORD, and the queue word is the one this dictionary already
 owns.** The node is compact and the fact line above it already names the amount or the document, so

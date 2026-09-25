@@ -1362,6 +1362,7 @@ door** back to the object already open.
 | `○` waiting | primary-school English — `No Purchase Order yet` · `Not received yet` — **never `PO: —`** |
 | `⚠` blocked | the reason in words, and the owning door |
 | `○` future (dashed) | a step the work has not reached — dashed box AND dashed connector |
+| `⚠` unreadable | **the read failed** (owner ruling 2026-09-26 · APPROVED TARGET / NOT BUILT): two plain lines — what could not be read and what that does NOT mean — then `Try again →`. Amber like `blocked`, because it is an exception, just not a business one. **Never a `✓`, never `CURRENT`, never a business sentence:** a failed read is not a position, and `No Purchase Order yet` printed from a thrown read is a false claim in the register the operator trusts most. One branch failing never blanks the map; the other groups draw from their own reads. Not `unknown` — that word already means an unknown MONEY VALUE in the resolver |
 
 **A `✓` costs real completion evidence.** Nothing is ticked because the next thing started.
 **State is never colour-only:** complete carries the tick, CURRENT carries its chip and word, future
@@ -1391,9 +1392,57 @@ invents one.
 - **Completed segments solid; a path the work has not walked is dashed.**
 - The one edge fact left is the loan's `collect back`, a small grey label ON its line; route names
   live on the group bands and product names on the plates, never on a connector.
-- `DELIVERY ORDER` is the single convergence gate; `DELIVER` and `DELIVERY PHOTO` hang below it in a
-  straight line. **The last node has no trailing line.**
+- **One delivery scope is ONE LANE — owner ruling 2026-09-26.** A scope is one `(leg, trip)` of
+  `ops_delivery_orders` (a leg of a Journey, or one trip of a split delivery); an ordinary order has
+  one scope, no plate, and exactly today's single chain. Two or more scopes each take a lane under
+  the `DELIVERY` band with the same grey caption plate grammar GOODS uses — `Leg 1 · Carres Klang →
+  JB transit warehouse` · `Trip 2 · Mattress, 1 item` · `Trip 3 · not booked yet` — and each lane
+  carries its own `LOGISTICS → DELIVERY DATE → DELIVERY ORDER → DELIVER → DELIVERY PHOTO`. The
+  `DELIVERY ORDER` gate is therefore per lane; goods STOCK tails join the gate of the trip that
+  carries them (`trip_groups`), and on a Journey every tail joins leg 1's gate while leg 2's gate
+  carries the extra requirement `Leg 1 arrived at {stop}`. `DELIVER` and `DELIVERY PHOTO` hang
+  below their own gate in a straight line; a transfer leg draws no `DELIVERY PHOTO` (the customer leg
+  owes the proof). **The last node of a lane has no trailing line.** `CURRENT` stays ONE for the
+  whole DELIVERY group — the earliest unfinished lane — never one per lane.
 - No node is ever an orphan, and no two nodes overlap — both are asserted, not assumed.
+
+### THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT
+
+**Measured on production 2026-09-25 (`6ed021fac`, SO-1362):** `orders.status = delivered`, two
+`ops_delivery_arrangements` rows (leg 1 NETS · Tue, 15 Sep · 10 AM to 1 PM; leg 2 AL · Thu, 17 Sep ·
+2 PM to 5 PM), two `ops_delivery_orders`, two `delivered` attempts — and the map printed `LOGISTICS ·
+Logistics not assigned`, `DELIVERY DATE · Not scheduled yet`, `DELIVERY ORDER · NOT READY FOR DELIVERY
+· 3 of 5`, with `DELIVER · Delivered: Sun, 13 Sep` beneath it. The cause is the input, not the
+drawing: `booking-brief` reads `ops_order_control.booking_stage / confirmed_date` (the V1 two-stage
+booking) and `orders.ops_assigned_logistic`, and the workspace hands the resolver one
+`orders.do_number` (`SalesOrderWorkspace.tsx:2422-2436`). Delivery's records have lived elsewhere
+since 2026-08-24 (Delivery MASTER §8.8). SO-1358 (NETS · Wed, 30 Sep on its arrangement) shows the
+same blindness. This ruling overwrites every source the DELIVERY group read before it.
+
+| Node | Reads (Delivery's own record, per scope) | Completion fact | Door |
+|---|---|---|---|
+| lane plate | `ops_delivery_orders.leg / trip / trip_groups`; before any DO, the arrangement's `leg` | — (a plate is not a station) | — |
+| `LOGISTICS` | `ops_delivery_arrangements.partner_id` → `delivery_partners.name` | a partner recorded on the scope | `Open Delivery →` (the Monitor row) |
+| `DELIVERY DATE` | `ops_delivery_arrangements.confirmed_date` (+ `confirmed_time`, printed only when recorded) | `confirmed_date` recorded — the time is optional (Delivery §5) | `Open Delivery →` |
+| `DELIVERY ORDER` | the 0362 gate predicate per scope; issued = an `ops_delivery_orders` row with `voided_at IS NULL` | the row exists | `Open {DO No} →` |
+| `DELIVER` | `delivery_attempts` + `delivery_handover_events` + `delivery_stops` **through Delivery's ONE label function** (`deliveryWorkStatusOf`, Delivery §8.4 — owner ruling 2026-09-25: one function prints the words) | customer leg: attempt `delivered`; transfer leg: attempt `delivered` = arrived at the named stop, never customer receipt | `Open Delivery →` |
+| `DELIVERY PHOTO` | `ops_order_control.delivery_photos` filtered by this scope's `doNumber` (`driverSubmissionOf`, the one reader) | a photo on this DO | `Open Delivery →` |
+
+- **`DELIVER` prints Delivery's words, not its own.** Line 1 is the §8.4 rung for the scope —
+  `Scheduled` · `Waiting for {partner} pickup` · `Collected by {partner}` · `On the way to customer` ·
+  `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Overdue` — and line 2 its
+  labelled date, ETA or the one reason. The Route's own `Not delivered yet` survives only for a
+  scope with no Delivery Order yet (a dashed future node). A second label function on this surface
+  is a Law D defect (the register/card split measured 2026-09-25 is the precedent).
+- **`DELIVERY DATE` never reads the Sales Order.** `Requested delivery: {date}` on its second line
+  is the customer's promise printed for contrast; `Scheduled delivery: {date}` is Delivery's fact.
+  Neither is stated as the other (THE CROSS-MODULE DATE CONTRACT).
+- **Owner chips stay honest:** Delivery's owner rule is not yet admitted to the shared resolver,
+  so these nodes still draw no initials (MEASURED BOUNDARY 2026-09-07 stands).
+- **Route facts load only when the Route is open.** Measured: `useSalesOrderRouteFacts` fires on
+  every opened order (`SalesOrderWorkspace.tsx:1293`), eleven requests the Order tab never reads.
+  The build gates it on `?route=1`.
+- The read/write boundary is unchanged: **Sales Order gains no writer.** Every door opens Delivery.
 
 ### The DELIVERY ORDER gate — derived, read-only, and NO release button
 
@@ -1422,8 +1471,36 @@ engine may never disagree):
 
 ```
 outstanding = 0   → ✓ Paid
-owing             → ✗ collect first — the delivery cannot be arranged while money is owed
+owing             → ✗ Hold delivery · RM {amount} unpaid        (owner ruling 2026-09-25, one word on every surface)
 ```
+
+**THE MONEY NODE AND THE GATE LINE SPEAK IN TWO LINES — OWNER RULING 2026-09-26 (Jess) · APPROVED
+TARGET / NOT BUILT.** Measured on production 2026-09-25: the node printed `RM 764.00 still to
+collect` and the gate `RM 764.00 still outstanding — collect, or request a payment approval`
+(`sales-order-route.ts:829/1028/1044`) — an invitation to a door closed on 2026-09-01, in words
+retired on 2026-09-25. The node now reads:
+
+```
+owing              Hold delivery
+                   RM 764.00 unpaid · by Thu, 22 Oct          ← paymentDeadlineOf (Payment MASTER):
+                   Collect  · Open Payments →                     2 working days before Scheduled delivery
+                                                                  (else the Requested date), 3 outstation
+paid               Paid
+                   Open Payments →
+OPEN Finance hold  Hold delivery
+                   Finance hold · {reason}
+                   Open Payments →
+no price           No price yet — money does not hold this delivery
+```
+
+The gate's money line is `Hold delivery · RM {amount} unpaid` unmet and `Paid` met; the OPEN
+Finance exception stays its own second line. **Deleted from the screen:** `still to collect` ·
+`still outstanding — collect, or request a payment approval` · `Money in full` · `COD approved —
+collect before unloading` · `Payment approval waiting for decision`. A pre-closure approval is
+still honoured by the 0362 predicate — a met line then reads `Paid` on the terms recorded, and the
+DO prints its COD instruction (Delivery §3) — but no surface invites a new one. The deadline is
+one arithmetic with the Work right panel and the Logistics card (`paymentDeadlineOf`,
+`packages/shared`); a passed deadline is `Missed` in Work and stays `by {date}` on the map.
 
 **RE-RULED 2026-09-01 — the exception is CLOSED.** The owner made money-in-full absolute: the
 Delivery Payment Approval door was removed from the screen (PR #1031) and nothing can request
@@ -1437,7 +1514,7 @@ fully-paid order, and an approval does not clear it. The full ruling, the approv
 definition and the COD terms live once in **§8 · Money on an order**.
 
 **An order whose value nobody has entered does not hold anything** (§8 — unknown warns, never
-blocks): the gate reads `No price yet — unknown never holds`.
+blocks): the gate reads `No price yet — money does not hold this delivery` (the dictionary's one spelling).
 
 **A met goods requirement on PARTIAL goods** is allowed ONLY when an explicit partial-delivery scope
 exists **and is displayed** — `Goods ready for this delivery (1 Unit in, 2 Units still open)`. The
@@ -1495,6 +1572,10 @@ must see it on Order Route.
 | Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |
 | Amended line | the map always reflects the CURRENT effective Revision |
 | Delivered | DELIVER complete with its date; DELIVERY PHOTO becomes the open step |
+| Singapore / any Journey | one DELIVERY lane per leg with its plate; every goods tail joins leg 1's gate; leg 2's gate adds `Leg 1 arrived at {stop}`; the transfer leg draws no DELIVERY PHOTO |
+| Split delivery (`trip > 0`) | one lane per trip naming its goods; each goods tail joins its own trip's gate; `Trip {n} · not booked yet` for a trip with no DO |
+| A change waiting for approval | the `PROPOSED CHANGE` banner above the canvas; the map draws the CURRENT effective Revision only |
+| A read failed | that group's nodes carry the `⚠ unreadable` mark; the other groups draw; nothing is ticked and nothing is CURRENT in the failed group |
 
 **A PO WHOSE GOODS ARRIVED IS STILL ITS LINE'S ROUTE.** The fork is keyed on the PO's ORDERED
 quantity, not its still-open quantity — keyed on the latter, the whole fork vanished the moment
@@ -1521,11 +1602,10 @@ primitives the Team board and the PO duty chips already use. The reading model i
 org-chart / parcel-tracking / GitHub-checks **patterns only**; every colour, font, spacing and
 component is the Carres UI Kit. **Sales Order gains no writer.**
 
-**KNOWN BOUNDARY, reported not hidden.** The card's DELIVER node lists `In transit` among its
-states. Delivery owns that fact (`Handed Over` → `Received by Logistics`,
-`docs/delivery/MASTER.md` §4) and the route does not read those statuses today, so DELIVER renders
-`Not delivered yet` / `Scheduled: {date}` / `Delivered: {date}` and no `In transit` is invented.
-Wiring Delivery's handover status is approved-target, not built.
+**DELIVER's words are Delivery's** — see THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS above
+(owner ruling 2026-09-26). The earlier boundary note that the route "does not read those statuses
+today" is retired with that ruling; until built, the shipped node still prints its own
+`Not delivered yet` / `Delivered: {date}` and reads the V1 booking fields.
 
 ## Owner UI acceptance corrections — 2026-08-14
 

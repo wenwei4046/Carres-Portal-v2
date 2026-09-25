@@ -102,7 +102,7 @@ the wrong place and it belongs on the affected lane's caption plate instead.
 
 ---
 
-### 3.2 · 🔴 A SPLIT DELIVERY COLLAPSES TO ONE TRIP
+### 3.2 · 🔴 A SPLIT DELIVERY COLLAPSES TO ONE TRIP — ✅ APPROVED 2026-09-26 (Jess), law in `MASTER.md` § Connectors / § THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS
 
 **Current, measured.** Migration `0542_a_split_delivery_has_one_document_per_trip` gives
 `ops_delivery_orders` a `trip` key — `0` = unsplit, `1..3` = one trip of a split delivery — because
@@ -139,7 +139,7 @@ is real but not urgent, and it waits behind §3.1 and §3.3.
 
 ---
 
-### 3.3 · 🔴 A FACT THAT COULD NOT BE READ LOOKS LIKE A FACT THAT IS NOT THERE
+### 3.3 · 🔴 A FACT THAT COULD NOT BE READ LOOKS LIKE A FACT THAT IS NOT THERE — ✅ APPROVED 2026-09-26 (Jess), law in `MASTER.md` § Node anatomy (`⚠ unreadable`)
 
 **Current.** The resolver has no notion of a failed read. Marks are `complete · current · waiting ·
 blocked · future`. If Purchasing's read throws, the lane renders `waiting` — **`No Purchase Order
@@ -254,9 +254,9 @@ Everything else in this document is an engineering or design judgement and I hav
 1. ✅ **ANSWERED 2026-09-25 (Jess): YES** — the banner is law, recorded in `MASTER.md` § `PROPOSED CHANGE`. *(was:)* **Does an operator need to see a waiting amendment on Order Route at all**, or is the `Order` tab
    enough? *(If the Order tab is enough, §3.1 disappears — it is the only one of the four that is a
    genuine business-visibility choice rather than a correctness fix.)*
-2. **Do split deliveries actually happen often enough to draw?** I can see the database supports up to
+2. ✅ ANSWERED 2026-09-26 — a planner call, not an owner one: production carries a real two-leg Journey (SO-1362) and `trip` support since 0542; lanes are built together with the Delivery-record read. *(was:)* **Do split deliveries actually happen often enough to draw?** I can see the database supports up to
    four trips; I cannot see how often Carres really splits. *(Drives §3.2's priority, not its design.)*
-3. **When a read fails, may the map say so in those words** — `Could not read Purchasing for this
+3. ✅ ANSWERED 2026-09-26 — the three sentences are registered in COPY-STANDARD (§ The Order Route words) under the segment Jess approved. *(was:)* **When a read fails, may the map say so in those words** — `Could not read Purchasing for this
    line` — or do you want different wording for the operator? *(The behaviour is a correctness fix
    either way; only the sentence is yours.)*
 
