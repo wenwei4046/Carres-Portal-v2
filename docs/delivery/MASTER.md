@@ -176,7 +176,7 @@ result, proof, problems and history.
   Operation   Monitor Payment column · Order Route gate · Work Logistics card
               Hold delivery  /  RM {amount} unpaid            or  Finance hold · {reason}
   Payment     Payment Monitor row · collection workspace · the Ask the customer to pay Work item
-              Hold delivery  /  RM {amount} unpaid · by {date}  or  Finance hold · {reason}
+              Payment due {day}  /  RM {amount} unpaid  or  Finance hold · {reason}   (owner reconciliation 2026-09-25: Payment's own line 1 is its deadline fact, not `Hold delivery`; `by {date}` is retired)
               doors: Record payment · Remove hold (Finance only)
   Warehouse   Warehouse Schedule row · Outbound
               Hold delivery  /  Payment incomplete · Do not pack     (never an amount)

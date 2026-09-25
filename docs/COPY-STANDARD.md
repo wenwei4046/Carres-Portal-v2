@@ -721,7 +721,7 @@ One fact, one first line on every surface, a second line written for the party r
 | Party · surface | Line 1 | Line 2 | Doors |
 |---|---|---|---|
 | Operation · Monitor `Payment` column · Order Route gate · Work Logistics card | `Hold delivery` | `RM {amount} unpaid` · `Finance hold · {reason}` | `Open Payments` |
-| Payment · Payment Monitor row · collection workspace · `Ask the customer to pay` | `Hold delivery` | `RM {amount} unpaid · by {date}` · `Finance hold · {reason}` | `Record payment` · `Remove hold` (Finance only) |
+| Payment · Payment Monitor row · collection workspace · `Ask customer to pay` | `Payment due {day}` / `Payment due today` (the Monitor's `Payment timing` fact — owner reconciliation 2026-09-25: the collection desk asks *when must the money be in*, so its first line is the deadline, never `Hold delivery`; `by {date}` is retired) | `RM {amount} unpaid` · `Finance hold · {reason}` | `Record payment` · `Remove hold` (Finance only) |
 | Warehouse · Warehouse Schedule row · Outbound | `Hold delivery` | `Payment incomplete` · `Do not pack` | none; never an amount, never the Finance reason |
 | Logistics · NETS portal · external link | `Hold delivery` | nothing | none; never money, never why |
 | Money settled | `Paid` | | |
@@ -2406,9 +2406,9 @@ it now has two words, and each appears once per screen:
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The money, as a fact line | **`RM {amount} unpaid`** (the 2026-09-25 screen-line rule: money says `Paid` or `RM {amount} unpaid`); **`Balance due`** is the label/column header and the Sales Order document word (2026-09-22) | Amount needed · Outstanding (on Payment/Work) · to collect · still needed · still to collect |
-| The date | **`Payment due {day}`** / **`Payment due today`** — the Monitor's own fact. ⚠ PENDING owner reconciliation with #1635's `by {date}` (Hold delivery table above), ruled the same day in the Delivery chat | Due T−2 · Collect by |
+| The date | **`Payment due {day}`** / **`Payment due today`** — the Monitor's own fact, on every Payment and Work surface (owner reconciliation 2026-09-25 of #1635's `by {date}`) | by {date} · to collect by · Due T−2 · Collect by |
 | Work middle card for collection | line 1 `PAYMENT · {customer}` · problem **`RM {amount} unpaid`** · action **`Ask customer to pay`** · footer **`SO-{n}`** | an Invoice number as the object · `Customer balance due` |
-| Work Route exception line | the deadline once — spelling pending the reconciliation above; `Payment · Hold delivery · Finance hold · {reason}` | the amount repeated here |
+| Work Route exception line | **`Payment due {day}`** — the deadline, once; `Payment · Hold delivery · Finance hold · {reason}` | the amount repeated here · by {date} |
 | Work Customer card, expanded | section **`Payment`**: `Ask customer to pay` · `Record the result` · `Record payment` · `Last answer` | a money line on the collapsed card |
 
 `RM {amount} still to collect` stays Delivery's own warning word (Delivery Monitor, Logistics card).
@@ -3482,7 +3482,7 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
 | Customer card sections | `Current action` · `Delivery` · `Partner contact` · `Contact by` · `Latest result` · `Open in Delivery` · `Exception` · `Evidence and communication history` · `Name not recorded` · `WhatsApp reply · 1 photo` · `In person` | Record reply · Accepted date |
 | Customer communication preview | only for a governed Carres exception or ERP-ARCHITECTURE §6.5 outstation release: `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
-| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · Hold delivery · RM {amount} unpaid · by {date}` · `Payment · Hold delivery · Finance hold · {reason}` | Blocked · a Payment circle · to collect |
+| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment due {day}` (owner reconciliation 2026-09-25; the amount is said once, in the summary) · `Payment · Hold delivery · Finance hold · {reason}` | Blocked · a Payment circle · to collect · `Payment · Hold delivery · RM {amount} unpaid · by {date}` (retired 2026-09-25) |
 | Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
 | Customer exception doors | `Open Sales Order` (a known delay · a wrong phone number) · `Open in Delivery` (another date · a refusal) | a Work form |
 | Customer card read failure | `Customer contact unavailable` + `Open Sales Order` | a guessed partner state |

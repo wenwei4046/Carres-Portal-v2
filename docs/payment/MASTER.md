@@ -267,10 +267,10 @@ Middle card (104px)   PAYMENT · {customer}          module · recipient
                       Ask customer to pay           the action
                       SO-1404                  ↗    the object is the Sales Order, never an Invoice
 Summary               RM 1,800.00 unpaid / Ask customer to pay · {customer} / [Ask customer to pay] [Open SO-1404]
-Order Route           the deadline, once — the exception line under the route. ⚠ WORDS PENDING OWNER
-                      RECONCILIATION 2026-09-25: this chat's `Payment due {day}` versus #1635's
-                      `Payment · Hold delivery · RM {amount} unpaid · by {date}` (the owner called
-                      `by` confusing in this chat the same day). Until ruled, #1635's spelling stands.
+Order Route           Payment due Wed, 23 Sep       the deadline, once — the exception line under the route
+                      (owner reconciliation 2026-09-25: `by {date}` and `Hold delivery` on Payment
+                      surfaces are retired; `Hold delivery` stays Delivery's, Warehouse's and
+                      Logistics' word, whose question is *can this be delivered*)
 Customer card         collapsed: Delivery's own line, unchanged (no money repeated)
                       expanded PAYMENT section: [Ask customer to pay] [Record the result] [Record payment]
                       · Last answer {result · day} · Payment's Communication History (read, not copied)
@@ -307,13 +307,14 @@ ask day is an engineering setting, not an owner ruling. Same one clock, same cal
 Editable by authorised Manager permission; asking must start earlier than the deadline (n > m).
 
 **The Work right panel reads this clock (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10):**
-the Order Route's one payment line `Payment · Hold delivery · RM {amount} unpaid · by {deadline}` and the
+the Order Route's one payment line `Payment due {day}` (owner reconciliation 2026-09-25) and the
 Logistics card's day-before money gap use the same deadline (`paymentDeadlineOf`, `packages/shared`). Payment is
 never a route point and never `Blocked`. **The hold is told to Payment with its reason (owner ruling
 2026-09-25, `../delivery/MASTER.md` §3 · APPROVED TARGET / NOT BUILT):** while a Scheduled delivery
 exists and the DO cannot issue, the Payment Monitor row, the collection workspace and the `Ask the
-customer to pay` Work item print `Hold delivery` over `RM {amount} unpaid · by {date}` or `Finance
-hold · {reason}`, beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
+customer to pay` Work item print `Payment due {day}` over `RM {amount} unpaid` (or `Finance
+hold · {reason}`) — owner reconciliation 2026-09-25: the collection desk's first line is its deadline
+fact, never `Hold delivery` — beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
 is this module's own record; Delivery, Warehouse and Work read it. Paying in full or removing the
 hold lets the system issue the DO, and the hold leaves every surface in the same read. **Gap:** both still use the ruled default m = 2 (3 outstation)
 rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.

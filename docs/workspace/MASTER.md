@@ -1225,7 +1225,7 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
   record (0487). Each act opens its owner's door and writes nothing in Work. `Waiting` is not
   derived for the customer; the Waiting tab lists only a source-recorded waiting state (§5.2.1
   `communication.replyState`) and is empty until a module records one.
-- **Payment exception line** beneath the Route: `Payment · Hold delivery · RM {amount} unpaid · by {date}` (amber
+- **Payment exception line** beneath the Route: `Payment due {day}` (owner reconciliation 2026-09-25; amber
   once the deadline is reached) or `Payment · Hold delivery · Finance hold · {reason}`; the deadline is
   `paymentDeadlineOf` — the one the Logistics day-before check reads (2 working days before the
   delivery date, 3 outstation; the effective-dated Payment rule row is not readable by Operation —
