@@ -338,8 +338,9 @@ test proves nothing.
 Approved business vocabulary only; a word that has not been ruled may not appear
 on a screen. The dictionary is `docs/COPY-STANDARD.md`.
 
-**Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` · `Scheduled` ·
-`Appointment Pending` · `Booking Pending` · `POD`.
+**Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` ·
+`Appointment Pending` · `Booking Pending` · `POD`. (`Scheduled` is the customer-leg delivery word
+since the owner ruling of 2026-09-24 — COPY-STANDARD.)
 
 A banned DISPLAY word may still exist as a database or API value where
 compatibility requires it. Never rename a stored value silently — the screen

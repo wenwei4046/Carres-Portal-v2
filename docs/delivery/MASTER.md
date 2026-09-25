@@ -361,13 +361,27 @@ or opened message is never reply evidence. **BUILT 2026-09-13 (CARD 11, 0487
 `ops_delivery_contacts`)**: the one Worker door writes the record; the arrangement save that
 carries `Information received from` records the contact in the same request.
 
-### 5.2 · The contact deadline
+### 5.2 · Who contacts the customer, and the contact deadline
 
-Logistics contacts the customer at least THREE working days before `Requested Delivery Date`,
-whether or not the goods are in. The deadline is the shared `chase` step (`deliveryStepDueIso`,
-lead `logistics_call_working_days` = 3 since 0342, on the Mon–Sat delivery week with Malaysian
-public holidays), read by the Orders list, the booking brief and Monitor alike. A customer who
-has named no day has no deadline and is never late. A late contact keeps the deadline it missed.
+**Who calls** is the company's setting `customer_contact_by` (0488, Delivery Settings): `partner` —
+the logistics company agrees the day with the customer (today every active company); `operation` —
+Carres staff do. The Work Customer card (`../workspace/MASTER.md` §5.10) reads it; the card and its
+words are identical in both modes, only the current act changes. Carres still contacts the customer
+itself for the exceptions: another date the company asked for, a later date that needs the
+customer's WhatsApp proof, a refusal or a wrong phone number.
+
+**The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
+a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
+Requested date) on the Mon–Sat delivery week with Malaysian public holidays. The `3 working days
+before` check is the company-has-the-details step. The Route's `Contact` point and the Customer card
+read the same check; there is no second clock. A customer who has named no day has no deadline and is
+never late. A late contact keeps the deadline it missed.
+
+**Waiting and follow-up (owner approval 2026-09-25).** `Record as sent` stores the contact with result
+`Waiting for Customer Reply`; `No answer` stores `No Answer`. Either one's follow-up day is the next
+Delivery working day after the contact — derived, never typed. Until then the Work item lists under
+`Waiting`; on the day it returns to `To do` (`No answer · Follow up today`). A passed governed action
+day is always `To do`.
 
 ### 5.3 · Backward planning — Delivery owns the ONE calculation
 
