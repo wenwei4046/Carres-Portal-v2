@@ -650,6 +650,20 @@ reads (`receivingSummaryOf`), never a second count. Measured on production 2026-
 2990 On hand/Incoming) separate the two for the same reason. Falsifier: an operator who needs the
 Incoming rows inside the default list to do a daily Warehouse job.
 
+**ONE ROW IS ONE UNIT, ONE CELL IS ONE FACT — owner ruling 2026-09-25, APPROVED TARGET / NOT
+BUILT.** The Register uses the nine approved columns above as nine separate 40px single-line
+columns under the Listing Template (`../ui/MASTER.md` §6.0): 13px/18 body text, 11px/600 slate
+header at 36px, 8px cell padding, `Unit ID` pinned left as the sticky identity, a long value
+ending in `…` and shown whole on hover/focus, dates and numbers never cut. **There is no row
+expansion and nothing is folded into a composite cell**: the shipped four-group cells (`Site /
+stock use`, `Orders / dates`) are retired as design, and a Unit's further facts live in Unit
+Detail, opened from the Unit ID. `Site · Ownership · Condition · Category · Last verified ·
+Supplier · Last moved` remain one click away in `Columns`. Every identifier prints in its ruled
+form — `U1-000-084` · `SO2609-4827` · `PO260924-4827` · a five-digit `DO`/`SDO` — and a quantity
+row prints `—` for Unit ID with `×{qty}` beside the product. Measured on production 2026-09-25:
+each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
+screen shows fifteen.
+
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
 Unit; they do not require permanent rail rows. `Needs checking` states the exact observed problem,
