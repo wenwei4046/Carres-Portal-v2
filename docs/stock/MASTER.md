@@ -701,6 +701,29 @@ Inventory words. `Ownership` (`Carres Owned` · `Supplier Consignment`) · `SO D
 `Last verified` · `Supplier` · `Last moved` stay one click away in `Columns`. Required facts (`Unit ID` ·
 `Item` · `Inventory Status`) never print an absence word; an empty required cell is a defect.
 
+**DAMAGED OR OLD GOODS CAN STILL BE SOLD — owner ruling 2026-09-25 (clearance).** `Stock Condition`
+never decides `Inventory Status` by itself. A Unit becomes `Cannot sell` only while a reported
+problem is being checked, while it is `In repair`, or while it is a `Wrong item` waiting for the
+supplier. After the check, the current GRN Duty decides: repair, return to supplier, or
+`Make available for sale` — which puts a `Damaged` or `Old` Unit back to `Available` for clearance
+sale while its `Stock Condition` keeps saying `Damaged` / `Old`, so Sales sees exactly what they are
+selling. Sales' Ready Stock view therefore shows `Stock Condition` beside every Unit. Receiving with
+result `Received` makes a Unit `Available` automatically (SAP unrestricted stock, Odoo done
+receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
+the way back from `Cannot sell`.
+
+**UNIT DETAIL — owner rulings 2026-09-25, APPROVED TARGET / NOT BUILT.** Titled `{Unit ID} ·
+{Item}`, `← Inventory` returns to the register with its filters and position. Four sections, one
+scroll, these words: **`Stock Details`** (Inventory Status · Stock Condition · Stock Location ·
+Ownership · Goods Received Date — the receipt date is the proof the Unit was seen; there is no
+separate `Last verified` / `Last counted` field, a later Count shows in History) · **`Documents`**
+(PO No · GRN No · SO No · DO No, each a door; absences `No SO` · `No DO yet`) · **`Current work`**
+(the one shared Work contract for this Unit, or `Nothing to do for this Unit.`) · **`History`**
+(append-only, actual actor and document). The header `⋮` holds exactly `Report a problem` ·
+`Make available for sale` (shown only while the Unit is `Cannot sell`) · `Count again` (shown only
+after a `Not found` report). No Edit, no status selector, no Delete. `Where it is now` and
+`Connected records` are retired heading words.
+
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
 Unit; they do not require permanent rail rows. `Needs checking` states the exact observed problem,
