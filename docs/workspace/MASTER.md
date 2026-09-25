@@ -1103,6 +1103,19 @@ day before arrival, missing Supplier DO/confirmation yields `Confirmation needed
 request yields `Waiting for supplier`; a passed arrival without receipt yields
 `Arrival missed · Follow up supplier`.
 
+**Alignment with Purchasing's owner-approved answer model (2026-09-25; Purchasing §5.4, §5.7).**
+`Record supplier delay` is the same act as Purchasing's ONE `Record supplier answer` form — per PO
+goods line, with `No change` · `Confirmed` · `New date` (server-classified `Earlier`/`Delayed`) ·
+`Split delivery` (any number of `{n} pcs · {date}` batches) and `Supplier DO received` at the top —
+never a second Workspace form. The expanded Supplier row therefore shows one sub-row per line or
+batch; `Expected arrival` is per batch, and each batch carries its own day-before check. Evidence
+accepts photo, video and PDF through the shared Receiving uploader. `PO Delivery Date` prints as
+`PO {n}-Day Delivery Date` on a single-PO fact (COPY). A destination change on a sent PO is
+Purchasing's `Change Deliver To` (same PO number, new version, moved Units keep their IDs); the card
+reads the resulting stock route and never offers a Workspace destination editor. Sending a PO
+version is Purchasing's `PoIssueEvidence` (`PO sent to supplier`) — where Work embeds it, it embeds
+that component and its `po_sends` record, not the generic `Record as sent` store.
+
 **Every goods need of the Sales Order counts — owner decision 2026-09-25.** Goods served from stock
 (order lines no PO of this order carries) get their own row `From stock · {ready} of {total} ready ·
 {Site}` (Delivery's readiness per line; Stock's Site for the reserved Units). Their short pieces are
@@ -1295,14 +1308,15 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Owning module · action identity | Why it exists / required result | Owner rule | Due law | What closes it / next |
 |---|---|---|---|---|
 | Sales Orders · `ask_delivery_date` | Requested delivery date absent · obtain the customer's date or `not yet` answer | Responsible Salesperson | `No date` for admitted legacy rows | Requested Delivery Date or governed no-date answer exists · order planning continues |
-| Sales Orders · `issue_po` | Demand is uncovered · obtain PO coverage | PO Duty | Purchasing Order By date | PO covers demand · supplier-confirmation work may open |
+| Sales Orders · `issue_po` | **Converging (owner ruling 2026-09-25, Purchasing §5.6.1):** the built per-Sales-Order card is implementation evidence; the target is ONE occurrence per PO window (below). Until built, this row keeps its current behaviour | PO Duty | Purchasing Order By date | Superseded by `purchasing.po_window` once built |
+| Purchasing · `purchasing.po_window` | **APPROVED TARGET / NOT BUILT (2026-09-25).** A PO window opens on a `PO Days` day at the Settings time (first `11:30 AM`, optional second `4:00 PM`; a supplier's earlier cut-off is its own occurrence) over the exact eligible SO demand admitted before it · obtain PO coverage AND current-version sent evidence for every PO issued from it | PO Duty | The window time, Office calendar; a missed occurrence keeps its time and reads Missed | Every PO issued from the scope has `po_sends confirmed_sent` on its current version. Card words are Purchasing §5.6.1's owner choice (`Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`; after issue `{k} POs issued · {x} not sent yet` / `Click WhatsApp, send {PO No} to {Supplier}`). Opening lands in SO Batch Purchase scoped and pre-ticked; the operator may untick or tick by hand. SO Batch also works without Work and closes the same occurrence |
 | Sales Orders · `delay_planning` | Supplier date breaks the customer commitment · record the customer-plan decision for that exact date | Responsible Delivery Operation for the customer commitment | 2 Office working days from detection | Decision and decided ETA recorded · Delivery opens the governed next booking act when required |
 | Purchasing · `manual_purchase.approve` | Manual Purchase awaits a decision · approval/refusal recorded | Purchasing Approver | Request Order By date, Office calendar | Decision stored · approved demand may require PO issue |
 | Purchasing · `manual_purchase.issue_po` | Approved demand/current PO version has not reached supplier · sent evidence | PO Duty | Request Order By date, Office calendar | Current version has confirmed-send evidence · normal state becomes Waiting for goods; no immediate reply task |
-| Purchasing · `purchasing.confirm_ready_date` | Open PO has no standing ready/arrival promise · supplier promise recorded | PO Duty | Customer date − buffer − production calendars | Standing supplier promise exists; the calculated PO Delivery Date alone is not confirmation |
+| Purchasing · `purchasing.confirm_ready_date` | **Retired 2026-09-25 (owner-approved Purchasing §5.7/§5.8):** a sent PO with no immediate supplier reply is `Waiting for goods from supplier`, not work. The built `Supplier date missing` card is implementation evidence to remove; `confirm_tomorrows_delivery` and the evidenced delay answer replace it | — | — | — |
 | Purchasing · `purchasing.supplier_reply` | **Retired 2026-09-24:** absence of an immediate answer after sending is not work | — | — | Early exception is recorded in Purchasing when reported; otherwise the exact-date day-before rule governs |
 | Purchasing · `purchasing.supplier_date_passed` | Supplier date passed with goods owing · new evidenced arrival answer | PO Duty | Supplier date, closure-adjusted | New governed supplier answer/date exists |
-| Purchasing · `purchasing.confirm_tomorrows_delivery` | Effective arrival is tomorrow · obtain Supplier DO or evidenced confirmation for that exact date and named Warehouse | PO Duty | One Office working day before effective arrival | Matching Supplier DO or evidenced tomorrow-delivery confirmation exists; a later delay records required reason/new date/WhatsApp evidence in Purchasing and derives a new date-specific occurrence |
+| Purchasing · `purchasing.confirm_tomorrows_delivery` | Effective arrival is tomorrow · obtain Supplier DO or evidenced confirmation for that exact date and named Warehouse. **One occurrence per PO goods line / split batch** (owner-approved 2026-09-25, Purchasing §5.7 per-item answer): a line split `4 pcs · 26 Sep` + `2 pcs · 6 Oct` derives two dated occurrences | PO Duty | One Office working day before each batch's effective arrival | Matching Supplier DO or evidenced tomorrow-delivery confirmation exists for that batch; a later answer is recorded per line in Purchasing's one `Record supplier answer` form (`No change` · `Confirmed` · `New date` → `Earlier`/`Delayed` · `Split delivery`) and derives new date-specific occurrences. Card action: `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` (email channel: `Click Email, …`) |
 | Purchasing · `purchasing.confirm_balance_delivery_date` | Short receipt left goods owing · balance promise | PO Duty | Opens with short receipt; Calls calendar owns filing | Balance promise for line exists |
 | Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival | GRN Duty | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
 | Warehouse · `warehouse.outbound_handover` | **Not admitted:** dated pickup has Units not handed over · exact receiver/proof result | Requires governed personal NETS operator or admitted Site queue; neither is currently built | Scheduled Site handover date on Warehouse calendar | Every required Unit has accepted handover evidence · admission waits for governed owner/acceptance |
