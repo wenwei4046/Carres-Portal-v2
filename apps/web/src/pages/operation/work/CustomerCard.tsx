@@ -265,7 +265,7 @@ export default function CustomerCard({
           <div>
             <div className="text-[14px] font-semibold leading-5 text-kit-slate-12">{action.act}</div>
             <ToneLine tone={actionTone}>
-              {[action.result, action.dueIso && action.timing !== "today" ? `due ${spell(action.dueIso)}` : null].filter(Boolean).join(" · ")}
+              {[action.result, action.dueIso && action.timing !== "today" && !action.act.includes(spell(action.dueIso)) ? `due ${spell(action.dueIso)}` : null].filter(Boolean).join(" · ")}
             </ToneLine>
           </div>
         ) : model.mode === "partner" && lm.partnerName ? (

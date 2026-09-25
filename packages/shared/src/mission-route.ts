@@ -123,7 +123,7 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
       ? d(range.fromIso)
       : sameMonth(range.fromIso, range.toIso)
         ? `${+range.fromIso.slice(8, 10)}–${d(range.toIso)}`
-        : `${d(range.fromIso)} – ${d(range.toIso)}`
+        : `${d(range.fromIso)}–${d(range.toIso)}`
     : null;
   if (sup.total === 0) {
     points.push({ key: "po", label: C.label.po, dateText: null, status: input.fromStock ? C.fromStock : C.notIssued, tone: input.fromStock ? "done" : "current", final: false });

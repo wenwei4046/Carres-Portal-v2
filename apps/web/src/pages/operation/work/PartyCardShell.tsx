@@ -1,7 +1,7 @@
 /**
  * THE PARTY-CARD SHELL — Customer and Supplier (Workspace MASTER §5.10).
  *
- * Collapsed it is EXACTLY 72px at every width: the heading row
+ * Collapsed it is EXACTLY 72px at every width (a 70px row inside the 1px edge): the heading row
  * `{Party} · {name}` 15/20/600 with its progress (12/16) on the right, then
  * ONE status line 12/16 — nothing else. The whole row is one button
  * (`aria-expanded` / `aria-controls`) with a 40×40 chevron target. Open or
@@ -91,9 +91,8 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
-        aria-label={`${open ? "Hide" : "Show"} ${party} details`}
         onClick={() => onToggle(!open)}
-        className="flex h-[72px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:px-4"
+        className="flex h-[70px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[960px]:px-4"
         data-testid={`${testId}-toggle`}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -109,6 +108,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
           </span>
           <span className="flex min-w-0" data-testid={`${testId}-status`}>{status}</span>
         </span>
+        <span className="sr-only">{`${open ? "Hide" : "Show"} ${party} details`}</span>
         <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11" aria-hidden="true" data-testid={`${testId}-chevron`}>
           <Icon name={open ? "collapse" : "expand"} size={16} />
         </span>
