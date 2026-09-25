@@ -427,6 +427,26 @@ demand is covered once, never twice.
 - The PDF of a PO with several Deliver To prints each destination from a new page
   (`docs/pdf/PO-PDF-STANDARD.md` §2).
 
+**Build boundary — owner confirmed the design 2026-09-25 · NOT BUILT.** Measured on `main`:
+`purchasing_revise_po` (0443) changes a whole line's quantity or Deliver To and mints a version, but
+cannot split a line, move exact Units to a new line, or carry `po_line_sources` with them — so today
+an operator can only move all 6 or open a second PO, both forbidden above. The build adds a split
+door on the same PO (new migration; 0443 untouched) and the `Change Deliver To` form beside each
+line under PO `Edit`. Decisions taken by the planner, not owner questions:
+- `Units moving` is **pre-selected by the system** (the line's last n IDs) and the operator may
+  change it. The choice is arbitrary by nature — the goods are still at the factory and, as the
+  owner noted 2026-09-25, the ID is on the packaging, not the product — so the screen never asks
+  for a reason to pick one Unit over another.
+- The SO allocation follows the Unit's existing line binding; a multi-source line splits by those
+  bindings, never by a second operator entry.
+- `Still to deliver` = ordered − received (Receiving's GRN); only that quantity may move. A fully
+  received line has no `Change Deliver To` and reads `All received · use a transfer instead`.
+- After save the new version enters the §5.6 send journey (`Version ({n}) must be sent to
+  {Supplier} again`); the prior version's PDF and send record are untouched.
+- Cross-module: the destination change changes the customer's stock route (Workspace §5.9); Delivery
+  reads it and owns any re-planning prompt on an already-booked delivery. Receiving records the
+  moved quantity at the new destination's station.
+
 ### 5.5 Supplier and SKU resolution
 
 Staff never guess a SKU, supplier or document.
@@ -677,6 +697,41 @@ WhatsApp screenshot (more may be retained) and one required governed reason:
 screenshot refuses the record. Evidence is append-only with supplier, recorder and server time;
 the immutable original PO Delivery Date and earlier answers are never overwritten. The existing
 arrival arithmetic recomputes only the affected open source-line scope and reports customer impact.
+
+**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** One
+`Record supplier answer` form on the PO records the supplier's answer **per PO goods line**. Each
+line chooses `No change` (default) · `Confirmed` · `New date` (the server classifies `Earlier` —
+no reason — or `Delayed` — one governed reason required) · `Split delivery` (any number of
+quantity + date batches via `+ Add another date`; batches must total the line's still-to-deliver
+quantity, shown as `Total {n} of {m}`; a later batch needs a reason). `Supplier DO received` sits at
+the top of the form because one Supplier DO normally covers the delivery; each line then states the
+quantity it covers. Exact-unit lines split by quantity only; Receiving verifies which Units arrive.
+The PO's `PO {n}-Day Delivery Date` (register column `PO Delivery Date`; `n` = the Settings value
+recorded on that PO at issue, never later Settings) never changes; every answer is append-only
+History with evidence, and the newest answer per line is the line's `Supplier Confirmed Delivery
+Date`. A supplier date answer creates no PO revision and no resend; changing quantity, goods or
+Deliver To is a PO change (new version), not an answer. Goods that arrive early without notice need
+no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
+Each batch derives its own day-before occurrence.
+
+**Answer evidence — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The answer form accepts
+photos, videos and PDF, several files per answer, through the shared Receiving uploader
+(`ArrivalEvidenceUploadField`) — never a second PO-only uploader; today's PO reply upload is
+JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot for a confirmation,
+date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
+Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
+
+**Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The eight reasons
+above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
+Material Shortage · Transport Delay · Waiting Customer Confirmation · Factory Closed · Other).
+`Waiting Customer Confirmation` is removed: it is not a supplier reason; customer waiting belongs to
+Sales `delay_planning`. Historical answers keep the reason they were recorded with; new answers
+cannot choose it.
+
+**Day-before occurrence wording (for Workspace, 2026-09-25):** fact `Confirm tomorrow's supplier
+delivery · {Supplier} · {date}`; action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO
+No}` (email channel: `Click Email, …`). Completion: a matching Supplier DO, or an evidenced
+confirmation for that exact date and Warehouse, recorded through `Record supplier answer`.
 
 One Office working day before the effective expected arrival,
 `purchasing.confirm_tomorrows_delivery` asks for either the **Supplier DO** or evidenced supplier
@@ -938,6 +993,13 @@ No supplier physical-Unit label, QR, barcode or Carres label template is require
 Operations attaches the same text Unit ID to the physical sofa at the showroom. Future suppliers
 may attach the physical label and future QR/barcode may encode the same permanent machine value;
 neither upgrade may renumber the Unit.
+
+**Physical identity after unpacking — OPEN, owner statement 2026-09-25.** Suppliers write the Unit
+ID on the packaging only; once the packaging is removed the piece cannot be told from its twins. A
+Carres sticker for the product is a future idea with **no solution yet** for bedframes and sofas,
+which have no place to stick one. Consequence for every build: no rule, screen or check may depend
+on a physical label existing on the product; identity between unpacking and labelling is a known
+gap, stated, not hidden.
 
 **MEASURED IN PRODUCTION, 2026-09-08.** `PO-20260908-2503` was issued through the real Manual
 Purchase screens and its Unit `U1-000-082` was written in the same transaction — both rows carry
@@ -2772,12 +2834,17 @@ own `Clear filters` are the shared listing standard's and are unchanged. No dupl
 a facet's number describes the whole register, never what another facet happens to have selected.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18.** Read-only
-ordered goods, exactly in order:
+**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
+owner-approved 2026-09-25 · NOT BUILT.** Read-only ordered goods, exactly in order:
 
 ```text
-Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items · Supplier Confirmed Delivery Date
 ```
+
+`Supplier Confirmed Delivery Date` (Jess, 2026-09-25) prints the line's newest supplier answer
+(§5.7 per-item answer): one date, or one row per batch as `{n} pcs · {date}` with `· Delayed` on a
+later batch; no answer reads `Not confirmed`. Read-only — the only write door is `Record supplier
+answer` on the PO. Its width comes from UI MASTER §6.8's registry.
 
 `PO No` is the first line of its cell and the associated Unit IDs sit underneath it in the same
 cell; item configuration sits beneath the item name. **The parent remains one row per PO** — a
