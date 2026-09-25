@@ -1039,7 +1039,9 @@ export const recordSupplierAnswersInput = z.object({
     file: z.string().trim().min(1).max(2000),
   }).strict().nullable().optional(),
   lines: z.array(z.object({
-    poLineId: z.string().uuid(),
+    /** The PO goods line's own id, exactly as the register read it; the SQL
+     *  door refuses a line that is not on this PO. */
+    poLineId: z.string().trim().min(1).max(64),
     answer: z.enum(["no_change", "confirmed", "new_date", "split"]),
     date: z.string().date().optional(),
     reason: z.enum(PO_DELAY_REASONS).optional(),

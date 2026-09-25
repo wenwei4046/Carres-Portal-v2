@@ -14,7 +14,6 @@ import {
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierAnswersInput,
-  recordSupplierReplyInput,
   recordArrivalConfirmationInput,
   confirmPoSentInput,
   recordSendInput,
@@ -163,7 +162,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at, terms_days",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at, terms_days, do_number, do_file_path, do_uploaded_at",
       );
 
     if (status !== "all") q = q.eq("status", status);

@@ -21,10 +21,13 @@ import { supabase } from "../lib/supabase";
  * invents a path — the server names every object key.
  */
 
+export type EvidenceKind = "photo" | "video" | "pdf";
+
 export interface EvidenceEntry {
   path: string;
-  /** 0587 — a supplier's PDF (a DO, an invoice page) is evidence too. */
-  kind: "photo" | "video" | "pdf";
+  /** 0587 — a supplier's PDF (a DO, an invoice page) is evidence too; a
+   *  caller that passes no `pdfMimes` never receives one. */
+  kind: EvidenceKind;
 }
 
 interface FileState {
@@ -38,10 +41,11 @@ interface FileState {
   file: File;
 }
 
-type Props = {
-  /** Successful uploads, owned by the caller's form state. */
-  entries: EvidenceEntry[];
-  onChange: (entries: EvidenceEntry[]) => void;
+type Props<E extends { path: string; kind: string }> = {
+  /** Successful uploads, owned by the caller's form state. A caller keeps its
+   *  own narrower entry type (photo | video) and receives only those kinds. */
+  entries: E[];
+  onChange: (entries: E[]) => void;
   /** The caller's own signing door — returns a signed upload slot. */
   sign: (file: File) => Promise<{ token: string; path: string }>;
   /** The private storage bucket the signed slot belongs to. */
@@ -60,7 +64,7 @@ type Props = {
 
 const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 
-export default function EvidenceUploadField({
+export default function EvidenceUploadField<E extends { path: string; kind: string }>({
   entries,
   onChange,
   sign,
@@ -74,7 +78,7 @@ export default function EvidenceUploadField({
   ariaLabel,
   disabled,
   testId,
-}: Props) {
+}: Props<E>) {
   const [files, setFiles] = useState<FileState[]>([]);
   const [pickError, setPickError] = useState<string | null>(null);
   /* onChange must see the freshest entries even when two uploads finish in
@@ -108,7 +112,7 @@ export default function EvidenceUploadField({
       );
       onChange([
         ...entriesRef.current,
-        { path: slot.path, kind: state.kind },
+        { path: slot.path, kind: state.kind } as E,
       ]);
     } catch (err) {
       setFiles((prev) =>

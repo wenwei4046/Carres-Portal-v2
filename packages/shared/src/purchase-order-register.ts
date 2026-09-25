@@ -16,7 +16,14 @@ import type { WorkItem } from "./work-engine";
  */
 export type PurchaseOrderRegisterFilter =
   | "pdf_not_sent"
+  /** A sent PO with no evidenced answer yet. Since 2026-09-24 (Purchasing
+   *  §9.3) it is NOT a rail row and NOT Work — `Waiting for goods from
+   *  supplier` is a state, not a chase; Work filters `purchasing.supplier_reply`
+   *  out. The fact is still computed for the readers that name it. */
   | "supplier_date_missing"
+  /** The day-before check is open for one of the PO's expected arrivals
+   *  (Purchasing §5.7 / §9.3 rail, Blueprint segment 2). */
+  | "confirm_tomorrows_delivery"
   | "supplier_date_passed"
   /** The supplier's evidenced date for the CURRENT version differs from the
    *  original PO Delivery Date (Purchasing MASTER §9.3 rail, Jess 2026-09-17). */
@@ -58,6 +65,15 @@ export interface PurchaseOrderRegisterInput {
   status: "open" | "received" | "cancelled";
   version?: number | null;
   supplierDate?: string | null;
+  /** 0587 · every expected arrival across the PO's lines / batches
+   *  (`poExpectedArrivalsOf`); when given, the reply facets read these
+   *  instead of the single PO-level `supplierDate`. */
+  expectedArrivals?: readonly string[] | null;
+  /** 0587 · lines whose newest answer moved away from the original. */
+  changedLines?: number | null;
+  /** 0587 · the page's own `tomorrowDeliveryCallOf` verdict over the expected
+   *  arrivals: an open, unconfirmed day-before check exists. */
+  arrivalCheckOpen?: boolean | null;
   /** The immutable original PO Delivery Date (`official_delivery_date`);
    *  null when the original is genuinely unknown. */
   originalDate?: string | null;
@@ -147,18 +163,27 @@ export function purchaseOrderRegisterFacts(
   /* SUPPLIER REPLY facets: only a current version marked as sent with goods
      pending (MASTER §9.3). */
   const replyOpen = !cancelled && !completed && !!currentSend && pending;
-  if (replyOpen && !input.supplierDate) {
+  const perLine = input.expectedArrivals != null;
+  if (replyOpen && (perLine ? (input.expectedArrivals ?? []).length === 0 && !input.supplierDate : !input.supplierDate)) {
     filters.push("supplier_date_missing");
+  }
+  if (replyOpen && input.arrivalCheckOpen) {
+    filters.push("confirm_tomorrows_delivery");
   }
   if (
     replyOpen &&
-    !!input.supplierDate &&
-    !!input.originalDate &&
-    input.supplierDate !== input.originalDate
+    (perLine
+      ? (input.changedLines ?? 0) > 0
+      : !!input.supplierDate && !!input.originalDate && input.supplierDate !== input.originalDate)
   ) {
     filters.push("supplier_date_changed");
   }
-  if (replyOpen && !!input.supplierDate && input.supplierDate < todayIso) {
+  if (
+    replyOpen &&
+    (perLine
+      ? (input.expectedArrivals ?? []).some((d) => d < todayIso)
+      : !!input.supplierDate && input.supplierDate < todayIso)
+  ) {
     filters.push("supplier_date_passed");
   }
   if (!cancelled && !completed && quantitiesKnown && received > 0 && open > 0) filters.push("partly_received");
