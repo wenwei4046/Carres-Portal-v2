@@ -618,8 +618,10 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
 - **My Work / Team Work** active segment is kit blue. Search is 240px beside `Covering for others`
   at every width above 600px.
 - **The empty list is one bordered white section** the height of its words.
-- **Sidebar:** names by default at every width; only the person's own collapse is remembered; the
-  bottom block shows the account's name where one exists.
+- **Sidebar:** names by default from 1280px; below that it starts as icons (a 232px named rail
+  would push Work under 768px and into the phone layout — measured on production 2026-09-25);
+  the person's own collapse is remembered; the bottom block shows the account's name where one
+  exists.
 - **Not done — needs its own card:** the bell badge (item 11) counts live order alerts and has no
   notification record to mark read.
 
