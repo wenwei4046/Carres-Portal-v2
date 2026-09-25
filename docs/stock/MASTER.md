@@ -774,6 +774,14 @@ performed the physical act.
 
 ## 8 · Work and dates
 
+**`Hold delivery` on the Warehouse Schedule and Outbound — owner ruling 2026-09-25 · APPROVED
+TARGET / NOT BUILT.** A scope whose Scheduled delivery exists but whose DO cannot issue (money
+unpaid or a Finance hold — Delivery's one gate predicate) prints `Hold delivery` over
+`Payment incomplete · Do not pack` on its Warehouse Schedule row and in Outbound. The Warehouse
+never sees the amount or the Finance reason; the line is read from Delivery and written by nobody
+here. It leaves when the system issues the DO, which is also when the dated preparation work
+appears. `Do not pack` is the one word for every stage of preparation.
+
 Warehouse uses the one shared Work Engine. Owner and cover are structured metadata, not sentence
 text. The business object has no fake universal Owner. Labels tell a new operator the concrete act;
 completion is an authoritative fact, never Mark done.

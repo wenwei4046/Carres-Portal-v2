@@ -166,6 +166,31 @@ result, proof, problems and history.
   `COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.` on the document. The gate
   record and the Finance exception are defined once in [`../orders/MASTER.md`](../orders/MASTER.md)
   §8; Delivery reads them and never writes them. No new payment exception door may be added.
+- **A hold is shown to every party — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT.**
+  The moment a Scheduled delivery exists and the DO cannot issue because money is unpaid or an
+  OPEN Finance exception holds the order, every surface that carries that delivery prints
+  **`Hold delivery`** on line one, from the ONE gate predicate, and a second line written for the
+  party reading it:
+
+  ```
+  Operation   Monitor Payment column · Order Route gate · Work Logistics card
+              Hold delivery  /  RM {amount} unpaid            or  Finance hold · {reason}
+  Payment     Payment Monitor row · collection workspace · the Ask the customer to pay Work item
+              Hold delivery  /  RM {amount} unpaid · by {date}  or  Finance hold · {reason}
+              doors: Record payment · Remove hold (Finance only)
+  Warehouse   Warehouse Schedule row · Outbound
+              Hold delivery  /  Payment incomplete · Do not pack     (never an amount)
+  Logistics   NETS portal · external link
+              Hold delivery                                          (never money, never why)
+  ```
+
+  The reason is Payment's own record (`orderMoney.outstanding`, `order_finance_exceptions`);
+  Delivery, Stock and Work read it and never write it. When the money is paid or Finance removes
+  the hold, the system issues the DO and the hold leaves every surface in the same read. Retired
+  by this ruling: `Do not deliver` · `RM {amount} still to collect` · `Finance is holding this
+  delivery` · `Payment blocked` · `Money in full` (the gate's met word is `Paid`). The words are in
+  `../COPY-STANDARD.md` (Hold delivery); the Payment side is `../payment/MASTER.md` §3, the
+  Warehouse side `../stock/MASTER.md` §8, the Work side `../workspace/MASTER.md` §5.9.
 - Issue rechecks permitted goods, split, Warehouse, address and applicable hold rules atomically,
   snapshots the scope and assigns the next owner. It does not create an actual delivery event.
 - Reprint retains the number and logs the event. Once handed to Logistics, a DO is never deleted;
@@ -322,7 +347,7 @@ words (§8.4).
 ## 5 · Customer contact, scheduled date, time and ETA
 
 - **`Requested Delivery Date`** is Sales Orders' customer fact. Delivery reads it and never writes
-  it; a wrong or changed promise goes through `Open Sales Order to change`.
+  it; a wrong or changed promise goes through the Sales Order (the row's `SO No` door).
 - **`Scheduled delivery`** is the agreed operational day (owner ruling 2026-09-24 — overwrites
   `Confirmed Delivery`). The date is REQUIRED; **`Scheduled time`** is OPTIONAL. A scheduled date
   alone completes the arrangement, releases the contact work and satisfies the Delivery Order's
@@ -763,7 +788,7 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 | 8 | `Scheduled delivery` | `Scheduled` · `Not scheduled` | `Thu, 22 Oct` then the time when one was recorded (`Thu, 22 Oct · 2 PM to 5 PM`), or the day alone; NOTHING while unscheduled — the contact deadline is column 3's, and it is stated once |
 | 9 | `Logistics` | partner name · `Logistics not assigned` | driver name once assigned |
 | 10 | `Items & Stock` | `Ready` · `Not ready` | `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` |
-| 11 | `Payment` | `Paid` · `Do not deliver` · `Collect RM {amount}` | `RM {amount} still to collect` · `Finance is holding this delivery` · `Cash on delivery` |
+| 11 | `Payment` | `Paid` · `Hold delivery` · `Collect RM {amount}` | `RM {amount} unpaid` · `Finance hold · {reason}` · `Cash on delivery` |
 | 12 | `DO No` | the number opens the DO; when absent, muted `DO` with `No delivery order yet` tooltip and accessible name (owner correction 2026-09-14), no action | `DO date` |
 
 **Row law.** The parent row is **72px** and carries exactly one primary fact and one supporting
@@ -837,8 +862,8 @@ the label rather than by the internal key.
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
 not yet late (`Not scheduled`, `Not ready`, `Logistics not assigned`, `No delivery date`, `Order
-details incomplete`, an actor-first status word). Red: `Overdue`, `Failed Delivery`, `Do not
-deliver`, a contact deadline that has passed. No generic attention label exists.
+details incomplete`, an actor-first status word). Red: `Overdue`, `Failed Delivery`, `Hold delivery`,
+a contact deadline that has passed. No generic attention label exists.
 
 **Icon law.** No emoji, tick, checkmark, warning mark or decorative progress icon appears inside
 a status fact. Governed functional icons remain: Search, Export, Columns, the expand chevron,
@@ -852,8 +877,8 @@ is the full order journey.
 
 **`Payment` arithmetic.** `orderMoney.outstanding` through the one money rule and the OPEN
 Finance exception, the same predicate the DO gate asks. `Paid` when outstanding = RM 0 and no
-exception holds; `Do not deliver` over `RM {amount} still to collect` while money is owed, or over
-`Finance is holding this delivery` while an exception is open; `Collect RM {amount}` over `Cash on
+exception holds; `Hold delivery` over `RM {amount} unpaid` while money is owed, or over
+`Finance hold · {reason}` while an exception is open (owner ruling 2026-09-25, §3); `Collect RM {amount}` over `Cash on
 delivery` only when the DO carries `cod_instruction` from an approval granted before the
 2026-09-01 closure. Monitor never adds a payment door.
 
@@ -898,7 +923,7 @@ addressed rows were warning about a state their own `State` column was printing.
 
 The location summary, the `State` column, the `STATE` dropdown and the `State not recorded` check
 now run **one reader** over **one address** — `resolveDeliveryLocality`. Correcting an address
-stays Sales work through `Open Sales Order to change`:
+stays Sales work through the Sales Order (`SO No`):
 
 ```
 STATE   1  the recorded customer_address_state, exactly as recorded
@@ -1165,7 +1190,7 @@ line sits beside it and says otherwise.
 LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
   customer leg          transfer leg             Ready
   Confirmed             Transfer confirmed       Stock risk
-  Collected by {p}      Collected for transfer   Payment blocked
+  Collected by {p}      Collected for transfer   Hold delivery
   On the way to         In transit to {stop}     Logistics details incomplete
     customer                                     DO not released
   Delivered to          Arrived at {stop}
@@ -1175,7 +1200,7 @@ LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
 
 **The two ladders share no word,** so `Delivered to customer` can never be reached by a warehouse
 leg and `Arrived at {stop}` never claims a customer received anything. Readiness precedence when
-more than one applies: `Payment blocked` → `Stock risk` → `Logistics details incomplete` →
+more than one applies: `Hold delivery` → `Stock risk` → `Logistics details incomplete` →
 `DO not released` → `Ready`; money first, because a trip that may not legally go is the harder stop.
 
 **`Arrived at customer` does not exist and may not be added by inference (owner ruling 2026-09-14).**
@@ -1232,16 +1257,22 @@ shared connector:
    right   full delivery address · building type · floor · lift · access or registration
            requirements
    two internal columns on desktop; one column on narrow screens
-   a missing required fact prints in orange as a problem (`Building type not recorded`) and
-   the panel's one control is `Open Sales Order to change`
+   a missing required fact prints in orange as a problem (`Building type not recorded`)
+   the panel's one control is `View Sales Order` (owner ruling 2026-09-25): it unfolds the live
+   Sales Order document — the governed SO renderer, the same bytes Print opens — inside the
+   panel, read-only, so the operator sees the whole order without leaving the row; a wrong
+   Sales fact is corrected through the row's `SO No` door, never here. `Open Sales Order to
+   change` is retired from the brief.
 
 2  DELIVERY DATES   (Delivery)
-   Customer requested          read-only Sales fact
-   Confirmed delivery date · Confirmed delivery time
+   Requested delivery          read-only Sales fact
+   Scheduled delivery date · Scheduled time (optional)
    the panel's one control     `Update date and time`  →  the panel's own edit state (§8.6)
 
 3  LOGISTICS DETAILS   (Delivery; pickup facts read from Warehouse)
    Logistics · driver · driver phone · vehicle plate · pickup fact · ETA
+   ETA is the partner's arrival time on the day (optional); Operation records it in this
+   panel's edit state (owner ruling 2026-09-25 — until then only the NETS portal could write it)
    pickup fact prints the recorded handover, `Handed over Thu, 22 Oct 12:53 · 2 of 2 Units`
    then `Received by NETS 13:10`; before any event, `Pickup not recorded`
    the panel's one control     `Assign logistics` or `Change logistics`; driver and vehicle are
@@ -1282,7 +1313,7 @@ The four panels and their inline doors are unchanged. Six corrections bind:
 4. **A delivery fee is money, not goods.** It never appears in Panel 4 in any form; it is
    Payment's fact and lives there.
 5. **`Access not recorded` is an actionable alert,** printed in the orange problem treatment with
-   the panel's `Open Sales Order to change` door — never the neutral grey absence word.
+   the row's `SO No` door — never the neutral grey absence word.
 6. **Logistics completeness is stated once.** When a delivery is confirmed and driver, vehicle
    plate, pickup or ETA is missing, Panel 3 prints **`Logistics details incomplete`** above the
    facts. The individual `Not recorded` lines remain; the verdict is what stops the operator
@@ -1329,14 +1360,15 @@ arrangement (owner ruling 2026-09-24).
 **A later date is never a silent edit.** When the new date is later than the customer's
 `Requested Delivery Date`, Operation must have contacted the customer: the save records the
 contact with purpose `Confirm New Delivery Date`, the customer's reply and the uploaded WhatsApp
-proof (§5.1). The Sales promise is never touched; `Open Sales Order to change` remains the only
+proof (§5.1). The Sales promise is never touched; the Sales Order (`SO No`) remains the only
 door to it. A customer-side reason also files Payment's written request to deliver later
 (`../payment/MASTER.md` §6) so the storage witness starts from the same record.
 
 **Logistics Details edit state.** The panel's one control opens the edit state for: partner
 (coverage informs and pre-selects; it never hides a partner), the governed reason when an existing
 partner changes (`Change logistics`, append-only history), driver and vehicle from the partner's
-fleet templates, condo registration, the prepared chase message with `Copy message`, `Open
+fleet templates, condo registration, `ETA` (the day's arrival time, optional; owner ruling
+2026-09-25), the prepared chase message with `Copy message`, `Open
 WhatsApp group` and the reply upload, and `Record Cannot Deliver on behalf of {partner}` with its
 governed reason and evidence. The live DO document preview lives on the DO object.
 
@@ -1649,7 +1681,9 @@ export.
 - Warehouse roles see and record only preparation, handover and returns for their Warehouse.
 - The NETS Logistics role sees only assigned deliveries and minimum customer and handling data; it
   may arrange, update ETA, record departure, results and proof, and use `Cannot Deliver`. It never
-  sees money, other Partners or commercial terms and cannot reassign.
+  sees money, other Partners or commercial terms and cannot reassign. While the gate holds it
+  sees `Hold delivery` and nothing more (owner ruling 2026-09-25, §3); the external link prints
+  the same one line.
 - Sales, Finance and Service read the facts relevant to their ownership and act only in their own
   module.
 - AL, TT, TEOW, EU, SSY, HOUZS and other no-Portal partners answer through their external link
@@ -1779,9 +1813,11 @@ only when a real vehicle-level fact exists.
 | POD | `Delivery Proof` or the concrete proof name |
 | Today · Tomorrow | the actual weekday and date |
 | Waiting for customer date · Delivery confirmed · Waiting for warehouse · Ready for handover · Out for delivery · Created, on Monitor | the §8.4 status words |
-| Paid in full · Payment pending · Needs attention, on Monitor | `Paid` · `Do not deliver` over `RM {amount} still to collect` · a specific fact word |
+| Paid in full · Payment pending · Needs attention, on Monitor | `Paid` · `Hold delivery` over `RM {amount} unpaid` · a specific fact word |
+| Do not deliver · still to collect · Finance is holding this delivery · Payment blocked · Money in full | `Hold delivery` over `RM {amount} unpaid` or `Finance hold · {reason}`; the gate's met word is `Paid` (owner ruling 2026-09-25, §3) |
+| Open Sales Order to change, inside the brief | `View Sales Order` (read-only, in place); the row's `SO No` opens the order to change |
 | Ready at Carres Klang Warehouse | `Ready` in Status and `Carres Klang` in Location |
-| Edit Delivery · Save Delivery | `Update date and time` · `Save confirmed delivery`; the other panel acts by their own names |
+| Edit Delivery · Save Delivery | `Update date and time` · `Save scheduled delivery`; the other panel acts by their own names |
 | `Call {partner} — confirm delivery date` | `Call NETS` over `Confirm the delivery date` |
 | Alert · Attention · Checklist · Due · Next Action · Priority, as Monitor columns | none; the three checks live in their columns |
 
@@ -1807,6 +1843,11 @@ their absence as a design blind spot:
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |
 | central Delivery reports | the Reports destination |
+| `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
+| the `ETA` field in the Logistics Details edit state (§8.6) — the Operation save already accepts `expectedArrival`; the brief has no input for it | `apps/web/src/pages/operation/components/DeliveryBrief.tsx` |
+| `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
+| **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
+| the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
 ### 15.2 · Whole-domain closure

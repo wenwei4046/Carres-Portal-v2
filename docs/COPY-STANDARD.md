@@ -56,6 +56,9 @@ English; complexity is never used to make an instruction sound official.
   naming the concrete result.
 - Print full dates such as `18 Aug 2026`; actionable work also carries its governed weekday/date.
 - Errors name what is wrong and exactly how to fix it.
+- **A screen line is at most 6 words (owner ruling 2026-09-25).** The first line names the fact
+  or the act; the second line gives the one reason. On a delivery hold, money says `Paid` or
+  `RM {amount} unpaid` — never `still to collect`, `outstanding` or `Money in full`.
 - A button says what pressing it does: verb plus object.
 - Keep necessary business nouns (`Purchase Order`, `Supplier`, `Deliver To`, `Unit ID`, `Invoice`,
   `Credit Note`, `Claim`, `Consignment`) and provide a simple first-use explanation through Help.
@@ -576,7 +579,7 @@ tab count and split, following the SELECTED RANGE and every active filter:
   {c} customer deliveries · {t} transfers          e.g. `0 customer deliveries · 2 transfers`
 
 LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
-  customer leg        transfer leg           Ready · Stock risk · Payment blocked ·
+  customer leg        transfer leg           Ready · Stock risk · Hold delivery ·
   Confirmed           Transfer confirmed     Logistics details incomplete · DO not released
   Collected by {p}    Collected for transfer
   On the way to       In transit to {stop}
@@ -621,7 +624,7 @@ logistics`** (replacing one, which requires a governed reason and writes history
 `Reassign`, `Set partner` or `Update logistics`. **`Edit Delivery` and `Save Delivery` are
 RETIRED**: the Delivery-owned writes live inside the Monitor row's expanded panels, and the date
 act is **`Update date and time`** with its save **`Save scheduled delivery`** (owner rulings
-2026-09-13 / 2026-09-24). A wrong Sales fact offers the door **`Open Sales Order to change`**. The Monitor
+2026-09-13 / 2026-09-24). A wrong Sales fact is corrected through the row's `SO No` door; the brief's first panel carries **`View Sales Order`**, which unfolds the read-only Sales Order document in place (owner ruling 2026-09-25 — `Open Sales Order to change` is retired from the brief). The Monitor
 selection bar does not invent a unit word: `1 selected` / `3 selected`. The Delivery Orders
 Register keeps its document count. The disclosure's hover reads **`Show delivery brief`**. A loan
 line inside the expansion reads `Loan {Unit ID} · collect back on delivery day`.
@@ -660,9 +663,9 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | `Items & Stock` | `Ready` · `Not ready` on line one; `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` on line two |
 | Monitor Payment when valuation is unknown | `No price yet` — the existing Sales wording; never infer `Paid` from absent prices |
 | `Payment`, paid | **`Paid`** |
-| `Payment`, unpaid | **`Do not deliver`** over **`RM {amount} still to collect`**, or over `Finance is holding this delivery` |
+| `Payment`, unpaid | **`Hold delivery`** over **`RM {amount} unpaid`**, or over **`Finance hold · {reason}`** (owner ruling 2026-09-25; see Hold delivery below) |
 | `Payment`, authoritative COD | **`Collect RM {amount}`** over **`Cash on delivery`** |
-| A required Sales fact missing on a Monitor row | **`Order details incomplete`** as the status word; the panel names the fact, for example `Building type not recorded`, with the door `Open Sales Order to change` |
+| A required Sales fact missing on a Monitor row | **`Order details incomplete`** as the status word; the panel names the fact, for example `Building type not recorded`; the row's `SO No` opens the order to change |
 | The expanded panels, in order | `Customer, Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock` |
 | Delivery Dates edit state | `Update date and time` · `Scheduled date` · `Scheduled time (optional)` · `Information received from` · `WhatsApp proof` · `Save scheduled delivery` · disabled form `Save scheduled delivery — upload the WhatsApp reply` |
 | `Information received from` choices | `{partner}` · `Customer` · `Operation on behalf of {partner}` |
@@ -675,11 +678,13 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 
 **Do NOT use on Monitor:** `Paid in full` (that is the Sales Orders register's money word) ·
 `Payment pending` · `Needs attention` · `Attention` · `Alert` · `Checklist` · `Due` · `Next
-Action` · `Priority` · `Ready at {place}` · `Edit Delivery` · `Save Delivery`.
+Action` · `Priority` · `Ready at {place}` · `Edit Delivery` · `Save Delivery` · `Do not deliver` ·
+`still to collect` · `Finance is holding this delivery` · `Payment blocked` · `Open Sales Order to
+change` (retired 2026-09-25).
 
 **Colour and icons (owner ruling 2026-09-13).** Semantic status uses clear words and text colour:
 green for `Paid`, `Ready`, `Scheduled`, `Delivered`; orange for a specific fact that needs an act
-and is not yet late; red for `Overdue`, `Failed Delivery`, `Do not deliver` and a passed contact
+and is not yet late; red for `Overdue`, `Failed Delivery`, `Hold delivery` and a passed contact
 deadline. Colour never replaces the word. No emoji, tick, checkmark, warning mark or decorative
 progress icon appears inside a status fact. Governed functional icons remain: Search, Export,
 Columns, the expand chevron, Download, Hide and Show filters, the calendar arrows and the rest of
@@ -707,6 +712,25 @@ to the tooltip, the accessible name, Search and the Excel export: `Contact deadl
 appears in either, and no glyph replaces the action text. `Call by {date}` survives ONLY on the
 order detail's `Before you call` panel, whose entry below is unchanged. The complete cell law is
 `delivery/MASTER.md` §8.3.
+
+### Hold delivery — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT
+
+One fact, one first line on every surface, a second line written for the party reading it
+(`delivery/MASTER.md` §3). The reason is Payment's record; nobody else writes it.
+
+| Party · surface | Line 1 | Line 2 | Doors |
+|---|---|---|---|
+| Operation · Monitor `Payment` column · Order Route gate · Work Logistics card | `Hold delivery` | `RM {amount} unpaid` · `Finance hold · {reason}` | `Open Payments` |
+| Payment · Payment Monitor row · collection workspace · `Ask the customer to pay` | `Hold delivery` | `RM {amount} unpaid · by {date}` · `Finance hold · {reason}` | `Record payment` · `Remove hold` (Finance only) |
+| Warehouse · Warehouse Schedule row · Outbound | `Hold delivery` | `Payment incomplete` · `Do not pack` | none; never an amount, never the Finance reason |
+| Logistics · NETS portal · external link | `Hold delivery` | nothing | none; never money, never why |
+| Money settled | `Paid` | | |
+
+`Do not deliver` · `still to collect` · `Finance is holding this delivery` · `Payment blocked` ·
+`Money in full` · `Clear the hold` are retired. `Do not pack` is one word for every stage of
+preparation; `Stop packing` is not a second spelling. The same day the owner ruled `View Sales
+Order` (the brief's first-panel control: the read-only Sales Order document unfolded in place) and
+the `ETA` field in the Logistics Details edit state.
 
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
 
@@ -2357,7 +2381,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | ⭐ The DO document's instruction, printed when issued under an approval and still owing | **`COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`** | any softer or reworded version — these are the owner's words |
 | The gate refusal, nothing raised | **`RM {amount} is still outstanding — collect it in full, or request a payment approval.`** | Money not collected · Balance due |
 | The gate refusal, request pending | **`RM {amount} is still outstanding — a payment approval is waiting for the approver's decision.`** | — |
-| Route gate, money met | **`Money in full`** · under approval **`COD approved — collect before unloading`** | Paid · Settled |
+| Route gate, money met | **`Paid`** (owner ruling 2026-09-25; `Money in full` retired) · under approval **`COD approved — collect before unloading`** | Money in full · Settled |
 | Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
 | The drawer's absence sentence | **`No delivery order yet — the system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
 
@@ -2568,15 +2592,15 @@ to point at one of them and be wrong about the others.
 | No scheduled day | **`Scheduled delivery not recorded`** | `Date + slot not confirmed` (retired 2026-09-24) · No booking · Unscheduled · TBC |
 | A scheduled day (time optional) | **`Scheduled delivery recorded`** | `Date + slot confirmed` (retired) · Booked |
 | Finance is not holding the delivery | **`No Finance hold`** | Money cleared · Paid enough |
-| An OPEN Finance exception holds it | **`Finance is holding this delivery: {reason} — Finance clears it`** | Payment outstanding · Unpaid · On hold · a derived balance sentence |
+| An OPEN Finance exception holds it | **`Hold delivery`** over **`Finance hold · {reason}`** (owner ruling 2026-09-25; Finance removes it) | Payment outstanding · Unpaid · On hold · a derived balance sentence |
 | Nobody has priced the order | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced · — |
 | The agreed day is a Sunday | **`Date falls on a Sunday — pick another day`** | Invalid date · Not a working day |
 | The agreed day is a public holiday | **`Date falls on a public holiday — pick another day`** | Closed · Holiday · Not available |
 
 **⭐ MONEY IS A GATE REQUIREMENT, ABSOLUTE (owner rulings 2026-08-19 and 2026-09-01 — the
 2026-08-16 "money left the gate" decision A is overturned).** The gate's money line shows
-**`Money in full`** when outstanding = 0, and **`RM {amount} still to collect`** while any of it
-is owed; since 2026-09-01 there is no exception path, so no request sentence exists. **The OPEN
+**`Paid`** when outstanding = 0, and **`Hold delivery`** over **`RM {amount} unpaid`** while any of it
+is owed (owner ruling 2026-09-25; `Money in full` and `still to collect` retired); since 2026-09-01 there is no exception path, so no request sentence exists. **The OPEN
 Finance exception stays the SECOND, independent money line**, stated with its reason and its
 owner because Finance is the only party that can clear it. The collect ACTION and its amount
 live on unchanged in the worklist. `docs/orders/MASTER.md` §8 carries the ruling.
@@ -3141,7 +3165,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Goods on this trip` · `The document` · `Rendering the document…` · `The document could not be rendered here — Print opens the same document.` | inside section one: the trip's lines, and the live document rendered by the governed DO renderer (the same bytes `Print` opens), its loading word and its failure | **RULED 2026-09-13** (Card 16) |
 | `Warehouse` · `ETA` · `Building type` · `Floor` · `Lift` · `No lift` · `Stairs` · `Access` · `Customer request` · `Instruction for logistics` · `No warehouse recorded` · `None recorded` | section one's site and arrangement facts and their absences (`Not recorded` remains the plain absence) | **RULED 2026-09-13** (Card 16) |
 | `Delivery on {day} · {result}` · `Goods: {location}` | the Delivery history entry and its second line | **RULED 2026-09-13** (Card 16) |
-| `No open problems` · `Finance is holding this delivery — {reason}` · `Payment approval requested — {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
+| `No open problems` · `Hold delivery · Finance hold · {reason}` · `Payment approval requested — {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
 | `Open Payments →` · `Open Unit {Unit ID} →` · `Open Case {Case No} →` · `Open {DO No} →` · `No exact Units recorded on this document` · `Service Cases could not be read` · `No Service Case on this order` · `No other delivery order on this Sales Order` | Related records' doors (beside `Open SO-{n} →` and `Open Order Route →`) and their absences | **RULED 2026-09-13** (Card 16) |
 | `Opening SO-{n}` · `Sales Order not found.` · `Back to Sales Orders` | the Sales Order object page opened by its NUMBER (`/operation/orders/so/SO-1362`): the one-moment loading word while the number resolves to the id, the absence when no order carries that number (the existing Unknown-SO word, reused), and its door | **REGISTERED 2026-09-13** (Delivery Card 19 — a number and an id open the same page; the owner may re-word) |
 | `Check the delivery proof` / `Accept it, ask for more, or reject it` · `Delivery proof not reviewed` | the Work sentence (act / required result) and the Work problem word of the `check_delivery_proof` rule, Delivery Duty's | **RULED 2026-09-13** |
@@ -3386,7 +3410,7 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 | The three checks | ⭐ `3 working days before · {date}` · ⭐ `2 working days before · {date}` · ⭐ `1 working day before · {date}`; not yet due `Opens {date}`; a check whose date was already behind the start `Passed before this delivery started` |
 | Check facts | `{company} has the delivery details` · `Details not received yet` · `Scheduled {date}` · `Not scheduled yet` · `No answer` · `Requested another date · {date}` · `Cannot deliver · {reason}` · `Nothing missing` |
 | Current action (line 1 · line 2) | `Assign logistics` · `Choose the company that carries this delivery` — ⭐ `Contact logistics today` (on or after the 3-day check; before it `Contact logistics`) · `Share the delivery details with {company}` — `Call {company}` · `Get the scheduled delivery date` — `Call the customer` · `Agree {date} with the customer, then record it` — `Decide the next step for this delivery` · `Keep {company} with a new date, or change logistics` — `Ask {company}` · `Record the driver and vehicle` / `Record the condo registration`; due `due {date}` · `Late — was due {date}` |
-| Day-before gaps (exceptions only) | `Goods not ready · {n of m}` · `Delivery Order not issued yet` · `Not received at {site} yet` · `Driver and vehicle not recorded` · `Condo registration not recorded` · ⭐ `RM {amount} still to collect` (only once money affects this delivery) · `Finance is holding this delivery` |
+| Day-before gaps (exceptions only) | `Goods not ready · {n of m}` · `Delivery Order not issued yet` · `Not received at {site} yet` · `Driver and vehicle not recorded` · `Condo registration not recorded` · `Hold delivery · RM {amount} unpaid` (only once money affects this delivery; the owner re-ruled the 2026-09-24 ⭐ `still to collect` to `unpaid` on 2026-09-25) · `Hold delivery · Finance hold · {reason}` |
 | Expanded section headings, in order | `Current action` · `Checks` · `Scheduled delivery` · `Assignment` · `Stock route` · `External link` · `Communication` · `Evidence and recent history` |
 | Stock route | ⭐ `Pickup from Carres Klang Warehouse` · ⭐ `Pickup from supplier` · ⭐ `Supplier sends directly to logistics` · `Supplier delivers to the customer` (the separate Ohana flow) · `Stock route not known yet`; lines `{PO No} · {supplier} · PO Delivery Date {date} · Received {date}` / `Not received yet` · `{n} Units reserved at {site}`; door `Open Purchasing` |
 | External link — Carres side | `External link` · `No link yet` · `Active link` · `Link revoked · {date}` · ⭐ `Create link` (only when none is active) · ⭐ `Copy link` · ⭐ `Revoke link` (only while active) · `Created {date} · {name}` · `Opened by {company} via external link · {date}` · `Not opened yet` · `{company} answers in its own portal.` · `{company} answers through the external link.` · `Assign logistics first.` · toasts `Link created` · `Link revoked` · `Link copied` |
@@ -3425,7 +3449,7 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
 | Customer card sections | `Current action` · `Delivery` · `Partner contact` · `Contact by` · `Latest result` · `Open in Delivery` · `Exception` · `Evidence and communication history` · `Name not recorded` · `WhatsApp reply · 1 photo` · `In person` | Record reply · Accepted date |
 | Customer communication preview | only for a governed Carres exception or ERP-ARCHITECTURE §6.5 outstation release: `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
-| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · RM {amount} to collect by {date}` · `Payment · Finance is holding this delivery` | Blocked · a Payment circle |
+| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · Hold delivery · RM {amount} unpaid · by {date}` · `Payment · Hold delivery · Finance hold · {reason}` | Blocked · a Payment circle · to collect |
 | Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
 | Customer exception doors | `Open Sales Order` (a known delay · a wrong phone number) · `Open in Delivery` (another date · a refusal) | a Work form |
 | Customer card read failure | `Customer contact unavailable` + `Open Sales Order` | a guessed partner state |
@@ -4056,7 +4080,7 @@ BR-7: Finance holds and clears a delivery from the Payment Record overflow (Fina
 | Form sentence | **`The Delivery Order is not issued while Finance holds this delivery.`** |
 | Reason field label | **`Why is Finance holding this delivery`** |
 | Overflow item, form title and button to lift it | **`Clear hold`** |
-| Clear form sentence | reuses **`Finance is holding this delivery: {reason}`** |
+| Clear form sentence | reuses **`Hold delivery · Finance hold · {reason}`** |
 | Evidence field label | **`What shows the money is found`** |
 | Toasts | **`Delivery held`** · **`Hold cleared`** · **`The delivery was not held — {error}`** · **`The hold was not cleared — {error}`** |
 

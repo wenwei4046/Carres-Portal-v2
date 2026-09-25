@@ -1404,7 +1404,8 @@ DO2609-4827 · Delivery order issued
 
 Requirements are plain sentences, GitHub-checks style, with the met count:
 `Goods not ready (0 of 1)` · `Logistics not assigned` · `Scheduled delivery not recorded` ·
-`RM {amount} still to collect`. When the confirmed date lands on a refused day the gate adds
+`Hold delivery · RM {amount} unpaid` (owner ruling 2026-09-25: the hold word is one on every
+surface and every party — `../delivery/MASTER.md` §3). When the confirmed date lands on a refused day the gate adds
 `Date falls on a Sunday — pick another day` (Malaysian public holidays take the same pattern).
 
 **When every requirement is met the SYSTEM issues the DO.** There is **no Release button, no Approve
@@ -1420,7 +1421,7 @@ ask (Law D — the guard that bound decision B, decision A and this ruling alike
 engine may never disagree):
 
 ```
-outstanding = 0   → ✓ Money in full
+outstanding = 0   → ✓ Paid
 owing             → ✗ collect first — the delivery cannot be arranged while money is owed
 ```
 

@@ -858,7 +858,7 @@ Logistics · AL Logistics                         Checks 1 of 3   ▾   ← head
 Call AL Logistics                                  ← the ONE current action (14/20/600)
 Get the scheduled delivery date · due 24 Oct       ← result · due (12/16/400; red once missed)
 Scheduled delivery · 27 Oct                        ← only when scheduled; time only when recorded
-⚠ RM 1,250.00 still to collect                     ← ONE exception, only when it affects delivery
+⚠ Hold delivery · RM 1,250.00 unpaid              ← ONE exception, only when it affects delivery
 ```
 
 **Party-card type — owner density ruling 2026-09-25 (typography only, the cards are not
@@ -898,7 +898,7 @@ internal keys `t3 · t2 · t1`.
 |---|---|---|---|---|
 | `3 working days before · {date}` | a company is assigned AND it has the details: a portal company is assigned, the link page rendered, the company answered, or Operation recorded its reply | `Opens {date}` | `Details not received yet` (red once missed) | `Assign logistics` from the day the PO is issued (never red until this date) · then `Contact logistics` → `Contact logistics today` on/after the date |
 | `2 working days before · {date}` | a Scheduled delivery date is recorded (time optional) | `Opens {date}` | `Not scheduled yet` · `No answer` once missed · `Requested another date · {date}` · `Cannot deliver · {reason}` | `Call {company}` / `Get the scheduled delivery date` · `Call the customer` / `Agree {date} …` · `Decide the next step for this delivery` |
-| `1 working day before · {date}` | on its date, NOTHING is missing — then it shows `Nothing missing` and creates no call | `Opens {date}` | one line per gap: DO gate (`Goods not ready`, `Delivery Order not issued yet`), pickup/handover (`Not received at {site} yet`, `Driver and vehicle not recorded`, `Condo registration not recorded`), money (`RM {amount} still to collect`, `Finance is holding this delivery`) | only a gap that logistics can close carries an act (`Ask {company}` / `Record the driver and vehicle`); Payment, Finance and Warehouse gaps are facts with their owner's door |
+| `1 working day before · {date}` | on its date, NOTHING is missing — then it shows `Nothing missing` and creates no call | `Opens {date}` | one line per gap: DO gate (`Goods not ready`, `Delivery Order not issued yet`), pickup/handover (`Not received at {site} yet`, `Driver and vehicle not recorded`, `Condo registration not recorded`), money (`Hold delivery · RM {amount} unpaid`, `Hold delivery · Finance hold · {reason}`) | only a gap that logistics can close carries an act (`Ask {company}` / `Record the driver and vehicle`); Payment, Finance and Warehouse gaps are facts with their owner's door |
 
 A check whose date was already behind the day the order proceeded is `Passed before this delivery
 started` (Q3: no impossible past step); the nearest still-possible check carries the action. A done
@@ -1189,8 +1189,8 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
   record (0487). Each act opens its owner's door and writes nothing in Work. `Waiting` is not
   derived for the customer; the Waiting tab lists only a source-recorded waiting state (§5.2.1
   `communication.replyState`) and is empty until a module records one.
-- **Payment exception line** beneath the Route: `Payment · RM {amount} to collect by {date}` (amber
-  once the deadline is reached) or `Payment · Finance is holding this delivery`; the deadline is
+- **Payment exception line** beneath the Route: `Payment · Hold delivery · RM {amount} unpaid · by {date}` (amber
+  once the deadline is reached) or `Payment · Hold delivery · Finance hold · {reason}`; the deadline is
   `paymentDeadlineOf` — the one the Logistics day-before check reads (2 working days before the
   delivery date, 3 outstation; the effective-dated Payment rule row is not readable by Operation —
   gap).
