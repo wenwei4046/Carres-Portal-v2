@@ -319,8 +319,9 @@ customer leg's success still walks the delivery door.
 
 **DELIVERY-TO-OUTBOUND RECONCILIATION (owner-approved 2026-09-01).** The DO owns the exact
 required goods scope; Warehouse Outbound reads that scope and does not re-create it. For each DO
-and each journey leg the shared read-only tally prints `Required · Loaded · Not loaded · Driver
-confirmed` and drills to the same Unit IDs. The clickable chain is `SO → DO → Outbound handover →
+and each journey leg the shared read-only tally prints `Required · Loaded · Driver confirmed`
+(three columns, never one; `Not loaded` is the difference and is never a fourth column — Stock §7,
+owner ruling 2026-09-25) and drills to the same Unit IDs. The clickable chain is `SO → DO → Outbound handover →
 Unit IDs → Logistics receipt → customer arrival proof`. The shared contract is defined once in
 `../ERP-ARCHITECTURE.md` §3.5.1.
 
@@ -340,7 +341,9 @@ operating party. The receipt may carry the counterparty's own Unit list, preserv
 Warehouse's. Every handover keeps every evidence file (`delivery_handover_evidence`). The Warehouse
 acts live on the approved Warehouse Outbound page; the DO object renders the chain read-only in its
 Warehouse handover section with each recorder named, and keeps `Confirm logistics receipt` as the
-counterparty's own act. On the DO page the recorded facts print their event words `Ready for
+counterparty's own act — the driver's, through a personal NETS login (NOT BUILT); until then Carres
+records it on the driver's behalf and the record names both, `recorded by {staff} for {driver}`
+(Stock §7, owner ruling 2026-09-25). On the DO page the recorded facts print their event words `Ready for
 handover` · `Handed over` · `Received by logistics`; those are record words, not Monitor status
 words (§8.4).
 
@@ -1593,7 +1596,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 
 | Section | Rows |
 |---|---|
-| `Logistics` | one row per partner opening its object: `Partner details` (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Warehouses & handover points` (the partner's own warehouse and the two-leg handover locations) · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
+| `Logistics` | one row per partner opening its object: `Partner details` (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Transit points` (the Logistics company's own points — `AL Sungai Buloh`, `HOUZS Balakong`, `HOUZS Penang` — registered once in Warehouse Settings → Sites as kind `Logistics transit point`; never a Carres warehouse; owner correction 2026-09-25, Stock §5) and the two-leg handover locations · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
 | `Delivery Rules` | who contacts the customer, per partner · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
 | `Access` | which People hold Delivery capabilities; a link to `Workspace → Staff & Duties`, never a copy |
@@ -1734,6 +1737,13 @@ means an outbound customer Delivery Order; inbound receiving stays under its PO/
 sends the prepared customer WhatsApp (delivery date, balance, payment link, storage charge on a
 later delay) and records the customer's reply with proof. Without that confirmation Delivery
 refuses the first-leg handover. The payment deadline is Payment's outstation timing row.
+
+**Transit points are the Logistics company's, and a move through one is a Journey (owner correction
+2026-09-25, Stock §5).** `AL Sungai Buloh`, `HOUZS Balakong` and the future `HOUZS Penang` are transit
+points of companies Carres assigns, not Carres warehouses. A customer's goods moving through one
+ride a Delivery Journey leg with its own DO scope, handover and arrival — never a Stock Transfer.
+Inventory prints only the two events, OUT at origin (`Ship Date · Pickup By {company} · Delivery
+Location`) and IN at the transit point; nobody records the road.
 
 **Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
 leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own
