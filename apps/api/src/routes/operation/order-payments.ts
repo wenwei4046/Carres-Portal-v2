@@ -19,6 +19,7 @@ import { userClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 import { storageSkuCategories } from "../../lib/sku-categories";
+import { resolveActorNames } from "../../lib/actor-names";
 
 /**
  * Order payment LEDGER (balance job — Jess 2026-06-26 "complete all the balance
@@ -78,17 +79,13 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
      operator nothing about who to ask. The SO PDF already resolves the same
      column the same way (`routes/orders.ts` — "COLLECTED BY"), so this is that
      lookup, not a second rule.
-     FAIL-SOFT: an unreadable or missing `app_users` row leaves the name null
-     and the screen prints `Not recorded`. A name is context; losing it must
-     never cost the operator the ledger itself. */
-  const recorderNames = new Map<string, string>();
-  const recorderIds = [...new Set(rows.map((r) => r.recorded_by).filter(Boolean).map(String))];
-  if (recorderIds.length > 0) {
-    const { data: users } = await sb.from("app_users").select("id, name").in("id", recorderIds);
-    for (const u of (users ?? []) as Array<{ id: unknown; name: unknown }>) {
-      if (u?.id != null && u?.name != null) recorderNames.set(String(u.id), String(u.name));
-    }
-  }
+     Names come from the one actor resolver, not a plain `app_users` read: an
+     operation login can only read operation peers there (0235), so Sales,
+     Finance and principal recorders came back unnamed.
+     FAIL-SOFT: an unresolved id leaves the name null and the screen prints
+     `Not recorded`. A name is context; losing it must never cost the operator
+     the ledger itself. */
+  const recorderNames = await resolveActorNames(sb, rows.map((r) => r.recorded_by as string | null));
 
   return c.json({
     payments: rows.map(({ source_channel, source_metadata, ...r }) => {

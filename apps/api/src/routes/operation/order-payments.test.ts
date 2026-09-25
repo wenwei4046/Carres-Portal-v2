@@ -60,7 +60,7 @@ function makeSb(
         return builder;
       }),
       eq: vi.fn(() => builder),
-      /* `.in()` — the recorder-name lookup filters app_users by a list of ids.
+      /* `.in()` — the recorder-name lookup filters salespersons by a list of ids.
          The builder had no such method, so the route 500'd inside the mock
          while the real PostgREST client was fine. A mock that cannot express a
          call the route makes does not prove the route works. */
@@ -175,14 +175,20 @@ describe("GET /:id/payments", () => {
      id, and a uuid on screen tells an operator nothing about who to ask. The
      SO PDF already resolves the same column the same way; this is that lookup
      on the reading endpoint, not a second rule. */
-  it("200 — resolves the recorder's name from app_users", async () => {
+  /* An operation login cannot read a principal's or Finance's app_users row
+     (0235 shows it operation peers only), so the name must come through the
+     actor_display_names door, the same resolver the Activity rail uses. */
+  it("200 — names a principal recorder to an operation reader", async () => {
     const rows = [
       { id: PAY_ID, order_id: ORDER_ID, amount: 1500, paid_on: "2026-06-26", method: "cash", kind: "payment", recorded_by: "u9" },
     ];
-    const sb = makeSb({
-      order_payments: { list: { data: rows, error: null } },
-      app_users: { list: { data: [{ id: "u9", name: "Shasha" }], error: null } },
-    });
+    const sb = makeSb(
+      {
+        order_payments: { list: { data: rows, error: null } },
+        app_users: { list: { data: [], error: null } },
+      },
+      { data: [{ id: "u9", name: "Shasha" }], error: null },
+    );
     vi.mocked(userClient).mockReturnValue(sb as never);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -194,20 +200,23 @@ describe("GET /:id/payments", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { payments: Array<{ recorded_by_name: string | null }> };
     expect(body.payments[0].recorded_by_name).toBe("Shasha");
-    expect(sb.from).toHaveBeenCalledWith("app_users");
+    expect(sb.rpc).toHaveBeenCalledWith("actor_display_names", { p_ids: ["u9"] });
   });
 
   /* ⛔ A NAME IS CONTEXT; LOSING IT MAY NEVER COST THE LEDGER. An unreadable
-     `app_users` leaves the name null and the ledger intact — the screen then
+     name source leaves the name null and the ledger intact — the screen then
      prints `Not recorded` rather than emptying the card. */
-  it("200 — an unreadable app_users leaves the name null and the rows whole", async () => {
+  it("200 — an unreadable name source leaves the name null and the rows whole", async () => {
     const rows = [
       { id: PAY_ID, order_id: ORDER_ID, amount: 1500, paid_on: "2026-06-26", method: "cash", kind: "payment", recorded_by: "u9" },
     ];
-    const sb = makeSb({
-      order_payments: { list: { data: rows, error: null } },
-      app_users: { list: { data: null, error: { message: "permission denied" } } },
-    });
+    const sb = makeSb(
+      {
+        order_payments: { list: { data: rows, error: null } },
+        salespersons: { list: { data: null, error: { message: "permission denied" } } },
+      },
+      { data: null, error: { message: "permission denied" } },
+    );
     vi.mocked(userClient).mockReturnValue(sb as never);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -239,7 +248,8 @@ describe("GET /:id/payments", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.from).not.toHaveBeenCalledWith("app_users");
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(sb.from).not.toHaveBeenCalledWith("salespersons");
   });
 });
 
