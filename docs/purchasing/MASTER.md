@@ -514,6 +514,14 @@ supplier and one confirmation may issue separate supplier POs. The scope is sour
 matching one SO never silently includes its unrelated lines. How an exceptional earlier supplier
 window is visually composed remains a UI decision, not a reason to falsify its due time.
 
+**WINDOW DAYS — OWNER RULING (Jess, 2026-09-25) · APPROVED / NOT BUILT.** The windows run on
+**every Office working day (Mon–Fri, Office calendar and holidays)**. "Purchasing working day"
+above means Office working day. The existing `PO Days` setting (live `Mon · Wed · Fri`) **stays in
+Settings for now** — it is not deleted, renamed or edited by this ruling — but it no longer limits
+which days a window opens, creates no Work and moves no date. Retiring the setting is a later,
+separate owner decision. A supplier who accepts orders only on certain days is expressed through
+that supplier's governed earlier cut-off, never by making every supplier wait for PO Days.
+
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
 - **THE VERSION IS DECLARED, NOT READ BACK.** The confirmation states the version it RENDERED;
@@ -1387,6 +1395,8 @@ also has transit days.
 an input to this arithmetic — the SO Batch surface passes no review days to the planner at all, so
 `Order By` is calendar arithmetic alone and may legitimately land on a day POs are not sent (in the
 worked example above, a Saturday). It never becomes an unlock date and never delays a late line.
+Since the 2026-09-25 ruling (§5.6.1) `PO Days` also does not decide which days a PO window opens:
+windows run every Office working day; the setting is kept, unused by windows, until retired.
 
 Timing classification, derived by the same engine:
 
@@ -4825,9 +4835,12 @@ Settings lives under the global header gear and requires authorised roles. It in
   `SalesOrderWorkspace` and `OperationOrdersControl` consume the shared Workspace Duty resolver;
   the Quick Rail reads the shared Work response. No caller may restore a direct `ops_po_duty`,
   cover-table read, page-local rota or compatibility response.
-- PO Days remain scheduling facts. They do not create reminders or `ops_tasks`; every order that
-  requires issue is already one structured `issue_po` Work projection, resolved to current PO Duty
-  and closed only by the owning order/purchase facts.
+- PO Days stay in Settings (owner ruling 2026-09-25) but are no longer an input to anything: they
+  create no reminders, no `ops_tasks` and no Work, and they do not decide window days. PO windows
+  (§5.6.1) run every Office working day. **Target:** issue work is one Work occurrence per PO window
+  over the exact eligible demand, resolved to current PO Duty and closed only by the owning
+  order/purchase facts. The built per-Sales-Order `issue_po` projection is implementation evidence
+  that must converge onto the window occurrence, not the target.
 - approval limits and Manual Purchase purposes;
 - default `Supplier Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
