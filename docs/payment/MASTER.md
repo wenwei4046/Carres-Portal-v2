@@ -261,9 +261,15 @@ ask day is an engineering setting, not an owner ruling. Same one clock, same cal
 Editable by authorised Manager permission; asking must start earlier than the deadline (n > m).
 
 **The Work right panel reads this clock (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10):**
-the Order Route's one payment line `Payment · RM {amount} to collect by {deadline}` and the Logistics
-card's day-before money gap use the same deadline (`paymentDeadlineOf`, `packages/shared`). Payment is
-never a route point and never `Blocked`. **Gap:** both still use the ruled default m = 2 (3 outstation)
+the Order Route's one payment line `Payment · Hold delivery · RM {amount} unpaid · by {deadline}` and the
+Logistics card's day-before money gap use the same deadline (`paymentDeadlineOf`, `packages/shared`). Payment is
+never a route point and never `Blocked`. **The hold is told to Payment with its reason (owner ruling
+2026-09-25, `../delivery/MASTER.md` §3 · APPROVED TARGET / NOT BUILT):** while a Scheduled delivery
+exists and the DO cannot issue, the Payment Monitor row, the collection workspace and the `Ask the
+customer to pay` Work item print `Hold delivery` over `RM {amount} unpaid · by {date}` or `Finance
+hold · {reason}`, beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
+is this module's own record; Delivery, Warehouse and Work read it. Paying in full or removing the
+hold lets the system issue the DO, and the hold leaves every surface in the same read. **Gap:** both still use the ruled default m = 2 (3 outstation)
 rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
