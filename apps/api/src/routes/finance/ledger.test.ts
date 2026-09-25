@@ -758,19 +758,20 @@ describe("GET /trial-balance", () => {
     expect(body).toMatchObject({ total_debit: 150, total_credit: 150, difference: 0, balances: true });
   });
 
-  // A chart three headings deep, in the order Finance dragged it (1120 above
-  // 1110), with a heading that holds nothing that moved (1300).
+  // A chart three headings deep, with made-up codes. Finance dragged Bank
+  // (CA-B) above Cash in hand (CA-A), so the chart's order is not the codes'
+  // order. Stock holds nothing that moved.
   const DEEP = [
-    { code: "1000", name: "Assets", kind: "ASSET", parent_code: null, sort_order: 0 },
-    { code: "1100", name: "Current assets", kind: "ASSET", parent_code: "1000", sort_order: 0 },
-    { code: "1120", name: "Bank", kind: "ASSET", parent_code: "1100", sort_order: -1 },
-    { code: "1121", name: "Maybank", kind: "ASSET", parent_code: "1120", sort_order: 0 },
-    { code: "1122", name: "Public Bank", kind: "ASSET", parent_code: "1120", sort_order: 0 },
-    { code: "1110", name: "Cash in hand", kind: "ASSET", parent_code: "1100", sort_order: 0 },
-    { code: "1300", name: "Stock", kind: "ASSET", parent_code: "1000", sort_order: 0 },
-    { code: "1310", name: "Finished goods", kind: "ASSET", parent_code: "1300", sort_order: 0 },
-    { code: "4000", name: "Income", kind: "INCOME", parent_code: null, sort_order: 0 },
-    { code: "4100", name: "Sales", kind: "INCOME", parent_code: "4000", sort_order: 0 },
+    { code: "AS", name: "Assets", kind: "ASSET", parent_code: null, sort_order: 0 },
+    { code: "CA", name: "Current assets", kind: "ASSET", parent_code: "AS", sort_order: 0 },
+    { code: "CA-B", name: "Bank", kind: "ASSET", parent_code: "CA", sort_order: -1 },
+    { code: "CA-B1", name: "Maybank", kind: "ASSET", parent_code: "CA-B", sort_order: 0 },
+    { code: "CA-B2", name: "Public Bank", kind: "ASSET", parent_code: "CA-B", sort_order: 0 },
+    { code: "CA-A", name: "Cash in hand", kind: "ASSET", parent_code: "CA", sort_order: 0 },
+    { code: "ST", name: "Stock", kind: "ASSET", parent_code: "AS", sort_order: 0 },
+    { code: "ST-F", name: "Finished goods", kind: "ASSET", parent_code: "ST", sort_order: 0 },
+    { code: "IN", name: "Income", kind: "INCOME", parent_code: null, sort_order: 0 },
+    { code: "IN-S", name: "Sales", kind: "INCOME", parent_code: "IN", sort_order: 0 },
   ].map((a) => ({ is_control: false, control_for: null, is_active: true, ...a }));
   const deepAnswer = (moved: Record<string, [number, number]>) => (call: Call): Result => {
     // readChart asks for sort_order, then code, across the whole chart.
@@ -787,31 +788,33 @@ describe("GET /trial-balance", () => {
     return ok([...accounts, tbRow({ ordinal: accounts.length + 1, row_kind: "TOTAL", total_debit: dr, total_credit: cr, balances: dr === cr })]);
   };
 
-  it("gives every heading its own debit and credit subtotal at every depth, in the chart's order", async () => {
-    // 1121 sits 500 on the debit side, 1122 is overdrawn 30, 1110 holds 20; sales take the 490.
-    fakeClient(deepAnswer({ "1121": [700, 200], "1122": [10, 40], "1110": [20, 0], "4100": [0, 490] }));
+  it("gives every heading its own debit and credit subtotal at every depth, and each row its place in the chart", async () => {
+    // Maybank sits 500 on the debit side, Public Bank is overdrawn 30, Cash in hand holds 20; sales take the 490.
+    fakeClient(deepAnswer({ "CA-B1": [700, 200], "CA-B2": [10, 40], "CA-A": [20, 0], "IN-S": [0, 490] }));
     const body = await json(await get("/trial-balance?asOf=2026-09-10"));
-    expect(body.headings.map((h: AnyJson) => [h.code, h.depth, h.parent_code, h.debit, h.credit])).toEqual([
-      ["1000", 1, null, 520, 30],
-      ["1100", 2, "1000", 520, 30],
-      ["1120", 3, "1100", 500, 30],
-      ["1300", 2, "1000", 0, 0],
-      ["4000", 1, null, 0, 490],
+    expect(body.headings.map((h: AnyJson) => [h.code, h.depth, h.parent_code, h.chart_position, h.debit, h.credit])).toEqual([
+      ["AS", 1, null, 1, 520, 30],
+      ["CA", 2, "AS", 2, 520, 30],
+      ["CA-B", 3, "CA", 3, 500, 30],
+      ["ST", 2, "AS", 7, 0, 0],
+      ["IN", 1, null, 9, 0, 490],
     ]);
-    // The accounts in the chart's order, each under its heading; no heading prints as an account.
-    expect(body.accounts.map((a: AnyJson) => [a.account_code, a.header_code])).toEqual([
-      ["1121", "1120"], ["1122", "1120"], ["1110", "1100"], ["1310", "1300"], ["4100", "4000"],
+    // The accounts keep the ledger's own order, as before headings; each
+    // carries its heading and its place in the chart, counted with the
+    // headings' places, so Bank (3) sorts above Cash in hand (6).
+    expect(body.accounts.map((a: AnyJson) => [a.account_code, a.header_code, a.chart_position])).toEqual([
+      ["CA-A", "CA", 6], ["CA-B1", "CA-B", 4], ["CA-B2", "CA-B", 5], ["IN-S", "IN", 10], ["ST-F", "ST", 8],
     ]);
-    // The totals are still the ledger's, and they still balance.
+    // The totals are the ledger's own, never the subtotals added in again, and they balance.
     expect(body).toMatchObject({ total_debit: 730, total_credit: 730, difference: 0, balances: true });
   });
 
   it("keeps the department filter, and the subtotals are that department's", async () => {
-    const { sb } = fakeClient(deepAnswer({ "1110": [20, 0], "4100": [0, 20] }));
+    const { sb } = fakeClient(deepAnswer({ "CA-A": [20, 0], "IN-S": [0, 20] }));
     const body = await json(await get("/trial-balance?asOf=2026-09-10&departmentType=SHOWROOM"));
     expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10", p_department_type: "SHOWROOM", p_department_id: null });
-    expect(body.headings.find((h: AnyJson) => h.code === "1000")).toMatchObject({ debit: 20, credit: 0 });
-    expect(body.headings.find((h: AnyJson) => h.code === "1120")).toMatchObject({ debit: 0, credit: 0 });
+    expect(body.headings.find((h: AnyJson) => h.code === "AS")).toMatchObject({ debit: 20, credit: 0 });
+    expect(body.headings.find((h: AnyJson) => h.code === "CA-B")).toMatchObject({ debit: 0, credit: 0 });
   });
 
   it("refuses a trial balance with an account the chart does not hold, never prints it short", async () => {
@@ -819,7 +822,7 @@ describe("GET /trial-balance", () => {
     fakeClient((call) => {
       if (call.name !== "gl_trial_balance") return answer(call);
       return ok([
-        tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "9999", account_name: "Stray", kind: "ASSET", total_debit: "5.00", total_credit: "0" }),
+        tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "XX", account_name: "Stray", kind: "ASSET", total_debit: "5.00", total_credit: "0" }),
         tbRow({ ordinal: 2, row_kind: "TOTAL", total_debit: "5.00", total_credit: "0", balances: false }),
       ]);
     });

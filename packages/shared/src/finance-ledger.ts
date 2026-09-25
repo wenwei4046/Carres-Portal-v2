@@ -128,6 +128,9 @@ export interface TrialBalanceAccountRow {
   /** The heading this account prints under: its parent, or itself when it
    *  sits at the top of the chart. The same rule as the Balance Sheet (0579). */
   header_code: string;
+  /** Its place in the chart's order, counted together with the headings'
+   *  places, so an account and a heading beside it sort as the chart lists them. */
+  chart_position: number;
 }
 
 /** One heading and its own subtotal: every account under it, at any depth,
@@ -140,6 +143,8 @@ export interface TrialBalanceHeadingRow {
   depth: number;
   /** The heading this one sits under; null at the top. */
   parent_code: string | null;
+  /** Its place in the chart's order, counted together with the accounts' places. */
+  chart_position: number;
   /** The Debit column and the Credit column of the accounts under it, added up. */
   debit: number;
   credit: number;
@@ -157,7 +162,8 @@ export interface TrialBalanceReport {
   status: "ok" | "before_go_live";
   go_live_on: string;
   as_of: string;
-  /** In the chart's order. A heading is left out unless something was posted to it. */
+  /** In the ledger's own order, as before headings were sent. A heading is
+   *  left out unless something was posted to it. */
   accounts: TrialBalanceAccountRow[];
   /** Every heading at every depth, in the chart's order. */
   headings: TrialBalanceHeadingRow[];

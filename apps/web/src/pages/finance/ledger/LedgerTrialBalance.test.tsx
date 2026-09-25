@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -106,74 +106,106 @@ describe("Trial Balance", () => {
   });
 });
 
-// As the API serves it since headings carry subtotals: Assets > Current assets
-// > Bank, three deep; 1300 holds only an account nothing was posted to, and
-// 1400 holds nothing at all (a heading whose last account moved out, 0580).
-const head = (code: string, name: string, kind: string, depth: number, parent: string | null, debit: number, credit: number) =>
-  ({ code, name, kind, depth, parent_code: parent, debit, credit });
-const under = (hdr: string, a: ReturnType<typeof acc>) => ({ ...a, header_code: hdr });
+/// As the API serves it since headings carry subtotals. The codes are made up;
+// what matters is the chart's order (`chart_position`), which is not the
+// codes' order: Finance dragged Bank above Cash in hand, so under Current
+// assets the sub-heading Bank prints before the account Cash in hand. Stock
+// holds only an account nothing was posted to, and Deposits paid holds nothing.
+// The accounts come in the ledger's own order, as they always have.
+const head = (code: string, name: string, kind: string, depth: number, parent: string | null, pos: number, debit: number, credit: number) =>
+  ({ code, name, kind, depth, parent_code: parent, chart_position: pos, debit, credit });
+const under = (hdr: string, pos: number, a: ReturnType<typeof acc>) => ({ ...a, header_code: hdr, chart_position: pos });
 const NESTED = {
   status: "ok", go_live_on: "2026-09-10", as_of: "2026-09-11",
   accounts: [
-    under("1120", acc("1121", "Maybank", "ASSET", 700, 200)),
-    under("1120", acc("1122", "Public Bank", "ASSET", 10, 40)),
-    under("1100", acc("1110", "Cash in hand", "ASSET", 20, 0)),
-    under("1300", acc("1310", "Finished goods", "ASSET", 0, 0)),
-    under("2000", acc("2110", "Trade payables", "LIABILITY", 0, 100)),
-    under("4000", acc("4100", "Sales", "INCOME", 0, 440)),
-    under("5000", acc("5100", "Purchases", "EXPENSE", 50, 0)),
+    under("CA", 6, acc("CA-C", "Cash in hand", "ASSET", 20, 0)),
+    under("CA-B", 4, acc("CA-B1", "Maybank", "ASSET", 700, 200)),
+    under("CA-B", 5, acc("CA-B2", "Public Bank", "ASSET", 10, 40)),
+    under("ST", 8, acc("ST-F", "Finished goods", "ASSET", 0, 0)),
+    under("EX", 15, acc("EX-P", "Purchases", "EXPENSE", 50, 0)),
+    under("IN", 13, acc("IN-S", "Sales", "INCOME", 0, 440)),
+    under("LI", 11, acc("LI-T", "Trade payables", "LIABILITY", 0, 100)),
   ],
   headings: [
-    head("1000", "Assets", "ASSET", 1, null, 520, 30),
-    head("1100", "Current assets", "ASSET", 2, "1000", 520, 30),
-    head("1120", "Bank", "ASSET", 3, "1100", 500, 30),
-    head("1300", "Stock", "ASSET", 2, "1000", 0, 0),
-    head("1400", "Deposits paid", "ASSET", 2, "1000", 0, 0),
-    head("2000", "Liabilities", "LIABILITY", 1, null, 0, 100),
-    head("4000", "Income", "INCOME", 1, null, 0, 440),
-    head("5000", "Cost of sales", "EXPENSE", 1, null, 50, 0),
+    head("AS", "Assets", "ASSET", 1, null, 1, 520, 30),
+    head("CA", "Current assets", "ASSET", 2, "AS", 2, 520, 30),
+    head("CA-B", "Bank", "ASSET", 3, "CA", 3, 500, 30),
+    head("ST", "Stock", "ASSET", 2, "AS", 7, 0, 0),
+    head("DP", "Deposits paid", "ASSET", 2, "AS", 9, 0, 0),
+    head("LI", "Liabilities", "LIABILITY", 1, null, 10, 0, 100),
+    head("IN", "Income", "INCOME", 1, null, 12, 0, 440),
+    head("EX", "Cost of sales", "EXPENSE", 1, null, 14, 50, 0),
   ],
   total_debit: 780, total_credit: 780, difference: 0, balances: true,
 };
 
+/** The account links on screen, top to bottom. */
+const printedAccounts = () => screen.getAllByRole("link").map((l) => l.textContent).filter((t) => /^[A-Z]{2}-/.test(t ?? ""));
+/** Click a column's sort; each column header repeats per group, so take the first. */
+const sortBy = (label: string) => fireEvent.click(screen.getAllByRole("button", { name: new RegExp(`^${label}`) })[0]!);
+
 describe("Trial Balance headings", () => {
-  it("prints each heading with its own subtotal, nested, in the chart's order; an empty heading adds no line", () => {
+  it("prints accounts and sub-headings mixed in the chart's order, each heading with its subtotal; an empty heading adds no line", () => {
     const printed = trialBalanceLines(NESTED as never).map((r) =>
       `${r.heading ? "H" : "A"}${r.depth} ${r.heading ? r.name : r.code} ${r.debit}/${r.credit}`);
     expect(printed).toEqual([
       "H1 Assets 520/30",
       "H2 Current assets 520/30",
-      // A heading's own accounts first, then the headings inside it, as statementRows prints.
-      "A3 1110 20/0",
+      // Bank sits above Cash in hand in the chart, so it prints first.
       "H3 Bank 500/30",
-      "A4 1121 500/0",
-      "A4 1122 0/30",
+      "A4 CA-B1 500/0",
+      "A4 CA-B2 0/30",
+      "A3 CA-C 20/0",
       // One heading holds the whole kind and nothing nests: no heading line,
       // as on the Balance Sheet and the Profit and Loss.
-      "A1 2110 0/100",
-      "A1 4100 0/440",
-      "A1 5100 50/0",
+      "A1 LI-T 0/100",
+      "A1 IN-S 0/440",
+      "A1 EX-P 50/0",
     ]);
-    // The accounts alone still balance: 500 + 20 + 50 = 30 + 100 + 440.
-    const accounts = trialBalanceLines(NESTED as never).filter((r) => !r.heading);
-    expect(accounts.reduce((t, r) => t + r.debit, 0)).toBe(570);
-    expect(accounts.reduce((t, r) => t + r.credit, 0)).toBe(570);
   });
 
-  it("indents the headings on screen, and the footer counts each account once", async () => {
+  it("indents the headings on screen, and the totals count each account once, never a subtotal", async () => {
     api.fetch.mockResolvedValue(NESTED);
     show();
     const bank = await screen.findByText("Bank");
     expect(bank).toHaveClass("font-semibold", "pl-8");
     expect(screen.getByText("Current assets")).toHaveClass("pl-4");
-    expect(screen.getByRole("link", { name: "1121 Maybank" }).parentElement).toHaveClass("pl-12");
+    expect(screen.getByRole("link", { name: "CA-B1 Maybank" }).parentElement).toHaveClass("pl-12");
     expect(screen.queryByText("Stock")).not.toBeInTheDocument();
     expect(screen.queryByText("Deposits paid")).not.toBeInTheDocument();
-    expect(screen.queryByText("1310 Finished goods")).not.toBeInTheDocument();
-    // Assets and Current assets both carry RM 520.00; the footer is RM 570.00 on each side.
+    expect(screen.queryByText("ST-F Finished goods")).not.toBeInTheDocument();
+    // Assets and Current assets both carry RM 520.00. The footer is the
+    // accounts alone, RM 570.00 on each side (500 + 20 + 50 = 30 + 100 + 440),
+    // with no subtotal added in a second time.
     expect(screen.getAllByText("RM 520.00").length).toBe(2);
     expect(screen.getAllByText("RM 570.00").length).toBe(2);
+  });
+
+  it("counts accounts, never heading lines, in the kind's count and the status line", async () => {
+    api.fetch.mockResolvedValue(NESTED);
+    show();
+    await screen.findByText("Bank");
+    // Maybank, Public Bank, Cash in hand: three accounts under three heading lines.
+    expect(screen.getByText(/Kind: Asset/).closest("tr")).toHaveTextContent("(3)");
     expect(screen.getByTestId("trial-balance-summary")).toHaveTextContent("6 accounts · Difference RM 0.00");
+  });
+
+  it("a sorted column prints the accounts alone, sorted as before headings; clearing the sort brings the headings back", async () => {
+    api.fetch.mockResolvedValue(NESTED);
+    show();
+    await screen.findByText("Bank");
+    sortBy("Account");
+    sortBy("Account");
+    // Descending by account, grouped by kind in the order the kinds first appear.
+    expect(printedAccounts()).toEqual(["LI-T Trade payables", "IN-S Sales", "EX-P Purchases", "CA-C Cash in hand", "CA-B2 Public Bank", "CA-B1 Maybank"]);
+    expect(screen.queryByText("Current assets")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bank")).not.toBeInTheDocument();
+    expect(screen.getByText("CA-B1 Maybank")).not.toHaveClass("pl-12");
+    expect(screen.getAllByText("RM 570.00").length).toBe(2);
+    expect(screen.getByTestId("trial-balance-summary")).toHaveTextContent("6 accounts");
+    sortBy("Account");
+    expect(screen.getByText("Current assets")).toBeInTheDocument();
+    expect(printedAccounts()).toEqual(["CA-B1 Maybank", "CA-B2 Public Bank", "CA-C Cash in hand", "LI-T Trade payables", "IN-S Sales", "EX-P Purchases"]);
   });
 
   it("asks for the department it was given", async () => {
@@ -189,13 +221,13 @@ describe("Trial Balance headings", () => {
       ["Account", "Kind", "Debit", "Credit"],
       ["Assets", "Asset", 520, 30],
       ["  Current assets", "Asset", 520, 30],
-      ["    1110 Cash in hand", "Asset", 20, 0],
       ["    Bank", "Asset", 500, 30],
-      ["      1121 Maybank", "Asset", 500, 0],
-      ["      1122 Public Bank", "Asset", 0, 30],
-      ["2110 Trade payables", "Liability", 0, 100],
-      ["4100 Sales", "Income", 0, 440],
-      ["5100 Purchases", "Expense", 50, 0],
+      ["      CA-B1 Maybank", "Asset", 500, 0],
+      ["      CA-B2 Public Bank", "Asset", 0, 30],
+      ["    CA-C Cash in hand", "Asset", 20, 0],
+      ["LI-T Trade payables", "Liability", 0, 100],
+      ["IN-S Sales", "Income", 0, 440],
+      ["EX-P Purchases", "Expense", 50, 0],
       ["Total", "", 570, 570],
     ]);
   });

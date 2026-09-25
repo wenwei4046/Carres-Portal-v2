@@ -529,36 +529,37 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
 // ── the trial balance ────────────────────────────────────────────────────────
 
 /**
- * The trial balance's accounts in the chart's order, and every heading with
- * its own subtotal at every depth. The rule is the Balance Sheet's (0579): a
- * heading is an account with accounts under it, or one at the top of the
- * chart; an account prints under its parent, a top one under itself. A
- * heading prints as an account only if something was posted to it, which
- * 0468 refuses. A heading's Debit and Credit are the Debit and Credit columns
- * of every account under it, each counted once.
+ * The trial balance's accounts, and every heading with its own subtotal at
+ * every depth. The rule is the Balance Sheet's (0579): a heading is an
+ * account with accounts under it, or one at the top of the chart; an account
+ * prints under its parent, a top one under itself. A heading prints as an
+ * account only if something was posted to it, which 0468 refuses. A heading's
+ * Debit and Credit are the Debit and Credit columns of every account under
+ * it, each counted once.
+ *
+ * The accounts stay in the ledger's own order, as the page has always had
+ * them. Each account and each heading carries its place in the chart's order
+ * (`chart_position`), counted in one sequence, so the page can print the
+ * accounts and sub-headings under a heading mixed the way the chart lists them.
  *
  * Null when an account the ledger totalled is not in the chart: a report
  * that would lose a row is refused, never printed short.
  */
 function trialBalanceTree(rows: Json[], chart: LedgerAccount[]): Pick<TrialBalanceReport, "accounts" | "headings"> | null {
   const tree = chartTree(chart);
-  const inTree = new Set(tree.map((a) => a.code));
-  if (rows.some((r) => !inTree.has(String(r.account_code)))) return null;
-  const byCode = new Map(rows.map((r) => [String(r.account_code), r]));
+  const byCode = new Map(tree.map((a, i) => [a.code, { ...a, position: i + 1 }]));
+  if (rows.some((r) => !byCode.has(String(r.account_code)))) return null;
   const parentOf = new Map(tree.map((a) => [a.code, a.depth === 0 ? null : a.parent_code]));
-  const accounts: TrialBalanceAccountRow[] = [];
   const headings = new Map<string, TrialBalanceHeadingRow>();
-  for (const a of tree) {
-    const heading = a.is_header || a.depth === 0;
-    if (heading) {
-      headings.set(a.code, {
-        code: a.code, name: a.name, kind: a.kind, depth: a.depth + 1,
-        parent_code: parentOf.get(a.code) ?? null, debit: 0, credit: 0,
-      });
-    }
-    // An account added after the balance was read has nothing posted yet.
-    const r = byCode.get(a.code);
-    if (!r) continue;
+  for (const a of tree.filter((x) => x.is_header || x.depth === 0)) {
+    headings.set(a.code, {
+      code: a.code, name: a.name, kind: a.kind, depth: a.depth + 1,
+      parent_code: parentOf.get(a.code) ?? null, chart_position: byCode.get(a.code)!.position, debit: 0, credit: 0,
+    });
+  }
+  const accounts: TrialBalanceAccountRow[] = [];
+  for (const r of rows) {
+    const a = byCode.get(String(r.account_code))!;
     const row: TrialBalanceAccountRow = {
       account_code: a.code,
       account_name: String(r.account_name),
@@ -568,7 +569,8 @@ function trialBalanceTree(rows: Json[], chart: LedgerAccount[]): Pick<TrialBalan
       total_debit: num(r.total_debit),
       total_credit: num(r.total_credit),
       natural_balance: num(r.natural_balance),
-      header_code: heading ? a.code : a.parent_code!,
+      header_code: headings.has(a.code) ? a.code : a.parent_code!,
+      chart_position: a.position,
     };
     if (a.is_header && isZeroMoney(row.total_debit) && isZeroMoney(row.total_credit)) continue;
     accounts.push(row);
