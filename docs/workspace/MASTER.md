@@ -968,11 +968,15 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
    arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
    check through the one `logisticsCheckDueIso`.
 7. The Ohana supplier-to-customer route.
-8. **Open owner decision — two contact clocks.** Work's `confirm_delivery_date`, the Route's `Contact`
-   point and the Logistics card use the `2 working days before` check; the Delivery work list, Monitor
-   and the Orders booking brief still use Orders Card 3's `T−3` window (the `chase` lead,
-   `logistics_call_working_days`). Converging them changes a Sales Orders business rule, so it waits
-   for the owner: keep T−3 as the contact day and T−2 as the schedule deadline, or retire T−3.
+8. **Two contact days — owner ruling 2026-09-25 (Jess: keep both).** They are two different facts,
+   never merged and never printed with the same words:
+   - **`3 working days before`** the promised date (Orders Card 3 `T−3`, the `chase` lead
+     `logistics_call_working_days`) is the day the customer is **contacted** — the Delivery work list,
+     Monitor and the Orders booking brief show it as the contact day.
+   - **`2 working days before`** (the Logistics card's check, `logisticsCheckDueIso("t2")`) is the
+     deadline by which the **Scheduled delivery must be recorded** — Work's `confirm_delivery_date`,
+     the Route's `Contact` point and the Logistics card show it as that deadline.
+   A surface that shows either day names which one it is; neither is relabelled as the other.
 
 ### 5.10 · Complete Work right panel — owner-approved target 2026-09-25 / NOT BUILT
 
