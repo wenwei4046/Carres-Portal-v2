@@ -1,10 +1,10 @@
 -- =============================================================================
--- 0480_purchasing_never_buys_from_an_other_creditor.sql
+-- 0583_purchasing_never_buys_from_an_other_creditor.sql
 -- PURCHASING · a landlord or an advertiser is never the supplier on a purchase
 --
 -- WHAT WAS WRONG. 0477 lets Finance add a landlord, an advertiser or a lorry
 -- company as a row in `suppliers` with kind = 'other_creditor', so its bills
--- can credit 2120 Other payables. The API keeps those rows out of every
+-- can credit Other payables. The API keeps those rows out of every
 -- Purchasing, Catalog and Operation picker (`purchasingSuppliersOnly` in
 -- packages/shared/src/schemas/catalog.ts). The database did not: a caller
 -- that skips the pickers could still make the landlord the supplier on a
@@ -109,7 +109,7 @@ begin
 
   -- No such supplier: the foreign key refuses it, with its own error.
   if v_kind = 'other_creditor' then
-    raise exception '% is an other creditor (Finance, 2120 Other payables), so it cannot be the supplier on %. Choose a supplier Purchasing buys from.',
+    raise exception '% is an other creditor (Finance, Other payables), so it cannot be the supplier on %. Choose a supplier Purchasing buys from.',
       v_name, public.purchasing_supplier_place(tg_table_name)
       using errcode = '23514',
             detail  = 'supplier_is_other_creditor',
@@ -122,7 +122,7 @@ end;
 $fn$;
 
 comment on function public.purchasing_supplier_is_not_an_other_creditor() is
-  '0480: refuses a suppliers.kind = other_creditor row as the supplier_id on a purchasing table (catalog SKU, PO, manual purchase line, supplier claim). 23514, detail supplier_is_other_creditor. An UPDATE that keeps supplier_id unchanged is not re-judged.';
+  '0583: refuses a suppliers.kind = other_creditor row as the supplier_id on a purchasing table (catalog SKU, PO, manual purchase line, supplier claim). 23514, detail supplier_is_other_creditor. An UPDATE that keeps supplier_id unchanged is not re-judged.';
 
 drop trigger if exists guard_supplier_not_other_creditor on public.product_skus;
 create trigger guard_supplier_not_other_creditor
@@ -194,7 +194,7 @@ end;
 $fn$;
 
 comment on function public.supplier_in_use_is_not_an_other_creditor() is
-  '0480: refuses changing suppliers.kind to other_creditor while any table carrying purchasing_supplier_is_not_an_other_creditor() still names the supplier. 23514, detail other_creditor_still_supplies.';
+  '0583: refuses changing suppliers.kind to other_creditor while any table carrying purchasing_supplier_is_not_an_other_creditor() still names the supplier. 23514, detail other_creditor_still_supplies.';
 
 drop trigger if exists guard_other_creditor_not_in_use on public.suppliers;
 create trigger guard_other_creditor_not_in_use
@@ -243,7 +243,7 @@ begin
         and cardinality(tg.tgattr::int2[]) = 1
         and a.attnum = any (tg.tgattr::int2[]));
   if v_bad is not null then
-    raise exception '0480 self-test: the guard is missing or mis-shaped on: %', v_bad;
+    raise exception '0583 self-test: the guard is missing or mis-shaped on: %', v_bad;
   end if;
 
   -- 2 · and on nothing else. Finance's bills and vouchers must still be able
@@ -255,7 +255,7 @@ begin
    where tg.tgfoid = v_guard
      and (n.nspname <> 'public' or c.relname <> all (v_tables));
   if v_bad is not null then
-    raise exception '0480 self-test: the guard is on a table it should not be on: %', v_bad;
+    raise exception '0583 self-test: the guard is on a table it should not be on: %', v_bad;
   end if;
 
   -- 3 · the kind guard on suppliers: BEFORE, per row, UPDATE OF kind only.
@@ -271,7 +271,7 @@ begin
        and tg.tgtype = 19
        and cardinality(tg.tgattr::int2[]) = 1
        and a.attnum = any (tg.tgattr::int2[])) then
-    raise exception '0480 self-test: the kind guard on suppliers is missing or mis-shaped';
+    raise exception '0583 self-test: the kind guard on suppliers is missing or mis-shaped';
   end if;
 
   -- 4 · not callable from outside
@@ -280,19 +280,19 @@ begin
      or has_function_privilege('authenticated', 'public.supplier_in_use_is_not_an_other_creditor()', 'execute')
      or has_function_privilege('anon', 'public.supplier_in_use_is_not_an_other_creditor()', 'execute')
      or has_function_privilege('authenticated', 'public.purchasing_supplier_place(text)', 'execute') then
-    raise exception '0480 self-test: a guard function is callable over the API';
+    raise exception '0583 self-test: a guard function is callable over the API';
   end if;
 
   -- 5 · behaviour. Everything below is rolled back.
   begin
     insert into public.suppliers (name, slug, kind, cat_covered)
-    values ('0480 self-test creditor ' || md5(random()::text), '0480-self-test-creditor-' || md5(random()::text), 'other_creditor', '{}')
+    values ('0583 self-test creditor ' || md5(random()::text), '0583-self-test-creditor-' || md5(random()::text), 'other_creditor', '{}')
     returning id into v_creditor;
     insert into public.suppliers (name, slug, kind, cat_covered)
-    values ('0480 self-test factory ' || md5(random()::text), '0480-self-test-factory-' || md5(random()::text), 'own_logistics', '{}')
+    values ('0583 self-test factory ' || md5(random()::text), '0583-self-test-factory-' || md5(random()::text), 'own_logistics', '{}')
     returning id into v_factory;
     insert into public.suppliers (name, slug, kind, cat_covered)
-    values ('0480 self-test spare ' || md5(random()::text), '0480-self-test-spare-' || md5(random()::text), 'own_logistics', '{}')
+    values ('0583 self-test spare ' || md5(random()::text), '0583-self-test-spare-' || md5(random()::text), 'own_logistics', '{}')
     returning id into v_spare;
 
     -- 5a · each real table refuses the other creditor on INSERT, and this
@@ -304,7 +304,7 @@ begin
       begin
         execute case v_t
           when 'supplier_claims' then
-            'insert into public.supplier_claims (supplier_id, claim_no) values ($1, ''0480-SELF-TEST'')'
+            'insert into public.supplier_claims (supplier_id, claim_no) values ($1, ''0583-SELF-TEST'')'
           else
             format('insert into public.%I (supplier_id) values ($1)', v_t)
         end
@@ -314,34 +314,34 @@ begin
         if v_state = '23514' and v_detail = 'supplier_is_other_creditor' then
           v_hit := true;
         else
-          raise exception '0480 self-test: an insert on % naming an other creditor failed for another reason first: % %',
+          raise exception '0583 self-test: an insert on % naming an other creditor failed for another reason first: % %',
             v_t, v_state, v_msg;
         end if;
       end;
       if not v_hit then
-        raise exception '0480 self-test: % accepted an other creditor as its supplier', v_t;
+        raise exception '0583 self-test: % accepted an other creditor as its supplier', v_t;
       end if;
     end loop;
 
     -- 5b · the function's own rules, on a scratch table carrying the same
     --      trigger (the real tables need a full parent chain for a valid row).
-    create temp table _0480_probe (supplier_id uuid);
+    create temp table _0583_probe (supplier_id uuid);
     create trigger guard_supplier_not_other_creditor
-      before insert or update of supplier_id on pg_temp._0480_probe
+      before insert or update of supplier_id on pg_temp._0583_probe
       for each row execute function public.purchasing_supplier_is_not_an_other_creditor();
 
-    insert into _0480_probe values (v_factory);   -- a supplier Purchasing buys from: allowed
-    insert into _0480_probe values (null);        -- no supplier: allowed
+    insert into _0583_probe values (v_factory);   -- a supplier Purchasing buys from: allowed
+    insert into _0583_probe values (null);        -- no supplier: allowed
 
     v_hit := false;
     begin
-      update _0480_probe set supplier_id = v_creditor where supplier_id = v_factory;
+      update _0583_probe set supplier_id = v_creditor where supplier_id = v_factory;
     exception when check_violation then
       get stacked diagnostics v_detail = pg_exception_detail;
       v_hit := v_detail = 'supplier_is_other_creditor';
     end;
     if not v_hit then
-      raise exception '0480 self-test: an UPDATE to an other creditor was accepted';
+      raise exception '0583 self-test: an UPDATE to an other creditor was accepted';
     end if;
 
     -- The factory is still on the scratch table, so it may not become an
@@ -354,7 +354,7 @@ begin
       v_hit := v_detail = 'other_creditor_still_supplies';
     end;
     if not v_hit then
-      raise exception '0480 self-test: a supplier in use was turned into an other creditor';
+      raise exception '0583 self-test: a supplier in use was turned into an other creditor';
     end if;
 
     -- A supplier nothing names may become one.
@@ -362,13 +362,13 @@ begin
 
     -- A row already holding an other creditor (from before this file) can
     -- still be edited when the edit leaves supplier_id alone.
-    alter table _0480_probe disable trigger guard_supplier_not_other_creditor;
-    insert into _0480_probe values (v_creditor);
-    alter table _0480_probe enable trigger guard_supplier_not_other_creditor;
+    alter table _0583_probe disable trigger guard_supplier_not_other_creditor;
+    insert into _0583_probe values (v_creditor);
+    alter table _0583_probe enable trigger guard_supplier_not_other_creditor;
     begin
-      update _0480_probe set supplier_id = supplier_id where supplier_id = v_creditor;
+      update _0583_probe set supplier_id = supplier_id where supplier_id = v_creditor;
     exception when check_violation then
-      raise exception '0480 self-test: an edit that left supplier_id unchanged was refused';
+      raise exception '0583 self-test: an edit that left supplier_id unchanged was refused';
     end;
 
     raise exception 'probe_rollback';
