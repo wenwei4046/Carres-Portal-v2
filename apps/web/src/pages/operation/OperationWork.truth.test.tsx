@@ -131,7 +131,10 @@ function show(url = "/operation?tab=work") {
   );
 }
 
-const dayNav = () => screen.getByRole("region", { name: "Date" });
+/* The §6.0 shell: Date and Page are toolbar selects; the trigger prints the
+   chosen option's label. */
+const dateTrigger = () => document.getElementById("work-date") as HTMLElement;
+const pageTrigger = () => document.getElementById("work-page") as HTMLElement;
 
 const savedTz = process.env.TZ;
 const savedWidth = window.innerWidth;
@@ -160,44 +163,35 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(new Date("2026-09-17T00:00:00").getTimezoneOffset()).toBe(-480);
   });
 
-  it("1 · a Thursday shows the week Mon, 14 Sep … Fri, 18 Sep through fmtDate", () => {
+  it("1 · a Thursday's Date select names Thu, 17 Sep · Today through fmtDate", () => {
     show();
-    const names = within(dayNav()).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
-    for (const label of ["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep"]) {
-      expect(names.some((name) => name.startsWith(label))).toBe(true);
-    }
-    expect(names.join("|")).not.toMatch(/Sun|Sept/);
+    expect(dateTrigger()).toHaveTextContent("Thu, 17 Sep · Today · 0");
   });
 
   it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18")]);
-    show();
-    expect(within(dayNav()).getByRole("button", { name: "Fri, 18 Sep · 1 action" })).toBeInTheDocument();
+    show("/operation?tab=work&day=2026-09-18");
+    expect(dateTrigger()).toHaveTextContent("Fri, 18 Sep · 1");
   });
 
-  it("3 · Wed, 16 Sep names Malaysia Day beside its badge and prints its zero (owner review 2026-09-25 item 19)", () => {
-    show();
-    const row = within(dayNav()).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day" });
-    expect(row).toHaveTextContent("Malaysia Day");
-    expect(row.querySelector("[data-rail-count]")).toHaveTextContent("0");
+  it("3 · Wed, 16 Sep names Malaysia Day and prints its zero (owner review 2026-09-25 item 19)", () => {
+    show("/operation?tab=work&day=2026-09-16");
+    expect(dateTrigger()).toHaveTextContent("Wed, 16 Sep · Malaysia Day · 0");
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
     workState.data = feed("2026-09-16", [item("2026-09-17"), item("2026-09-18")]);
     show();
-    expect(within(dayNav()).getByRole("button", { name: /^Thu, 17 Sep/ })).toHaveAttribute("aria-pressed", "true");
+    expect(dateTrigger()).toHaveTextContent("Thu, 17 Sep");
     const list = screen.getByTestId("work-list");
     expect(list).toHaveTextContent(/SO-\d+/);
     expect(within(list).getAllByRole("button", { name: /Ask customer for a delivery date/ })).toHaveLength(1);
   });
 
-  it("5 · Saturday appears only when something is due Sat, 19 Sep", () => {
-    const first = show();
-    expect(within(dayNav()).queryByRole("button", { name: /^Sat, 19 Sep/ })).toBeNull();
-    first.unmount();
+  it("5 · Saturday is a Date only when something is due Sat, 19 Sep", () => {
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
-    show();
-    expect(within(dayNav()).getByRole("button", { name: "Sat, 19 Sep · 1 action" })).toBeInTheDocument();
+    show("/operation?tab=work&day=2026-09-19");
+    expect(dateTrigger()).toHaveTextContent("Sat, 19 Sep · 1");
   });
 
   it("6 · My Work with nothing today and 2 on Friday does not say Nothing assigned to you", () => {
@@ -210,27 +204,12 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
   });
 
-  it("7 · a module filter keeps every other module's real count, and all modules add up to the rows", () => {
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
-    workState.data = feed("2026-09-17", [
-      inModule("payment", "2026-09-17"),
-      inModule("delivery", "2026-09-17"),
-      inModule("delivery", "2026-09-17"),
-    ]);
-    const first = show("/operation?tab=work&module=payment");
-    const rail = screen.getByRole("region", { name: "Page" });
-    expect(within(rail).getByRole("button", { name: "Delivery · 2 actions" })).toHaveTextContent(/2$/);
-    expect(within(rail).getByRole("button", { name: "Payment · 1 action" })).toHaveTextContent(/1$/);
-    first.unmount();
-
-    show();
-    const allRail = screen.getByRole("region", { name: "Page" });
-    const moduleSum = ["Sales Orders", "Purchasing", "Receiving", "Delivery", "Payment", "Issue Tracker"]
-      .map((label) => Number(within(allRail).getByRole("button", { name: new RegExp(`^${label}`) }).querySelector("[data-rail-count]")?.textContent ?? 0))
-      .reduce((sum, n) => sum + n, 0);
-    const rows = within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ }).length;
-    expect(rows).toBe(3);
-    expect(moduleSum).toBe(rows);
+  it("7 · a page filter narrows the list and the Page select names the page with its count", () => {
+    workState.data = feed("2026-09-17", [inModule("delivery", "2026-09-17"), inModule("delivery", "2026-09-17"), inModule("payment", "2026-09-17")]);
+    show("/operation?tab=work&module=delivery");
+    expect(pageTrigger()).toHaveTextContent("Delivery · 2");
+    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
+    expect(dateTrigger()).toHaveTextContent("Thu, 17 Sep · Today · 2");
   });
 
   it("8 · a failed source says which one and when, and never an empty sentence", () => {
@@ -250,16 +229,14 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
-  it("9 · a 1180px page collapses only the rail; Filters reopens it beside the list", () => {
+  it("9 · a 1180px page shows the list beside the detail — no rail (UI MASTER §6.0 shell)", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       width: 1180, height: 800, top: 0, left: 0, right: 1180, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect);
     show();
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
     expect(screen.queryByRole("complementary", { name: "Work filters" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("work-filters-toggle"));
-    expect(screen.getByRole("complementary", { name: "Work filters" })).toBeInTheDocument();
+    expect(screen.queryByTestId("work-filters-toggle")).toBeNull();
     expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
   });
 

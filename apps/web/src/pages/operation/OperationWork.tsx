@@ -33,7 +33,6 @@ import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
-import { TopBarIcons } from "./components/GlobalTopBar";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 import {
   filterWork,
@@ -43,7 +42,9 @@ import {
   WORK_MODULES,
   workFocusDay,
   workLayoutFor,
+  workDateOptions,
   workModuleCounts,
+  workPageOptions,
   workRailDates,
   workSections,
   type WorkWhen,
@@ -54,7 +55,7 @@ import WorkActionPanel from "./work/WorkActionPanel";
 import WorkParties, { type MissionReport, type Party } from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
-import WorkRail, { WorkDateSection, WorkModuleSection } from "./work/WorkDayNav";
+import ModuleHeader from "./components/ModuleHeader";
 import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
 
 type ViewKey = "mine" | "team";
@@ -127,10 +128,6 @@ export default function OperationWork() {
   useEffect(() => {
     if (activePanel === "detail") backRef.current?.focus();
   }, [activePanel]);
-  /** 768–1279px: the rail is collapsed until the toolbar's `Filters` opens it. */
-  const [railOpen, setRailOpen] = useState(false);
-  /** Below 768px: which compact filter control is open. */
-  const [compact, setCompact] = useState<"date" | "module" | null>(null);
 
   // The PAGE decides the panels, not the window: with the portal sidebar open
   // a 1440px window leaves ~1200px of page. The page is this page's own
@@ -410,7 +407,6 @@ export default function OperationWork() {
       : isWorkDate(selectedDay)
         ? fmtDate(selectedDay)
         : "Work";
-  const moduleWord = moduleFilter === "all" ? "All pages" : MODULE_LABEL[moduleFilter];
 
   const card = (i: WorkRow) => (
     <WorkCard
@@ -430,35 +426,15 @@ export default function OperationWork() {
     />
   );
 
-  const dateSectionFor = (compactStrip: boolean) => railDates ? (
-    <WorkDateSection
-      compact={compactStrip}
-      dates={railDates}
-      selected={railSelected}
-      onSelect={(key) => {
-        updateParam("day", key);
-        setCompact(null);
-      }}
-      onWeek={(monday) => updateParam("week", monday)}
-    />
-  ) : null;
-  const moduleSection = (
-    <WorkModuleSection
-      modules={railModules}
-      counts={moduleCounts}
-      total={moduleCountRows.length}
-      selected={moduleFilter}
-      onSelect={(module) => {
-        updateParam("module", module);
-        setCompact(null);
-      }}
-    />
-  );
+  /* THE §6.0 SHELL (owner ruling 2026-09-25): Date and Page are two toolbar
+     selects — the same facts and counts the rail held, in the register's
+     grammar. Every option prints its number, `0` included. */
+  const dateOptions = railDates ? workDateOptions(railDates) : [];
+  const pageOptions = workPageOptions(railModules, moduleCounts, moduleCountRows.length);
 
   /* One toolbar control: 36px from 768px, 40px below; 14/20; 12px sides. */
-  const toolbarRow = layout === "one" ? "flex flex-wrap items-center gap-2" : "contents";
   const toolbarButton = (active: boolean) =>
-    `inline-flex h-10 items-center gap-1.5 rounded-control border px-3 text-control min-[768px]:h-9 ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
+    `inline-flex h-9 items-center gap-1.5 rounded-control border px-3 text-control ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
 
   const listBody = listTab === "completed" || (listTab === "waiting" && !loading && visible.length === 0) ? (
     <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
@@ -528,176 +504,119 @@ export default function OperationWork() {
   );
 
   return (
-    <ListPageShell
-      title="Work"
-      testId="operation-work"
-      workspace
-      actions={<TopBarIcons />}
-      titleRight={
-        /* The list heading carries the count (owner review 2026-09-25 item 4);
-           the header speaks only when My Work is empty while the team is not
-           (item 5), so a new hire never reads `0` as a free day. */
-        activeView === "mine" && !loading && beforeDay.length === 0 && teamTotal > 0 ? (
-          <span className="block whitespace-normal text-[12px] font-normal leading-4 text-base-400 min-[768px]:text-[13px] min-[768px]:leading-[18px]" data-testid="work-header-count">
-            0 for you · {teamTotal} for the team
-          </span>
-        ) : null
-      }
-    >
+    <>
+      {/* The 50px Destination Header every listing carries (UI MASTER §6.0,
+          owner ruling 2026-09-25: Work follows the Sales Orders shell). It
+          embeds the global utilities; the page prints no count up here. */}
+      <ModuleHeader destinationHeader testId="work-destination-header" word="Work" docTitle="Work — Carres" />
+      <ListPageShell register testId="operation-work">
       <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-        {/* The toolbar: ONE independent white section (owner density ruling
-            2026-09-25). Below 768px it is exactly two rows — Date · Module ·
-            My/Team, then Search · Owner · Covered — and below 600px four:
-            Date · Module / My/Team / Search / Owner · Covered. */}
-        <WorkSection aria-label="Work toolbar" className={`flex shrink-0 gap-2 p-2.5 min-[600px]:p-3 ${layout === "one" ? "flex-col" : "flex-wrap items-center"}`} data-testid="work-toolbar">
-          <div className={toolbarRow} data-testid="work-toolbar-row-1">
-            {layout === "two" ? (
+        {/* The toolbar row of the §6.0 shell: white, one bottom rule, no box.
+            My Work · Team Work · Search (340px) · Date · Page · Owner ·
+            Covering. Below 600px the controls wrap. */}
+        <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-base-200 bg-white px-2 py-1.5" data-testid="work-toolbar">
+          <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
+            {(
+              [
+                ["mine", "My Work"],
+                ["team", "Team Work"],
+              ] as const
+            ).map(([k, label]) => (
               <button
+                key={k}
                 type="button"
-                aria-expanded={railOpen}
-                aria-controls="work-filters"
-                data-testid="work-filters-toggle"
-                onClick={() => setRailOpen((open) => !open)}
-                className={toolbarButton(railOpen)}
+                data-testid={`work-view-${k}`}
+                aria-pressed={activeView === k}
+                onClick={() => {
+                  setParams((before) => {
+                    const next = new URLSearchParams(before);
+                    if (k === "mine") {
+                      next.delete("scope");
+                      next.delete("owner");
+                    } else next.set("scope", "team");
+                    return next;
+                  }, { replace: true });
+                }}
+                className={`h-[34px] px-3 text-control max-[599px]:flex-1 ${
+                  activeView === k
+                    ? "bg-kit-blue-9 font-semibold text-white"
+                    : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
+                }`}
               >
-                <Icon name="panelToggle" />
-                Filters
+                {label}
               </button>
-            ) : null}
-            {layout === "one" ? (
-              <>
-                <button
-                  type="button"
-                  aria-expanded={compact === "date"}
-                  data-testid="work-compact-date"
-                  onClick={() => setCompact((open) => (open === "date" ? null : "date"))}
-                  /* Only the chosen day is blue while the strip is open (item 3). */
-                  className={toolbarButton(false)}
-                >
-                  <Icon name="date" />
-                  {listHeading}
-                </button>
-                <button
-                  type="button"
-                  aria-expanded={compact === "module"}
-                  data-testid="work-compact-module"
-                  onClick={() => setCompact((open) => (open === "module" ? null : "module"))}
-                  className={toolbarButton(false)}
-                >
-                  <Icon name="modules" />
-                  {moduleWord}
-                </button>
-              </>
-            ) : null}
-            {/* The border is inside the 36px (40px): each segment is 34px (38px). */}
-            <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
-              {(
-                [
-                  ["mine", "My Work"],
-                  ["team", "Team Work"],
-                ] as const
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  data-testid={`work-view-${k}`}
-                  aria-pressed={activeView === k}
-                  onClick={() => {
-                    setParams((before) => {
-                      const next = new URLSearchParams(before);
-                      if (k === "mine") {
-                        next.delete("scope");
-                        next.delete("owner");
-                      } else next.set("scope", "team");
-                      return next;
-                    }, { replace: true });
-                  }}
-                  className={`h-[38px] px-3 text-control min-[768px]:h-[34px] max-[599px]:flex-1 ${
-                    activeView === k
-                      ? "bg-kit-blue-9 font-semibold text-white"
-                      : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-          <div className={toolbarRow} data-testid="work-toolbar-row-2">
-            {/* Search is 240px beside `Covering` (item 8); only a phone gives
-                it the whole row. */}
-            <div className={layout === "one" ? "w-60 shrink-0 max-[599px]:w-auto max-[599px]:basis-full" : "w-60 shrink-0"}>
-              <SearchInput
-                toolbar
-                id="work-search"
-                value={search}
-                onChange={(event) => updateParam("q", event.target.value)}
-                placeholder="Search work…"
-              />
-            </div>
-            {activeView === "team" && (
-              <Select
-                id="work-owner"
-                value={ownerFocus ?? "all"}
-                onValueChange={(value) => updateParam("owner", value)}
-                options={ownerOptions}
-                toolbar
-              />
-            )}
+          <div className="w-[340px] shrink-0 max-[599px]:w-auto max-[599px]:basis-full">
+            <SearchInput
+              toolbar
+              id="work-search"
+              value={search}
+              onChange={(event) => updateParam("q", event.target.value)}
+              placeholder="Search work…"
+            />
+          </div>
+          <Select
+            id="work-date"
+            value={railSelected ?? undefined}
+            onValueChange={(value) => updateParam("day", value)}
+            options={dateOptions}
+            placeholder="Date"
+            toolbar
+          />
+          <Select
+            id="work-page"
+            value={moduleFilter}
+            onValueChange={(value) => updateParam("module", value)}
+            options={pageOptions}
+            toolbar
+          />
+          {activeView === "team" && (
+            <Select
+              id="work-owner"
+              value={ownerFocus ?? "all"}
+              onValueChange={(value) => updateParam("owner", value)}
+              options={ownerOptions}
+              toolbar
+            />
+          )}
+          <button
+            type="button"
+            aria-pressed={covered}
+            onClick={() => updateParam("covered", covered ? null : "1")}
+            className={toolbarButton(covered)}
+          >
+            Covering
+          </button>
+          {activeView === "team" && ownerFocus && (
             <button
               type="button"
-              aria-pressed={covered}
-              onClick={() => updateParam("covered", covered ? null : "1")}
-              className={toolbarButton(covered)}
+              data-testid="work-owner-clear"
+              onClick={() => updateParam("owner", null)}
+              className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
             >
-              Covering
+              {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
+              · Clear
             </button>
-            {activeView === "team" && ownerFocus && (
-              <button
-                type="button"
-                data-testid="work-owner-clear"
-                onClick={() => updateParam("owner", null)}
-                className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
-              >
-                {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
-                · Clear
-              </button>
-            )}
-            {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
-              <button
-                type="button"
-                onClick={() => setParams((before) => {
-                  const next = new URLSearchParams(before);
-                  for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
-                  return next;
-                }, { replace: true })}
-                className="h-10 px-2 text-control text-kit-blue-11 min-[768px]:h-9"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-        </WorkSection>
-
-        {/* Below 768px the chosen compact control opens its section here. */}
-        {layout === "one" && compact ? (
-          <div className="shrink-0" data-testid={`work-compact-${compact}-panel`}>
-            {compact === "date" ? dateSectionFor(true) : moduleSection}
-          </div>
-        ) : null}
+          )}
+          {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
+            <button
+              type="button"
+              onClick={() => setParams((before) => {
+                const next = new URLSearchParams(before);
+                for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
+                return next;
+              }, { replace: true })}
+              className="h-9 px-2 text-control text-kit-blue-11"
+            >
+              Clear all
+            </button>
+          )}
+        </section>
 
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
-          railOpen={railOpen}
-          rail={(
-            <div id="work-filters">
-              <WorkRail>
-                {dateSectionFor(false)}
-                {moduleSection}
-              </WorkRail>
-            </div>
-          )}
           list={(
             <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
               {/* The heading and tabs stay put; the cards scroll beneath them. */}
@@ -787,6 +706,7 @@ export default function OperationWork() {
           ) : null /* nothing to select: no box asks for a choice */}
         />
       </div>
-    </ListPageShell>
+      </ListPageShell>
+    </>
   );
 }

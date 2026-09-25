@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
-import { filterWork, parseWorkWeek, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workSections, workWeek } from "./work-model";
+import { workDateOptions, workPageOptions, filterWork, parseWorkWeek, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workSections, workWeek } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
@@ -187,5 +187,31 @@ describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
   it("module counts cover every admitted module and add up to the rows", () => {
     const counts = workModuleCounts([row({ module: "delivery" }), row({ module: "delivery" }), row({ module: "payment" })]);
     expect(counts).toEqual({ orders: 0, purchasing: 0, receiving: 0, delivery: 2, payment: 1, issue_tracker: 0 });
+  });
+});
+
+describe("the toolbar selects (UI MASTER §6.0 shell, owner ruling 2026-09-25)", () => {
+  it("Date: Missed first, every day with its count (0 too), Today in words, No working date last", () => {
+    const rail = workRailDates([
+      row({ id: "a", dueIso: "2026-09-16", timingBucket: "later" }),
+      row({ id: "b", dueIso: "2026-09-10", timingBucket: "overdue" }),
+      row({ id: "c", dueIso: null, timingBucket: "no_date" }),
+    ], "2026-09-15", "2026-09-17");
+    const options = workDateOptions(rail);
+    expect(options[0]).toEqual({ value: "missed", label: "Missed · 1" });
+    expect(options[1]).toEqual({ value: "2026-09-14", label: "Mon, 14 Sep · 0" });
+    expect(options[2]).toEqual({ value: "2026-09-15", label: "Tue, 15 Sep · Today · 0" });
+    expect(options[3]).toEqual({ value: "2026-09-16", label: "Wed, 16 Sep · Malaysia Day · 1" });
+    expect(options.at(-1)).toEqual({ value: "no_date", label: "No working date · 1" });
+    expect(options).toHaveLength(12);
+  });
+  it("Page: All pages first with the list total, then every page with its count", () => {
+    const counts = { orders: 1, purchasing: 0, receiving: 0, delivery: 2, payment: 0, issue_tracker: 0 };
+    const options = workPageOptions([{ key: "orders", label: "Sales Orders" }, { key: "delivery", label: "Delivery" }], counts, 3);
+    expect(options).toEqual([
+      { value: "all", label: "All pages · 3" },
+      { value: "orders", label: "Sales Orders · 1" },
+      { value: "delivery", label: "Delivery · 2" },
+    ]);
   });
 });

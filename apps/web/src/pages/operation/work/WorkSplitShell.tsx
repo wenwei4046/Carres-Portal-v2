@@ -44,7 +44,9 @@ export default function WorkSplitShell({
   activePanel?: WorkPanel;
   /** Only read at `two`: whether the collapsible rail is showing. */
   railOpen?: boolean;
-  rail: ReactNode;
+  /** Absent since the §6.0 shell (owner ruling 2026-09-25): Date and Page are
+   *  toolbar selects, so the list and the detail share the whole width. */
+  rail?: ReactNode;
   list: ReactNode;
   detail: ReactNode;
 }) {
@@ -60,9 +62,9 @@ export default function WorkSplitShell({
     );
   }
 
-  const showRail = layout === "three" || railOpen;
+  const showRail = rail != null && (layout === "three" || railOpen);
   const columns = layout === "three"
-    ? "grid-cols-[240px_420px_minmax(480px,1fr)]"
+    ? showRail ? "grid-cols-[240px_420px_minmax(480px,1fr)]" : "grid-cols-[420px_minmax(480px,1fr)]"
     : showRail
       ? "grid-cols-[240px_400px_minmax(0,1fr)]"
       : "grid-cols-[400px_minmax(0,1fr)]";
