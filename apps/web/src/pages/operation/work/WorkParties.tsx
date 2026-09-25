@@ -49,6 +49,8 @@ export type Party = "logistics" | "customer" | "supplier";
 export interface MissionReport {
   shown: boolean;
   act: { party: Party; label: string } | null;
+  /** The open card has an act of its own — it then holds the blue. */
+  openCardHasAct: boolean;
 }
 
 /** Which party card the selected work itself belongs to. */
@@ -98,7 +100,7 @@ export default function WorkParties({
   const ready = Boolean(ref && orderId && scope.card);
 
   useEffect(() => {
-    if (!ready) onReport?.({ shown: false, act: null });
+    if (!ready) onReport?.({ shown: false, act: null, openCardHasAct: false });
   }, [ready, onReport]);
 
   if (!ref) return null;
@@ -173,7 +175,7 @@ function Mission({
 
   const openHasAct =
     openParty === "logistics" ? Boolean(logisticsAct)
-    : openParty === "customer" ? true // Record reply is always an act
+    : openParty === "customer" ? Boolean(customerAct)
     : openParty === "supplier" ? actRow !== null
     : false;
   /* One visible blue: the open card's act when it has one; with every card
@@ -189,9 +191,10 @@ function Mission({
     return label ? { party: primary, label } : null;
   }, [primary, logisticsAct?.act, customerAct?.act]);
 
+  const openCardHasAct = Boolean(openParty && openHasAct && !embedded);
   useEffect(() => {
-    onReport?.({ shown: true, act });
-  }, [onReport, act?.party, act?.label]); // eslint-disable-line react-hooks/exhaustive-deps
+    onReport?.({ shown: true, act, openCardHasAct });
+  }, [onReport, act?.party, act?.label, openCardHasAct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Opening a card (from the Route or the summary) brings it into view. */
   useEffect(() => {

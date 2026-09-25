@@ -35,7 +35,7 @@
       "top": 523,
       "bottom": 543,
       "h": 20,
-      "w": 200
+      "w": 204
     },
     "supplier": {
       "top": 586,
@@ -47,9 +47,11 @@
       "top": 603,
       "bottom": 623,
       "h": 20,
-      "w": 151
+      "w": 153
     },
-    "blue": [],
+    "blue": [
+      "Contact logistics today"
+    ],
     "focused": null,
     "consoleErrors": []
   },
@@ -62,32 +64,32 @@
     "routeScrollX": 0,
     "back": null,
     "summary": {
-      "top": 15,
-      "bottom": 95,
+      "top": 159,
+      "bottom": 239,
       "h": 80,
       "w": 716
     },
     "route": {
-      "top": 103,
-      "bottom": 209,
+      "top": 247,
+      "bottom": 353,
       "h": 106,
       "w": 716
     },
     "logistics": {
-      "top": 217,
-      "bottom": 325,
+      "top": 361,
+      "bottom": 469,
       "h": 108,
       "w": 716
     },
     "customer": {
-      "top": 333,
+      "top": 477,
       "bottom": 884,
-      "h": 551,
+      "h": 407,
       "w": 716
     },
     "customerHeading": {
-      "top": 350,
-      "bottom": 370,
+      "top": 494,
+      "bottom": 514,
       "h": 20,
       "w": 204
     },
@@ -104,7 +106,7 @@
       "w": 153
     },
     "blue": [
-      "WhatsApp"
+      "Contact logistics today"
     ],
     "focused": "party-customer-toggle"
   },
@@ -148,8 +150,8 @@
     },
     "supplier": {
       "top": 196,
-      "bottom": 1054,
-      "h": 858,
+      "bottom": 1026,
+      "h": 830,
       "w": 716
     },
     "supplierHeading": {
@@ -213,7 +215,9 @@
       "h": 20,
       "w": 153
     },
-    "blue": [],
+    "blue": [
+      "Contact logistics today"
+    ],
     "focused": null,
     "consoleErrors": []
   },
@@ -226,32 +230,32 @@
     "routeScrollX": 0,
     "back": null,
     "summary": {
-      "top": -65,
-      "bottom": 15,
+      "top": 79,
+      "bottom": 159,
       "h": 80,
       "w": 732
     },
     "route": {
-      "top": 23,
-      "bottom": 129,
+      "top": 167,
+      "bottom": 273,
       "h": 106,
       "w": 732
     },
     "logistics": {
-      "top": 137,
-      "bottom": 245,
+      "top": 281,
+      "bottom": 389,
       "h": 108,
       "w": 732
     },
     "customer": {
-      "top": 253,
+      "top": 397,
       "bottom": 804,
-      "h": 551,
+      "h": 407,
       "w": 732
     },
     "customerHeading": {
-      "top": 270,
-      "bottom": 290,
+      "top": 414,
+      "bottom": 434,
       "h": 20,
       "w": 204
     },
@@ -268,7 +272,7 @@
       "w": 153
     },
     "blue": [
-      "WhatsApp"
+      "Contact logistics today"
     ],
     "focused": "party-customer-toggle"
   },
@@ -312,8 +316,8 @@
     },
     "supplier": {
       "top": 196,
-      "bottom": 1054,
-      "h": 858,
+      "bottom": 1026,
+      "h": 830,
       "w": 732
     },
     "supplierHeading": {
@@ -382,7 +386,9 @@
       "h": 20,
       "w": 153
     },
-    "blue": [],
+    "blue": [
+      "Contact logistics today"
+    ],
     "focused": "work-back",
     "consoleErrors": []
   },
@@ -394,38 +400,38 @@
     "pageOverflowX": 0,
     "routeScrollX": 0,
     "back": {
-      "top": 9,
-      "bottom": 49,
+      "top": 133,
+      "bottom": 173,
       "h": 40,
       "w": 102
     },
     "summary": {
-      "top": 57,
-      "bottom": 137,
+      "top": 181,
+      "bottom": 261,
       "h": 80,
       "w": 796
     },
     "route": {
-      "top": 145,
-      "bottom": 251,
+      "top": 269,
+      "bottom": 375,
       "h": 106,
       "w": 796
     },
     "logistics": {
-      "top": 259,
-      "bottom": 349,
+      "top": 383,
+      "bottom": 473,
       "h": 90,
       "w": 796
     },
     "customer": {
-      "top": 357,
+      "top": 481,
       "bottom": 888,
-      "h": 531,
+      "h": 407,
       "w": 796
     },
     "customerHeading": {
-      "top": 374,
-      "bottom": 394,
+      "top": 498,
+      "bottom": 518,
       "h": 20,
       "w": 204
     },
@@ -442,7 +448,7 @@
       "w": 153
     },
     "blue": [
-      "WhatsApp"
+      "Contact logistics today"
     ],
     "focused": "party-customer-toggle"
   },
@@ -491,8 +497,8 @@
     },
     "supplier": {
       "top": 236,
-      "bottom": 1078,
-      "h": 842,
+      "bottom": 1066,
+      "h": 830,
       "w": 796
     },
     "supplierHeading": {
@@ -561,7 +567,9 @@
       "h": 20,
       "w": 153
     },
-    "blue": [],
+    "blue": [
+      "Contact logistics today"
+    ],
     "focused": "work-back",
     "consoleErrors": []
   },
@@ -573,55 +581,55 @@
     "pageOverflowX": 0,
     "routeScrollX": 0,
     "back": {
-      "top": -112,
-      "bottom": -72,
+      "top": -63,
+      "bottom": -23,
       "h": 40,
       "w": 102
     },
     "summary": {
-      "top": -64,
-      "bottom": 16,
+      "top": -15,
+      "bottom": 65,
       "h": 80,
       "w": 719
     },
     "route": {
-      "top": 24,
-      "bottom": 130,
+      "top": 73,
+      "bottom": 179,
       "h": 106,
       "w": 719
     },
     "logistics": {
-      "top": 138,
-      "bottom": 228,
+      "top": 187,
+      "bottom": 277,
       "h": 90,
       "w": 719
     },
     "customer": {
-      "top": 236,
-      "bottom": 767,
-      "h": 531,
+      "top": 285,
+      "bottom": 692,
+      "h": 407,
       "w": 719
     },
     "customerHeading": {
-      "top": 253,
-      "bottom": 273,
+      "top": 302,
+      "bottom": 322,
       "h": 20,
       "w": 204
     },
     "supplier": {
-      "top": 775,
-      "bottom": 847,
+      "top": 700,
+      "bottom": 772,
       "h": 72,
       "w": 719
     },
     "supplierHeading": {
-      "top": 792,
-      "bottom": 812,
+      "top": 717,
+      "bottom": 737,
       "h": 20,
       "w": 153
     },
     "blue": [
-      "WhatsApp"
+      "Contact logistics today"
     ],
     "focused": "party-customer-toggle"
   },
@@ -670,8 +678,8 @@
     },
     "supplier": {
       "top": 236,
-      "bottom": 1078,
-      "h": 842,
+      "bottom": 1066,
+      "h": 830,
       "w": 719
     },
     "supplierHeading": {
@@ -700,47 +708,49 @@
     },
     "summary": {
       "top": 382,
-      "bottom": 484,
-      "h": 102,
+      "bottom": 614,
+      "h": 232,
       "w": 366
     },
     "route": {
-      "top": 492,
-      "bottom": 598,
+      "top": 622,
+      "bottom": 728,
       "h": 106,
       "w": 366
     },
     "logistics": {
-      "top": 606,
-      "bottom": 712,
+      "top": 736,
+      "bottom": 842,
       "h": 106,
       "w": 366
     },
     "customer": {
-      "top": 720,
-      "bottom": 792,
+      "top": 850,
+      "bottom": 922,
       "h": 72,
       "w": 366
     },
     "customerHeading": {
-      "top": 737,
-      "bottom": 757,
+      "top": 867,
+      "bottom": 887,
       "h": 20,
       "w": 204
     },
     "supplier": {
-      "top": 800,
-      "bottom": 872,
+      "top": 930,
+      "bottom": 1002,
       "h": 72,
       "w": 366
     },
     "supplierHeading": {
-      "top": 817,
-      "bottom": 837,
+      "top": 947,
+      "bottom": 967,
       "h": 20,
       "w": 153
     },
-    "blue": [],
+    "blue": [
+      "Contact logistics today"
+    ],
     "focused": "work-back",
     "consoleErrors": []
   },
@@ -752,55 +762,55 @@
     "pageOverflowX": 0,
     "routeScrollX": 0,
     "back": {
-      "top": -44,
-      "bottom": -4,
+      "top": -91,
+      "bottom": -51,
       "h": 40,
       "w": 102
     },
     "summary": {
-      "top": 4,
-      "bottom": 106,
-      "h": 102,
+      "top": -43,
+      "bottom": 189,
+      "h": 232,
       "w": 366
     },
     "route": {
-      "top": 114,
-      "bottom": 220,
+      "top": 197,
+      "bottom": 303,
       "h": 106,
       "w": 366
     },
     "logistics": {
-      "top": 228,
-      "bottom": 334,
+      "top": 311,
+      "bottom": 417,
       "h": 106,
       "w": 366
     },
     "customer": {
-      "top": 342,
-      "bottom": 921,
-      "h": 579,
+      "top": 425,
+      "bottom": 832,
+      "h": 407,
       "w": 366
     },
     "customerHeading": {
-      "top": 359,
-      "bottom": 379,
+      "top": 442,
+      "bottom": 462,
       "h": 20,
       "w": 204
     },
     "supplier": {
-      "top": 929,
-      "bottom": 1001,
+      "top": 840,
+      "bottom": 912,
       "h": 72,
       "w": 366
     },
     "supplierHeading": {
-      "top": 946,
-      "bottom": 966,
+      "top": 857,
+      "bottom": 877,
       "h": 20,
       "w": 153
     },
     "blue": [
-      "WhatsApp"
+      "Contact logistics today"
     ],
     "focused": "party-customer-toggle"
   },
@@ -812,50 +822,50 @@
     "pageOverflowX": 0,
     "routeScrollX": 0,
     "back": {
-      "top": -124,
-      "bottom": -84,
+      "top": -254,
+      "bottom": -214,
       "h": 40,
       "w": 102
     },
     "summary": {
-      "top": -76,
-      "bottom": 26,
+      "top": -206,
+      "bottom": -104,
       "h": 102,
       "w": 366
     },
     "route": {
-      "top": 34,
-      "bottom": 140,
+      "top": -96,
+      "bottom": 10,
       "h": 106,
       "w": 366
     },
     "logistics": {
-      "top": 148,
-      "bottom": 254,
+      "top": 18,
+      "bottom": 124,
       "h": 106,
       "w": 366
     },
     "customer": {
-      "top": 262,
-      "bottom": 334,
+      "top": 132,
+      "bottom": 204,
       "h": 72,
       "w": 366
     },
     "customerHeading": {
-      "top": 279,
-      "bottom": 299,
+      "top": 149,
+      "bottom": 169,
       "h": 20,
       "w": 204
     },
     "supplier": {
-      "top": 342,
-      "bottom": 1280,
-      "h": 938,
+      "top": 212,
+      "bottom": 1138,
+      "h": 926,
       "w": 366
     },
     "supplierHeading": {
-      "top": 359,
-      "bottom": 379,
+      "top": 229,
+      "bottom": 249,
       "h": 20,
       "w": 153
     },
@@ -864,7 +874,7 @@
     ],
     "focused": "party-supplier-toggle"
   },
-  "1440-waiting": {
+  "1440-customer-delay": {
     "viewport": [
       1440,
       900
@@ -873,51 +883,163 @@
     "routeScrollX": 0,
     "back": null,
     "summary": {
-      "top": 188,
-      "bottom": 268,
+      "top": 47,
+      "bottom": 127,
       "h": 80,
       "w": 716
     },
     "route": {
-      "top": 276,
-      "bottom": 382,
+      "top": 135,
+      "bottom": 241,
       "h": 106,
       "w": 716
     },
     "logistics": {
-      "top": 390,
-      "bottom": 498,
+      "top": 249,
+      "bottom": 357,
       "h": 108,
       "w": 716
     },
     "customer": {
-      "top": 506,
-      "bottom": 578,
-      "h": 72,
+      "top": 365,
+      "bottom": 884,
+      "h": 519,
       "w": 716
     },
     "customerHeading": {
-      "top": 523,
-      "bottom": 543,
+      "top": 382,
+      "bottom": 402,
       "h": 20,
       "w": 204
     },
     "supplier": {
-      "top": 586,
-      "bottom": 658,
+      "top": 892,
+      "bottom": 964,
       "h": 72,
       "w": 716
     },
     "supplierHeading": {
-      "top": 603,
-      "bottom": 623,
+      "top": 909,
+      "bottom": 929,
       "h": 20,
       "w": 153
     },
-    "blue": [],
-    "focused": null
+    "blue": [
+      "Open Sales Order"
+    ],
+    "focused": "party-customer-toggle"
   },
-  "1440-no-po": {
+  "1440-customer-another-date": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 48,
+      "bottom": 128,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 136,
+      "bottom": 242,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 250,
+      "bottom": 358,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 366,
+      "bottom": 885,
+      "h": 519,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 383,
+      "bottom": 403,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 893,
+      "bottom": 965,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 910,
+      "bottom": 930,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Open in Delivery"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1440-customer-refused": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 17,
+      "bottom": 97,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 105,
+      "bottom": 211,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 219,
+      "bottom": 327,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 335,
+      "bottom": 884,
+      "h": 549,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 352,
+      "bottom": 372,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 892,
+      "bottom": 964,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 909,
+      "bottom": 929,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Open in Delivery"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1440-no-po-loan": {
     "viewport": [
       1440,
       900
@@ -967,60 +1089,9 @@
       "h": 20,
       "w": 60
     },
-    "blue": [],
-    "focused": null
-  },
-  "1440-partner": {
-    "viewport": [
-      1440,
-      900
+    "blue": [
+      "Contact logistics today"
     ],
-    "pageOverflowX": 0,
-    "routeScrollX": 0,
-    "back": null,
-    "summary": {
-      "top": 188,
-      "bottom": 268,
-      "h": 80,
-      "w": 716
-    },
-    "route": {
-      "top": 276,
-      "bottom": 382,
-      "h": 106,
-      "w": 716
-    },
-    "logistics": {
-      "top": 390,
-      "bottom": 498,
-      "h": 108,
-      "w": 716
-    },
-    "customer": {
-      "top": 506,
-      "bottom": 578,
-      "h": 72,
-      "w": 716
-    },
-    "customerHeading": {
-      "top": 523,
-      "bottom": 543,
-      "h": 20,
-      "w": 204
-    },
-    "supplier": {
-      "top": 586,
-      "bottom": 658,
-      "h": 72,
-      "w": 716
-    },
-    "supplierHeading": {
-      "top": 603,
-      "bottom": 623,
-      "h": 20,
-      "w": 153
-    },
-    "blue": [],
     "focused": null
   },
   "1440-not-assigned": {
@@ -1073,7 +1144,9 @@
       "h": 20,
       "w": 153
     },
-    "blue": [],
+    "blue": [
+      "Assign logistics"
+    ],
     "focused": null
   }
 }

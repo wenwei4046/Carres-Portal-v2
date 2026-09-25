@@ -103,10 +103,10 @@ export default function OperationWork() {
      reports — the summary opens a card and carries the one blue act while
      every card is collapsed. Reset whenever another work item is chosen. */
   const [openParty, setOpenParty] = useState<Party | null>(null);
-  const [mission, setMission] = useState<MissionReport>({ shown: false, act: null });
+  const [mission, setMission] = useState<MissionReport>({ shown: false, act: null, openCardHasAct: false });
   const reportMission = useCallback((report: MissionReport) => {
     setMission((before) =>
-      before.shown === report.shown && before.act?.party === report.act?.party && before.act?.label === report.act?.label ? before : report,
+      before.shown === report.shown && before.act?.party === report.act?.party && before.act?.label === report.act?.label && before.openCardHasAct === report.openCardHasAct ? before : report,
     );
   }, []);
   /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
@@ -731,7 +731,7 @@ export default function OperationWork() {
               <WorkActionPanel
                 item={selected.source}
                 hasParties={mission.shown}
-                primaryAct={mission.act && !openParty ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
+                primaryAct={mission.act && !mission.openCardHasAct ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
                 onOpen={() => navigate(selected.destination)}
               />
               <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
