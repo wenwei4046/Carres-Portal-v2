@@ -6,10 +6,15 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { OperationWorkItem } from "@carres/shared";
+import { ApiError } from "@/lib/api";
 import { PartyCardShell, ToneLine } from "./PartyCardShell";
 import { primaryPartyOf } from "./WorkParties";
 
 const scopeState = { failed: true };
+const ordersState: { error: unknown } = { error: null };
+vi.mock("@/lib/queries", () => ({
+  useOperationOrders: () => ({ error: ordersState.error, isLoading: false, refetch: vi.fn() }),
+}));
 vi.mock("../delivery-scope-card", () => ({
   useOrderIdFromRef: () => null,
   useDeliveryScopeCard: () => ({ card: null, loading: false, failed: scopeState.failed }),
@@ -74,6 +79,16 @@ describe("an order the panel cannot read", () => {
     const { container } = render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
     expect(container).toBeEmptyDOMElement();
     scopeState.failed = true;
+  });
+
+  it("a refused read prints the owner's permission words and leaks nothing", async () => {
+    ordersState.error = new ApiError(403, "forbidden", null);
+    const WorkParties = (await import("./WorkParties")).default;
+    const item = { object: { kind: "sales_order", id: "order-1", label: "SO-1362" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
+    render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
+    expect(screen.getByTestId("work-mission-denied")).toHaveTextContent("You cannot view this record");
+    expect(screen.getByText("Ask an authorised operation user for access.")).toBeInTheDocument();
+    ordersState.error = null;
   });
 
   it("a work item that names no Sales Order draws no mission at all", async () => {

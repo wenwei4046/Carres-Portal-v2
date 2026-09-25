@@ -154,10 +154,6 @@ export const operationWorkItemSchema = z.object({
     recipient: z.string().min(1),
     sentAt: z.string().datetime().nullable(),
     replyState: z.enum(["not_sent", "waiting", "replied"]).nullable(),
-    /** The follow-up day while `waiting` (the next Delivery working day after
-     *  the recorded contact — `customerFollowUpIso`); on it the item returns
-     *  to `To do` (Workspace §5.9). */
-    replyDueOn: z.string().date().nullable().optional(),
   }).strict().nullable(),
   blocker: z.object({
     reason: z.string().min(1),
@@ -247,9 +243,6 @@ export interface OperationWorkPresentation {
   actionOn?: string | null;
   noDateReason?: string | null;
   interaction?: OperationWorkInteraction;
-  /** Source-owned communication state (Delivery's contact records), when the
-   *  owning module supplies one. */
-  communication?: OperationWorkItem["communication"];
 }
 
 /** Translate a module engine's open projection into the transport contract.
@@ -316,7 +309,7 @@ export function operationWorkItemFromProjection(
       noDateReason: actionOn === null ? (presentation.noDateReason ?? "The owning rule has no working date") : null,
       calendar,
     },
-    communication: presentation.communication ?? null,
+    communication: null,
     blocker: null,
     nextConsequence: null,
     interaction: presentation.interaction ?? {

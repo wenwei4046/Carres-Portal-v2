@@ -2590,10 +2590,6 @@ export interface DeliveryPartnerRow {
   pickup_days?: number[] | null;
   journey_regions?: unknown;
   surcharge_areas?: string[] | null;
-  /** 0488 — who agrees the day with the customer: the company or Carres
-   *  Operation. The Work Customer card follows it (Workspace §5.10). Absent on
-   *  an older Worker → read as `partner` (today's value for every company). */
-  customer_contact_by?: "partner" | "operation" | null;
 }
 export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];
@@ -7124,27 +7120,6 @@ export function useSupplierCardFacts(orderId: string | null) {
       ),
     enabled: Boolean(orderId),
     staleTime: 30_000,
-  });
-}
-
-/**
- * Record a customer contact through Delivery's ONE contact door (0487,
- * Delivery §5.1): `Record as sent`, `No answer`, a refusal, a wrong number,
- * the date the customer asked for, the address check.
- */
-export function useRecordDeliveryContact(orderId: string | null, leg = 0) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: import("@carres/shared").DeliveryContactInput) =>
-      apiFetch<{ contact: unknown }>(
-        `/api/operation/delivery-arrangements/${encodeURIComponent(orderId ?? "")}/contacts?leg=${leg}`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
-      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
-      void qc.invalidateQueries({ queryKey: ["operation", "work"] });
-    },
   });
 }
 

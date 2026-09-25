@@ -82,4 +82,21 @@ describe("WorkActionPanel", () => {
     render(<WorkActionPanel item={{ ...base, action: "Call AL Logistics", recipient: "AL Logistics", interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
     expect(screen.getByTestId("work-detail-action")).toHaveTextContent(/^Call AL Logistics$/);
   });
+
+  it("with every card collapsed the summary carries the ONE blue act, which opens that card", () => {
+    const onClick = vi.fn();
+    render(<WorkActionPanel hasParties primaryAct={{ label: "Contact logistics today", onClick }} item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
+    const act = screen.getByTestId("work-detail-primary-act");
+    expect(act).toHaveTextContent("Contact logistics today");
+    expect(act.className).toContain("bg-kit-blue-9");
+    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-kit-blue-9");
+    fireEvent.click(act);
+    expect(onClick).toHaveBeenCalled();
+  });
+
+  it("an embedded action keeps the blue: no summary act beside it", () => {
+    render(<WorkActionPanel primaryAct={{ label: "Contact logistics today", onClick: () => {} }} item={{ ...base, interaction: { mode: "embedded" } } as OperationWorkItem} embedded={<div>form</div>} onOpen={() => {}} />);
+    expect(screen.queryByTestId("work-detail-primary-act")).not.toBeInTheDocument();
+  });
 });
+

@@ -205,27 +205,33 @@ const ARRANGEMENTS = {
   contacts: [] as Array<Record<string, unknown>>,
 };
 
-/* ── THE REST OF THE RIGHT PANEL (owner approval 2026-09-25, §5.10) ──────────
-   `?cm=` — the Customer: `operation` (Carres calls; default), `waiting`
-   (Record as sent yesterday), `partner` (the company calls).
+/* ── THE REST OF THE RIGHT PANEL (owner approval + correction 2026-09-25, §5.10) ─
+   `?cm=` — the Customer: default = normal partner scheduling (read-only, no
+   Carres act); `delay` (Sales Orders' delay_planning open), `another` (the
+   company asked for another date), `refused`, `phone` (contact details wrong).
    `?sp=` — the Suppliers: `three` (default: one delayed, one expected, one
    not issued), `none` (no PO), `received`. `?loan=1` adds a loan offer. */
-const cm = new URLSearchParams(window.location.search).get("cm") ?? "operation";
+const cm = new URLSearchParams(window.location.search).get("cm") ?? "normal";
 const sp = new URLSearchParams(window.location.search).get("sp") ?? "three";
 const loanOn = new URLSearchParams(window.location.search).get("loan") === "1";
-if (cm === "waiting") {
-  ARRANGEMENTS.contacts.push({
-    id: "c-1", order_id: ORDER, leg: 0, purpose_key: "confirm_delivery_date", channel: "whatsapp", contacted_person: "customer",
-    contact_owner_user_id: ME, acting_user_id: ME, contacted_at: `${REAL_TODAY}T02:42:00Z`, result_key: "waiting_for_customer_reply",
-    reply_evidence_path: null, next_action: null, note: "Template: Confirm delivery date", on_behalf_of_partner_id: null, recorded_by: ME, recorded_at: `${REAL_TODAY}T02:42:00Z`,
-  });
+const contactRow = (result: string) => ({
+  id: "c-1", order_id: ORDER, leg: 0, purpose_key: "confirm_delivery_date", channel: "call", contacted_person: "partner",
+  contact_owner_user_id: ME, acting_user_id: ME, contacted_at: `${REAL_TODAY}T02:42:00Z`, result_key: result,
+  reply_evidence_path: result === "customer_refused_delivery" ? "arrangement/wa-2.jpg" : null, next_action: null, note: null,
+  on_behalf_of_partner_id: AL, recorded_by: ME, recorded_at: `${REAL_TODAY}T02:42:00Z`,
+});
+if (cm === "refused") ARRANGEMENTS.contacts.push(contactRow("customer_refused_delivery"));
+if (cm === "phone") ARRANGEMENTS.contacts.push(contactRow("contact_details_incorrect"));
+if (cm === "delay") {
+  const d = item("orders", TODAY);
+  d.ruleKey = "delay_planning";
+  d.id = "orders:SO-1362:delay_planning";
+  d.object = { kind: "sales_order", id: ORDER, label: "SO-1362" };
+  d.problem = "Supplier date misses the customer commitment";
+  d.action = "Decide the customer plan for the new supplier date";
+  FEED.items.push(d);
 }
 const plusDays = (n: number) => addWorkingDays(REAL_TODAY, n, { holidays: myHolidaySet() });
-/* The feed's Waiting fact — what the server derives from that contact. */
-if (cm === "waiting" && firstDelivery) {
-  firstDelivery.timing = { ...firstDelivery.timing, actionOn: TODAY, businessDueOn: TODAY, placement: "on_day", missedAge: { state: "counted", workingDays: 0, basis: { calendarKey: "module+person", from: TODAY, to: TODAY } } };
-  firstDelivery.communication = { channel: "whatsapp", recipient: "Lim Kuan Yang", sentAt: `${REAL_TODAY}T02:42:00.000Z`, replyState: "waiting", replyDueOn: plusDays(1) };
-}
 const SUPPLIERS = sp === "none"
   ? []
   : sp === "received"
@@ -248,7 +254,7 @@ const facts = () => ({
     : null,
   lastRevokedAt: null,
   detailsReceivedAt: linkActive ? "2026-09-15T06:10:00Z" : null,
-  answer: null,
+  answer: cm === "another" ? { kind: "another_date", at: `${REAL_TODAY}T03:10:00Z`, proposedDate: addWorkingDays(REQUESTED, 2, { holidays: myHolidaySet() }), reasonKey: "customer_asked" } : null,
   history: withPartner
     ? [
         ...(scheduled ? [{ event: "arrangement_saved", at: "2026-09-16T01:42:00Z", source: "external_link", who: "AL Logistics via external link", detail: REQUESTED }] : []),
@@ -266,20 +272,11 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return new Response(JSON.stringify(FEED), { status: 200, headers: { "Content-Type": "application/json" } });
   }
   if (/\/api\/operation\/orders(\?|$)/.test(url)) return json(ORDERS);
-  if (/\/api\/operation\/partners(\?|$)/.test(url)) return json({ partners: [{ id: AL, name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/example", customer_contact_by: cm === "partner" ? "partner" : "operation" }] });
+  if (/\/api\/operation\/partners(\?|$)/.test(url)) return json({ partners: [{ id: AL, name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/example" }] });
   if (/\/api\/operation\/pos\/for-order\//.test(url)) return json({ purchaseOrders: SUPPLIERS });
   if (/\/loan-offers/.test(url)) return json({ offers: loanOn ? [{ id: "lo-1", seq: 1, order_id: ORDER, event: "offered", item_id: null, label: "Loan sofa", reason: null, recorded_by: ME, recorded_at: `${REAL_TODAY}T01:00:00Z`, unit_id: null }] : [] });
   if (/\/api\/operation\/staff(\?|$)/.test(url)) return json({ staff: [{ user_id: ME, email: "sha@carres.co", name: "Shasha", pooled: true, available: true, note: null, last_seen_at: null, duties: [] }], myDuties: [] });
   if (/\/api\/operation\/suppliers(\?|$)/.test(url)) return json({ suppliers: [{ id: "s-1", name: "Sleepwell", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, whatsapp_group_url: "https://chat.whatsapp.com/sleepwell" }] });
-  if (/\/contacts\?/.test(url) && init?.method === "POST") {
-    const body = JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>;
-    ARRANGEMENTS.contacts.push({
-      id: `c-${ARRANGEMENTS.contacts.length + 2}`, order_id: ORDER, leg: 0, purpose_key: body.purpose, channel: body.channel, contacted_person: body.contactedPerson,
-      contact_owner_user_id: ME, acting_user_id: ME, contacted_at: new Date().toISOString(), result_key: body.result,
-      reply_evidence_path: body.replyEvidencePath ?? null, next_action: null, note: body.note ?? null, on_behalf_of_partner_id: null, recorded_by: ME, recorded_at: new Date().toISOString(),
-    });
-    return json({ contact: { id: "c-new" } });
-  }
   if (/\/api\/operation\/delivery-arrangements(\?|$)/.test(url)) return json(ARRANGEMENTS);
   if (/\/api\/operation\/delivery-orders(\?|$)/.test(url)) return json({ deliveryOrders: [], attempts: [], handoverEvents: [], proofReviews: [], attemptEvidence: [] });
   if (/\/logistics-card/.test(url)) return json(facts());

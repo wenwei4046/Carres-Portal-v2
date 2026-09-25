@@ -38,7 +38,7 @@ operationPartnersRouter.get("/", async (c) => {
     // T9 (0283) — the carrier's own delivery rules ride the list every consumer
     // already fetches, so the drawer can show them without a second round trip.
     .select(
-      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days, pickup_days, journey_regions, surcharge_areas, customer_contact_by",
+      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days, pickup_days, journey_regions, surcharge_areas",
     )
     .order("name", { ascending: true });
   if (error) return fail(c, error);

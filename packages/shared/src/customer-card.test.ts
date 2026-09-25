@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  askedForNote,
-  customerCardModel,
-  customerFollowUpIso,
-  customerWaitingOf,
-  type CustomerCardInput,
-  type CustomerContactFact,
-} from "./customer-card";
+import { customerCardModel, mytDayOf, type CustomerCardInput, type CustomerContactFact } from "./customer-card";
 
 const spell = (iso: string) => {
   const [, m, d] = iso.split("-").map(Number);
@@ -15,17 +8,15 @@ const spell = (iso: string) => {
 
 function input(over: Partial<CustomerCardInput> = {}): CustomerCardInput {
   return {
-    todayIso: "2026-10-24",
-    holidays: [],
-    contactBy: "operation",
+    todayIso: "2026-10-22",
     companyName: "AL Logistics",
     requestedIso: "2026-10-27",
     scheduledIso: null,
     deliveredIso: null,
-    contactCheck: { dueIso: "2026-10-24", state: "open" },
+    contactCheck: { dueIso: "2026-10-24", state: "not_open" },
     contacts: [],
-    condoRequired: false,
-    condoRecorded: false,
+    partnerAnswer: null,
+    delayNoticeRequired: false,
     settled: false,
     spell,
     ...over,
@@ -33,137 +24,76 @@ function input(over: Partial<CustomerCardInput> = {}): CustomerCardInput {
 }
 
 const contact = (over: Partial<CustomerContactFact>): CustomerContactFact => ({
-  atIso: "2026-10-23T03:00:00Z",
+  atIso: "2026-10-21T03:00:00Z",
   purpose: "confirm_delivery_date",
-  channel: "whatsapp",
-  result: "waiting_for_customer_reply",
+  channel: "call",
+  result: "no_answer",
+  person: "customer",
   evidencePath: null,
   note: null,
   by: "Shasha",
   ...over,
 });
 
-describe("the collapsed status line follows the governed precedence", () => {
-  it("contact due today is the blue line when Carres contacts and nothing is recorded", () => {
+describe("owner correction 2026-09-25 — the logistics company contacts the customer", () => {
+  it("normal partner scheduling: read-only, the company's deadline, NO Carres act", () => {
     const m = customerCardModel(input());
-    expect(m.status).toEqual({ text: "Contact due today", tone: "current" });
-    expect(m.action?.act).toBe("Contact customer today");
-    expect(m.action?.door).toBe("contact");
-  });
-
-  it("a future check reads its day, and the act names the day", () => {
-    const m = customerCardModel(input({ todayIso: "2026-10-20", contactCheck: { dueIso: "2026-10-24", state: "not_open" } }));
-    expect(m.status.text).toBe("Contact due 24 Oct");
-    expect(m.action?.act).toBe("Contact customer by 24 Oct");
-  });
-
-  it("partner mode: the company contacts the customer and Carres has no routine act", () => {
-    const m = customerCardModel(input({ contactBy: "partner" }));
-    expect(m.mode).toBe("partner");
-    expect(m.status.text).toBe("AL Logistics contacts the customer · by 24 Oct");
+    expect(m.status).toEqual({ text: "AL Logistics contacts the customer · by 24 Oct", tone: "future" });
     expect(m.action).toBeNull();
+    expect(m.exception).toBeNull();
   });
 
-  it("no company assigned: Carres owns the contact even if the setting says partner", () => {
-    const m = customerCardModel(input({ contactBy: "partner", companyName: null }));
-    expect(m.mode).toBe("operation");
+  it("even on the deadline day and after it, there is no routine Carres contact act", () => {
+    expect(customerCardModel(input({ todayIso: "2026-10-24", contactCheck: { dueIso: "2026-10-24", state: "open" } })).action).toBeNull();
+    expect(customerCardModel(input({ todayIso: "2026-10-26", contactCheck: { dueIso: "2026-10-24", state: "missed" } })).action).toBeNull();
+    expect(customerCardModel(input({ contacts: [contact({ result: "no_answer", person: "partner" })] })).action).toBeNull();
   });
 
-  it("Record as sent → Waiting until the next Delivery working day; no act", () => {
-    const m = customerCardModel(input({ todayIso: "2026-10-23", contactCheck: { dueIso: "2026-10-24", state: "not_open" }, contacts: [contact({})] }));
-    expect(m.waiting).toBe(true);
-    expect(m.followUpIso).toBe("2026-10-24");
-    expect(m.status).toEqual({ text: "Waiting for customer", tone: "future" });
-    expect(m.action).toBeNull();
+  it("after the arrangement: Scheduled {date}", () => {
+    expect(customerCardModel(input({ scheduledIso: "2026-10-27" })).status).toEqual({ text: "Scheduled 27 Oct", tone: "neutral" });
   });
 
-  it("on the follow-up day the row returns to To do: No answer · Follow up today", () => {
-    const m = customerCardModel(input({ todayIso: "2026-10-24", contacts: [contact({ result: "no_answer" })] }));
-    expect(m.waiting).toBe(false);
-    expect(m.status.text).toBe("No answer — follow up");
-    expect(m.action?.act).toBe("Contact customer today");
+  it("no company: Logistics not assigned — never a guessed partner", () => {
+    expect(customerCardModel(input({ companyName: null })).status.text).toBe("Logistics not assigned");
+  });
+});
+
+describe("the four Carres exceptions, each through its owner's door", () => {
+  it("1 · a known delay → Tell the customer the new date, in the Sales Order", () => {
+    const m = customerCardModel(input({ delayNoticeRequired: true }));
+    expect(m.status).toEqual({ text: "Delivery delayed · customer notice required", tone: "missed" });
+    expect(m.action).toMatchObject({ act: "Tell the customer the new date", door: "sales_order" });
   });
 
-  it("a missed deadline outranks waiting — Waiting never hides it", () => {
-    const m = customerCardModel(
-      input({ todayIso: "2026-10-26", contactCheck: { dueIso: "2026-10-24", state: "missed" }, contacts: [contact({ atIso: "2026-10-26T01:00:00Z" })] }),
-    );
-    expect(m.status).toEqual({ text: "Contact missed 24 Oct", tone: "missed" });
+  it("2 · Logistics recorded another date → Decide the next step, in Delivery", () => {
+    const m = customerCardModel(input({ partnerAnswer: { kind: "another_date", proposedIso: "2026-10-30", atIso: "2026-10-22T02:00:00Z" } }));
+    expect(m.status.text).toBe("Customer requested another date · 30 Oct");
+    expect(m.action).toMatchObject({ act: "Decide the next step for this delivery", result: "The customer asked for 30 Oct", door: "delivery" });
   });
 
-  it("the customer asked for another date: amber line and the scheduled-delivery door", () => {
-    const m = customerCardModel(
-      input({ contacts: [contact({ result: "requested_another_date", note: askedForNote("2026-10-30"), evidencePath: "x.jpg" })] }),
-    );
-    expect(m.status).toEqual({ text: "Customer requested another date", tone: "attention" });
-    expect(m.action).toMatchObject({ act: "Record scheduled delivery", result: "The customer asked for 30 Oct", door: "schedule" });
+  it("3 · a refusal → Decide the next step, in Delivery", () => {
+    const m = customerCardModel(input({ contacts: [contact({ result: "customer_refused_delivery", person: "partner" })] }));
+    expect(m.status).toEqual({ text: "Customer refused delivery", tone: "missed" });
+    expect(m.action?.door).toBe("delivery");
   });
 
-  it("refusal and a wrong phone number send the operator to the Sales Order", () => {
-    expect(customerCardModel(input({ contacts: [contact({ result: "customer_refused_delivery" })] })).status.tone).toBe("missed");
+  it("4 · wrong contact details → Correct the phone number, in the Sales Order", () => {
     const m = customerCardModel(input({ contacts: [contact({ result: "contact_details_incorrect" })] }));
     expect(m.status.text).toBe("Phone number is wrong");
-    expect(m.action?.door).toBe("sales_order");
+    expect(m.action).toMatchObject({ act: "Correct the phone number", door: "sales_order" });
   });
 
-  it("scheduled: the date is neutral; contact due today rides along only while the customer was never contacted", () => {
-    const m = customerCardModel(input({ scheduledIso: "2026-10-27" }));
-    expect(m.status).toEqual({ text: "Scheduled 27 Oct · Contact due today", tone: "current" });
-    const later = customerCardModel(input({ scheduledIso: "2026-10-27", contacts: [contact({ result: "confirmed" })] }));
-    expect(later.status).toEqual({ text: "Scheduled 27 Oct", tone: "neutral" });
-    expect(later.action).toBeNull();
-  });
-
-  it("delivered wins over everything and closes the act", () => {
-    const m = customerCardModel(input({ deliveredIso: "2026-10-27", contacts: [contact({ result: "no_answer" })] }));
-    expect(m.status.text).toBe("Delivered 27 Oct");
-    expect(m.action).toBeNull();
+  it("a Scheduled date settles another-date; delivered ends every exception", () => {
+    expect(customerCardModel(input({ scheduledIso: "2026-10-30", partnerAnswer: { kind: "another_date", proposedIso: "2026-10-30", atIso: "2026-10-22T02:00:00Z" } })).action).toBeNull();
+    const done = customerCardModel(input({ deliveredIso: "2026-10-27", delayNoticeRequired: true }));
+    expect(done.status.text).toBe("Delivered · 27 Oct");
+    expect(done.action).toBeNull();
   });
 });
 
-describe("the three checks are stored facts", () => {
-  it("contacted · agreed · address and access (condo registration included)", () => {
-    const none = customerCardModel(input());
-    expect(none.doneCount).toBe(0);
-    const m = customerCardModel(
-      input({
-        scheduledIso: "2026-10-27",
-        condoRequired: true,
-        condoRecorded: false,
-        contacts: [contact({ purpose: "confirm_delivery_address", result: "confirmed" })],
-      }),
-    );
-    expect(m.checks.map((c) => c.done)).toEqual([true, true, false]);
-    expect(customerCardModel({ ...input({ scheduledIso: "2026-10-27", condoRequired: true, condoRecorded: true, contacts: [contact({ purpose: "confirm_delivery_address", result: "confirmed" })] }) }).doneCount).toBe(3);
+describe("the Carres business day", () => {
+  it("07:30 MYT Fri 23 Oct stored as 22 Oct 23:30Z is the 23rd", () => {
+    expect(mytDayOf("2026-10-22T23:30:00Z")).toBe("2026-10-23");
+    expect(mytDayOf("2026-10-23")).toBe("2026-10-23");
   });
 });
-
-describe("follow-up and message", () => {
-  it("the follow-up day skips Sunday and public holidays (Delivery week)", () => {
-    expect(customerFollowUpIso("2026-10-24T10:00:00Z")).toBe("2026-10-26");
-    expect(customerFollowUpIso("2026-10-23T10:00:00Z", ["2026-10-24"])).toBe("2026-10-26");
-  });
-
-  it("silence is never waiting", () => {
-    expect(customerWaitingOf({ latest: null, todayIso: "2026-10-23" })).toEqual({ waiting: false, followUpIso: null });
-    expect(customerWaitingOf({ latest: { atIso: "2026-10-23T01:00:00Z", result: "confirmed" }, todayIso: "2026-10-23" }).waiting).toBe(false);
-  });
-
-});
-
-describe("review fixes (#1608)", () => {
-  it("the follow-up day is counted from the Carres business day, not the UTC date", () => {
-    // 07:30 MYT Fri 23 Oct is stored as 22 Oct 23:30Z → next Delivery working day is Sat 24 Oct.
-    expect(customerFollowUpIso("2026-10-22T23:30:00Z")).toBe("2026-10-24");
-    expect(customerWaitingOf({ latest: { atIso: "2026-10-22T23:30:00Z", result: "waiting_for_customer_reply" }, todayIso: "2026-10-23" }).waiting).toBe(true);
-  });
-
-  it("a missed check shows the act even while a reply is awaited — a passed day is always To do", () => {
-    const m = customerCardModel(
-      input({ todayIso: "2026-10-26", contactCheck: { dueIso: "2026-10-24", state: "missed" }, contacts: [contact({ atIso: "2026-10-26T01:00:00Z" })] }),
-    );
-    expect(m.status.tone).toBe("missed");
-    expect(m.action?.act).toBe("Contact customer today");
-  });
-});
-
