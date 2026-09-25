@@ -30,6 +30,7 @@ export const SUPPLIER_CARD_COPY = {
   none: "No purchase order for this Sales Order",
   needPo: (n: number) => `No purchase order for this Sales Order · ${n} ${n === 1 ? "item needs" : "items need"} one`,
   fromStock: (ready: number, total: number) => `From stock · ${ready} of ${total} ready`,
+  needPoMixed: (n: number) => `${n} ${n === 1 ? "item needs" : "items need"} a PO`,
   issued: (i: number, n: number) => `${i} of ${n} POs issued`,
   datesReady: (d: number, n: number) => `${d} of ${n} dates ready`,
   received: (r: number, n: number) => `${r} of ${n} received`,
@@ -251,7 +252,12 @@ export function supplierCardModel(input: {
           : SUPPLIER_CARD_COPY.datesReady(datedCount, total);
     let exception: string | null = null;
     let tone: PartyTone = issuedCount < total ? "attention" : receivedCount === total ? "done" : "neutral";
-    if (count("arrivalMissed")) {
+    /* Goods no PO covers outrank every supplier exception except a missed
+       arrival: nobody is making them (owner decision 2026-09-25). */
+    if (needPoCount > 0 && !count("arrivalMissed")) {
+      exception = SUPPLIER_CARD_COPY.needPoMixed(needPoCount);
+      tone = "attention";
+    } else if (count("arrivalMissed")) {
       exception = SUPPLIER_CARD_COPY.arrivalMissed(count("arrivalMissed"));
       tone = "missed";
     } else if (delayedCount) {

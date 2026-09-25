@@ -224,3 +224,16 @@ describe("owner decisions 2026-09-25 — Expected arrival, and every goods need 
   });
 });
 
+describe("a mixed order — one line on a PO, another short with no PO", () => {
+  it("the collapsed line still names the unbought goods", () => {
+    const m = supplierCardModel({
+      todayIso: "2026-10-12",
+      pos: [po({ effectiveIso: "2026-10-30", lines: [{ sku: "M1", qty: 1 }] })],
+      goods: [{ sku: "M1", qty: 1, shortQty: 1 }, { sku: "B2", qty: 2, shortQty: 2 }],
+      spell,
+    });
+    expect(m.needPoCount).toBe(2);
+    expect(m.status).toEqual({ text: "1 of 1 dates ready · 2 items need a PO", tone: "attention" });
+  });
+});
+

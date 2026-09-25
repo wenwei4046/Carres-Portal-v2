@@ -374,7 +374,7 @@ informs the Monitor ladder only.
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
 Requested date) on the Mon–Sat delivery week with Malaysian public holidays. The `3 working days
 before` check is the company-has-the-details step. The Route's `Contact` point and the Customer card
-read the same check; there is no second clock. A customer who has named no day has no deadline and is
+read the same check. **Open owner decision:** the Delivery work list, Monitor and the Orders booking brief still count the contact window 3 working days before the promised date (Orders Card 3 `T−3`, the `chase` lead `logistics_call_working_days`); Work and the Logistics checks use 2 (Workspace §5.9 gap 8). A customer who has named no day has no deadline and is
 never late. A late contact keeps the deadline it missed.
 
 ### 5.3 · Backward planning — Delivery owns the ONE calculation

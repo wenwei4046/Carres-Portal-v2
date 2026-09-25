@@ -959,12 +959,20 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
 3. Which delivery requirement makes a time mandatory (building types) — its own missing item.
 4. The Delivery Order download through the link — the governed DO prints `SO No`, which the link may
    not show; decide the paper or the rule.
-5. The legacy Orders booking door (`ops_order_control`) still requires a time slot for leg 0; the
-   Delivery arrangement no longer does. Converge the whole-order DO issue onto the arrangement.
+5. The legacy Orders booking door (`ops_order_control`, `/operation/old-orders` →
+   `/:id/booking/confirm`) still requires a time slot for leg 0 and writes only
+   `ops_order_control.confirmed_date`. Since 2026-09-25 the Work feed reads Delivery's arrangement,
+   so a booking made through that door does not close `confirm_delivery_date`. Retire the door or
+   make it write the leg-0 arrangement; converge the whole-order DO issue onto the arrangement.
 6. Closed 2026-09-25 (owner decision): the Work feed's `confirm_delivery_date` reads Delivery's
    arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
    check through the one `logisticsCheckDueIso`.
 7. The Ohana supplier-to-customer route.
+8. **Open owner decision — two contact clocks.** Work's `confirm_delivery_date`, the Route's `Contact`
+   point and the Logistics card use the `2 working days before` check; the Delivery work list, Monitor
+   and the Orders booking brief still use Orders Card 3's `T−3` window (the `chase` lead,
+   `logistics_call_working_days`). Converging them changes a Sales Orders business rule, so it waits
+   for the owner: keep T−3 as the contact day and T−2 as the schedule deadline, or retire T−3.
 
 ### 5.10 · Complete Work right panel — owner-approved target 2026-09-25 / NOT BUILT
 
@@ -1098,7 +1106,8 @@ goods that need a PO: with no PO for the order the collapsed line reads `No purc
 Sales Order · {n} items need one` and the card's door is the Sales Order (its `issue_po` act). The
 Route's `PO` point reads `From stock` only when no goods still need a PO. Evidence: production SO-1222
 showed Logistics `Goods not ready · 0 of 5 · 5 short` beside a bare `No purchase order for this Sales
-Order`.
+Order`. In a mixed order (some lines on a PO, others short with none) the collapsed line keeps the
+PO progress and names the unbought goods as its top exception: `{n} items need a PO`.
 
 #### Shared communication and Work states
 
