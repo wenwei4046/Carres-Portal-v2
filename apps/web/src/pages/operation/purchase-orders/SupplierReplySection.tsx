@@ -1,3 +1,5 @@
+// design-standard: not-a-list-page — one section of the Purchase Order object page (its
+// facts column), drawn as a per-line table inside the page's own shell; not a List page.
 import { useMemo, useState } from "react";
 import {
   PO_DELAY_REASONS,

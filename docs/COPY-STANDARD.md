@@ -2033,7 +2033,7 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
 <a id="record-supplier-answer-words"></a>
-### Record supplier answer words — APPROVED (Jess, 2026-09-25) · NOT BUILT
+### Record supplier answer words — APPROVED (Jess, 2026-09-25) · BUILT 2026-09-26
 
 The PO object page's per-item supplier answer (Purchasing MASTER §5.7, Blueprint segment 1).
 Retired with it: the section heading `Supplier has not confirmed the PO date` and the rail row of
@@ -2051,7 +2051,13 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 | Dates and people | `Answered by supplier on` · `Recorded by {name}` |
 | Result lines | `Delayed` · `Earlier` · `Reported` (no original date) · `Supplier changed from {date}` · `All received` · `Received · {GRN No}` |
 | Last answer | `Last answer · {date} · recorded by {name} · Evidence {n}` · `None recorded yet` |
-| Save blockers | `Save — add a WhatsApp screenshot` · `Save — upload the Supplier DO` · `Save — the batches must total {m}` |
+| Save blockers (the button names the gap) | `Save — answer a line or record the Supplier DO` · `Save — record the Supplier DO number` · `Save — upload the Supplier DO` · `Save — record the supplier delivery date` · `Save — choose why the supplier moved the date` · `Save — write why the supplier moved the date` · `Save — the batches must total {m}` · `Save — add a WhatsApp screenshot` · `Save — name who answered` · `Save — record when the supplier answered` |
+| People and time | `Recipient` · `Answered by` · `Answered by supplier on` · `Channel` |
+| Bulk answer bar | `{n} selected · Apply to selected` · `Choose answer` · `Apply` |
+| Split sub-row | `└ batch {n}` · `{n} pcs` |
+| Read-state absences | `Not confirmed` · `None recorded yet` · `All received` · `Supplier DO · Not recorded` |
+| Receiving Work card, date-derived (Purchasing §9.4, segment 2) | fact `Supplier date passed · nothing received yet` (a submitted Warehouse count keeps `Goods arrived · GRN not posted`) · action `Check in {PO No} from {Supplier}` |
+| Day-before Work card (Purchasing §5.7) | fact `Confirm tomorrow's supplier delivery` · action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` · `Click Email, …` · no channel recorded: `Ask {Supplier} for the Supplier DO for {PO No}` · button `Record supplier answer` |
 | Read failure | `Supplier answers could not be loaded` + `Try again` |
 
 <a id="purchasing-ui-dictionary"></a>
