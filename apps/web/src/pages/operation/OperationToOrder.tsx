@@ -6,8 +6,12 @@ import {
   soBatchPurchaseResponseSchema,
   type SoBatchPurchaseResponse,
   type SoBatchSelection,
+  PO_WINDOW_WORK_COPY,
+  parsePoWindowKey,
+  poWindowTimeWord,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
 import SoBatchRegister from "./so-batch/SoBatchRegister";
 import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
@@ -40,8 +44,13 @@ const QUERY_KEY = ["so-batch-purchase"] as const;
 
 export default function OperationToOrder() {
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const scopeSo = searchParams.get("so");
+  /* ⭐ THE PO WINDOW SCOPE (Purchasing §5.6.1). Work's window card opens this
+     page on exactly that window's demand lines — the server filters with the
+     same stamp the card was built from, so the two cannot disagree. */
+  const scopeWindow = searchParams.get("window");
+  const windowParts = scopeWindow ? parsePoWindowKey(scopeWindow) : null;
   const [selections, setSelections] = useState<SoBatchSelection[] | null>(null);
 
   /**
@@ -54,9 +63,11 @@ export default function OperationToOrder() {
    * cannot support.
    */
   const q = useQuery<SoBatchPurchaseResponse>({
-    queryKey: QUERY_KEY,
+    queryKey: [...QUERY_KEY, windowParts ? scopeWindow : null],
     queryFn: async () => {
-      const path = "/api/operation/purchase/demands";
+      const path = windowParts
+        ? `/api/operation/purchase/demands?window=${encodeURIComponent(scopeWindow!)}`
+        : "/api/operation/purchase/demands";
       return soBatchPurchaseResponseSchema.parse(
         await apiFetch<unknown>(path),
       ) as SoBatchPurchaseResponse;
@@ -138,6 +149,15 @@ export default function OperationToOrder() {
         isLoading={q.isLoading}
         hidden={issuing}
         initialSearch={scopeSo ? `SO-${scopeSo.replace(/^SO-/i, "")}` : undefined}
+        scope={windowParts ? {
+          label: `${PO_WINDOW_WORK_COPY.objectLabel(poWindowTimeWord(windowParts.time))} · ${fmtDate(windowParts.date)}`,
+          preselectKey: scopeWindow!,
+          onClear: () => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("window");
+            setSearchParams(next, { replace: true });
+          },
+        } : undefined}
         onIssue={setSelections}
       />
     </>

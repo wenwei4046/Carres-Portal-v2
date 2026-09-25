@@ -519,7 +519,7 @@ Supplier out-of-stock, delayed model/fabric, changed quantity or changed price i
 A supplier price change stops the issue/change and routes to the commercial approver; Operations
 does not decide it.
 
-#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; target, not built
+#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; BUILT on branch, awaiting owner review (not live)
 
 SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
 Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
@@ -580,6 +580,31 @@ facts, the one send area and the completion fact below.
   `Issue POs to {suppliers}`, `{n} of {m} POs · Sending not confirmed`) are not used.
 - **Retired with this journey:** the per-Sales-Order `issue_po` card and `confirm_ready_date`
   (`Supplier date missing`); the day-before check (§5.7) replaces the latter.
+
+**BUILD FACTS — branch `build/work-po-windows`, migrations 0584 / 0585 NOT APPLIED; nothing is live
+until Jess approves.**
+
+- **Admission time is the Sales Order's `Proceed`** (`orders.proceeded_at`) — the moment the order
+  enters SO Batch (§9.1). An order with no recorded Proceed time gets no window; none is guessed.
+- **One arithmetic, one stamp.** The SO Batch read stamps every demand line and every lineage PO with
+  `poWindow` (`2026-09-25T11:30`) through `poWindowFor` over the windows, the `PO Days` calendar
+  (`poWindowCalendarOf`: ticked PO Days ∩ Office working days and holidays) and the supplier's
+  cut-off. `?window=` scopes SO Batch to exactly those lines; Work's window card (Workspace §6.2)
+  reads the same stamp. Unreadable window settings stamp nothing and say `poWindowsUnavailable` —
+  buying still works.
+- **Which demand.** Only lines SO Batch may buy (`isSelectableForBuying`) — including `can order
+  early`, because the window, not Order By, now sets when PO Duty buys. `PO Days` still does not
+  move `Order By`.
+- **Opening pre-ticks.** SO Batch opened with `?window=` ticks every eligible line once (default
+  destination); an unticked line stays unticked. The window name and `Clear filters` sit above the
+  grid so they stay visible while the selection bar replaces the toolbar.
+- **Several unsent POs** name the earliest (lowest PO No) in the card's send line.
+- **Completion.** `POST /pos/:id/confirm-sent` completes the window occurrence once no eligible
+  demand is left and every PO it issued has its current version sent; `issue-batch` completes
+  nothing. A received PO needs no sending; a PO serving two windows belongs to the earliest.
+- **Gap.** 0585 stores the window times (`purchasing_set_po_windows`) and supplier cut-offs
+  (`purchasing_set_supplier_po_cutoff`), but Purchasing Settings has no editing screen for them yet;
+  until it ships the windows are the 11:30 AM / 4:00 PM defaults and no supplier has a cut-off.
 
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 

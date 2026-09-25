@@ -1,8 +1,9 @@
 import { Hono } from "hono";
+import { bodyTouchesDeliveryDate, salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import {
   abandonOrderInput,
@@ -211,6 +212,13 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     );
   }
   const { stage, channel, search } = parsed.data;
+  // 0584 · ONE ORDER, THE SAME ROW. The Work completion probe reads exactly
+  // what this list reads — the select AND every enrichment below (po_skus,
+  // arrivals, units) — for a single order, so "was it open" has one answer.
+  const onlyOrderId = c.req.query("orderId") ?? null;
+  if (onlyOrderId !== null && !/^[0-9a-f-]{36}$/i.test(onlyOrderId)) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "orderId must be an order id" }, 422);
+  }
 
   const sb = userClient(c.env, c.var.auth.jwt);
   // Phase 4.5 Chunk 2 (T9): customer-leg LP fields now live on
@@ -329,6 +337,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   }
   // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
   // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
+  if (onlyOrderId) q = q.eq("id", onlyOrderId);
   if (channel === "dealers") q = q.is("outlet_id", null);
   if (channel === "showrooms") q = q.not("outlet_id", "is", null);
   if (search) {
@@ -1855,7 +1864,18 @@ const saveRevisionInput = z
   })
   .strict();
 
-operationOrdersRouter.post("/:id/save", requireOperation, async (c) => {
+operationOrdersRouter.post(
+  "/:id/save",
+  requireOperation,
+  // 0584 — an office save that records the Requested Delivery Date (or the
+  // customer's "not yet") completes `ask_delivery_date`; a save that does not
+  // touch it costs no Work read.
+  salesOrderWorkCompletion({
+    rules: ["ask_delivery_date"],
+    orderId: (c) => c.req.param("id") ?? null,
+    when: bodyTouchesDeliveryDate,
+  }),
+  async (c) => {
   const id = c.req.param("id");
   const raw = await c.req.json().catch(() => ({}));
   const parsed = saveRevisionInput.safeParse(raw);
@@ -2557,9 +2577,28 @@ const amendmentDecisionInput = z
     }
   });
 
+/** The order an amendment belongs to, read under the caller's own RLS
+ *  (null = unknown: the completion writer then observes nothing). */
+async function amendmentOrderId(c: Context<AppEnv>): Promise<string | null> {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt)
+    .from("sales_order_amendments")
+    .select("order_id")
+    .eq("id", c.req.param("amendmentId") ?? "")
+    .maybeSingle();
+  if (error) return null;
+  return (data as { order_id?: string } | null)?.order_id ?? null;
+}
+
 operationOrdersRouter.post(
   "/amendment/:amendmentId/decide",
   requirePrincipal,
+  // 0584 — an APPROVED amendment applies its Requested Delivery Date to the
+  // order: that is the completion fact for `ask_delivery_date`.
+  salesOrderWorkCompletion({
+    rules: ["ask_delivery_date"],
+    orderId: amendmentOrderId,
+    when: async (c) => ((await c.req.json().catch(() => null)) as { decision?: string } | null)?.decision === "approve",
+  }),
   async (c) => {
     const raw = await c.req.json().catch(() => ({}));
     const parsed = amendmentDecisionInput.safeParse(raw);

@@ -2420,3 +2420,44 @@ describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
     expect(source()).toContain('searchPresentation="responsive"');
   });
 });
+
+describe("a PO window opens pre-ticked (Purchasing §5.6.1, owner ruling 2026-09-25)", () => {
+  function renderWindow() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onClear = vi.fn();
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/operation?tab=purchase&window=2026-09-25T11:30"]}>
+          <SoBatchRegister
+            data={data()}
+            isLoading={false}
+            onIssue={onIssue}
+            scope={{ label: "11:30 AM PO window · Fri, 25 Sep", onClear, preselectKey: "2026-09-25T11:30" }}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    return { onClear };
+  }
+
+  it("every eligible line of the window is ticked, and the window is named with Clear filters", () => {
+    onIssue.mockClear();
+    const { onClear } = renderWindow();
+    expect(screen.getByTestId("so-batch-window-scope")).toHaveTextContent("11:30 AM PO window · Fri, 25 Sep");
+    // The server already scoped the read to the window; every eligible line in it is ticked.
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("3 Sales Orders · 4 items · 5 units · Issue 2 POs");
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledWith(expect.arrayContaining([
+      { demandId: "build::o1::b1", allocations: [{ destinationId: KLANG, qty: 2 }] },
+    ]));
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(onClear).toHaveBeenCalled();
+  });
+
+  it("a line the operator unticks stays unticked", () => {
+    renderWindow();
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-select-o1")).not.toBeChecked();
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("2 Sales Orders");
+  });
+});

@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { salesOrderWorkCompletion } from "../lib/sales-order-work-completion";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
@@ -3692,7 +3693,12 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
  *  sofa 21d — see shared `DELIVERY_LEAD_DAYS`) is enforced via async
  *  pre-flight because the wizard's client-side gate doesn't apply once
  *  the order is already in Place with `dateTbd: true`. */
-ordersRouter.post("/:id/date", (c) =>
+ordersRouter.post(
+  "/:id/date",
+  // 0584 — recording the date is Sales Orders' completion fact for
+  // `ask_delivery_date`; the writer observes this door, never edits it.
+  salesOrderWorkCompletion({ rules: ["ask_delivery_date"], orderId: (c) => c.req.param("id") ?? null }),
+  (c) =>
   dispatchOrderMutation(c, {
     schema: setOrderDateInputSchema,
     rpcName: "set_order_date",

@@ -102,10 +102,7 @@ operationStockRouter.get("/", async (c) => {
     // can SELL, so it reads `sellable` (exact Units plus bulk pieces on the
     // floor); `available` alone answers the narrower "which exact Unit can a
     // Sales Order bind", which is the drawer's question, not this page's.
-    const available = Array.from(perWh.values()).reduce(
-      (acc, b) => acc + b.sellable,
-      0,
-    );
+    const available = sellableOf(Array.from(perWh.values()));
     return {
       sku: s.sku,
       name: model?.name ?? s.sku,
@@ -138,3 +135,9 @@ operationStockRouter.get("/", async (c) => {
 });
 
 export default operationStockRouter;
+
+/** A SKU's sellable total across warehouses (0368 — summed from the
+ *  authority). The stock page and the one-order Work probe use this one sum. */
+export function sellableOf(rows: ReadonlyArray<{ sellable: number | string | null }>): number {
+  return rows.reduce((acc, row) => acc + Number(row.sellable ?? 0), 0);
+}

@@ -262,6 +262,97 @@ const facts = () => ({
       ]
     : [],
 });
+/* ── THE PO WINDOW CARDS (Purchasing §5.6.1, owner rulings 2026-09-24/25) ──
+   `?pw=1` adds today's two windows: 11:30 AM after issue (three POs, two not
+   sent yet) and 4:00 PM before issue (demand still to buy). The SO Batch read
+   and the PO rows below are what the panel computes the same window from. */
+const pw = new URLSearchParams(window.location.search).get("pw") === "1";
+const SUP = { ohana: "00000000-0000-4000-8000-0000000005a1", hookka: "00000000-0000-4000-8000-0000000005a2", dorsett: "00000000-0000-4000-8000-0000000005a3" };
+const W1130 = `${TODAY}T11:30`;
+const W1600 = `${TODAY}T16:00`;
+function windowItem(key: string, label: string, problem: string, action: string, recipient: string, embedded: boolean): OperationWorkItem {
+  const base = item("purchasing", TODAY);
+  const destination = `/operation?tab=purchase&window=${encodeURIComponent(key)}`;
+  return {
+    ...base,
+    id: `purchasing:${key}:purchasing.po_window`,
+    ruleKey: "purchasing.po_window",
+    object: { kind: "po_window", id: key, label },
+    problem, action, recipient,
+    requiredResult: "Every PO issued and marked as sent",
+    completionStatement: "Every PO issued from the window has its current version marked as sent",
+    owner: { ...base.owner, rule: "po_duty", dutyKey: "po_duty" },
+    interaction: embedded
+      ? {
+          mode: "embedded", actionKey: "purchasing.confirm_po_sent", componentKey: "purchasing.po_issue_evidence",
+          capability: "POST /api/operation/pos/:id/confirm-sent", inputContract: "ConfirmPoSentInput",
+          evidenceContract: "po_sends confirmed_sent for the rendered version", idempotencyKey: "po_id + po_version",
+          staleVersion: "ConfirmPoSentInput.poVersion", staleRefusal: "stale_po_version",
+          successReceipt: "PO sent to supplier", fallbackDestination: destination,
+        }
+      : { mode: "open_module", fallbackDestination: destination },
+    destination,
+  };
+}
+if (pw) {
+  FEED.items.push(
+    windowItem(W1130, "11:30 AM PO window", "3 POs issued · 2 not sent yet", "Click WhatsApp, send PO170926-4827(1) to Ohana", "2 suppliers", true),
+    windowItem(W1600, "4:00 PM PO window", "Buy 7 items for 4 Sales Orders", "Issue the POs by 4:00 PM", "2 suppliers", false),
+  );
+}
+const demandRow = (id: string, orderId: string, so: number, supplierId: string, supplier: string, toBuy: number) => ({
+  id, state: "safety_days_full", lineIds: [`${id}-l`], orderId, so, customer: "Customer", customerDelivery: "2026-10-20",
+  item: "M1401F", variant: "King", category: "mattress", skus: ["M1401F-K"], supplierId, supplier,
+  qtyNeeded: toBuy, readyStock: 0, takenFromStock: 0, onPo: 0, poNumbers: [], toBuy, goodsMustArrive: "2026-10-06",
+  issueRef: { proposalKey: "p", buildKey: "b" }, action: null, parts: [], supplierKind: "own_logistics",
+  ownerName: "Shasha", ownerDuty: null, poWindow: W1600,
+});
+const windowPo = (poId: string, supplierId: string, supplierName: string, sent: boolean) => ({
+  poId, status: "open", supplierId, supplierName, destinationId: "dest-klang", officialDeliveryDate: "2026-10-01",
+  sentCurrentVersion: sent, version: 1, poWindow: W1130,
+});
+const SO_BATCH = {
+  today: TODAY,
+  rows: [
+    demandRow("r1", "so-a", 1401, SUP.ohana, "Ohana", 2),
+    demandRow("r2", "so-b", 1402, SUP.ohana, "Ohana", 3),
+    demandRow("r3", "so-c", 1403, SUP.ohana, "Ohana", 1),
+    demandRow("r4", "so-d", 1404, SUP.hookka, "Hookka", 1),
+  ],
+  registerRows: [{
+    orderId: "so-x", so: 1390, customer: "Customer", status: "ordered", proceededAt: `${TODAY}T01:00:00Z`,
+    requestedDeliveryDate: "2026-10-20", deliveryCity: "Klang", deliveryState: "Selangor",
+    pos: [
+      windowPo("PO170926-4827", SUP.ohana, "Ohana", false),
+      windowPo("PO170926-4828", SUP.hookka, "Hookka", false),
+      windowPo("PO170926-4829", SUP.dorsett, "Dorsett", true),
+    ],
+    lines: [], outstandingSuppliers: [],
+  }],
+  destinations: [{ id: "dest-klang", name: "Carres Klang Warehouse", isDefault: true, active: true }],
+  defaultDestinationId: "dest-klang", currentPoDuty: { userId: ME, name: "Shasha" }, actingPoDuty: null,
+  poDutyNameUnavailable: false, poDutyUnavailable: false, mayIssue: true, procurementPartners: [], safetyDays: 14,
+};
+const WINDOW_SUPPLIERS = [
+  { id: SUP.ohana, name: "Ohana", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, contact_email: null, whatsapp_group_url: "https://chat.whatsapp.com/ohana" },
+  { id: SUP.hookka, name: "Hookka", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, contact_email: "po@hookka.example", whatsapp_group_url: null },
+  { id: SUP.dorsett, name: "Dorsett", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, contact_email: null, whatsapp_group_url: null },
+];
+const sentPos = new Set<string>(["PO170926-4829"]);
+const poRow = (poId: string) => {
+  const po = SO_BATCH.registerRows[0]!.pos.find((p) => p.poId === poId)!;
+  return {
+    pos: [{
+      id: poId, supplier_id: po.supplierId, version: 1, destination_id: "dest-klang", status: "open",
+      sends: sentPos.has(poId) ? [{ channel: "whatsapp", note: null, sent_at: `${TODAY}T03:10:00Z`, kind: "confirmed_sent", recipient: "group", po_version: 1, sent_by_name: "Shasha", po_revisions: null }] : [],
+      purchase_order_lines: [],
+    }],
+    destinations: [{ id: "dest-klang", name: "Carres Klang Warehouse", is_default: true }],
+    referencedDestinations: [],
+    messageTemplate: "Hi {supplier}, please find our purchase order {po} attached. Thank you.",
+  };
+};
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -276,7 +367,17 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (/\/api\/operation\/pos\/for-order\//.test(url)) return json({ purchaseOrders: SUPPLIERS });
   if (/\/loan-offers/.test(url)) return json({ offers: loanOn ? [{ id: "lo-1", seq: 1, order_id: ORDER, event: "offered", item_id: null, label: "Loan sofa", reason: null, recorded_by: ME, recorded_at: `${REAL_TODAY}T01:00:00Z`, unit_id: null }] : [] });
   if (/\/api\/operation\/staff(\?|$)/.test(url)) return json({ staff: [{ user_id: ME, email: "sha@carres.co", name: "Shasha", pooled: true, available: true, note: null, last_seen_at: null, duties: [] }], myDuties: [] });
-  if (/\/api\/operation\/suppliers(\?|$)/.test(url)) return json({ suppliers: [{ id: "s-1", name: "Sleepwell", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, whatsapp_group_url: "https://chat.whatsapp.com/sleepwell" }] });
+  if (/\/api\/operation\/suppliers(\?|$)/.test(url)) return json({ suppliers: [{ id: "s-1", name: "Sleepwell", kind: "own_logistics", cat_covered: [], lead_time: null, contact: null, whatsapp_group_url: "https://chat.whatsapp.com/sleepwell" }, ...WINDOW_SUPPLIERS] });
+  if (/\/api\/operation\/purchase\/demands/.test(url)) {
+    return json({
+      ...SO_BATCH,
+      registerRows: SO_BATCH.registerRows.map((r) => ({ ...r, pos: r.pos.map((p) => ({ ...p, sentCurrentVersion: sentPos.has(p.poId) })) })),
+    });
+  }
+  const poConfirm = /\/api\/operation\/pos\/([^/]+)\/confirm-sent/.exec(url);
+  if (poConfirm) { sentPos.add(decodeURIComponent(poConfirm[1]!)); return json({ ok: true }); }
+  const onePo = /\/api\/operation\/pos\?[^#]*poId=([^&]+)/.exec(url);
+  if (onePo) return json(poRow(decodeURIComponent(onePo[1]!)));
   if (/\/api\/operation\/delivery-arrangements(\?|$)/.test(url)) return json(ARRANGEMENTS);
   if (/\/api\/operation\/delivery-orders(\?|$)/.test(url)) return json({ deliveryOrders: [], attempts: [], handoverEvents: [], proofReviews: [], attemptEvidence: [] });
   if (/\/logistics-card/.test(url)) return json(facts());

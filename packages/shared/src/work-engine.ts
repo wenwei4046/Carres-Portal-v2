@@ -326,14 +326,19 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     completionFact: "a sent mark for every linked current PO version (po_sends)",
   },
   {
-    key: "purchasing.confirm_ready_date",
+    /* ⭐ ONE OCCURRENCE PER PO WINDOW (Purchasing §5.6.1, owner rulings
+     * 2026-09-24/25). Replaces the per-Sales-Order `issue_po` card in Work and
+     * the retired `confirm_ready_date` (Purchasing §5.7/§5.8): the calculated
+     * PO Delivery Date is not a confirmation, and the day-before check is the
+     * supplier-date work. */
+    key: "purchasing.po_window",
     module: "purchasing",
-    trigger: "an open PO owing goods with no standing ready/arrival promise",
+    trigger: "eligible SO demand is stamped into a daily PO window, or a PO issued from that window has an unsent current version",
     owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
     ownerRule: "po_duty",
-    action: "Confirm ready date",
-    dueRule: "customer date − buffer (OFFICE week) − production (FACTORY week)",
-    completionFact: "a standing promise row (po_supplier_promises)",
+    action: "Issue the POs by {window time}",
+    dueRule: "the window's own time on its day — PO Days that are Office working days; a supplier's earlier cut-off is its own window",
+    completionFact: "no eligible demand left in the window and every PO issued from it has its current version marked sent (po_sends confirmed_sent)",
   },
   {
     key: "payment.collect_customer_balance",
@@ -488,7 +493,7 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
   "manual_purchase.approve": "The approval or refusal decision is recorded",
   "manual_purchase.issue_po": "Every linked current PO version marked as sent",
-  "purchasing.confirm_ready_date": "A standing supplier promise is recorded",
+  "purchasing.po_window": "Every PO issued from the window has its current version marked as sent",
   "payment.collect_customer_balance": "The outstanding balance is RM 0",
   "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",
   "payment.missed_promise": "The outstanding balance is RM 0",
