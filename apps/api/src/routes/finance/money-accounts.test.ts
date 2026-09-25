@@ -104,6 +104,29 @@ describe("the list", () => {
     expect(sb.from).not.toHaveBeenCalled();
   });
 
+  it.each(["PGRST202", "42883"])("before SQL 23 runs (%s), the card accounts come from 0576's two reads", async (code) => {
+    const rows = [
+      { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true },
+      { code: "1131", name: "Card", money_kind: "HOLDING", is_active: true },
+      { code: "1133", name: "Stripe", money_kind: "HOLDING", is_active: true },
+    ];
+    const sb = stubRpc({ data: rows, error: null }, { data: null, error: { code, message: "not found" } });
+    const inFn = vi.fn(() => Promise.resolve({ data: [{ account_code: "1131" }], error: null }));
+    sb.from.mockImplementation((table: string) =>
+      table === "gl_payment_account_map"
+        ? { select: () => ({ in: inFn }) }
+        : { select: () => Promise.resolve({ data: [{ holding_code: "1133" }], error: null }) },
+    );
+    const res = await call("GET", "");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { code: string; is_card_account: boolean }[]).map((r) => [r.code, r.is_card_account])).toEqual([
+      ["1121", false],
+      ["1131", true],
+      ["1133", true],
+    ]);
+    expect(inFn).toHaveBeenCalledWith("method", ["card", "credit_card", "debit_card"]);
+  });
+
   it("card accounts that could not be read are an error, never a list with none marked", async () => {
     stubRpc({ data: [{ code: "1131", name: "Card", money_kind: "HOLDING", is_active: true }], error: null }, {
       data: null,

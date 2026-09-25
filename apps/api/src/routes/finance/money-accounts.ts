@@ -43,9 +43,23 @@ financeMoneyAccountsRouter.get("/", requireFinance, async (c) => {
   // (`_card_payout_holdings()`), the one gl_money_move_create refuses a card
   // payout from: mapped, routed, or posted to by a card sale.
   const [list, card] = await Promise.all([sb.rpc("gl_money_accounts_list"), sb.rpc("gl_card_accounts_list")]);
-  const error = list.error ?? card.error;
-  if (error) return fail(c, error);
-  const cardCodes = new Set((card.data ?? []) as string[]);
+  if (list.error) return fail(c, list.error);
+  let cardCodes: Set<string>;
+  if (!card.error) cardCodes = new Set((card.data ?? []) as string[]);
+  else if (card.error.code === "PGRST202" || card.error.code === "42883") {
+    // Deployed before SQL 23 ran: the list isn't there yet, so read 0576's
+    // two sources, as before 0583. ponytail: drop this once 0583 is applied.
+    const [mapped, routed] = await Promise.all([
+      sb.from("gl_payment_account_map").select("account_code").in("method", ["card", "credit_card", "debit_card"]),
+      sb.from("card_settlement_routes").select("holding_code"),
+    ]);
+    const error = mapped.error ?? routed.error;
+    if (error) return fail(c, error);
+    cardCodes = new Set([
+      ...((mapped.data ?? []) as { account_code: string }[]).map((r) => r.account_code),
+      ...((routed.data ?? []) as { holding_code: string }[]).map((r) => r.holding_code),
+    ]);
+  } else return fail(c, card.error);
   const rows = (list.data ?? []) as Omit<MoneyAccountRow, "is_card_account">[];
   return c.json(rows.map((r): MoneyAccountRow => ({ ...r, is_card_account: cardCodes.has(r.code) })));
 });
