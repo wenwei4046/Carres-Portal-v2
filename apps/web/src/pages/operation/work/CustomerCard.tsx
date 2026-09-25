@@ -37,6 +37,8 @@ import {
   type DeliveryContactChannelKey,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
+import Select from "@/components/kit/Select";
 import DatePicker from "@/components/kit/DatePicker";
 import Icon from "@/components/kit/Icon";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -420,24 +422,25 @@ export default function CustomerCard({
               else void saveReply();
             }}
           >
-            <fieldset className="flex flex-wrap gap-2">
-              <legend className="mb-1 text-label text-kit-slate-11">{C.channel}</legend>
-              {(["whatsapp", "call", "email"] as Channel[]).map((ch) => (
-                <label key={ch} className="inline-flex min-h-10 items-center gap-1.5 text-body text-kit-slate-12">
-                  <input type="radio" name="customer-channel" checked={channel === ch} onChange={() => setChannel(ch)} />
-                  {ch === "whatsapp" ? "WhatsApp" : ch === "call" ? "Call" : "Email"}
-                </label>
-              ))}
-            </fieldset>
-            <fieldset className="flex flex-col">
-              <legend className="mb-1 text-label text-kit-slate-11">{C.reply}</legend>
-              {CUSTOMER_REPLIES.filter((r) => ["accepted_date", "another_date", "no_answer", "details_changed"].includes(r.key)).map((r) => (
-                <label key={r.key} className="inline-flex min-h-10 items-center gap-1.5 text-body text-kit-slate-12">
-                  <input type="radio" name="customer-reply" checked={reply === r.key} onChange={() => setReply(r.key)} data-testid={`party-customer-reply-${r.key}`} />
-                  {r.label}
-                </label>
-              ))}
-            </fieldset>
+            <Select
+              id={`customer-channel-${orderId}`}
+              label={C.channel}
+              value={channel}
+              onValueChange={(v) => setChannel(v as Channel)}
+              options={[
+                { value: "whatsapp", label: "WhatsApp" },
+                { value: "call", label: "Call" },
+                { value: "email", label: "Email" },
+              ]}
+            />
+            <Select
+              id={`customer-reply-${orderId}`}
+              label={C.reply}
+              value={reply ?? undefined}
+              onValueChange={(v) => setReply(v as CustomerReplyKey)}
+              placeholder={C.reply}
+              options={CUSTOMER_REPLIES.filter((r) => ["accepted_date", "another_date", "no_answer", "details_changed"].includes(r.key)).map((r) => ({ value: r.key, label: r.label }))}
+            />
             {reply === "another_date" ? (
               <DatePicker id={`customer-asked-${orderId}`} label={C.askedDate} value={askedIso} onChange={setAskedIso} required />
             ) : null}
@@ -461,10 +464,7 @@ export default function CustomerCard({
               </p>
             ) : null}
             {reply && reply !== "details_changed" && reply !== "accepted_date" ? (
-              <label className="inline-flex min-h-10 items-center gap-1.5 text-body text-kit-slate-12">
-                <input type="checkbox" checked={addressChecked} onChange={(e) => setAddressChecked(e.target.checked)} />
-                {C.addressChecked}
-              </label>
+              <Checkbox id={`customer-address-${orderId}`} label={C.addressChecked} checked={addressChecked} onCheckedChange={setAddressChecked} />
             ) : null}
             <div className="flex flex-wrap gap-2">
               {reply !== "details_changed" ? (

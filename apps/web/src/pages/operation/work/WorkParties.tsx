@@ -113,6 +113,16 @@ function Mission({ orderId, item }: { orderId: string; item: OperationWorkItem }
         partyOfWork(item),
       );
 
+  /* The ONE blue belongs to the most urgent party — unless the operator opened
+     another card that has an act of its own: then the blue sits on the card
+     in front of them, so exactly one blue is always visible. */
+  const openHasAct =
+    openParty === "logistics" ? Boolean(lm.model?.currentAction)
+    : openParty === "customer" ? true // Record reply is always an act
+    : openParty === "supplier" ? supplierTiming !== null
+    : false;
+  const visiblePrimary = !embedded && openParty && openParty !== primary && openHasAct ? openParty : primary;
+
   /* Opening a card from the Route brings it into view. */
   const [scrollTo, setScrollTo] = useState<Party | null>(null);
   useEffect(() => {
@@ -134,10 +144,10 @@ function Mission({ orderId, item }: { orderId: string; item: OperationWorkItem }
         }}
       />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
-        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={primary === "logistics"} />
+        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={visiblePrimary === "logistics"} />
       </div>
-      <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={primary === "customer"} />
-      <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={primary === "supplier"} />
+      <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={visiblePrimary === "customer"} />
+      <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={visiblePrimary === "supplier"} />
     </div>
   );
 }
