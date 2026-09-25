@@ -317,7 +317,7 @@ import {
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema } from "@carres/shared";
+import { operationWorkResponseSchema, type LogisticsCardFacts } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -7089,6 +7089,45 @@ export function useSaveDeliveryArrangement(orderId: string | undefined, leg = 0)
       void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
   });
+}
+
+/**
+ * THE LOGISTICS CARD'S DELIVERY FACTS (0581) — the partner and whether it has
+ * a portal, the stock route read from Purchasing/Stock, the external link, the
+ * partner's latest answer and recent history. Nested under the scope's
+ * `delivery-arrangement` key, so every arrangement save refreshes it.
+ */
+export function useLogisticsCardFacts(orderId: string | null, leg = 0) {
+  return useQuery<LogisticsCardFacts, ApiError>({
+    queryKey: ["operation", "delivery-arrangement", orderId ?? "", "logistics-card", leg],
+    queryFn: () =>
+      apiFetch<LogisticsCardFacts>(`/api/operation/delivery-arrangements/${orderId}/logistics-card?leg=${leg}`),
+    enabled: Boolean(orderId),
+    staleTime: 15_000,
+  });
+}
+
+/** Create link · Revoke link (0581). Two explicit acts: a new link is only
+ *  ever created after the old one is revoked. */
+export function useDeliveryLinkActs(orderId: string | null, leg = 0) {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+  const create = useMutation({
+    mutationFn: () =>
+      apiFetch<{ link: { id: string; token: string; created_at: string } }>(
+        `/api/operation/delivery-arrangements/${orderId}/link?leg=${leg}`,
+        { method: "POST" },
+      ),
+    onSuccess: refresh,
+  });
+  const revoke = useMutation({
+    mutationFn: () =>
+      apiFetch<{ revoked: boolean }>(`/api/operation/delivery-arrangements/${orderId}/link/revoke?leg=${leg}`, {
+        method: "POST",
+      }),
+    onSuccess: refresh,
+  });
+  return { create, revoke };
 }
 
 export function useDeliveryOrdersRegister(opts?: { orderId?: string; enabled?: boolean }) {

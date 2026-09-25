@@ -181,7 +181,10 @@ function ReplyProofField({
 }
 
 /* ── PANEL 2 · the Delivery Dates edit state (§8.6) ─────────────────────── */
-function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard; onDone: () => void }) {
+/** Exported for the Work Logistics card (owner ruling 2026-09-24): Work
+ *  embeds THIS Delivery-owned form and calls the same door — it never draws a
+ *  second form for the same act (Law C). */
+export function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard; onDone: () => void }) {
   const row = card.scope;
   const arrangement = row.arrangement;
   const leg = card.leg ?? 0;
@@ -292,7 +295,17 @@ function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard; onDone
 }
 
 /* ── PANEL 3 · the Logistics Details edit state (§8.6) ───────────────────── */
-function LogisticsDetailsEdit({ card, onDone }: { card: DeliveryMonitorCard; onDone: () => void }) {
+/** Exported for the Work Logistics card, like `DeliveryDatesEdit`. `linkUrl`
+ *  is the scope's active external link, inserted into the prepared message. */
+export function LogisticsDetailsEdit({
+  card,
+  onDone,
+  linkUrl = null,
+}: {
+  card: DeliveryMonitorCard;
+  onDone: () => void;
+  linkUrl?: string | null;
+}) {
   const row = card.scope;
   const arrangement = row.arrangement;
   const leg = card.leg ?? 0;
@@ -321,7 +334,7 @@ function LogisticsDetailsEdit({ card, onDone }: { card: DeliveryMonitorCard; onD
   const chaseMessage = useMemo(
     () =>
       chaseMessageFor({
-        so: row.so,
+        reference: (row.o.source_ref ?? []).filter(Boolean).join(" · ") || null,
         customer: displayCustomerName(row.o.customer_name) || null,
         address:
           trim(row.o.customer_address) ||
@@ -330,8 +343,9 @@ function LogisticsDetailsEdit({ card, onDone }: { card: DeliveryMonitorCard; onD
         building: trim(row.o.building_type) || null,
         goods: (row.o.order_lines ?? []).map((l) => lineName({ sku: l.sku })),
         requestedDate: row.customerDeliveryIso ? fmtDate(row.customerDeliveryIso) : null,
+        linkUrl,
       }),
-    [row],
+    [row, linkUrl],
   );
   const copyChase = async () => {
     try {
@@ -853,10 +867,8 @@ export default function DeliveryBrief({
             label={MONITOR_COPY.confirmedDate}
             value={card.confirmedDate ? fmtDate(card.confirmedDate) : absentWord(MONITOR_COPY.notConfirmed)}
           />
-          <Fact
-            label={MONITOR_COPY.confirmedTime}
-            value={card.confirmedTime ?? absentWord(MONITOR_COPY.noTimeAgreed)}
-          />
+          {/* Time is optional (owner ruling 2026-09-24): printed only when recorded. */}
+          {card.confirmedTime ? <Fact label={MONITOR_COPY.confirmedTime} value={card.confirmedTime} /> : null}
         </div>
       )}
     </Panel>
@@ -945,7 +957,7 @@ export default function DeliveryBrief({
             <div className="break-words">{stop.from_loc || DW.notRecorded} → {stop.to_loc || DW.notRecorded}</div>
             <div>{booking?.partner_name ?? stop.partner_name ?? MONITOR_COPY.noLogistics}</div>
             <div>{date ? fmtDate(date) : MONITOR_COPY.notConfirmed}</div>
-            <div>{time || MONITOR_COPY.noTimeAgreed}</div>
+            {time ? <div>{time}</div> : null}
           </div>;
         })}
       </div> : null}

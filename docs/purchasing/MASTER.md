@@ -348,6 +348,21 @@ from Warehouse authority. An external destination does not create Carres Stock m
 can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
 exist, a new destination may not silently invent who receives or what Stock consequence follows.
 
+**The destination decides the customer delivery's stock route — owner ruling 2026-09-24
+(Workspace §5.9).** A destination resolving to an own Site is `Pickup from Carres Klang Warehouse`;
+one resolving to a partner Site (AL Sungai Buloh, HOUZS) is `Supplier sends directly to logistics`;
+one with no Site (Ohana) is the separate supplier-to-customer flow. `Pickup from supplier` (the
+logistics company collects at the factory; no GRN) needs a Purchasing fact that does not exist yet
+and a Stock `Collected from supplier` custody event — **APPROVED TARGET / NOT BUILT**. Work and
+Delivery only READ the route; changing it stays a Purchasing edit (a new PO version once sent).
+
+**Work Supplier card and Route (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10)** read, per
+PO serving one Sales Order: issued or not, the immutable `PO Delivery Date`, the latest supplier
+reply (word, reason, evidence) and `effectiveArrivalOf`, the PO's Supplier DO (`do_number`,
+`do_uploaded_at`), Deliver To and the Warehouse's GRN date — through
+`GET /api/operation/pos/for-order/:orderId`. Nothing is written from Work; recording a supplier
+answer stays `Open {PO No}` until the reply rule is admitted as an embedded action.
+
 **ONE PO MAY CARRY SEVERAL DELIVER TO — owner ruling (Jess, 2026-09-22).** A sofa PO is always one
 Deliver To. A mattress or bedframe PO may send its goods to one or several governed Deliver To
 destinations; each goods line names its own (a null line follows the PO default). Moving goods to
@@ -484,6 +499,21 @@ Supplier out-of-stock, delayed model/fabric, changed quantity or changed price i
 A supplier price change stops the issue/change and routes to the commercial approver; Operations
 does not decide it.
 
+#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; target, not built
+
+SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
+Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
+and one optional editable second standard window, initially `4:00 PM`. The second window may be
+switched off. Demand admitted before a window belongs to that next valid window; demand after the
+last enabled window belongs to the next Purchasing working day's first window. A supplier's
+governed earlier cut-off always wins and may never be placed in a later invalid window.
+
+Workspace projects one actionable window occurrence over the exact eligible demand, never one card
+per SO. Opening it preserves that demand scope in SO Batch Purchase. Review groups lines by
+supplier and one confirmation may issue separate supplier POs. The scope is source-line demand;
+matching one SO never silently includes its unrelated lines. How an exceptional earlier supplier
+window is visually composed remains a UI decision, not a reason to falsify its due time.
+
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
 - **THE VERSION IS DECLARED, NOT READ BACK.** The confirmation states the version it RENDERED;
@@ -562,6 +592,27 @@ governed transport planning facts or silently rewrite SO safety calculations.
   last. The reply door and the balance-date door both call it; the SO-ref-inferring
   `purchasing_push_supplier_date` projection is retired. It writes goods-arrival planning only;
   the customer promise is a separate Sales fact it never touches.
+
+**SUPPLIER DELAY EVIDENCE — owner-approved 2026-09-24; target, not built.** Confirmed sending of
+the first/current PO version opens `Waiting for goods from supplier`; it does not require an
+immediate reply merely repeating the calculated PO Delivery Date, and that default/planned date is
+never labelled `Confirmed`. If the supplier reports that it cannot meet the effective arrival,
+PO Duty records the answer against the exact PO/version with a required new date, at least one
+WhatsApp screenshot (more may be retained) and one required governed reason:
+`Production delay` · `Material unavailable` · `Capacity / scheduling delay` ·
+`Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` ·
+`Partial quantity ready` · `Other`. `Other` alone requires a short note. Missing date, reason or
+screenshot refuses the record. Evidence is append-only with supplier, recorder and server time;
+the immutable original PO Delivery Date and earlier answers are never overwritten. The existing
+arrival arithmetic recomputes only the affected open source-line scope and reports customer impact.
+
+One Office working day before the effective expected arrival,
+`purchasing.confirm_tomorrows_delivery` asks for either the **Supplier DO** or evidenced supplier
+confirmation that the named goods will be sent/delivered to the named Warehouse on that exact next
+day. `Supplier DO` is distinct from Carres's customer Delivery Order. A later delay records another
+reason/date/evidence occurrence, retires the old date-specific obligation and derives the check for
+the new effective date. Neither a promise nor a Supplier DO proves physical receipt; only Receiving
+and its GRN establish Goods Received Date, quantity, condition and location.
 - **THE SENT DOCUMENT IS KEPT, PER VERSION.** The first confirmed send of a version freezes the
   full `purchasing_po_document` payload in `po_version_documents`; a resend of the same version
   reuses the same recorded facts, and Revisions can reprint exactly what the supplier received
@@ -580,7 +631,7 @@ The operator sees facts, not a vague workflow:
 ```text
 Confirm PO sent to supplier
 Waiting for goods from supplier
-Supplier has not confirmed the PO date
+Confirm tomorrow's supplier delivery
 Supplier Confirmed Delivery Date changed
 Supplier delivery date passed
 Partly received
@@ -599,10 +650,11 @@ a sent mark stays in `Completed`; its cell may still say `Sending not confirmed`
 Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
 Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
 Delivery Qty and never create available stock. A supplier date may split by quantity. An
-unconfirmed, passed or changed supplier promise creates supplier-contact work; it never rewrites
-the original PO Delivery Date or the customer promise. Confirmation work begins only after the
-current PO version has confirmed-sent evidence, Pending Delivery Qty is above zero and no supplier
-answer exists for that version.
+passed or changed supplier promise creates supplier-contact work; it never rewrites the original
+PO Delivery Date or the customer promise. An absent immediate answer after confirmed sending does
+not create work. Date-specific confirmation opens only one Office working day before the effective
+arrival while Pending Delivery Qty remains above zero; an earlier evidenced exception may revise
+that effective date and therefore the future occurrence.
 
 ---
 
@@ -1024,8 +1076,8 @@ summary. Action ownership uses structured avatar metadata.
 Official UI language is English at primary-school reading level.
 
 ```text
-Supplier has not confirmed the PO date
-[YJ] Ask Dorsettloft to confirm the PO delivery date
+Confirm tomorrow's supplier delivery
+[YJ] Ask Dorsettloft for the Supplier DO or confirmation for Fri, 28 Aug
 ```
 
 Line 1 is the authoritative blocking fact. Line 2 is a smaller 11px action. The avatar is structured
@@ -2629,8 +2681,9 @@ current group's header is sticky inside its own group and stops at its boundary.
 number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**, once, for every
 grouped listing page; this section neither restates its mechanics nor varies them.
 
-**Rail — owner correction Jess 2026-09-18, BUILT 2026-09-18.** `Supplier reply` contains
-`Supplier has not confirmed the PO date`, `Supplier Confirmed Delivery Date changed` and
+**Rail — owner correction Jess 2026-09-18, BUILT 2026-09-18; missing-confirmation row superseded
+2026-09-24.** `Supplier reply` contains `Confirm tomorrow's supplier delivery` when its exact-date
+trigger opens, `Supplier Confirmed Delivery Date changed` and
 `Supplier delivery date passed`, using the existing current-version sent/pending predicates.
 `Receiving` contains `Partly received`. `Supplier` and `Supplier Deliver To` keep their facts and
 selection rules. **The complete label is used everywhere — row, active-condition chip and export —
@@ -4732,8 +4785,7 @@ invoice/settlement.
 | Manual Purchase Request awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase Request · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |
 | Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue PO` (same business context; distinct by request UUID) | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
-| Supplier has not confirmed the PO date | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka to confirm the PO delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact sent PO version |
-| Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |
+| Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Supplier DO or actual matching-date answer, channel, evidence, recorder and times exist on the exact PO |
 | Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
 | Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |

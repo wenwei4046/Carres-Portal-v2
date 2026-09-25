@@ -160,8 +160,8 @@ describe("DeliveryOrdersRegister", () => {
       "Customer",
       "Status",
       "Requested Delivery Date",
-      "Confirmed Delivery",
-      "Confirmed Time",
+      "Scheduled delivery",
+      "Scheduled time",
       "Logistics",
       "Delivery Location",
       "Driver submission",
@@ -171,7 +171,7 @@ describe("DeliveryOrdersRegister", () => {
     const at = (label: string) => headers.findIndex((h) => h.includes(label));
     expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
     /* ADJACENT — nothing may be inserted between the request and the answer. */
-    expect(at("Confirmed Delivery") - at("Requested Delivery Date")).toBe(1);
+    expect(at("Scheduled delivery") - at("Requested Delivery Date")).toBe(1);
     /* `DO date` follows the number it dates, not the far end of the sheet. */
     expect(at("DO date") - at("DO No")).toBe(1);
     /* ONE status column: the separate default `Delivery Result` is retired,
@@ -212,7 +212,7 @@ describe("DeliveryOrdersRegister", () => {
     const cellUnder = (label: string) =>
       cells[headers.findIndex((h) => h.includes(label))] ?? "";
     expect(cellUnder("Requested Delivery Date")).toContain("20 Aug");
-    expect(cellUnder("Confirmed Delivery")).toContain("24 Aug");
+    expect(cellUnder("Scheduled delivery")).toContain("24 Aug");
     expect(cellUnder("DO date")).toContain("17 Aug");
   });
 
@@ -716,8 +716,8 @@ describe("DeliveryOrdersRegister", () => {
         orders: { ...doRow().orders, ops_order_control: { delivery_photos: [] } },
       }),
     ]);
-    expect(screen.getAllByText("No confirmed date").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("No logistics picked").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Not scheduled").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Logistics not assigned").length).toBeGreaterThan(0);
     /* Nothing recorded yet: nothing is due, and the cell says so. */
     expect(screen.getAllByText("Not delivered yet").length).toBeGreaterThan(0);
     expect(screen.getAllByText("No signed document yet").length).toBeGreaterThan(0);

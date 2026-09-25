@@ -751,11 +751,11 @@ export default function DeliveryOrdersRegister() {
           (a.requestedDelivery ?? "").localeCompare(b.requestedDelivery ?? ""),
       },
       {
-        /* `Confirmed Delivery` — the agreed operational day (COPY-STANDARD;
-           the ambiguous `Delivery date` label is retired by the 2026-09-06
-           correction). `Confirmed Time` is its own column in the chooser. */
+        /* `Scheduled delivery` — the agreed operational day (owner ruling
+           2026-09-24 overwrites `Confirmed Delivery`). `Scheduled time` is
+           its own optional column in the chooser. */
         key: "confirmed_delivery",
-        label: "Confirmed Delivery",
+        label: "Scheduled delivery",
         width: 150,
         sortable: true,
         chooserGroup: "Dates",
@@ -776,7 +776,7 @@ export default function DeliveryOrdersRegister() {
       },
       {
         key: "confirmed_time",
-        label: "Confirmed Time",
+        label: "Scheduled time",
         width: 120,
         sortable: true,
         filterType: "enum",

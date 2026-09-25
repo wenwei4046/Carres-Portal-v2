@@ -757,7 +757,7 @@ function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
     kind: "logistics",
     title: "LOGISTICS",
     complete: Boolean(name),
-    lines: name ? [name] : ["No logistics chosen yet"],
+    lines: name ? [name] : ["Logistics not assigned"],
     action: {
       ownerKey: "delivery",
       label: "Assign logistics",
@@ -776,10 +776,12 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
     id: "delivery-date",
     kind: "delivery-date",
     title: "DELIVERY DATE",
-    complete: Boolean(confirmed && booking?.slot),
+    /* Owner ruling 2026-09-24: the Scheduled date completes it; the time is
+       optional and printed only when recorded. */
+    complete: Boolean(confirmed),
     lines: confirmed
-      ? [dated("Delivery appointment", confirmed), booking?.slot ?? "Slot not confirmed"]
-      : ["Date + slot not confirmed", dated("Customer requested", input.order.deliveryDate)],
+      ? [dated("Scheduled delivery", confirmed), ...(booking?.slot ? [booking.slot] : [])]
+      : ["Not scheduled yet", dated("Requested delivery", input.order.deliveryDate)],
     action: {
       ownerKey: "sales",
       label: "Confirm delivery date",
@@ -1056,12 +1058,12 @@ function gateRequirements(
     {
       id: "logistics",
       met: Boolean(logisticsName),
-      text: logisticsName ? `Logistics chosen (${logisticsName})` : "No logistics chosen",
+      text: logisticsName ? `Logistics chosen (${logisticsName})` : "Logistics not assigned",
     },
     {
       id: "appointment",
-      met: Boolean(confirmed && booking?.slot),
-      text: confirmed && booking?.slot ? "Date + slot confirmed" : "Date + slot not confirmed",
+      met: Boolean(confirmed),
+      text: confirmed ? "Scheduled delivery recorded" : "Scheduled delivery not recorded",
     },
     moneyRequirement(input),
     financeExceptionRequirement(input),

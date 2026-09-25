@@ -135,7 +135,7 @@ describe("CalendarPanel — confirmed is the only green", () => {
       confirmed(TODAY, { so: 1211, delivery_partner_id: null, delivery_partners: null }),
     ];
     render(<CalendarPanel />);
-    expect(within(day(TODAY)!).getAllByText("No logistics picked").length).toBeGreaterThan(0);
+    expect(within(day(TODAY)!).getAllByText("Logistics not assigned").length).toBeGreaterThan(0);
   });
 });
 

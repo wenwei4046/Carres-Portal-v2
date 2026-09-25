@@ -237,7 +237,7 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(attempt.outcome).toBe("blocked");
     expect(
       attempt.outcome === "blocked" && attempt.reasons.join(" "),
-    ).toContain("has not confirmed a delivery date");
+    ).toContain("has no scheduled date yet");
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 

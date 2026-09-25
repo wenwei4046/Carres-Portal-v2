@@ -98,6 +98,19 @@ export default {
           // is the only piece proto adds on top.
           soft: "hsl(var(--error-soft))",
         },
+        /* The Work page's own ladder (Work middle-card kit, 2026-09-24).
+         * Values live in index.css; only Work reads these names. */
+        work: {
+          line: "var(--work-line)",
+          "line-hover": "var(--work-line-hover)",
+          ink: "var(--work-ink)",
+          slate: "var(--work-slate)",
+          muted: "var(--work-muted)",
+          tabs: "var(--work-tabs)",
+          "missed-fill": "var(--work-missed-fill)",
+          "missed-line": "var(--work-missed-line)",
+          "missed-ink": "var(--work-missed-ink)",
+        },
         /* ⭐ THE KIT PALETTE (UI-KIT §3.2 · §3.3, card D0.5a) — Radix steps,
          * namespaced under `kit` so they ADD to the palette instead of
          * overriding Tailwind's own blue/green/amber/red, which 76 live class
@@ -160,6 +173,9 @@ export default {
         body: ["13px", { lineHeight: "18px", fontWeight: "400" }],
         meta: ["12px", { lineHeight: "16px", fontWeight: "400" }],
         label: ["11px", { lineHeight: "14px", fontWeight: "500" }],
+        /* The workspace toolbar control (Work, owner density ruling
+           2026-09-25): 14/20 in a 36px (40px below 600px) control. */
+        control: ["14px", { lineHeight: "20px", fontWeight: "400" }],
       },
       fontFamily: {
         // v17 (2026-06-09): Inter is the workhorse UI font for body + display.
@@ -257,6 +273,7 @@ export default {
         pill: "4px", // pill · small tag · checkbox
         control: "6px", // button · input · dropdown
         card: "10px", // card · panel · modal · drawer
+        work: "9px", // Work page sections and middle cards (Work kit 2026-09-24)
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
