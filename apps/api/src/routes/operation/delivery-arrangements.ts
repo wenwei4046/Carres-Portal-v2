@@ -962,7 +962,9 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
           : "confirm_delivery_date",
       channel: input.replyProofPath ? "whatsapp" : "call",
       contactedPerson: from === "partner" ? "partner" : "customer",
-      result: input.confirmedDate && input.confirmedTime ? "confirmed" : "requested_another_date",
+      /* A scheduled DATE is the agreement — the time is optional (owner ruling
+         2026-09-24). A date-only save used to record `requested_another_date`. */
+      result: input.confirmedDate ? "confirmed" : "requested_another_date",
       replyEvidencePath: input.replyProofPath ?? null,
       onBehalfOfPartnerId: from === "customer" ? null : nextPartner,
       nextAction: null,

@@ -40,7 +40,7 @@ import {
   orderActionLines,
   type OrderActionKey,
 } from "@carres/shared";
-import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
+import { collectionOwnerResolution, customerWaitingOf, type CollectionOwnerContextRow } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { userClient } from "../../lib/supabase";
@@ -198,6 +198,8 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** §6.1 (0489) — the proof reviews and attempt evidence per document
    *  number, read once. Absent ⇒ no review work is composed. */
   proofFacts?: ProofFactsByDo | null;
+  /** Delivery's latest customer contact per order — the Waiting tab's fact. */
+  customerContacts?: ReadonlyMap<string, LatestCustomerContact> | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -306,6 +308,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
       logistics:
         input.partnerNameById?.get(row.delivery_partner_id ?? row.ops_assigned_logistic ?? "") ?? null,
       deliveryOrderNumber: row.do_number ?? null,
+      latestCustomerContact: input.customerContacts?.get(row.id) ?? null,
       today: input.today,
     });
   });
@@ -822,6 +825,34 @@ const ORDER_RESULT: Record<string, string> = {
   ask_delivery_date: "Customer Delivery exists or Not yet is recorded",
 };
 
+/**
+ * THE WAITING TAB'S FACT (Workspace §5.9). Only the customer's delivery-date
+ * items carry it, and only a RECORDED result says waiting — silence never
+ * does (0487). The follow-up day is `customerFollowUpIso` via the shared
+ * `customerWaitingOf`, the same answer the Customer card prints (Law D).
+ */
+export function customerCommunicationOf(
+  ruleKey: string,
+  latest: LatestCustomerContact | null,
+  customer: string | null,
+  today: string,
+): OperationWorkItem["communication"] {
+  if (!latest || (ruleKey !== "confirm_delivery_date" && ruleKey !== "arrange_new_delivery_date")) return null;
+  const { waiting, followUpIso } = customerWaitingOf({
+    latest: { atIso: latest.contacted_at, result: latest.result_key as never },
+    todayIso: today,
+    holidays: myHolidaySet(),
+  });
+  const replied = !["waiting_for_customer_reply", "no_answer"].includes(latest.result_key);
+  return {
+    channel: latest.channel,
+    recipient: customer?.trim() || "Customer",
+    sentAt: new Date(latest.contacted_at).toISOString(),
+    replyState: waiting ? "waiting" : replied ? "replied" : "not_sent",
+    replyDueOn: followUpIso,
+  };
+}
+
 export function projectSalesOrderWork(input: {
   open: readonly OrderOpenAction[];
   context: OrderWorkContext;
@@ -829,6 +860,8 @@ export function projectSalesOrderWork(input: {
   /** The order's Logistics Partner, by name, for the Delivery lines. */
   logistics?: string | null;
   deliveryOrderNumber?: string | null;
+  /** Delivery's latest customer contact (0487) — Workspace §5.9 Waiting. */
+  latestCustomerContact?: LatestCustomerContact | null;
   today: string;
   workingDays?: WorkingDayOptions;
   queueLeads?: DeliveryQueueLeads;
@@ -883,6 +916,7 @@ export function projectSalesOrderWork(input: {
       requiredResult:
         lines?.result ?? ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
       destination,
+      communication: customerCommunicationOf(item.ruleKey, input.latestCustomerContact ?? null, input.customer, input.today),
       interaction: item.ruleKey === "check_delivery_proof" && deliveryOrder
         ? {
             mode: "embedded",
@@ -1290,6 +1324,26 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
   return { reviews, evidenceAt };
 }
 
+/** A customer's latest delivery contact, per order (leg 0) — Delivery's
+ *  `ops_delivery_contacts` (0487). It answers ONLY the Waiting tab; a failed
+ *  read leaves every item in To do (never hides work). */
+export type LatestCustomerContact = { contacted_at: string; result_key: string; channel: string };
+async function readLatestCustomerContacts(c: Context<AppEnv>): Promise<Map<string, LatestCustomerContact>> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("ops_delivery_contacts")
+    .select("order_id, contacted_at, result_key, channel")
+    .eq("contacted_person", "customer")
+    .eq("leg", 0)
+    .order("contacted_at", { ascending: false });
+  const latest = new Map<string, LatestCustomerContact>();
+  if (error) return latest;
+  for (const row of (data ?? []) as Array<LatestCustomerContact & { order_id: string }>) {
+    if (!latest.has(row.order_id)) latest.set(row.order_id, row);
+  }
+  return latest;
+}
+
 /**
  * §6 — `Check the stored furniture`, every configured interval.
  *
@@ -1367,7 +1421,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
+         invoices, outcomes, refunds, issueSource, timingRules, proofFacts, customerContacts] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1403,6 +1457,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
       readCollectionTimingRules(c),
       readProofFacts(c),
+      readLatestCustomerContacts(c),
     ]);
   const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -1449,6 +1504,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     invoiceStorageByOrder,
     timingRules,
     proofFacts,
+    customerContacts,
   };
   // Owner ruling 2026-09-17 — routine Delivery work is the order's responsible
   // Operation person. A probe pass per order learns which orders carry a
