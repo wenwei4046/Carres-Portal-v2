@@ -180,7 +180,7 @@
 </div>
 <script>
   (function(){
-    var rows=[].slice.call(document.querySelectorAll('#rows tr'));
+    var rows=[].slice.call(document.querySelectorAll('#rows > tr'));
     var rail=[].slice.call(document.querySelectorAll('.rail .row'));
     var words={missed:'Missed',ask:'Ask customer today',due:'Payment due today',promised:'Customer promised to pay today',storage:'Storage Invoice not paid',later:'Payment due later',nodate:'No delivery date',goods:'Waiting for goods',hold:'Finance hold',review:'Needs review',paid:'Paid orders',all:'All unpaid orders'};
     function money(tr){var t=tr.querySelector('td.num .l1').textContent.replace(/[^\d.]/g,'');return Number(t)||0;}
