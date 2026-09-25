@@ -633,8 +633,8 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-PO Doc Date · Goods Received Date · Handed over · Unit ID · Item · Inventory Status · Stock Condition ·
-Stock Location · Logistics · Delivery Location · SO Date · SO No · PO No / Ref No
+Goods Received Date · SO No · PO No / Ref No · Unit ID · Item · Inventory Status · Stock Condition ·
+Stock Location · Logistics · Delivery Location · Ship Date
 ```
 
 `Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
@@ -669,18 +669,16 @@ row prints `—` for Unit ID with `×{qty}` beside the product. Measured on prod
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
-**THE THIRTEEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, APPROVED TARGET / NOT
-BUILT.** Under the Listing Template's rule 2 (record dates first, then the document number, exactly
-as Sales Orders leads with `Proceed Date · SO Doc Date · SO No`) the Unit's dates lead and the pinned
-`Unit ID` follows. Every head is a word the dictionary already rules; no head may be minted for this
+**THE ELEVEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, APPROVED TARGET / NOT
+BUILT.** The order is the owner's own sequence: the receipt date first, then the two document
+numbers a person copies, then the pinned `Unit ID`, then the facts, and `Ship Date` last; it is not
+the Sales Orders date-first order. Every head is a word the dictionary already rules; no head may be minted for this
 page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showroom Display`,
 `History` …) only filter the same table and never carry their own columns.
 
 | Column | Meaning | Absence |
 |---|---|---|
-| `PO Doc Date` | the day the Unit was born (official PO issue) | `Not recorded` |
 | `Goods Received Date` | the day it entered Carres control (posted receipt) | `Not received` |
-| `Handed over` | the day the Warehouse posted OUT to the Logistics company (Delivery §4.1 record word) | blank while the Unit stands in a Site |
 | `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
 | `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
@@ -688,18 +686,19 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 | `Stock Location` | the Carres or partner Site the Unit stands in or last stood in: `Carres Klang` · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`. Never a company, never NETS | — |
 | `Logistics` | the company whose driver took the goods (`NETS` · `AL` · `HOUZS`); filled only after OUT | blank |
 | `Delivery Location` | where the goods are going (the DO's customer address, or the next Site on a Journey leg); filled only after OUT | blank |
-| `SO Date` · `SO No` | the Sales Order the Unit is promised to | blank · `No SO` |
+| `SO No` | the Sales Order the Unit is promised to | `No SO` |
 | `PO No / Ref No` | the document the goods came in on (PO, Transfer, Repair, Claim number) | `Not recorded` |
+| `Ship Date` | the day the Warehouse posted OUT to the Logistics company — the international pair to `Goods Received Date` (Oracle/Dynamics/NetSuite `Ship Date`; SAP `Goods Issue Date`, rejected because `issue` reads as a problem) | blank while the Unit stands in a Site |
 
 Nobody records the road. OUT at origin (`Record {n} Units loaded to {Logistics}`, 0424) and IN at
 destination (Receiving, 0490) are the only two events, exactly as SAP/Odoo stock-in-transit works;
-between them the row keeps its `Stock Location`, gains `Handed over · Logistics · Delivery
+between them the row keeps its `Stock Location`, gains `Ship Date · Logistics · Delivery
 Location`, and after the customer signs it leaves the list into History. A partner leg reads the
 same way: Klang OUT → `Logistics AL · Delivery Location AL Sungai Buloh`; AL IN → `Stock Location
 AL Sungai Buloh`; AL OUT → `Logistics AL · Delivery Location {customer}`; delivered → History.
 `With NETS Delivery`, `In transit`, `On the way`, `Who has it`, `Site` and `Where` are not
-Inventory words. `Ownership` (`Carres Owned` · `Supplier Consignment`) · `Category` · `Last
-verified` · `Supplier` · `Last moved` stay one click away in `Columns`. Required facts (`Unit ID` ·
+Inventory words. `Ownership` (`Carres Owned` · `Supplier Consignment`) · `SO Date` · `PO Doc Date` · `Category` ·
+`Last verified` · `Supplier` · `Last moved` stay one click away in `Columns`. Required facts (`Unit ID` ·
 `Item` · `Inventory Status`) never print an absence word; an empty required cell is a defect.
 
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
