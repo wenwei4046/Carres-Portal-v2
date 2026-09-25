@@ -346,11 +346,28 @@ working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
-**Owner approval 2026-09-25 (segment 1 of the Payment Blueprint review) · APPROVED / NOT BUILT.**
-The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
-opens the same row; `?invoice=` is retired with the Invoice-keyed row): Money → Delivery Dates →
-Items, Services & Stock → Storage → What to do → Collection owner → Related Payments →
-Communication History. **There is no `Invoice` section**: the Invoice is the closing document and
+**Owner approval 2026-09-25 (segments 1 and 4 of the Payment Blueprint review) · APPROVED / NOT
+BUILT.** The row's expansion is COMPACT and uses width, not height (design record
+`docs/payment/design/monitor-status-rail.html`, reviewed by the owner 2026-09-25):
+
+```text
+[Record payment] [Ask customer to pay ← blue] [⋯ Statement · Print · Create payment link]   28px doors, right
+Balance due · Total payable · Paid · Payment due · Collection owner                            fact grid, 4 columns
+Customer · phone · Reference · Scheduled delivery · Logistics · Items & Stock · Storage         × 2 rows, 11px label / 13px value
+─────────────────────────────────────────────────────────────────────────────────────────────
+WHAT TO DO              │ DOCUMENTS                                   │ COMMUNICATION HISTORY
+fact · sub-line · door  │ Receipts (No · RM · date · kind · Print/Send)│ answers and sent messages, newest first
+                        │ Invoice (issued at RM 0) · Statement (Print) │
+```
+
+Flat: the grey expansion band, one hairline under the fact grid, the three blocks side by side with a
+1px divider between them, no nested cards. Storage's own doors (`Record storage start` · `Request
+more free days` · `Create Storage Invoice` · `Check the stored furniture`) sit under `WHAT TO DO`
+when a case exists (Storage segment to settle the words). The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
+opens the same row; `?invoice=` is retired with the Invoice-keyed row): the fact grid carries Money,
+Delivery Dates, Items & Stock, Storage and Collection owner as facts; the three blocks carry What to
+do, Documents and Communication History; Delivery's `Items, Services & Stock` panel opens from the
+`Items & Stock` cell as today. **There is no `Invoice` section**: the Invoice is the closing document and
 lives with the Receipt in Payment Records. The doors sit on one strip above it (`Statement` ·
 `Print` · `Create payment link` · `Record payment` · `Ask customer to pay`); **one blue** — `Ask
 customer to pay` once the clock admits asking, otherwise `Record payment`. Money reads
