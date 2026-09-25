@@ -671,6 +671,18 @@ JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot f
 date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
 Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
 
+**Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The eight reasons
+above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
+Material Shortage · Transport Delay · Waiting Customer Confirmation · Factory Closed · Other).
+`Waiting Customer Confirmation` is removed: it is not a supplier reason; customer waiting belongs to
+Sales `delay_planning`. Historical answers keep the reason they were recorded with; new answers
+cannot choose it.
+
+**Day-before occurrence wording (for Workspace, 2026-09-25):** fact `Confirm tomorrow's supplier
+delivery · {Supplier} · {date}`; action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO
+No}` (email channel: `Click Email, …`). Completion: a matching Supplier DO, or an evidenced
+confirmation for that exact date and Warehouse, recorded through `Record supplier answer`.
+
 One Office working day before the effective expected arrival,
 `purchasing.confirm_tomorrows_delivery` asks for either the **Supplier DO** or evidenced supplier
 confirmation that the named goods will be sent/delivered to the named Warehouse on that exact next
