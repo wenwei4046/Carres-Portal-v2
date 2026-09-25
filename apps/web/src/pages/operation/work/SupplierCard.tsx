@@ -159,7 +159,7 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
               ? [row.supplierDo.number, row.supplierDo.atIso ? spell(row.supplierDo.atIso) : null].filter(Boolean).join(" · ")
               : row.confirmByIso
                 ? `Needed by ${spell(row.confirmByIso)}`
-                : S.notRecorded}
+                : "Not needed yet"}
           </Fact>
         ) : null}
         <Fact label={S.deliverTo}>{row.deliverTo ?? S.notRecorded}</Fact>

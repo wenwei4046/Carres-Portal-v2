@@ -187,3 +187,11 @@ describe("review fix (#1608): a failed supplier read never wipes the route", () 
   });
 });
 
+describe("review fix (#1613): Purchasing anchors on the ETA only", () => {
+  it("a PO with no ETA raises no confirmation — Purchasing raises none either", () => {
+    const m = supplierCardModel({ todayIso: "2026-10-19", pos: [po({ etaIso: null, effectiveIso: "2026-10-20", originalIso: "2026-10-20" })], spell });
+    expect(m.rows[0].state).toBe("expected");
+    expect(m.rows[0].confirmByIso).toBeNull();
+  });
+});
+

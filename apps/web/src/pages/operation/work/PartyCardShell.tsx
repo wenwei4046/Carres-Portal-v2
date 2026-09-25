@@ -65,7 +65,7 @@ export function escapeBelongsToControl(event: { defaultPrevented: boolean; targe
   return Boolean(el?.closest?.('input, textarea, select, [role="listbox"], [role="option"], [role="combobox"], [role="dialog"], [role="menu"]'));
 }
 
-export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, status, open, onToggle, escapeLocked = false, children }: {
+export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, status, open, onToggle, children }: {
   testId: string;
   /** DOM id the Order Route scrolls to when it opens this card. */
   anchorId?: string;
@@ -76,8 +76,6 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
   status: ReactNode;
   open: boolean;
   onToggle: (open: boolean) => void;
-  /** A half-filled form is open: Escape never throws it away. */
-  escapeLocked?: boolean;
   children: ReactNode;
 }) {
   const bodyId = useId();
@@ -89,7 +87,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
       data-testid={testId}
       aria-label={party}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && open && !escapeLocked && !escapeBelongsToControl(event)) {
+        if (event.key === "Escape" && open && !escapeBelongsToControl(event)) {
           event.stopPropagation();
           onToggle(false);
           toggleRef.current?.focus();

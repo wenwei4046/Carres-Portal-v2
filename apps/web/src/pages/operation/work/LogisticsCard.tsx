@@ -233,8 +233,7 @@ export default function LogisticsCard({
   const [editing, setEditing] = useState<null | "logistics" | "schedule">(null);
   const partnersQ = useDeliveryPartners();
   const acts = useDeliveryLinkActs(orderId, leg);
-  const { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model } = useLogisticsModel(orderId, leg);
-  void today;
+  const { scope, factsQ, card, facts, partnerName, o, linkUrl, model } = useLogisticsModel(orderId, leg);
 
   if (scope.loading && !card) {
     return <WorkSection className="p-4 text-body text-kit-slate-11" data-testid="logistics-card">{PARTY_COPY.loading}</WorkSection>;

@@ -1330,12 +1330,9 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   return c.json(response);
 });
 
-// ----- GET /:id/audit -----
-// Complete version index plus the append-only PO event ledger. Staff identity
-// is resolved through app_users; a permission role is never a person's name.
 /**
  * GET /for-order/:orderId — the Work Supplier card's facts (owner approval
- * 2026-09-25, Workspace MASTER §5.9): every PO serving ONE Sales Order, read
+ * 2026-09-25, Workspace MASTER §5.10): every PO serving ONE Sales Order, read
  * from Purchasing and the Warehouse. Read-only; nothing here writes.
  */
 operationPosRouter.get("/for-order/:orderId", requireOperation, async (c) => {
@@ -1390,6 +1387,9 @@ operationPosRouter.get("/for-order/:orderId", requireOperation, async (c) => {
   });
 });
 
+// ----- GET /:id/audit -----
+// Complete version index plus the append-only PO event ledger. Staff identity
+// is resolved through app_users; a permission role is never a person's name.
 operationPosRouter.get("/:id/audit", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const poId = c.req.param("id");

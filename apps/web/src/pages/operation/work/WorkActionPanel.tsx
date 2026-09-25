@@ -45,7 +45,11 @@ export default function WorkActionPanel({
       className="shrink-0 rounded-work border border-work-line bg-white p-3 min-[960px]:px-4 min-[960px]:py-3"
       data-testid="work-detail-header"
     >
-      <div className="flex items-start gap-3">
+      {/* On a phone (below 600px) the doors stack under the words (Jess's 390
+          rule): the primary act fills its row, `Open {object}` takes the next.
+          From 600px they sit beside the text, so the 743×704 acceptance keeps
+          all three party headings in view. */}
+      <div className="flex flex-col gap-2 min-[600px]:flex-row min-[600px]:items-start min-[600px]:gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-medium leading-[14px] text-kit-slate-11">{item.object.label} · {WORK_MODULE_WORD[item.module]}</p>
           <h2 className="text-[16px] font-semibold leading-[22px] text-kit-slate-12" data-testid="work-detail-title">{item.problem}</h2>
@@ -54,11 +58,13 @@ export default function WorkActionPanel({
             <p className="text-[13px] leading-[18px] text-kit-slate-11" data-testid="work-detail-result">{result}</p>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2" data-testid="work-detail-open-row">
+        <div className="flex flex-col items-start gap-2 min-[600px]:max-w-[50%] min-[600px]:shrink-0 min-[600px]:flex-row min-[600px]:flex-wrap min-[600px]:justify-end" data-testid="work-detail-open-row">
           {primaryAct && item.interaction.mode !== "embedded" ? (
-            <Button type="button" size="touch" variant="primary" onClick={primaryAct.onClick} data-testid="work-detail-primary-act">
-              {primaryAct.label}
-            </Button>
+            <div className="grid w-full min-[600px]:block min-[600px]:w-auto" data-testid="work-detail-primary-row">
+              <Button type="button" size="touch" variant="primary" onClick={primaryAct.onClick} data-testid="work-detail-primary-act">
+                {primaryAct.label}
+              </Button>
+            </div>
           ) : null}
           <Button type="button" size="touch" onClick={onOpen}>Open {item.object.label}</Button>
         </div>

@@ -24,6 +24,7 @@ import {
   CUSTOMER_CARD_COPY as C,
   CUSTOMER_RESULT_WORD,
   customerCardModel,
+  mytDayOf,
   type CustomerContactFact,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
@@ -84,7 +85,7 @@ export function useCustomerCard(orderId: string, leg = 0) {
       companyName: lm.partnerName,
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,
-      deliveredIso: o.delivered_at ? o.delivered_at.slice(0, 10) : null,
+      deliveredIso: o.delivered_at ? mytDayOf(o.delivered_at) : null,
       contactCheck: { dueIso: lm.model.rows[1].dueIso, state: lm.model.rows[1].state },
       contacts,
       partnerAnswer: answer ? { kind: answer.kind, proposedIso: answer.proposedDate, atIso: answer.at } : null,
@@ -188,7 +189,7 @@ export default function CustomerCard({
         <Fact label="Scheduled delivery">
           <span className="font-semibold">{card.confirmedDate ? [spell(card.confirmedDate), card.confirmedTime].filter(Boolean).join(" · ") : "Not scheduled yet"}</span>
         </Fact>
-        {o.delivered_at ? <Fact label="Delivered">{spell(o.delivered_at.slice(0, 10))}</Fact> : null}
+        {o.delivered_at ? <Fact label="Delivered">{spell(mytDayOf(o.delivered_at))}</Fact> : null}
       </section>
 
       {/* 3 · Partner contact — read-only; Delivery records the company's reply */}

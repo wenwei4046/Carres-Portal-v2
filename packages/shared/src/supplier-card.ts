@@ -18,8 +18,8 @@
  * PURE — no clock, no I/O. Dates are ISO `YYYY-MM-DD`; `spell` prints them.
  */
 import { myHolidaySet } from "./my-holidays";
-import { PURCHASING_OFFICE_OFF_DAYS, tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
-import { subtractWorkingDays, type WorkingDayOptions } from "./working-days";
+import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
+import type { WorkingDayOptions } from "./working-days";
 import type { PartyTone } from "./customer-card";
 
 export const SUPPLIER_CARD_COPY = {
@@ -139,7 +139,6 @@ export function supplierCardModel(input: {
   const today = input.todayIso.slice(0, 10);
   const spell = input.spell;
   const holidays = input.holidays ?? myHolidaySet();
-  const office = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
   const rows: SupplierRow[] = input.pos.map((po) => {
     const eff = po.effectiveIso ? po.effectiveIso.slice(0, 10) : null;
     const delayed = po.issued && po.reply?.answer === "delayed";
@@ -148,7 +147,9 @@ export function supplierCardModel(input: {
     const owed = ordered !== null && receivedQty !== null ? Math.max(0, ordered - receivedQty) : 1;
     /* Purchasing's one arrival call: open from the working day before the
        expected arrival until an answer ABOUT that date is recorded. */
-    const anchor = po.etaIso ?? po.originalIso ?? null;
+    /* Purchasing anchors its arrival call on `eta_date` ONLY: a PO with no ETA
+       has no call, so the card raises none either. */
+    const anchor = po.etaIso ?? null;
     const call = po.issued
       ? tomorrowDeliveryCallOf(
           {
@@ -163,9 +164,12 @@ export function supplierCardModel(input: {
         )
       : null;
     const hasDo = Boolean(po.supplierDo?.number || po.supplierDo?.atIso);
+    /* Confirmed = Purchasing's own closing clause (an answer ABOUT the ETA —
+       the reason its call returns nothing inside the window) or a Supplier DO.
+       The due day is the call's own; none is derived here. */
     const answeredAbout = Boolean(anchor && po.reply?.aboutIso && po.reply.aboutIso.slice(0, 10) === anchor.slice(0, 10));
     const confirmed = hasDo || answeredAbout;
-    const confirmByIso = call?.dueIso ?? (anchor ? subtractWorkingDays(anchor.slice(0, 10), 1, office) : null);
+    const confirmByIso = call?.dueIso ?? null;
     const received = Boolean(po.grnIso) && !(ordered !== null && receivedQty !== null && receivedQty < ordered);
     const short = Boolean(po.grnIso) && !received;
 

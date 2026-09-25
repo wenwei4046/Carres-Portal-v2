@@ -25,6 +25,7 @@ import {
   loanOfferStateOf,
   missionRouteModel,
   moneyAffectsDelivery,
+  mytDayOf,
   myHolidaySet,
   paymentDeadlineOf,
   type MissionRoutePoint,
@@ -88,14 +89,14 @@ export function useMissionRoute(orderId: string) {
         : null;
     return missionRouteModel({
       todayIso: today,
-      proceededIso: (o.proceeded_at ?? o.proceed_date ?? null)?.slice(0, 10) ?? null,
+      proceededIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : o.proceed_date ? o.proceed_date.slice(0, 10) : null,
       loan,
       supplier: supplier ?? null,
       fromStock: Boolean(supplier && supplier.total === 0 && card.stock.ready),
       contact: { dueIso: lm.model.rows[1].dueIso, state: lm.model.rows[1].state },
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,
-      deliveredIso: o.delivered_at ? o.delivered_at.slice(0, 10) : null,
+      deliveredIso: o.delivered_at ? mytDayOf(o.delivered_at) : null,
       payment: {
         owedText: owed > 0 ? `RM ${RM.format(owed)}` : null,
         deadlineIso: paymentDeadlineOf({ anchorIso: anchor, outstation, holidays }),
@@ -290,7 +291,17 @@ function RouteDetail({
     case "grn":
       return (
         <>
-          {(supplier?.rows ?? []).map((r) => row(r.supplier ?? r.poNo, r.grnIso ? `Received ${spell(r.grnIso)}` : "Not received yet", r.poNo))}
+          {(supplier?.rows ?? []).map((r) =>
+            row(
+              r.supplier ?? r.poNo,
+              r.state === "received" && r.grnIso
+                ? `Received ${spell(r.grnIso)}`
+                : r.state === "shortReceived" && r.orderedQty != null && r.receivedQty != null
+                  ? `${r.receivedQty} of ${r.orderedQty} received`
+                  : "Not received yet",
+              r.poNo,
+            ),
+          )}
           {link("Open Purchasing", "/operation/procurement")}
         </>
       );

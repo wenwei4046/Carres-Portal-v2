@@ -53,6 +53,23 @@ describe("the party-card shell", () => {
   });
 });
 
+describe("Escape belongs to the control that owns it (#1608 review)", () => {
+  it.each([
+    ["an input", <input key="i" aria-label="Date the customer asked for" />],
+    ["a listbox", <div key="l" role="listbox" tabIndex={0}>options</div>],
+  ])("Escape inside %s keeps the card open", (_label, control) => {
+    const onToggle = vi.fn();
+    render(
+      <PartyCardShell testId="party-x" party="Customer" heading="Customer · Lim" status="Scheduled 27 Oct" open onToggle={onToggle}>
+        {control}
+      </PartyCardShell>,
+    );
+    const target = screen.queryByRole("textbox") ?? screen.getByRole("listbox");
+    fireEvent.keyDown(target, { key: "Escape" });
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+});
+
 describe("ONE blue action across the panel", () => {
   it("missed beats today beats the selected work's party beats future", () => {
     expect(primaryPartyOf({ logistics: "today", customer: "missed", supplier: "ahead" }, "logistics")).toBe("customer");
