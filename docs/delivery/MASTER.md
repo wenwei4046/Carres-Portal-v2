@@ -1545,7 +1545,10 @@ Warehouse handover    the recorded chain with recorder, role, company and proof;
 Evidence              every file bound to the event it proves; the proof-review acts (§6.1)
 Exceptions            open and historical problems with owner and next act
 History               the append-only audit of every object change and proxy record
-Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs
+Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs — each
+                      door is the record's own number or name (`SO-1322` · `Order Route` · `Payments` ·
+                      `Unit id-dtd627907` · `Case SC-1031` · `DO2609-0002`), never `Open … →` (owner
+                      ruling 2026-09-25)
 ```
 
 **BUILT 2026-09-13 (Card 16):** `DeliveryOrderPage.tsx` is the seven sections above in order on
@@ -1856,6 +1859,7 @@ only when a real vehicle-level fact exists.
 | Paid in full · Payment pending · Needs attention, on Monitor | `Paid` · `Hold delivery` over `RM {amount} unpaid` · a specific fact word |
 | Do not deliver · still to collect · Finance is holding this delivery · Payment blocked · Money in full | `Hold delivery` over `RM {amount} unpaid` or `Finance hold · {reason}`; the gate's met word is `Paid` (owner ruling 2026-09-25, §3) |
 | Open Sales Order to change, inside the brief | `View Sales Order` (read-only, in place); the row's `SO No` opens the order to change |
+| Delivery exception · DO date · `Open {record} →` · `No delivery result recorded yet — evidence binds to the delivery it proves.` · `No signed document yet` · `No delivery photo yet` · `Upload signed Delivery Order` (queue and button) · the long register empty sentence | `Partially Delivered` / `Failed Delivery` on line 1 · `DO Date` · the record's number or name · `No delivery result yet.` · `No signed DO yet` · `No photo yet` · `Upload signed DO` · `No delivery orders yet.` over `The system issues one when goods, logistics, date and money are ready.` (owner ruling 2026-09-25, segment 3) |
 | Call customer · Stock risk · Logistics details incomplete · DO not released · Open DO · Show delivery brief · `{n} deliveries need a confirmed date.` · Open No confirmed date | `Get delivery date from {partner}` / `… from customer` · `Goods not ready` · `Driver and vehicle not recorded` · (nothing — the reason prints) · the DO number · `See delivery details` · `No delivery scheduled this week.` over the link `{n} orders still need a delivery date.` (owner ruling 2026-09-25) |
 | Ready at Carres Klang Warehouse | `Ready` in Status and `Carres Klang` in Location |
 | Edit Delivery · Save Delivery | `Update date and time` · `Save scheduled delivery`; the other panel acts by their own names |
