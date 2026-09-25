@@ -633,8 +633,8 @@ Register filter.
 The default current-Inventory columns are:
 
 ```
-Goods Received Date · SO No · PO No / Ref No · Unit ID · Item · Inventory Status · Stock Condition ·
-Stock Location · Logistics · Delivery Location · Ship Date
+Goods Received Date · Ship Date · SO No · Inventory Status · Stock Condition · PO No / Ref No ·
+Unit ID · Item · Logistics · Stock Location · Delivery Location
 ```
 
 `Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
@@ -670,9 +670,9 @@ each composite row rendered about 70px and a 768px-tall screen showed six Units;
 screen shows fifteen.
 
 **THE ELEVEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, APPROVED TARGET / NOT
-BUILT.** The order is the owner's own sequence: the receipt date first, then the two document
-numbers a person copies, then the pinned `Unit ID`, then the facts, and `Ship Date` last; it is not
-the Sales Orders date-first order. Every head is a word the dictionary already rules; no head may be minted for this
+BUILT.** The order is the owner's own sequence (2026-09-25, second correction): the two dates first
+(in, out), the Sales Order and its saleability, then the source document and the pinned `Unit ID`,
+then the goods and the movement facts; it is not the Sales Orders date-first order. Every head is a word the dictionary already rules; no head may be minted for this
 page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showroom Display`,
 `History` …) only filter the same table and never carry their own columns.
 
