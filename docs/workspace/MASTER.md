@@ -595,6 +595,34 @@ inside its Delivery page component and is not admitted in Work. UI construction 
 for review, but production acceptance requires these facts and may not disguise a gap with client
 defaults, hard-coded people/calendars, independent source calls or a copied mutation form.
 
+### 5.2.2 · Owner review 2026-09-25 — the Work page as Jess walked it (BUILT)
+
+Jess reviewed the live page in an 829px window and approved 24 fixes as written in
+`docs/cards/CARD-2026-09-25-workspace-01-work-page-review.md`. The rules they set:
+
+- **One stage below 768px only.** 768–1279 collapses the rail; 1280 and up shows three panels. The
+  743×704 acceptance keeps its 40px rows.
+- **The compact Date control (<768) is one horizontal strip of chips**, the chosen day blue, the
+  strip closing on a pick; the toolbar's own Date and Page buttons stay neutral while it is open.
+- **The header prints no count.** The list heading carries `{n} actions to do`; below 768px it is
+  the count alone (the toolbar button already names the day). The header speaks only when My Work
+  is empty while the team has work: `0 for you · {n} for the team`, and the empty list offers
+  `See Team Work`.
+- **Words:** `Covering for others` (not `Covered`) · rail section `Page` / `All pages` (not
+  Module) · header `Search` with no printed shortcut · `Help` and `Settings` beside their icons ·
+  the right rail names each icon.
+- **The Date rail** prints every count, `0` included; `Today` in words beside today's date;
+  `No working date` always listed; two work weeks with a divider before the second Monday; the
+  section heading is slate, not blue.
+- **List tabs** all carry a number (`Completed 0` until the ledger's Completed list is wired).
+- **My Work / Team Work** active segment is kit blue. Search is 240px beside `Covering for others`
+  at every width above 600px.
+- **The empty list is one bordered white section** the height of its words.
+- **Sidebar:** names by default at every width; only the person's own collapse is remembered; the
+  bottom block shows the account's name where one exists.
+- **Not done — needs its own card:** the bell badge (item 11) counts live order alerts and has no
+  notification record to mark read.
+
 ### 5.3 · Filter, search and URL contract
 
 Search matches the authorised open set by object number/label, customer, supplier, recipient,

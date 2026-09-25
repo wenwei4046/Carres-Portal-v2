@@ -272,9 +272,9 @@ describe("the keyboard", () => {
     expect(screen.getByTestId("jump-to-surface")).toBeInTheDocument();
   });
 
-  it("the trigger prints its keyboard hint", () => {
+  it("the trigger says Search and prints no keyboard hint (owner review 2026-09-25 item 12)", () => {
     renderJump();
-    expect(screen.getByTestId("jump-to-trigger").textContent).toMatch(/⌘K|Ctrl K/);
+    expect(screen.getByTestId("jump-to-trigger").textContent).toBe("Search");
   });
 });
 

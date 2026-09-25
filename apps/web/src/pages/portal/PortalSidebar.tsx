@@ -43,7 +43,6 @@ import {
 } from "./purchasing-sidebar";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
-const NARROW_DESKTOP_QUERY = "(max-width: 1279px)";
 
 /* ⭐ THE MEASURED RAIL (CARD-2026-08-19-sidebar-expandable-modules §3).
  *
@@ -157,7 +156,12 @@ export default function PortalSidebar() {
   const role = useAuth((s) => s.role);
   const session = useAuth((s) => s.session);
   const email = session?.user?.email ?? "";
-  const initials = email.slice(0, 2).toUpperCase();
+  /* The person's name where the account carries one (item 10); the address
+     stands in only while it does not. */
+  const displayName = (session?.user?.user_metadata as { name?: string; full_name?: string } | undefined)?.name
+    ?? (session?.user?.user_metadata as { full_name?: string } | undefined)?.full_name
+    ?? email;
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -174,25 +178,15 @@ export default function PortalSidebar() {
   const searchTab = new URLSearchParams(location.search).get("tab");
 
   // Collapse — self-owned, persisted. Icon rail = more room for wide tables.
+  /* Names by default (owner review 2026-09-25 item 9): the rail collapses
+     only when the person collapsed it, never because the window is narrow. */
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return (
-        localStorage.getItem(COLLAPSE_KEY) === "1" ||
-        window.matchMedia?.(NARROW_DESKTOP_QUERY).matches === true
-      );
+      return localStorage.getItem(COLLAPSE_KEY) === "1";
     } catch {
       return false;
     }
   });
-  useEffect(() => {
-    const media = window.matchMedia?.(NARROW_DESKTOP_QUERY);
-    if (!media) return;
-    const collapseAtNarrowDesktop = (event: MediaQueryListEvent) => {
-      if (event.matches) setCollapsed(true);
-    };
-    media.addEventListener("change", collapseAtNarrowDesktop);
-    return () => media.removeEventListener("change", collapseAtNarrowDesktop);
-  }, []);
   const toggleCollapse = () =>
     setCollapsed((c) => {
       const next = !c;
@@ -991,7 +985,7 @@ export default function PortalSidebar() {
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <div className="text-meta font-semibold text-base-900 truncate">
-              {email}
+              {displayName}
             </div>
             <div className="text-label text-base-500 uppercase tracking-[0.1em] mt-px">
               {roleLabel}

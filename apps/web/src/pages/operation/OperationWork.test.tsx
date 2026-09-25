@@ -220,9 +220,9 @@ describe("Operation Work — one server feed", () => {
       expect(title.className).toContain("min-[768px]:leading-[34px]");
       // The one header row carries the top-bar icons: no second 44px bar.
       expect(within(header).getByTestId("top-bar-icons")).toBeInTheDocument();
-      const count = screen.getByTestId("work-header-count");
-      expect(count.className).toContain("text-[12px]");
-      expect(count.className).toContain("min-[768px]:text-[13px]");
+      /* The header count is gone (owner review 2026-09-25 item 4); the list
+         heading carries the number. */
+      expect(screen.queryByTestId("work-header-count")).toBeNull();
 
       const heading = screen.getByTestId("work-list-heading");
       expect(heading.className).toContain("text-[16px]");
@@ -230,7 +230,10 @@ describe("Operation Work — one server feed", () => {
       expect(heading.className).toContain("min-h-6");
       expect(heading.className).toContain("mb-2");
       expect(heading.className).not.toMatch(/text-strong|font-bold/);
-      expect(heading.querySelector("span")?.className).toContain("text-[13px]");
+      /* Below 768px the heading is the count alone, at the heading's own
+         size (owner review 2026-09-25 item 25). */
+      expect(heading.querySelector("span")?.className).toContain("text-[16px]");
+      expect(heading).not.toHaveTextContent("Sep");
       expect(screen.getByTestId("work-card-scroll").className).toContain("mt-2");
 
       const toolbar = screen.getByTestId("work-toolbar");
@@ -244,11 +247,11 @@ describe("Operation Work — one server feed", () => {
       expect(within(rows[0]).getByTestId("work-compact-module")).toBeInTheDocument();
       expect(within(rows[0]).getByTestId("work-view-mine")).toBeInTheDocument();
       expect(within(rows[1]).getByRole("searchbox")).toBeInTheDocument();
-      expect(within(rows[1]).getByRole("button", { name: "Covered" })).toBeInTheDocument();
+      expect(within(rows[1]).getByRole("button", { name: "Covering for others" })).toBeInTheDocument();
       for (const control of [
         screen.getByTestId("work-compact-date"),
         screen.getByRole("searchbox"),
-        screen.getByRole("button", { name: "Covered" }),
+        screen.getByRole("button", { name: "Covering for others" }),
       ]) {
         // 40px below 768px, 36px from 768px; 14/20 type.
         expect(control.className).toContain("h-10");
@@ -274,7 +277,7 @@ describe("Operation Work — one server feed", () => {
       expect(toolbar.className).toContain("flex-wrap");
       for (const row of within(toolbar).getAllByTestId(/^work-toolbar-row-/)) expect(row.className).toBe("contents");
       expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-60");
-      expect(screen.getByRole("button", { name: "Covered" }).className).toContain("min-[768px]:h-9");
+      expect(screen.getByRole("button", { name: "Covering for others" }).className).toContain("min-[768px]:h-9");
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: savedWidth });
     }

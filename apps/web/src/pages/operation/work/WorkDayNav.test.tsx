@@ -26,12 +26,30 @@ describe("WorkDateSection (rail column and the compact Date control)", () => {
     expect(within(section).getByRole("button", { name: "Missed · 3 actions" })).toHaveTextContent("Missed3");
     expect(within(section).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day · 4 actions" })).toHaveAttribute("aria-pressed", "true");
     expect(within(section).getByRole("button", { name: "Thu, 17 Sep · Today · 1 action" }).querySelector("[data-today]")).not.toBeNull();
-    expect(within(section).getByRole("button", { name: "Mon, 14 Sep" }).querySelector("[data-rail-count]")).toBeNull();
-    expect(within(section).queryByRole("button", { name: /^No working date/ })).toBeNull();
-    expect(section).not.toHaveTextContent("Today");
+    /* Owner review 2026-09-25 (items 19–22): a zero is printed, No working
+       date is always listed, and today says `Today` in words. */
+    expect(within(section).getByRole("button", { name: "Mon, 14 Sep" }).querySelector("[data-rail-count]")).toHaveTextContent("0");
+    expect(within(section).getByRole("button", { name: /^No working date/ })).toHaveTextContent("0");
+    expect(within(section).getByRole("button", { name: "Thu, 17 Sep · Today · 1 action" })).toHaveTextContent("Today");
     fireEvent.click(within(section).getByRole("button", { name: "Missed · 3 actions" }));
     expect(pick).toHaveBeenCalledWith("missed");
     fireEvent.click(within(section).getByRole("button", { name: "Next week" }));
     expect(week).toHaveBeenCalledWith("2026-09-21");
+  });
+
+  it("compact (below 768px): one horizontal strip of chips, the chosen one blue, never a full-width row (item 2)", () => {
+    const pick = vi.fn();
+    render(<WorkDateSection compact dates={DATES} selected="2026-09-16" onSelect={pick} onWeek={vi.fn()} />);
+    const strip = screen.getByTestId("work-date-strip");
+    expect(strip.className).toContain("flex-wrap");
+    expect(screen.queryByRole("region", { name: "Date" })).toBeNull();
+    const chosen = within(strip).getByRole("button", { name: "Wed, 16 Sep · Malaysia Day · 4 actions" });
+    expect(chosen).toHaveAttribute("aria-pressed", "true");
+    expect(chosen.className).toContain("bg-kit-blue-3");
+    expect(chosen.className).not.toContain("w-full");
+    expect(within(strip).getByRole("button", { name: "Missed · 3 actions" })).toHaveTextContent("Missed3");
+    expect(within(strip).getByRole("button", { name: "Thu, 17 Sep · Today · 1 action" })).toHaveTextContent("Today");
+    fireEvent.click(within(strip).getByRole("button", { name: "Mon, 14 Sep" }));
+    expect(pick).toHaveBeenCalledWith("2026-09-14");
   });
 });
