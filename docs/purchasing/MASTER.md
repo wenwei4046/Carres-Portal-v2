@@ -542,8 +542,8 @@ facts, the one send area and the completion fact below.
 - **Completion.** The occurrence completes only when every PO issued from its scope has its current
   version marked sent (`PO sent to supplier`, `po_sends confirmed_sent`). Issuing alone does not
   complete it. Opening WhatsApp or email never completes it.
-- **Missed window.** An unfinished occurrence keeps its own time and reads `Window passed · {time}`;
-  it never silently rolls into the next window. Later demand belongs to the next occurrence, so two
+- **Missed window.** An unfinished occurrence keeps its own time — it still reads `Issue the POs by
+  {time}` and Work marks it Missed — and it never silently rolls into the next window. Later demand belongs to the next occurrence, so two
   occurrences never share a line.
 - **One send area.** `PoIssueEvidence` (`Copy message` · `Open WhatsApp group` / `Open WhatsApp` ·
   `Open email` · `Download PDF` · `PO sent to supplier`) is the only send control set, shown on the
@@ -552,7 +552,12 @@ facts, the one send area and the completion fact below.
 - **Action line for an issued PO whose current version is not marked sent**, by the supplier's
   recorded channel: `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to
   {Supplier}` · no channel recorded: `Send {PO No} to {Supplier}`. Several unconfirmed POs name the
-  earliest-due one; the fact line states `{n} of {m} POs`.
+  earliest-due one.
+- **Card words — OWNER CHOICE (Jess, 2026-09-25).** The Work card says what to do: before issue
+  `Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`; after issue
+  `{k} POs issued · {x} not sent yet` / the earliest unsent PO's send line; reference
+  `{time} PO window`. The count-style lines (`{time} PO window · {n} suppliers · {n} Sales Orders`,
+  `Issue POs to {suppliers}`, `{n} of {m} POs · Sending not confirmed`) are not used.
 - **Retired with this journey:** the per-Sales-Order `issue_po` card and `confirm_ready_date`
   (`Supplier date missing`); the day-before check (§5.7) replaces the latter.
 
