@@ -340,10 +340,26 @@ export function moneyAffectsDelivery(input: {
   holidays?: WorkingDayOptions["holidays"];
 }): boolean {
   if (!(input.owed > 0) || !input.anchorIso) return false;
-  const deadline = subtractWorkingDays(input.anchorIso.slice(0, 10), input.outstation ? 3 : 2, {
-    holidays: input.holidays,
-  });
-  return input.todayIso.slice(0, 10) >= deadline;
+  const deadline = paymentDeadlineOf(input);
+  return deadline !== null && input.todayIso.slice(0, 10) >= deadline;
+}
+
+/**
+ * The day payment must be complete for this delivery — the ONE deadline the
+ * Logistics day-before check, the Order Route's payment line and the collapsed
+ * exception all read (Law D). Payment's ruled default: 2 working days before
+ * the anchor in the Klang Valley, 3 outstation (Payment MASTER "Collection
+ * timing"; the effective-dated rule row is not readable by Operation — gap
+ * recorded there).
+ */
+export function paymentDeadlineOf(input: {
+  anchorIso: string | null;
+  outstation: boolean;
+  holidays?: WorkingDayOptions["holidays"];
+}): string | null {
+  const anchor = input.anchorIso?.slice(0, 10) ?? null;
+  if (!anchor || !ISO.test(anchor)) return null;
+  return subtractWorkingDays(anchor, input.outstation ? 3 : 2, { holidays: input.holidays });
 }
 
 /* ── the external link ─────────────────────────────────────────────────── */
