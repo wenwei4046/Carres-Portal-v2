@@ -2765,12 +2765,17 @@ own `Clear filters` are the shared listing standard's and are unchanged. No dupl
 a facet's number describes the whole register, never what another facet happens to have selected.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18.** Read-only
-ordered goods, exactly in order:
+**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
+owner-approved 2026-09-25 · NOT BUILT.** Read-only ordered goods, exactly in order:
 
 ```text
-Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items · Supplier Confirmed Delivery Date
 ```
+
+`Supplier Confirmed Delivery Date` (Jess, 2026-09-25) prints the line's newest supplier answer
+(§5.7 per-item answer): one date, or one row per batch as `{n} pcs · {date}` with `· Delayed` on a
+later batch; no answer reads `Not confirmed`. Read-only — the only write door is `Record supplier
+answer` on the PO. Its width comes from UI MASTER §6.8's registry.
 
 `PO No` is the first line of its cell and the associated Unit IDs sit underneath it in the same
 cell; item configuration sits beneath the item name. **The parent remains one row per PO** — a
