@@ -75,7 +75,9 @@ export interface LedgerAccount {
   is_control: boolean;
   control_for: string | null;
   is_active: boolean;
-  /** A header groups other accounts and can never be posted to (0461, 0468). */
+  /** A header groups other accounts and can never be posted to (0461, 0468).
+   *  Stored since 0580 (gl_accounts.is_heading), so it stays a header when its
+   *  last account leaves. */
   is_header: boolean;
   /** Where Finance dragged it among the accounts under the same parent (0557).
    *  Ties break on code, so 0 everywhere reads exactly as by-code order. It is
