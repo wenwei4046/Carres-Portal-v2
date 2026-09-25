@@ -104,15 +104,21 @@ Every active Unit has Catalog identity, source order, ownership, **Where**, **Wh
 condition, calculated availability, reservation connection, last verified date, evidence and
 append-only history.
 
-| Where | Who has it |
+| Where (Site) | Who has it |
 |---|---|
-| Carres Klang Warehouse | NETS Warehouse |
-| On the way to PJ Showroom | NETS Delivery |
-| PJ Showroom | PJ Showroom |
+| Carres Klang Warehouse | Carres |
+| PJ Showroom | Carres |
+| On the way to PJ Showroom | NETS |
+| AL Sungai Buloh · HOUZS Balakong | AL · HOUZS |
 | selected JB partner warehouse | JB partner |
 | On the way to the Singapore customer | EU or SSY |
 
-NETS is not a Site. Site, operating party and role are separate. Independently saleable or
+**Owner correction 2026-09-25: Carres Klang Warehouse is Carres's own Site and NETS only operates
+it.** `Who has it` is the organisation responsible for the goods, printed as its own name: `Carres`
+while the Unit is inside any Carres-owned Site (Klang, PJ Showroom), the logistics company (`NETS`)
+only once its driver has taken the goods, and the partner (`AL` · `HOUZS`) inside a partner Site.
+`Operated by NETS` is a Warehouse Settings fact about the Site, never a holder value on a Unit. NETS
+is not a Site. Site, operating party and role are separate. Independently saleable or
 replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
 Missing required modules, components or packages prevents Ready stock eligibility.
 
@@ -668,11 +674,11 @@ screen shows fifteen.
 
 - `Site` joins the default columns directly after `Stock use`: the PLACE (`Carres Klang Warehouse`
   · `PJ Showroom` · `AL Sungai Buloh` · `HOUZS Balakong`), or `On the way to {destination}` while
-  the Unit is in transit. `Who has it` is the ORGANISATION holding the goods, printed as its own
-  actual name and nothing more — `NETS` whether it is acting as warehouse operator at Carres Klang
-  or as the delivery company on the road; `PJ Showroom` for showroom staff. No role word is glued
-  onto a party name (`NETS Warehouse` · `NETS Delivery` are retired as printed values); the role is
-  read from the Site and Stock use beside it. Site, party and role stay separate facts (§3).
+  the Unit is in transit. `Who has it` is the ORGANISATION responsible for the goods, printed as its
+  own actual name and nothing more — `Carres` inside any Carres-owned Site, `NETS` once the driver
+  has taken the goods, `AL` / `HOUZS` inside a partner Site (owner correction 2026-09-25: Klang is
+  Carres's; NETS only operates it). No role word is glued onto a party name (`NETS Warehouse` ·
+  `NETS Delivery` are retired as printed values). Site, party and role stay separate facts (§3).
 - `Stock use` prints one plain word for what the Unit can do now: `Available` (can be promised) ·
   `Reserved` (bound to the Sales Order in `SO No`; `Reserved / sold` is retired — a sold Unit is
   delivered and lives in History) · `In transit` · `Incoming` (never in the default list). A Unit
