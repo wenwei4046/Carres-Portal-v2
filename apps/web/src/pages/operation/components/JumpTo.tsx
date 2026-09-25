@@ -309,12 +309,12 @@ export default function JumpTo() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Search"
+        aria-label="Search the portal"
         /* The word and the hint collapse under `sm` — a 44px header cannot
          * carry four labelled utilities on a phone, and a keyboard hint is a
          * lie on a device with no keyboard. `title` keeps the glyph named,
          * which is exactly how Bell / Help / Settings beside it already read. */
-        title={`Search (${hint})`}
+        title={`Search the portal (${hint})`}
         aria-keyshortcuts="Meta+K Control+K"
         data-testid="jump-to-trigger"
         className="flex items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"

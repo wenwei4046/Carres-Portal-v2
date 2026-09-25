@@ -69,7 +69,7 @@ describe("ModuleHeader · the Destination Header", () => {
     mount(<ModuleHeader testId="dh" word="Unpaid by Supplier" docTitle="x" destinationHeader />);
     /* The four §6.7 utilities. `Jump to…` collapses its LABEL under `sm`
        (JumpTo.tsx) and keeps its accessible name; nothing is removed. */
-    for (const name of ["Search", "Alerts", "Help", "Settings"]) {
+    for (const name of ["Search the portal", "Alerts", "Help", "Settings"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
   });
