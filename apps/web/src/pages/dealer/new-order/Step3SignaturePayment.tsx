@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { ORDER_TERMS, ORDER_TERMS_HEADING } from "@/lib/order-terms";
 import {
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
@@ -687,35 +688,12 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           PDF they sign. Any future edit must touch both files together. */}
       <Section title="Terms & conditions">
         <div className="rounded border border-base-200 bg-white p-3.5 text-[11px] leading-relaxed text-base-700 max-h-[140px] overflow-auto">
-          <p className="text-base-900 font-semibold mb-1.5">Carres Group Sdn Bhd · Order Terms</p>
-          <p>
-            {/* THE OWNER-CORRECTED WORDING (2026-08-09), law in
-                docs/pdf/SO-PDF-STANDARD.md §T&C. Card 3.0-FIX applied it to the
-                PDF and MISSED THIS SCREEN, so the customer was signing "becomes
-                a binding tax invoice" while receiving "the sales invoice is a
-                separate document". The comment above this Section predicted
-                exactly that — "any future edit must touch both files together" —
-                and prose cannot enforce it, so sales-order-terms.test.tsx now
-                does. */}
-            1. This sales order records your purchase agreement with Carres. The sales invoice is a
-            separate document issued upon delivery.
-          </p>
-          <p>
-            2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow
-            QR, and cheque accepted.
-          </p>
-          <p>
-            3. Delivery date is best-effort and may shift ±3 working days subject to operation
-            confirmation.
-          </p>
-          <p>
-            4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced
-            separately on the DO.
-          </p>
-          <p>
-            5. Once the delivery date has been confirmed, any subsequent request to change or
-            extend the date will incur a rescheduling surcharge.
-          </p>
+          <p className="text-base-900 font-semibold mb-1.5">{ORDER_TERMS_HEADING}</p>
+          {ORDER_TERMS.map((t, i) => (
+            <p key={i}>
+              {i + 1}. {t}
+            </p>
+          ))}
         </div>
         <label
           className={`mt-2.5 flex items-start gap-2.5 px-3.5 py-3 border rounded cursor-pointer ${

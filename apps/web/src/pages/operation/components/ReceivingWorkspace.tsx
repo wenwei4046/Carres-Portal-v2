@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import "./receiving-workspace.css";
 import { Link } from "react-router-dom";
 import {
   caseProductCategory,
@@ -25,6 +26,7 @@ import {
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
+import Checkbox from "@/components/kit/Checkbox";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
 
 /**
@@ -89,6 +91,7 @@ interface UnitState {
 
 export default function ReceivingWorkspace({
   po,
+  products = [],
   supplier,
   warehouseName,
   warehouses = [],
@@ -99,6 +102,7 @@ export default function ReceivingWorkspace({
   onPosted,
 }: {
   po: operationPoListRow;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   supplier: SupplierRow | undefined;
   warehouseName: string;
   /** Actual Site choices — the governed warehouses. */
@@ -125,6 +129,7 @@ export default function ReceivingWorkspace({
       {receiving ? (
         <ReceivingMode
           po={po}
+          products={products}
           supplierName={supplierName}
           warehouseName={warehouseName}
           warehouses={warehouses}
@@ -135,6 +140,7 @@ export default function ReceivingWorkspace({
       ) : (
         <ReadMode
           po={po}
+          products={products}
           supplierName={supplierName}
           warehouseName={warehouseName}
           dutyAllowed={dutyAllowed}
@@ -154,6 +160,7 @@ export default function ReceivingWorkspace({
 
 function ReadMode({
   po,
+  products = [],
   supplierName,
   warehouseName,
   dutyAllowed,
@@ -165,6 +172,7 @@ function ReadMode({
   summary,
 }: {
   po: operationPoListRow;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   supplierName: string;
   warehouseName: string;
   dutyAllowed: boolean;
@@ -193,7 +201,7 @@ function ReadMode({
             </span>
           </Prop>
           <Prop label="Supplier">{supplierName}</Prop>
-          <Prop label="Deliver To">{warehouseName}</Prop>
+          <Prop label="Supplier Deliver To">{warehouseName}</Prop>
           {po.eta_date ? (
             <Prop label="Expected arrival">
               <span className="tabular-nums">{fmtDateShort(po.eta_date)}</span>
@@ -284,8 +292,9 @@ function ReadMode({
             data-testid={`receiving-item-${i + 1}`}
           >
             <span className="w-4 text-kit-slate-9 tabular-nums">{i + 1}</span>
-            <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
-              {l.sku}
+            <span className="flex-1 min-w-0 text-kit-slate-12">
+              {products.find((p) => p.sku === l.sku)?.name ?? l.sku}
+              <span className="block font-mono text-meta text-kit-slate-9">{l.sku}{products.find((p) => p.sku === l.sku)?.category ? ` · ${products.find((p) => p.sku === l.sku)?.category}` : ""}</span>
             </span>
             <span className="w-14 text-right tabular-nums text-kit-slate-12">
               {l.qty}
@@ -430,6 +439,7 @@ export function eventSentence(e: ReceivingEvent): string {
 
 function ReceivingMode({
   po,
+  products = [],
   supplierName,
   warehouseName,
   warehouses,
@@ -438,6 +448,7 @@ function ReceivingMode({
   onPosted,
 }: {
   po: operationPoListRow;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   supplierName: string;
   warehouseName: string;
   warehouses: Array<{ id: string; name: string }>;
@@ -453,7 +464,7 @@ function ReceivingMode({
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  /** `Deliver To` is the instruction; `Actual Site` is where the goods
+  /** `Supplier Deliver To` is the instruction; `Actual Site` is where the goods
    *  physically arrived. "" = the PO's own booked warehouse. */
   const [actualSiteId, setActualSiteId] = useState<string>("");
   const [arrivalEvidence, setArrivalEvidence] = useState<
@@ -463,6 +474,7 @@ function ReceivingMode({
   /** ONE key per Session entry — the idempotency contract (0426): a retried
    *  uncertain Save returns the first posting, never a second GRN. */
   const [saveKey] = useState(() => crypto.randomUUID());
+  const [confirmedInput, setConfirmedInput] = useState<string | null>(null);
 
   /** The governed Units still expected, grouped by the LINE they were born
    *  for (0442 `po_line_id`) — two lines of one SKU are two lines. */
@@ -583,13 +595,20 @@ function ReceivingMode({
 
   /** THE RECEIVING BUTTON LAW — one shared copy (COPY-STANDARD): the button
    *  names the FIRST missing fact, top to bottom. */
+  // Confirmation belongs to this exact draft. Editing any receipt fact or
+  // evidence invalidates it; retrying an unchanged failed save retains it.
+  const inputSnapshot = JSON.stringify({
+    doNumber, doFilePath, goodsReceivedAt, actualSiteId, note,
+    arrivalEvidence, extraLines, lineViews, unitStates,
+  });
+  const resultsConfirmed = confirmedInput === inputSnapshot;
   const blocker = receivingSaveBlocker({
     doNumber,
     doFilePath,
     counted,
     overCounted,
     claimProblems,
-  });
+  }) ?? (resultsConfirmed ? null : "Save — confirm receiving results");
 
   function submit() {
     if (blocker || !doFilePath || save.isPending) return;
@@ -653,44 +672,48 @@ function ReceivingMode({
     "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9";
 
   return (
-    <div data-testid="receiving-mode" className="pb-20">
+    <div data-testid="receiving-mode" className="receiving-workspace min-w-0 pb-20">
       {/* 1 · header and source facts */}
-      <div className="flex items-start gap-2">
+      <div className="receiving-header flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1 text-body text-kit-slate-12">
           {supplierName} → {warehouseName}
         </div>
-        <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0">
+        <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0 max-w-full break-words">
           {po.id}
         </span>
       </div>
+      <p className="mt-2 text-body text-kit-amber-11" role="status">
+        {resultsConfirmed ? "Receiving results confirmed. Not saved yet."
+          : "Prefilled results are not confirmed. Check the goods before saving."}
+      </p>
 
       {/* 2 · Receiving Details */}
       <Section title="Receiving Details">
-        <div className="flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Goods received on
+            Goods Received Date
           </span>
           <input
             type="date"
             value={goodsReceivedAt}
             onChange={(e) => setGoodsReceivedAt(e.target.value)}
-            aria-label="Goods received on"
+            aria-label="Goods Received Date"
             data-testid="goods-received-at"
             className={FIELD}
           />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Deliver To
+            Supplier Deliver To
           </span>
           <span className="text-body text-kit-slate-12">{warehouseName}</span>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Goods arrived at
           </span>
           {/* Where the goods PHYSICALLY arrived. It never overwrites
-              `Deliver To` — both facts are preserved (owner correction
+              `Supplier Deliver To` — both facts are preserved (owner correction
               2026-09-06 §3; the retired label was `Actual Site`). */}
           <select
             value={actualSiteId || po.warehouse_id}
@@ -706,20 +729,20 @@ function ReceivingMode({
             ))}
           </select>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Supplier DO No.
+            Supplier DO No
           </span>
           <input
             type="text"
             value={doNumber}
             onChange={(e) => setDoNumber(e.target.value)}
-            aria-label="Supplier DO No."
+            aria-label="Supplier DO No"
             data-testid="do-number"
             className={`${FIELD} flex-1`}
           />
         </div>
-        <div className="mt-1 flex items-start gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-start gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Signed DO photo
           </span>
@@ -731,7 +754,7 @@ function ReceivingMode({
             />
           </span>
         </div>
-        <div className="mt-1 flex items-start gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-start gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Arrival evidence
           </span>
@@ -745,7 +768,7 @@ function ReceivingMode({
             />
           </span>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+        <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Note (optional)
           </span>
@@ -772,8 +795,9 @@ function ReceivingMode({
           return (
             <div key={l.id} className="border-b border-kit-slate-4 py-1.5">
               <div className="flex items-center gap-2 text-body">
-                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
-                  {l.sku}
+                <span className="flex-1 min-w-0 text-kit-slate-12">
+                  {products.find((p) => p.sku === l.sku)?.name ?? l.sku}
+              <span className="block font-mono text-meta text-kit-slate-9">{l.sku}{products.find((p) => p.sku === l.sku)?.category ? ` · ${products.find((p) => p.sku === l.sku)?.category}` : ""}</span>
                 </span>
                 <span className="w-14 text-right tabular-nums text-kit-slate-12">
                   {l.qty}
@@ -1002,6 +1026,7 @@ function ReceivingMode({
 
       {/* 5 · Receiving Summary (live) + 6 · what saving will do */}
       <Section title="Receiving Summary">
+        <p className="mb-2 text-meta text-kit-slate-11">Proposed results · not saved</p>
         <Prop label="Received Qty">
           <span className="tabular-nums" data-testid="live-received-qty">
             {lineViews.reduce((s, v) => s + v.receivedNow, 0)}
@@ -1025,6 +1050,13 @@ function ReceivingMode({
           extra goods never become available stock. A claim opens only when a
           recorded issue needs one.
         </div>
+        <Checkbox
+          id="receiving-results-confirmed"
+          label="I checked the goods and confirm these receiving results."
+          checked={resultsConfirmed}
+          disabled={save.isPending}
+          onCheckedChange={(checked) => setConfirmedInput(checked ? inputSnapshot : null)}
+        />
       </Section>
 
       {err && (
@@ -1035,7 +1067,7 @@ function ReceivingMode({
 
       {/* 7 · sticky action area — the live pending figure beside the one
              primary action, on desktop and mobile alike. */}
-      <div className="sticky bottom-0 mt-3 flex items-center gap-2 border-t border-kit-slate-5 bg-white py-2">
+      <div className="receiving-actions sticky bottom-0 mt-3 flex flex-wrap items-center gap-2 border-t border-kit-slate-5 bg-white py-2">
         <button
           type="button"
           onClick={onDone}

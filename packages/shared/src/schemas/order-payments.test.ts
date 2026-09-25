@@ -3,14 +3,20 @@ import {
   recordPaymentInputSchema,
   collectStorageInput,
   isLivePayment,
+  requiredPaymentReference,
+  receivedBeforeInvoice,
   summarizePayments,
   type PaymentKind,
 } from "./order-payments";
 
 describe("recordPaymentInputSchema", () => {
-  it("accepts a valid payment + defaults method/kind", () => {
-    const r = recordPaymentInputSchema.parse({ amount: 1500, paidOn: "2026-06-26" });
+  it("accepts a valid payment + defaults kind", () => {
+    const r = recordPaymentInputSchema.parse({ amount: 1500, paidOn: "2026-06-26", method: "cash" });
     expect(r).toMatchObject({ amount: 1500, paidOn: "2026-06-26", method: "cash", kind: "payment" });
+  });
+
+  it("refuses a payment with no method (0535: never guessed as cash)", () => {
+    expect(recordPaymentInputSchema.safeParse({ amount: 1500, paidOn: "2026-06-26" }).success).toBe(false);
   });
 
   it("rejects a non-positive amount", () => {
@@ -110,5 +116,38 @@ describe("summarizePayments", () => {
     expect(isLivePayment({})).toBe(true);
     expect(isLivePayment({ voided_at: null })).toBe(true);
     expect(isLivePayment({ voided_at: "2026-08-13T02:00:00Z" })).toBe(false);
+  });
+});
+
+describe("requiredPaymentReference (§16, mirrors 0535 + 0551)", () => {
+  it("asks a cheque for its number and every card key for its approval code", () => {
+    expect(requiredPaymentReference("cheque")).toBe("Cheque number");
+    for (const k of ["card", "credit", "Installment", "credit_card", "debit-card"]) {
+      expect(requiredPaymentReference(k)).toBe("Approval code");
+    }
+  });
+  it("0551 — a bank transfer and a DuitNow QR payment carry a reference number", () => {
+    for (const k of ["bank", "bank_transfer", "Bank Transfer", "duitnow_qr", "duitnow-qr"]) {
+      expect(requiredPaymentReference(k)).toBe("Reference number");
+    }
+  });
+  it("leaves cash, online, other and manager-added methods optional", () => {
+    for (const k of ["cash", "online", "other", "grab_pay", "", "  ", null, undefined]) {
+      expect(requiredPaymentReference(k)).toBeNull();
+    }
+  });
+});
+
+describe("receivedBeforeInvoice", () => {
+  it("counts live goods money recorded up to the issue moment, nothing else", () => {
+    const rows = [
+      { amount: 1000, kind: "deposit" as const, created_at: "2026-09-01T02:00:00Z" },
+      { amount: 200.5, kind: "payment" as const, created_at: "2026-09-10T02:00:00Z" },
+      { amount: 300, kind: "payment" as const, created_at: "2026-09-02T00:00:00Z", voided_at: "2026-09-03T00:00:00Z" },
+      { amount: 150, kind: "storage" as const, created_at: "2026-09-02T00:00:00Z" },
+      { amount: 800, kind: "payment" as const, created_at: "2026-09-20T00:00:00Z" },
+    ];
+    expect(receivedBeforeInvoice(rows, "2026-09-10T02:00:00Z")).toBe(1200.5);
+    expect(receivedBeforeInvoice(rows, "2026-08-01T00:00:00Z")).toBe(0);
   });
 });

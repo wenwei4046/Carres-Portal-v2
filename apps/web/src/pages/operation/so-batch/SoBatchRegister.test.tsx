@@ -10,7 +10,7 @@ import type {
   SoBatchOrderRow,
   SoBatchPurchaseResponse,
 } from "@carres/shared";
-import { soBatchAction } from "@carres/shared";
+import { soBatchAction, purchaseDemandStateWords } from "@carres/shared";
 import type { SalesOrderExpansionResponse } from "@/lib/queries";
 
 const navigate = vi.fn();
@@ -22,11 +22,29 @@ vi.mock("../components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 /* The expansion's Unit IDs come through the Sales Order expansion endpoint —
    the same door the Sales Orders register asks. The suite answers it empty
    unless a test overrides. */
-const apiFetch = vi.fn(async (..._a: unknown[]) => ({
-  defaultDeliverTo: null,
-  place: [],
-  lines: [] as { lineId: string; sku: string; unitIds: string[]; deliverTo: Array<{ name: string; qty: number }> }[],
-} as SalesOrderExpansionResponse));
+/* ⭐ AND THE READY STOCK READ IS ANSWERED TOO (owner ruling 2026-09-18). The
+   `Ready Stock` cell is on the item row now, so every expanded row asks this
+   door; an unanswered read leaves every cell reading `Loading…` for ever,
+   which is correct behaviour and useless as a fixture. The suite answers an
+   EMPTY shelf unless a test overrides — the honest default for an order
+   nothing is reserved against. */
+const EMPTY_READY_STOCK = {
+  orderId: "o1",
+  so: null,
+  reference: null,
+  lines: [],
+  units: [],
+};
+const apiFetch = vi.fn(async (path?: unknown, ..._a: unknown[]) => {
+  if (typeof path === "string" && path.endsWith("/ready-stock")) {
+    return EMPTY_READY_STOCK as unknown as SalesOrderExpansionResponse;
+  }
+  return {
+    defaultDeliverTo: null,
+    place: [],
+    lines: [] as { lineId: string; sku: string; unitIds: string[]; deliverTo: Array<{ name: string; qty: number }> }[],
+  } as SalesOrderExpansionResponse;
+});
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
@@ -68,6 +86,11 @@ function leaf(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean, and `false` — nothing
+       of this build sits on an open purchase order — is the ordinary case. A
+       leaf without it is an older Worker's, which the register now reads as
+       "could not be checked" rather than as permission. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -287,15 +310,17 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 
 const onIssue = vi.fn();
 
-function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}) {
+function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
-        <SoBatchRegister data={data(over)} isLoading={false} onIssue={onIssue} />
+        <SoBatchRegister data={data(over)} isLoading={isLoading} onIssue={onIssue} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  if (expandHistory) { const group = screen.queryByText("No purchase needed"); if (group) fireEvent.click(group); }
+  return rendered;
 }
 
 beforeEach(() => {
@@ -309,52 +334,76 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
 
 /**
- * ⭐ THE READING ORDER — owner correction 2026-09-11.
+ * ⭐ THE APPROVED READING ORDER — owner ruling 2026-09-18, Purchasing §9.1.
  *
- * `Status` is retired as a presentation: blank · `Partial` · `Ordered` was a
- * generic word for an arithmetic the row already showed in `PO No` and the
- * expansion, and an operator could not act on any of the three. The
- * ELIGIBILITY it was derived from is untouched — it still decides which rows
- * can be ticked — it simply stopped being a column.
+ * `Status` returns, and it is a DIFFERENT column: `Need PO` / `No PO needed`,
+ * the one question a buying page exists for, read from the same remaining
+ * demand that puts the row under its group. What stays retired is blank ·
+ * `Partial` · `Ordered` — a generic progress word nobody could act on.
  *
- * What remains is ordered the way the work is read: which order, whose, when
- * it arrived, when the customer wants it, where it goes, who supplies it,
- * where the goods land, and finally the documents.
+ * `PO Safety Days` replaces `Order By` (the date becomes an engine/detail fact
+ * again), `Items` joins, and the customer's date and location say WHOSE they
+ * are and rise above the customer's name. This is the owner's exact order; a
+ * general ordering heuristic may not rearrange it.
  */
+/* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
+   `<thead>` — every OPEN group draws the same header between its heading and
+   its records. One `<colgroup>` and one layout serve them all, so reading the
+   first group's header reads the layout. */
+const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
+  ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
+];
 describe("the approved columns, in the approved reading order", () => {
   const APPROVED = [
-    "SO No",
-    "Customer",
+    "Status",
     "Proceed Date",
-    "Requested Delivery Date",
-    "Delivery Location",
+    "SO No",
+    "PO Safety Days",
+    "Customer Requested Delivery Date",
+    "Customer Delivery Location",
+    "Customer",
+    "Items",
     "Supplier",
-    "Deliver To",
+    "Supplier Deliver To",
     "PO No",
     "PO Delivery Date",
   ];
 
-  it("draws exactly the nine business columns, identity first and documents last", () => {
+  it("draws exactly the twelve business columns, in the owner's order", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll("thead th")]
+    const heads = groupHeaderCells(container)
       .map((el) => el.textContent ?? "")
       .filter((t) => t.trim() !== "");
     expect(heads).toHaveLength(APPROVED.length);
-    APPROVED.forEach((label, i) => expect(heads[i], label).toContain(label));
+    /* A two-line head carries no space between its lines in `textContent`, so
+       the comparison is made on the letters, not on the line break. */
+    const flat = (t: string) => t.replace(/\s+/g, "");
+    APPROVED.forEach((label, i) =>
+      expect(flat(heads[i]!), label).toContain(flat(label)),
+    );
   });
 
-  it("has no Status column, and no Status cell on any row", () => {
+  it("says `Need PO` / `No PO needed`, and nothing about progress", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
-    expect(text).not.toContain("Status");
-    expect(screen.queryByTestId("so-batch-status-o1")).toBeNull();
-    /* The FACT survives: eligibility still refuses the tick on an Ordered row. */
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
+    expect(text).not.toContain("Partial");
+    expect(text).not.toContain("Ordered");
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Need PO");
+    /* A word is not a permission: eligibility still refuses the tick. */
     expect(screen.getByTestId("so-batch-select-o5")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-status-o5")).toHaveTextContent("No PO needed");
+  });
+
+  it("retires `Order By` as a column and keeps it on the wire", () => {
+    const { container } = renderRegister();
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
+    expect(text).not.toContain("Order By");
+    expect(LEAF_O1.orderBy ?? null).not.toBeUndefined();
   });
 
   it("the retired columns are gone from the Register", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     for (const gone of [
       "Source SO",
       "Required For",
@@ -380,13 +429,30 @@ describe("the approved columns, in the approved reading order", () => {
     expect(container.textContent).not.toContain("Goods Must Arrive");
   });
 
-  it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v3"');
-    expect(source()).not.toContain("register.v1");
+  it("the saved layout key is BUMPED so a stale arrangement cannot override the order", () => {
+    expect(source()).toContain('"carres.soBatchPurchase.register.v7"');
+    expect(source()).not.toContain('"carres.soBatchPurchase.register.v6"');
   });
 
-  it("`SO No` is the explicit sticky identity", () => {
-    expect(source()).toContain('stickyIdentity={{ columnKey: "soNo" }}');
+  /**
+   * §6.7 rule 2 fixes the ORDER of the record date and the identity; the
+   * owner's page order puts `Status` ahead of them. All three lead; only the
+   * PAIR pins, and `Status` scrolls under the pinned block like any other fact.
+   */
+  it("leads Status · Proceed Date · SO No, and pins only the pair (§6.7 rule 2)", () => {
+    const { container } = renderRegister();
+    const heads = groupHeaderCells(container);
+    const data = heads.filter((th) => th.title);
+    expect(data.slice(0, 4).map((th) => th.title)).toEqual([
+      "Status",
+      "Proceed Date",
+      "SO No",
+      "PO Safety Days",
+    ]);
+    expect(data[0]!.style.left).toBe("");
+    expect(data[1]!.style.left).not.toBe("");
+    expect(data[2]!.style.left).not.toBe("");
+    expect(data[3]!.style.left).toBe("");
   });
 });
 
@@ -492,7 +558,7 @@ describe("a missing DEFAULT destination does not stop the buying", () => {
 
     /* The selection actually happened - the bar is the page's own proof. */
     const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByText("1 Sales Order · 1 item · 2 units · Issue 1 PO")).toBeVisible();
   });
 
   it("opens on the first ACTIVE destination and says which, without blocking", () => {
@@ -502,6 +568,12 @@ describe("a missing DEFAULT destination does not stop the buying", () => {
     expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
     const note = screen.getByTestId("so-batch-no-default-destination");
     expect(note).toHaveTextContent("ticks open on Carres Klang");
+  });
+
+  it("does not report absent destination settings while their read is loading", () => {
+    renderRegister({ destinations: [], defaultDestinationId: null }, false, true);
+    expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-no-default-destination")).not.toBeInTheDocument();
   });
 
   it("an EMPTY list still blocks, and still names the setting", () => {
@@ -545,7 +617,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
 
     const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByText("1 Sales Order · 1 item · 2 units · Issue 1 PO")).toBeVisible();
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveAttribute(
       "title",
@@ -579,7 +651,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 1 PO",
+      "1 Sales Order · 1 item · 2 units · Issue 1 PO",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
@@ -638,7 +710,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     /* The leaf's own remainder — 1 unit, never the 2 already on the PO. */
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 1 unit · Issue 1 PO",
+      "1 Sales Order · 1 item · 1 unit · Issue 1 PO",
     );
   });
 
@@ -677,45 +749,19 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument();
   });
 
-  it("`All not ordered` is a REAL outstanding-only filter, and it excludes Ordered records", () => {
+  /* ⛔ `TO ORDER / All not ordered` IS GONE — owner correction 2026-09-11. It
+     was the one rail row that named the page's own DEFAULT rather than a fact
+     about a Sales Order, and it sat above the section that answers what to buy
+     today. Pinned here so it cannot quietly return under another spelling. */
+  it("offers no `All not ordered` row, and no TO ORDER section, anywhere on the rail", () => {
     renderRegister();
-    const all = screen.getByTestId("so-batch-all-not-ordered");
-    /* The count is UNIQUE Sales Orders with outstanding eligible demand:
-       o1 · o3 · o8 · o4 — never the Ordered o5, never the covered o6. */
-    expect(all.textContent).toContain("4");
-    fireEvent.click(all);
-    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("so-batch-row-o6")).not.toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
-    /* And it toggles back to the whole Register. */
-    fireEvent.click(all);
+    expect(screen.queryByTestId("so-batch-all-not-ordered")).not.toBeInTheDocument();
+    const rail = screen.getByTestId("so-batch-rail").textContent ?? "";
+    expect(rail).not.toMatch(/TO ORDER/);
+    expect(rail).not.toMatch(/not ordered/i);
+    /* And the whole permanent Register is what the cleared rail shows. */
     expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
-  });
-
-  it("keeps a not-yet-ordered Register line in `All not ordered` when no issue leaf exists", () => {
-    const uncovered = orderRow({
-      orderId: "open-po-pool-mismatch",
-      so: 1297,
-      lines: [
-        {
-          orderLineId: "uncovered-line",
-          sku: "5539-1A(LHF)",
-          qty: 1,
-          stockTaken: 0,
-          item: "Booqit",
-          variant: null,
-          category: "sofa",
-          pos: [],
-        },
-      ],
-      outstandingSuppliers: ["Ohana"],
-    });
-    renderRegister({ rows: [], registerRows: [uncovered] });
-
-    const all = screen.getByTestId("so-batch-all-not-ordered");
-    expect(all.textContent).toContain("1");
-    fireEvent.click(all);
-    expect(screen.getByTestId("so-batch-row-open-po-pool-mismatch")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument();
   });
 
   it.each([
@@ -753,6 +799,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     const panel = screen.getByTestId(`so-batch-blocker-build::ob::${state}`);
     expect(panel.textContent).toBeTruthy();
     expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-ob")).toHaveAccessibleDescription(purchaseDemandStateWords(data().safetyDays)[state]);
   });
 
   it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
@@ -849,18 +896,17 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(screen.queryByTestId("so-batch-row-o7")).not.toBeInTheDocument();
   });
 
-  it("`All not ordered` and a timing facet combine with AND — never a widening OR (Card 02-C)", () => {
+  it("a timing facet and a product facet combine with AND — never a widening OR (Card 02-C)", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-all-not-ordered"));
-    /* Alone, the outstanding filter still shows the setup-blocked o4. */
-    expect(screen.getByTestId("so-batch-row-o4")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("so-batch-state-can_order_early"));
-    /* Both on: only rows satisfying BOTH — outstanding AND in the band. An OR
-       would have quietly widened the timing facet back to all outstanding. */
     expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o3")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
     expect(screen.queryByTestId("so-batch-row-o4")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("so-batch-product-select"), {
+      target: { value: "mattress" },
+    });
+    /* Both on: only rows satisfying BOTH. An OR would have quietly widened the
+       timing facet back to every mattress. */
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
     expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
     expect(screen.queryByTestId("so-batch-row-o7")).not.toBeInTheDocument();
   });
@@ -908,15 +954,26 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     expect(localStorage.getItem("carres.soBatchPurchase.filters.open")).toBe("1");
   });
 
-  it("renders REGION immediately after SUPPLIER", () => {
+  /* ⭐ ON A NARROW WINDOW THE RAIL FLOATS OVER THE REGISTER instead of taking
+     240 of its 459 pixels — the shared purchasing responsive pattern, already
+     shipped on Purchase Orders. The class is asserted rather than the computed
+     layout because jsdom applies no media query; the rendered behaviour was
+     walked at 459px. */
+  it("leaves the flow below md so it cannot consume the table", () => {
+    renderRegister();
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("@container so-batch (width < 896px)");
+    /* Its positioning context is the row it sits in, not the page. */
+    expect(rail().parentElement?.className).toContain("relative");
+  });
+
+  it("renders Region immediately after Supplier", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["TO ORDER", "ORDER TIMING", "PRODUCT", "SUPPLIER", "REGION", "SETUP TO FIX"];
+    const order = ["Order timing", "Product", "Supplier", "Region", "Setup to fix"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     for (const word of [
-      "All not ordered",
       "Can order early",
       "14 safety days left",
       "1–13 safety days left",
@@ -935,7 +992,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     ]) {
       expect(text, word).toContain(word);
     }
-    expect(text).not.toContain("WORK TO DO");
+    expect(text.toLowerCase()).not.toContain("work to do");
     expect(text).not.toContain("Ask customer for a delivery date");
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
@@ -1052,15 +1109,16 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
-  it("filters combine across sections — All not ordered + Mattress + Hooka", () => {
+  it("filters combine across sections — Mattress + Hooka", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-all-not-ordered"));
     pick("so-batch-product-select", "mattress");
     pick("so-batch-supplier-select", "Hooka");
-    for (const on of ["o1", "o3", "o8"]) {
+    /* The Register is PERMANENT, so a facet narrows it and never hides an
+       already-bought record: o5 and o7 both carry a Hooka mattress document. */
+    for (const on of ["o1", "o3", "o5", "o7", "o8"]) {
       expect(screen.getByTestId(`so-batch-row-${on}`)).toBeInTheDocument();
     }
-    for (const off of ["o4", "o5", "o6", "o7"]) {
+    for (const off of ["o4", "o6"]) {
       expect(screen.queryByTestId(`so-batch-row-${off}`)).not.toBeInTheDocument();
     }
   });
@@ -1068,9 +1126,8 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
   it("counts cross-update against the other selected sections", () => {
     renderRegister();
     pick("so-batch-product-select", "sofa");
-    /* Under `Sofa`, nothing is outstanding and nothing can order early —
-       the numbers say so instead of keeping yesterday's totals. */
-    expect(screen.getByTestId("so-batch-all-not-ordered").textContent).toContain("0");
+    /* Under `Sofa`, nothing can order early — the numbers say so instead of
+       keeping yesterday's totals. */
     expect(screen.getByTestId("so-batch-state-can_order_early").textContent).toContain("0");
     /* A supplier with no sofa drops off; the sofa's own suppliers stay. */
     const values = [
@@ -1130,7 +1187,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
 });
 
 describe("the expansion — the ONE shared child table", () => {
-  it("uses GoodsMiniTable, with coverage, supplier and PO Delivery Date columns", async () => {
+  it("draws TWO connected sections, and the line ends in a curve at the last", async () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
@@ -1141,34 +1198,127 @@ describe("the expansion — the ONE shared child table", () => {
     expect(expansionCell.parentElement!.children).toHaveLength(3);
     expect(expansionCell.previousElementSibling).toHaveAttribute("data-testid", "grid-expansion-gutter-__expand__");
     expect(expansionCell).toHaveStyle({ padding: "0px" });
-    /* The exact item-to-PO/supplier/destination/date mapping. */
-    const first = within(box).getByTestId("so-batch-part-H1401S-K");
-    expect(first).toHaveTextContent("PO-20260820-1111");
+
+    /* ⭐ READY STOCK IS NOT A SECTION ANY MORE (owner ruling 2026-09-18). The
+       question is per ITEM LINE, so it is answered on the item line. What is
+       left is the pair that answers two different questions about the whole
+       order: what can still be bought, and what has already been bought. */
+    const sections = within(box)
+      .getAllByTestId(/^connected-section-/)
+      .map((s) => s.getAttribute("data-testid"));
+    expect(sections).toEqual([
+      "connected-section-goods",
+      "connected-section-po-details",
+    ]);
+
+    /* ⭐ THE LINE COMES FROM THE CARET (§6.9, Card 12 review 2026-09-21): the
+       grid draws the drop and the curve in the caret column, the first section
+       takes it in as a flat run, every later section on its own elbow — and the
+       LAST one draws no trunk, so nothing can run on into the next Sales Order. */
+    expect(within(box).getByTestId("section-run-goods")).toBeInTheDocument();
+    expect(within(box).queryByTestId("section-elbow-goods")).toBeNull();
+    expect(within(box).getByTestId("section-elbow-po-details")).toBeInTheDocument();
+    expect(screen.getByTestId("expansion-connector-drop")).toBeInTheDocument();
+    expect(screen.getByTestId("expansion-connector-elbow")).toBeInTheDocument();
+    expect(within(box).getByTestId("section-trunk-goods")).toBeInTheDocument();
+    expect(within(box).queryByTestId("section-trunk-po-details")).toBeNull();
+  });
+
+  it("puts the exact item-to-PO/supplier/destination/date mapping in the details, not the item row", async () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+    const box = await screen.findByTestId("so-batch-inspector-o5");
+
+    /* ⛔ THE ITEM ROW CARRIES NO PO REFERENCE AND NO DOCUMENT QUANTITY AT ALL
+       (owner ruling 2026-09-18). `Ordered Qty` left the actionable table with
+       `SKU`, `To buy` and `Order By`; every one of those facts is still on the
+       page, in the section that is ABOUT documents. */
+    const goods = within(box).getByTestId("goods-mini-table");
+    expect(goods).not.toHaveTextContent("PO-20260820-1111");
+    expect(goods).not.toHaveTextContent("PO-20260821-2222");
+    expect(within(goods).queryByTestId("goods-ordered-qty-l51")).toBeNull();
+
+    /* And the record says everything, once, under its own heading. */
+    const details = within(box).getByTestId("po-details-table");
+    const rowFor = (poNo: string) =>
+      within(details).getByRole("button", { name: poNo }).closest("tr")!;
+    const first = rowFor("PO-20260820-1111");
     expect(first).toHaveTextContent("Hooka");
     expect(first).toHaveTextContent("Carres Klang");
     expect(first).toHaveTextContent("10 Sep");
-    const second = within(box).getByTestId("so-batch-part-S9-2A");
-    expect(second).toHaveTextContent("PO-20260821-2222");
+    /* The document's own state, in the one Purchasing vocabulary — the fact
+       that tells fourteen delivered documents from fourteen outstanding ones. */
+    expect(first).toHaveTextContent("Completed");
+    const second = rowFor("PO-20260821-2222");
     expect(second).toHaveTextContent("Ohana");
     expect(second).toHaveTextContent("AL Sungai Buloh");
+    expect(second).toHaveTextContent("Waiting for goods from supplier");
+    /* ⛔ A RECORD CARRIES NO CONTROL. Not a tick, not a destination editor. */
+    expect(within(details).queryByRole("checkbox")).toBeNull();
+    expect(within(details).queryByRole("combobox")).toBeNull();
   });
 
-  it("Ready Stock coverage is explained in the expansion, never as a parent Status", async () => {
+  it("a full PO number is never shortened, and stays readable in the record", async () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+    const box = await screen.findByTestId("so-batch-inspector-o5");
+    const details = within(box).getByTestId("po-details-table");
+    /* `PO-20260820-1111`, never `PO-260820-1111`: no numbering change is
+       approved, and a shortened number names a document that does not exist. */
+    expect(
+      within(details).getByRole("button", { name: "PO-20260820-1111" }),
+    ).toBeInTheDocument();
+    /* `PO-260820-1111` is the six-digit short form a "tidier" column invents. */
+    expect(details.textContent).not.toMatch(/PO-\d{6}-/);
+  });
+
+  it("an order with no purchase order has no details section at all", async () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
+    const box = await screen.findByTestId("so-batch-inspector-o1");
+    expect(within(box).queryByTestId("po-details-table")).toBeNull();
+    expect(within(box).queryByTestId("connected-section-po-details")).toBeNull();
+    /* ONE section, so the line from the caret ends at the goods table. */
+    expect(within(box).queryByTestId("section-trunk-goods")).toBeNull();
+    expect(within(box).getByTestId("section-run-goods")).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ THE APPROVED GOODS TABLE — owner ruling 2026-09-18:
+   * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   * Supplier Deliver To`, and nothing else.
+   *
+   * This line is fully answered off the shelf: the customer ordered 2, Ready
+   * Stock answered 2, no document carries any of it and nothing is left to buy
+   * — so it cannot be ticked, and it says `No PO needed` rather than a generic
+   * progress word.
+   */
+  it("draws the approved goods columns, and the removed ones are gone", async () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
     const box = await screen.findByTestId("so-batch-inspector-o6");
-    /* ⭐ THE ARITHMETIC IS EXPLICIT — `Covered by` folded three answers into
-       one word. This line is fully answered off the shelf: the customer
-       ordered 2, Ready Stock answered 2, no document carries any of it and
-       nothing is left to buy — so the row cannot be ticked, and it says why
-       without a generic Status word anywhere on the page. */
-    const line = within(box).getByTestId("so-batch-part-B1201S-Q");
-    const cells = [...line.querySelectorAll("td")].map((c) => c.textContent);
-    expect(cells).toEqual([
-      "—", "B1201S-Q", "BooqitQueen", "2", "2", "—", "—", "—", "Loading…", "—", "—", "Mattress",
+    const goods = within(box).getByTestId("goods-mini-table");
+    const heads = [...goods.querySelectorAll("thead th")]
+      .map((el) => (el.textContent ?? "").trim())
+      .filter(Boolean);
+    expect(heads).toEqual([
+      "Status",
+      "Category",
+      "Qty",
+      "Item",
+      "Ready Stock",
+      "Supplier",
+      "Supplier Deliver To",
     ]);
+    for (const gone of ["SKU", "Ordered Qty", "To buy", "Order By", "Unit ID", "PO Safety Days"]) {
+      expect(heads, gone).not.toContain(gone);
+    }
+    const line = within(box).getByTestId("so-batch-part-B1201S-Q");
+    expect(within(line).getByTestId("goods-status-l61")).toHaveTextContent("No PO needed");
     expect(within(line).queryByRole("checkbox")).toBeNull();
-    expect(screen.queryByTestId("so-batch-status-o6")).toBeNull();
+    /* The customer's ORIGINAL quantity, never quietly rewritten. */
+    expect(line).toHaveTextContent("2");
+    expect(screen.getByTestId("so-batch-status-o6")).toHaveTextContent("No PO needed");
   });
 
   it("an eligible line carries the existing destination editor — Split included", async () => {
@@ -1185,42 +1335,84 @@ describe("the expansion — the ONE shared child table", () => {
     apiFetch.mockResolvedValueOnce({
       defaultDeliverTo: null,
       place: [],
-      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-777", "U1-000-778"], deliverTo: [] as Array<{ name: string; qty: number }> }],
-      unitCoverage: { "U1-000-778": "PO-SECOND", "U1-000-777": "PO-FIRST" },
+      lines: [{ lineId: "l51", sku: "H1401S-K", unitIds: ["U1-000-777"], deliverTo: [] as Array<{ name: string; qty: number }> }],
+      unitCoverage: { "U1-000-777": "PO-20260820-1111" },
+      unitLines: { "U1-000-777": "l51" },
     } as SalesOrderExpansionResponse);
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
-    const box = await screen.findByTestId("so-batch-inspector-o6");
-    expect(await within(box).findByText("U1-000-777")).toBeInTheDocument();
-    const firstUnit = within(box).getByText("U1-000-777");
-    const secondUnit = within(box).getByText("U1-000-778");
-    expect(firstUnit.closest("tr")).not.toBe(secondUnit.closest("tr"));
-    expect(within(firstUnit.closest("tr")!).getByRole("button", { name: "PO-FIRST" })).toBeInTheDocument();
-    expect(firstUnit.closest("tr")).not.toHaveTextContent("PO-SECOND");
-    expect(within(secondUnit.closest("tr")!).getByRole("button", { name: "PO-SECOND" })).toBeInTheDocument();
-    expect(secondUnit.closest("tr")).not.toHaveTextContent("PO-FIRST");
-    /**
-     * ⭐ A UNIT ROW IS A RECORD, NOT A SECOND DEMAND — the 2026-09-11 fix.
-     *
-     * Every Unit row used to carry the SAME line key, selection state and
-     * `deliverToNode` as the line above it, so one ticked demand drew N ticked
-     * boxes and N copies of the Deliver To / Split editor beside historical
-     * purchase orders. The toolbar said `1 selected`; the screen showed four.
-     */
-    for (const unit of [firstUnit, secondUnit]) {
-      const row = unit.closest("tr")!;
-      expect(row).toHaveAttribute("data-row", "evidence");
-      expect(within(row).queryByRole("checkbox")).toBeNull();
-      expect(within(row).queryByRole("combobox")).toBeNull();
-      expect(within(row).queryByRole("button", { name: "Split" })).toBeNull();
-      expect(within(row).getByText("1")).toBeInTheDocument();
-      expect(row.parentElement).toHaveClass("divide-y", "divide-base-200");
-    }
-    /* The demand row above them keeps the goods' own identity. */
-    const demand = within(box).getByTestId("so-batch-part-B1201S-Q");
-    expect(demand).toHaveAttribute("data-row", "demand");
-    expect(within(demand).getByText("B1201S-Q")).toBeInTheDocument();
-    expect(String(apiFetch.mock.calls[0]![0])).toBe("/api/operation/orders/o6/expansion");
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+    const box = await screen.findByTestId("so-batch-inspector-o5");
+    const unit = await within(box).findByText("U1-000-777");
+    /* ⭐ `PO No` AND `Unit ID` ARE NEIGHBOURS — the two identifiers a person
+       copies. A reader who has to look across four columns to pair a document
+       with its goods pairs them wrongly. */
+    const row = unit.closest("tr")!;
+    const cells = [...row.querySelectorAll("td")];
+    expect(cells[0]).toHaveTextContent("PO-20260820-1111");
+    expect(cells[1]).toHaveTextContent("U1-000-777");
+    expect(row).toHaveAttribute("data-row", "record");
+    expect(within(row).queryByRole("checkbox")).toBeNull();
+    expect(within(row).queryByRole("combobox")).toBeNull();
+    /* The exact document, never the line's other one. */
+    expect(row).not.toHaveTextContent("PO-20260821-2222");
+    expect(String(apiFetch.mock.calls[0]![0])).toBe("/api/operation/orders/o5/expansion");
+  });
+
+  /**
+   * ⭐ AN INFERRED ASSOCIATION IS NOT EVIDENCE — 2026-09-11.
+   *
+   * The expansion door used to group every reserved Unit of an order by
+   * normalized SKU, so two item lines of one SKU printed the SAME Unit IDs.
+   * `ops_stock_items.reserved_order_line_id` is the stored binding; a Unit
+   * that carries none is still SHOWN — evidence is never dropped to tidy a
+   * screen — and it says that its item line was never recorded.
+   */
+  it("says a Unit reached this line by SKU, instead of implying a binding", async () => {
+    apiFetch.mockResolvedValueOnce({
+      defaultDeliverTo: null,
+      place: [],
+      lines: [{ lineId: "l51", sku: "H1401S-K", unitIds: ["U1-000-777"], deliverTo: [] as Array<{ name: string; qty: number }> }],
+      unitCoverage: { "U1-000-777": "PO-20260820-1111" },
+      unitLines: { "U1-000-777": null },
+    } as SalesOrderExpansionResponse);
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+    const box = await screen.findByTestId("so-batch-inspector-o5");
+    const row = (await within(box).findByText("U1-000-777")).closest("tr")!;
+    expect(row).toHaveTextContent("Item line matched by SKU");
+  });
+
+  /**
+   * ⭐ TWO ROWS OPEN AT ONCE — the case the per-section drawing exists for.
+   *
+   * Nothing measures a group's height, so each Sales Order's line is drawn
+   * entirely by its OWN sections. Two rows open together therefore carry two
+   * independent lines, and neither can reach the other — which is the one thing
+   * a connector on a register must never do.
+   */
+  it("draws an independent connector per expanded row, and neither reaches the other", async () => {
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
+    const five = await screen.findByTestId("so-batch-inspector-o5");
+    const one = await screen.findByTestId("so-batch-inspector-o1");
+
+    /* o5 has documents, so it holds two sections and its line ends at the
+       record; o1 has none, so it holds one and its line ends at the goods. */
+    expect(within(five).getAllByTestId(/^connected-section-/)).toHaveLength(2);
+    expect(within(one).getAllByTestId(/^connected-section-/)).toHaveLength(1);
+
+    /* THE LAST SECTION OF EACH DRAWS NO TRUNK. There is no line to leak. */
+    expect(within(five).queryByTestId("section-trunk-po-details")).toBeNull();
+    expect(within(one).queryByTestId("section-trunk-goods")).toBeNull();
+
+    /* And each row's line belongs to that row, not to the register: its own
+       run from its own caret, plus an elbow for each later section. */
+    expect(within(five).getAllByTestId(/^section-run-/)).toHaveLength(1);
+    expect(within(five).getAllByTestId(/^section-elbow-/)).toHaveLength(1);
+    expect(within(one).getAllByTestId(/^section-run-/)).toHaveLength(1);
+    expect(within(one).queryAllByTestId(/^section-elbow-/)).toHaveLength(0);
+    expect(screen.getAllByTestId("expansion-connector-drop")).toHaveLength(2);
   });
 
   it("no second hand-drawn mini-table — the box is the shared component", () => {
@@ -1230,22 +1422,34 @@ describe("the expansion — the ONE shared child table", () => {
   });
 
   it("does not call pending Unit IDs unallocated", async () => {
-    apiFetch.mockImplementationOnce(() => new Promise(() => {}));
+    /* The Sales Order expansion read is the one left hanging; the Ready Stock
+       read still answers, so the only `Loading…` on screen is the Unit's. */
+    apiFetch.mockImplementationOnce((path?: unknown) =>
+      typeof path === "string" && path.endsWith("/ready-stock")
+        ? (Promise.resolve(EMPTY_READY_STOCK) as unknown as Promise<SalesOrderExpansionResponse>)
+        : (new Promise(() => {}) as Promise<SalesOrderExpansionResponse>),
+    );
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
-    const box = await screen.findByTestId("so-batch-inspector-o6");
-    expect(within(box).getByText("Loading…")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o7"));
+    const box = await screen.findByTestId("so-batch-inspector-o7");
+    /* UNKNOWN is not `None`: the document carries a unit, and whether a Unit
+       answers it has not been ANSWERED yet. Saying `Not allocated` here is how
+       a reader concludes goods do not exist because a request was slow. */
+    expect(within(box).getAllByText("Loading…").length).toBeGreaterThan(0);
     expect(within(box).queryByText("Not allocated")).not.toBeInTheDocument();
   });
 
-  it("offers retry when Unit IDs fail to load", async () => {
+  it("offers retry when Unit IDs fail to load, and says the read failed meanwhile", async () => {
     apiFetch.mockRejectedValueOnce(new Error("Unavailable"));
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
+    fireEvent.click(screen.getByTestId("so-batch-expand-o7"));
+    const box = await screen.findByTestId("so-batch-inspector-o7");
+    expect(await within(box).findByText("Could not be loaded")).toBeInTheDocument();
     const retry = await screen.findByRole("button", { name: "Unit IDs could not be loaded. Try again" });
     apiFetch.mockResolvedValueOnce({ defaultDeliverTo: null, place: [], lines: [
-      { lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-070"], deliverTo: [] as Array<{ name: string; qty: number }> },
-    ] } as SalesOrderExpansionResponse);
+      { lineId: "l71", sku: "B1201S-K", unitIds: ["U1-000-070"], deliverTo: [] as Array<{ name: string; qty: number }> },
+    ], unitCoverage: { "U1-000-070": "PO-20260822-3333" }, unitLines: { "U1-000-070": "l71" },
+    } as SalesOrderExpansionResponse);
     fireEvent.click(retry);
     expect(await screen.findByText("U1-000-070")).toBeInTheDocument();
   });
@@ -1327,7 +1531,7 @@ describe("the arrangement is the demand's, never the summary's", () => {
     fireEvent.change(within(box).getByTestId("so-batch-deliver-to-select-build::o8::a"), {
       target: { value: BULOH },
     });
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 1 unit");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item · 1 unit");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
@@ -1347,7 +1551,7 @@ describe("the arrangement is the demand's, never the summary's", () => {
     });
     fireEvent.click(within(box).getByTestId("so-batch-split-apply-build::o1::b1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 2 POs",
+      "1 Sales Order · 1 item · 2 units · Issue 2 POs",
     );
   });
 });
@@ -1455,55 +1659,302 @@ describe("a demand with several Unit records", () => {
       place: [],
       lines: [{ lineId, sku: "B1201S-K", unitIds, deliverTo: [] as Array<{ name: string; qty: number }> }],
       unitCoverage: coverage,
+      unitLines: Object.fromEntries(unitIds.map((u) => [u, lineId])),
     } as unknown as SalesOrderExpansionResponse);
   };
 
   it("draws exactly ONE checkbox and ONE arrangement editor, however many Units it has", async () => {
-    withUnits("l1", ["U1-000-101", "U1-000-102", "U1-000-103"], {
+    withUnits("l3", ["U1-000-101", "U1-000-102"], {
       "U1-000-101": "PO-20260820-4827",
       "U1-000-102": "PO-20260820-4827",
-      "U1-000-103": "PO-20260821-1190",
     });
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    const box = await screen.findByTestId("so-batch-inspector-o1");
+    fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
+    const box = await screen.findByTestId("so-batch-inspector-o3");
     await within(box).findByText("U1-000-101");
     const table = within(box).getByTestId("goods-mini-table");
     expect(within(table).getAllByRole("checkbox")).toHaveLength(1);
     expect(within(table).getAllByTestId(/^so-batch-deliver-to-select-/)).toHaveLength(1);
     expect(within(table).getAllByTestId(/^so-batch-split-/)).toHaveLength(1);
-    /* Three records, each on its own row, none of them selectable. */
-    expect(within(table).getAllByRole("row").filter((r) => r.getAttribute("data-row") === "evidence"))
-      .toHaveLength(3);
+    /* ⛔ AND NOT ONE UNIT ROW UPSTAIRS. The demand table holds exactly one row
+       per item line, whatever the record below it holds. */
+    expect(within(table).getAllByRole("row").filter((r) => r.getAttribute("data-row") === "demand"))
+      .toHaveLength(1);
+    expect(within(table).queryAllByRole("row").filter((r) => r.getAttribute("data-row") === "record"))
+      .toHaveLength(0);
+    /* Two records, each on its own row, in the read-only table, no control. */
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByRole("row").filter((r) => r.getAttribute("data-row") === "record"))
+      .toHaveLength(2);
+    expect(within(details).queryByRole("checkbox")).toBeNull();
   });
 
   it("ticking the one demand never reports more than the demand", async () => {
-    withUnits("l1", ["U1-000-101", "U1-000-102"], {});
+    withUnits("l3", ["U1-000-101", "U1-000-102"], {});
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    const box = await screen.findByTestId("so-batch-inspector-o1");
-    await within(box).findByText("U1-000-101");
-    fireEvent.click(within(box).getByRole("checkbox"));
+    fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
+    const box = await screen.findByTestId("so-batch-inspector-o3");
+    const table = within(box).getByTestId("goods-mini-table");
+    fireEvent.click(within(table).getByRole("checkbox"));
     /* What the toolbar says and what the screen shows are the same number. */
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item · 1 unit");
     expect(
-      within(within(box).getByTestId("goods-mini-table"))
-        .getAllByRole("checkbox")
-        .filter((c) => (c as HTMLInputElement).checked),
+      within(table).getAllByRole("checkbox").filter((c) => (c as HTMLInputElement).checked),
     ).toHaveLength(1);
   });
 
   it("a Unit record names its own document and never the line's other ones", async () => {
-    withUnits("l1", ["U1-000-101", "U1-000-102"], {
-      "U1-000-101": "PO-20260820-4827",
-      "U1-000-102": "PO-20260821-1190",
-    });
+    withUnits("l3", ["U1-000-101"], { "U1-000-101": "PO-20260820-4827" });
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    const box = await screen.findByTestId("so-batch-inspector-o1");
+    fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
+    const box = await screen.findByTestId("so-batch-inspector-o3");
     const first = (await within(box).findByText("U1-000-101")).closest("tr")!;
     expect(within(first).getByRole("button", { name: "PO-20260820-4827" })).toBeInTheDocument();
     expect(first).not.toHaveTextContent("PO-20260821-1190");
+  });
+});
+
+/* ─── FOURTEEN DOCUMENTS ON A QTY-1 LINE ─────────────────────────────────── */
+
+/**
+ * ⭐ THE OWNER'S SCREENSHOT, TURNED INTO FIXTURES (2026-09-11).
+ *
+ * `Qty 1 · On PO 14 · To buy 1` was reported as possible duplicate buying. It
+ * is not ONE situation, it is four, and only the documents' own recorded state
+ * tells them apart — which is exactly why `PO Status` is now a column.
+ *
+ * ── THE TWO NUMBERS, AND THEIR DIFFERENT SCOPES ─────────────────────────────
+ *
+ *   `On PO`   the HISTORICAL document quantity. Every non-cancelled
+ *             `po_line_sources` row whose `order_line_id` is THIS line —
+ *             `Completed` documents included, never netted by `received_qty`.
+ *             Customer-attributed and exact.
+ *
+ *   `To buy`  the ENGINE's EFFECTIVE remainder. Drawn from a per-SKU pool of
+ *             `purchase_orders.status = 'open'` lines only, net of
+ *             `received_qty`, allocated greedily earliest-deadline-first with
+ *             NO customer attribution — so another order may drain it first.
+ *
+ * They are allowed to disagree, and the fixtures below state what each
+ * disagreement MEANS. No third formula is derived from them anywhere.
+ */
+describe("fourteen documents on a one-unit line", () => {
+  const FOURTEEN = Array.from({ length: 14 }, (_, i) => `PO-2026090${(i % 9) + 1}-${4665 + i}`);
+
+  const documents = (sent: boolean, status: "open" | "received" = "open") =>
+    FOURTEEN.map((poId) => ({
+      poId,
+      status,
+      supplierId: "s-ohana",
+      supplierName: "Ohana",
+      destinationId: KLANG,
+      officialDeliveryDate: null,
+      sentCurrentVersion: sent,
+    }));
+
+  const order = (over: {
+    sent: boolean;
+    status: "open" | "received";
+    orderStatus: "blank" | "partial" | "ordered";
+  }) =>
+    orderRow({
+      orderId: "o14",
+      so: 1442,
+      customer: "FOURTEEN DOCUMENTS",
+      status: over.orderStatus,
+      pos: documents(over.sent, over.status),
+      lines: [
+        {
+          orderLineId: "l14",
+          sku: "B1201S-K",
+          qty: 1,
+          stockTaken: 0,
+          item: "Booqit",
+          variant: "King",
+          category: "mattress",
+          pos: FOURTEEN.map((poId) => ({ poId, qty: 1 })),
+        },
+      ],
+      outstandingSuppliers: ["Ohana"],
+    });
+
+  const leaf14 = (over: Partial<PurchaseDemandRow> = {}) =>
+    leaf({
+      id: "build::o14::b",
+      orderId: "o14",
+      so: 1442,
+      customer: "FOURTEEN DOCUMENTS",
+      lineIds: ["l14"],
+      skus: ["B1201S-K"],
+      qtyNeeded: 1,
+      toBuy: 1,
+      parts: [{ sku: "B1201S-K", qty: 1, unitCost: 100 }],
+      ...over,
+    });
+
+  /**
+   * FIXTURE A — the documents were SENT and they cover what the line required.
+   * Another purchase is NOT allowed: `isSelectableForOrder` reads the order's
+   * OWN lineage on confirmed-sent documents, and there is no checkbox at all.
+   */
+  it("refuses a second purchase when the order's own sent documents cover it", async () => {
+    renderRegister({
+      rows: [leaf14()],
+      registerRows: [order({ sent: true, status: "open", orderStatus: "ordered" })],
+    });
+    expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(within(within(box).getByTestId("goods-mini-table")).queryByRole("checkbox")).toBeNull();
+    /* And the record says WHY: fourteen documents, every one of them Waiting for goods from supplier. */
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByText("Waiting for goods from supplier")).toHaveLength(14);
+  });
+
+  /**
+   * FIXTURE B — the documents are NUMBERED and none has been sent. Nothing has
+   * reached a supplier, so status stays `blank` and buying is legitimate. The
+   * record says so: fourteen rows, every one `Sending not confirmed`.
+   */
+  it("allows the purchase when not one of the fourteen has been sent", async () => {
+    renderRegister({
+      rows: [leaf14()],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    expect(screen.getByTestId("so-batch-select-o14")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByText("Sending not confirmed")).toHaveLength(14);
+    /* Fourteen document rows, one unit each — the whole evidence, not a sample. */
+    expect(within(details).getAllByRole("row").filter((r) => r.dataset.row === "record"))
+      .toHaveLength(14);
+  });
+
+  /**
+   * FIXTURE C — the goods already ARRIVED. `On PO 14` counts them because they
+   * are this line's history; the engine's pool counts none of them, because a
+   * `Completed` document supplies nothing future. Two different scopes, one
+   * screen, and the column that reconciles them is `PO Status`.
+   */
+  it("still counts delivered documents under On PO, and says they are Completed", async () => {
+    renderRegister({
+      rows: [leaf14()],
+      registerRows: [order({ sent: true, status: "received", orderStatus: "ordered" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    /* ⭐ THE HISTORICAL QUANTITY LEFT THE ITEM ROW AND NOT THE PAGE (owner
+       ruling 2026-09-18). `Ordered Qty` is no longer a goods column; the
+       fourteen documents are named one per row in the section that is ABOUT
+       documents, which is where the quantity was always evidenced. */
+    expect(within(box).queryByTestId("goods-ordered-qty-l14")).toBeNull();
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByText("Completed")).toHaveLength(14);
+    /* ⛔ And the raw database word never reaches the screen. */
+    expect(details.textContent).not.toMatch(/\bopen\b/);
+  });
+
+  /**
+   * ⭐ FIXTURE D — the ENGINE's own `fullyOnPo`, and THE SCREEN AGREES WITH THE
+   * DOOR.
+   *
+   * Every unit of the build was drawn from the OPEN-purchase-order pool, so
+   * `To buy` is not a remainder. Since 0430 `POST /issue-batch` REFUSES such a
+   * selection by name — `already_on_po`, 422, naming the covering document —
+   * and creates nothing; production had minted SIX open purchase orders
+   * against one 1-unit line of SO-1340 because nothing downstream of the
+   * receipt refused it.
+   *
+   * The register offered the tick anyway, which is the trap shape
+   * `isSelectableForBuying`'s own contract exists to prevent: *offering a
+   * tick-box would be offering an act that fails*. So the row is not tickable
+   * and states the door's own refusal beside the figure that raised the
+   * question.
+   */
+  it("refuses the tick the issue door would refuse, and says so in its words", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 1, fullyOnPo: true })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    /* No parent tick either: the order's only eligible demand has gone. */
+    expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    const demand = within(box).getByTestId("so-batch-part-B1201S-K");
+    expect(within(demand).queryByRole("checkbox")).toBeNull();
+    /* ⭐ REMOVING THE COLUMNS REMOVED NO SAFEGUARD (owner ruling 2026-09-18).
+       `To buy` is gone from this table and the page still refuses the act the
+       door would refuse: no tick on the demand, no tick on the parent, and the
+       parent's `PO Safety Days` naming the covering document in the page's own
+       governed word rather than printing a margin it cannot state. The
+       customer's ORIGINAL `Qty 1` is untouched. */
+    const cells = [...demand.querySelectorAll("td")].map((c) => c.textContent);
+    expect(cells).toContain("1");
+    expect(demand.textContent).not.toMatch(/To buy/);
+    /* This order's own lineage already carries every unit it required, so the
+       row needs no NEW document and has no margin to state — the cell is
+       BLANK, which is its own meaning and is never a `0`. */
+    expect(screen.getByTestId("so-batch-status-o14")).toHaveTextContent("No PO needed");
+    expect(screen.getByTestId("so-batch-safety-days-o14")).toHaveTextContent("");
+  });
+
+  /**
+   * ⭐ UNKNOWN IS NOT YES (owner correction 2026-09-11).
+   *
+   * An older Worker carries no `fullyOnPo`, so the page cannot tell an
+   * uncovered line from one it has no answer about. It used to read the gap as
+   * permission and offer the tick. It now says it could not check — no
+   * purchasing quantity and no tick, because both would describe an
+   * eligibility nobody verified. The issue door's own refusal is untouched
+   * underneath; nothing about the backend rule changed.
+   */
+  it("neither offers nor prices a line whose coverage it could not check", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 1, fullyOnPo: undefined })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-o14")).toHaveAccessibleDescription("Coverage not checked");
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    const demand = within(box).getByTestId("so-batch-part-B1201S-K");
+    expect(within(demand).queryByRole("checkbox")).toBeNull();
+    /* UNKNOWN is stated, and it is stated as the MARGIN nobody could measure —
+       never as a `0` and never as permission. The demand stays fully visible:
+       the customer's original `Qty 1` is on its row. */
+    const cells = [...demand.querySelectorAll("td")].map((c) => c.textContent);
+    expect(cells).toContain("1");
+    expect(screen.getByTestId("so-batch-safety-days-o14")).toHaveTextContent(
+      "Coverage not checked",
+    );
+    expect(screen.getByTestId("so-batch-safety-days-o14")).not.toHaveTextContent("0");
+  });
+
+  it("says nothing of the kind when the remainder is genuine", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 0, fullyOnPo: false })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(within(box).getByTestId("so-batch-part-B1201S-K"))
+      .not.toHaveTextContent("Already on a PO");
+    expect(screen.getByTestId("so-batch-safety-days-o14"))
+      .not.toHaveTextContent("Already on a PO");
+  });
+
+  /* An older Worker sends no `fullyOnPo`. UNKNOWN accuses nothing and claims
+     nothing: the sentence simply does not appear. */
+  it("says nothing when the Worker did not carry the engine's flag", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 1, fullyOnPo: undefined })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(within(box).getByTestId("so-batch-part-B1201S-K"))
+      .not.toHaveTextContent("Already on a PO");
   });
 });
 
@@ -1549,9 +2000,13 @@ describe("a demand that covers several item lines", () => {
     expect(within(table).getAllByRole("checkbox")).toHaveLength(1);
     expect(within(table).getAllByTestId(/^so-batch-deliver-to-select-/)).toHaveLength(1);
     expect(table).toHaveTextContent("With 1 more lines in this set");
-    /* Both of the customer's lines are still listed with their own goods. */
-    expect(within(table).getByText("S9-2A")).toBeInTheDocument();
-    expect(within(table).getByText("S9-1A")).toBeInTheDocument();
+    /* Both of the customer's lines are still listed with their own goods. The
+       SKU column is gone (owner ruling 2026-09-18), so what tells the two
+       module lines apart is the configuration under the item — which is what
+       identified them to an operator in the first place. */
+    expect(table).toHaveTextContent("2 seater");
+    expect(table).toHaveTextContent("1 seater");
+    expect(table).not.toHaveTextContent("S9-2A");
   });
 
   it("ticks the whole set once — the leaf contract is unchanged", async () => {
@@ -1559,7 +2014,7 @@ describe("a demand that covers several item lines", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-oset"));
     const box = await screen.findByTestId("so-batch-inspector-oset");
     fireEvent.click(within(within(box).getByTestId("goods-mini-table")).getByRole("checkbox"));
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 2 items · 2 units");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::oset::s", allocations: [{ destinationId: KLANG, qty: 2 }] },
@@ -1627,7 +2082,7 @@ describe("a tick whose To buy has changed", () => {
   it("is dropped when the recomputed remainder is smaller", () => {
     const { rerender } = renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item · 2 units");
     /* Two Units of the two were answered off the shelf. */
     rerender(
       again({
@@ -1706,7 +2161,10 @@ describe("choosing a Ready Unit", () => {
         supplier: null,
         qty: 1,
         dateIn: "2026-08-01",
+        poNo: "PO-20260820-4827",
         matchingLineIds: ["l1"],
+        lineIds: ["l1"],
+        reservedForLineId: null,
         blocked: null,
       },
     ],
@@ -1722,9 +2180,11 @@ describe("choosing a Ready Unit", () => {
     apiFetch.mockImplementation(async (path: unknown) => {
       const p = String(path);
       if (p.endsWith("/ready-stock")) return READY as unknown as SalesOrderExpansionResponse;
-      if (p.includes("ready-stock/reserve")) {
+      if (p.includes("ready-stock/save")) {
         return {
           reserved: 1,
+          added: 1,
+          released: 0,
           reference: "SO-1318",
           units: [{ itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: "l1" }],
         } as unknown as SalesOrderExpansionResponse;
@@ -1746,19 +2206,24 @@ describe("choosing a Ready Unit", () => {
     expect(screen.getByTestId("so-batch-issue")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
+    /* ⭐ THE SAFEGUARD SURVIVED THE MOVE TO THE ITEM ROW (2026-09-18). Ready
+       Stock is a CELL now, and the path its act travels back to the Register is
+       worth pinning: the picker opens under its own item, and saving still
+       reaches `onSaved` and still drops the tick BEFORE the recomputed numbers
+       arrive. Nothing about the reservation door itself changed. */
+    fireEvent.click(await screen.findByTestId("ready-stock-toggle-l1"));
     const row = await screen.findByTestId(
       "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
     );
     fireEvent.click(within(row).getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    fireEvent.click(screen.getByTestId("ready-stock-save-l1"));
 
     await waitFor(() =>
       expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument(),
     );
     /* And the act says what it did, in Units. */
-    expect(screen.getByTestId("ready-stock-act-o1")).toHaveTextContent(
-      "Unit ID · U1-000-001",
+    expect(screen.getByTestId("ready-stock-act-l1")).toHaveTextContent(
+      "1 Unit on this item line",
     );
   });
 
@@ -1767,16 +2232,191 @@ describe("choosing a Ready Unit", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
+    fireEvent.click(await screen.findByTestId("ready-stock-toggle-l1"));
     const row = await screen.findByTestId(
       "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
     );
     fireEvent.click(within(row).getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
-    await screen.findByTestId("ready-stock-act-o1");
+    fireEvent.click(screen.getByTestId("ready-stock-save-l1"));
+    await screen.findByTestId("ready-stock-act-l1");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o3::b3", allocations: [{ destinationId: KLANG, qty: 1 }] },
     ]);
+  });
+});
+
+
+describe("approved PO Safety Days column", () => {
+  /**
+   * ⭐ THE MARGIN, NOT THE DATE — owner ruling 2026-09-18.
+   *
+   * The parent states the TIGHTEST margin over exactly the leaves the parent
+   * checkbox would tick, and the number is the SERVER's. Nothing to buy prints
+   * nothing; a margin nobody could measure prints the governed absence word,
+   * never a `0`.
+   */
+  it("shows the tightest measured margin and ignores covered leaves", () => {
+    const original = data();
+    const rows: PurchaseDemandRow[] = original.rows.map((r) => ({
+      ...r,
+      orderBy: "2026-09-25",
+      safetyDaysLeft: 9,
+    }));
+    rows.push(leaf({ id: "covered", orderBy: "2026-01-01", safetyDaysLeft: 1, fullyOnPo: true }));
+    renderRegister({ rows });
+    expect(screen.getByTestId("so-batch-safety-days-o1")).toHaveTextContent("9");
+    expect(screen.getByTestId("so-batch-safety-days-o5")).toBeEmptyDOMElement();
+  });
+
+  it("never prints a `0` for a margin the engine did not measure", () => {
+    const rows: PurchaseDemandRow[] = data().rows.map((r) => ({
+      ...r,
+      safetyDaysLeft: null,
+    }));
+    renderRegister({ rows });
+    const cell = screen.getByTestId("so-batch-safety-days-o1");
+    expect(cell).not.toHaveTextContent("0");
+    expect(cell).toHaveTextContent("Not planned");
+  });
+
+  it("names a production overrun rather than a negative number", () => {
+    const rows: PurchaseDemandRow[] = data().rows.map((r) => ({
+      ...r,
+      safetyDaysLeft: -2,
+    }));
+    renderRegister({ rows });
+    const cell = screen.getByTestId("so-batch-safety-days-o1");
+    expect(cell).toHaveTextContent("Not enough production days");
+    expect(cell).not.toHaveTextContent("-2");
+  });
+
+  it("names blocked planning and leaves the no-PO destination blank", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-safety-days-o4")).toHaveTextContent("Not planned");
+    expect(screen.getByTestId("so-batch-deliver-to-o4")).toBeEmptyDOMElement();
+  });
+
+  it("explains denied Issue authority in the selected toolbar", () => {
+    renderRegister({ mayIssue: false });
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByText("Only PO Duty can issue this PO")).toBeInTheDocument();
+  });
+});
+
+
+describe("two truthful groups on one permanent Register", () => {
+  it("starts with buying open and no-purchase-needed collapsed, preserving the total", () => {
+    renderRegister({}, false);
+    expect(screen.getByText("To buy")).toBeInTheDocument();
+    expect(screen.getByText("No purchase needed")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
+    fireEvent.click(screen.getByText("No purchase needed"));
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument();
+  });
+});
+
+
+describe("search, clear and default buying order", () => {
+  it("sorts selectable dates ascending with descending SO ties before blocked demand", () => {
+    const rows = data().rows.map((r) => ({ ...r, orderBy: r.orderId === "o1" ? "2026-09-30" : "2026-09-16" }));
+    const { container } = renderRegister({ rows }, false);
+    const ids = [...container.querySelectorAll('[data-testid^="so-batch-row-"]')].map((r) => r.getAttribute("data-testid"));
+    expect(ids.indexOf("so-batch-row-o3")).toBeLessThan(ids.indexOf("so-batch-row-o1"));
+    expect(ids.indexOf("so-batch-row-o1")).toBeLessThan(ids.indexOf("so-batch-row-o4"));
+  });
+  it("search reveals a covered order and no match offers a complete clear", async () => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1400" } });
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument());
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "NOT-A-REAL-SO" } });
+    await screen.findByText("No Sales Orders match these filters");
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
+  });
+});
+
+describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
+  /* Group-local headers (Jess, 2026-09-18): each group is its own table, its
+     heading riding in that table's `<thead>` beside its column header. Reading
+     both sections keeps the document order this test is about. */
+  const rowsIn = (container: HTMLElement) =>
+    [...container.querySelectorAll("thead tr, tbody tr")].map((tr) =>
+      tr.getAttribute("data-testid") ?? tr.textContent ?? "");
+
+  it("R1 — To buy is a heading above; No purchase needed is a collapsed button below", () => {
+    const { container } = renderRegister({}, false);
+    const heading = screen.getByRole("heading", { name: /To buy/ });
+    expect(heading.tagName).not.toBe("BUTTON");
+    const toggle = screen.getByTestId("grid-group-toggle-no-purchase-needed");
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const order = rowsIn(container);
+    expect(order.indexOf("grid-group-to-buy")).toBeLessThan(order.indexOf("grid-group-no-purchase-needed"));
+    /* Remaining demand decides — partly bought o3 and blocked o4 buy; Ordered
+       o5, Ready-Stock-only o6 and fully linked o7 need nothing. */
+    for (const id of ["o1", "o3", "o4", "o8"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+    for (const id of ["o5", "o6", "o7"]) expect(screen.queryByTestId(`so-batch-row-${id}`)).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    for (const id of ["o5", "o6", "o7"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+  });
+
+  it("R1 — a search match inside the collapsed group is revealed, and clearing restores the collapse", async () => {
+    renderRegister({}, false);
+    const input = screen.getByTestId("search-box").querySelector("input")!;
+    fireEvent.change(input, { target: { value: "STOCKED" } });
+    expect(await screen.findByTestId("so-batch-row-o6")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("search-clear"));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o6")).not.toBeInTheDocument());
+    expect(input.value).toBe("");
+  });
+
+  it("R2 — To buy reads Order By ascending, then Not planned, then SO No descending", () => {
+    const { container } = renderRegister({
+      rows: [
+        { ...LEAF_O1, orderBy: "2026-08-25" },
+        { ...LEAF_O3, orderBy: "2026-08-23" },
+        { ...LEAF_O8A, orderBy: "2026-08-30" },
+        { ...LEAF_O8B, orderBy: "2026-08-24" },
+        LEAF_O4,
+      ],
+    }, false);
+    const rows = rowsIn(container).filter((t) => t.startsWith("so-batch-row-"));
+    expect(rows).toEqual(["so-batch-row-o3", "so-batch-row-o8", "so-batch-row-o1", "so-batch-row-o4"]);
+    /* The DEFAULT READING ORDER is still the engine's Order By, even though
+       the column that prints is the margin: the sort is planning truth, not a
+       column's text (owner ruling R2, unchanged 2026-09-18). */
+    expect(screen.getByTestId("so-batch-safety-days-o4").textContent).toBe("Not planned");
+  });
+
+  it("R6 — the footer carries one total, singular for one order", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, false);
+    expect(screen.getByTestId("so-batch-footer").textContent).toBe("1 Sales Order");
+  });
+
+  it("R4 — the search box, its active query and its clear control are on the toolbar", () => {
+    renderRegister({}, false);
+    const box = screen.getByTestId("search-box");
+    expect(screen.getByTestId("search-icon")).toBeInTheDocument();
+    fireEvent.change(box.querySelector("input")!, { target: { value: "Kimmy" } });
+    expect(box).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("search-icon")).toHaveAttribute("data-hidden", "true");
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
+  });
+
+  it("R5 — a ticked row is marked as ticked; an expanded unticked row is not", () => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
+    expect(screen.getByTestId("so-batch-row-o3").className).not.toMatch(/trTicked/);
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-row-o1").className).toMatch(/trTicked/);
+    expect(source()).toContain('palette="slate"');
+    expect(source()).toContain('searchPresentation="responsive"');
   });
 });

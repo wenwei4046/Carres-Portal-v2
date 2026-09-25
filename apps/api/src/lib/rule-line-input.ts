@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Adapters, DB, PWP_RULES, type PwpRule } from "@carres/shared";
+import { Adapters, DB, PWP_RULES, type PwpRule, type RuleLineInput } from "@carres/shared";
 
 /**
  * Shared sku → { model_id, category, variant } resolution for the order-path
@@ -19,6 +19,20 @@ export interface SkuInfo {
   category: string;
   variant: string | null;
 }
+
+/** A flat trigger line → the matcher's RuleLineInput. Triggers are flat real SKUs. */
+export function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
+  const category = info?.category ?? "";
+  const isSofa = category.toLowerCase() === "sofa";
+  return {
+    category,
+    modelId: info?.modelId ?? null,
+    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
+    builtCompartments: [],
+  };
+}
+
+export const upper = (s: string): string => String(s ?? "").toUpperCase();
 
 /** Read the embedded product_models.category (object or array-of-1 per client). */
 export function embedCategory(

@@ -10,7 +10,12 @@ import {
 } from "@carres/shared";
 
 import type { RecomputableLine } from "./sofa-recompute";
-import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import {
+  deriveRuleLine,
+  readActivePwpRules,
+  resolveSkuInfo,
+  upper,
+} from "./rule-line-input";
 
 /**
  * Order-path PWP CARRY-FORWARD sweep (2990s Products parity Phase 8d, migration
@@ -93,21 +98,6 @@ export type SweepOutcome = {
    *  route can surface "N earned voucher(s) were not saved" to the salesperson. */
   softWarning?: string;
 };
-
-/** A flat trigger line → the matcher's core RuleLineInput (mirrors the reserve
- *  route's `deriveRuleLine`). Triggers are flat real SKUs. */
-function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
-  const category = info?.category ?? "";
-  const isSofa = category.toLowerCase() === "sofa";
-  return {
-    category,
-    modelId: info?.modelId ?? null,
-    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
-    builtCompartments: [],
-  };
-}
-
-const upper = (s: string): string => String(s ?? "").toUpperCase();
 
 /**
  * Sweep the caller's unclaimed RESERVED vouchers for THIS submit: carry forward

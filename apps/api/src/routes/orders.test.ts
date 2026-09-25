@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -11,7 +11,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-2";
 
 const env = {
   SUPABASE_URL,
@@ -20,19 +19,11 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "test@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 const DEALER_A = "00000000-0000-0000-0000-000000000d01";
@@ -484,11 +475,14 @@ function validCreateBody(over: Record<string, unknown> = {}) {
       phone: "012-3456789",
       address: "123 Jalan Sample, 50000 KL",
       addressUnknown: false,
+      /* The required Sales facts (owner ruling 2026-09-13, Delivery Card 18). */
+      addressState: "Kuala Lumpur",
       billing: null,
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
     delivery: { date: "2026-06-01", proceedDate: "2026-05-15", dateTbd: false, floor: 1, hasLift: false },
+    entryData: { fields: { building_type: "Condo" } },
     lines: [
       {
         sku: "mattress:carres-classic:queen",
@@ -516,17 +510,8 @@ function validCreateBody(over: Record<string, unknown> = {}) {
   };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -913,6 +898,42 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     expect(body.customer.name).toBe("Tan Mei Ling");
     expect(body.lines).toHaveLength(1);
     expect(body.addons).toHaveLength(1);
+    /* The service carries its own code for the Item Code cell — without it
+       the paper printed the `ADD-ON` placeholder (owner review 2026-08-09).
+       No catalogue link here, so the saved key prints exactly as saved. */
+    expect(body.addons[0].sku).toBe("stair_carry");
+  });
+
+  it("prints a LINKED service's catalogue Service SKU, and an unlinked one's saved key untouched", async () => {
+    const row = makeJoinedRow();
+    row.order_addons = [
+      { addon_key: "dispose-mattress", qty: 1, unit_price: "80" },
+      { addon_key: "DELIVERY", qty: 1, unit_price: "250" },
+    ];
+    const sb = buildSb({
+      one: row,
+      byTable: {
+        addons: [
+          { key: "dispose-mattress", name: "Dispose old mattress", service_sku: "SVC-DISPOSE-MATTRESS" },
+          { key: "DELIVERY", name: "Delivery fee", service_sku: null },
+        ],
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const codes = Object.fromEntries(body.addons.map((a: any) => [a.label, a.sku]));
+    expect(codes["Dispose old mattress"]).toBe("SVC-DISPOSE-MATTRESS");
+    expect(codes["Delivery fee"]).toBe("DELIVERY");
   });
 
   it("admits operation (revised 2026-05-12 — they need it on handover)", async () => {
@@ -5139,12 +5160,11 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     expect(sb._rpcCalls).toHaveLength(1);
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
     expect(payload.payment_method).toBe("cash");
-    // REGRESSION (2026-07-14): the key must be ABSENT, not `null` — a JSON
-    // null arrives in Postgres as jsonb 'null' (not SQL NULL) and trips
-    // create_order's `entry_data must be a json object` guard, killing every
-    // order without entry extras (e.g. installment with only an approval
-    // code + EDC slip).
-    expect("entry_data" in payload).toBe(false);
+    // REGRESSION (2026-07-14): the key must never be `null` — a JSON null
+    // arrives in Postgres as jsonb 'null' (not SQL NULL) and trips
+    // create_order's `entry_data must be a json object` guard. Since Card 18
+    // every valid body carries the building type, so the key is an OBJECT.
+    expect(payload.entry_data).toEqual({ fields: { building_type: "Condo" } });
   });
 
   it("an unconfigured method → 422 invalid_payment_method, create_order never fires", async () => {
@@ -5173,12 +5193,12 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     const res = await post(
       validCreateBody({
         paymentMethod: "credit",
-        entryData: { payment: { bank: "Maybank" } },
+        entryData: { payment: { bank: "Maybank" }, fields: { building_type: "Condo" } },
       }),
     );
     expect(res.status).toBe(400); // stop-probe → gate passed
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
-    expect(payload.entry_data).toEqual({ payment: { bank: "Maybank" } });
+    expect(payload.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { building_type: "Condo" } });
   });
 
   it("credit + a bank NOT in the configured options → 422 payment_followup_invalid", async () => {
@@ -5187,7 +5207,7 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     const res = await post(
       validCreateBody({
         paymentMethod: "credit",
-        entryData: { payment: { bank: "Bank of Mars" } },
+        entryData: { payment: { bank: "Bank of Mars" }, fields: { building_type: "Condo" } },
       }),
     );
     expect(res.status).toBe(422);
@@ -5201,11 +5221,11 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(
       validCreateBody({
-        entryData: { fields: { occupation: "Engineer" } },
+        entryData: { fields: { occupation: "Engineer", building_type: "Condo" } },
       }),
     );
     expect(res.status).toBe(400); // stop-probe → gate passed
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
-    expect(payload.entry_data).toEqual({ fields: { occupation: "Engineer" } });
+    expect(payload.entry_data).toEqual({ fields: { occupation: "Engineer", building_type: "Condo" } });
   });
 });

@@ -22,6 +22,7 @@ import type {
   OtherReceiptRow,
 } from "@carres/shared/other-money-in";
 import { apiFetch } from "@/lib/api";
+import { withDepartment } from "../department";
 
 const BASE = "/api/finance/other-money-in";
 const ROOT = ["finance", "other-money-in"] as const;
@@ -64,10 +65,11 @@ export function useOtherDebtorParties() {
   });
 }
 
-export function useOtherDebtorInvoices() {
+export function useOtherDebtorInvoices(dept = "") {
+  const d = withDepartment(moneyInKeys.invoices(), `${BASE}/invoices`, dept);
   return useQuery({
-    queryKey: moneyInKeys.invoices(),
-    queryFn: () => apiFetch<OtherDebtorInvoiceRow[]>(`${BASE}/invoices`),
+    queryKey: d.queryKey,
+    queryFn: () => apiFetch<OtherDebtorInvoiceRow[]>(d.url),
   });
 }
 
@@ -79,10 +81,11 @@ export function useOtherDebtorInvoice(id: string | null) {
   });
 }
 
-export function useOtherReceipts() {
+export function useOtherReceipts(dept = "") {
+  const d = withDepartment(moneyInKeys.receipts(), `${BASE}/receipts`, dept);
   return useQuery({
-    queryKey: moneyInKeys.receipts(),
-    queryFn: () => apiFetch<OtherReceiptRow[]>(`${BASE}/receipts`),
+    queryKey: d.queryKey,
+    queryFn: () => apiFetch<OtherReceiptRow[]>(d.url),
   });
 }
 

@@ -46,6 +46,23 @@ export const EVENT_WORD: Record<string, string> = {
   rejected: "Returned to draft",
   cancelled: "Cancelled",
   file_added: "File added",
+  // Supplier advances (migration 0485).
+  advance_applied: "Advance applied",
+  advance_taken_off: "Advance taken off",
+  money_back: "Money back recorded",
+  money_back_cancelled: "Money back cancelled",
+};
+
+/** One knock-off of an advance against a bill (migration 0485). */
+export const ADVANCE_APPLICATION_STATUS_WORD: Record<string, string> = {
+  applied: "Applied",
+  cancelled: "Taken off",
+};
+
+/** Money a supplier sent back out of an advance (migration 0485). */
+export const MONEY_BACK_STATUS_WORD: Record<string, string> = {
+  posted: "Recorded",
+  voided: "Cancelled",
 };
 
 export function word(map: Record<string, string>, key: string | null | undefined): string {
@@ -76,15 +93,18 @@ export function cents(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function todayIso(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
-
 /** The price on the supplier's invoice against the PO's price: a flag, never a block. */
 export function priceDiffWord(diff: number | null): string {
   if (diff === null) return "No PO price";
   if (Math.abs(diff) < 0.005) return "Same as PO price";
   return diff > 0 ? `${rm(diff)} above PO price` : `${rm(-diff)} below PO price`;
+}
+
+/** A bill's Price Check: how many of its lines differ from the PO price. The
+ *  Bills register and the voucher's bill list say it the same way. */
+export function priceCheckWord(r: { price_flags: number; grn_nos: string | null }): string {
+  if (r.price_flags > 0) return `${r.price_flags} ${r.price_flags === 1 ? "line differs" : "lines differ"} from PO`;
+  return r.grn_nos ? "Matches PO" : "No PO price";
 }
 
 /** Refusals the database words for a developer, re-worded for the operator.

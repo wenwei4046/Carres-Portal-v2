@@ -39,10 +39,15 @@ function renderAt(entry: string) {
 beforeEach(() => vi.clearAllMocks());
 
 const WAREHOUSE_PAGES = [
-  "/operation?tab=warehouse-monitor",
+  "/operation?tab=warehouse-arrival-schedule",
+  "/operation?tab=warehouse-pickup-schedule",
   "/operation?tab=warehouse-inbound",
   "/operation?tab=stock-onhand",
   "/operation?tab=warehouse-outbound",
+  // The retired Calendar addresses still resolve to Arrival Schedule, so a
+  // bookmark that lands there must still be offered Warehouse Settings.
+  "/operation?tab=warehouse-monitor",
+  "/operation?tab=warehouse-dashboard",
 ];
 
 describe("Settings → Warehouse", () => {
@@ -56,7 +61,7 @@ describe("Settings → Warehouse", () => {
   });
 
   it("opens the working Warehouse Settings route, not a placeholder", () => {
-    renderAt("/operation?tab=warehouse-monitor");
+    renderAt("/operation?tab=warehouse-arrival-schedule");
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Warehouse Settings" }));
     expect(navigate).toHaveBeenCalledWith("/operation/settings/warehouse/details");
@@ -67,6 +72,13 @@ describe("Settings → Warehouse", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const menu = screen.getByTestId("settings-launcher");
     expect(within(menu).queryByRole("menuitem", { name: "Warehouse Settings" })).toBeNull();
+  });
+
+  it("offers Finance Settings on a Finance page, and it opens the money accounts", () => {
+    renderAt("/finance/payment-vouchers");
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Finance Settings" }));
+    expect(navigate).toHaveBeenCalledWith("/finance/settings");
   });
 
   it("still offers the OTHER modules their own settings", () => {

@@ -1,4 +1,33 @@
-/* Compatibility entry point for the shared purchasing register theme. */
+/* SO Batch Purchase — owner ruling R5, 2026-09-16. The page no longer composes
+   the shared purchasing hex palette (`PurchasingRegister.module.css`, still
+   used by Manual Purchase and Purchase Orders). Its Register colours come from
+   DataGrid's governed `palette="slate"`; the page keeps the owner canvas. */
 .page {
-  composes: page from "../PurchasingRegister.module.css";
+  background: theme("colors.kit.canvas");
+  color: theme("colors.kit.slate.12");
+}
+
+/* Breakpoints measure the buying canvas, after both portal rails. */
+.canvas { container: so-batch / inline-size; }
+@container so-batch (width < 896px) {
+  .canvas .rail { position: absolute; inset-block: 0; left: 0; z-index: 30; }
+}
+@container so-batch (width < 768px) {
+  .canvas [data-testid="sales-orders-grid"] { --grid-row-h: 40px; }
+}
+.issue { container: so-batch-issue / inline-size; }
+.issueBody { display: flex; flex-direction: column; overflow-y: auto; }
+@container so-batch-issue (min-width: 768px) {
+  .issue .issueBody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; }
+}
+
+@container so-batch-issue (min-width: 768px) {
+  .issue .issueWork, .issue .issuePreview { min-height: 0; flex-shrink: 1; overflow-y: auto; }
+  .issue .issueWork { border-bottom-width: 0; border-right-width: 1px; }
+}
+
+/* Keep Clear, the duty holder and Issue PO reachable on the narrow canvas. */
+@container so-batch (width < 640px) {
+  .canvas [data-testid="selection-bar"] { flex-wrap: wrap; }
+  .canvas [data-testid="selection-bar"] > span:first-child { flex-basis: 100%; white-space: normal; }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addWorkingDays } from "./working-days";
-import {
+import { poDeliveryDateOf,
+  poDeliveryWorkingDays,
   PURCHASING_NUMBER_KEYS,
   expectedArrivalOf,
   orderByFromDeliveryDate,
@@ -269,6 +270,79 @@ describe("the wire refuses what the database would refuse", () => {
  */
 const NO_HOLIDAYS: ReadonlySet<string> = new Set();
 
+/**
+ * ⭐ `poDeliveryDateOf` — THE PO's OWN DELIVERY DATE (owner ruling Jess,
+ * 2026-09-22). `PO Date + n Settings working days`, and `n` is exactly the
+ * recorded production number: NO transit day is added. It is deliberately a
+ * DIFFERENT answer from `expectedArrivalOf`, which is when the goods reach
+ * Carres — the pair below is the whole point of having two functions.
+ */
+describe("poDeliveryDateOf — the Settings date the supplier's paper prints", () => {
+  it("counts the recorded production days on the FACTORY's week and adds no transit", () => {
+    // Ohana works Saturday (offDays [0]) on a 7-day bedframe lead: Mon 3 Aug
+    // + 7 working days is Tue 11 Aug. `expectedArrivalOf` then adds Ohana's
+    // transit day and answers Wed 12 Aug — one day later, for a different
+    // question. The PAPER prints the factory's own promise.
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        poDateIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-11");
+    expect(
+      expectedArrivalOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        fromIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-12");
+  });
+
+  it("the label's `n` counts back to the same number it was computed from", () => {
+    /* The paper prints `PO {n}-Day Delivery Date`, and `n` is counted from the
+       two dates by `poDeliveryWorkingDays`. Computing the date from Settings
+       and counting it back must agree, or the label and the date would be two
+       arithmetics again (Law D). */
+    const date = poDeliveryDateOf(SETTINGS, {
+      supplierId: NICE,
+      category: "mattress",
+      poDateIso: "2026-08-03",
+      holidays: NO_HOLIDAYS,
+    });
+    expect(date).not.toBeNull();
+    expect(
+      poDeliveryWorkingDays(SETTINGS, {
+        supplierId: NICE,
+        poDateIso: "2026-08-03",
+        deliveryDateIso: date,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe(productionWorkingDaysFor(SETTINGS, NICE, "mattress"));
+  });
+
+  it("NULL IS A REAL ANSWER — no production number, no date", () => {
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "mattress",
+        poDateIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        poDateIso: null,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
   it("production on the FACTORY's week, then transit on the OFFICE week", () => {
     // Ohana works Saturday (offDays [0]). Mon 3 Aug + 7 working days lands on
@@ -517,5 +591,32 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
     expect(workWeekLabel([0])).toBe(weekdayListLabel([1, 2, 3, 4, 5, 6]));
     // Two working days do not collapse into a range — `Mon Tue`, never `Mon–Tue`.
     expect(weekdayListLabel([1, 2])).toBe("Mon Tue");
+  });
+});
+
+describe("poDeliveryWorkingDays — the n of `PO {n}-Day Delivery Date` (owner 2026-09-22)", () => {
+  const settings = {
+    suppliers: [
+      { id: "nf", name: "Nice Future", categories: [], offDays: [0, 6], transitDays: 1 },
+      { id: "ohana", name: "Ohana", categories: [], offDays: [0], transitDays: 1 },
+    ],
+  } as unknown as Pick<import("./purchasing-settings").PurchasingSettings, "suppliers">;
+
+  it("Mon 21 Sep 2026 → Fri 9 Oct 2026 on a Mon–Fri supplier is 14 — the owner's example", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(14);
+  });
+
+  it("counts on THIS supplier's week — a Saturday-working factory gets more days in the same span", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "ohana", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(16); // + Sat 26 Sep, Sat 3 Oct
+  });
+
+  it("skips a public holiday", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set(["2026-10-01"]) })).toBe(13);
+  });
+
+  it("no date, or a date not after the PO Date, is no number — never a guess", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: null })).toBeNull();
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: null, deliveryDateIso: "2026-10-09" })).toBeNull();
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-10-09", deliveryDateIso: "2026-10-09" })).toBeNull();
   });
 });

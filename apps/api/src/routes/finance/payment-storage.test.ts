@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -250,3 +233,36 @@ describe("POST /api/finance/payment-storage/later-delivery-request", () => {
   });
 });
 
+
+describe("GET /api/finance/payment-storage/later-delivery-requests — the Monitor asks for every order", () => {
+  const REQUEST = {
+    id: "00000000-0000-0000-0000-00000000040d", order_id: ORDER_ID, requested_date: "2026-09-20",
+    reason_key: "customer_not_ready", reason_detail: null, terms_acknowledged: true,
+    free_storage_requested: true, evidence_url: "https://x/evidence.png",
+    recorded_by: "u1", recorded_at: "2026-09-10T00:00:00Z",
+  };
+  async function get(query: string, role = "operation") {
+    return app.fetch(new Request(
+      `http://t/api/finance/payment-storage/later-delivery-requests${query}`,
+      { headers: { Authorization: `Bearer ${await makeJwt(role)}` } }), env);
+  }
+  it("without an order id lists every request (the Monitor's `Free request waiting for approval`)", async () => {
+    const sb = sbWithList([REQUEST]);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await get("");
+    expect(res.status).toBe(200);
+    expect((await res.json() as { requests: unknown[] }).requests).toHaveLength(1);
+    // No narrowing was applied — the whole table answered.
+    expect((sb.from() as { eq: ReturnType<typeof vi.fn> }).eq).not.toHaveBeenCalled();
+  });
+  it("with an order id narrows to that order", async () => {
+    const sb = sbWithList([REQUEST]);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await get(`?orderId=${ORDER_ID}`)).status).toBe(200);
+    expect((sb.from() as { eq: ReturnType<typeof vi.fn> }).eq).toHaveBeenCalledWith("order_id", ORDER_ID);
+  });
+  it("a malformed order id is still refused", async () => {
+    vi.mocked(userClient).mockReturnValue(sbWithList([]) as never);
+    expect((await get("?orderId=nope")).status).toBe(422);
+  });
+});

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredPaymentReference } from "./order-payments";
 
 /**
  * 0219 — Order Entry configurability (Loo 2026-07-12).
@@ -85,10 +86,9 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     sublabel: "Full payment",
     active: true,
     approvalCodeRequired: true,
-    // Bank ships OPTIONAL in the code default so an older POS client (or an
-    // in-flight order missing the answer) never 422s the moment the API
-    // deploys — the operator flips `required` in the SO Maintenance editor.
-    followUps: [{ key: "bank", label: "Bank", options: [...MY_BANKS], required: false }],
+    // KL Gateway 2026-09-18: a card sale names the bank that took it —
+    // required here and forced on in resolvePaymentMethods for any config.
+    followUps: [{ key: "bank", label: "Bank", options: [...MY_BANKS], required: true }],
   },
   {
     key: "installment",
@@ -134,7 +134,20 @@ export function resolvePaymentMethods(
 ): PaymentMethodConfig[] {
   const configured = cfg?.paymentMethods ?? [];
   const src = configured.length > 0 ? configured : DEFAULT_PAYMENT_METHODS;
-  return src.filter((m) => m.active);
+  // Whatever the saved config says: a card sale names its bank, and every
+  // method the writer refuses without a reference carries one. Since 0551 that
+  // is card / credit / installment / cheque / bank / bank-transfer / DuitNow
+  // QR — asked of `requiredPaymentReference` so this list and the SQL guard
+  // are the same list. A method a manager invents is NOT on it, and the writer
+  // leaves it optional, so a saved `approvalCodeRequired: false` still stands.
+  // Without this, an operator adding "Cheque" in SO Maintenance would leave
+  // the box unticked, the form would accept a blank, and the database would
+  // refuse the payment at the very end.
+  return src.filter((m) => m.active).map((m) => requiredPaymentReference(m.key) === null ? m : {
+    ...m, approvalCodeRequired: true,
+    followUps: m.key !== "credit" ? m.followUps
+      : m.followUps.map((f) => f.key === "bank" ? { ...f, required: true } : f),
+  });
 }
 
 // ---------------------------------------------------------------------------

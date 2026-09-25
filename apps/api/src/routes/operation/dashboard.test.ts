@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -10,7 +12,6 @@ vi.mock("../../lib/supabase", () => ({
 import { userClient } from "../../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -19,19 +20,11 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: `${role}@carres.com`,
     app_metadata: { role },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 const SUMMARY_PAYLOAD = {
@@ -41,17 +34,8 @@ const SUMMARY_PAYLOAD = {
   low_stock: [],
 };
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -205,5 +189,20 @@ describe("GET /api/operation/dashboard", () => {
   it("returns 401 without Authorization header", async () => {
     const res = await app.fetch(new Request("http://t/api/operation/dashboard"), env);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("the dashboard's today is Kuala Lumpur's (0519)", () => {
+  it("the summary, the follow-up rollover and the ETA sweep no longer read the UTC clock", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0519_overdue_scans_and_effective_from_defaults_use_kl_today.sql"),
+      "utf-8",
+    );
+    const bodies = mig.slice(mig.indexOf("-- 1. Operation dashboard"));
+    expect(bodies).not.toContain("current_date");
+    for (const fn of ["operation_dashboard_summary", "ops_tasks_rollover_overdue", "supplier_claim_sweep_overdue"]) {
+      expect(bodies).toMatch(new RegExp(`function public\\.${fn}\\(\\)`, "i")); // 0125 shouts
+    }
+    expect(bodies.match(/\(timezone\('Asia\/Kuala_Lumpur', now\(\)\)\)::date/g)?.length).toBe(9);
   });
 });

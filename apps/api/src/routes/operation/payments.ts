@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -48,10 +48,7 @@ paymentsRouter.get("/", async (c) => {
     .in("status", ["place", "proceed_order", "delivered"])
     .order("delivery_date", { ascending: true, nullsFirst: false })
     .limit(500);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ rows: data ?? [] });
 });
 

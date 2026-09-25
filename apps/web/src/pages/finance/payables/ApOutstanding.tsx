@@ -8,12 +8,18 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useApBillOutstanding, useApOutstanding } from "@/lib/payables-queries";
 import { cents, creditorKindWord, money, num } from "./payables-words";
 import { PayablesSwitch, ReadFailed } from "./PayablesParts";
+import { supplierUnpaid, unpaidTotal } from "../money-owed";
+import SupplierAdvancesOf from "./SupplierAdvancesOf";
 
 /**
  * Finance → Unpaid by Supplier (migration 0477, `ap_outstanding`). What
  * Carres still owes each supplier and creditor on confirmed bills, and how
  * much of that is already on a payment voucher waiting for approval. Read
  * only: paying is a Payment Voucher, one door.
+ *
+ * Advance Left and Unpaid After Advance (0484) come from the database
+ * (`advance_open`, `net_owing`) — the same figure the ledger self-check reads.
+ * A supplier with only an advance shows here with a negative Unpaid After Advance.
  */
 export default function ApOutstanding() {
   const navigate = useNavigate();
@@ -30,8 +36,14 @@ export default function ApOutstanding() {
       numberValue: (r) => num(r.billed_total), filterType: "number", exportValue: (r) => num(r.billed_total) ?? "" },
     { key: "paid", label: "Paid", width: 140, align: "right", accessor: (r) => money(r.paid_total),
       numberValue: (r) => num(r.paid_total), filterType: "number", exportValue: (r) => num(r.paid_total) ?? "" },
-    { key: "unpaid", label: "Unpaid", width: 140, align: "right", accessor: (r) => money(r.balance_owing),
-      numberValue: (r) => num(r.balance_owing), filterType: "number", exportValue: (r) => num(r.balance_owing) ?? "" },
+    { key: "unpaid", label: "Unpaid", width: 140, align: "right", accessor: (r) => money(supplierUnpaid(r)),
+      numberValue: (r) => supplierUnpaid(r), filterType: "number", exportValue: (r) => supplierUnpaid(r) ?? "" },
+    // 0484: an advance paid before the bill is owed back to Carres until it is
+    // applied or sent back, so it comes off what Carres owes the supplier.
+    { key: "advance", label: "Advance Left", width: 140, align: "right", accessor: (r) => money(r.advance_open),
+      numberValue: (r) => num(r.advance_open), filterType: "number", exportValue: (r) => num(r.advance_open) ?? "" },
+    { key: "net", label: "Unpaid After Advance", width: 170, align: "right", accessor: (r) => money(r.net_owing),
+      numberValue: (r) => num(r.net_owing), filterType: "number", exportValue: (r) => num(r.net_owing) ?? "" },
     { key: "waiting", label: "On a Voucher, Not Approved", width: 200, align: "right",
       accessor: (r) => money(onVoucher(r)), numberValue: (r) => onVoucher(r), filterType: "number" },
     { key: "free", label: "Not on a Voucher", width: 160, align: "right", accessor: (r) => money(r.uncommitted),
@@ -64,10 +76,10 @@ export default function ApOutstanding() {
             expandable={{ renderExpansion: (r) => <UnpaidBillsOf row={r} /> }}
             onRowDoubleClick={(r) => navigate(`/finance/payment-vouchers/new?supplier=${r.supplier_id}`)}
             statusSummary={(visible) => {
-              const unpaid = visible.reduce((s, r) => s + (num(r.balance_owing) ?? 0), 0);
+              const t = unpaidTotal(visible); // same arithmetic as the Dashboard (Law D)
               return (
                 <span data-testid="ap-outstanding-summary">
-                  {visible.length} {visible.length === 1 ? "supplier" : "suppliers"} · {money(cents(unpaid))} unpaid
+                  {t.suppliers} {t.suppliers === 1 ? "supplier" : "suppliers"} · {money(t.total)} unpaid
                 </span>
               );
             }}
@@ -98,12 +110,13 @@ function UnpaidBillsOf({ row }: { row: ApOutstandingRow }) {
             ? <p>No unpaid bill.</p>
             : open.map((b) => (
               <p key={b.bill_id}>
-                <Link to={`/finance/bills/${b.bill_id}`}>{b.bill_no}</Link>
+                <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${b.bill_id}`}>{b.bill_no}</Link>
                 {" · "}{b.supplier_invoice_no} · {fmtDate(b.bill_date)}
                 {" · "}{b.due_date ? `due ${fmtDate(b.due_date)}` : "no due date"}
                 {" · "}{money(b.balance_owing)} unpaid
               </p>
             ))}
+      <SupplierAdvancesOf supplierId={row.supplier_id} />
       <Link className="btn-secondary mt-3 inline-block" to={`/finance/payment-vouchers/new?supplier=${row.supplier_id}`}>
         New Payment Voucher
       </Link>

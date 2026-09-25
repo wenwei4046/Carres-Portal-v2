@@ -9,6 +9,7 @@ import {
   normalizeSkuKey,
   reassignPoWarehouseInput,
   officeReceiveInput,
+  poDeliveryWorkingDays,
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierReplyInput,
@@ -19,15 +20,18 @@ import {
   setLineDestinationInput,
   setLineOpsRemarkInput,
   splitLineDestinationInput,
+  warehouseReceiptTotals,
   type AwaitingStockShortageResponse,
   type PoReportLine,
   type PoReportResponse,
+  type WarehouseReceiptLine,
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
 import { chunk } from "../../lib/purchase-demand-read";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
 
 /**
@@ -149,7 +153,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at, terms_days",
       );
 
     if (status !== "all") q = q.eq("status", status);
@@ -207,7 +211,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // presents them as line attribution. Manual Purchase lineage follows the
   // line's `demand_id` to its request header.
   const poSourcesByLine = new Map<string, Record<string, unknown>[]>();
-  const salesSourcesByPo = new Map<string, Array<{ kind: "sales_order"; reference: string }>>();
+  const salesSourcesByPo = new Map<string, Array<{ kind: "sales_order"; reference: string; order_id: string | null }>>();
   if (poIds.length > 0) {
     const sourceResult = await readEveryChunked<Record<string, unknown>, string>(
       poIds,
@@ -231,7 +235,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         const reference = `SO-${Number(source.so)}`;
         const current = salesSourcesByPo.get(poId) ?? [];
         if (!current.some((item) => item.reference === reference)) {
-          current.push({ kind: "sales_order", reference });
+          /* The order id makes one SO number a door to its Sales Order. */
+          current.push({ kind: "sales_order", reference, order_id: (source.order_id as string | null) ?? null });
           salesSourcesByPo.set(poId, current);
         }
       }
@@ -275,18 +280,23 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         .filter((id): id is string => !!id),
     ),
   ];
-  /* Card 08 §3.5 — a Manual Purchase source has no visible number. The
-     visible reference is the label `Manual Purchase`; identity stays the
-     request UUID, and the business facts (Proceed Date, purpose) travel so
-     detailed source lines can tell two purchases apart. `req_no` is legacy
-     compatibility data and is not read. */
-  const requestFactsById = new Map<string, { proceedDate: string | null }>();
+  /* ⭐ MPR IS THE MANUAL PURCHASE'S VISIBLE IDENTITY AGAIN — owner ruling
+     2026-09-18, which overwrites Card 08 §3.5's 2026-09-04 retirement. The
+     request's own permanent number (`purchase_requests.req_no`,
+     `MPR-YYYYMMDD-RRRR`, 0359) is what the PO listing's `SO No / MPR No`
+     column prints and what opens the request. It is READ, never minted here: a
+     request with no stored number keeps the governed label `Manual Purchase`,
+     because a number nobody allocated is a number nobody can look up.
+     Identity stays the request UUID and the business facts (Proceed Date,
+     purpose) still travel, so detailed source lines can tell two purchases
+     apart. */
+  const requestFactsById = new Map<string, { proceedDate: string | null; reqNo: string | null }>();
   if (requestIds.length > 0) {
     const requestResult = await readEveryChunked<Record<string, unknown>, string>(
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, created_at")
+        .select("id, created_at, req_no")
         .in("id", ids)
         .order("id"),
     );
@@ -299,6 +309,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         proceedDate:
           typeof request.created_at === "string"
             ? request.created_at.slice(0, 10)
+            : null,
+        reqNo:
+          typeof request.req_no === "string" && request.req_no.trim() !== ""
+            ? request.req_no.trim()
             : null,
       });
     }
@@ -655,6 +669,60 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  /* GRN No · Goods Received Date · Received Qty (Purchasing MASTER §9.3, Jess
+     2026-09-17, extended by the owner ruling 2026-09-18): the posted receipts
+     of each PO. A draft has no number and is not a GRN, so only numbered
+     receipts ride the list. Receiving owns them; the register only links.
+
+     ⭐ THE PHYSICAL DATE IS ITS OWN FACT. `goods_received_at` is the day the
+     goods actually arrived (0314); `created_at` is when the record was filed.
+     They are routinely different days and the register may never substitute
+     one for the other — a PO Default Delivery Date, a Supplier Confirmed
+     Delivery Date and a Goods Received Date are three separate columns.
+
+     ⭐ AND THE QUANTITY HAS ONE ARITHMETIC (Law D). `warehouseReceiptTotals`
+     is the shared reader Receiving already uses, so the count beside a GRN
+     here and the count on the GRN itself cannot drift. Damaged and wrong-item
+     units are NOT received — that is the same arithmetic, not a second one. */
+  const grnsByPo = new Map<
+    string,
+    Array<{ id: string; grn_no: string; goods_received_at: string | null; received_qty: number }>
+  >();
+  if (poIds.length > 0) {
+    const grnResult = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("warehouse_receipts")
+        .select("id, po_id, grn_no, goods_received_at, lines, created_at")
+        .in("po_id", ids)
+        .not("grn_no", "is", null)
+        .order("goods_received_at", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
+    );
+    if (grnResult.error) {
+      const m = mapPgError(grnResult.error);
+      return c.json(m.body, m.status);
+    }
+    for (const receipt of grnResult.data) {
+      const poId = receipt.po_id as string;
+      const current = grnsByPo.get(poId) ?? [];
+      const lines = Array.isArray(receipt.lines)
+        ? (receipt.lines as WarehouseReceiptLine[])
+        : [];
+      current.push({
+        id: receipt.id as string,
+        grn_no: receipt.grn_no as string,
+        goods_received_at:
+          typeof receipt.goods_received_at === "string"
+            ? receipt.goods_received_at.slice(0, 10)
+            : null,
+        received_qty: warehouseReceiptTotals(lines).received,
+      });
+      grnsByPo.set(poId, current);
+    }
+  }
+
   const { data: tmplRow, error: tmplError } = await sb
     .from("purchasing_settings")
     .select("supplier_message_template")
@@ -679,7 +747,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
       return [{
         kind: "manual_purchase" as const,
-        reference: "Manual Purchase",
+        /* The stored MPR number where the request has one; the governed label
+           where it has none. Never a UUID, never an invented number. */
+        reference: facts?.reqNo ?? "Manual Purchase Request",
+        req_no: facts?.reqNo ?? null,
         request_id: demand.requestId,
         purpose: demand.purpose,
         proceed_date: facts?.proceedDate ?? null,
@@ -706,6 +777,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       promises: promisesByPo.get(row.id as string) ?? [],
       sends: sendsByPo.get(row.id as string) ?? [],
+      grns: grnsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => {
         const salesLineSources = poSourcesByLine.get(l.id as string) ?? [];
         const salesAllocated = salesLineSources.reduce(
@@ -726,7 +798,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             }]),
             ...(demand ? [{
               kind: "manual_purchase" as const,
-              reference: "Manual Purchase",
+              reference: manualFacts?.reqNo ?? "Manual Purchase Request",
+              req_no: manualFacts?.reqNo ?? null,
               // A mixed legacy row can carry both ledgers. Preserve its Manual
               // Purchase reference without claiming the full line twice.
               qty: Math.max(0, Number(l.qty ?? 0) - salesAllocated) || null,
@@ -1369,6 +1442,8 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
 //
 // `purchasing_po_document` is the document authority. A route that overwrites
 // its answer is a second truth about the same paper.
+// It may ADD a fact the SQL cannot derive (`poPaperFacts`: the working-day
+// count and the delivery method) — never overwrite one it answered.
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
 // Resume the existing document's send step without issuing another PO.
@@ -1464,8 +1539,50 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  return c.json(doc as Record<string, unknown>);
+  return c.json({ ...(doc as Record<string, unknown>), ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)) });
 });
+
+type PoDocumentDates = { issue_date?: string | null; eta_date?: string | null };
+
+/**
+ * TWO FACTS THE PAPER PRINTS THAT THE SQL DOCUMENT CANNOT DERIVE (owner rulings
+ * 2026-09-22, PO-PDF-STANDARD §2). Both are ADDED beside the document; neither
+ * overwrites a field `purchasing_po_document` answered.
+ *
+ * - `delivery_working_days` — the `{n}` of `PO {n}-Day Delivery Date`, counted
+ *   by the shared working-day engine (`poDeliveryWorkingDays`) on this
+ *   supplier's work week. The engine is TypeScript; SQL has no copy of it, and
+ *   a second copy would be a second arithmetic (Law D).
+ * - `delivery_method` — `we_collect` when the supplier is a collection supplier
+ *   (`suppliers.kind = 'factory_pickup'`, the same rule Purchasing Settings
+ *   reads), else `supplier_delivers`.
+ *
+ * A KEPT version (`?version=N`) never passes through here: it reprints exactly
+ * what the supplier received.
+ */
+async function poPaperFacts(
+  sb: ReturnType<typeof userClient>,
+  poId: string,
+  doc: PoDocumentDates,
+): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null }> {
+  const { data: po } = await sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle();
+  const supplierId = (po as { supplier_id: string | null } | null)?.supplier_id ?? null;
+  if (!supplierId) return { delivery_working_days: null, delivery_method: null };
+  const [supplier, week] = await Promise.all([
+    sb.from("suppliers").select("kind").eq("id", supplierId).maybeSingle(),
+    sb.from("purchasing_supplier_settings").select("off_days").eq("supplier_id", supplierId).maybeSingle(),
+  ]);
+  const offDays = ((week.data as { off_days: number[] | null } | null)?.off_days ?? []).map(Number);
+  const days = poDeliveryWorkingDays(
+    { suppliers: [{ id: supplierId, name: "", categories: [], offDays: offDays.length > 0 ? offDays : null, transitDays: null }] },
+    { supplierId, poDateIso: doc.issue_date, deliveryDateIso: doc.eta_date },
+  );
+  const kind = (supplier.data as { kind: string | null } | null)?.kind ?? null;
+  return {
+    delivery_working_days: days,
+    delivery_method: supplier.error || !supplier.data ? null : kind === "factory_pickup" ? "we_collect" : "supplier_delivers",
+  };
+}
 
 // ----- GET /:id/source-orders -----
 //
@@ -2253,6 +2370,21 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
+});
+
+// ----- PUT /:id/terms-days -----
+// 0530 — the PO's own payment terms. They win over the supplier's when the
+// bill form fills in a due date. Null clears them.
+operationPosRouter.put("/:id/terms-days", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setTermsDaysInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_po_terms_days", {
+    p_po_id: c.req.param("id"),
+    p_days: parsed.data.days,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true });
 });
 
 // ----- PUT /message-template -----

@@ -12,6 +12,7 @@ import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { toast } from "sonner";
 import { useSaveParty } from "./api";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 const KIND_OPTIONS = [
   { value: "company", label: "Company" },
@@ -132,9 +133,9 @@ export default function PartyModal({
           />
         )}
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {refusal}
-          </p>
+          </FieldError>
         )}
       </div>
     </Modal>

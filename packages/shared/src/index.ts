@@ -70,6 +70,8 @@ export {
   WEEKDAYS,
   SUNDAY,
   expectedArrivalOf,
+  poDeliveryDateOf,
+  poDeliveryWorkingDays,
   arrivalFromReadyDate,
   orderByFromDeliveryDate,
   isPurchasingCategory,
@@ -93,6 +95,7 @@ export {
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
+  purchasingSetSupplierTermsDaysInput,
   TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
@@ -112,6 +115,7 @@ export {
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
+  type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 
@@ -513,7 +517,6 @@ export {
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
   abandonOrderInput,
-  warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -525,7 +528,6 @@ export {
   reselectPartnerInput,
   lpAcceptOrderInput,
   lpRejectOrderInput,
-  transferReadyInputSchema,
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
@@ -546,7 +548,6 @@ export {
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
   type AbandonOrderInput,
-  type WarehousePickInput,
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
@@ -557,7 +558,6 @@ export {
   type ReselectPartnerInput,
   type LpAcceptOrderInput,
   type LpRejectOrderInput,
-  type TransferReadyInput,
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
@@ -585,8 +585,6 @@ export {
   bankStatementsListQuery,
   reconciliationCreateInput,
   cashflowSeriesQuery,
-  monthlyPlQuery,
-  topSkusQuery,
   refundApplyInput,
   type PaymentMethod,
   type FinanceTopupApproveInput,
@@ -604,15 +602,15 @@ export {
   type BankStatementsListQuery,
   type ReconciliationCreateInput,
   type CashflowSeriesQuery,
-  type MonthlyPlQuery,
-  type TopSkusQuery,
   type RefundApplyInput,
 } from "./schemas/finance";
 
 // The read-only Finance Ledger (Journal · Trial Balance · Self-check).
 export {
   ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
-  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput, ledgerAccountReorderInput,
+  ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE, ledgerAccountCodeInput, ledgerAccountMoveInput, ledgerAccountAddInput,
+  type LedgerAccountReorderInput, type LedgerAccountMoveInput, type LedgerAccountAddInput,
   type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
 
@@ -874,6 +872,8 @@ export {
   opsStaffListResponseSchema,
   updateOpsStaffSettingInput,
   distributeOrders,
+  planOpsAssignment,
+  type OpsAssignmentCandidate,
   seenTodayMYT,
   countsAsInToday,
   OPS_DAY_CUTOFF_HOUR_MYT,
@@ -893,6 +893,11 @@ export {
   deliveryPhotoSchema,
   DELIVERY_PHOTO_MIMES,
   DELIVERY_PHOTO_MAX_BYTES,
+  DELIVERY_VIDEO_MIMES,
+  DELIVERY_VIDEO_MAX_BYTES,
+  DELIVERY_PROOF_MIMES,
+  DELIVERY_PROOF_EXTENSION,
+  isDeliveryVideoMime,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
   deliveryPhotoListResponseSchema,
@@ -953,6 +958,8 @@ export {
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
+  orderActionLines,
+  type OrderActionLines,
   orderActionQueue,
   purchasingActionButton,
   purchasingActionDone,
@@ -1005,6 +1012,7 @@ export {
   poSupplierDeliveryDateOf,
   poReplyDateOf,
   poRecordedReplyOf,
+  poDocumentNumberOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,
@@ -1196,6 +1204,15 @@ export {
 export {
   buildGrnRegisterView,
   expectedArrivalCounts,
+  grnDateMonths,
+  grnDateWeeks,
+  grnMonthEnd,
+  grnWeekStart,
+  GRN_RECEIVED_WITH_ROWS,
+  type GrnDateDay,
+  type GrnDateMonth,
+  type GrnDateWeek,
+  type GrnReceivedWith,
   type GrnRegisterFactRow,
   type GrnRegisterSelection,
   type GrnRegisterView,
@@ -1403,7 +1420,6 @@ export {
   isOpsManagerRow,
   isStockPlanner,
   LEGACY_OPS_MANAGER_EMAILS,
-  LEGACY_PO_DUTY_EDITOR_EMAILS,
   type DutyKey,
   type DutyHolderMap,
   type DutyGrant,
@@ -1612,8 +1628,10 @@ export {
   type PaymentMoneyAccount,
   type PaymentMethodSaveInput,
   recordPaymentInputSchema,
+  requiredPaymentReference,
   collectStorageInput,
   summarizePayments,
+  receivedBeforeInvoice,
   // CARD 4 closing slice (0347) — the ONE "is this a valid payment?" predicate.
   // A voided row stays in the history and counts toward nothing.
   isLivePayment,
@@ -2073,11 +2091,26 @@ export {
 // `Created` belongs to the Register and may never appear on the workspace.
 export {
   deliveryWorkStatusOf,
-  DELIVERY_WORK_STATUS_LABEL,
+  deliveryJourneyProgressOf,
+  deliveryJourneyProgressFromStatus,
+  deliveryWorkStatusLabelOf,
+  DELIVERY_WORK_STATUS_KINDS,
+  DELIVERY_WORK_STATUS_TONE,
+  LOGISTICS_ROLE_WORD,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusKind,
   type DeliveryWorkStatusInput,
+  type DeliveryWorkStatusTone,
+  type DeliveryStatusSpell,
 } from "./delivery-work-status";
+// 【DELIVERY】 CARD 19 — what a Sales Order URL param names: the id, the
+// operator's document word (`SO-1362`), or nothing. ONE resolver for the
+// object page and the by-number door.
+export {
+  salesOrderParamOf,
+  salesOrderNumberWord,
+  type SalesOrderParam,
+} from "./sales-order-identity";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
 // travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
 // nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.
@@ -2105,6 +2138,10 @@ export {
   type DeliveryArrangementRow,
   type DeliveryArrangementEventRow,
   type ChangeLogisticsReasonKey,
+  operationCannotDeliverInput,
+  type OperationCannotDeliverInput,
+  type DeliveryCannotDeliverRow,
+  cannotDeliverReasonLabel,
 } from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
@@ -2283,14 +2320,15 @@ export {
   manualPurchaseApproverLine,
   manualPurchaseApprovalOf,
   manualPurchaseStatusOf,
-  manualPurchaseNotOrdered,
+  manualPurchaseGroupOf,
+  manualPurchaseOrderByCell,
+  compareManualPurchaseRows,
   manualPurchaseOrderByOf,
   manualPurchaseOrderByLine,
   manualPurchaseLeadDayFacts,
   manualPurchaseTimingOf,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
-  manualPurchaseWorkOrder,
   manualPurchaseWorkItems,
   manualPurchaseWorkContext,
   manualPurchaseObjectHeading,
@@ -2304,6 +2342,7 @@ export {
   manualPurchaseForOf,
   manualPurchaseSelectable,
   manualPurchaseNotSelectableReason,
+  manualPurchaseIssueDocuments,
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   stillNeededOf,
@@ -2311,7 +2350,8 @@ export {
   type ManualPurchaseStatus,
   type ManualPurchaseStatusInput,
   type ManualPurchaseStatusKind,
-  type ManualPurchaseWorkKey,
+  type ManualPurchaseGroup,
+  type ManualPurchaseDecisionFacts,
   type ManualPurchaseTimingState,
   type ManualPurchaseSetupKey,
   type ManualPurchaseWorkInput,
@@ -2332,6 +2372,7 @@ export {
   purchaseDemandRailWords,
   purchaseDemandBlockerOf,
   purchaseDemandTimingOf,
+  purchaseDemandSafetyDaysLeft,
   purchaseDemandQuantities,
   purchaseDemandHelpLine,
   purchaseDemandCoverageLine,
@@ -2361,6 +2402,9 @@ export {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
+  soBatchToBuyState,
+  type SoBatchToBuyState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchProductCategory,
@@ -2372,6 +2416,16 @@ export {
   soBatchOrderRowSchema,
   soBatchCellSummary,
   soBatchOrderSelection,
+  soBatchOrderPlanning,
+  soBatchOrderUnselectableReason,
+  soBatchOrderSafetyDays,
+  soBatchOrderStatusWord,
+  type SoBatchSafetyDaysCell,
+  soBatchOrderByAbsenceWord,
+  type SoBatchOrderByAbsence,
+  soBatchOrderRemainingQty,
+  compareSoBatchPlanning,
+  type SoBatchRegisterGroup,
   soBatchPurchaseResponseSchema,
   type SoBatchOrderStatus,
   type SoBatchOrderPoFact,
@@ -2409,8 +2463,6 @@ export {
   READY_STOCK_CONDITION_ABSENT,
   READY_STOCK_CONDITION_WORDS,
   READY_STOCK_REFUSAL_WORDS,
-  manualPurchaseReadyStockGroupSchema,
-  manualPurchaseReadyStockResponseSchema,
   readyStockConditionWord,
   readyStockIdentityScopeSchema,
   readyStockLineSchema,
@@ -2419,17 +2471,58 @@ export {
   readyStockRefusalWord,
   readyStockReserveInputSchema,
   readyStockReserveResultSchema,
+  readyStockSaveInputSchema,
+  readyStockSaveResultSchema,
   readyStockResponseSchema,
   readyStockUnitSchema,
-  type ManualPurchaseReadyStockGroup,
-  type ManualPurchaseReadyStockResponse,
   type ReadyStockLine,
   type ReadyStockPick,
   type ReadyStockReserveInput,
   type ReadyStockReserveResult,
+  type ReadyStockSaveInput,
+  type ReadyStockSaveResult,
   type ReadyStockResponse,
   type ReadyStockUnit,
 } from "./so-batch-ready-stock";
+/* ── MANUAL PURCHASE · READY STOCK ALLOCATION (owner ruling 2026-09-18) ─────
+   Its own module, because it is a CAPABILITY the SO Batch contract explicitly
+   said Manual Purchase did not have. Folding it into that file would leave the
+   two rulings arguing inside one set of comments. */
+export {
+  MANUAL_PURCHASE_NEED_STATUS_WORDS,
+  MANUAL_PURCHASE_STOCK_BLOCK_WORDS,
+  MANUAL_PURCHASE_STOCK_REFUSAL_ACTS,
+  MANUAL_PURCHASE_STOCK_REFUSAL_WORDS,
+  MANUAL_PURCHASE_STOCK_UNIT_BLOCKED_WORDS,
+  manualPurchaseIntentSchema,
+  manualPurchaseLineStockRemaining,
+  manualPurchaseNeedStatusOf,
+  manualPurchaseStockBlockOf,
+  manualPurchaseStockBlockSchema,
+  manualPurchaseStockBlockWord,
+  manualPurchaseStockCounts,
+  manualPurchaseStockLineSchema,
+  manualPurchaseStockRefusal,
+  manualPurchaseStockResponseSchema,
+  manualPurchaseStockSaveInputSchema,
+  manualPurchaseStockSaveResultSchema,
+  manualPurchaseStockUnitSchema,
+  type ManualPurchaseIntent,
+  type ManualPurchaseNeedStatus,
+  type ManualPurchaseStockBlock,
+  type ManualPurchaseStockLine,
+  type ManualPurchaseStockResponse,
+  type ManualPurchaseStockSaveInput,
+  type ManualPurchaseStockSaveResult,
+  type ManualPurchaseStockUnit,
+} from "./manual-purchase-stock";
+export {
+  PO_SAFETY_DAYS_NONE,
+  poSafetyDaysOf,
+  poSafetyDaysWord,
+  tightestPoSafetyDays,
+  type PoSafetyDays,
+} from "./purchasing-safety-days";
 export {
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
@@ -2903,6 +2996,10 @@ export {
   // The SQL mirror `rental_late_interest()` asserts the same worked examples.
   rentalLateInterest,
   RENTAL_LATE_INTEREST_PCT_PER_MONTH,
+  // 0538 — Finance's month across all agreements.
+  rentalMonthView,
+  type RentalMonthBilling,
+  type RentalMonthView,
   // 0264 — the offer layer: service SKU codes + the pick → money resolver
   // (shared by the P&M previews, the POS lanes and the signing recompute).
   serviceSkuCode,
@@ -3033,6 +3130,7 @@ export {
 } from "./schemas/hr";
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
+export * from "./sales-order-change";
 export * from "./sales-order-commitment";
 // ONE FIELD CONTRACT — the choices the Sales Portal offers and the emergency
 // contact's three-fields-⇄-one-column codec, shared with the object page so the
@@ -3048,6 +3146,11 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+// DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
+// surface must read it: the recorded purchase-order dates, the latest supplier
+// reply, the exact per-line shortage, and ONE arrival state over them. It
+// computes no arrival date — `expectedArrivalOf` already did, once.
+export * from "./delivery-arrival";
 
 /**
  * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,
@@ -3073,12 +3176,19 @@ export * from "./work-engine";
 // Workspace foundation — company-wide owner-Duty assignments, cover resolution,
 // and immutable actor evidence. Capability/permission duties remain separate.
 export * from "./workspace-duty";
+export * from "./workspace-duties-catalogue";
+export * from "./delivery-contact";
+export * from "./delivery-settings";
+export * from "./delivery-proof";
+export * from "./schemas/loan-offer";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
 export * from "./sales-order-work-source";
 export * from "./storage-obligation";
 export * from "./payment-collection-outcome";
+export * from "./payment-monitor";
+export * from "./payment-collection-owner";
 export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
@@ -3095,3 +3205,59 @@ export * from "./warehouse-inbound";
 export * from "./arrival-source";
 
 export * from "./warehouse-settings";
+
+export * from "./warehouse-schedule";
+
+export { stockSiteVisits, type StockMovementEvidence, type StockSiteVisit } from "./stock-site-visits";
+
+// ⭐ PURCHASE RETURNS — the owner-confirmed register vocabulary (§9.6,
+// 2026-09-18). Presentation truth only: labels, the confirmed column order and
+// FACTUAL predicates. Custody stays with Stock; issuing a return moves nothing.
+export {
+  PURCHASE_RETURN_PREFIX,
+  PURCHASE_RETURN_NOT_ISSUED,
+  PURCHASE_RETURN_ABSENT,
+  PURCHASE_RETURN_COLUMN_ORDER,
+  PURCHASE_RETURN_COLUMN_LABEL,
+  PURCHASE_RETURN_UNIT_COLUMN_ORDER,
+  PURCHASE_RETURN_UNIT_COLUMN_LABEL,
+  PURCHASE_RETURN_SUPERSEDED_LABELS,
+  PURCHASE_RETURN_EVIDENCE_PURPOSES,
+  PURCHASE_RETURN_UNIT_QTY,
+  PURCHASE_RETURN_RAIL_SECTIONS,
+  PURCHASE_RETURN_CONDITIONS,
+  PURCHASE_RETURN_CONDITION_SECTION,
+  PURCHASE_RETURN_CONDITION_ORDER,
+  purchaseReturnNo,
+  purchaseReturnEvidenceLabel,
+  purchaseReturnPhotoAction,
+  purchaseReturnVideoAction,
+  purchaseReturnQty,
+  purchaseReturnCollectedQty,
+  purchaseReturnCollectedBy,
+  purchaseReturnActualPickupDate,
+  purchaseReturnSupplierReceivedDate,
+  purchaseReturnPickupLocation,
+  purchaseReturnReturnTo,
+  purchaseReturnCategory,
+  purchaseReturnPoNo,
+  purchaseReturnUnitCell,
+  purchaseReturnItems,
+  purchaseReturnItemSpec,
+  purchaseReturnConditions,
+  purchaseReturnPickupProofMissing,
+  purchaseReturnMatches,
+  purchaseReturnSupplierCounts,
+  purchaseReturnConditionCounts,
+  type PurchaseReturnColumnKey,
+  type PurchaseReturnUnitColumnKey,
+  type PurchaseReturnEvidencePurpose,
+  type PurchaseReturnEvidenceCount,
+  type PurchaseReturnUnitRow,
+  type PurchaseReturnListRow,
+  type PurchaseReturnRailSection,
+  type PurchaseReturnCondition,
+} from "./purchase-return";
+
+export * from "./department";
+export * from "./logistics-card";

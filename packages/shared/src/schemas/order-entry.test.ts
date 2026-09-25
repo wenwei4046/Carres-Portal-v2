@@ -16,8 +16,8 @@ describe("resolvePaymentMethods (0219)", () => {
       const credit = methods.find((m) => m.key === "credit")!;
       expect(credit.followUps[0]?.key).toBe("bank");
       expect(credit.followUps[0]?.options).toEqual([...MY_BANKS]);
-      // Deploy safety: the DEFAULT bank ships optional (older clients never 422).
-      expect(credit.followUps[0]?.required).toBe(false);
+      // KL Gateway 2026-09-18: a card sale names its bank.
+      expect(credit.followUps[0]?.required).toBe(true);
       expect(methods.find((m) => m.key === "cash")!.approvalCodeRequired).toBe(false);
     }
   });
@@ -29,6 +29,44 @@ describe("resolvePaymentMethods (0219)", () => {
     ];
     const methods = resolvePaymentMethods({ paymentMethods: configured });
     expect(methods.map((m) => m.key)).toEqual(["ewallet"]);
+  });
+
+  it("a saved config cannot make the card bank optional", () => {
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      { key: "credit", label: "Credit / Debit", sublabel: "", active: true, approvalCodeRequired: true,
+        followUps: [{ key: "bank", label: "Bank", options: ["Maybank"], required: false }] },
+    ] });
+    expect(methods[0].followUps[0].required).toBe(true);
+  });
+
+  it("a saved config cannot drop the approval code on credit or installment", () => {
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      { key: "installment", label: "Installment", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+      { key: "cash", label: "Cash", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+    ] });
+    expect(methods.map((m) => m.approvalCodeRequired)).toEqual([true, false]);
+  });
+
+  // 0551 — the form and `_customer_payment_post` must name the same methods.
+  // A manager adding Cheque / Bank transfer / DuitNow QR in SO Maintenance
+  // leaves the box unticked; the writer refuses a blank reference either way,
+  // so the operator has to learn it from a database error instead of the form.
+  it("a method the WRITER requires a reference for is required whatever the config says", () => {
+    const off = (key: string, label: string): PaymentMethodConfig =>
+      ({ key, label, sublabel: "", active: true, approvalCodeRequired: false, followUps: [] });
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      off("cheque", "Cheque"), off("bank-transfer", "Bank transfer"), off("duitnow-qr", "DuitNow QR"),
+    ] });
+    expect(methods.map((m) => m.approvalCodeRequired)).toEqual([true, true, true]);
+  });
+
+  it("cash, online transfer and a manager's own method keep the flag they were saved with", () => {
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      { key: "cash", label: "Cash", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+      { key: "grab-pay", label: "GrabPay", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+      { key: "online", label: "Online transfer", sublabel: "", active: true, approvalCodeRequired: true, followUps: [] },
+    ] });
+    expect(methods.map((m) => m.approvalCodeRequired)).toEqual([false, false, true]);
   });
 });
 

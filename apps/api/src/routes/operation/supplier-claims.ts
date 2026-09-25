@@ -15,6 +15,7 @@ import {
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -161,9 +162,6 @@ supplierClaimsRouter.get("/", async (c) => {
   const supplierIds = [
     ...new Set(claims.map((r) => r.supplier_id as string).filter(Boolean)),
   ];
-  const reporterIds = [
-    ...new Set(claims.map((r) => r.reported_by as string).filter(Boolean)),
-  ];
 
   const grnNumbers = new Map<string, string>();
   const receiptIds = [...new Set(claims.map((row) => row.warehouse_receipt_id as string).filter(Boolean))];
@@ -210,19 +208,10 @@ supplierClaimsRouter.get("/", async (c) => {
     for (const s of result.data)
       supplierNames.set(s.id as string, s.name as string);
   }
-  const reporterNames = new Map<string, string>();
-  if (reporterIds.length > 0) {
-    const result = await readEveryClaimRelation<Record<string, unknown>>(
-      reporterIds,
-      (ids) => sb.from("app_users").select("id, name").in("id", ids),
-    );
-    if (result.error) {
-      const m = mapPgError(result.error);
-      return c.json(m.body, m.status);
-    }
-    for (const u of result.data)
-      reporterNames.set(u.id as string, u.name as string);
-  }
+  const reporterNames = await resolveActorNames(
+    sb,
+    claims.map((r) => r.reported_by as string | null),
+  );
 
   // R3 — does the PO line behind a LATE claim still owe us units?
   //

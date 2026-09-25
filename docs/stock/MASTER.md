@@ -1,5 +1,11 @@
 # STOCK / WAREHOUSE — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 > **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, re-closed 2026-09-04.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
@@ -29,51 +35,41 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has four operator destinations: **Monitor · Inbound · Inventory · Outbound**
-(owner replacement Card, 2026-09-06). The ERP keeps ONE global Dashboard; no Warehouse-local
-`Dashboard` label exists, and Calendar, Transfer, Ready Stock and Dashboard are not
-additional Warehouse destinations. The navigation rail contains page names only.
+Warehouse has five operator destinations: **Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound**.
+The two schedules are separate read-only projections. They use large working-day dates, white cards,
+quiet Expected/Scheduled badges and warning colour only for actual overdue work. They keep distinct
+orders identifiable, retain delayed and undated work, and never reschedule goods automatically.
 
-- Monitor: the module's ONLY Calendar-summary page — a dated read-only projection of both
-  incoming and outgoing Warehouse work; never a second truth.
-- Inbound: physical goods expected at a governed Site — a 240px filter rail + Inbound
-  Register in the shared row grammar (unified card 2026-09-07) that routes actual receipt
-  work to the governed Receiving Session.
-- Inventory: the one current Unit authority (240px rail + Register), including Ready Stock
-  and Counts & Adjustments views. No Calendar summary and no six-day date strip.
-- Outbound: dated physical work for Units that must leave a governed Site — a 240px filter
-  rail + Outbound Register in the SAME row grammar as Inbound; the governed acts live in
-  each arrangement's expanded detail.
+Inbound uses actual governed Receiving Site tabs. Its default register keeps Document and its dates,
+Receive, Product/quantity and receiving progress visible together. Supplier DOs link to their actual
+receipts; multiple receipts remain distinct. Expected arrival, PO Delivery Date, Supplier Delivery
+Date and Goods received on are different facts. The date filter uses expected arrival (the evidenced
+supplier date where present, otherwise the PO/source date). Awaiting receipt / Fully received / All
+arrivals are the three filters. Physical arrival never substitutes for accepted correct quantity.
+Receive opens the existing ReceivingWorkspace full width in Inbound; returning preserves the list.
 
-Ready Stock is one shared eligible-Unit view of Inventory. Operations reaches it through Warehouse
-Inventory; Sales reaches the same authority through `Sales → Ready Stock`. It is not another stock
-table or a fifth Warehouse destination. Counts, differences and Adjustment requests remain one
-`Counts & Adjustments` control view within Inventory, not three separate pages.
+**Supplier-delay boundary — owner-approved 2026-09-24.** Purchasing owns the exact PO/version,
+original PO Delivery Date, revised effective arrival, governed delay reason and WhatsApp evidence.
+Warehouse reads the revised effective arrival for planning only. A supplier message, screenshot,
+promise or Supplier DO never creates a receipt or GRN. Only the Receiving write door establishes
+Goods Received Date, received quantity, condition and physical Site.
 
-Reports, Settings, Work, Quick Rail and Calendar keep their shared Shell homes. Receiving,
-Purchasing, Delivery, Payments and Service Cases keep their own doors.
+Outbound keeps DO/SO, pickup date, product quantity, the Loading entry and separate Required / Loaded /
+Driver confirmed counts visible. The default includes outstanding loading, missing loading evidence
+and outstanding driver confirmation. Warehouse loading does not impersonate driver acceptance.
+Loading opens the existing exact-Unit work surface full width; product expansion has only product
+and Unit identity details. Dates and actions must be measured inside the actual shell and filter rails.
 
-Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
-Report issue · Count again**.
+Inventory is the one current Unit authority. Exact goods show Unit ID separately; quantity goods
+show SKU/quantity without an invented Unit ID. Actual in/out dates must describe the same Site visit
+using owning receipt/handover evidence, never a PO-issued date_in value. Returns start another visit.
+Ready Stock is a shared eligible-Unit view; Counts & Adjustments belongs within Inventory.
+Reports, Settings, Work and Calendar keep their shared Shell homes. There is no Warehouse-local
+Dashboard, Monitor, Transfer, Ready Stock or Counts top-level destination.
 
-**WAREHOUSE MONITOR CALENDAR — OWNER RULING 2026-09-06 (replaces the 2026-09-04 Dashboard
-Calendar law).** Monitor renders the full-width six-working-day Calendar and carries NO 240px
-page filter rail — filtering belongs to the destination pages its cards open. Each date shows
-the actual weekday and date; inside a date, work is arranged by actual time. Both directions
-render: ARRIVAL (`Supplier arrival` · `Transfer arrival` · `Customer/failed-delivery return` ·
-`Return from repair`) and PICKUP (`Customer-delivery pickup` · `Transfer pickup` ·
-`Supplier-return pickup` · `Repair pickup`). Every event says what its time means —
-`Supplier arrival 09:00–10:00` · `Driver pickup 14:30` — or exactly `Time not provided`;
-an unexplained bare time may not render. A valid empty day says
-`No arrivals or pickups on {date}. Choose another date.` The Calendar card uses the owning
-source's actual words and never invents a shorter Warehouse status vocabulary. On mobile the
-same projection is one selected day as a vertical time-ordered list with previous/next
-working-date controls.
-
-Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
-Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
-Next Action, Priority, Edit, Delete, Add stock, Remove stock or Mark done. Shared copy remains
-governed by the Copy Standard.
+Approved words include Where · Who has it · Carres Owned · Supplier Consignment · Report issue ·
+Count again. Generic status editing, Add stock, Remove stock and Mark done remain forbidden.
+UI Kit acceptance remains pending the owner's visual review; implementation is not a design freeze.
 
 ## 3 · Unit operating model
 
@@ -138,6 +134,13 @@ Successful customer delivery of an exact `Supplier Consignment` Unit emits the a
 event Purchasing uses to create a Consignment Sale Notice. Stock records the ownership/history
 consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
 refused delivery emits no sale event.
+
+**Diglant Subscription supply handling — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-22.**
+Rental §5.6 owns the programme's five-case operating matrix. Completed goods held at Diglant and
+production covered by a PO are distinguishable expected supply, not a fabricated warehouse receipt
+or automatic Ready Stock qualification. Unknown evidence is not zero supply. Each customer line
+checks existing coverage before additional procurement; enough quantity arriving late is a timing
+risk, not an automatic new purchase. Preserve the eligibility and exact-Unit authority below.
 
 Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
@@ -306,6 +309,12 @@ ID, `What did you see?`, governed Site/current holder context, required photo/ev
 factual note. It never asks the observer to choose Quarantine, Hold, write-off, Supplier Claim,
 compensation, replacement or another business remedy.
 
+**Operator-flow review — owner approved 2026-09-16; implementation outstanding.** Unit Detail
+and Loading must expose this existing governed report journey where the problem is observed.
+The operator records the observation and required evidence and can see the responsible next
+owner. This is not a second Problems Register or a shortcut that merely changes condition without
+the report, evidence, protective consequence and shared Work contract below.
+
 On submission, policy derives the immediate control rather than asking the observer to guess it.
 Where the observed fact affects suitability, the Unit leaves Ready Stock and cannot receive a new
 SO reservation; unsafe or incomplete goods cannot be handed over. An existing SO reservation stays
@@ -362,98 +371,31 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Each of the four Warehouse destinations starts with the governed six-working-day strip. It prints
-actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, `Tomorrow`,
-`Upcoming` or an undated priority bucket. Clicking a date reveals the work governed for that date.
-Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
-it into a misleading current-day bucket.
+Arrival Schedule and Pickup Schedule are separate full-width six-working-day projections. Registers
+have date filters instead of calendar strips.
 
-The shared six-working-day strip is the Warehouse daily operating spine, not a decorative filter.
-For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
-5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
-later working date come from the Warehouse calendar rather than staff memory.
+**EVERY CONFIGURED WORKING DAY SURVIVES EVERY VIEWPORT WIDTH — owner ruling 2026-09-16, APPROVED /
+LOCKED.** The board previously swapped to a single-date agenda below 1280px; at 703px the operator
+saw one column and five days of committed work left the screen with no control saying they existed.
+That is a loss, not an adaptation: the operator plans Thursday's lorry while standing on Tuesday, so
+the week is the unit of the job and is never silently truncated to fit a screen. A narrow screen
+SCROLLS to the sixth day instead of hiding it. Each date column holds a **240px floor** — the width
+at which a supplier name still stands beside its date badge and open door — so six dates make a
+1440px calendar canvas that scrolls horizontally inside its own frame. The portal itself never
+scrolls sideways, date headings stay sticky at the calendar's top and stay aligned with their own
+column, and previous/next page the whole week at every width. The date sequence remains the governed
+projection's; this law fixes presentation only and hardcodes no weekday.
 
-**MONITOR CALENDAR COMPOSITION — OWNER RULING 2026-09-06 (replaces the 2026-09-04
-composition law).** Monitor is the read-only date overview; it does not replace Outbound's
-exact-Unit work listing. On desktop the six operating dates remain one chronological
-horizontal sequence at full page width — no page filter rail beside them. Date columns have a
-readable minimum width and the Monitor work area owns horizontal overflow; the dates may not
-wrap into a `3 × 2` grid whose tall first row pushes later days below the fold. There is one
-shared vertical scroll, not an independent scroll inside every day column. At narrow width the
-same projection becomes a single-day agenda with previous/next date controls; data,
-permissions and destinations do not change.
+Cards preserve the owning document and Site, use quiet Expected/Scheduled badges, and show real
+loading separately from driver acceptance. Delayed and undated work stays reachable under its real
+dates; no automatic rescheduling occurs.
 
-One Calendar card is one dated piece of physical work from its owning module — a PICKUP card
-is one governed outbound source scope (never one whole customer order, never a second DO); an
-ARRIVAL card is one expected-arrival source scope. It shows, in this order: the governed time
-sentence · the event name with its direction · the source document identity · the party and
-what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
-shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
-or an `Edit Delivery` control. A Failed Delivery appears only through the exact governed
-return/collection work that requires a Warehouse physical act.
-
-Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
-document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
-nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
-may show a clickable `DO No`, and that DO opens as a read-only source document; Warehouse
-never enters `Edit Delivery`. Delivery remains the only owner of its partner/date/time/route
-editor.
-
-For any selected date, the operator journey is always:
-
-1. **Open Monitor:** read everything that must happen on that actual date across Inbound,
-   Inventory, `Needs checking`, Outbound and Month-end.
-2. **Complete Inbound work:** receive and check the exact PO/Consignment/Return/Transfer/Repair
-   Units through Receiving; unresolved arrivals remain under their promised date.
-3. **Complete Inventory work:** Count or Count again, inspect reported damage, look for an exact
-   Unit not found and confirm an observed holder/Site mismatch. Inventory does not invent a NETS
-   Zone, Rack or Bin.
-4. **Complete Outbound work:** check, pack and hand over the exact DO/Transfer/Return/Repair Units;
-   the accepted event transfers holder authority to the individually identified next person.
-5. **Close the date:** Monitor separates `Completed on {date}`, `{n} not done`, `Evidence not
-   submitted` and `Units still with NETS Delivery`. Each total drills to the source object and exact
-   Units.
-
-The sequence changes presentation only, never ownership. Receiving completes receipt facts;
-Inventory/Count completes physical facts; Delivery completes journey facts; the Work Engine
-re-resolves the responsible person. Monitor and the date strip store none of them.
-
-Work not completed stays visibly under its original actual date, for example `Wed, 2 Sep · 2 not
-done`, followed by `[JL] Receive and check 3 Units for PO-2041` and `[AM] Count U-1012 again at NETS
-Warehouse`. It is not silently carried forward, relabelled `Overdue` or hidden when the operator
-opens another date.
-
-Monitor is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
-from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
-an actual date, the page groups the one work set in business order:
-
-```
-INBOUND         expected arrival and receiving work
-INVENTORY       governed Count and Unit-control work
-NEEDS CHECKING  exact damage, missing Unit, mismatch and unresolved-difference work
-OUTBOUND        check, pack and handover work
-MONTH-END       count-window and Stock Confirmation work when applicable
-```
-
-Every row shows its source document/Unit identity, concrete fact, resolved owner avatar and plain
-action. Examples are `PO-2041 · 5 Units expected` / `Receive and check 5 Units`, `U-1005 was not
-found in the stock count` / `Find out why U-1005 did not match the count`, and `DO-1048 · SO-1318 ·
-2 Units` / `Check, pack and hand over 2 Units`. The source identity is clickable:
-
-- PO/Consignment arrival → its Receiving Session;
-- Unit or Count difference → Unit Detail or `Counts & Adjustments`;
-- DO handover → the Outbound work with linked Delivery Order;
-- Month-end requirement → the Month-end Stock Confirmation.
-
-Monitor stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
-or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manually assign routine
-work. Completion occurs only when the authoritative source fact exists, after which the shared row
-updates everywhere.
-
-The management view adds exception summaries over the same drillable facts: unresolved Stock differences,
-Adjustments awaiting Stock Adjustment Approver decision, damaged Units requiring a decision and Month-end submissions not
-done. Every number expands to exact Units/documents, actual dates and resolved owners; a KPI with no
-drill-down is invalid.
+The daily journey is: open the appropriate schedule, follow its exact Inbound or Outbound entry,
+complete the owning receipt or loading action, and read the resulting Inventory and evidence.
+Counts, differences and month-end work belong to their Inventory/control objects and shared Work,
+not a second Warehouse Monitor. These capabilities remain approved targets where unbuilt.
+Delivery alone owns logistics assignment, driver/vehicle facts and customer delivery dates.
+Receiving owns receipt; Warehouse owns preparation/loading; the driver owns independent acceptance.
 
 An individually signed-in NETS operator sees only permitted physical work: receive and check, Count
 or Count again, check and pack, hand over, Report a problem and upload evidence. NETS cannot see
@@ -465,39 +407,177 @@ it is not a second Receiving form. It covers Purchase Order, Consignment Order, 
 Site-transfer arrival, supplier replacement and a Unit returning from repair while preserving each
 source object's own authority.
 
-**UNIFIED REGISTER ROW — owner card 2026-09-07.** One row = one dated arrival arrangement
-with its own goods scope — never automatically the whole PO, never one row per Unit. A formal
-split makes its own arrangement counting only its own scope; a part-received arrangement keeps
-its remainder; a formal date change preserves history and overdue work stays under its
-original date. The Register defaults are:
+**THE RECEIVING WORKSPACE — owner card 2026-09-15. This OVERWRITES the 2026-09-07 unified
+register card; that version is in Git history and is not a second authority.**
+
+One row = one dated arrival arrangement with its own goods scope — never automatically the whole
+PO, never one row per Unit. A formal split makes its own arrangement counting only its own scope;
+a part-received arrangement keeps its remainder; a formal date change preserves history and overdue
+work stays under its original date.
+
+**SITE IS A TAB.** Inbound answers *what is arriving HERE*, so the place is the first question and
+not a rail row. The strip is built from the governed Sites the operator may see and opens on
+`Carres Klang Warehouse`; a partner Site appears because it is a governed Site with receiving
+access, never because its name was written into the page. Where a purchasing destination has goods
+coming and NO governed Site linked, those arrangements get their own final tab, named and counted,
+carrying the destinations' own recorded names — **an unlinked destination is a MAPPING GAP and may
+never be rendered as "no incoming goods"**. Those rows carry NO receiving door: goods that never
+reach a Carres Site must not mint a warehouse receipt.
+
+**PHYSICAL ARRIVAL AND ACCEPTED FULFILMENT ARE DIFFERENT FACTS.** The Register prints the five
+governed receiving quantities (`COPY-STANDARD`), each its own number:
 
 ```
-Document · Product · From · To · Expected arrival · Received on ·
-Units (Expected · Received · Not yet received · With issue) · Status · Exceptions
+Order Qty · Received Qty · Damaged Qty · Wrong Item Qty · Pending Delivery Qty
 ```
 
-`Document` is the fixed header; the cell prints the record's own name and number (`PO No PO-…`
-· `Transfer No TR-…` · `Repair Order No RO-…` · `Claim No` / `Case No` for authorised
-replacement and return arrangements) and the number opens that document. `Product` prints EVERY
-product of the arrangement with its arranged quantity — names wrap and the row grows; `+N more`
-and silent truncation are forbidden. `From`/`To` are places (or the customer); a carrier or
-driver never substitutes for a location and a missing origin reads `Origin not recorded`.
-`With issue` counts INSIDE received — 4 received with 1 damaged never reads 5. `Status` speaks
-one physical-progress word; `Exceptions` lists each named difference beside it — the two never
-merge. `SO No · SO date · PO date` remain as optional columns.
+`Received Qty` is the CORRECT goods accepted. `Damaged` and `Wrong Item` are present, unavailable
+and reported separately; **they never reduce `Pending Delivery Qty`**, because the supplier still
+owes a replacement. Order Qty 10 with six correct, two damaged and two never sent reads
+`Received Qty 6 · Damaged Qty 2 · Pending Delivery Qty 4`, and eight pieces are physically in
+custody. **FULLY ARRIVED IS NOT FULLY FULFILLED.** Every figure is read from the one receiving/PO
+arithmetic (`receivingSummaryOf`); Inbound owns no second subtraction engine. An unreadable receipt
+reports the absence — **an unknown quantity is never printed as a zero**. The exact Unit counts
+remain the separate PHYSICAL answer the Schedule reads, and the two never merge into one number.
 
-Clicks are explicit: the Document number opens the document; the Product cell (its arrow and
-its content are ONE expansion entry) expands the row; a Unit ID inside the expansion opens
-that Unit's record; the row itself navigates nowhere. The expansion shows the complete
-products with per-product received counts, the exact Units with per-Unit results, every posted
-Receiving record (`GRN-…`, viewable per receipt), and the ONE action door
-`Open Receiving Session`; Inbound cannot submit or post a receipt and carries no Work column
-or duty avatar. From the menu the Register defaults to every UNFINISHED arrangement under its
-original date (`Not finished`); completed arrangements stay queryable through `Received`; an
-exact Monitor deep link inherits date, Site ID and document scope and shows its arrangement
-even when finished. The rail counts, the listed rows, the footer summary (counted in
-arrangements, labelled so) and the export always describe one shared scope, and a status pick
-composes with the date filter instead of cancelling it.
+**THE DEFAULT COLUMN SET IS WHAT FITS THE SCREEN (correction 2026-09-15).** The first cut of this
+card declared FOURTEEN default columns — 2,130px of them — inside roughly 1,010px of grid at
+1280px with the rail open, so every date, every quantity and the `Receive` control sat past the
+right edge. **`No page-level horizontal scroll` is not a usability measurement**; the grid scrolls,
+and an operator does not find an action they cannot see. A default set is judged by what is
+readable together at 1280px, measured, not by how many facts it can name.
+
+**THE GRID'S WIDTH IS NOT THIS PAGE'S TO CHOOSE, so ORDER is what keeps the important things on
+screen.** Measured on PRODUCTION 2026-09-15: at a 1,366px viewport the grid is **826px**, because
+the portal navigation (240px) and the filter rail (240px) take 480px before it begins. A local
+harness that omits the portal navigation reports ~240px more than exists and must never be used to
+size a register — the first two attempts at this card were both tuned against exactly that.
+
+The Register defaults, in OPERATIONAL PRIORITY order:
+
+```
+Document · Receiving · Product · Receiving progress · Supplier & DO No
+      ↑ all inside the visible width at 1280px WITH the portal nav and rail open
+PO Delivery Date · Supplier Delivery Date · Status · Exceptions
+      ↑ follow, reachable by scrolling
+```
+
+**`Receiving` sits SECOND, beside the identity.** The operator sees which document, what to do,
+what is in it and how much is still owed before anything scrolls. An action placed after the facts
+it belongs to is an action that disappears on the first narrow screen.
+
+`Receiving progress` prints the governed quantities, each with its own number —
+`Order Qty` · `Received Qty` · `Pending Delivery Qty`, and `Damaged Qty` / `Wrong Item Qty` when
+either is above zero. **`Receiving` sits AHEAD of `Status`** so the action is inside the visible
+width by construction. `To` is hidden inside a Site's own tab, where it would repeat that Site's
+name on every row, and returns automatically on the `Destinations without a Site` tab where every
+row differs. Nothing is deleted: `To` · `Goods received on` · each of the five quantities on its
+own sortable, number-filterable column · `PO Issued` · `SO No` all remain one click away in the
+Columns chooser and persist once chosen. **No governed font size may be reduced to fit, and no
+column may be squeezed below its content** — a column that will not fit leaves the default set.
+
+The arrival-date filter names the date it filters (`Arrival date from … to …`): the date in force,
+which is the supplier's evidenced answer where one exists and the PO's own date otherwise.
+
+**MEASURED IN THE BROWSER, not asserted (2026-09-15).** Fourteen default columns rendered 2,243px;
+the set above renders **1,286px**, and a governed header is not allowed to set a column's width —
+`PO Delivery Date` declared 95px and rendered 143 until the grid's own two-line header
+(`headerLines`) let the governed words stand over two rows. Measured at the preview:
+
+```
+               grid    fully visible
+1366px  prod    826    Document · Receiving · Product · Receiving progress ·
+                       Supplier & DO No · PO Delivery Date
+1280px          784    Document · Receiving · Product · Receiving progress ·
+                       Supplier & DO No
+ 760px          744    rail collapses to Filters; the grid scrolls, and only
+                       the leading columns are reachable without scrolling
+```
+
+The default Register uses four columns: Document (supplier, dates and linked Supplier DO receipts),
+Receiving, Product, and Receiving progress. Independent sortable/filterable fact columns remain
+available in Columns. Composition must be verified with both shell rails present; dates, quantities
+and the owning action must be visible without shrinking typography. Narrow devices retain the
+document/action first and expose filters in their drawer.
+
+`Document` is the fixed header; the cell prints the record's own number with `PO Issued {date}`
+beneath, and a non-PO arrangement keeps its OWN document word (`Transfer No` · `Repair Order No` ·
+`Claim No` / `Case No`) — **`PO / Source No` is forbidden**. `Product` lists EVERY product of the
+arrangement with its quantity; `+N more` and dropping a product stay forbidden. One product's NAME
+wraps in full, and **the quantity is pinned
+and never clipped**. `Supplier`/`To` are parties and places; a carrier never substitutes for a
+location and a missing origin reads `Origin not recorded`. **Three dates, three questions:**
+`PO Delivery Date` is the official date on the PO, `Supplier Delivery Date` is the supplier's own
+evidenced answer (`Not confirmed` · `Same as PO` · the different date — absence is tested BEFORE
+equality), and `Goods received on` lists each supplier delivery note by its own DO number, linking
+to its own receipt and its own actual date. `Status` speaks one progress word; `Exceptions` lists
+each named difference beside it — the two never merge. `SO No` remains an optional column.
+
+**THREE ARRIVAL FILTERS, NOT FIVE.**
+
+```
+Awaiting receipt    correct goods are still owed     (the menu default)
+Received        the required correct goods are accepted
+All arrivals    both
+```
+
+`Expected`, `Part received` and `With issue` are retired as filters: they overlapped each other and
+every other word, and they are FACTS ON THE ROW. A retired deep link falls back to `Awaiting receipt` —
+an old link shows the work, never an empty page.
+
+**RECEIVING HAPPENS ON THIS PAGE.** The row's own `Receive` control opens the authoritative
+Receiving Workspace FULL-WIDTH on Inbound. It is the SAME component and the SAME write path
+Receiving uses — one receiving engine, two hosts — and a Goods Receipt is never squeezed into a
+side panel. The Register stays MOUNTED beneath it, so Site, filters, search and list position are
+exactly as they were on return. The resolved receiving permission is passed in explicitly: while
+the authority is still answering the row says so and offers nothing, and a refusal names the duty
+rather than hiding the row. After a successful save the affected row, its quantities, the rail
+counts and the receipt records are re-read; a failed save preserves what the operator typed.
+Inbound still owns no write path and carries no Work column or duty avatar.
+
+Clicks are explicit: the Document number opens the document; the Product cell (its arrow and its
+content are ONE expansion entry) expands the row; a Unit ID inside the expansion opens that Unit's
+record; the row itself navigates nowhere. **The expansion has ONE job: the full product detail** —
+the complete products with their own quantities, the exact Units with per-Unit results, and every
+posted receipt with its supplier DO number and actual date. From the menu the Register defaults to
+every UNFINISHED arrangement under its original date; an exact Schedule deep link inherits date,
+Site ID and document scope and shows its arrangement even when finished. The rail counts, the
+listed rows, the footer summary (counted in arrangements, labelled so) and the export always
+describe one shared scope, and a status pick composes with the date filter instead of cancelling it.
+
+**THE GOVERNED RECEIVING SITES — owner ruling, Jess 2026-09-15 (migration 0509).**
+`Carres Klang Warehouse` (own) · `AL Sungai Buloh` · `HOUZS Balakong` (both
+`operation_partner`, owned by the AL and HOUZS delivery partners, each operated by its own
+`warehouse_operator` party — one organisation, two roles, exactly as NETS already is). AL and
+HOUZS physically accept goods, so that arrival is that Site's Inbound work; their later handover
+to the customer is a SEPARATE outbound/delivery event for the same goods and creates no second
+receipt. `Ohana` and `Hookka Industries` remain destinations with NO Site: Ohana delivers straight
+to the final customer, and goods that never reach a Carres Site must not mint a warehouse receipt.
+
+🔴 **MEASURED PERMISSION BOUNDARY — RECEIVING AUTHORITY IS NOT SITE-SCOPED, AND NOTHING ELSE
+GATES IT (verified against the live database 2026-09-15).** Read from `pg_proc`, not from a file:
+
+- `office_receive_post` opens with `v_ctx := public.receiving_require_post_authority();` →
+  `receiving_actor_context()`, **which takes no site argument**. That is the whole authority check.
+- The only site test in the entire function is existence:
+  `if p_actual_site_id is not null and not exists (select 1 from warehouses where id = …)`.
+- `warehouse_holds_capability` — the function that reads a `confirm_inbound_receipt` grant — is
+  referenced by `warehouse_grant_capability` and `warehouse_settings_gate` and by nothing else.
+  **The capability guards Warehouse Settings; it does not guard receiving.**
+- `warehouse_working_hours` is never consulted on the posting path.
+
+**Therefore a holder of GRN duty, its dated cover, or an Operations Superuser can post a receipt at
+ANY existing Site**, including `AL Sungai Buloh` and `HOUZS Balakong`. Creating those Sites (0509)
+widened where a receipt can land. An earlier version of this section claimed that missing hours and
+a missing Site duty holder meant nothing could be received there — **that claim was false**; neither
+is a gate. The UI offers the `Receive` control on exactly the same global answer, so screen and
+server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
+decision and is not assumed here.**
+
+**COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
+mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of
+a gap that does not exist. Only an `exact_unit` scope missing its minted identities is incomplete,
+and damage on counted stock is reported by QUANTITY because there is no Unit ID to name.
 
 An individually signed-in NETS operator uses Receiving to scan each actual Unit and record Received,
 Received with issue, rejected/not delivered or another governed receipt outcome. After the GRN is
@@ -507,6 +587,13 @@ posted, Inbound updates from that authority:
 - received with issue → Inventory under `Needs checking`, never Ready Stock;
 - not yet received → remains in Inbound;
 - the supplier/PO consequence routes to Purchasing; Warehouse does not guess a replacement date.
+
+**Receiving confirmation — owner approved 2026-09-16; built, production verification pending.** Prefilled
+outcomes or quantities are proposed input, never evidence that physical verification is complete.
+The working form must make their unconfirmed nature clear and require explicit confirmation of
+the actual Unit results or quantity before saving. Its live summary must not read as a completed
+receipt. Preserve the existing Receiving engine, evidence requirements, partial receipt arithmetic,
+retry identity and GRN posting boundary; do not introduce a new stored stock status for UI review.
 
 When the expected date passes with no Receiving result, Inbound must not accuse the supplier of
 being late. It states `Expected arrival was {actual date}` and `No Receiving result was submitted`,
@@ -620,28 +707,23 @@ Supplier Return, send for repair, Internal Staff Purchase and Subsidiary Purchas
 continues to own why the movement exists; Outbound tells the assigned NETS Warehouse operator what
 must physically be checked, packed and handed over on each actual date.
 
-**UNIFIED REGISTER ROW — owner card 2026-09-07.** One row = one dated pickup arrangement (one
-DO scope today), in the SAME grammar as Inbound. The Register defaults are:
+One Outbound row is one DO + Site scope. Defaults are Document (DO/SO, scheduled handover,
+origin/destination, logistics/driver), Loading, Product, and Units (Required / Loaded / Not loaded /
+Driver confirmed, with named differences). Optional fact columns preserve sorting and filtering.
+Product expansion only exposes product and exact Unit identity. Loading opens the existing work
+surface full width with scans, checks, packing, loading evidence and separate driver confirmation.
+The default includes outstanding loading, missing evidence and unmatched driver acceptance;
+Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
+filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
-```
-Scheduled handover · Document · Product · From · To · Logistics Partner · Assigned Driver ·
-Units (Required · Loaded · Not loaded · Driver confirmed) · Status · Exceptions
-```
-
-`Scheduled handover` is the warehouse→transporter handover date with `Driver pickup {time}` or
-exactly `Time not provided` — never the customer's delivery time. Required, warehouse-loaded
-and driver-confirmed are THREE separate facts, per arrangement, per product and per exact Unit:
-`Loaded 2 of 3 with 1 driver-confirmed` must show one Unit not loaded AND one loaded Unit the
-driver has not matched. Loading, handing over, driver confirmation and customer receipt are
-four different facts and no screen may merge them. `SO No · SO date · Vehicle · Loaded at ·
-Driver collected at` remain as optional columns. The Document number opens the DO; the Product
-cell is the one expansion entry; the expansion carries the two evidence lines
-(`Warehouse loaded …` · `Driver collected …`), the per-Unit scan/check/pack/load/driver-confirm
-table, and the governed acts (scan, check, pack, `Record {n} Units loaded to {person}`) — the
-row itself acts nowhere and carries no Work column or duty avatar. From the menu the Register
-defaults to every unfinished arrangement (`Not finished`) under its original date; `Loaded` is
-the completed query; the rail counts, rows, footer Units summary and export share one scope —
-a `Loaded 1` beside an empty day cannot happen.
+**Completion and return — owner approved 2026-09-16; built, production verification pending.** Once all
+required Units are loaded, make outstanding driver confirmation and the owning Delivery Order
+door clear instead of continuing to emphasise scanning as the next act. Warehouse never confirms
+on the driver's behalf. Return from a Unit or work surface must reach the correct source register
+and preserve its applicable filters and position; a button labelled Inventory must not land on
+Dashboard. Reuse Delivery's shared register and object-detail grammar, not its customer-arrangement
+Monitor workspace. Keep the five Warehouse destinations, the shipped six-working-day schedules,
+the shared Receiving engine and full-width Loading. This approval introduces no new design system.
 
 The NETS operator journey is:
 
@@ -654,15 +736,16 @@ The NETS operator journey is:
 6. Only the completed physical handover changes `Who has it`; a scheduled plan alone never moves
    authority from NETS Warehouse to NETS Delivery, showroom, supplier or repair partner.
 
-Delivery owns customer DO, journey, Logistics Partner and customer-delivery proof. Stock owns the
+Delivery owns customer DO, journey, Logistics and customer-delivery proof. Stock owns the
 Unit's current holder and physical history. Purchasing owns Supplier Return and supplier decision.
 Service Case owns the repair need and resolution. Outbound stores no duplicate business status.
 
 Inbound, Inventory and Outbound use the shared cross-module reconciliation contract in
 `../ERP-ARCHITECTURE.md` §3.5.1. They do not ask an operator to tally Receiving or Delivery again:
 
-- Inbound reads `Expected · Received · Not yet received · With issue` from the PO/Consignment and
-  Receiving Session/GRN; only posted arrival facts enter Inventory.
+- Inbound reads `Order Qty · Received Qty · Damaged Qty · Wrong Item Qty · Pending Delivery Qty`
+  from the PO/Consignment and Receiving Session/GRN through the ONE receiving arithmetic; damaged
+  and wrong goods never reduce `Pending Delivery Qty`. Only posted arrival facts enter Inventory.
 - Inventory derives the current Unit and `Who has it` from the append-only arrival and handover
   facts; each Unit has only one current answer.
 - Outbound reads the exact Units required by the source DO, Transfer, Supplier Return or Repair
@@ -996,6 +1079,16 @@ hold both NETS Warehouse and NETS Delivery roles, but every event records the ro
 act. Shared login, shared avatar and impersonation are forbidden. Removing or expiring one person
 stops future access without erasing their historical evidence.
 
+**The one company-level exception — owner ruling 2026-09-24 (Delivery §5.5, 0581).** A logistics
+company with NO portal login answers ONE delivery through its external link: the actor recorded is
+the company (`{company} via external link`), never a person, and the link can only save a scheduled
+date, ask for another date or report Cannot deliver. It moves no Unit and records no receipt,
+collection or handover. **APPROVED TARGET / NOT BUILT — `Collected from supplier`:** for the
+`Pickup from supplier` route (no GRN), a governed custody event names the PO/source lines, supplier,
+logistics company, collection date and time, quantity, the Supplier DO or collection evidence, the
+recorded source and actor; from it the logistics company holds the goods. It is not a receipt and
+not proof the customer received anything (Workspace §5.9 gaps).
+
 Optional partner APIs may **propose** receipt, collection, arrival, return and proof events. Before
 acceptance, Portal validates the partner organisation, individual operator, active role, permitted
 Site/journey, source document, exact Unit ID, event order, duplicate submission, actual time,
@@ -1049,7 +1142,7 @@ with the physical Units. No page or integration may directly set an `Available` 
 `Who has it` and ownership through the left rail; expand every total to exact Units; open Unit
 Detail for source, reservation, handover, problem and append-only history.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Monitor · Inbound ·
+**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Arrival Schedule · Pickup Schedule · Inbound ·
 Inventory · Outbound`. Defaults are `Unit ID · Product · Stock use · Who has it · Site · Condition
 · SO No · SO date · PO No · PO date · Expected arrival · Last verified · Work`. Ready Stock is a
 saved view of the same authority; Sales and Operations read the same eligible Units with different
@@ -1083,16 +1176,17 @@ received Units show actual Site/holder and are tested for eligibility; issue Uni
 checking`; rejected/not-delivered Units do not enter physical Stock; partial receipt preserves both
 the accepted Units and outstanding expected Units; unknown or wrong-Site Units enter investigation.
 
-**OPERATOR JOURNEY →** open Inbound on the actual date; read source and exact expected Units; choose
-`Open Receiving Session`; scan each Unit and record only the observed result/evidence; submit the
-session; read the resulting Received/Not yet received/With issue tally. No operator repeats the
+**OPERATOR JOURNEY →** open Inbound on the Site's tab; read source and exact expected Units; choose
+`Receive` ON THE ROW; scan each Unit and record only the observed result/evidence; save the
+session; read the resulting `Received Qty` / `Pending Delivery Qty` / `Damaged Qty` beside the same
+row, without having left the list. No operator repeats the
 receipt through Inventory.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inbound defaults are `Document · Product · From · To ·
-Expected arrival · Received on · Expected · Received · Not yet received · With issue · Status ·
-Exceptions` (unified card 2026-09-07; `SO No · SO date · PO date` optional). Inbound is the dated
-work/progress Register; Receiving Session is the only submit door; Inventory has no Add Stock
-action; the Register carries no Work column or duty avatar. Unit Detail links Receiving Session,
+**UI / PAGE / OBJECT PLACEMENT →** Inbound's Register defaults, Site tabs, three filters and the
+five governed receiving quantities are the receiving-workspace card above (owner card 2026-09-15).
+Inbound is the dated work/progress Register and now HOSTS the one Receiving Workspace full-width;
+the Receiving Session remains the only submit door and the only write path; Inventory has no Add
+Stock action; the Register carries no Work column or duty avatar. Unit Detail links Receiving Session,
 GRN, individual receiver, actual date and evidence. No NETS internal Rack, Bin, Zone or placement
 task appears.
 
@@ -1266,14 +1360,10 @@ reservation, issue/control and prior handover; operator checks/packs; actual NET
 signs in and scans acceptance; both identities/evidence are retained. NETS Delivery then completes
 journey arrivals through Delivery, not Outbound.
 
-**UI / PAGE / OBJECT PLACEMENT →** Outbound Register defaults are `Scheduled handover · Document
-· Product · From · To · Logistics Partner · Assigned Driver · Required · Loaded · Not loaded ·
-Driver confirmed · Status · Exceptions` (unified card 2026-09-07; `SO No · SO date · Vehicle ·
-Loaded at · Driver collected at` optional; no Work column, no duty avatars on rows). The expanded
-detail shows exact Unit, product, reservation, check, pack, both sides' scans, evidence and
-not-loaded reason, and carries the governed acts. It cannot edit customer date, route, partner,
-SO, DO or price; the loading act appears only when the physical checkpoint is valid. No
-Zone/Rack/staging/wave page exists.
+**UI / PAGE / OBJECT PLACEMENT →** Outbound follows §7: visible document/date, Loading entry,
+product and separate quantities. Product expansion is read-only. The full-width owning work shows
+exact Unit, product, reservation, check/pack dates, both sides' evidence and remaining responsibility.
+It cannot edit the customer date, route, partner, SO, DO or price.
 
 **CROSS-MODULE CONNECTION →** Sales Order owns customer promise and exact reservation; Delivery
 owns DO/Journey/partners/dates and customer outcome; Stock owns Unit eligibility and holder; NETS
@@ -1325,6 +1415,20 @@ Delivery keeps its own DO/Journey; supplier return keeps Purchase Return/Supplie
 Finance consumes physical movement without maintaining freight allocation in Transfer.
 
 ### 12.8 Customer Return, Supplier Return and Repair
+
+**Direct inventory repair source — owner-approved target, 2026-09-18; NOT BUILT.**
+Purchasing MASTER §9.7 admits an authorised RO from existing Warehouse, Showroom or Dealer Units,
+including Display, without a Supplier Claim. Location does not establish ownership: supplier-owned
+consignment/display retains the actual owner, consent evidence and cost-responsibility facts.
+Owner ruling B (2026-09-19), Purchasing §9.7: missing owner consent does not block document Issue;
+keep its outstanding follow-up in the existing Work engine. Issue is not proof of consent or a
+stock movement. This document-Issue exception does not waive physical handover controls. Preserve existing
+holds, reservations, custody, eligibility and duplicate-repair guards. Planned pickup defaults from
+actual Stock Location; editing it does not move stock. Outbound proves dispatch; Receiving accepts
+the original Unit against the authorised RO and requires inspection before availability. The 0490
+Claim/Case source restriction needs a scoped extension, not a fabricated Claim or a bypass. §9.7
+owns commercial approval; this section owns physical truth for both direct and Claim-origin repairs.
+
 
 **CURRENT CARRES →** a failed Delivery or return can leave the Unit falsely with Delivery; returned
 goods may become Ready Stock without inspection; Service Case/Supplier Claim closure can be
@@ -1612,471 +1716,52 @@ rejects negative Stock, shortage override, duplicate quantity/rack ledgers, dire
 instant Transfer, automatic returned-stock availability, broad external administration, and
 unmeasured pallet/license-plate/wave/labour/robotics complexity.
 
-## 13 · Current implementation reality — evidence, not law
+## 13 · Implementation evidence and remaining limits
 
-### 13.1 · BUILT / VERIFIED — the Unit authority foundation (0366, 2026-08-20)
+This section describes implementation, not a second set of business rules. The current delivery is
+being verified on 2026-09-15. A passing test, a merged PR, a deployed build and user visual acceptance
+are separate milestones. No Warehouse surface is frozen into the UI Kit by this delivery.
 
-`CARD-2026-08-20-warehouse-unit-authority` is built and applied. The exact physical Unit register
-`ops_stock_items` is now the one inventory authority, enforced in the database rather than by
-convention. Measured on production before the change, and again after it:
-
-| What the card required | How it is enforced now | Verified |
+| Capability | Existing owner and implementation | Current limit / delivery evidence |
 |---|---|---|
-| One permanent Unit ID, never duplicated | `unit_code` NOT NULL, defaulted from `gen_unit_code()`, FULL unique index `ops_stock_items_unit_code_uq` (it was PARTIAL, and 88 of 136 live units carried no id at all) | duplicate insert refused |
-| Never reused after cancellation, delivery, return, write-off or disposal | ledger table `stock_unit_ids` — every id ever minted, never pruned; the generator asks the LEDGER, and a birth trigger re-registers | a written-off unit's id refused for reuse |
-| A row is never deleted | `stock_unit_identity_permanence` refuses every DELETE (0341 protected only committed units); `trg_po_units_follow_destination` now VOIDS surplus incoming units instead of deleting them | delete refused |
-| A replacement label keeps the original id | the same trigger refuses any change to `unit_code` | rename refused |
-| No bulk sofa row acts as several reservable Units | CHECK `ops_stock_items_bulk_never_reserved`; trigger refuses `qty > 1` when the CATALOG says the SKU is a sofa | bulk reservation refused |
-| Ownership: Carres Owned vs Supplier Consignment | `ownership` column + CHECK; consignment must name its supplier | — |
-| Site, operating party and role are separate | `warehouses` = Site; new `stock_operating_parties` = WHO HAS IT (`carres_warehouse`, `nets_warehouse`, `nets_delivery`, `pj_showroom`); `holder_party_id` on the Unit. NETS is a row, never hard-coded | two doors, neither moves the other |
-| Last verified date | `last_verified_at`, stamped only by `ops_stock_verify_unit` | — |
-| Append-only identity and physical event lineage | `stock_unit_events`, written by a TRIGGER on the register itself so no door can forget it; UPDATE and DELETE both refused; ordered by a monotonic `seq` (0372) | a Unit driven through a governed life in one transaction reads `unit_born -> status_changed -> reservation_changed -> protection_changed -> holder_changed -> verified -> ownership_changed -> condition_changed`, 8 events, 8 distinct sequences, and the sequence itself refused a rewrite |
-| ONE availability arithmetic | `unit_availability(status, needs_repair, hold_reason, condition)` in SQL and `unitAvailability()` in `packages/shared/src/unit-availability.ts`, pinned to each other by tests | six words, both sides |
-| Availability is never a stored number | view `stock_sku_availability` computes from the register on every read — it cannot be stale. A trigger-kept column was rejected: a second copy is still a second copy (Architecture Law D) | — |
-| Every derived total drills to the exact ids | view `stock_unit_availability_v` carries id, availability, lifecycle outcome, catalog category and source status | 74 (sku, site) rows all drill |
-| A bulk record is never mistaken for promisable stock | `stock_sku_availability` carries THREE named numbers (0368) | 85 bindable · 893 bulk · 978 sellable |
-| Negative stock impossible | availability is counted from units that exist; `stock_balances_qty_nonneg` | 0 impossible rows |
-| No generic Edit, Delete, Add stock, Remove stock or status selector | `ops_stock_items` lost its write policy entirely; `POST /api/ops/stock` ("+ Add stock"), `DELETE /:itemId`, `POST /api/operation/warehouse/adjust`, `operation_adjust_stock` and the `+ Adjust` modal are all gone | adjust refused in words |
-| One governed door per fact | `ops_stock_set_condition` · `refurbish` · `refurbish_complete` · `bind_units` · `unbind_unit` · `set_site` · `set_holder` · `set_ownership` · `verify_unit` · `book_in_units` · `set_thresholds` | — |
-| No second reservation writer | the two raw writers measured on live (POS post-receive labelling, the sofa-loan claim and its rollback) now go through `ops_stock_bind_units` / `ops_stock_unbind_unit`. Sales Order still decides WHICH unit; Stock only records it | — |
-| A stock total can never be hand-written | `stock_balances_derived_only` refuses any write to `qty`/`reserved` outside the rollup | hand-write refused |
+| Unit identity and availability | 0366 authority, 0371 condition correction, 0453 quantity identity separation; stock_unit_register_v is the listing | Quantity records have no displayable Unit ID; no negative or manually adjusted total |
+| Inbound | warehouse-inbound shared projection; actual Receiving Site, formal source, full products and receipt outcomes | Awaiting receipt / Fully received / All arrivals; accepted, physical arrived and pending quantities remain distinct |
+| Receiving | ReceivingWorkspace and existing receipt writer; posted GRN and receiving_unit_results | Same-page work, stable retry identity, source evidence and actual goods receipt date; no second Stock Add |
+| Outbound | 0424 exact DO Unit scope, prep and two-sided handover; explicit Loading workspace | Loading does not confirm for the driver; loaded with zero driver confirmations remains open |
+| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority | Four default fact groups retain independent Unit ID. PO issue dates never stand in for actual receipts |
+| Physical Site visits | Posted receiving_unit_results + warehouse_receipts.actual_site_id / goods_received_at; arrival_source_events.collected with source.from_site_id | Only unambiguous same-Unit, same-Site evidence pairs. Every later receipt opens another visit. Missing or overlapping evidence remains visibly unpaired |
+| Historical DO departures | delivery_handover_event_units warehouse side + handed_over event | These old events have no historical Site field. Preserve the departure independently; do not infer Site from the Unit's current warehouse, rewrite history or fabricate a backfill |
+| Arrival Schedule / Pickup Schedule | WarehouseWorkspace, warehouse-schedule projection and Site operating dates | Separate pages; normal white cards and quiet date provenance badges, overdue work highlighted, undated/delayed work reachable, including older overdue and dated non-working-day entries without changing their dates. Pickup opens exact Loading scope |
+| Transfer and return arrival sources | Migration 0490 is committed, replacing the former unnumbered draft; existing arrival source writer and Receiving engine | Do not rebuild a parallel Transfer/Return engine. Planned, collected, carrier-received and received are distinct facts |
+| Stock Count / Difference / approved Adjustment | Approved business design in §6 and §12.5 | Not built as a complete stocktake engine. WarehouseCountModal records truck/loading counts and is not a stocktake |
+| Month-end / Finance handoff | Approved business design in §9 and §12.10 | Complete versioned confirmation and Finance acknowledgement are not claimed shipped |
+| Duty / permission / external operations | Existing personal-role guards and RLS remain authoritative | No new external rights, service-role browser access, shared credentials or second stock writer |
+| Operator-flow review, 2026-09-16 | Owner approved clearer receiving confirmation, governed in-context problem reporting, correct register return and post-loading direction | Receiving now identifies prefilled outcomes as proposed, requires confirmation of the exact draft and invalidates it on edits. Inventory keeps its register mounted through Unit Detail and returns to Inventory; Loading separates loaded from driver-confirmed, opens the owning DO and retains scan errors for correction. Targeted component tests and local rendered checks cover these changes; production verification pending. The governed problem-report engine/entrances remain NOT BUILT: existing condition/repair writers do not atomically persist an observation, evidence, protective control and shared Work. This approval does not freeze the UI Kit. |
 
-**The two arithmetics that did not agree, measured.** `ops_rollup_stock_balances` used `count(*)`,
-not `sum(qty)`, so the five live bulk rows (qty 2 · 555 · 15 · 319 · 2) counted as ONE unit each.
-They contribute **893 units**; the rollup saw 5. After the change the cache and the authority agree
-on every row (`cache_drift = 0`), and the live figures are 978 available · 2 reserved · 43 incoming
-across 74 (sku, site) rows.
+### 13.1 · Required read and failure behavior
 
-**`stock_balances` survives as a NON-AUTHORITATIVE CACHE, and nothing may read it as truth.**
-Eighteen live SECURITY DEFINER functions across Orders, Purchasing, Receiving and Delivery still
-read its `qty`/`reserved`; dragging them into a Warehouse foundation card would have been a worse
-change. So it lost its independence instead: no hand write, recomputed by statement trigger inside
-the same transaction as the change, and every screen that decides whether goods can be OFFERED —
-the alert RPC, the POS shortage feed, the warehouse totals, the stock summary, the order drawer,
-the purchase assembly and the PO-duty cron — now reads `stock_sku_availability`. Its
-`low_threshold`/`high_threshold` remain, because those are Settings and configuration is what
-survives go-live. **Retiring the cache entirely is the next card's work, not a gap in this one.**
+A source failure is not an empty register. Existing source-warning and receiving-action gates from
+PR #1368 are incorporated. Unit physical history has an independent read and retry: a failed history
+feed leaves current Unit facts available and says that the history could not be loaded. No failing
+read may be replaced with zero, a guessed receipt date or the current Site as historical evidence.
 
-**THREE NAMED NUMBERS, because there are three questions (0368).** 0366 shipped ONE `available`
-and it answered two of them at once — the defect this whole card exists to remove, found by review
-before merge. `ops_stock_items_bulk_never_reserved` forbids a `qty > 1` record from ever being
-reserved, yet `available` summed those records: it said **978** where **85** could actually be
-promised. Corrected to:
+### 13.2 · Delivery verification
 
-| Number | The question it answers | Live 2026-08-20 |
-|---|---|---|
-| `available` | which exact Units can a Sales Order BIND right now | **85** |
-| `bulk_on_hand` | pieces present in a `qty > 1` record — real goods no exact-Unit promise can name | **893** in 5 records |
-| `sellable` | must we BUY more? (`available + bulk_on_hand`) | **978** |
-| `on_hand` | what is physically at this Site, reserved and controlled included | **980** |
+PR #1368 is merged as `22e09a70`. PR #1372 (`59d57f67`) delivers the Inbound / Outbound
+layout, receiving product context, explicit loading entry, driver-confirmation distinction and
+visible-viewport empty states. PR #1373 (`96f1499c`) delivers the physical Site-visit reader,
+Inventory layout and Schedule-to-Loading link. Both later deployment workflows succeeded;
+these are existing shipped capabilities, not pending replacement work.
 
-`sellable` is what the reorder alert, the POS shortage feed, the purchase assembly, the PO-duty cron
-and the Stock page's sellable column read — a shelf holding 555 pillows needs no purchase order,
-whether or not a pillow carries an identity. `available` is what an exact-Unit promise reads.
-Nothing computes `on_hand - reserved`. `stock_balances.qty` deliberately did NOT move: it tracks
-`sellable + reserved`, which is the free + reserved membership it has meant since 0137.
-
-**THE ONE THING THIS CARD SURFACED AND DID NOT DECIDE — an owner question.** 893 real pieces
-(pillows, mattress protectors) sit in 5 bulk records, and **no Sales Order can bind any of them to a
-customer**, because a record standing for 555 anonymous pieces cannot carry one customer's promise.
-Splitting them into 893 Units was proposed and rejected here: MASTER §3 requires an identity for
-every sofa and every independently saleable or replaceable module, the id is printed by the SUPPLIER
-on its own label, and Carres does not label 555 pillows one at a time — minting 893 ids would change
-how Carres operates, which is Jess's call and not a migration's. The card also forbids a backfill
-over imported rows, and every live row is test data.
-
-So the question stands, and it is a real operating choice, not an engineering one:
-
-```
-AUTHORITY SEARCHED       Stock MASTER §3 (Unit identity, supplier-printed label) ·
-                         §4 (availability) · Card §2/§6 · Constitution §6 (clean start)
-WHY NOT ALREADY RESOLVED the approved model requires identity for FURNITURE and is silent on
-                         whether an accessory piece carries one
-TWO REAL OPTIONS         (a) every accessory piece is a Unit with a supplier-printed id -
-                             honest binding, but the supplier must label pillows one by one
-                         (b) accessory demand is satisfied WITHOUT exact-Unit binding -
-                             no labelling burden, but the Sales Order can never promise a
-                             specific pillow and Stock needs a quantity-draw door for them
-RECOMMENDATION           (b). The labelling cost in (a) falls on the supplier for goods nobody
-                         traces individually, and the operator gains nothing from it.
-OPERATIONAL CONSEQUENCE  under (b) a later card owes Stock a governed quantity-draw door for
-                         bulk records; until then those pieces are visible and countable but
-                         not promisable, which is exactly what the screens now say.
-```
-
-Nothing is blocked on the answer: the numbers are honest either way, and both options build on the
-same Unit authority.
-
-**CLOSED 2026-09-01 — the Blueprint answered it as option (b).** §14.1 G3 rules that every sofa and
-independently saleable module carries a Unit ID while governed interchangeable goods use quantity
-scope without exact-Unit binding. The governed quantity-draw door for bulk records remains an
-approved target for a later card.
-
-**`ended` never erases how a life ended.** `unit_lifecycle_outcome()` is a separate authoritative
-answer beside the availability word — `delivered` · `cancelled_before_receipt` · `written_off` ·
-`returned_to_supplier` · `active` — so Delivered / history can tell them apart without a second
-query or a second arithmetic. Physical disposal is not a fifth word until that fact is recorded.
-
-**Seven migrations, because self-review and review kept finding real holes. Every one was found by
-looking again, not by a failing test — which is the point of Law 4. Two of them (0369, 0370) exist
-because a guard described as protecting the numbers could not fire at all, and one (0371) because
-the new authority disagreed with the oldest reader it was meant to replace.**
-
-| | What it does | Why it exists |
-|---|---|---|
-| **0366** | the foundation above | the card |
-| **0367** | revokes the write grants on the five objects 0366 created | **found by self-review.** 0366 §10 revoked INSERT/UPDATE/DELETE on the register and the cache by name, but assumed a NEW table starts with no write grant. Supabase's `ALTER DEFAULT PRIVILEGES` hands `authenticated` ALL on every new table in `public`, so all five came out carrying INSERT/UPDATE/DELETE/TRUNCATE. RLS still refused the three tables — but `stock_unit_availability_v` is a simple view over one table and therefore **auto-updatable**, a latent second door onto the inventory authority. 0366's sanity block checked policies and never checked grants, which is why it passed. 0367 revokes, and asserts grants from here on. It also revokes TRUNCATE, which empties a table without firing the row trigger that refuses a delete |
-| **0368** | the three named numbers above, and widens the bulk guard from sofa-only to sofa/bedframe/mattress | **found by review.** `available` overstated promisable stock ~11x; and two of the five live bulk records (`DIVAN ONLY (K)`, `SONIC-L1202S-Q`) are furniture, which a sofa-only guard never covered. The guard asks the CATALOG, so a SKU the catalog does not hold cannot be judged and passes — at go-live the catalog is configuration that survives, so every real SKU has a row; today none of the five does, which is why the sofa-only guard never fired on any of them |
-
-| **0369** | every bucket in `stock_sku_availability` is `coalesce(..., 0)`; `anon` loses its SELECT on all seven objects; the sanity block is rewritten NULL-safe and carries its own negative control | **found by review, and the sharpest of the three.** 0366 counted rows (`count(*) filter`, which returns 0 for an empty group); 0368 had to SUM `qty` so a bulk record contributes 555 rather than 1 — and `sum(...) filter` returns **NULL** for an empty group. Measured: `reserved` NULL on 73 of 74 rows, `bulk_on_hand` on 69, `incoming` on 50. Worse, 0368's own reconciliation guard was written `where sellable <> available + bulk_on_hand`, and a NULL on either side makes that predicate NULL — neither true nor false — so it never raised. **The predicate evaluated to NULL on all 74 rows: the guard was not passing, it was not testing anything.** A test believed to hold while the thing it guards is broken. 0369's guards use `is distinct from` and one of them is a deliberate negative control that proves the reconciliation check CAN fail |
-
-| **0370** | the rollup upserts every pair (no `> 0` predicate), then RE-READS what it wrote and raises if it disagrees with the register | **found by review, and it had already caused harm.** During the window between 0368 and 0369 the view returned NULL for empty buckets, and the rollup's two predicates both read `(sellable + reserved)`: `NULL > 0` is NULL, so the INSERT skipped the row and the follow-up `update ... set qty = 0 where not exists (... > 0)` matched it and **zeroed it**. The cache said Carres held **5** units where the register held **980** — and eighteen SECURITY DEFINER functions read that cache. Repaired by re-running the rollup (980 = 980, 0 drifted rows). But the real defect was that a function whose whole job is to keep two numbers equal could write a wrong answer and return success, so it now proves its own answer and a disagreement aborts the statement that caused it |
-
-| **0371** | `unit_availability()` gains CONDITION, and the three-argument signature is dropped | **found by review, comparing the new authority against the oldest free-stock reader in the repo.** `readFreeStock` in the To Order engine has excluded damaged goods since 2026-08-04, and said why: R4 releases a quarantined unit back to `free` keeping the condition it was released with, so a damaged unit can be free, sound and unsellable. 0366's arithmetic never asked about condition — so the moment a damaged unit is released, the AUTHORITY would offer a unit every other reader refuses. Live exposure is zero today (0 damaged units; live conditions are `new` and `exhibition`), which is the same reason To Order closed it early. The old signature is DROPPED rather than defaulted: a fourth parameter with a default leaves the wrong call resolvable, which is how this existed in the first place |
-
-| **0372** | `stock_unit_events` gains a monotonic `seq`, and `event_at` moves from `now()` to `clock_timestamp()` | **found by review, the first time anyone READ a lineage instead of asserting the trigger fired.** Driving one Unit through a governed life in a single transaction wrote all eight events correctly and returned them as `status_changed -> unit_born -> …` — a Unit that was BORN SECOND. `now()` is the TRANSACTION start time, so every event written in one transaction ties to the microsecond and the order collapses to a uuid tiebreak. Every governed door writes several events per transaction, so this was the normal case, not an edge. MASTER §7 asks In & out for "actual time … event", and §6 asks a correction to preserve the original event and its time; an append-only history whose order cannot be reconstructed answers neither |
-
-**Verification evidence.** All seven migrations applied to production; each sanity block passed.
-Eight negative controls were run against production in a rolled-back transaction after 0366 —
-duplicate id · delete · id reuse after write-off · rename · bulk reservation · hand-written total ·
-the retired adjust door · editing a unit event — and **all eight fired**; the register was unchanged
-afterwards (136 units · 136 ledger ids · 0 events · 0 units without an identity). After 0367 the
-seven Warehouse objects carry SELECT and nothing else. After 0368 the three numbers reconcile
-(85 + 893 = 978) and `stock_balances` did not move (`cache_moved = 0`). After 0369, across the same
-74 rows: **0 NULL buckets** in any of the eight columns, the reconciliation guard passes for real
-and its negative control proves it can fail, and **0 grants of any kind remain to `anon`** on the
-seven objects. Live figures unchanged throughout: on_hand 980 · available 85 · bulk_on_hand 893 ·
-sellable 978 · reserved 2 · incoming 43. After 0370 the cache equals the register exactly (**980 = 980**, 0 drifted
-rows), and healing was proven end to end in a rolled-back transaction against production: the cache
-was zeroed deliberately, ONE unit was touched, and the statement trigger restored all 980 units for
-the whole Site.
-
-**All seven applied migrations were reconciled against their repository files** by comment-stripped
-md5 — every one an exact match, so what production runs is what the repository says:
-
-| Migration | md5 (repo == applied) |
-|---|---|
-| 0366 | `33ab7586e227a63366f0ba44d9c7ebc8` |
-| 0367 | `a98022030312d9071a60b3b2c55d1ada` |
-| 0368 | `c13fbeab0f2cb7fa4772bf9b46be3d96` |
-| 0369 | `c9860a6375a0d89ebb0bc6e954170a38` |
-| 0370 | `07357039f1ad66aa1bd11163a1aa43d4` |
-| 0371 | `a45dea200a0556fea6bd060ae812b690` |
-| 0372 | `5c3b8be145f1382c553009b42aa550fc` |
-
-**Card §6 coverage, item by item.** Each row says how it is proven, not that it is.
-
-| Card §6 requires | Proven by | Result |
-|---|---|---|
-| duplicate and reused Unit IDs are refused | production negative controls ①③ — duplicate insert, and reuse of a written-off unit's id | both refused |
-| traceable goods cannot be an over-reserving bulk row | CHECK `ops_stock_items_bulk_never_reserved` + the catalog-driven trigger; negative control ⑤ | refused |
-| Carres Owned and Supplier Consignment stay distinct | production controls — a third word refused, consignment-without-supplier refused, consignment-with-supplier persists, default is `carres_owned` | 4 of 4 fired |
-| Site and operating party change independently | route tests: two doors, and neither call carries the other's parameter | green |
-| Sales Order reservation reflected with no second Stock writer | the register has no write policy; the two raw writers now call `ops_stock_bind_units`; route test asserts no direct `.update()` | green |
-| incoming, in-transit, protected and reserved absent from available | live view query — rows that are `available` while not free/sound/unreserved/undamaged | **0 leaks** |
-| every derived total drills to the exact contributing ids | live query comparing each `available` against the sum of its own contributing unit rows | **0 that do not drill** |
-| direct or unauthorised writes and deletes are refused | negative controls ②④⑥⑧ + the grant assertions in 0367/0369 | all refused |
-| existing Purchasing, Receiving, Orders and Delivery tests green | full API suite | 2293 green |
-
-**The one item this card does NOT prove: "incomplete".** Card §6 asks that an *incomplete* Unit be
-absent from available results. Missing components/packages is not a fact the register records — there
-is no column for it and no door that sets one — so nothing here can enforce it. `damaged` and the
-protection reasons cover the adjacent cases. Recording completeness is Receiving's scan surface
-(MASTER §5) and belongs to that card; it is named here so it is not mistaken for shipped.
-
-**Local release gate:** shared (2474) and API (2293) suites fully green; typecheck, lint, build
-clean; no server secret in the web bundle. The web suite is green on 265 of 266 files. The one
-exception is **pre-existing flakiness this card did not cause and did not fix**:
-`apps/web/src/pages/operation/OperationPurchaseOrders.test.tsx` (last touched by PR #858, untouched
-by this branch) passes 132/132 in isolation but times out under full parallel load — three
-consecutive full runs failed a DIFFERENT set of its tests each time (16, then 2, then 1), with the
-drag-and-drop column-reorder tests taking 68s and 36s before failing. It is flagged for its own
-card rather than papered over here.
-
-### 13.2 · BUILT / VERIFIED — the Stock Register (0373, 2026-08-21)
-
-`CARD-2026-08-20-stock-register` is built. **`Stock` replaced `On hand`** as the Warehouse master
-list: the rail row, the destination header, the page and `Jump to` all say Stock, and the word
-`On hand` is absent from every operator surface. The `?tab=stock-onhand` address is unchanged, so
-no bookmark and no learned rail position moved.
-
-| What the card required | How it is met | Verified |
-|---|---|---|
-| The destination says **Stock** | `portal-nav.ts` row, `ModuleHeader word="Stock"`, `Jump to` reads the same word | test asserts `On hand` appears nowhere on the surface |
-| One register, not separate stores | the page reads `stock_unit_register_v` and nothing else | test asserts `ops_stock_items` and `stock_balances` are never fetched |
-| Every count derives from Card 1's authority | `availability` and `lifecycle_outcome` arrive already decided; the page copies them | test feeds a row whose `status` contradicts its `availability` and asserts the VIEW wins |
-| Rail sections, cross-section filtering, clear-all, deep-link | rail state lives in the URL; sections AND together; `All stock` clears everything | 13 page tests + 29 pure tests |
-| `Changed` uses PHYSICAL events only | `stock_unit_register_v.last_event_at` (0373), ordered by `seq` per 0372 — never `updated_at` | migration sanity + negative control |
-| Exact Unit search opens the correct Unit Object | `/operation/stock/unit/:unitCode`, looked up by the PERMANENT id | API test asserts the lookup is by `unit_code`, never row uuid |
-| Ended Units out of the default view, still findable | `ended` is filtered out unless the id is typed EXACTLY, or `Delivered / history` is chosen | test asserts a delivered Unit is hidden by default, found by exact id, and NOT found by prefix or product |
-| No dead controls, generic editor or second reservation door | the page is read-only | test asserts no Reserve/Release/Edit/Delete/Add stock/Adjust/Mark done control exists |
-| Current/non-current year formatting | the ONE governed formatter, `fmtDate` | — |
-
-**THE FOOTER PRINTS TWO NUMBERS, AND THAT IS THE POINT.** `85 you can promise · 893 pieces you
-cannot`. §13.1 established that a `qty > 1` record can never be reserved; a Register that printed
-one number would either hide 893 real pillows or promise 893 that no Sales Order can name. The row
-itself repeats the warning inline — *"555 pieces in one record — cannot be promised individually"* —
-which is the one permitted inline second line, and it earns it. This keeps the open owner question
-in §13.1 visible on the screen where it matters instead of buried in a document.
-
-**Date spelling — a deliberate deference.** Card §4 spells time `Tue, 18 Aug · 10:42 AM`; the
-portal's one governed formatter spells it `Tue, 18 Aug 10:42`. `fmt-date.ts` records that three
-page-local formatters were deleted for disagreeing with it, so the Register uses the governed one.
-Changing the spelling is a one-line change in that file for whoever wants it — and it must happen
-THERE, for every page at once, never here.
-
-### 13.3 · The rail is drawn from facts that exist — and five are missing
-
-Card §3 names nine Attention reasons. **Four shipped; five have no fact to read**, and inventing a
-chip that reads a column nobody writes would put a number on screen that means nothing.
-
-| Reason | State | What it waits for |
-|---|---|---|
-| waiting inspection · damaged · in repair · no purchase order | **BUILT** | — |
-| cannot find | not built | a "cannot find" observation — Issues/Counts card (§6) |
-| Unit ID issue | not built | the governed relabel/issue record (§3) |
-| Site differs | not built | a second Site, and Counts (§6). One Site exists today |
-| components missing | not built | a components manifest — Receiving's scan surface (§5) |
-| evidence incomplete | not built | an evidence-completeness fact (§5) |
-
-Two more reasons are measurable but were deliberately NOT shipped as chips because they flag
-**136 of 136 Units**, which is the same as flagging nothing: `last_verified_at IS NULL` (the column
-shipped hours earlier) and `holder_party_id IS NULL` (no door populates it yet). They become useful
-the moment Counts and the handover doors write them. `Who has it` is still shown as a COLUMN, and
-reads **Not recorded** rather than inventing a holder.
-
-`Where` and `Ownership` render only when the data holds more than one value — one Site and no
-consignment Unit exist today, and a filter offering one choice is not a filter
-(`03-page-patterns.md:149`). Each section appears by itself when a second value arrives; no code
-changes.
-
-`Changed` shows **0 in all three scopes**, honestly: `stock_unit_events` holds 0 rows because every
-Unit predates 0366's lineage trigger and nothing has physically moved since. The rail says so in
-words rather than showing three empty filters that look broken.
-
-### 13.4 · Still not built
-
-The superseded planning-page meaning of Ready stock, generic Held stock or Quarantine, and the
-claim-only issue route remain superseded. Transfers (PR #860), Counts, month-end, Ready stock as
-eligible Units, Showroom Sites, the partner mobile surfaces and the reports in §11 remain
-**APPROVED TARGET / NOT BUILT**.
-
-**`OperationStockOnHand.tsx` IS DE-ROUTED, NOT DELETED, AND THE REASON IS A DEPENDENCY.** No
-operator can reach it. It is kept because TWO capabilities still live only there:
-`ReorderStockCard` (the K1 reorder points, migration 0286 — the one door where a reorder point and
-lead days are set) and `ImportStockDialog` (the Klg Warehouse sheet import). Deleting the file would
-destroy both without replacing them, and an existing useful capability defaults to KEEP. Their
-homes are **Ready stock** (reorder points) and **Settings/Maintenance** (the sheet import) — a
-relocation this card's scope excluded. **The file dies in the PR that gives those two a home, and
-that is the next Warehouse scope.**
-
-0366's five governed doors that could legitimately live on Unit Detail — `ops_stock_set_site` ·
-`set_holder` · `set_ownership` · `verify_unit` · `set_condition` — are **NOT wired**. Each needs its
-own confirmation copy, permission surface and evidence rule; wiring them half-way would put five
-buttons on screen whose refusals nobody had designed. They are the scope after the relocation.
-
-### 13.5 · BUILT — the four destinations in the rail (CARD 01, PR #1045)
-
-`CARD-2026-09-01-warehouse-01-sidebar` shipped the §2 map: the Warehouse module rows are
-**Dashboard · Inbound · Inventory · Outbound**, complete from day one. `Inventory` is the one
-live door — the same Unit Register page, key and `?tab=stock-onhand` address unchanged, its
-destination header/docTitle/export renamed to the rail's word. Dashboard, Inbound and Outbound
-print `Coming soon` as non-controls and go live in their own pages' PRs. The collapsed 60px
-icon opens the NAMED landing (`WAREHOUSE_LANDING_KEY` = Inventory) until Dashboard exists.
-
-The superseded `Stock · Ready stock · In & out · Transfers · Counts` rows left the rail.
-**De-navigated, not deleted:** `?tab=stock-plan` (reorder points K1 · urgent restock K3 · pool
-usage K4) and `?tab=movements` (event history) keep their routes until their capabilities
-relocate — replenishment to Purchasing/Settings under this Blueprint, the history into Unit
-History/Inventory. Those relocations join the `OperationStockOnHand` debt above as the named
-next scopes. Production proof rides the PR's deploy record.
-
-### 13.6 · Inventory source restored; expanded Register in PR #1149
-
-**Production correction, 2026-09-07:** the missing-name defect was confirmed against
-the live 0373 view. After owner BUILD/apply approval, the exact committed
-`0417_the_register_names_the_site_and_the_holder` passed a rollback rehearsal and
-was applied transactionally with tracker version `20260907112136`. Stored source
-SHA-256 matches the repository. Post-apply assertions preserve all 221 authority
-rows, 221 Site names, 1 holder name, caller security and SELECT-only grants.
-Authenticated Inventory now loads 181 current records and 40 history records.
-See [WAREHOUSE — INVENTORY](../cards/CARD-2026-09-07-warehouse-inventory-production-defect.md)
-for the full evidence. The expanded 240px Register with saved views and source
-facts is in PR #1149, which records final CI and production deployment evidence.
-
-`CARD-2026-09-03-warehouse-02-inventory` supplied fixes for three measured P0s. **The register API had
-answered 500 since birth**: the route selected `site_name`/`holder_name` from
-`stock_unit_register_v` and no migration ever gave the view either column — the route merged
-2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
-governed-name joins on 0373's exact shape. **A Unit's permanent address rendered the
-Dashboard**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
-route-gate test that only mounting the app can provide. **Every Warehouse surface drew two top
-rows**: the register, both de-navigated legacy pages and Unit Detail draw their own Destination
-Header and none suppressed the slim global bar; all four do now, with a dashboard control test.
-The rail group and column that said `Attention` say **`Needs checking`** (§2's rejected-word
-list, applied). PR #1149 implements the current Inventory rail and source-column
-slice. Counts/Adjustments and unsourced Work are not claimed as built by this page.
-
-### 13.7 · BUILT — Dashboard Calendar → exact-Unit Outbound handover (CARD 03, 0424)
-
-`CARD-2026-09-04-warehouse-03-dashboard-outbound` shipped the vertical slice: Dashboard
-Calendar → scoped Outbound → exact-Unit scan/check/pack → evidence-backed partial or complete
-handover → atomic `Who has it` update.
-
-**The exact-Unit transaction (migration `0424`).** `delivery_order_units` snapshots the DO's
-required scope from the ONE Sales Order allocation at issue (a trigger on the one issuing path;
-live whole-order documents backfilled deterministically — zero live split documents existed, so
-nothing was guessed). `delivery_unit_prep` records per-Unit `scanned → checked → packed`
-append-only and idempotently. `delivery_handover_event_units` records which exact Units each
-accepted batch moved (`recorded_side` keeps the Logistics receipt's OWN list beside the
-Warehouse's); a Unit is accepted once per scope and holds at most one live delivery claim. The
-ONE extended door `delivery_handover_record` validates scope · Site · holder · prep · receiver ·
-proof, appends the batch and moves ONLY the accepted Units' `holder_party_id` to the partner's
-governed operating party (`delivery_partners.operating_party_id` — NETS links to 0366's
-`nets_delivery` seed by CODE; every other partner minted its own delivery-operator identity 1:1;
-the client never sends the holder). 0366's lineage trigger records each `holder_changed`. Every
-refusal branch — duplicate · wrong Site · wrong DO · wrong holder · voided · missing proof ·
-out-of-order · unauthorised role · warehouse recording the logistics receipt — was proven
-against production in rolled-back probes before merge, ending `PROBE_COMPLETE_ALL_PASS`.
-
-**The surfaces.** `?tab=warehouse-dashboard` is the read-only Calendar (six operating dates in
-ONE horizontal sequence, shared vertical scroll, one-day agenda below 1280px, the governed empty
-sentence, rail `OUTBOUND SCHEDULE · SITE · SOURCE` with no dead one-option group) and became
-the module's NAMED landing (`WAREHOUSE_LANDING_KEY`). `?tab=warehouse-outbound` is the dated
-work listing with the §12.6 defaults and the exact-Unit drill-down; card click opens it scoped,
-`DO No` opens the formal read-only document, and one mounted workspace keeps the board's
-filters/scroll across Back. The Warehouse acts LEFT the Delivery surfaces: the DO object offers
-the `Open Outbound` door and keeps only `Confirm logistics receipt`. The external Warehouse
-shell gained `/warehouse/outbound` — the minimum responsive handover door over the SAME feed and
-the SAME governed writers, Site-narrowed server-side. The schedule feed now reads
-`delivery_order_units` as the required-scope authority and carries per-Unit prep/handover facts;
-`warehouseOutboundCards()` in `packages/shared` is the ONE card arithmetic
-(`required = handed over + not handed over`, §3.5.1).
-
-**Production proof — 2026-09-04.** Merged as `71f0bfd4` (PR #1091); `0424` applied through the
-governed path (tracker tail `0424_outbound_hands_over_exact_units_and_the_holder_moves`;
-backfill produced both live DOs' scopes, 0 split documents surfaced, all 12 partners resolve a
-holder, NETS → the `nets_delivery` seed). `erp.carresofficial.com/__carres_deploy.json`
-reported exactly `71f0bfd4` after the deploy run succeeded. Authenticated walk as
-`operation@carres.com` on that SHA: Dashboard rendered the approved rail and six-date board
-with the exact empty sentence; saving a NETS arrangement on SO-1321 through Edit Delivery made
-the `DO-170826-5050` card appear under Fri, 4 Sep reading `Required 1 · Handed over 0 · Not
-handed over 1`; the card opened Outbound scoped by URL; scan → check → pack recorded through
-the prep door (duplicate scan reconciled); `Record handover` with the actual receiver and an
-uploaded proof landed the batch — the card re-read `12:53 · Required 1 · Handed over 1 · Not
-handed over 0`, `ops_stock_items.holder_party_id` moved to **NETS Delivery** with one
-`holder_changed` lineage event and the stored proof; `DO No` opened the formal read-only
-document whose header now offers only `Confirm logistics receipt` and whose Warehouse handover
-block and History print the fact with recorder/duty/receiver; browser Back restored Outbound
-then the Dashboard. Narrow/mobile agenda verified at 375px against the identical code (the
-committed dev preview): one-day agenda, `[Filters]` drawer, horizontally self-scrolling Unit
-table — the walk found and fixed the rail crushing the agenda (`build/warehouse-03-walk-fixes`).
-Zero console errors; every `/api/*` call 200. Warehouse-role Site scoping, every refusal branch
-and the partial-batch holder transition were proven on production in rolled-back probes before
-merge (`PROBE_COMPLETE_ALL_PASS`).
-
-### 13.8 · BUILT / PRODUCTION-VERIFIED — the replacement Card: Monitor, Inbound, and the rail + Register pages
-
-The 2026-09-06 owner replacement Card cancelled the Warehouse `Dashboard` name, the
-Calendar-on-every-page pattern, the `35% / 65%` Inbound/Outbound layouts and the generic
-`Handover / Receiver / Ready / Needs checking` outbound wording, and this build applied it:
-
-- The rail reads **Monitor · Inbound · Inventory · Outbound**; `?tab=warehouse-dashboard`
-  still lands on Monitor (address alias, the `stock-onhand` precedent), and the collapsed icon's
-  named landing is Monitor.
-- **Monitor** renders the full-width six-working-day Calendar with NO 240px rail, both ARRIVAL
-  and PICKUP events time-ordered per governed §2 law, and routes each card to filtered
-  Inbound/Outbound. Supplier arrivals project from Purchasing's open POs (`eta_date`, Pending
-  Delivery Qty); pickups from Delivery's schedule feed. Event kinds with no live source yet
-  (transfers, returns, repair) exist in the shared taxonomy and project nothing — no invented
-  rows.
-- **Inbound** is a 240px rail + Inbound Register over expected arrivals (`Waiting goods
-  arrival · Overdue goods arrival · Waiting Carres check`, Site) that ROUTES to the governed
-  Receiving Session (`?tab=receiving&po=` / `&session=`) and posts nothing itself.
-- **Outbound** is a 240px rail (`PICKUP STATUS`, Site) + the dated work rows; `Logistics
-  Partner`, `Assigned Driver` and `Vehicle` are separate fields (`Waiting for {partner} to
-  assign a driver` when unassigned); the loading act is `Record {n} Units loaded to {person}`;
-  `Warehouse loaded` and `Driver collected` stay two evidence lines, and a confirmed collection
-  with an unloaded Unit names that exact Unit (`{unit} was not confirmed by {person}. It
-  remains with {site}.`).
-- The shared projector lives in `packages/shared/src/warehouse-monitor.ts` (one arithmetic;
-  Law D); the outbound empty day says `No pickups on {date}. Choose another date.`
-
-**Production proof (2026-09-07):** PR #1123 merged as `d45e9047`; the production deploy proof
-(`__carres_deploy.json`) reports build `4d717422`, whose ancestry contains that merge, and the
-served bundle carries the shipped surface verbatim — `warehouse-monitor` / `warehouse-inbound`
-addresses, `Goods scheduled for pickup`, `No arrivals or pickups on`, `Driver pickup`,
-`Time not provided`, `to assign a driver`, ` loaded to ` and `was not confirmed by` all grep
-positive in `/assets/index-BZQ9N_Ss.js`. Desktop (1512px, six days full-width) and mobile
-(375px one-day agenda; Outbound Filters drawer) were walked on the identical code via the
-dev preview entry before merge. CI `verify` passed on the PR head. The Inbound/Outbound
-PRESENTATION in this entry is since superseded by the unified Register (§13.9); the Monitor
-law and the governed act sentences stand.
-
-### 13.9 · BUILT / PRODUCTION-VERIFIED — the unified Inbound/Outbound Register (owner card 2026-09-07)
-
-The Jess-approved unification card shipped as PR #1153, squash-merged to `main` as
-`819d6764`:
-
-- Both pages speak ONE Register grammar (§7's two UNIFIED REGISTER ROW blocks): Destination
-  Header, one toolbar row (Filters toggle · compact From/To date range · search ·
-  Export/Columns), 240px rail (drawer on mobile), wrap-not-truncate `Product`/`Exceptions`
-  columns, explicit clicks only (Document → the document · Product cell → the ONE expansion
-  entry · Unit ID → the Unit record), footer range summary labelled in arrangements, and
-  restore of date/filters/search/scroll on return.
-- The rail counts, rows, footer and export read one shared filter pipeline
-  (`buildInboundRegisterView` / `buildOutboundRegisterView`) — the screenshotted
-  `Loaded 1` beside an empty day is structurally impossible now, and a status pick composes
-  with the date filter.
-- Outbound surfaces the LOGISTICS side's own per-Unit receipt (`recorded_side='logistics'`)
-  as `Driver confirmed {n}` — three counts, never merged; `Driver collected` no longer borrows
-  the Warehouse's loading event.
-- Migration `0440_a_handover_keeps_every_evidence_file.sql` — **APPLIED to production as
-  `20260907073647`, BEFORE the merge** (so no worker ever called a missing signature). It adds
-  the append-only `delivery_handover_evidence` ledger and re-creates the one handover door with
-  `p_evidence`: many photos/videos per act, per-file upload with retry, first file mirrored
-  into `proof_path` for legacy readers. Its own sanity gate caught the 0367 defect on the first
-  attempt (a new table inherits TRUNCATE/REFERENCES/TRIGGER grants) and the applied version
-  revokes the full set — verified: exactly one 9-argument `delivery_handover_record`, zero
-  client write grants on the ledger. Receiving's stored `arrival_evidence` files are now signed
-  for RE-VIEWING on the record.
-
-**Production proof (2026-09-07):** `Deploy production` for `819d6764` succeeded;
-`erp.carresofficial.com/__carres_deploy.json` reports exactly `819d6764`, and the served bundle
-(`/assets/index-CsU7sDQh.js`) greps positive for `Scheduled handover`, `DOCUMENT TYPE`,
-`Not finished`, `Driver confirmed`, `Repair Order No`, `Loaded, not confirmed by`,
-`no Warehouse loading record`, `Show every product and Unit`,
-`photos and videos of the loaded goods` and the evidence-picker copy. The Worker and the
-Inbound endpoint answer 401 unauthenticated — alive behind their role gates. CI `verify`
-passed on the PR head (shared 3004 · api 2806 · web 3951 tests; strict `tsconfig.app.json`
-typecheck; design-standard lint). Authenticated operator walks remain the owner's checklist.
-
-**CORRECTION — the first ship of this card broke two production surfaces (2026-09-07).** The
-merged branch carried an earlier session's arrival-source reads, which name
-`arrival_sources`, `arrival_source_units`, `arrival_source_events` and
-`warehouse_receipts.arrival_source_id` — objects that live only in an unnumbered draft and do
-not exist in production. Both registers therefore failed to open: Inbound (whose rows had been
-composed client-side from working endpoints before this card) and the Receiving Register, whose
-select list gained the absent column. **The 2026-09-07 verification did not catch it because it
-proved the deployed SHA, the bundle strings and the 401 gate — none of which exercises an
-authenticated read.** A green suite and a live route are not a working page.
-
-The rule this writes down: **a Register that reads an object the deployed schema may not carry
-must treat that absence as "this source kind has no records", never as a failed read** —
-`apps/api/src/lib/optional-relation.ts` degrades on an undefined table/column ONLY, so a
-permission or RLS failure still travels loudly, and both routes heal themselves the moment the
-draft lands. Both routes now carry a `PRODUCTION SHAPE` regression test that reproduces the
-deployed schema; the Inbound and Receiving suites fail if either read is made unconditional
-again.
-
-Still owed (not this card's build): land the arrival-sources draft
-(`supabase/drafts/arrival_sources_and_receiving.sql`, still unnumbered) — until it does, the
-Inbound rail's Transfer / Customer Return / Failed Delivery return / Return from repair /
-Supplier replacement rows honestly count zero. Migration **0437** (Khor Yee offboard /
-two-person duty) was found unapplied while 0438–0440 were — with nobody resolving `po_duty` or
-`grn_duty`, which blocked every GRN posting. It was applied on 2026-09-07 as
-`20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the
-2026-10 → 2027-09 alternating rotation exists.
+The Mac verification checked the rendered separate schedules, Inbound document/date/product
+and receipt quantities, exact-Unit Loading scope, separate loaded/driver counts and a rejected
+wrong-Unit scan retaining its input without changing stock. At 1280px the Outbound action and
+four fact groups remain visible with the menu and filters open. Focused tests cover receipt
+outcomes, wrong Site/Unit, return visits, ambiguous and absent evidence, driver count zero,
+retry/input preservation and register state. A final identity follow-up carries source SKU onto
+schedule cards, includes SKU/quantity in Inventory exports and translates stored Unit history
+event keys. These checks do not claim that the controls marked unbuilt in §13 are complete.
+The UI Kit remains unfrozen pending the owner's rendered-design review.
 
 ## 14 · Whole-domain completion gate
 
@@ -2092,10 +1777,10 @@ two-person duty) was found unapplied while 0438–0440 were — with nobody reso
 | G6 | Add/Remove is not a Count. Blind Count, Count again, Difference, investigation and approved Adjustment are the complete control. | approved target / not built |
 | G7 | generic reservation cannot prove customer promise; Sales Order binds/releases/substitutes the exact eligible Unit atomically. | integrity/authority consolidation gap |
 | G8 | one status cannot combine holder, Site, condition, availability, reservation and work; these remain separate facts over one event history. | engineering/authority consolidation gap |
-| G9 | Delivery selection without physical Warehouse handover lets digital state outrun reality; Outbound requires exact two-sided handover. | approved cross-module target / not built |
-| G10 | return state without return receipt/inspection leaves false holder and availability; Return/Repair uses new out-and-back events and check required. | approved lifecycle target / not built |
+| G9 | Delivery selection without physical Warehouse handover lets digital state outrun reality; Outbound requires exact two-sided handover. | built exact-Unit handover; UI completion and driver distinction verified separately |
+| G10 | return state without return receipt/inspection leaves false holder and availability; Return/Repair uses new out-and-back events and check required. | 0490 arrival-source and receiving path exists; completeness is movement-specific |
 | G11 | unknown import cannot become new/sellable/reserved truth; reject to review and never allocate through migration. | data-governance/engineering gap |
-| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and four destinations consolidate presentation. | UI/engineering consolidation gap |
+| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and five destinations consolidate presentation. | UI/engineering consolidation gap |
 | G13 | legacy Stock/Receiving/partner/PO write paths cannot coexist as authorities; each physical act has one owning door and forbidden external overwrite. | engineering/authority consolidation gap |
 | G14 | appointment/customer-date ownership was once contradictory. It is now resolved: Sales Order owns the customer promise; Delivery derives DO/Journey dates; Warehouse consumes dated Inbound/Outbound work and never owns the promise. | resolved cross-module authority; no Warehouse owner decision |
 
@@ -2110,8 +1795,8 @@ offline/API boundaries; history/audit; cancellation/partial/concurrency conseque
 Carres-operated warehouse compatibility.
 
 The former 11-task roadmap is research history, not current Blueprint authority and not a substitute
-for this coverage. No lifecycle or cross-module seam remains an unknown deferred blind spot;
-implementation may later be dependency-sliced only after a separate BUILD/DELIVERY takeover.
+for this coverage. Implementation status is recorded in §13. Approved target coverage does not mean every control is built,
+and missing historical evidence remains an explicit limit rather than a fabricated fact.
 
 ### 14.3 Resolution classification
 
@@ -2130,16 +1815,16 @@ measured need, and assumed external cutover.
 **RESOLVED FROM AUTHORITY:** Unit authority, ownership seams, shared Work and UI grammar and
 upstream/downstream owners.
 
-**APPROVED TARGET / NOT BUILT:** the rest of this Warehouse operating model and its UI — the
-remaining destinations in §2 (Ready stock as eligible Units, Transfers, Counts), the journeys in §5,
-Issues/Counts/correction in §6, month-end in §9 and the reports in §11.
+**BUILT / VERIFIED:** the Unit-authority foundation (PR #878), the five destinations in §2,
+existing Receiving and exact-Unit two-sided handover, 0490 arrival sources, and the layout and
+physical-history corrections recorded in §13. Verification is scoped to those capabilities;
+missing historical Site evidence remains explicitly unpaired.
 
-**BUILT / VERIFIED:** the Unit-authority foundation and the exact-Unit Stock Register that
-replaced On hand as the Warehouse master list — merged as `4246ff91` (PR #878) with all seven
-migrations, production-verified 2026-08-21 and proved by ancestry (`git merge-base --is-ancestor
-4246ff91 <live>` stays true as main moves). Measured then: 136 units · 0 without identity ·
-0 write policies/grants on the seven Warehouse objects · exactly 1 `unit_availability`.
-Everything else in §13 is evidence to re-measure before build, not target authority.
+**APPROVED TARGET / NOT BUILT:** complete blind Stock Count / Count again / Difference /
+approved Adjustment, versioned month-end reconciliation and Finance acknowledgement.
+Movement-specific supplier-return and repair coverage and reporting controls must be assessed
+against their owning workflows; arrival-source support alone does not prove end-to-end completion.
+There are no additional Ready stock, Transfers or Counts destinations in the approved five-page map.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision. The formerly open accessory
 question — does an accessory piece carry a Unit identity? — is closed by §14.1 G3: every sofa

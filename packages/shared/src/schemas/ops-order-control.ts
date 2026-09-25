@@ -121,6 +121,23 @@ export const deliveryPhotoSchema = z.object({
   at: z.string(),
   /** Who attached it (app_users.id, server-stamped). */
   by: z.string().uuid().nullable().default(null),
+  /**
+   * ⭐ THE DOCUMENT THIS SUBMISSION BELONGS TO (owner ruling 2026-09-11).
+   *
+   * The ledger used to record WHICH ORDER a file proved and nothing more, so
+   * an order carrying two Delivery Orders could not say which trip a photo
+   * came back from - and a register offering per-document counts would have
+   * been inventing them. The attach door now stamps the DO number it verified
+   * against this order's own documents.
+   *
+   * ABSENT = UNKNOWN, never "belongs to every document": a file recorded
+   * before this ruling names no trip and is counted for none of them. It stays
+   * visible on the Sales Order, which is the scope it actually proves.
+   */
+  doNumber: z.string().nullable().default(null),
+  /** photo or video. ABSENT = UNKNOWN - the ledger was photo-only before the
+   *  2026-09-11 ruling, and an unstated kind is not restated as a fact. */
+  kind: z.enum(["photo", "video"]).nullable().default(null),
 });
 export type DeliveryPhoto = z.infer<typeof deliveryPhotoSchema>;
 
@@ -153,15 +170,60 @@ export const DELIVERY_PHOTO_MIMES = [
 ] as const;
 export const DELIVERY_PHOTO_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB
 
+/** The moving-picture half of a driver's submission (owner ruling
+ *  2026-09-11). Defined HERE, beside the photo family, so the handover
+ *  evidence door and the delivery-proof door share ONE definition of what a
+ *  video is and how big it may be (Architecture Law D) — the handover schema
+ *  re-exports these under its own long-standing names. A video is never
+ *  automatically required: this list says what MAY be uploaded, never what
+ *  must be. */
+export const DELIVERY_VIDEO_MIMES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+] as const;
+export const DELIVERY_VIDEO_MAX_BYTES = 25 * 1024 * 1024; // 25 MiB
+export const DELIVERY_PROOF_MIMES = [
+  ...DELIVERY_PHOTO_MIMES,
+  ...DELIVERY_VIDEO_MIMES,
+] as const;
+
+/** The ONE mime → file-extension map both proof doors key their object names
+ *  from. A mime with no entry is not uploadable — the zod enums above are the
+ *  gate, this is only the spelling. */
+export const DELIVERY_PROOF_EXTENSION: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+};
+
+/** Is this mime a video? ONE answer for the schema, the route and the UI. */
+export function isDeliveryVideoMime(mime: string): boolean {
+  return (DELIVERY_VIDEO_MIMES as readonly string[]).includes(mime);
+}
+
 /** POST /:id/delivery-photo/sign-upload — ask for a short-lived signed upload
  *  URL into the proof-of-delivery bucket. The route refuses unless the order
  *  is delivered (the artifact proves a delivery that HAPPENED). */
 export const signDeliveryPhotoUploadInput = z
   .object({
-    mimeType: z.enum(DELIVERY_PHOTO_MIMES),
-    sizeBytes: z.number().int().positive().max(DELIVERY_PHOTO_MAX_BYTES),
+    /** Photos and videos alike since the 2026-09-11 driver-submission ruling
+     *  — the register offers a real video count, so videos need a real door. */
+    mimeType: z.enum(DELIVERY_PROOF_MIMES),
+    sizeBytes: z.number().int().positive().max(DELIVERY_VIDEO_MAX_BYTES),
   })
-  .strict();
+  .strict()
+  .superRefine((v, c) => {
+    if (!isDeliveryVideoMime(v.mimeType) && v.sizeBytes > DELIVERY_PHOTO_MAX_BYTES)
+      c.addIssue({
+        code: "custom",
+        path: ["sizeBytes"],
+        message: "A photo is at most 10 MB",
+      });
+  });
 export type SignDeliveryPhotoUploadInput = z.infer<
   typeof signDeliveryPhotoUploadInput
 >;
@@ -171,6 +233,15 @@ export type SignDeliveryPhotoUploadInput = z.infer<
 export const attachDeliveryPhotoInput = z
   .object({
     path: z.string().min(1).max(500),
+    /** The Delivery Order this submission came back from (owner ruling
+     *  2026-09-11). The route REFUSES a number that is not one of this
+     *  order's own documents, so the stamp can never be wishful. Omitted =
+     *  the submission names no trip, exactly as every entry before the
+     *  ruling does. */
+    doNumber: z.string().trim().min(1).max(40).optional(),
+    /** What was uploaded. Omitted = photo, which is what the sign-upload
+     *  door allowed before videos existed. */
+    kind: z.enum(["photo", "video"]).optional(),
   })
   .strict();
 export type AttachDeliveryPhotoInput = z.infer<typeof attachDeliveryPhotoInput>;
@@ -884,6 +955,55 @@ export function distributeOrders(
     plan.push({ orderId, userId: target.userId });
   }
   return plan;
+}
+
+/** One open order as the sweep sees it: who carries it, and how they got it. */
+export interface OpsAssignmentCandidate {
+  orderId: string;
+  assignedStaff: string | null;
+  assignedBy: string | null;
+}
+
+/**
+ * THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13; migration 0504).
+ *
+ * A Sales Order is dealt to ONE individual when it enters Operations and stays
+ * with that person — they carry the customer follow-up, the balance and the
+ * storage collection. So the sweep hands out only what nobody carries:
+ *
+ *   · never assigned at all, or
+ *   · the SYSTEM put it on an account that may not own one — a shared login, a
+ *     robot account, or somebody who has since left.
+ *
+ * An order already resting with an active individual is never touched again —
+ * not by a later login, not by an absence, not by a re-run — and a human's
+ * deliberate assignment is never touched at all. Absence is expressed as COVER
+ * (`delivery_responsible_operation`), never as a reassignment, which is what
+ * the old every-sweep redistribution got wrong: it made `assigned_staff` an
+ * actor of the day rather than a stable owner.
+ *
+ * Loads count EVERY open order a member already carries, so the deal levels the
+ * real workload and not only the untouched remainder. Deterministic (sorted
+ * ids, ties broken on userId): two operators sweeping at once agree.
+ *
+ * @param mayOwn — active INDIVIDUAL (a People record with a `staff_code`).
+ */
+export function planOpsAssignment(
+  open: readonly OpsAssignmentCandidate[],
+  poolIds: readonly string[],
+  mayOwn: (userId: string | null | undefined) => boolean,
+): { orderId: string; userId: string }[] {
+  const owners = poolIds.filter(mayOwn);
+  if (owners.length === 0) return [];
+  const unowned = open.filter(
+    (o) => !mayOwn(o.assignedStaff) && o.assignedBy == null,
+  );
+  if (unowned.length === 0) return [];
+  const loads = owners.map((userId) => ({
+    userId,
+    openCount: open.filter((o) => o.assignedStaff === userId).length,
+  }));
+  return distributeOrders(unowned.map((o) => o.orderId).sort(), loads);
 }
 
 /** HR-P2 (0260): "who may manage the pool" moved to duty keys — the grant now

@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -44,10 +45,7 @@ annotationsRouter.post("/:id/annotations", requireOperationOrPrincipal, async (c
     p_content: parsed.data.content,
     p_tag: parsed.data.tag ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data, 201);
 });
 
@@ -58,10 +56,7 @@ annotationsRouter.get("/:id/timeline", requireOperationOrPrincipal, async (c) =>
   const { data, error } = await sb.rpc("operation_get_timeline", {
     p_order_id: orderId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? []);
 });
 
@@ -88,28 +83,17 @@ escalationsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // created_by FK points to auth.users (not public.app_users) so PostgREST
-  // can't traverse it. Fetch names from app_users manually in one round-trip.
+  // can't traverse it. Names come from the one actor lookup.
   const rows = data ?? [];
-  const authorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))];
-  const nameMap: Record<string, string> = {};
-  if (authorIds.length) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", authorIds);
-    (users ?? []).forEach((u) => { nameMap[u.id] = u.name; });
-  }
+  const names = await resolveActorNames(sb, rows.map((r) => r.created_by));
 
   return c.json(
     rows.map((r) => ({
       ...r,
-      app_users: r.created_by ? { name: nameMap[r.created_by] ?? null } : null,
+      app_users: r.created_by ? { name: names.get(r.created_by) ?? null } : null,
     })),
   );
 });

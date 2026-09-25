@@ -13,8 +13,17 @@ const PAYLOAD = {
     { route_source: "pj_showroom", bank_name: "Hong Leong Bank", account_name: null, account_no: null },
     { route_source: "dealer", bank_name: "RHB", account_name: "Carres Sdn Bhd", account_no: "212345678" },
   ],
+  collection_timing: [
+    { id: "t1", ask_days_before: 3, deadline_days_before: 2, effective_from: "2026-08-19",
+      reason: "Owner ruling 2026-08-19", created_at: "2026-09-12T00:00:00Z" },
+  ],
+  setting_changes: [
+    { id: "c1", what: "storage_rule:mattress_bedframe", old_value: { free_days: 14 }, new_value: { free_days: 7 },
+      reason: "Owner ruling 2026-09-12", effective_from: "2026-09-12", changed_at: "2026-09-12T01:00:00Z", actor: null },
+  ],
+  online_provider: { name: "Stripe", configured: false },
   storage_rules: [
-    { id: "r1", product_group: "mattress_bedframe", free_days: 14, charge_amount: 150,
+    { id: "r1", product_group: "mattress_bedframe", free_days: 7, charge_amount: 150,
       cycle_days: 30, operation_limit_day: 21, waiver_limit_day: 30,
       extra_free_allowed: true, inspection_days: 30, effective_from: "2026-09-06" },
     { id: "r2", product_group: "sofa", free_days: 14, charge_amount: 200,
@@ -61,9 +70,9 @@ beforeEach(() => {
 describe("Settings → Payment (§16)", () => {
   it("shows readable summaries: routing, methods, numbering and the storage cards", async () => {
     show();
-    await waitFor(() => expect(screen.getByText(/PJ own-showroom order/)).toBeInTheDocument());
-    expect(screen.getByText(/→ Hong Leong Bank/)).toBeInTheDocument();
-    expect(screen.getByText(/→ RHB/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText(/PJ own-showroom order/).length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/→ Hong Leong Bank/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/→ RHB/).length).toBeGreaterThan(0);
     expect(screen.getByText("Carres Sdn Bhd · 212345678")).toBeInTheDocument();
     expect(screen.getByText("The account is not entered yet. Ask a manager to add it.")).toBeInTheDocument();
     expect(screen.getByText("Numbers are created automatically.")).toBeInTheDocument();
@@ -71,13 +80,17 @@ describe("Settings → Payment (§16)", () => {
     expect(screen.queryByText(/Prefix/)).not.toBeInTheDocument();
     // The §7 storage cards.
     const mb = screen.getByTestId("storage-card-mattress_bedframe");
-    expect(mb).toHaveTextContent("Free storage: 14 calendar days");
-    expect(mb).toHaveTextContent("RM 150.00");
+    expect(mb).toHaveTextContent("Free storage 7 calendar days");
+    expect(mb).toHaveTextContent("Charge RM 150.00");
+    expect(mb).toHaveTextContent("Charge every 30 calendar days");
     expect(mb).toHaveTextContent("Operation may approve until Day 21");
-    expect(mb).toHaveTextContent("Storage Waiver Approver may approve until Day 30");
+    expect(mb).toHaveTextContent("Approver may approve until Day 30");
+    expect(mb).toHaveTextContent("Check stored goods every 30 calendar days");
     const sofa = screen.getByTestId("storage-card-sofa");
-    expect(sofa).toHaveTextContent("RM 200.00");
-    expect(sofa).toHaveTextContent("Extra free storage: Not allowed");
+    expect(sofa).toHaveTextContent("Free storage 14 calendar days");
+    expect(sofa).toHaveTextContent("Charge RM 200.00");
+    expect(sofa).toHaveTextContent("Charge every 14 calendar days");
+    expect(sofa).toHaveTextContent("Extra free storage Not allowed");
     // No approver NAME, Payment Duty or roster in Payment Settings (§16).
     expect(screen.queryByText(/Jess/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Payment Duty/)).not.toBeInTheDocument();
@@ -136,6 +149,79 @@ describe("Settings → Payment (§16)", () => {
     ));
   });
 
+  it("the sections come in the ruled order, ending with the online provider fact", async () => {
+    show();
+    await waitFor(() => expect(screen.getAllByText(/→ Hong Leong Bank/).length).toBeGreaterThan(0));
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings.slice(0, 8)).toEqual([
+      "Receiving bank accounts", "Which bank to use", "Payment methods", "Collection timing",
+      "WhatsApp templates", "Invoice and Receipt numbers", "Storage charges", "Online payment provider",
+    ]);
+    expect(screen.getByTestId("payment-settings-online-provider")).toHaveTextContent("Stripe · Not connected");
+    // The change log names old → new, the effective date and the reason.
+    const log = screen.getByTestId("payment-settings-changes");
+    expect(log).toHaveTextContent("Storage charges · Mattress / Bedframe");
+    expect(log).toHaveTextContent("free days 14 → free days 7");
+    expect(log).toHaveTextContent("Owner ruling 2026-09-12");
+    expect(log).toHaveTextContent("Staff identity not recorded");
+  });
+  it("Collection timing shows the effective pair and edits through Review changes (0486)", async () => {
+    show();
+    const card = await screen.findByTestId("payment-settings-collection-timing");
+    expect(card).toHaveTextContent("Start asking the customer to pay");
+    expect(card).toHaveTextContent("3 working days before Scheduled delivery");
+    expect(card).toHaveTextContent("Payment must be complete");
+    expect(card).toHaveTextContent("2 working days before Scheduled delivery");
+    fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText(/Start asking/), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText(/Payment must be complete/), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Try" } });
+    // Asking must start EARLIER than the deadline — the gap is named on the button.
+    expect(within(card).getByRole("button", { name: /asking must start earlier/ })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Start asking/), { target: { value: "4" } });
+    fireEvent.click(within(card).getByRole("button", { name: "Review changes" }));
+    expect(screen.getByTestId("collection-timing-review")).toHaveTextContent("Start asking: 3 → 4");
+    fireEvent.click(within(card).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(state.fetch).toHaveBeenCalledWith(
+      "/api/finance/payment-settings/collection-timing",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    const call = state.fetch.mock.calls.find((c) => c[0] === "/api/finance/payment-settings/collection-timing")!;
+    expect(JSON.parse(call[1].body)).toMatchObject({ askDaysBefore: 4, deadlineDaysBefore: 2, reason: "Try" });
+  });
+  it("Collection timing's Effective from is today at Edit, not at page open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-09-15T04:00:00Z") });
+    try {
+      show();
+      const card = await screen.findByTestId("payment-settings-collection-timing");
+      vi.setSystemTime(new Date("2026-09-16T01:00:00Z")); // left open overnight; 09:00 KL next day
+      fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+      expect(screen.getByLabelText("Effective from")).toHaveTextContent("16 Sep");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("a storage rule card edits through Review changes and carries its reason", async () => {
+    show();
+    const card = await screen.findByTestId("storage-card-sofa");
+    await waitFor(() => expect(card).toHaveTextContent("Charge RM 200.00"));
+    fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Free storage (calendar days)"), { target: { value: "10" } });
+    fireEvent.change(within(card).getByLabelText("Reason"), { target: { value: "Ruling" } });
+    const review = within(card).getByRole("button", { name: /Review changes/ });
+    expect(review).toHaveTextContent(/^Review changes$/);
+    fireEvent.click(review);
+    expect(screen.getByTestId("storage-rule-review-sofa")).toHaveTextContent("Free storage 14 → 10 calendar days");
+    fireEvent.click(within(card).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(state.fetch).toHaveBeenCalledWith(
+      "/api/finance/payment-settings/storage-rule",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    const call = state.fetch.mock.calls.find((c) => c[0] === "/api/finance/payment-settings/storage-rule")!;
+    expect(JSON.parse(call[1].body)).toMatchObject({
+      productGroup: "sofa", freeDays: 10, chargeAmount: 200, cycleDays: 14, extraFreeAllowed: false, reason: "Ruling",
+    });
+  });
   it("a failed read is an error with recovery, never empty settings", async () => {
     state.fetch.mockRejectedValue(new Error("down"));
     show();

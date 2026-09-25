@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
-import { paymentRegisterQuery } from "@carres/shared/payment-register";
+import { paymentInvoiceNumbers, paymentRegisterQuery } from "@carres/shared/payment-register";
 import { APP_USERS, ORDER_PAYMENTS } from "@carres/shared/tables";
 import {
   financeRecordReceiptInput,
@@ -55,7 +55,7 @@ financePaymentsRouter.get("/register", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error, count } = await sb
     .from(ORDER_PAYMENTS)
-    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,source_metadata,orders(id,so,customer_name),payment_allocations(id,order_id,invoice_id,amount,allocated_at,voided_at,invoices(invoice_no))", { count: "exact" })
+    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,source_channel,source_metadata,orders(id,so,customer_name),payment_allocations(id,order_id,invoice_id,amount,allocated_at,voided_at,invoices(invoice_no))", { count: "exact" })
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -117,7 +117,7 @@ financePaymentsRouter.get("/:id/receipt-document", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
     .from(ORDER_PAYMENTS)
-    .select("id,order_id,amount,paid_on,method,kind,reference,note,receipt_no,voided_at,void_reason,snapshot,orders(so,customer_name)")
+    .select("id,order_id,amount,paid_on,method,kind,reference,note,receipt_no,voided_at,void_reason,snapshot,orders(so,customer_name),payment_allocations(voided_at,invoices(invoice_no))")
     .eq("id", id)
     .maybeSingle();
   if (error) {
@@ -164,6 +164,9 @@ financePaymentsRouter.get("/:id/receipt-document", async (c) => {
       reference: source.reference ?? null,
       note: source.note ?? null,
       currency: String(source.currency ?? "MYR"),
+      // §4 "its one receipt lists the allocations" — read live, so a
+      // corrected allocation (0450) reprints with the invoice it now settles.
+      invoice_nos: paymentInvoiceNumbers(row),
     },
   });
 });

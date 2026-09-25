@@ -1,7 +1,6 @@
 import { Hono, type Context } from "hono";
 import {
   isOpsGenericAccount,
-  resolveWarehouseSchedule,
   warehouseCapabilityGrantInput,
   warehouseImportHolidayCalendarInput,
   warehouseSaveSpecialDateInput,
@@ -14,7 +13,7 @@ import {
   type WarehouseSettingsResponse,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -30,7 +29,6 @@ import type { AppEnv } from "../../types";
  *   POST /holiday-calendar    import ONE verified, sourced calendar version
  *   POST /access/grant        one capability to one active person
  *   POST /access/revoke       take it back; the record survives
- *   GET  /schedule?date=      the resolved schedule and the rule that decided
  *
  * Every write is a gated `SECURITY DEFINER` RPC. The settings tables carry no
  * write policy at all, so PostgREST cannot be used to walk around this router
@@ -352,36 +350,6 @@ warehouseSettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   }
 });
 
-warehouseSettingsRouter.get("/schedule", requireOperationOrPrincipal, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const date = c.req.query("date");
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return c.json({ error: "bad_date", code: "bad_date", message: "Give a date like 2026-09-30." }, 400);
-  }
-  try {
-    const siteId = await primarySiteId(sb, c.req.query("siteId"));
-    if (!siteId) {
-      return c.json({ error: "no_warehouse_site", code: "no_warehouse_site", message: "No warehouse site is configured." }, 404);
-    }
-    const s = await loadSettings(c, siteId);
-    return c.json(
-      resolveWarehouseSchedule({
-        date,
-        siteStatus: s.details.status,
-        workingHours: s.workingHours,
-        specialDates: s.specialDates,
-        holidayPolicy: s.holidayPolicy,
-        holidayDates: s.holidayDates,
-      }),
-    );
-  } catch (e) {
-    return c.json(
-      { error: "settings_unavailable", code: "settings_unavailable", message: (e as Error).message },
-      500,
-    );
-  }
-});
-
 warehouseSettingsRouter.put("/details", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseJsonBody(c, warehouseSetDetailsInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
@@ -396,10 +364,7 @@ warehouseSettingsRouter.put("/details", requireOperationOrPrincipal, async (c) =
     p_key_contact_id: parsed.data.keyContactId ?? null,
     p_contact_number: parsed.data.contactNumber ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -411,10 +376,7 @@ warehouseSettingsRouter.put("/working-hours", requireOperationOrPrincipal, async
     p_site_id: parsed.data.siteId,
     p_rows: parsed.data.rows,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -431,10 +393,7 @@ warehouseSettingsRouter.post("/special-dates", requireOperationOrPrincipal, asyn
     p_closes_at: parsed.data.closesAt ?? null,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -452,10 +411,7 @@ warehouseSettingsRouter.put("/holiday-policy", requireOperationOrPrincipal, asyn
     p_opens_at: parsed.data.specialOpensAt ?? null,
     p_closes_at: parsed.data.specialClosesAt ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -471,10 +427,7 @@ warehouseSettingsRouter.post("/holiday-calendar", requireOperationOrPrincipal, a
     p_verified_at: parsed.data.verifiedAt,
     p_dates: parsed.data.dates,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const siteId = await primarySiteId(sb, c.req.query("siteId"));
   return respond(c, siteId as string);
 });
@@ -488,10 +441,7 @@ for (const act of ["grant", "revoke"] as const) {
       act === "grant" ? "warehouse_grant_capability" : "warehouse_revoke_capability",
       { p_capability: parsed.data.capability, p_user_id: parsed.data.userId },
     );
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     const siteId = await primarySiteId(sb, c.req.query("siteId"));
     return respond(c, siteId as string);
   });

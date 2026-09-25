@@ -5,7 +5,7 @@ import {
   partnerRejectRfdInput,
   receivePoWithDoInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -103,10 +103,7 @@ partnerPickupsRouter.get("/", async (c) => {
     const { data: oRows, error: oErr } = await sb.rpc("partner_orders_for_threads", {
       p_order_ids: orderIds,
     });
-    if (oErr) {
-      const m = mapPgError(oErr);
-      return c.json(m.body, m.status);
-    }
+    if (oErr) return fail(c, oErr);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ((oRows ?? []) as any[])) {
       orderInfo.set(String(r.id), {
@@ -186,10 +183,7 @@ partnerPickupsRouter.post("/:id/accept", async (c) => {
   const { data, error } = await sb.rpc("partner_accept_pickup", {
     p_po_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -202,10 +196,7 @@ partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
   const { data, error } = await sb.rpc("partner_mark_picked_up", {
     p_po_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -226,10 +217,7 @@ partnerPickupsRouter.post("/:id/confirm-receive", async (c) => {
   const { data, error } = await sb.rpc("partner_confirm_receive", {
     p_po_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -245,10 +233,7 @@ partnerPickupsRouter.post("/:id/reject-receive", async (c) => {
     p_po_id: c.req.param("id"),
     p_reason: reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -272,34 +257,7 @@ partnerPickupsRouter.post("/events/:eventId/collect", async (c) => {
   const { data, error } = await sb.rpc("partner_mark_pickup_collected", {
     p_event_id: c.req.param("eventId"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
-});
-
-// 2026-05-10 (Loo) — third partner-side state transition. picked_up →
-// delivered (sup_status only; status stays 'open' so the warehouse-side
-// receive flow still has work to do). Wraps migration 0082 RPC.
-//
-// Kept around for the rare case where a partner driver wants to flag arrival
-// without simultaneously filing the DO + counts. The new POST /:id/receive
-// (Loo 2026-05-11) is the happy-path replacement that goes straight to
-// status='received'.
-partnerPickupsRouter.post("/:id/arrived", async (c) => {
-  const auth = c.var.auth;
-  if (auth.role !== "partner" || !auth.partnerId) {
-    throw new HTTPException(403, { message: "Only partner role with partner_id" });
-  }
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("partner_arrived_at_warehouse", {
-    p_po_id: c.req.param("id"),
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -314,7 +272,7 @@ partnerPickupsRouter.post("/:id/arrived", async (c) => {
  * (migration 0076). The RPC's role gate already admits partners and verifies
  * `purchase_orders.procurement_partner_id = auth.app_partner_id()` — so a
  * cross-partner call returns 42501 → 403, matching the cross-partner guard
- * on /accept, /mark-picked-up, /arrived.
+ * on /accept and /mark-picked-up.
  *
  * Body shape: receivePoWithDoInput (camelCase, same as the operation route)
  * — { doNumber, doFilePath, lines: [{ id, receivedQty }] }. Reshaped to
@@ -342,10 +300,7 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
       received_qty: l.receivedQty,
     })),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -456,10 +411,7 @@ partnerPickupsRouter.post("/accept-rfd", async (c) => {
   const { data, error } = await sb.rpc("operation_partner_accept_rfd", {
     p_thread_id: parsed.data.threadId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -494,10 +446,7 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
     p_thread_id: parsed.data.threadId,
     p_reason: parsed.data.reason ?? "",
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -540,10 +489,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     .eq("order_id", id)
     .eq("delivery_partner_id", auth.partnerId)
     .maybeSingle();
-  if (tErr) {
-    const m = mapPgError(tErr);
-    return c.json(m.body, m.status);
-  }
+  if (tErr) return fail(c, tErr);
   if (!ownThread) {
     // Either order doesn't exist, doesn't have a thread, or thread isn't
     // assigned to this partner. Same 404 either way — don't leak which.
@@ -560,10 +506,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     )
     .eq("id", id)
     .maybeSingle();
-  if (e1) {
-    const m = mapPgError(e1);
-    return c.json(m.body, m.status);
-  }
+  if (e1) return fail(c, e1);
   if (!order) {
     return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
   }
@@ -578,10 +521,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     .from("order_lines")
     .select("sku, qty, unit_price")
     .eq("order_id", id);
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
+  if (e2) return fail(c, e2);
   const lineRows = lines ?? [];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -592,10 +532,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
       .from("product_skus")
       .select("sku, variant")
       .in("sku", skus);
-    if (e3) {
-      const m = mapPgError(e3);
-      return c.json(m.body, m.status);
-    }
+    if (e3) return fail(c, e3);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of (skuRows ?? []) as any[]) {
       skuVariantBySku[String(r.sku)] = String(r.variant);

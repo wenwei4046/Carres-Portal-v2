@@ -17,7 +17,7 @@
  */
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import Button from "./Button";
 import Checkbox from "./Checkbox";
 import DataTable from "./DataTable";
@@ -124,9 +124,14 @@ describe("Modal", () => {
    *
    * That law said *"a modal that can be told its width is four widths by next
    * quarter, so there is no size prop"*, and the danger it names is a FREE
-   * width. The set is closed at two, both values live in `tailwind.config.ts`,
-   * and the prop is a union of one literal — so what a page can express is
-   * "wide" or nothing, never a number.
+   * width. The set is closed, every value lives in `tailwind.config.ts` with
+   * the measurement that produced it, and the prop is a union of literals —
+   * so what a page can express is "wide", "viewer" or nothing, never a number.
+   *
+   * A THIRD value joined on 2026-09-11 for the delivery-evidence viewer: a
+   * surface whose binding constraint is a PICTURE's height rather than a
+   * column of text. It went through this union — the kit grew by one measured
+   * value — rather than a page drawing its own overlay.
    */
   it("takes the 512px width when it is told nothing — an absent prop is the default", () => {
     render(
@@ -150,6 +155,41 @@ describe("Modal", () => {
     // Two max-widths on one element is a race the last class wins; the map
     // returns ONE, so the surface cannot be told two things at once.
     expect(modal).not.toHaveClass("max-w-modal");
+  });
+
+  it("⭐ takes the viewer width ONLY when asked, and still exactly one width", () => {
+    render(
+      <Modal open onOpenChange={() => {}} title="t" width="viewer">
+        body
+      </Modal>,
+    );
+    const modal = document.querySelector('[data-kit="modal"]')!;
+    expect(modal).toHaveClass("max-w-modal-viewer");
+    expect(modal).not.toHaveClass("max-w-modal");
+    expect(modal).not.toHaveClass("max-w-modal-wide");
+  });
+
+  it("the width set stays CLOSED — three measured values, no fourth by accident", () => {
+    /* The guard the law actually needs: a page cannot invent a width, so the
+       only way a fourth appears is a deliberate edit to this union AND to the
+       measurement table it points at. */
+    const widths = ["max-w-modal", "max-w-modal-wide", "max-w-modal-viewer"];
+    for (const w of widths) {
+      const { unmount } = render(
+        <Modal
+          open
+          onOpenChange={() => {}}
+          title="t"
+          width={w === "max-w-modal" ? undefined : w === "max-w-modal-wide" ? "wide" : "viewer"}
+        >
+          body
+        </Modal>,
+      );
+      const modal = document.querySelector('[data-kit="modal"]')!;
+      const applied = widths.filter((candidate) => modal.classList.contains(candidate));
+      expect(applied).toEqual([w]);
+      unmount();
+    }
   });
 });
 
@@ -725,5 +765,85 @@ describe("GridToolbar", () => {
     const bar = document.querySelector('[data-kit="grid-toolbar"]')!;
     expect(bar.textContent).toContain("28 selected");
     expect(bar.textContent).toContain("Updated 10:32 AM");
+  });
+});
+
+/**
+ * ⭐ RETURNING FOCUS — the kit's own job, and a defect until 2026-09-11.
+ *
+ * Radix restores focus to `Dialog.Trigger`. The kit has none: `open` is
+ * CONTROLLED, so what opens a surface is an ordinary page button, a row action
+ * or a keyboard shortcut. Radix's modal content therefore prevented its own
+ * default restore and focused a trigger that was `null` — and every modal and
+ * drawer in the portal dropped a keyboard user onto `<body>`, with no way back
+ * to the row they opened.
+ */
+describe("focus comes back", () => {
+  function Harness({ place }: { place: "modal" | "drawer" }) {
+    const [open, setOpen] = useState(false);
+    const Surface = place === "modal" ? Modal : Drawer;
+    return (
+      <>
+        <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+          open
+        </button>
+        <Surface open={open} onOpenChange={setOpen} title="Probe">
+          body
+        </Surface>
+      </>
+    );
+  }
+
+  for (const place of ["modal", "drawer"] as const) {
+    it(`⭐ a closed ${place} puts focus back on whatever opened it`, async () => {
+      render(<Harness place={place} />);
+      const opener = screen.getByTestId("opener");
+      opener.focus();
+      fireEvent.click(opener);
+      await screen.findByRole("dialog");
+      /* Focus went INTO the surface — the trap is Radix's and still works. */
+      expect(document.activeElement).not.toBe(opener);
+
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(opener));
+    });
+  }
+
+  it("an opener the close itself removed never takes focus, and never throws", async () => {
+    /* A row action whose row disappears behind the surface — deleting the
+       record, say. Focusing a detached node is an error; the surface closes
+       quietly instead. */
+    function Vanishing() {
+      const [open, setOpen] = useState(false);
+      const [gone, setGone] = useState(false);
+      return (
+        <>
+          {gone ? null : (
+            <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+              open
+            </button>
+          )}
+          <Modal
+            open={open}
+            onOpenChange={(next) => {
+              setOpen(next);
+              if (!next) setGone(true);
+            }}
+            title="Probe"
+          >
+            body
+          </Modal>
+        </>
+      );
+    }
+    render(<Vanishing />);
+    const opener = screen.getByTestId("opener");
+    opener.focus();
+    fireEvent.click(opener);
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByTestId("opener")).toBeNull();
   });
 });

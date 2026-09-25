@@ -1,7 +1,13 @@
 import { Hono, type Context } from "hono";
 import type { ZodError } from "zod";
 import {
+  departmentRpcArgs,
+  ledgerAccountAddInput,
+  ledgerAccountCodeShape,
   ledgerAccountLedgerQuery,
+  ledgerAccountMoveInput,
+  ledgerAccountReorderInput,
+  ledgerAccountUpdateInput,
   ledgerAsOfQuery,
   ledgerEntriesQuery,
   ledgerEntryRef,
@@ -31,9 +37,11 @@ import {
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { requireFinance } from "../../lib/auth-guards";
-import { mapPgError } from "../../lib/route-helpers";
+import { IN_URL_MAX, mapPgError, parseJsonBody, readAllPages, tooManyRows } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
+import financeMoneyAccountsRouter from "./money-accounts";
 
 /**
  * FINANCE LEDGER — the read-only Journal, Trial Balance and Self-check.
@@ -42,11 +50,22 @@ import type { AppEnv } from "../../types";
  * and principal — the HTTP mirror of `gl_may_read()`) and reads through
  * `userClient`, so the ledger's own gates see the signed-in user: RLS on the
  * four `gl_*` tables and `gl_report_guard()` inside every report function.
- * Nothing here writes. The ledger is written only by `gl_post` / `gl_reverse`.
+ * Nothing here writes but the one account door. The ledger is written only by `gl_post` / `gl_reverse`.
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
- *   GET /accounts           the chart, and the day the ledger started
+ *   GET /accounts           the chart, the day the ledger started, and the headings no
+ *                           account moves into or out of (gl_rule_headings, 0570)
+ *   PATCH /accounts/:code   one account's name and number (gl_account_update, 0550) — a new
+ *                           number is carried to every row that names it, by `on update cascade`.
+ *                           Since 0570 that includes a document that has left Draft: its
+ *                           frozen trigger lets the number through and nothing else.
+ *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) —
+ *                           writes sort_order only; a move never writes the number.
+ *   POST  /accounts/move    put one account or heading under another heading (gl_account_move,
+ *                           0570, headings since 0577) — writes parent and order; never the number or the name.
+ *   POST  /accounts         add an account under a heading, or a heading with its first
+ *                           account (gl_account_add, 0577). The kind follows the heading.
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -54,20 +73,18 @@ import type { AppEnv } from "../../types";
  *   GET /profit-and-loss    gl_profit_and_loss, passed through
  *   GET /balance-sheet      gl_balance_sheet, passed through
  *
+ *   /money-accounts         the one list of cash, bank and holding accounts
+ *                           (0512) — the only writer mounted here; see money-accounts.ts
+ *
  * A read that fails is an error, never an empty answer: an empty Journal and
  * a Journal that could not be read must not look the same.
  */
 const financeLedgerRouter = new Hono<AppEnv>();
+financeLedgerRouter.route("/money-accounts", financeMoneyAccountsRouter);
 
 type Sb = ReturnType<typeof userClient>;
 type PgError = { code?: string; message?: string; details?: string };
 type Json = Record<string, unknown>;
-
-/** PostgREST caps a single read at 1000 rows in this project. */
-const PAGE = 1000;
-
-/** Today in Malaysia (UTC+8), the business day every ledger date is. */
-const todayMyt = () => new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
@@ -110,37 +127,48 @@ function failed(c: Context<AppEnv>, what: string) {
   return c.json({ error: "rpc_failed", code: "rpc_failed", message: `${what} could not be loaded. Try again.` }, 500);
 }
 
-/**
- * Read every row of a set-returning report, 1000 at a time, in a fixed order.
- * Fail closed: an error on any page is an error for the whole read, and a
- * read longer than `maxPages` is refused rather than cut short.
- */
-async function readAllPages(
-  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: PgError | null }>,
-  maxPages = 20,
-): Promise<{ rows: Json[] } | { error: PgError } | { tooMany: true }> {
-  const rows: Json[] = [];
-  for (let i = 0; i < maxPages; i += 1) {
-    const { data, error } = await page(i * PAGE, (i + 1) * PAGE - 1);
-    if (error) return { error };
-    if (!Array.isArray(data)) return { error: { message: "no rows array" } };
-    rows.push(...(data as Json[]));
-    if (data.length < PAGE) return { rows };
-  }
-  return { tooMany: true };
-}
-
 // ── the Journal ──────────────────────────────────────────────────────────────
 
-/** The linked entry numbers come from the two self-references on
- *  `gl_entries`, named by their foreign keys so PostgREST knows which is which. */
+/** An entry's own columns — nothing embedded. `reverses` and `reversed_by`
+ *  point back into `gl_entries` itself, and PostgREST will not embed a table
+ *  in itself through a foreign-key hint ("To disambiguate recursive
+ *  relationships, PostgREST requires Computed Relationships" — its docs). The
+ *  hinted embed failed every read: production answered 500 to the Journal and
+ *  to an entry number that does not exist. The linked numbers are read
+ *  separately, by `linkedEntryNumbers`. */
 const ENTRY_COLUMNS =
   "id,entry_no,entry_date,source_type,source_doc_no,narration,total_debit,total_credit," +
-  "reversed,reverses,reversed_by,created_at," +
-  "reverses_entry:gl_entries!gl_entries_reverses_fkey(entry_no)," +
-  "reversed_by_entry:gl_entries!gl_entries_reversed_by_fkey(entry_no)";
+  "reversed,reverses,reversed_by,created_at";
 
-function toEntryRow(r: Json): LedgerEntryRow {
+/** Ids per linked-number read — keeps the `in (…)` list well inside a URL. */
+const LINK_SLICE = 100;
+
+/** The one sentence the Journal refuses a department filter with. */
+const TOO_MANY_DEPARTMENT_ENTRIES = "There are too many entries in this department to list here.";
+
+/**
+ * The entry number of every entry these rows point at, through `reverses` or
+ * `reversed_by`. Fail closed like `readAllPages`: a slice that cannot be read
+ * is an error for the whole answer, never a reversal shown without its link.
+ */
+async function linkedEntryNumbers(sb: Sb, rows: Json[]): Promise<{ numbers: Map<string, string> } | { error: PgError }> {
+  const ids = [...new Set(rows
+    .flatMap((r) => [r.reverses, r.reversed_by])
+    .filter((v): v is string => typeof v === "string"))];
+  const numbers = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += LINK_SLICE) {
+    const { data, error } = await sb.from("gl_entries").select("id,entry_no").in("id", ids.slice(i, i + LINK_SLICE));
+    if (error) return { error };
+    for (const r of (data ?? []) as Json[]) {
+      if (typeof r.id === "string" && typeof r.entry_no === "string") numbers.set(r.id, r.entry_no);
+    }
+  }
+  return { numbers };
+}
+
+function toEntryRow(r: Json, numbers: Map<string, string>): LedgerEntryRow {
+  const reverses = (r.reverses as string | null) ?? null;
+  const reversedBy = (r.reversed_by as string | null) ?? null;
   return {
     id: String(r.id),
     entry_no: String(r.entry_no),
@@ -151,10 +179,10 @@ function toEntryRow(r: Json): LedgerEntryRow {
     total_debit: num(r.total_debit),
     total_credit: num(r.total_credit),
     reversed: r.reversed === true,
-    reverses: (r.reverses as string | null) ?? null,
-    reverses_entry_no: one(r.reverses_entry as { entry_no: string } | null)?.entry_no ?? null,
-    reversed_by: (r.reversed_by as string | null) ?? null,
-    reversed_by_entry_no: one(r.reversed_by_entry as { entry_no: string } | null)?.entry_no ?? null,
+    reverses,
+    reverses_entry_no: reverses ? (numbers.get(reverses) ?? null) : null,
+    reversed_by: reversedBy,
+    reversed_by_entry_no: reversedBy ? (numbers.get(reversedBy) ?? null) : null,
     created_at: String(r.created_at),
   };
 }
@@ -162,16 +190,48 @@ function toEntryRow(r: Json): LedgerEntryRow {
 financeLedgerRouter.get("/entries", requireFinance, async (c) => {
   const parsed = ledgerEntriesQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
-  const { from, to, account, source, q, offset, limit } = parsed.data;
+  const { from, to, account, source, q, offset, limit, departmentType, departmentId } = parsed.data;
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // An account narrows to the entries with at least one line on it. `!inner`
   // makes the embedded filter a filter on the entries, and the count follows.
+  const embeds = [account ? "gl_entry_lines!inner(account_code)" : null].filter(Boolean);
+
+  // 0540: a sales invoice, a customer payment and a rental collection take
+  // their department at read time from the order, so it lives in
+  // gl_line_departments and not on the line. Read that view ONCE for the
+  // entries it matches. Not as an embedded computed relationship: PostgREST
+  // rebuilds the whole view per parent row and the read never returns.
+  //
+  // TWO ceilings, and the first version of this (PR #1495) had neither. Its
+  // comment claimed the Journal's page cap held the list; that cap bounds the
+  // ENTRIES page, not this read.
+  //   1 · the read itself — unbounded, so past 1000 view rows the entries of
+  //       the lines that never came back silently vanished from the Journal.
+  //       Paged now, and refused rather than cut short.
+  //   2 · the id list — every id is spelt into the `.in()` URL below, so the
+  //       list cannot be chunked (the count and the page come from ONE query)
+  //       and is capped instead.
+  let deptEntries: string[] | null = null;
+  if (departmentType) {
+    // `line_id` is the view's unique column: paging on a non-unique order can
+    // miss or repeat a row across two pages.
+    const read = await readAllPages<{ entry_id: string }>((a, b) => {
+      let d = sb.from("gl_line_departments").select("entry_id").eq("department_type", departmentType);
+      if (departmentId) d = d.eq("department_id", departmentId);
+      return d.order("line_id", { ascending: true }).range(a, b);
+    });
+    if ("error" in read) return ledgerError(c, read.error, "The journal");
+    if (!("rows" in read)) return tooManyRows(c, TOO_MANY_DEPARTMENT_ENTRIES);
+    deptEntries = [...new Set(read.rows.map((r) => String(r.entry_id)))];
+    if (deptEntries.length > IN_URL_MAX) return tooManyRows(c, TOO_MANY_DEPARTMENT_ENTRIES);
+  }
   let req = sb
     .from("gl_entries")
-    .select(account ? `${ENTRY_COLUMNS},gl_entry_lines!inner(account_code)` : ENTRY_COLUMNS, { count: "exact" })
+    .select([ENTRY_COLUMNS, ...embeds].join(","), { count: "exact" })
     .eq("posted", true);
   if (account) req = req.eq("gl_entry_lines.account_code", account);
+  if (deptEntries) req = req.in("id", deptEntries);
   if (from) req = req.gte("entry_date", from);
   if (to) req = req.lte("entry_date", to);
   if (source) req = req.eq("source_type", source);
@@ -184,7 +244,10 @@ financeLedgerRouter.get("/entries", requireFinance, async (c) => {
     .range(offset, offset + limit - 1);
   if (error) return ledgerError(c, error, "The journal");
   if (!Array.isArray(data) || count == null) return failed(c, "The journal");
-  return c.json({ rows: (data as unknown as Json[]).map(toEntryRow), total: count });
+  const rows = data as unknown as Json[];
+  const linked = await linkedEntryNumbers(sb, rows);
+  if ("error" in linked) return ledgerError(c, linked.error, "The journal");
+  return c.json({ rows: rows.map((r) => toEntryRow(r, linked.numbers)), total: count });
 });
 
 financeLedgerRouter.get("/entries/:ref", requireFinance, async (c) => {
@@ -204,7 +267,10 @@ financeLedgerRouter.get("/entries/:ref", requireFinance, async (c) => {
   if (!head.data) {
     return c.json({ error: "not_found", code: "not_found", message: "No entry has that number." }, 404);
   }
-  const entry = toEntryRow(head.data as unknown as Json);
+  const headRow = head.data as unknown as Json;
+  const linked = await linkedEntryNumbers(sb, [headRow]);
+  if ("error" in linked) return ledgerError(c, linked.error, "This entry");
+  const entry = toEntryRow(headRow, linked.numbers);
   const base = baseSourceType(entry.source_type);
 
   const [lines, related] = await Promise.all([
@@ -275,8 +341,11 @@ financeLedgerRouter.get("/entries/:ref", requireFinance, async (c) => {
 
 async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgError }> {
   const [accounts, config] = await Promise.all([
+    // 0557: the order Finance dragged, then the code. sort_order is 0 on every
+    // account nobody has dragged, so the tiebreak keeps the by-code order.
     sb.from("gl_accounts")
-      .select("code,name,kind,parent_code,is_control,control_for,is_active")
+      .select("code,name,kind,parent_code,is_control,control_for,is_active,sort_order")
+      .order("sort_order", { ascending: true })
       .order("code", { ascending: true }),
     sb.from("gl_config").select("go_live_on").limit(1).maybeSingle(),
   ]);
@@ -298,16 +367,158 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
         control_for: (r.control_for as string | null) ?? null,
         is_active: r.is_active === true,
         is_header: parents.has(String(r.code)),
+        sort_order: Number(r.sort_order ?? 0),
       })),
     },
   };
 }
 
+// 0540: the finance departments, for every Department filter and line picker.
+financeLedgerRouter.get("/departments", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_departments");
+  if (error) return ledgerError(c, error, "The department list");
+  return c.json({ rows: Array.isArray(data) ? data : [] });
+});
+
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const read = await readChart(sb);
+  const [read, rules, roles, money] = await Promise.all([
+    readChart(sb),
+    sb.rpc("gl_rule_headings"),
+    sb.rpc("gl_account_roles_read"),
+    sb.from("gl_money_accounts").select("account_code"),
+  ]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
-  return c.json(read.chart);
+  // 0570: the headings no account moves into or out of, so the chart screen
+  // never offers that drop. If this read fails the chart still loads: the
+  // screen then offers the drop and gl_account_move refuses it in its own words.
+  const ruleHeadings = !rules.error && Array.isArray(rules.data) ? rules.data.map(String) : [];
+  // 0570: which account does each job (role -> code), and which accounts hold
+  // money. Screens read these instead of writing a number. If a read fails the
+  // chart still loads; a screen that needs the missing answer says so.
+  const roleMap: Record<string, string> = {};
+  if (!roles.error && roles.data && typeof roles.data === "object" && !Array.isArray(roles.data)) {
+    for (const [k, v] of Object.entries(roles.data as Record<string, unknown>)) roleMap[k] = String(v);
+  }
+  const moneyAccounts = !money.error && Array.isArray(money.data)
+    ? (money.data as Json[]).map((r) => String(r.account_code))
+    : [];
+  return c.json({ ...read.chart, rule_headings: ruleHeadings, roles: roleMap, money_accounts: moneyAccounts });
+});
+
+/**
+ * 0550's refusals each carry a DETAIL tag, and the sentence the user must read
+ * is the function's own message — `mapPgError` already answers with that
+ * message and the status the tag deserves:
+ *
+ *   not_finance    42501 → 403   Only Finance changes the chart of accounts.
+ *   account_missing P0002 → 404  That account is not in the chart.
+ *   name_missing   22023 → 422   Type the account name.
+ *   name_too_long  22023 → 422   Keep the name to 60 characters.
+ *   name_exists    22023 → 422   An account named X is already in the chart.
+ *   code_shape     22023 → 422   A number is four digits, like 1210, or AutoCount's …
+ *   code_exists    22023 → 422   An account numbered X is already in the chart.
+ *
+ * What is added here is the tag itself, forwarded as `code` — the same
+ * passthrough money-moves.ts and payables.ts do — so the modal can put the
+ * sentence under the field it is about instead of at the foot of the form.
+ * A 500 keeps `rpc_failed`: a tag on a break is not a refusal.
+ */
+function accountError(c: Context<AppEnv>, error: PgError) {
+  const m = mapPgError(error);
+  if (error.details && m.status !== 500) return c.json({ ...m.body, code: error.details }, m.status);
+  return c.json(m.body, m.status);
+}
+
+financeLedgerRouter.patch("/accounts/:code", requireFinance, async (c) => {
+  const code = c.req.param("code");
+  // Both shapes 0570 accepts, not just four digits: an account renumbered to
+  // 100-0001 or 900-A001 must still be reachable by its own path.
+  if (!ledgerAccountCodeShape.test(code)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerAccountUpdateInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // No number given means the number stays; the function reads null as "keep".
+  const { data, error } = await sb.rpc("gl_account_update", {
+    p_code: code,
+    p_name: body.data.name,
+    p_new_code: body.data.code ?? null,
+  });
+  if (error) return accountError(c, error);
+  // The answer is the number the account now carries, which is the new one.
+  return c.json({ code: data as string });
+});
+
+/**
+ * Move accounts inside one heading (0557). POST, not PATCH on a code: the thing
+ * being changed is the HEADING's order, not any one account. No account code,
+ * name, kind or parent is written — `gl_accounts_reorder` writes sort_order and
+ * nothing else.
+ *
+ * The body carries BOTH orders and this route forwards both untouched. The
+ * database compares `was` against the order stored right now and answers 40001
+ * → 409 when somebody else moved first; the screen shows that sentence and
+ * re-reads the chart.
+ */
+financeLedgerRouter.post("/accounts/reorder", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountReorderInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_accounts_reorder", {
+    p_parent_code: body.data.parentCode,
+    p_was: body.data.was,
+    p_now: body.data.now,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ moved: Number(data ?? 0) });
+});
+
+/**
+ * Put one posting account under another heading (0570). Both before/after pairs are
+ * forwarded untouched: the database refuses with 409 when either `was` is no
+ * longer the stored order under its heading. Refusal tags go up as `code`, the
+ * same way the PATCH above sends them.
+ */
+financeLedgerRouter.post("/accounts/move", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountMoveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_move", {
+    p_code: body.data.code,
+    p_to_parent: body.data.toParentCode,
+    p_from_was: body.data.from.was,
+    p_from_now: body.data.from.now,
+    p_to_was: body.data.to.was,
+    p_to_now: body.data.to.now,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) });
+});
+
+/**
+ * Add an account under a heading, or a heading with its first account (0577).
+ * The refusals are gl_account_update's sentences, and their tags go up as
+ * `code` so the form puts each under its field.
+ */
+financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountAddInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_add", {
+    p_parent_code: body.data.parentCode,
+    p_code: body.data.code,
+    p_name: body.data.name,
+    p_first_code: body.data.first?.code ?? null,
+    p_first_name: body.data.first?.name ?? null,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) }, 201);
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────
@@ -315,10 +526,10 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
 financeLedgerRouter.get("/trial-balance", requireFinance, async (c) => {
   const parsed = ledgerAsOfQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
-  const asOf = parsed.data.asOf ?? todayMyt();
+  const asOf = parsed.data.asOf ?? todayIsoMYT();
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const [tb, chart] = await Promise.all([sb.rpc("gl_trial_balance", { p_as_of: asOf }), readChart(sb)]);
+  const [tb, chart] = await Promise.all([sb.rpc("gl_trial_balance", { p_as_of: asOf, ...departmentRpcArgs(parsed.data) }), readChart(sb)]);
   if (tb.error) return ledgerError(c, tb.error, "The trial balance");
   if ("error" in chart) return ledgerError(c, chart.error, "The trial balance");
   const rows = (Array.isArray(tb.data) ? tb.data : []) as Json[];
@@ -368,9 +579,10 @@ financeLedgerRouter.get("/account-ledger", requireFinance, async (c) => {
   const parsed = ledgerAccountLedgerQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const { account, from, to } = parsed.data;
+  const dept = departmentRpcArgs(parsed.data);
   const sb = userClient(c.env, c.var.auth.jwt);
   const read = await readAllPages((a, b) => sb
-    .rpc("gl_account_ledger", { p_account_code: account, p_from: from, p_to: to })
+    .rpc("gl_account_ledger", { p_account_code: account, p_from: from, p_to: to, ...dept })
     .order("ordinal", { ascending: true })
     .range(a, b));
   if ("tooMany" in read) {
@@ -504,8 +716,11 @@ function toControls(rows: Json[]): ControlAccountCheck[] {
  * Accounts payable, two ways. The ledger side sums every supplier on the
  * liability-side supplier control accounts (read from the chart, so a second
  * payables account joins with no code change). The document side is
- * `ap_outstanding` — confirmed bills less released vouchers (0464). A
- * supplier whose two figures differ is named.
+ * `ap_outstanding.net_owing` — confirmed bills less what paid them, less the
+ * advance paid and not yet used (0484). An approved advance debits the same
+ * control, so `balance_owing` alone would name every supplier with an advance.
+ * `balance_owing` is the fallback for a server without 0484. A supplier whose
+ * two figures differ is named.
  */
 function toPayables(controlRows: Json[], apRows: Json[]): PayablesCheck {
   const accountCodes = controlRows
@@ -524,7 +739,10 @@ function toPayables(controlRows: Json[], apRows: Json[]): PayablesCheck {
   }
   const bills = new Map<string, { name: string | null; owing: number }>();
   for (const r of apRows) {
-    bills.set(String(r.supplier_id), { name: (r.supplier_name as string | null) ?? null, owing: num(r.balance_owing) });
+    bills.set(String(r.supplier_id), {
+      name: (r.supplier_name as string | null) ?? null,
+      owing: num(r.net_owing ?? r.balance_owing),
+    });
   }
   const differences: SupplierDifference[] = [];
   for (const id of new Set([...ledger.keys(), ...bills.keys()])) {
@@ -683,7 +901,7 @@ financeLedgerRouter.get("/profit-and-loss", requireFinance, async (c) => {
   const parsed = ledgerPeriodQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_profit_and_loss", { p_from: parsed.data.from, p_to: parsed.data.to });
+  const { data, error } = await sb.rpc("gl_profit_and_loss", { p_from: parsed.data.from, p_to: parsed.data.to, ...departmentRpcArgs(parsed.data) });
   if (error) return ledgerError(c, error, "The profit and loss");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The profit and loss");
   return c.json({ rows: data });
@@ -693,7 +911,7 @@ financeLedgerRouter.get("/balance-sheet", requireFinance, async (c) => {
   const parsed = ledgerAsOfQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_balance_sheet", { p_as_of: parsed.data.asOf ?? todayMyt() });
+  const { data, error } = await sb.rpc("gl_balance_sheet", { p_as_of: parsed.data.asOf ?? todayIsoMYT(), ...departmentRpcArgs(parsed.data) });
   if (error) return ledgerError(c, error, "The balance sheet");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The balance sheet");
   return c.json({ rows: data });

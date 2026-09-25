@@ -1,10 +1,23 @@
-/* Local PO/SO detail styling trial. Explicit object scopes keep other shared
+/* Local PO/SO detail styling trial. `.mp-create-style` joins the SAME rule
+   rather than copying it: the Manual Purchase create workspace reuses the
+   Sales Order composition (owner 2026-09-22), and one section band belongs to
+   one stylesheet — a second copy is how two greys start drifting apart.
+ Explicit object scopes keep other shared
    blocks, alert banners, action controls and PDF templates intact. */
-:is(.po-detail-style, .so-detail-style) {
+:is(.po-detail-style, .so-detail-style, .mp-create-style) {
   font-family: Inter, "SF Pro Text", Roboto, system-ui, sans-serif;
 }
 
-:is(.po-detail-style, .so-detail-style) [data-block] > div:first-child {
+/* ⭐ THE SALES ORDER PAGE LEFT THIS BAND — OWNER RULING (Jess, 2026-09-21,
+   re-affirmed 2026-09-22 "remain blue"): its card title is 15px/600 sentence
+   case in `kit-blue-11` on a WHITE card over a 1px rule. The band survives for
+   Purchase Orders and the Manual Purchase create workspace, which are governed
+   by their own module and did not change.
+   ⛔ AND IT IS THIS RULE, NOT THE MARKUP, THAT DECIDED THE OLD LOOK. The `<h2>`
+   already carried `text-kit-blue-11`; a page-scoped stylesheet overrode it with
+   raw hex, so a reviewer read the ruling as unbuilt while the class was in the
+   DOM all along. Changing the component alone would have shipped nothing. */
+:is(.po-detail-style, .mp-create-style) [data-block] > div:first-child {
   margin: -0.75rem -1rem 0;
   padding: 0.75rem 1rem;
   border-left: 0;
@@ -15,7 +28,7 @@
   color: #26384a;
 }
 
-:is(.po-detail-style, .so-detail-style) [data-block] > div:first-child > h2 {
+:is(.po-detail-style, .mp-create-style) [data-block] > div:first-child > h2 {
   font-family: inherit;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -27,23 +40,15 @@
   font-family: inherit;
 }
 
-.so-detail-style [data-block] > div:first-child > h2 {
-  color: #ffffff;
-  text-transform: uppercase;
-}
-
+/* A note or a chip beside the blue title now sits on white, so it takes the
+   page's ordinary muted grey rather than the pale shade the band needed. */
 .so-detail-style [data-block] > div:first-child :is(span, p) {
-  color: #94a3b8;
+  color: #667085;
 }
 
 .so-detail-style [data-testid="subhead-delivery-address"],
 .so-detail-style [data-testid="subhead-emergency-contact"] {
   color: #334155;
-}
-
-.so-detail-style [data-block] > div:first-child :is(a, button),
-.so-detail-style [data-block] > div:first-child :is(a, button) * {
-  color: #38bdf8;
 }
 
 /* ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (Jess, 2026-09-10) — the

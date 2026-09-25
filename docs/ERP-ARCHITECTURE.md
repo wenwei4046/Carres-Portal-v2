@@ -132,34 +132,36 @@ authoritative business rule and current roster:
 missing customer commitment       → responsible salesperson
 issue PO / confirm supplier date  → current PO Duty
 receive goods                     → current GRN Duty
-collect customer balance          → Payment ownership rule
-confirm delivery appointment      → Delivery ownership rule
+order/customer/delivery follow-up → Sales Order PIC, with Buddy cover
+collect customer balance          → Sales Order PIC, with Buddy cover
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
 employment/account eligibility facts only; **Workspace → Staff & Duties** is the ONE company-wide
-Duty assignment door. Every module references a Duty key and never stores its own staff list. The
-Shared Duty Resolver applies the active Primary holder and governed Buddy cover so absence changes
-who sees today's work without changing the underlying business record or rewriting its history. A
-manager may see or filter the resolved owner, but Work never creates a second assignment truth.
+Duty assignment door. An Owner Rule may reference a stable object owner such as the Sales Order PIC
+or a governed Duty key; modules never keep a second staff list. The shared resolver applies the
+governed Buddy cover so absence changes who sees today's work without changing the underlying
+business record or rewriting its history. A manager may see or filter the resolved owner, but Work
+never creates a second assignment truth.
 
 ### Law F.1 · One Shared Duty Resolver
 
-**OWNER-APPROVED / LOCKED 2026-09-01; GLOBAL DUTY MODEL OVERWRITTEN 2026-09-03.** No page, module
-or API reads a rota table or calculates a Duty holder for itself. The same assignment, approval
-routing and Buddy-cover mechanism applies across the ERP; each kind of work still names its own
-Duty. The complete resolution chain is:
+**OWNER-APPROVED / LOCKED 2026-09-01; OVERWRITTEN 2026-09-17.** No page, module or API reads a
+rota table or calculates a Duty holder or object-owner cover for itself. The same owner-resolution,
+approval-routing and Buddy-cover mechanism applies across the ERP. Each action names an Owner Rule;
+that rule may resolve a stable object owner such as the Sales Order PIC or a governed Duty. The
+complete resolution chain is:
 
 ```
 People — individual staff identity, active/access, last working date and leave facts
-→ Workspace → Staff & Duties — Duty catalogue, one Primary holder and optional Buddy cover
-→ Shared Duty Resolver — date + active staff + leave/cover rules
+→ owning object or Workspace → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
+→ Shared Owner Resolver — date + active staff + leave/cover rules
 → Work Engine — resolves the owner of each action from its Owner rule
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
 ```
 
 An action stores its `Owner rule`, trigger, completion fact, governed date and source object. Its
-audit evidence preserves three distinct identities: the normal Primary owner, today's resolved
+audit evidence preserves three distinct identities: the normal PIC or Duty owner, today's resolved
 Cover (when one acts), and the actual person who completed/approved the work. Historical evidence
 never changes when a Duty holder changes later. The displayed owner/avatar is the resolver result,
 not a second stored `assigned_to`. A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
@@ -177,8 +179,10 @@ The governed Duty catalogue is business-specific, not one fake `ERP Owner`:
 | Payment exception | `Payment Approver` |
 | Stock adjustment | `Stock Adjustment Approver` |
 | Service Case decision | `Service Case Approver` |
+| Sales Order has no PIC and routine Delivery work must remain visible | `Delivery Duty` fallback only — never the routine owner |
 
-Each Duty has exactly one active Primary holder and may have one governed Buddy cover. When the
+Each Duty has exactly one active Primary holder and may have one governed Buddy cover. A Sales
+Order has one PIC and may resolve the same governed Buddy cover for absence. When the
 Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
 it does not rewrite the normal owner. Changing staff or approval ownership happens once in
 `Workspace → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
@@ -488,7 +492,7 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 > with the order, because **both are promises to the customer, and the customer's promise is
 > what this module owns.** A booking is *"we told them Tuesday"*; the gate is *"we do not send
 > goods that are not paid for"*. Neither is a fact about a truck or a ledger. **The operational
-> ARRANGEMENT — which Logistics Partner carries a scope, the confirmed operational date and
+> ARRANGEMENT — which Logistics carries a scope, the confirmed operational date and
 > time, ETA, note, reply proof, driver/vehicle — is Delivery's own record**
 > (`ops_delivery_arrangements`, owner ruling 2026-08-24): the promise and the arrangement are
 > two facts with two owners, and neither module writes the other's.
@@ -663,11 +667,18 @@ or correct its event.
   Delivery owns the ONE derivation rule (Law D), and for multi-leg journeys the ONE backward
   calculation `customer date → latest partner-warehouse arrival → KL pickup day → latest Carres
   Warehouse ready date`, which Warehouse and Purchasing consume through dated Work.
-- The **proof**: the delivery photo and the signed document.
+- The **proof**: the delivery photo, the signed document and the proof review (`Proof Accepted` ·
+  `More Proof Required` · `Proof Rejected`).
+- The **customer contact record** for a delivery: purpose, channel, person, time, result and
+  reply evidence (owner ruling 2026-09-13). Silence is never a result.
 
-**ACTIONS** — assign or change a carrier · record the arrangement · record the delivery
-result · upload the proof · maintain the carrier's rules. (The SYSTEM issues the delivery
-order; `Request Delivery Order` is the one governed manual door.)
+**ACTIONS** — assign or change a Logistics Partner · record the arrangement inside the Monitor
+row's expanded panels · record a customer contact · record the delivery result · upload and
+review the proof · maintain the partner's rules in central Delivery Settings. (The SYSTEM issues
+the delivery order; `Request Delivery Order` is the one governed manual door.) Every routine act
+resolves to the linked Sales Order's PIC and today's governed Buddy cover. Only an order with no
+PIC falls back to `Delivery Duty`, where the unresolved work remains visible with the Staff &
+Duties correction door. The Loan offer and decision stay with the Customer Order.
 
 **SUMMARISES** — the customer's promised date and confirmed booking · what the order contains ·
 whether money holds it.
@@ -722,33 +733,38 @@ do not chase payment for goods you cannot deliver).
 ## 3.8 · SUPPLIER CLAIM
 
 **OWNS**
-- The **claim workstream** — opened under one Service Case when evidence indicates supplier
-  responsibility, bound to its PO line, SKU and supplier forever.
-- What we asked, what the supplier answered, **Carres' own resolution**, and the item's outcome.
-- The claim's own money: what the supplier owes us, completed on **external evidence** (their
-  credit-note or debit-note number), never a tick-box.
+- The **stock/product Supplier Claim** — owned by Purchasing and opened from the affected
+  Stock Unit, PO line or receipt evidence, bound to its supplier and item/source. It does not
+  originate from Service Case and has no mandatory Service Case parent (owner ruling 2026-09-14).
+- What we asked, what the supplier answered, **Carres' authorised supplier/stock-claim outcome**,
+  and the item's outcome. Customer collection/replacement order is owned by Service Case;
+  supplier execution follows Purchasing §9.5. Delivery/Stock prove physical movements.
+- The supplier recovery obligation and its outstanding evidence. Finance owns credit/debit-note,
+  settlement and payment facts; the Claim reads/links that external evidence, never a second
+  financial ledger or a completion tick-box.
 
-**ACTIONS** — ask the supplier · record their answer · decide the customer resolution · decide
+**ACTIONS** — ask the supplier · record their answer · authorise the stock-claim resolution · decide
 the item outcome · split a claim · close it.
 
-**SUMMARISES** — its parent Service Case · the purchase order · the receiving or downstream
+**SUMMARISES** — a related customer Service Case, if any · the purchase order · the receiving or downstream
 event that found the problem · the customer order waiting on the goods, when applicable.
 
 **LINKS TO** — Service Case · Receiving · Purchasing · Stock · the customer order.
 
 > **A claim has no independent create button.** Staff report the problem where they discover it;
-> the system opens or links one Service Case and, when supplier responsibility is in scope,
-> creates the Supplier Claim workstream for Purchasing. `Supplier Claims` is Purchasing's work
-> view of those workstreams, not a second case register and not a second intake form.
+> stock/supplier problems open a source-linked Purchasing Claim directly. Service Case handles
+> customer complaints separately and is not a Claim creation or approval route. `Supplier Claims`
+> is the stock-claim Register; related customer context is a read-only link.
 
 ---
 
 ## 3.9 · SERVICE
 
 **OWNS**
-- The **case** — the one parent record for a customer-affecting problem that requires evidence,
-  remedy, communication or follow-up, whether first found by Customer Care, Delivery, Warehouse,
-  Receiving, Purchasing or Finance.
+- The **case** — the customer complaint/service-request record, reported by the customer or
+  recorded by staff on the customer's behalf. It owns the customer remedy and communication.
+  A receiving/stock supplier problem belongs to Purchasing Claim; merely affecting a customer
+  order does not turn it into a Service Case (owner clarification 2026-09-14).
 - The shared evidence, affected item/order/document links, parties, Work, decisions, deadlines,
   history and completion evidence.
 
@@ -766,7 +782,9 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 > evidence, another owner, later follow-up, investigation, hold, remedy or recovery, staff press
 > `Report Problem` on the record already in front of them. The system decides whether the facts
 > require a Service Case, an Operational Issue, an owning-module exception, or linked records;
-> staff do not choose a module or document type first.
+> staff do not choose a module or document type first. A stock/receiving supplier-goods problem
+> is reported from its Stock Unit, PO line or Goods Receipt as a source-linked Purchasing Supplier
+> Claim; it never needs a Service Case.
 >
 > **A customer-facing case is finished when the CUSTOMER is, and all required internal or
 > external outcomes are complete** — never merely when a dropdown changes.
@@ -790,11 +808,12 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
 ### GLOBAL DUTY AND APPROVAL ROUTING — OWNER-APPROVED 2026-09-03
 
-Workspace owns one Staff & Duties registry for every ERP module. Each work/approval type maps to
-its own duty (for example Payment Duty, Storage Waiver Approver, Purchasing Approver); there is no
-universal ERP Manager owner. A duty has a primary holder and optional buddy cover. Resolution
-retains normal owner, today's cover and actual actor, so absence changes today's work without
-rewriting history. Reassignment is one Workspace change and never a module code change.
+Workspace owns one Staff & Duties registry for governed Duties and Buddy cover. Approval and
+specialist work maps to its own Duty (for example Storage Waiver Approver or Purchasing Approver);
+routine order, Delivery and collection work maps to the Sales Order PIC. Delivery Duty is only the
+no-PIC fallback. There is no universal ERP Manager owner. Resolution retains normal owner, today's
+cover and actual actor, so absence changes today's work without rewriting history. Reassignment is
+one governed owner change and never a module-local staff list.
 
 ---
 
@@ -941,8 +960,8 @@ WhatsApp manifest sent to the carrier = generated from the view. Multi-leg journ
 trip RECORD either, but the legs are **Delivery Journey legs, not stock movements** (owner
 ruling 2026-09-01, overwriting the 2026-08-06 "a warehouse-to-warehouse leg is a stock
 movement" half): a Singapore SO's KL → JB-partner-warehouse leg and its JB → customer leg each
-carry their own Logistics Partner, DO/scope, dates, handover and exact-Unit reconciliation
-(`../delivery/MASTER.md` §1.1, §8; `../stock/MASTER.md` §5). Stock still owns each Unit's
+carry their own Logistics, DO/scope, dates, handover and exact-Unit reconciliation
+(`delivery/MASTER.md` §1.1, §8; `stock/MASTER.md` §5). Stock still owns each Unit's
 current `Where`/`Who has it` along the way; an internal reposition that serves no customer
 Journey remains Stock's Transfer.
 
@@ -960,14 +979,94 @@ remainder, supplier commitment and `Deliver To`; Receiving owns the physical rec
 then owns Unit custody/location. The Sales Order reads risk and connected documents but cannot mark
 goods ordered or received.
 
-**④ Supplier Claim entrance — RESOLVED FROM AUTHORITY 2026-08-22.**
-There is one problem intake through Service Case or the authoritative receiving exception. The
-system creates the Purchasing claim workstream when supplier responsibility is in scope.
-`Supplier Claims` is the Purchasing work view, not a second intake.
+**④ Supplier Claim entrance — OWNER-APPROVED 2026-09-14.**
+Purchasing controls stock/product supplier claims. Stock Unit, PO line and receiving evidence
+provide the source; a Service Case is neither the origin nor a prerequisite. Customer complaints
+and remedies stay in Service. Related records may link without transferring authority.
 
 **⑤ Is Orders V1 migrated, or replaced?**
 This document is the blueprint either way. **Which one it is changes nothing above and
 everything about sequencing** — and it is the first thing a build plan needs.
+
+---
+
+## §6.3 · Diglant Subscription cross-module boundary — owner-confirmed 2026-09-22/23
+
+**APPROVED TARGET / NOT BUILT.** The only Rental/Subscription authority is
+[`rental/MASTER.md`](rental/MASTER.md), especially §4 (owner rulings), §5.6 (advance PO and later
+customer SO), §5.8 (factory holding and logistics evidence), and §5.9 (service lifecycle).
+Its other sections explicitly marked PROPOSAL / NOT LAW remain proposals; neither this pointer
+nor circulation to other tasks approves the entire blueprint or starts implementation.
+
+- Purchasing may issue an approved advance PO before a customer SO exists. Later SO demand
+  checks eligible stock and evidenced PO supply first, buying only the verified uncovered balance.
+  A date risk or missing evidence must not become a duplicate purchase. Unit/PO coverage is counted once.
+- Initial completed stock remains at Diglant Klang. Carres arranges pickup; NETS is the short-term
+  Klang Valley choice, not a nationwide appointment. Other regions need actual partners and rates.
+  Factory holding does not prove Carres warehouse receipt, ownership transfer or Ready Stock status.
+- Subscription owns contract/service facts; Sales Orders owns customer fulfilment commitments;
+  Purchasing, Receiving, Stock and Delivery retain their existing writers and evidence. Customer
+  receipt with accepted proof precedes service activation; pickup/intermediate arrival does not.
+  Visit completion, upgrade recovery/new delivery and termination/physical recovery remain distinct.
+- Actual regional volume, pickup frequency, complete delivery cost and delivery performance inform
+  partner decisions. 100/200/500 are scenarios; the approximately 3–6 month review is not a lease,
+  guaranteed volume or automatic warehouse move. No expansion of existing Finance/Rental billing law.
+
+**All Portal planning/build tasks:** read these scoped owner rulings before changing a connected
+boundary. Keep legacy business rules in their original scope. Do not reintroduce per-customer
+procurement as the primary Diglant supply model, assign legacy nationwide partners by inference,
+copy old rent-to-own terms, or promote unfinished proposals because another task mentioned them.
+Use current shared repository authority; pending branch-only changes must be identified as such.
+
+## §6.4 · The chase carries the answer door — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT)
+
+One rule for every module that reminds or chases an outside party — Logistics Partner, supplier,
+and later the customer. The prepared remind/chase message carries one link to that party's own
+scoped Portal surface, opened at exactly the rows the message names. The party's personal login
+answers there, and the answer is written to the **owning module's existing record**:
+
+```
+Logistics Partner  →  Delivery arrangement (contacted, confirmed date/time, ETA, Cannot Deliver)
+Supplier           →  Purchasing PO promise / delay evidence (Purchasing §§5.6.1, 5.7)
+Customer (later)   →  Delivery customer contact / Payment promise, per their MASTERs
+```
+
+Work (Workspace) raises the remind/chase and closes it only from that owning record. No module
+keeps a second chase or acknowledgement ledger (Law A, Law C). The WhatsApp group or chat stays
+the channel; an answer given only there still needs the recorded answer plus its uploaded proof.
+Sending the link is not an answer; silence leaves the row unconfirmed and chaseable.
+
+**No-portal logistics companies — owner ruling 2026-09-24, BUILT (0581, Delivery §5.5).** A
+logistics company WITHOUT a portal login (AL, TT, TEOW, EU, SSY, HOUZS …) answers through ONE
+external link per delivery instead: no OTP, no PIN, no name; the actor is the COMPANY (`{company}
+via external link`); one active link at a time, revoked and re-created explicitly; a save through a
+valid link is that company's own record and needs no screenshot. NETS keeps its individual login. Each party's
+rollout — issuing production logins and telling that party to use them — is an external cutover
+needing its own owner authorisation. **NETS is first**; suppliers follow on the same rule.
+
+## §6.5 · Outstation release — owner rulings 2026-09-24 (APPROVED TARGET / NOT BUILT)
+
+Why: once goods leave Carres Klang for an outstation leg, a customer delay creates partner storage
+charges and return cost. An **outstation order** is one whose delivery has a first leg out of
+Carres Klang to another partner or warehouse (Singapore, Johor/Melaka via JB, AL/HOUZS, East
+Malaysia) or whose Logistics Partner is not the Klang Valley default.
+
+```
+1. Customer confirms first   Operation sends the prepared WhatsApp and stores the customer's
+                             reply proof BEFORE the first leg leaves Carres Klang. No
+                             confirmation → the first leg is not handed over.
+                             The message states the delivery date, the balance, the payment
+                             link, and that a delay asked after the goods leave carries a
+                             storage charge.
+2. Money earlier             Payment must be complete 3 working days before Confirmed Delivery
+                             (the customer's delivery date — owner chose this anchor), not
+                             Klang Valley's 2.
+```
+
+Owners: Delivery owns the confirmation contact and the first-leg handover refusal (Delivery
+§14.1); Payment owns the one collection clock and its outstation timing row (Payment "Collection
+timing"); Sales Orders' DO gate reads that one clock unchanged. **PROPOSAL / NOT LAW:** no COD
+approval for outstation orders. Falsifier: the owner approves an outstation COD case.
 
 ---
 

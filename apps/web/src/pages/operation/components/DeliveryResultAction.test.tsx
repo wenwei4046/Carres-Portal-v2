@@ -86,13 +86,14 @@ vi.mock("@/lib/queries", async () => {
   };
 });
 
-function mount() {
+function mount(props: { leg?: number; lastLeg?: number; legDestination?: string | null } = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <DeliveryResultAction
         order={{ id: "order-a", so: 1205, do_number: "DO-260831-1205" }}
         lines={[{ sku: "JAGER-SS", qty: 2 }]}
+        {...props}
       />
     </QueryClientProvider>,
   );
@@ -173,9 +174,46 @@ describe("DeliveryResultAction", () => {
         reasonKey: "customer_rejected_goods",
         whereGoods: "still_with_logistics",
         note: "Customer accepted one Unit; the other stays with NETS.",
+        leg: 0,
         deliveredItemIds: ["00000000-0000-0000-0000-000000000101"],
         returned: [],
       },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it("0491 — a Unit that did not reach the customer comes back for CHECKING, never an immediate hold word", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("do-result-primary-action"));
+    fireEvent.click(screen.getByRole("button", { name: "Failed" }));
+    fireEvent.change(screen.getByLabelText("Goods location"), { target: { value: "returned_to_warehouse" } });
+    const words = [...document.querySelectorAll("option")].map((o) => o.textContent);
+    expect(words).toContain("Return to Warehouse for checking");
+    expect(words).toContain("Release the reservation");
+    expect(words).not.toContain("Hold for Inspection");
+  });
+
+  it("0491 — a leg's failed result carries its leg to the one attempt door", () => {
+    mount({ leg: 2, lastLeg: 2 });
+    fireEvent.click(screen.getByTestId("do-result-primary-action"));
+    fireEvent.click(screen.getByRole("button", { name: "Failed" }));
+    fireEvent.change(screen.getByLabelText("Delivery Result reason"), { target: { value: "customer_rejected_goods" } });
+    fireEvent.change(screen.getByLabelText("Goods location"), { target: { value: "still_with_logistics" } });
+    fireEvent.change(screen.getByLabelText("Explanation"), { target: { value: "Refused at the door." } });
+    fireEvent.click(screen.getByRole("button", { name: "Record Failed Delivery" }));
+    expect(recordAttempt).toHaveBeenCalledWith(expect.objectContaining({ result: "failed", leg: 2 }), expect.anything());
+  });
+
+  it("0491 — an INTERMEDIATE leg records an ARRIVAL: no Unit moves, the customer leg still owes its result", () => {
+    mount({ leg: 1, lastLeg: 2, legDestination: "JB transit" });
+    fireEvent.click(screen.getByTestId("do-result-primary-action"));
+    const arrived = screen.getByTestId("do-result-delivered");
+    expect(arrived).toHaveTextContent("Arrived");
+    fireEvent.click(arrived);
+    expect(screen.getByText(/Arrived at JB transit/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Record arrival" }));
+    expect(recordAttempt).toHaveBeenCalledWith(
+      { result: "delivered", leg: 1, note: null, deliveredItemIds: [], returned: [] },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });

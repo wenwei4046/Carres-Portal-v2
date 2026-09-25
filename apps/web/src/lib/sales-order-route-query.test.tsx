@@ -24,6 +24,8 @@ beforeEach(() => {
     if (url.endsWith("/booking-brief")) return Promise.resolve({ brief: { appointment: null } });
     if (url.endsWith("/delivery-attempts")) return Promise.resolve({ attempts: [] });
     if (url.endsWith("/loans")) return Promise.resolve({ loans: [] });
+    /* 0492 (Card 15) — the loan offer conversation rides the same fan-in. */
+    if (url.endsWith("/loan-offers")) return Promise.resolve({ offers: [] });
     if (url.endsWith("/refunds")) return Promise.resolve({ refunds: [] });
     if (url.startsWith("/api/ops/service-cases")) return Promise.resolve({ items: [] });
     // The gate's two money records (0355 + 0362) ride the same fan-in.
@@ -59,6 +61,7 @@ describe("useSalesOrderRouteFacts", () => {
       "/api/operation/orders/order-1/booking-brief",
       "/api/operation/orders/order-1/delivery-attempts",
       "/api/operation/orders/order-1/loans",
+      "/api/operation/orders/order-1/loan-offers",
       "/api/operation/orders/order-1/refunds",
       "/api/ops/service-cases?orderId=order-1",
       "/api/operation/supplier-claims?status=all",

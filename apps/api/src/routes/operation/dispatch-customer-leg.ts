@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { dispatchCustomerLegInput } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -61,10 +61,7 @@ dispatchCustomerLegRouter.post("/dispatch-customer-leg", async (c) => {
     p_confirm_delivery_date: parsed.data.confirmDeliveryDate,
     p_force_dispatch: parsed.data.forceDispatch,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

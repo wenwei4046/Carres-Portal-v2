@@ -10,6 +10,7 @@ import {
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageSkuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 
 /**
@@ -81,7 +82,7 @@ paymentStorageRouter.get("/", async (c) => {
         importedSof: (ctrl.storage_fee_sof as number | string | null) ?? null,
         skus,
         categories: await storageSkuCategories(sb, skus),
-        asOf: new Date().toISOString().slice(0, 10),
+        asOf: todayIsoMYT(),
         collectedAt: (ctrl.storage_collected_at as string | null) ?? null,
         waiverStatus: (ctrl.storage_waiver_status as string | null) ?? null,
       });
@@ -207,15 +208,19 @@ paymentStorageRouter.get("/later-delivery-requests", async (c) => {
     throw new HTTPException(403, { message: "You cannot view storage records." });
   }
   const orderId = c.req.query("orderId");
-  if (!orderId || !z.string().uuid().safeParse(orderId).success) {
+  // The Storage section asks for ONE order; the Payment Monitor asks for
+  // every order at once (its `Free request waiting for approval` cell). A
+  // present-but-malformed id is still refused.
+  if (orderId !== undefined && !z.string().uuid().safeParse(orderId).success) {
     return c.json({ error: "invalid_id", code: "invalid_param", message: "order id must be a uuid" }, 422);
   }
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb
+  let query = sb
     .from("payment_delivery_date_requests")
     .select("id,order_id,requested_date,reason_key,reason_detail,terms_acknowledged,free_storage_requested,evidence_url,recorded_by,recorded_at")
-    .eq("order_id", orderId)
     .order("recorded_at", { ascending: false });
+  if (orderId) query = query.eq("order_id", orderId);
+  const { data, error } = await query;
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

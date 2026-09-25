@@ -14,8 +14,9 @@ import {
   type ToOrderProposal,
 } from "@carres/shared";
 import { loadPurchasingSettings } from "./purchasing-settings";
-import { mapPgError } from "./route-helpers";
+import { mapPgError, readAllPages } from "./route-helpers";
 import { userClient } from "./supabase";
+import { todayIsoMYT } from "./today";
 
 /**
  * THE CUSTOMER-DEMAND READ — one recomputation, two Purchasing surfaces.
@@ -47,7 +48,7 @@ import { userClient } from "./supabase";
  */
 
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoMYT();
 }
 
 /**
@@ -66,6 +67,9 @@ export function todayIso(): string {
  * NAMED instead of skipped.
  */
 const IN_CHUNK = 40;
+
+/** The one sentence the demand read refuses an over-long open-PO read with. */
+export const TOO_MANY_OPEN_PO_LINES = "There are too many open purchase order lines to plan here.";
 
 export function chunk<T>(xs: readonly T[], n = IN_CHUNK): T[][] {
   const out: T[][] = [];
@@ -228,6 +232,7 @@ export type Loaded = {
   stockQtyById: Map<string, number>;
   /** Every supplier's own name, off the same read the kinds come from. */
   supplierNames: Map<string, string>;
+  supplierAddresses?: Map<string, string | null>;
   /**
    * The Register's own facts. ADDITIVE — no existing caller reads them, and the
    * To Order response is byte-identical with or without them.
@@ -287,6 +292,10 @@ export type FreeStockUnit = {
   supplier: string | null;
   identityScope: string;
   dateIn: string | null;
+  /** 0546 — the Unit's OWN source document, for the approved stock picker's
+   *  `PO No / Ref No` column. It is the goods' provenance, never the purchase
+   *  that happens to be looking at them. */
+  poNo: string | null;
 };
 
 export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<{
@@ -345,7 +354,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
     const { data: itemRows, error: itemErr } = await sb
       .from("stock_unit_register_v")
       .select(
-        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id",
+        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id, po_no",
       )
       .eq("availability", "available");
     if (itemErr) throw new Error(itemErr.message);
@@ -396,6 +405,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
         supplier: (it.supplier as string | null) ?? null,
         identityScope: scope,
         dateIn: (it.date_in as string | null) ?? null,
+        poNo: (it.po_no as string | null) ?? null,
       };
       freeUnitsByKey.set(key, [...(freeUnitsByKey.get(key) ?? []), unit]);
       /* The netting offer stays EXACT UNITS ONLY: a counted row cannot be
@@ -547,7 +557,7 @@ export async function loadToOrder(
     });
   }
 
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind");
+  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind, address");
   if (supErr) {
     const m = mapPgError(supErr);
     return { ok: false, status: m.status, body: m.body };
@@ -806,15 +816,30 @@ export async function loadToOrder(
    */
   const openPoRefs: Record<string, { poId: string; qty: number }[]> = {};
   {
-    const { data: poLines, error: poErr } = await sb
+    // Paged and fail-closed. Read once with no `.range()` this was the same
+    // unbounded read the Finance department filter shipped twice: past 1000
+    // open PO lines the rest never came back, `openPoBySku` under-counted the
+    // cover already on order, and the engine proposed buying goods a supplier
+    // is already making. Ordered by `id` — paging on a non-unique order can
+    // miss or repeat a row across two pages.
+    const read = await readAllPages<Record<string, unknown>>((a, b) => sb
       .from("purchase_order_lines")
       .select("po_id, sku, qty, received_qty, purchase_orders!inner(status)")
-      .eq("purchase_orders.status", "open");
-    if (poErr) {
-      const m = mapPgError(poErr);
+      .eq("purchase_orders.status", "open")
+      .order("id", { ascending: true })
+      .range(a, b));
+    if ("error" in read) {
+      const m = mapPgError(read.error);
       return { ok: false, status: m.status, body: m.body };
     }
-    for (const r of poLines ?? []) {
+    if (!("rows" in read)) {
+      return {
+        ok: false,
+        status: 422,
+        body: { error: "invalid_param", code: "too_many_rows", message: TOO_MANY_OPEN_PO_LINES },
+      };
+    }
+    for (const r of read.rows) {
       const remaining = Number(r.qty ?? 0) - Number(r.received_qty ?? 0);
       if (remaining <= 0) continue;
       const sku = r.sku as string;
@@ -855,16 +880,11 @@ export async function loadToOrder(
    * read still uses `stock_balances`; that is a different surface and is
    * reported, not changed here.
    *
-   * THE LEDGER, NOT `status = 'reserved'`. A unit that is delivered becomes
-   * `sold`, so a reservation-based reading would let a satisfied requirement
-   * come BACK as something to buy the day the goods went out. The ledger is
-   * permanent and dated, and its own comment says why: it counts the DECISION,
-   * never net units.
-   *
-   * NEITHER READ MAY TAKE THE PAGE DOWN. To Order turned customer orders into
-   * purchase orders for months before ready stock was on it; if either table
-   * is unreachable the FEATURE is unavailable and the workspace is exactly
-   * what it was — no offer, no netting, nothing invented.
+   * Current exact bindings count both reserved and sold Units. The permanent
+   * ledger supplies only legacy coverage; modern reservation History excludes
+   * its Units from that fallback even after release. If coverage cannot be read,
+   * refuse the demand response rather than offer duplicate purchasing. The
+   * optional free-stock offer may still degrade independently.
    */
   const { stockWarehouse, freeStock, stockQtyById } = await readFreeStock(sb);
 
@@ -880,7 +900,8 @@ export async function loadToOrder(
    *              both count, because the binding survives the sale — a
    *              delivered requirement must not return as something to buy.
    *
-   *   LEGACY     `ops_stock_pool_usage`, read for units that carry NO binding.
+   *   LEGACY     `ops_stock_pool_usage`, excluding every Unit whose reservation
+   *              History records a line binding, even after that binding clears.
    *              That ledger counts the DECISION and is append-only by law
    *              (0292: "a later release does not unmake the decision"), which
    *              is exactly why it cannot answer coverage on its own. It stays
@@ -901,13 +922,15 @@ export async function loadToOrder(
     if (boundErr) throw new Error(boundErr.message);
     for (const r of (boundRows ?? []) as Record<string, unknown>[]) {
       const lineId = r.reserved_order_line_id as string;
+      if (!lineId) continue;
       boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + Math.max(1, Number(r.qty ?? 1)));
       boundUnitIds.add(r.id as string);
       const code = (r.unit_code as string | null) ?? null;
       if (code) boundUnitCodesByLine.set(lineId, [...(boundUnitCodesByLine.get(lineId) ?? []), code]);
     }
   } catch (e) {
-    console.error("ready stock bindings unavailable — coverage not shown", (e as Error).message);
+    console.error("ready stock bindings unavailable", (e as Error).message);
+    return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
   }
 
   /** `{ref}::{stockKey}` → units already drawn for it, UNBOUND rows only. */
@@ -917,17 +940,41 @@ export async function loadToOrder(
       .from("ops_stock_pool_usage")
       .select("item_id, sku, qty, ref");
     if (usageErr) throw new Error(usageErr.message);
+    // A cleared binding is not evidence of a legacy reservation. 0471 writes
+    // order_line_id to reservation History; that immutable provenance excludes
+    // the Unit from ledger fallback forever. Only the current Unit binding
+    // above supplies coverage, so release/reassign restores demand immediately.
+    const modernIds = new Set(boundUnitIds);
+    const usageIds = [...new Set((usageRows ?? []).map((u) => u.item_id).filter(Boolean))] as string[];
+    for (const ids of chunk(usageIds)) {
+      for (let offset = 0; ; offset += 500) {
+        const { data: events, error } = await sb.from("ops_activity_log")
+          .select("id, detail")
+          .eq("action", "stock_reserve")
+          .in("detail->>item_id", ids)
+          .not("detail->>order_line_id", "is", null)
+          .order("id")
+          .range(offset, offset + 499);
+        if (error) return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
+        for (const event of events ?? []) {
+          const detail = event.detail as { item_id?: string; order_line_id?: string } | null;
+          if (detail?.item_id && detail.order_line_id) modernIds.add(detail.item_id);
+        }
+        if ((events?.length ?? 0) < 500) break;
+      }
+    }
     for (const u of (usageRows ?? []) as Record<string, unknown>[]) {
       const ref = (u.ref as string | null) ?? "";
       if (!ref) continue;
       /* Bound units answer through their line; counting their ledger row too
          would net the same goods twice. */
-      if (u.item_id && boundUnitIds.has(u.item_id as string)) continue;
+      if (u.item_id && modernIds.has(u.item_id as string)) continue;
       const k = `${ref}::${stockMatchKey(u.sku as string)}`;
       takenByRefKey.set(k, (takenByRefKey.get(k) ?? 0) + Math.max(0, Number(u.qty ?? 0)));
     }
   } catch (e) {
-    console.error("ready stock ledger unavailable — takes not shown", (e as Error).message);
+    console.error("ready stock coverage unavailable", (e as Error).message);
+    return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
   }
 
   /**
@@ -1057,6 +1104,7 @@ export async function loadToOrder(
       settings,
       stockWarehouse,
       stockQtyById,
+      supplierAddresses: new Map((supRows ?? []).map((s) => [s.id as string, (s.address as string | null) ?? null])),
       supplierNames: new Map(
         (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
       ),

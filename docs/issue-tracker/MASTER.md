@@ -1,7 +1,8 @@
 # ISSUE TRACKER — MASTER
 
 > **The only Issue Tracker document.** Overwritten when re-ruled; never versioned.
-> **APPROVED / LOCKED — Jess, 2026-08-14.**
+> **APPROVED / LOCKED business architecture — Jess, 2026-08-14; complete page Blueprint ready for
+> owner review, 2026-09-15.**
 > Read `CLAUDE.md`, `docs/ERP-ARCHITECTURE.md`, this file and the affected module MASTERs.
 
 | I am working on | Read |
@@ -331,7 +332,10 @@ Every Issue row includes:
 9. party response/date;
 10. current required result.
 
-Confirmed, awaiting response and disputed Issues are separate report sections. An allegation never
+Confirmed, awaiting response and disputed Issues are separate report sections, and one party row
+lands in exactly one (HF-2, 2026-09-17): the party disagrees → Disputed, whatever the finding;
+otherwise a confirmed or contributing fault → Confirmed; otherwise not yet confirmed → Waiting. Only
+Issues observed inside the chosen month (`?month=YYYY-MM`) count. An allegation never
 enters confirmed totals. Disagreement never deletes evidence: preserve Carres finding, evidence
 sent/date, party response/date and final reviewed outcome.
 
@@ -402,6 +406,195 @@ Permissions:
 
 No KPI-card dashboard, employee league table, bulk fault/close/recovery mutation, Issue calendar,
 duplicate Settings home, blank English report, copied Issue or deletion.
+
+## §11.1 · Workspace destination composition
+
+Issue Tracker is the third `Workspace` destination beside `Work` and `Staff & Duties`; it is not a
+Work scope and not a Dashboard. The Register answers what incidents exist and where accountability,
+money or learning remains incomplete. Shared Work answers who must perform the current admitted
+Issue action. One Issue and one versioned `issue_actions` occurrence retain the same identities on
+both pages.
+
+```text
+┌ Issue Tracker ───────────────────────────────────────────────────────────────┐
+│ Every issue stays for facts, money and learning.                            │
+│ Search issues…   Views   Filters                  Monthly report  Record issue│
+├ VIEW / FILTER ───────┬ ISSUE REGISTER ───────────────────────────────────────┤
+│ All Issues           │ Issue No. · Observed · Issue · Linked object          │
+│ Needs triage         │ Fault Owners · Current Action · Money · Review state  │
+│ Wednesday review     │                                                       │
+│ Internal issues      │ IS-2608-0001 · 14 Sep                                │
+│ Waiting response     │ Unit CU-000128 was damaged…                          │
+│ Waiting finding      │ PO-2041 · Hookka                                     │
+│ Cost not recorded    │ Supplier has not answered                            │
+│ Recovery not…        │ Ask supplier for an answer                           │
+│ Closed · Voided      │ RM80 incurred · Waiting review                       │
+└──────────────────────┴───────────────────────────────────────────────────────┘
+
+The default view is `All Issues`; materiality never removes routine Issues. Search matches Issue No.,
+official English, linked object number, governed Related Party and authorised staff identity. Filters
+are `Observed`, `Source module`, `Issue type`, `Materiality`, `Related Party`, `Internal team/person`,
+`Review state`, `Current-action state`, `Money state` and `Repeat/related`. Saved views are governed
+combinations of these filters, not separately calculated lists. Search, selected view, filters and
+opened `issue` identity are URL-visible and individually removable under one `Clear filters`.
+
+The Register is reference truth. Selecting a row opens the Issue workspace; no row-level fault,
+money, close or result mutation exists. `Current Action` uses the shared two-line presentation and
+opens the exact action/result section. It never says `Set next action`: when no valid action exists,
+it states the lifecycle fact such as `No current action`, `Waiting for triage rule` or `Closed`, and a
+configuration failure remains visible to authorised supervision.
+
+## §11.2 · Issue workspace composition
+
+The Issue workspace is a full object detail, not a wide generic modal. Its fixed identity header is
+`Issue No. · lifecycle state · materiality`, with links to exact owning objects. The reading order is:
+
+1. `What is true` — official generated English and observed/source facts;
+2. `Current Action` — structured owner, fact/problem, action, recipient, required result, due and
+   exact `Record result` door when the signed-in actor is authorised;
+3. `Linked records` — live read-only identities/statuses from owning modules;
+4. `Accountability` — Found by, Staff involved, Fault Owners, Action Owner, Cost Bearer and Service
+   Provider kept distinct;
+5. `Money` — incurred, recoverable and recovered tracks with Finance doors, never local arithmetic;
+6. `Evidence & timeline` — append-only evidence, responses, findings, actions and corrections;
+7. `Review & learning` — standard/full review, Wednesday outcome and prevention evidence;
+8. `Related Issues & history` — repeat links, merge/split/reopen/void evidence.
+
+Only the current relevant section expands by default. On desktop, a quiet section index may remain
+sticky beside the document. The primary action changes with lifecycle and permission; there is never
+more than one competing blue action in a section. Closing the detail preserves Register search/view.
+
+## §11.3 · Record Issue and current-action generation
+
+`Record issue` follows §4 one governed question per step, with Back and a visible progress sentence.
+Entering from an owning object pre-fills and locks its typed identity while allowing the reporter to
+correct a visibly wrong link through a governed search. Dates use the shared date control; proof uses
+the governed uploader and records actual files, not a proof-type answer with no attachment.
+
+The system—not the reporter—derives source module, official English, materiality suggestion, review
+requirement, owner rule, next-action choices and due law from structured answers/settings. The
+reporter confirms the generated factual preview and may choose only a governed result/action branch.
+They never type an arbitrary action, required result or due date to make intake pass. `I am not sure`
+opens a complete evidence-check action owned by Issue Triage Duty.
+
+Creation is atomic: Issue identity, typed links, intake facts, evidence references and first governed
+action either persist together or not at all (BUILT 2026-09-17: `issue_record_issue`, 0526, keyed by the client `request_id`). An uncertain response reconciles by request/Issue
+identity before retry; it cannot create a duplicate incident. Success opens the new Issue workspace.
+
+`Record result` shows the exact action being completed and only its governed result choices. Each
+choice names the evidence required and the derived consequence before confirmation. One atomic
+transition records result, actual actor, normal owner, cover, time and evidence, then completes or
+replaces the occurrence. There is no generic `Save result`, free-text-only completion or manual
+`Done`. Optional detail supplements a structured result and never determines status.
+
+### Intake and result validation copy
+
+| Condition | Exact sentence |
+|---|---|
+| Problem object missing | `Choose what has a problem.` |
+| Observed problem missing | `Choose what you saw.` |
+| Finder missing | `Choose who found the issue.` |
+| Observed date missing | `Choose when the issue was found.` |
+| Required typed source missing | `Find and choose the linked record.` |
+| Required proof branch has no evidence | `Add the required proof.` |
+| Generated facts not confirmed | `Check the facts before recording this issue.` |
+| No governed action rule can be derived | `The next action could not be worked out. Ask an Issue Tracker reviewer to check the rules.` |
+| Result choice missing | `Choose what happened.` |
+| Result evidence missing | `Add the evidence needed for this result.` |
+| Action already changed/completed (404) | warning icon plus `Action changed · Review again` |
+| Create/result uncertain — network error, timeout, no answer | warning icon plus `Not confirmed · Try again`; never `not recorded`. A retry of the same answers reuses the request id, so it cannot record a second Issue |
+| Create refused by the server with an error | `Issue not recorded · Try again` |
+| Result refused by the server with an error | `Result not recorded · Try again` |
+| Permission refused (403) | `Only {acting person} can record this.`; only when no acting person can be named: `You do not have access to record this result.` Never `Only {Duty} can record this result.` — a Duty is not the person who acts |
+
+Owner ruling 2026-09-17 (HF-2). A 400/422 shows the sentence of the first wrong step and opens that
+step. Every sentence appears inside the open dialog, takes focus and keeps every answer; the submit
+button accepts one request at a time.
+
+The page focuses the first invalid governed answer and preserves all valid answers/files. A raw
+database, validation-library or status-code sentence never reaches the operator.
+
+## §11.4 · Register and detail states
+
+| State | Required presentation and behaviour |
+|---|---|
+| Loading | Keep view/search/filter shell; row/detail skeletons match final geometry; never show `0 issues` early |
+| True empty | `No issues recorded` only when the complete authorised source is healthy; `Record issue` remains available |
+| No match | `No issues match these filters` · `Clear filters`; never imply there is no history |
+| List source failed | `Issue Tracker could not be opened` · `Try again`; footer does not print zero |
+| Detail source failed | Keep selected Issue identity where safe · name failed section · retry it without closing the Register |
+| No current action | Print exact lifecycle reason; do not invite a generic next action |
+| Not assigned | Print governed Duty and Staff & Duties correction door; Issue remains visible in Register and Team Work health |
+| Late action | Exact due date/working-days-late from shared Work; blocked/review state does not hide lateness |
+| Permission refused | No protected evidence, people, money or counts leak; return to authorised Register scope |
+| Save in progress | Disable duplicate submit; preserve entered structured facts; show one progress state |
+| Save failed/uncertain | Keep answers/evidence; reconcile original request before retry; never fabricate success |
+| Closed/voided | Read-only full authorised history with closure/void actor, reason and surviving links |
+
+At 1440px and above use filter rail + Register and full-width object detail. At 1024–1439px collapse
+the filter rail behind `Filters` while retaining the table's identity and action columns. Below
+1024px each Issue becomes a vertical reference row in the same column order; no sideways eight-column
+table, clipped official English or three-card accountability grid. Intake and result flows are
+single-column, touch-safe and resumable. Hover evidence is also accessible by focus/tap.
+
+## §11.5 · Current → proposed gap audit — 2026-09-15
+
+| Current branch evidence | Required Blueprint state |
+|---|---|
+| Register, saved-view labels, Record issue, object detail, monthly-report door and versioned action result exist | Retain identities and authoritative doors; rebuild presentation to §11.1–§11.4 |
+| Current list has no governed loading, error, true-empty or no-match treatment and prints `0 issues` before source health | Add explicit source-aware states; failed/unknown is never zero |
+| Current views are local state; search and structured filters are absent | Use one authorised query contract with URL-visible view/search/filters |
+| Current eight-column table relies on horizontal overflow | Preserve desktop reference table; use vertical rows below 1024px |
+| Current row says `No current action` when no occurrence exists (HF-2, 2026-09-17) | Replace with exact lifecycle/configuration fact; no generic action invention |
+| Current detail is one wide modal with three simplified accountability cards | Use the governed object-detail reading order and keep all distinct identities/evidence |
+| Current intake asks for free-form linked identity/date facts and lets reporter choose action, required result and due | Make typed object/date/evidence controls and system-derived action/due law authoritative |
+| Current proof choice can save without actual evidence attachment | Require governed file/evidence record where the chosen branch says proof exists |
+| Current result flow uses generic choices plus free-text evidence and `Save result` | Show action-specific result/evidence choices and one atomic transition with actual actor/cover |
+| Current tests prove only basic register/intake/action opening | Add source-state, URL, permission, identity, atomic retry, action derivation and 1440/1024/390 responsive evidence |
+
+## §11.6 · Permission matrix
+
+| Capability | Authorised actor | Everyone else |
+|---|---|---|
+| Read Issue/Register | Permissioned Operations/Principal and specifically authorised reviewers | No row, count, identity, evidence or money leak |
+| Record Issue | Any authorised observer/reviewer, including about another person | No intake door |
+| Add involved-staff response | That staff member or authorised recorder acting with attributed evidence | Cannot overwrite observed facts/finding |
+| Perform Current Action | Shared Work's resolved acting person with the action's required capability | Read-only action facts or no access |
+| Record Current Action result | Same authorised actor/proxy law checked at submit | Refused without changing occurrence |
+| Confirm Fault Owner/finding | Review-authorised Operations/Principal, not automatically the involved person | May add response only where authorised |
+| Record/link money | Finance through Finance's source doors | Issue Tracker reads links only |
+| Waive recovery / close critical or restricted Issue | Principal or governed authority | No control; never a disabled imitation |
+| Merge, split, void or reopen | Restricted governed authority with reason/evidence | Read-only lifecycle history |
+| Approve/send Related Party report | Authorised business owner; external transmission separately confirmed | Preview only within permission scope |
+
+Permission is checked again by each write door. Visibility of an Issue or Work item never implies
+authority to decide fault, post money, waive recovery, send externally or close it.
+
+## §11.7 · Issue Tracker acceptance contract
+
+The page is ready for owner acceptance only when all are demonstrable:
+
+- routine, significant and critical Issues enter one Register with one permanent searchable number;
+- source-object entry prefills a typed link and preserves authoritative source facts;
+- the guided intake reaches a generated official-English preview without a required blank narrative;
+- source module, materiality/review rule, owner rule, action choices, required result and due law are
+  system-derived; staff cannot type an arbitrary action/date to create a valid Issue;
+- evidence branches that say proof exists retain an actual governed file/evidence record;
+- exactly one open versioned action exists, projects once into Work and completes/replaces atomically
+  with normal owner, cover, actual actor, result, evidence and time;
+- all accountability identities and all three money tracks remain separate and reconcile to their
+  owning sources;
+- saved views are reproducible filters; URL search/view/filter/Issue selection survives detail and
+  cross-module navigation;
+- permissions in §11.6 pass positive and negative authenticated tests without leaked counts/details;
+- loading, true-empty, no-match, partial/detail failure, not-assigned, late, uncertain-save,
+  closed and voided states match §11.4;
+- duplicate create/result retries, concurrent result attempts, merge/split/reopen/void and correction
+  preserve one incident/action history without deletion;
+- Register, object detail, intake, result and monthly-report paths remain readable and keyboard/touch
+  operable at 1440, 1024 and 390px;
+- Wednesday review and Related Party report totals trace back to distinct Issues and Finance links,
+  never duplicated action/task rows.
 
 # §12 · Legacy Service Notes
 

@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import { Hono } from "hono";
 import { authMiddleware, _setJwksForTesting } from "../../middleware/auth";
 import stockPlanRouter from "./stock-plan";
@@ -33,7 +26,6 @@ vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn()
 import { userClient } from "../../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-plan";
 const env = {
   SUPABASE_URL,
   SUPABASE_ANON_KEY: "test-anon",
@@ -63,29 +55,12 @@ function buildApp() {
 }
 const app = buildApp();
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, email = "khoryee@carres.com") {
-  return new SignJWT({ email, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject(ME)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt(ME, { email, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -147,13 +122,12 @@ function buildSb(opts: SbOpts = {}) {
       if (table === "ops_stock_plan_lines") return chainFor(opts.lines ?? []);
       if (table === "ops_stock_items") return chainFor(opts.stock ?? []);
       if (table === "order_lines") return chainFor(opts.sales ?? []);
-      if (table === "app_users")
-        return chainFor([{ id: ME, name: "Khor Yee" }]);
       return chainFor([]);
     }),
     rpc: vi.fn(async (name: string, args: unknown) => {
       rpcCalls.push([name, args]);
       if (name === "my_org_duties") return { data: opts.duties ?? [], error: null };
+      if (name === "actor_display_names") return { data: [{ id: ME, name: "Khor Yee" }], error: null };
       if (opts.rpcError) return { data: null, error: opts.rpcError };
       return { data: opts.rpcData ?? null, error: null };
     }),

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,9 +12,6 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 const BILL_ID = "aaaaaaaa-0000-4000-8000-000000000001";
 const VOUCHER_ID = "bbbbbbbb-0000-4000-8000-000000000002";
@@ -24,25 +21,11 @@ const PO_LINE_ID = "eeeeeeee-0000-4000-8000-000000000005";
 const FILE_UUID = "ffffffff-0000-4000-8000-000000000006";
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -124,6 +107,23 @@ describe("GET readers", () => {
     expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_grn_candidates", { p_supplier_id: SUPPLIER_ID });
   });
 
+  it("GET /bills/grn-candidates adds each PO's payment terms (0530)", async () => {
+    const inFn = vi.fn().mockResolvedValue({ data: [{ id: "PO-1", terms_days: 14 }], error: null });
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: [{ po_id: "PO-1" }, { po_id: "PO-2" }], error: null }),
+      from: vi.fn(() => ({ select: () => ({ in: inFn }) })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await call("/bills/grn-candidates");
+    expect(sb.from).toHaveBeenCalledWith("purchase_orders");
+    expect(inFn).toHaveBeenCalledWith("id", ["PO-1", "PO-2"]);
+    expect(await res.json()).toEqual({ rows: [
+      { po_id: "PO-1", po_terms_days: 14 },
+      { po_id: "PO-2", po_terms_days: null },
+    ] });
+  });
+
   it("GET /outstanding with no filter asks for every supplier", async () => {
     const sb = mockRpc({ data: [], error: null });
     await call("/outstanding");
@@ -166,7 +166,7 @@ describe("GET readers", () => {
     const res = await call("/suppliers");
     expect(res.status).toBe(200);
     expect(from).toHaveBeenCalledWith("suppliers");
-    expect(select).toHaveBeenCalledWith("id, name, kind");
+    expect(select).toHaveBeenCalledWith("id, name, kind, terms_days");
   });
 });
 
@@ -185,10 +185,12 @@ describe("bills", () => {
         {
           warehouse_receipt_id: RECEIPT_ID, po_line_id: PO_LINE_ID, account_code: null,
           description: null, sku: null, qty: 5, unit_price: 105, amount: null,
+          department_type: null, department_id: null,
         },
         {
           warehouse_receipt_id: null, po_line_id: null, account_code: "6200",
           description: "Rent", sku: null, qty: null, unit_price: null, amount: 3000,
+          department_type: null, department_id: null,
         },
       ],
       p_due_date: null,
@@ -273,12 +275,31 @@ describe("payment vouchers", () => {
       p_payee_name: null,
       p_voucher_date: "2026-09-11",
       p_pay_from_account_code: "1120",
-      p_lines: [{ account_code: "6500", description: "Bank charge", amount: 5 }],
+      p_lines: [{ account_code: "6500", description: "Bank charge", amount: 5, department_type: null, department_id: null }],
       p_allocations: [{ bill_id: BILL_ID, amount: 1025 }],
       p_pay_method: "BANK_TRANSFER",
       p_pay_reference: "TT-1",
       p_narration: null,
     });
+    // No advance, no advance argument: this call also works on a database without 0484.
+    expect(sb.rpc.mock.calls[0]?.[1]).not.toHaveProperty("p_advance_amount");
+  });
+
+  it("POST /vouchers carries an advance with no bill (pay before the bill)", async () => {
+    const sb = mockRpc({ data: VOUCHER_ID, error: null });
+    const res = await call("/vouchers", {
+      method: "POST",
+      body: { ...goodVoucher, allocations: [], lines: [], advanceAmount: 1500 },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc.mock.calls[0]?.[1]).toMatchObject({ p_allocations: [], p_lines: [], p_advance_amount: 1500 });
+  });
+
+  it.each([-1, 10.005])("POST /vouchers refuses an advance of %s before the database", async (advanceAmount) => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call("/vouchers", { method: "POST", body: { ...goodVoucher, advanceAmount } });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("POST /vouchers refuses an amount field (the total is computed)", async () => {
@@ -305,6 +326,23 @@ describe("payment vouchers", () => {
     expect(await res.json()).toMatchObject({ code: "separation_of_duties" });
   });
 
+  it("approve by the checker: 403 checker_cannot_approve keeps the database's sentence (0529)", async () => {
+    mockRpc({
+      data: null,
+      error: {
+        code: "42501",
+        message: "You checked payment voucher PV-1, so somebody else must approve it. Three different people prepare, check and approve a payment.",
+        details: "checker_cannot_approve",
+      },
+    });
+    const res = await call(`/vouchers/${VOUCHER_ID}/approve`, { method: "POST" });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: "checker_cannot_approve",
+      message: expect.stringContaining("You checked payment voucher PV-1"),
+    });
+  });
+
   it("approve by someone without the approver duty: 403 keeps the reason code", async () => {
     mockRpc({
       data: null,
@@ -327,6 +365,130 @@ describe("payment vouchers", () => {
     const res = await call(`/vouchers/${VOUCHER_ID}/reject`, { method: "POST", body: {} });
     expect(res.status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("supplier advances", () => {
+  const APPLICATION_ID = "abababab-0000-4000-8000-000000000007";
+  const MONEY_BACK_ID = "cdcdcdcd-0000-4000-8000-000000000008";
+  const KEY = "efefefef-0000-4000-8000-000000000009";
+
+  it("GET /advances passes the supplier filter", async () => {
+    const sb = mockRpc({ data: [{ voucher_id: VOUCHER_ID, advance_open: 900 }], error: null });
+    const res = await call(`/advances?supplierId=${SUPPLIER_ID}`);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advances", { p_supplier_id: SUPPLIER_ID });
+    expect(await res.json()).toEqual({ rows: [{ voucher_id: VOUCHER_ID, advance_open: 900 }] });
+  });
+
+  it("apply: knocks the advance off one bill", async () => {
+    const sb = mockRpc({ data: APPLICATION_ID, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      body: { billId: BILL_ID, amount: 600 },
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: APPLICATION_ID });
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_apply", {
+      p_voucher_id: VOUCHER_ID,
+      p_bill_id: BILL_ID,
+      p_amount: 600,
+    });
+  });
+
+  it.each([0, -5, 1.005])("apply refuses an amount of %s before the database", async (amount) => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      body: { billId: BILL_ID, amount },
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("apply: more than the advance has left reaches the page as 422 with its code", async () => {
+    mockRpc({
+      data: null,
+      error: { code: "P0001", message: "Only RM 900.00 of the advance on PV-1 is left.", details: "advance_over_applied" },
+    });
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      body: { billId: BILL_ID, amount: 901 },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "advance_over_applied" });
+  });
+
+  it("take off: needs a reason and names the knock-off", async () => {
+    const sb = mockRpc({ data: APPLICATION_ID, error: null });
+    const bad = await call(`/advance-applications/${APPLICATION_ID}/cancel`, { method: "POST", body: { reason: "" } });
+    expect(bad.status).toBe(422);
+    const ok = await call(`/advance-applications/${APPLICATION_ID}/cancel`, {
+      method: "POST",
+      body: { reason: "Wrong bill" },
+    });
+    expect(ok.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_application_cancel", {
+      p_application_id: APPLICATION_ID,
+      p_reason: "Wrong bill",
+    });
+  });
+
+  it("money back: records it with its double-press key", async () => {
+    const sb = mockRpc({ data: MONEY_BACK_ID, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/money-back`, {
+      method: "POST",
+      body: { moneyBackDate: "2026-09-15", moneyAccountCode: "1120", amount: 300, reference: "TT-BACK", idempotencyKey: KEY },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_money_back_record", {
+      p_voucher_id: VOUCHER_ID,
+      p_money_back_date: "2026-09-15",
+      p_money_account_code: "1120",
+      p_amount: 300,
+      p_reference: "TT-BACK",
+      p_narration: null,
+      p_idempotency_key: KEY,
+    });
+  });
+
+  it("money back refuses a missing account before the database", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/money-back`, {
+      method: "POST",
+      body: { moneyBackDate: "2026-09-15", moneyAccountCode: "", amount: 300 },
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("cancel money back: someone without the approver duty gets 403 with the reason code", async () => {
+    mockRpc({
+      data: null,
+      error: { code: "42501", message: "Cancelling money back takes the finance approver.", details: "not_finance_approver" },
+    });
+    const res = await call(`/money-back/${MONEY_BACK_ID}/cancel`, { method: "POST", body: { reason: "Bank returned it" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_finance_approver" });
+  });
+
+  it("cancel money back passes the reason", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/money-back/${MONEY_BACK_ID}/cancel`, { method: "POST", body: { reason: "Bank returned it" } });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_money_back_cancel", {
+      p_money_back_id: MONEY_BACK_ID,
+      p_reason: "Bank returned it",
+    });
+  });
+
+  it("the advance doors refuse a dealer", async () => {
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      role: "dealer",
+      body: { billId: BILL_ID, amount: 1 },
+    });
+    expect(res.status).toBe(403);
   });
 });
 
@@ -388,5 +550,33 @@ describe("files", () => {
     expect(res.status).toBe(200);
     expect(createSignedUrl).toHaveBeenCalledWith(path, 300);
     expect(await res.json()).toEqual({ url: "https://t.x/signed" });
+  });
+});
+
+describe("departments (0540)", () => {
+  it("GET /bills?departmentType= keeps the bills with a line in that department", async () => {
+    // The line read is PAGED — one `.range()` per page, short page ends it.
+    const eq = vi.fn();
+    const range = vi.fn().mockResolvedValue({ data: [{ bill_id: BILL_ID }], error: null });
+    const q = { eq, order: vi.fn(), range };
+    eq.mockReturnValue(q);
+    q.order.mockReturnValue(q);
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: [{ id: BILL_ID }, { id: VOUCHER_ID }], error: null }),
+      from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue(q) }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await call("/bills?departmentType=OFFICE");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ rows: [{ id: BILL_ID }] });
+    expect(sb.from).toHaveBeenCalledWith("supplier_bill_lines");
+    expect(eq).toHaveBeenCalledWith("department_type", "OFFICE");
+    expect(range).toHaveBeenCalledWith(0, 999);
+  });
+
+  it("GET /bills refuses an Office department with an id", async () => {
+    mockRpc({ data: [], error: null });
+    expect((await call(`/bills?departmentType=OFFICE&departmentId=${BILL_ID}`)).status).toBe(422);
   });
 });

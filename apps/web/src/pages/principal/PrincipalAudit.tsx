@@ -49,14 +49,14 @@ const UUID_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 function displayAction(action: string): string {
   return action.replace(
     new RegExp(LEGACY_REQUEST_TOKEN.source, "g"),
-    "Manual Purchase",
+    "Manual Purchase Request",
   );
 }
 
 function displayRef(ref: string | null): string | null {
   if (!ref) return null;
   const trimmed = ref.trim();
-  if (LEGACY_REQUEST_TOKEN.test(trimmed)) return "Manual Purchase";
+  if (LEGACY_REQUEST_TOKEN.test(trimmed)) return "Manual Purchase Request";
   if (UUID_TOKEN.test(trimmed)) return null;
   return trimmed.slice(0, 8);
 }

@@ -38,17 +38,24 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
      visible strings, set below the real count so an unrelated edit does not
      trip them and far above zero so a matcher that stopped matching cannot
      make every assertion below vacuously true. */
-  describe("the collections desk — the Payments Register", () => {
-    itSaysNoBannedWord(join(PAGES, "finance", "PaymentRegister.tsx"), {
+  describe("Payment Records — the money listing", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentRecords.tsx"), {
       minStrings: 70,
-      expectString: "Back to Payments",
+      expectString: "Back to Payment Records",
     });
   });
 
-  describe("the collections desk — the Invoices Register", () => {
-    itSaysNoBannedWord(join(PAGES, "finance", "InvoiceRegister.tsx"), {
-      minStrings: 110,
-      expectString: "Goods ready",
+  describe("the collection desk — the Payment Monitor", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentMonitor.tsx"), {
+      minStrings: 40,
+      expectString: "Show payment details",
+    });
+  });
+
+  describe("the collection workspace behind the Monitor row", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentCollectionWorkspace.tsx"), {
+      minStrings: 40,
+      expectString: "Do not ask the customer to pay yet.",
     });
   });
 
@@ -78,7 +85,7 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
     );
     itSaysNoBannedWord(
       join(PAGES, "operation", "components", "PoIssueEvidence.tsx"),
-      { minStrings: 20, expectString: "Record the PDF sent" },
+      { minStrings: 20, expectString: "PO sent to supplier" },
     );
   });
 
@@ -155,7 +162,7 @@ describe("the scanner reads what a human reads", () => {
   });
 
   it("carries the whole banned list, so a rule cannot be quietly dropped", () => {
-    expect(BANNED.length).toBe(12);
+    expect(BANNED.length).toBe(14);
     expect(BANNED.map(([re]) => re.source)).toContain("\\bchase[ds]?\\b");
   });
 });

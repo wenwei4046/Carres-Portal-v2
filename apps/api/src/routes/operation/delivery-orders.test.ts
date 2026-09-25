@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -15,34 +15,18 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string, warehouseId?: string) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000001", {
     email: `${role}@x`,
     app_metadata: { role, ...(warehouseId ? { warehouse_id: warehouseId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
+  vi.mocked(adminClient).mockClear();
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -155,6 +139,35 @@ describe("GET /api/operation/delivery-orders — the register", () => {
     expect(selected).toContain("ops_order_control(delivery_photos)");
   });
 
+  it("§6.1 (0489) — the register read carries the proof reviews and the attempt evidence, and a missing relation reads as none", async () => {
+    const review = { id: "r1", do_number: "DO-180826-3035", decision: "rejected", reason: "Lobby, not goods", reviewed_at: "2026-09-12T01:00:00Z" };
+    mockSb([
+      { data: [DO_ROW] },
+      { data: [] }, // attempts
+      { data: [] }, // handover events
+      { data: [review] }, // proof reviews
+      { error: { code: "42P01", message: "relation does not exist" } }, // evidence table not yet applied
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { proofReviews: unknown[]; attemptEvidence: unknown[] };
+    expect(body.proofReviews).toEqual([review]);
+    expect(body.attemptEvidence).toEqual([]);
+  });
+
+  it("§6.1 — any other proof-record failure is a failed register, never a silent empty queue", async () => {
+    mockSb([
+      { data: [DO_ROW] },
+      { data: [] },
+      { data: [] },
+      { error: { code: "42501", message: "permission denied" } },
+      { data: [] },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(500);
+    expect(((await res.json()) as { error: string }).error).toBe("proof_reviews_read_failed");
+  });
+
   it("computes nothing server-side — no owner, action or status field rides a row", async () => {
     mockSb([{ data: [DO_ROW] }, { data: [] }]);
     const res = await call("", "operation");
@@ -191,6 +204,10 @@ describe("GET /api/operation/delivery-orders/:id — the document", () => {
       { data: [] }, // handover events (0363)
       { data: [] }, // handover evidence ledger (0440)
       { data: [{ sku: "JAGER-SS", variant: "Jager Super Single" }] },
+      { data: [] }, // delivery_order_units (0424)
+      { data: [] }, // delivery_handover_event_units
+      { data: [] }, // proof reviews (0489)
+      { data: [] }, // attempt evidence (0489)
     ]);
     const res = await call("/DO-180826-3035", "operation");
     expect(res.status).toBe(200);
@@ -211,6 +228,130 @@ describe("GET /api/operation/delivery-orders/:id — the document", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { message: string };
     expect(body.message).toContain("not found");
+  });
+});
+
+describe("§6.1 (0489) — the review, the evidence binding and the signed paper", () => {
+  const DOC = { id: DO_ROW.id, do_number: DO_ROW.do_number, order_id: DO_ROW.order_id };
+
+  it("a review goes through the governed door with its decision and reason", async () => {
+    const { rpc } = mockSb([{ data: DOC }], [{ data: { id: "r1", decision: "rejected" } }]);
+    const res = await call("/DO-180826-3035/proof-review", "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "rejected",
+        reason: "The photo shows the lobby, not the goods",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000001",
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("delivery_proof_review", {
+      p_do_number: "DO-180826-3035",
+      p_attempt_id: null,
+      p_decision: "rejected",
+      p_reason: "The photo shows the lobby, not the goods",
+      p_expected_evidence_at: "2026-09-16T01:00:00.000Z",
+      p_idempotency_key: "00000000-0000-4000-8000-000000000001",
+    });
+  });
+
+  it("a refusal or a request for more must say why — refused before any call", async () => {
+    const { rpc } = mockSb([{ data: DOC }]);
+    const res = await call("/DO-180826-3035/proof-review", "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "more_required",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000002",
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the door's own refusal reaches the operator in words", async () => {
+    mockSb([{ data: DOC }], [{ error: { code: "22023", message: "that delivery attempt does not belong to this document", details: "attempt_mismatch" } }]);
+    const res = await call("/DO-180826-3035/proof-review", "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "accepted",
+        attemptId: "00000000-0000-0000-0000-0000000f0001",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000003",
+      }),
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(((await res.json()) as { message: string }).message).toContain("does not belong");
+  });
+
+  it("reports stale proof as a conflict so the operator reviews the latest evidence", async () => {
+    mockSb([{ data: DOC }], [{
+      error: {
+        code: "40001",
+        message: "The delivery proof changed. Review the latest proof.",
+        details: "stale_proof_evidence",
+      },
+    }]);
+    const res = await call("/DO-180826-3035/proof-review", "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "accepted",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000004",
+      }),
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: "conflict",
+      code: "stale_proof_evidence",
+      message: "The delivery proof changed. Review the latest proof.",
+    });
+  });
+
+  it("evidence binds each file to the exact attempt, and only from this order's own prefixes", async () => {
+    const { rpc } = mockSb([{ data: DOC }], [{ data: { id: "e1" } }, { data: { id: "e2" } }]);
+    const ok = await call(`/${DO_ROW.id}/attempts/00000000-0000-0000-0000-0000000f0001/evidence`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        files: [
+          { path: `order/${DO_ROW.order_id}/a.jpg`, kind: "photo" },
+          { path: `order-${DO_ROW.order_id}/do.pdf`, kind: "document" },
+        ],
+      }),
+    });
+    expect(ok.status).toBe(201);
+    expect(rpc).toHaveBeenCalledTimes(2);
+    mockSb([{ data: DOC }]);
+    const bad = await call(`/${DO_ROW.id}/attempts/00000000-0000-0000-0000-0000000f0001/evidence`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ files: [{ path: "order/someone-else/a.jpg", kind: "photo" }] }),
+    });
+    expect(bad.status).toBe(422);
+  });
+
+  it("the signed Delivery Order attaches through its OWN door — never the deliver-and-deduct one", async () => {
+    const { rpc } = mockSb([{ data: DOC }], [{ data: { attempt_id: "a1" } }]);
+    const res = await call("/DO-180826-3035/signed-document", "operation", {
+      method: "POST",
+      body: JSON.stringify({ doFilePath: `order-${DO_ROW.order_id}/x-DO.pdf`, signerName: "Mr Tan" }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("delivery_signed_do_attach", {
+      p_do_number: "DO-180826-3035",
+      p_do_file_path: `order-${DO_ROW.order_id}/x-DO.pdf`,
+      p_signed_by: "Mr Tan",
+      p_signature_path: null,
+    });
+    expect(rpc).not.toHaveBeenCalledWith("operation_attach_do_and_deliver", expect.anything());
+  });
+
+  it("refuses a role outside operation/principal on every §6.1 door", async () => {
+    for (const path of ["/DO-1/proof-review", "/DO-1/attempts/x/evidence", "/DO-1/signed-document"]) {
+      mockSb([]);
+      const res = await call(path, "supplier", { method: "POST", body: JSON.stringify({}) });
+      expect([401, 403]).toContain(res.status);
+    }
   });
 });
 
@@ -468,6 +609,92 @@ describe("POST /:id/outbound-prep — scan / check / pack exact Units (0424)", (
     );
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⭐ THE SIGNED DELIVERY ORDER'S VIEWING DOOR (owner ruling 2026-09-11).
+ *
+ * The register's `Driver submission` column offers a link to the paper the
+ * customer signed, and no reader existed for it: `orders.do_file_path` lives
+ * in a PRIVATE bucket, so the Worker signs it after its own role gate — the
+ * same 0280 pattern the photo ledger already uses. Signed ON DEMAND, because
+ * a list that pre-signed every row would hand out hundreds of one-hour links
+ * nobody clicks.
+ */
+describe("GET /:id/signed-document — the paper the customer signed", () => {
+  const DO_ID = "00000000-0000-0000-0000-0000000d0001";
+
+  it("signs the order's document for viewing, resolved by the DO number", async () => {
+    mockSb([
+      {
+        data: {
+          id: DO_ID,
+          do_number: "DO-180826-3035",
+          orders: { id: "a", do_number: "DO-180826-3035", do_file_path: "order-a/signed.pdf", do_uploaded_at: "2026-08-20T10:00:00Z" },
+        },
+      },
+    ]);
+    const createSignedUrl = vi
+      .fn()
+      .mockResolvedValue({ data: { signedUrl: "https://signed/do.pdf" }, error: null });
+    const bucket = vi.fn().mockReturnValue({ createSignedUrl });
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: bucket } } as never);
+
+    const res = await call("/DO-180826-3035/signed-document", "operation");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      url: "https://signed/do.pdf",
+      uploadedAt: "2026-08-20T10:00:00Z",
+    });
+    /* The customer-facing DO lives in the delivery-orders bucket, not the
+       proof-of-delivery one the photos use. */
+    expect(bucket).toHaveBeenCalledWith("delivery-orders");
+  });
+
+  it("a document with no signed paper answers an ABSENCE, never a 500", async () => {
+    mockSb([
+      { data: { id: DO_ID, do_number: "DO-1", orders: { id: "a", do_file_path: null, do_uploaded_at: null } } },
+    ]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ url: null, uploadedAt: null });
+  });
+
+  it("does not sign the final DO’s mirror when the requested DO is intermediate", async () => {
+    mockSb([{ data: { id: DO_ID, do_number: "DO-1", orders: { do_number: "DO-2", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } } }, { data: [] }]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(await res.json()).toEqual({ url: null, uploadedAt: null });
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("opens this trip’s bound paper after the order mirror moves to the next trip", async () => {
+    mockSb([{ data: { id: DO_ID, do_number: "DO-1", orders: { do_number: "DO-2", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } } }, { data: [{ do_number: "DO-1", kind: "document", path: "order/first.pdf", recorded_at: "2026-09-13T10:00:00Z" }] }]);
+    const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed/first.pdf" }, error: null });
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: () => ({ createSignedUrl }) } } as never);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(200);
+    expect(createSignedUrl).toHaveBeenCalledWith("order/first.pdf", 3600);
+    expect(await res.json()).toEqual({ url: "https://signed/first.pdf", uploadedAt: "2026-09-13T10:00:00Z" });
+  });
+
+  it("reports an evidence read failure instead of inventing an absence", async () => {
+    mockSb([{ data: { id: DO_ID, do_number: "DO-1", orders: null } }, { error: { message: "read failed" } }]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(500);
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("404s a document that does not exist", async () => {
+    mockSb([{ data: null }]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses a role outside operation/principal", async () => {
+    mockSb([]);
+    const res = await call(`/${DO_ID}/signed-document`, "supplier");
+    expect([401, 403]).toContain(res.status);
   });
 });
 

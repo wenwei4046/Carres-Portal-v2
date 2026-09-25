@@ -3,6 +3,8 @@ import { cors } from "hono/cors";
 import { authMiddleware } from "./middleware/auth";
 import analyticsRouter from "./routes/analytics";
 import authRouter from "./routes/auth";
+import deliveryLinksRouter from "./routes/operation/delivery-links";
+import publicDeliveryLinkRouter from "./routes/public/delivery-link";
 import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
 import ordersRouter from "./routes/orders";
@@ -19,6 +21,7 @@ import operationStockRouter from "./routes/operation/stock";
 import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
 import operationBadgesRouter from "./routes/operation/badges";
+import registerLayoutsRouter from "./routes/operation/register-layouts";
 import operationDashboardRouter from "./routes/operation/dashboard";
 // `Jump to…` — the document half of the ONE global navigate-only command
 // surface (ui/MASTER, APPROVED / LOCKED 2026-08-11). Read-only, no create.
@@ -27,10 +30,12 @@ import operationMovementsRouter from "./routes/operation/movements";
 import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
+import deliverySettingsRouter from "./routes/operation/delivery-settings";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 // R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
 import supplierClaimsRouter from "./routes/operation/supplier-claims";
+import purchaseReturnsRouter from "./routes/operation/purchase-returns";
 // R6 — the ops half: review what the warehouse filed, then replay it through
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
@@ -78,9 +83,9 @@ import partnerPickupsBatchRouter from "./routes/partner/pickups-batch";
 import partnerPodRouter from "./routes/partner/pod";
 import pickupEventsRouter from "./routes/pickup-events/print";
 import financePaymentsRouter from "./routes/finance/payments";
-import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import paymentSettingsRouter from "./routes/finance/payment-settings";
+import collectionOwnerRouter from "./routes/finance/collection-owner";
 import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financePayablesRouter from "./routes/finance/payables";
@@ -89,6 +94,11 @@ import financeReconciliationRouter from "./routes/finance/reconciliation";
 import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
 // The read-only Finance Ledger — Journal, Trial Balance, Self-check.
 import financeLedgerRouter from "./routes/finance/ledger";
+import financeDealerCommissionRouter from "./routes/finance/dealer-commission";
+// The manual journal door — the principal's one write to the ledger (0462).
+import financeManualJournalsRouter from "./routes/finance/manual-journals";
+import financeMoneyMovesRouter from "./routes/finance/money-moves";
+import financeCardSettlementRouter from "./routes/finance/card-settlement";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
@@ -130,7 +140,6 @@ import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
-import { runSupplierClaimSweepCron } from "./cron/supplier-claim-sweep";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -166,6 +175,10 @@ app.get("/health", (c) => c.json({ ok: true, commit: c.env.DEPLOY_SHA ?? "local"
 // there is no Supabase JWT). Signature verification is the trust boundary.
 app.route("/stripe", stripeWebhookRouter);
 
+// THE EXTERNAL LOGISTICS LINK (0581) — OUTSIDE the signed-in /api group: the
+// logistics company has no login. The 256-bit token is the trust boundary.
+app.route("/public/delivery-link", publicDeliveryLinkRouter);
+
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
 // POS-parity — MAINTAIN → Sales analysis flattened feed (principal only).
@@ -196,6 +209,8 @@ api.route("/account", accountRouter);
 // Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
+// 0528 — personal saved column layouts (Purchase Orders pilot), own rows only.
+api.route("/operation/register-layouts", registerLayoutsRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/jump", jumpRouter);
 api.route("/operation/movements", operationMovementsRouter);
@@ -209,6 +224,7 @@ api.route("/operation/orders", deliveryChainRouter);
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
 api.route("/operation/delivery-arrangements", deliveryArrangementsRouter);
+api.route("/operation/delivery-arrangements", deliveryLinksRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
 api.route("/operation/payment-approvals", paymentApprovalsRouter);
 // 0184 balance job — payment ledger + storage collect / waiver / delivery gate
@@ -236,6 +252,7 @@ api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
+api.route("/operation/delivery-settings", deliverySettingsRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
 api.route("/operation/pos", dispatchCustomerLegRouter);
@@ -264,9 +281,10 @@ api.route("/partner/pickups", partnerPickupsBatchRouter);
 api.route("/partner/pod", partnerPodRouter);
 api.route("/pickup-events", pickupEventsRouter);
 api.route("/finance/payments", financePaymentsRouter);
-api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
+// 0489 — one Sales Order keeps one collection owner (owner ruling 2026-09-13).
+api.route("/finance/collection-owner", collectionOwnerRouter);
 api.route("/finance/payment-storage", paymentStorageRouter);
 api.route("/finance/refunds", financeRefundsRouter);
 // Money in that is not a sale (0478): other debtor invoices and receipts.
@@ -278,6 +296,14 @@ api.route("/finance/payables", financePayablesRouter);
 api.route("/finance/exceptions", financeExceptionsRouter);
 // The read-only Finance Ledger. Also before the catch-all `/finance` router.
 api.route("/finance/ledger", financeLedgerRouter);
+// Dealer commission and renovation rebate rates and report (0544). Before the catch-all.
+api.route("/finance/dealer-commission", financeDealerCommissionRouter);
+// The manual journal (principal only). Before the catch-all as well.
+api.route("/finance/manual-journals", financeManualJournalsRouter);
+// Bank transfers and card payouts (0529). Before the catch-all as well.
+api.route("/finance/money-moves", financeMoneyMovesRouter);
+// Card settlement files and their matching (0572). Before the catch-all as well.
+api.route("/finance/card-settlement", financeCardSettlementRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);
@@ -300,6 +326,7 @@ api.route("/ops/issues", issuesRouter);
 api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);
+api.route("/operation/purchase-returns", purchaseReturnsRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/workspace-duties", workspaceDutiesRouter);
 api.route("/operation/work", operationWorkRouter);
@@ -320,11 +347,8 @@ export default {
       (async () => {
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
-        // R2 (0288) — an ETA that has passed with units still owed becomes a
-        // late-delivery claim. Idempotent, so a retry costs nothing.
-        await runSupplierClaimSweepCron(env).catch((e) =>
-          console.error("supplier-claim sweep failed:", (e as Error).message),
-        );
+        // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,
+        // never authority to create a product Claim.
       })(),
     );
   },

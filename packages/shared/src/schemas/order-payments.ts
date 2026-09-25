@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ledgerAccountCodeShape } from "../finance-ledger";
 
 /**
  * Order payment ledger — the balance job's foundation (Jess 2026-06-26
@@ -66,7 +67,7 @@ export interface PaymentMoneyAccount {
 export const paymentMethodSaveInput = z.object({
   method: paymentMethodKeySchema.nullish(),
   label: z.string().trim().min(1, "a payment method needs a name").max(40, "keep the name to 40 characters"),
-  accountCode: z.string().trim().regex(/^[0-9]{3,6}$/, "choose an account"),
+  accountCode: z.string().trim().regex(ledgerAccountCodeShape, "choose an account"),
   active: z.boolean().default(true),
 });
 export type PaymentMethodSaveInput = z.infer<typeof paymentMethodSaveInput>;
@@ -83,8 +84,9 @@ export const recordPaymentInputSchema = z.object({
   amount: z.number().positive("amount must be greater than 0"),
   paidOn: isoDate,
   /** 0476: a system word or a method from Settings → Payment (the SQL writer
-   *  checks which; an alias like `bank_transfer` folds to `bank`). */
-  method: paymentMethodKeySchema.default("cash"),
+   *  checks which; an alias like `bank_transfer` folds to `bank`). 0535: no
+   *  default — a payment with no method is refused, never guessed as cash. */
+  method: paymentMethodKeySchema,
   kind: z.enum(PAYMENT_KINDS).default("payment"),
   reference: z.string().trim().max(120).nullish(),
   note: z.string().trim().max(500).nullish(),
@@ -103,6 +105,27 @@ export const recordPaymentInputSchema = z.object({
   duplicateAck: z.boolean().optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
+
+/** payment/MASTER.md §16 — the reference a method must carry, or null when
+ *  it is optional. Mirrors the check in `_customer_payment_post` (0535,
+ *  widened by 0551): the key folds like `payment_method_key` (POS `credit` /
+ *  `installment` are card, `bank_transfer` is bank).
+ *
+ *  0551 added bank and DuitNow QR because card settlement for every non-GHL
+ *  acquirer is matched BY the reference — it is a reconciliation key, not
+ *  paperwork. Cash, online, other and a method a manager adds stay optional,
+ *  exactly as the writer leaves them: this list is closed, never "anything
+ *  not cash". THE one predicate — every form asks it, so no screen can drift
+ *  from the database. */
+export function requiredPaymentReference(
+  method: string | null | undefined,
+): "Approval code" | "Cheque number" | "Reference number" | null {
+  const k = (method ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (k === "cheque") return "Cheque number";
+  if (["card", "credit", "installment", "credit_card", "debit_card"].includes(k)) return "Approval code";
+  if (["bank", "bank_transfer", "duitnow_qr"].includes(k)) return "Reference number";
+  return null;
+}
 
 /** Collect a storage fee — POST /api/operation/orders/:id/storage/collect. Same
  *  shape as a payment minus `kind` (the route forces `kind:'storage'` + stamps
@@ -253,4 +276,16 @@ export function summarizePayments(
     outstanding: safeBill > 0 ? Math.max(0, safeBill - goodsPaid) : 0,
     storageCollected: byKind.storage,
   };
+}
+
+/** Goods money (payment + deposit, live rows only) recorded at or before an
+ *  invoice was issued — the "received before this invoice" line on the Sales
+ *  Invoice PDF (deposit then final invoice, KL Gateway 2026-09-18). */
+export function receivedBeforeInvoice(
+  payments: ReadonlyArray<{ amount: number; kind: PaymentKind; voided_at?: string | null; created_at: string }>,
+  issuedAt: string,
+): number {
+  const cut = Date.parse(issuedAt);
+  const s = summarizePayments(payments.filter((p) => Date.parse(p.created_at) <= cut), 0);
+  return Math.round((s.byKind.payment + s.byKind.deposit) * 100) / 100;
 }

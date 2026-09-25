@@ -2,7 +2,6 @@ import {
   type ReactNode,
   Fragment,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -69,6 +68,7 @@ import {
   type OpsStockListResponse,
   type OpsOrderControl,
   type OrderActionTrack,
+  requiredPaymentReference,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -86,6 +86,7 @@ import type {
   InvoiceTemplateData,
   SalesOrderTemplateData,
   PoTemplateData,
+  ReceiptTemplateData,
 } from "@/lib/pdf/types";
 import {
   qk,
@@ -102,9 +103,7 @@ import {
   useSaveOrderControl,
   useConfirmBooking,
   usePartnerBookingCheck,
-  useSetPartnerDeliveryRules,
   useDeliveryPhotos,
-  useUploadDeliveryPhoto,
   useOrderServiceCases,
   useOrderGuarantees,
   type OrderPaymentRow,
@@ -113,7 +112,7 @@ import {
 } from "@/lib/queries";
 import { methodLabel, useManualMethods } from "@/lib/payment-methods";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
@@ -148,7 +147,7 @@ import { waLink } from "@/lib/wa-link";
 import BookingSpine from "./BookingSpine";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
-import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
+import { MiniStopsBar, StopsEditor } from "./RouteStops";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -166,9 +165,9 @@ import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import { displayStageOf, type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
+import { DeliveryProofUploadButton } from "./DriverSubmission";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
-import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import AnnotationTimeline from "./AnnotationTimeline";
@@ -326,7 +325,6 @@ export default function OrderDetailDrawer({
   const [showDO, setShowDO] = useState(false);
   const [showAbandon, setShowAbandon] = useState(false);
   const [showConfirmProceed, setShowConfirmProceed] = useState(false);
-  const [showTransferReady, setShowTransferReady] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
   const [showServiceNote, setShowServiceNote] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
@@ -340,7 +338,6 @@ export default function OrderDetailDrawer({
       showDO ||
       showAbandon ||
       showConfirmProceed ||
-      showTransferReady ||
       showTopUp ||
       showServiceNote;
     if (anyModalOpen) return;
@@ -358,7 +355,6 @@ export default function OrderDetailDrawer({
     showDO,
     showAbandon,
     showConfirmProceed,
-    showTransferReady,
     showTopUp,
     showServiceNote,
   ]);
@@ -402,7 +398,6 @@ export default function OrderDetailDrawer({
               onDOClick={() => setShowDO(true)}
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
-              onTransferReadyClick={() => setShowTransferReady(true)}
               onTopUpClick={() => setShowTopUp(true)}
               onServiceNoteClick={() => setShowServiceNote(true)}
               onFollowUpClick={() => setShowFollowUp(true)}
@@ -433,13 +428,6 @@ export default function OrderDetailDrawer({
                 order={data.order}
                 lines={data.lines}
                 onClose={() => setShowConfirmProceed(false)}
-              />
-            )}
-            {showTransferReady && (
-              <TransferReadyDialog
-                order={data.order}
-                lines={data.lines}
-                onClose={() => setShowTransferReady(false)}
               />
             )}
             {showTopUp && (
@@ -556,7 +544,6 @@ interface DrawerBodyProps {
   onDOClick: () => void;
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
-  onTransferReadyClick: () => void;
   onTopUpClick: () => void;
   onFollowUpClick: () => void;
 }
@@ -720,7 +707,7 @@ function MiniBadge({
 }) {
   // v4 §6 — status = soft tint + dark same-hue text, NEVER a solid block
   // (the old solid-red nopo badge is gone). red = blocks · amber = warning ·
-  // green = ok; values from docs/UI-KIT.md §1.
+  // green = ok; values from docs/01-design-tokens.md.
   const TONE: Record<string, string> = {
     nopo: "bg-[#FCEBEB] text-[#A32D2D]",
     waiting: "bg-[#FAEEDA] text-[#854F0B]",
@@ -1294,7 +1281,6 @@ function DrawerBody({
   onDOClick,
   onAbandonClick,
   onConfirmProceedClick,
-  onTransferReadyClick,
   onTopUpClick,
   onServiceNoteClick,
   onFollowUpClick,
@@ -1641,7 +1627,7 @@ function DrawerBody({
   // is still >1 day away; red "Hold Delivery" from ETA−1 if still uncollected.
   // Applies to BOTH the goods balance and the storage fee; the header rolls up
   // the red (blocking) ones into one HOLD DELIVERY status.
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = appTodayIso();
   const daysToDelivery =
     !order.delivery_date_tbd && order.delivery_date
       ? Math.round(
@@ -2680,7 +2666,6 @@ function DrawerBody({
           orderId={order.id}
           pipelineStatus={pipelineStatus}
           onServiceNoteClick={onServiceNoteClick}
-          onTransferReadyClick={onTransferReadyClick}
           onConfirmProceedClick={onConfirmProceedClick}
           onTopUpClick={onTopUpClick}
           onAbandonClick={onAbandonClick}
@@ -3952,7 +3937,7 @@ function DrawerBody({
                         const end =
                           form.draft.storage_to.trim() ||
                           form.draft.logistic_eta.trim() ||
-                          new Date().toISOString().slice(0, 10);
+                          appTodayIso();
                         const days = Math.max(
                           0,
                           Math.round(
@@ -4137,7 +4122,7 @@ function DrawerBody({
                         {deliveryDateGapFact(chasePartnerName)}
                       </MiniBadge>
                     );
-                  return <MiniBadge tone="muted">No logistics picked</MiniBadge>;
+                  return <MiniBadge tone="muted">Logistics not assigned</MiniBadge>;
                 })()}
                 {/* deadline date lives ONCE — on the card header below (mono);
                     a second sans copy here read as "two fonts" (Jess). */}
@@ -4177,7 +4162,7 @@ function DrawerBody({
                           ? "Not confirmed"
                           : order.ops_assigned_logistic
                             ? deliveryDateGapFact(chasePartnerName)
-                            : "No logistics picked";
+                            : "Logistics not assigned";
                 return (
                   <div className="max-w-[700px]">
                     {/* Grounded delivery card (Loan template; Jess 2026-07-19) —
@@ -4206,9 +4191,9 @@ function DrawerBody({
                               className={`text-body font-semibold truncate ${
                                 deliveredDone ? "text-base-500" : "text-base-900"
                               }`}
-                              title={chasePartnerName ?? "No logistics picked yet"}
+                              title={chasePartnerName ?? "Logistics not assigned"}
                             >
-                              {chasePartnerName ?? "No logistics picked yet"}
+                              {chasePartnerName ?? "Logistics not assigned"}
                             </div>
                           </div>
                         </div>
@@ -4395,7 +4380,10 @@ function DrawerBody({
                           not-yet-delivered order; this row simply doesn't
                           render until then. */}
                       {deliveredDone && (
-                        <DeliveryPhotoRow orderId={order.id} />
+                        <DeliveryPhotoRow
+                          orderId={order.id}
+                          doNumber={order.do_number ?? null}
+                        />
                       )}
                       {/* The fields nobody fills (ETA 1.6% · chase-day 0.5%) —
                           tucked behind a fold, opened only when needed (Jess
@@ -5018,7 +5006,6 @@ function BookingBlock({
   // Confirm button never reads it, because a partner's working pattern is the
   // partner's fact, not one of our obligations — the operator may have already
   // phoned them.
-  const [rulesOpen, setRulesOpen] = useState(false);
   const partnerCheck = usePartnerBookingCheck(orderId, open ? date : "");
   const partnerWarnings = partnerCheck.data?.warnings ?? [];
   const checkedPartner = partnerCheck.data?.partner ?? null;
@@ -5049,7 +5036,6 @@ function BookingBlock({
       // last step.
       for (const w of res.gateWarnings ?? []) toast.warning(w);
       setOpen(false);
-      setRulesOpen(false);
       setTripGroups(null);
     },
     onError: (e) =>
@@ -5283,26 +5269,18 @@ function BookingBlock({
             </div>
           )}
           {checkedPartner && (
+            /* D5 relocated (owner ruling 2026-09-13): a partner's delivery
+               rules are maintained in Delivery Settings, never in this drawer.
+               The drawer keeps the DOOR and loses the editor. */
             <div className="text-right py-0.5">
-              <Btn
-                variant="ghost"
-                size="sm"
-                onClick={() => setRulesOpen((v) => !v)}
+              <Link
+                className="text-meta font-semibold text-kit-blue-11"
+                to={`/operation/settings/delivery/partners/${encodeURIComponent(checkedPartner.id)}/schedule`}
+                data-testid="drawer-partner-rules-door"
               >
-                {rulesOpen ? "Close" : `${checkedPartner.name} delivery rules`}
-              </Btn>
+                {checkedPartner.name} delivery rules
+              </Link>
             </div>
-          )}
-          {rulesOpen && checkedPartner && (
-            <PartnerRulesEditor
-              partnerId={checkedPartner.id}
-              partnerName={checkedPartner.name}
-              rules={partnerCheck.data?.rules ?? null}
-              onSaved={() => {
-                setRulesOpen(false);
-                void partnerCheck.refetch();
-              }}
-            />
           )}
           {gateHints.length > 0 && (
             <div className="text-right text-meta text-warning py-0.5">
@@ -5328,200 +5306,27 @@ function BookingBlock({
   );
 }
 
-/** T9 (0283) — the logistics company's own delivery rules, edited where FIRST
- *  read (L6: "build the fields WITH the first consumer, not as an admin page up
- *  front"). Four facts, plain words: which days it runs, days it is not running
- *  at all, how many drops it takes, and how much notice it needs.
- *
- *  Sunday is not offered: nobody delivers on Sunday, and the booking gate
- *  refuses it for every company — showing a switch for it would suggest the
- *  rule is negotiable per partner.
- *
- *  The rules belong to the CARRIER, not this order: saving here changes what
- *  the portal warns about on every order that uses it, which is why the panel
- *  says so out loud and why the write is audited server-side. */
-function PartnerRulesEditor({
-  partnerId,
-  partnerName,
-  rules,
-  onSaved,
-}: {
-  partnerId: string;
-  partnerName: string;
-  rules: {
-    offDays: number[];
-    blackoutDates: string[];
-    dailyCapacity: number | null;
-    bookingLeadDays: number;
-  } | null;
-  onSaved: () => void;
-}) {
-  const [offDays, setOffDays] = useState<number[]>(rules?.offDays ?? [0]);
-  const [blackouts, setBlackouts] = useState<string[]>(rules?.blackoutDates ?? []);
-  const [capacity, setCapacity] = useState<string>(
-    rules?.dailyCapacity != null ? String(rules.dailyCapacity) : "",
-  );
-  const [lead, setLead] = useState<string>(String(rules?.bookingLeadDays ?? 0));
-  const [newBlackout, setNewBlackout] = useState("");
-  const save = useSetPartnerDeliveryRules(partnerId, {
-    onSuccess: () => {
-      toast.success(`${partnerName} delivery rules saved`);
-      onSaved();
-    },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't save the delivery rules",
-      ),
-  });
-  const FIELD =
-    "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
-  const WEEK = [
-    { n: 1, label: "Mon" },
-    { n: 2, label: "Tue" },
-    { n: 3, label: "Wed" },
-    { n: 4, label: "Thu" },
-    { n: 5, label: "Fri" },
-    { n: 6, label: "Sat" },
-  ];
-  const runsOn = (n: number) => !offDays.includes(n);
-  const toggleDay = (n: number) =>
-    setOffDays((cur) =>
-      cur.includes(n) ? cur.filter((d) => d !== n) : [...cur, n],
-    );
-  // Sunday is always off; the API validates the same thing, this keeps the
-  // operator from saving a company that runs no day at all.
-  const runsSomeDay = WEEK.some((d) => runsOn(d.n));
-  const capacityNum = capacity.trim() === "" ? null : Number(capacity);
-  const leadNum = Number(lead || 0);
-  const valid =
-    runsSomeDay &&
-    Number.isInteger(leadNum) &&
-    leadNum >= 0 &&
-    leadNum <= 30 &&
-    (capacityNum === null ||
-      (Number.isInteger(capacityNum) && capacityNum >= 1 && capacityNum <= 999));
-  return (
-    <DRow k={`${partnerName} rules`} block>
-      <div className="py-1 space-y-1.5 text-right">
-        <div className="text-label text-base-500">
-          These are {partnerName}&apos;s own rules — they apply to every order
-          this logistics company delivers, and they warn, never block.
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Delivers on</span>
-          {WEEK.map((d) => (
-            <Btn
-              key={d.n}
-              variant={runsOn(d.n) ? "box" : "ghost"}
-              size="sm"
-              onClick={() => toggleDay(d.n)}
-              title={
-                runsOn(d.n)
-                  ? `${partnerName} runs on ${d.label}`
-                  : `${partnerName} does not run on ${d.label}`
-              }
-            >
-              {d.label}
-            </Btn>
-          ))}
-        </div>
-        {!runsSomeDay && (
-          <div className="text-meta text-danger">
-            A logistics company must run on at least one day of the week
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Needs</span>
-          <input
-            type="number"
-            min={0}
-            max={30}
-            value={lead}
-            onChange={(e) => setLead(e.target.value)}
-            aria-label={`${partnerName} booking notice in working days`}
-            className={`${FIELD} w-[70px]`}
-          />
-          <span className="text-meta text-base-600">
-            working days notice · takes at most
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={999}
-            value={capacity}
-            placeholder="not set"
-            onChange={(e) => setCapacity(e.target.value)}
-            aria-label={`${partnerName} deliveries a day`}
-            className={`${FIELD} w-[90px]`}
-          />
-          <span className="text-meta text-base-600">deliveries a day</span>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Not running on</span>
-          {blackouts.length === 0 && (
-            <span className="text-meta text-base-400">no dates</span>
-          )}
-          {blackouts.map((b) => (
-            <Btn
-              key={b}
-              variant="ghost"
-              size="sm"
-              onClick={() => setBlackouts((cur) => cur.filter((x) => x !== b))}
-              title="Remove this date"
-            >
-              {fmtDate(b).split(",")[0]} ×
-            </Btn>
-          ))}
-          <input
-            type="date"
-            value={newBlackout}
-            onChange={(e) => {
-              const v = e.target.value;
-              setNewBlackout("");
-              if (v && !blackouts.includes(v))
-                setBlackouts((cur) => [...cur, v].sort());
-            }}
-            aria-label={`Add a date ${partnerName} is not running`}
-            className={`${FIELD} w-[150px]`}
-          />
-        </div>
-        <div className="flex items-center gap-1.5 justify-end">
-          <Btn
-            variant="box"
-            size="sm"
-            disabled={!valid || save.isPending}
-            onClick={() =>
-              save.mutate({
-                offDays: [0, ...WEEK.filter((d) => !runsOn(d.n)).map((d) => d.n)],
-                blackoutDates: blackouts,
-                dailyCapacity: capacityNum,
-                bookingLeadDays: leadNum,
-              })
-            }
-          >
-            {save.isPending ? "Saving…" : "Save rules"}
-          </Btn>
-        </div>
-      </div>
-    </DRow>
-  );
-}
 
-/** T6 (0280) — the delivery-photo row inside the delivery card, shown only
- *  once the order is delivered. Existing photos open in a new tab via
- *  short-lived signed urls (the bucket is private); Upload shrinks the file
- *  browser-side, then runs the sign-upload → attach flow. The SERVER is the
- *  gate (delivered-only + own-order path prefix) — this row is assistance. */
-function DeliveryPhotoRow({ orderId }: { orderId: string }) {
+/**
+ * T6 (0280) — the delivery-photo row inside the delivery card, shown only once
+ * the order is delivered. Existing files open in a new tab via short-lived
+ * signed urls (the bucket is private).
+ *
+ * ⭐ ONE UPLOADER, AND IT NAMES THE TRIP (owner ruling 2026-09-11). The
+ * picker is the shared `DeliveryProofUploadButton` the Delivery Orders
+ * register renders - a second picker here would be a second form for one act
+ * (Law C) - and it passes the order's own DO number so the file belongs to a
+ * document instead of floating at order level. An order with no DO number yet
+ * uploads UNBOUND, which is the honest answer, not a guessed one.
+ */
+function DeliveryPhotoRow({
+  orderId,
+  doNumber,
+}: {
+  orderId: string;
+  doNumber: string | null;
+}) {
   const photosQ = useDeliveryPhotos(orderId);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const upload = useUploadDeliveryPhoto(orderId, {
-    onSuccess: () => toast.success("Delivery photo uploaded"),
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't upload the delivery photo",
-      ),
-  });
   const photos = photosQ.data?.photos ?? [];
   return (
     <DRow k="Delivery photo">
@@ -5550,27 +5355,7 @@ function DeliveryPhotoRow({ orderId }: { orderId: string }) {
             ),
           )
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          aria-label="Delivery photo file"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) upload.mutate(f);
-            e.target.value = "";
-          }}
-        />
-        <Btn
-          variant="box"
-          size="sm"
-          icon={Upload}
-          disabled={upload.isPending}
-          onClick={() => inputRef.current?.click()}
-        >
-          {upload.isPending ? "Uploading…" : "Upload delivery photo"}
-        </Btn>
+        <DeliveryProofUploadButton orderId={orderId} doNumber={doNumber} />
       </span>
     </DRow>
   );
@@ -5657,8 +5442,16 @@ async function openReceipt(
   meta: { orderCode: string; customerName: string },
 ) {
   try {
-    const blob = await renderReceiptPdf({
-      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+    // §4 — a numbered receipt prints from the one receipt document (the 0449
+    // snapshot plus the invoices it settles), same as Payment Records.
+    const doc = row.receipt_no
+      ? await apiFetch<{ document: ReceiptTemplateData; voided: boolean; void_reason: string | null }>(
+          `/api/finance/payments/${row.id}/receipt-document`)
+      : null;
+    const blob = await renderReceiptPdf(doc
+      ? { ...doc.document, voided: doc.voided, void_reason: doc.void_reason }
+      : {
+      receipt_no: row.id.slice(0, 8),
       issue_date: row.paid_on,
       order_code: meta.orderCode,
       customer: { name: meta.customerName },
@@ -5803,7 +5596,7 @@ function PaymentForm({
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
+  const [paidOn, setPaidOn] = useState(appTodayIso());
   // 0476 — the methods are the Settings → Payment list; a method switched off
   // there disappears here. Bank transfer is the default when it is Active.
   const { methods } = useManualMethods();
@@ -5821,7 +5614,10 @@ function PaymentForm({
     onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
   });
   const amt = Number(amount);
-  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
+  // §16 (0535) — a cheque needs its number, a card its approval code.
+  const refWord = requiredPaymentReference(method);
+  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0
+    && (!refWord || refNo.trim() !== "");
   const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
 
   const acceptFile = (f: File | undefined | null) => {
@@ -5944,7 +5740,7 @@ function PaymentForm({
           </label>
         ) : (
           <label className="block">
-            <span className="t4-label">Ref no (optional)</span>
+            <span className="t4-label">{refWord ?? "Ref no (optional)"}</span>
             <input
               type="text"
               value={refNo}
@@ -6246,7 +6042,7 @@ function StorageCard({
   exempt: boolean;
   delivered: boolean;
 }) {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = appTodayIso();
   const { draft, set } = form;
   const endSet = draft.storage_to.trim();
   const endEff = endSet || draft.logistic_eta.trim() || todayIso;
@@ -7135,7 +6931,6 @@ function ActionsMenu({
   orderId,
   pipelineStatus,
   onServiceNoteClick,
-  onTransferReadyClick,
   onConfirmProceedClick,
   onTopUpClick,
   onAbandonClick,
@@ -7148,7 +6943,6 @@ function ActionsMenu({
   orderId: string;
   pipelineStatus: PipelineStatus;
   onServiceNoteClick: () => void;
-  onTransferReadyClick: () => void;
   onConfirmProceedClick: () => void;
   onTopUpClick: () => void;
   onAbandonClick: () => void;
@@ -7252,15 +7046,6 @@ function ActionsMenu({
                     }}
                   />
                 )}
-                <MenuItem
-                  icon={<PackagePlus className="w-4 h-4" />}
-                  label="Transfer to ready"
-                  title="Mark stock on-hand → ready (manual bridge)"
-                  onClick={() => {
-                    close();
-                    onTransferReadyClick();
-                  }}
-                />
                 <MenuItem
                   icon={<Pencil className="w-4 h-4" />}
                   label="Record top-up"

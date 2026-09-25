@@ -44,6 +44,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 /**
  * WAREHOUSE — OUTBOUND: one row = one dated pickup arrangement (one DO
@@ -90,7 +91,9 @@ function useIsNarrow(): boolean {
 }
 
 const STATUSES = [
-  ["open", "Not finished"],
+  ["open", "Awaiting loading or driver confirmation"],
+  ["not-loaded", "Not loaded yet"],
+  ["awaiting-driver", "Awaiting driver confirmation"],
   ["loaded", "Loaded"],
   ["no-evidence", "Evidence not submitted"],
   ["all", "All pickups"],
@@ -100,6 +103,7 @@ export default function WarehouseOutboundWork() {
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const selectedDo = params.get("do");
+  const workId = params.get("loading");
   /* Menu default = every unfinished arrangement; an exact Monitor deep link
      must show its arrangement even when the work is already done. */
   const effectiveView = params.get("view") ?? (selectedDo ? "all" : "open");
@@ -129,14 +133,16 @@ export default function WarehouseOutboundWork() {
   const [railHidden, setRailHidden] = useState(false);
   const isNarrow = useIsNarrow();
   const root = useRef<HTMLDivElement>(null);
-  const scrollKey = `outbound-scroll:${params.toString()}`;
+  const listParams = new URLSearchParams(params);
+  listParams.delete("loading");
+  const scrollKey = `outbound-scroll:${listParams.toString()}`;
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || workId) return;
     const scroll =
       root.current?.querySelector<HTMLElement>('[data-testid="grid-scroll"]');
     if (scroll)
       scroll.scrollTop = Number(sessionStorage.getItem(scrollKey) ?? 0);
-  }, [isLoading, scrollKey]);
+  }, [isLoading, scrollKey, workId]);
 
   const setFilter = useCallback(
     (key: string, value: string) => {
@@ -156,11 +162,14 @@ export default function WarehouseOutboundWork() {
     (value: string) => setFilter("q", value),
     [setFilter],
   );
+  const workKey = (c: WarehouseOutboundCard) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`;
+  const workCard = allCards.find((c) => workKey(c) === workId);
 
   const columns = useMemo<DataGridColumn<WarehouseOutboundCard>[]>(
     () => [
       {
         key: "date",
+        defaultHidden: true,
         label: "Scheduled handover",
         width: 140,
         wrap: true,
@@ -179,12 +188,12 @@ export default function WarehouseOutboundWork() {
       {
         key: "document",
         label: "Document",
-        width: 150,
+        width: 245,
         wrap: true,
         searchValue: (c) => `DO No ${c.doNumber} ${c.source}`,
         accessor: (c) => (
           <div className="py-0.5 leading-[18px]">
-            <div className="text-label uppercase tracking-wide text-base-400">
+            <div className="text-label font-semibold text-kit-slate-11">
               DO No
             </div>
             <Link
@@ -195,13 +204,23 @@ export default function WarehouseOutboundWork() {
             >
               {c.doNumber}
             </Link>
+            <div><Link className="font-mono text-kit-blue-11 hover:underline" to={c.sourceHref}>{c.source}</Link></div>
+            <div>Scheduled handover {fmtDate(c.eventDate)}</div>
+            <div className="text-meta text-base-600">{c.expectedCollectionWindow ? `Driver pickup ${c.expectedCollectionWindow}` : "Time not provided"}</div>
+            <div className="text-meta text-base-600">{c.fromLocation} → {c.toCustomer}</div>
+            <div className="text-meta text-base-600">{c.logisticsPartner}</div>
+            <div className="text-meta text-base-600" data-testid={`wo-driver-${c.doNumber}`}>{warehouseAssignedDriverLine(c.logisticsPartner, c.driverName)}</div>
           </div>
         ),
       },
       {
+        key: "loading", label: "Loading", width: 85, wrap: true, filterable: false,
+        accessor: (c) => <button type="button" className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint" data-testid={`wo-open-loading-${c.doNumber}`} onClick={() => setFilter("loading", workKey(c))}>Loading</button>,
+      },
+      {
         key: "products",
         label: "Product",
-        width: 230,
+        width: 200,
         wrap: true,
         searchValue: (c) =>
           c.products
@@ -227,6 +246,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "from",
+        defaultHidden: true,
         label: "From",
         width: 140,
         wrap: true,
@@ -235,6 +255,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "to",
+        defaultHidden: true,
         label: "To",
         width: 190,
         wrap: true,
@@ -243,6 +264,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "partner",
+        defaultHidden: true,
         label: "Logistics Partner",
         width: 125,
         searchValue: (c) => c.logisticsPartner,
@@ -250,6 +272,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "driver",
+        defaultHidden: true,
         label: "Assigned Driver",
         width: 150,
         wrap: true,
@@ -275,11 +298,13 @@ export default function WarehouseOutboundWork() {
             </div>
             <div>Not loaded {c.notHandedOver}</div>
             <div>Driver confirmed {c.driverConfirmed}</div>
+            {outboundExceptionLines(c, today, fmtDate).map((line) => <div key={line} className="text-meta text-base-600">{line}</div>)}
           </div>
         ),
       },
       {
         key: "status",
+        defaultHidden: true,
         label: "Status",
         width: 125,
         searchValue: (c) => outboundStatusWordOf(c),
@@ -287,6 +312,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "exceptions",
+        defaultHidden: true,
         label: "Exceptions",
         width: 230,
         wrap: true,
@@ -352,7 +378,7 @@ export default function WarehouseOutboundWork() {
             : "",
       },
     ],
-    [today],
+    [today, setFilter],
   );
 
   const context = params.get("date") || params.get("from");
@@ -364,16 +390,16 @@ export default function WarehouseOutboundWork() {
     (!params.get("to") || params.get("to") === params.get("from"))
       ? params.get("from")
       : null);
-  const empty = exactDate
+  const empty = exactDate && !params.get("q") && !selectedDo
     ? warehouseEmptyDaySentence(fmtDate(exactDate))
     : effectiveView === "open" && !context && !params.get("q") && !selectedDo
-      ? "No unfinished pickups. Every arranged pickup is loaded."
+      ? "No pickups awaiting loading or driver confirmation match these filters."
       : "No pickups match these filters.";
 
   const dateControls = (
     <>
       <label className="text-meta">
-        From{" "}
+        Pickup date from{" "}
         <input
           className="h-7 rounded-control border border-kit-slate-5 px-2"
           type="date"
@@ -431,7 +457,14 @@ export default function WarehouseOutboundWork() {
         docTitle="Outbound · Warehouse — Carres"
         destinationHeader
       />
-      <div className="flex min-h-0 min-w-0 flex-1">
+      {workId && <div className="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="outbound-loading-workspace">
+        <div className="flex flex-wrap items-center gap-3 border-b border-kit-slate-5 bg-white p-3">
+          <button type="button" className="text-body text-kit-blue-11" onClick={() => setFilter("loading", "")}>← Back to Outbound</button>
+          {workCard && <span className="font-mono text-body">{workCard.doNumber}</span>}
+        </div>
+        {isLoading ? <p role="status" className="p-3">Loading…</p> : error ? <div role="alert" className="p-3">{error.message}<button onClick={() => void refetch()}>Try again</button></div> : workCard ? <OutboundUnitWork card={workCard} /> : <p role="alert" className="p-3">This pickup could not be opened.</p>}
+      </div>}
+      <div className={`flex min-h-0 min-w-0 flex-1 ${workId ? "hidden" : ""}`}>
         <div
           className={`${showFilters ? "flex" : "hidden"} min-h-0 shrink-0 ${railHidden ? "md:hidden" : "md:flex"}`}
         >
@@ -447,12 +480,13 @@ export default function WarehouseOutboundWork() {
                 {dateControls}
               </div>
             )}
-            <FilterRailGroup title="PICKUP STATUS">
+            <FilterRailGroup title="Pickup status" icon="waiting">
               {STATUSES.map(([value, label]) => (
                 <FilterRailRow
                   key={value}
                   label={label}
                   active={effectiveView === value}
+                  resets={value === "all"}
                   count={
                     isLoading || error ? undefined : view.facets.view[value] ?? 0
                   }
@@ -465,7 +499,7 @@ export default function WarehouseOutboundWork() {
               ))}
             </FilterRailGroup>
             {siteNames.length > 1 && (
-              <FilterRailGroup title="SITE">
+              <FilterRailGroup title="Site" icon="warehouse">
                 {siteNames.map((name) => (
                   <FilterRailRow
                     key={name}
@@ -510,18 +544,19 @@ export default function WarehouseOutboundWork() {
           ) : (
             <DataGrid<WarehouseOutboundCard>
               stickyIdentity={{ columnKey: "document" }}
-              key={params.get("q") === null ? "clear" : "search"}
+              key={`${params.get("q") === null ? "clear" : "search"}:${selectedDo ?? ""}:${selectedDo ? view.rows.map((c) => c.warehouseSiteId ?? c.fromLocation).join(",") : ""}`}
               appearance="reference"
+              wrapToolbar
               rows={view.rows}
               columns={columns}
-              rowKey={(c) => c.doNumber}
+              rowKey={(c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`}
               rowTestId={(c) => `wo-row-${c.doNumber}`}
-              storageKey="carres.outbound.register.v1"
+              storageKey="carres.outbound.register.v2"
               exportName="Outbound"
               searchPlaceholder="DO, SO, product, customer, driver or Unit ID…"
               initialSearch={params.get("q") ?? ""}
               onSearchChange={onSearch}
-              isLoading={isLoading}
+              isLoading={isLoading || !data}
               groupBanner={false}
               emptyMessage={empty}
               rowStyle={(c) =>
@@ -552,7 +587,11 @@ export default function WarehouseOutboundWork() {
                   <Link
                     to={`/operation?${(() => {
                       const back = new URLSearchParams(params);
-                      back.set("tab", "warehouse-monitor");
+                      /* Outbound IS pickup work, so it returns to the Pickup
+                         Schedule — carrying `date` and `site` untouched, which
+                         is what puts the operator back on the column they
+                         opened this from. */
+                      back.set("tab", "warehouse-pickup-schedule");
                       back.delete("do");
                       back.delete("view");
                       back.delete("q");
@@ -561,7 +600,7 @@ export default function WarehouseOutboundWork() {
                     className="text-meta text-base-600 underline-offset-2 hover:underline"
                     data-testid="wo-back-monitor"
                   >
-                    ← Monitor
+                    ← Pickup Schedule
                   </Link>
                   {!isNarrow && dateControls}
                   {selectedDo && (
@@ -575,8 +614,10 @@ export default function WarehouseOutboundWork() {
               expandable={{
                 trigger: { columnKey: "products" },
                 testId: (c) => `wo-row-toggle-${c.doNumber}`,
-                defaultExpandedKeys: selectedDo ? [selectedDo] : [],
-                renderExpansion: (c) => <OutboundUnitWork card={c} />,
+                renderExpansion: (c) => <div className="space-y-2 p-3 text-body" data-testid={`wo-product-detail-${c.doNumber}`}>
+                  {c.products.map((p) => <div key={p.sku ?? "no-sku"}>{p.name ?? p.sku} · {p.sku} · Qty {p.qty}</div>)}
+                  {c.units.map((u) => <div key={u.unitId}><Link className="font-mono text-kit-blue-11" to={`/operation/stock/unit/${encodeURIComponent(u.unitId)}`}>{u.unitId}</Link> · {u.productName ?? u.sku}</div>)}
+                </div>,
               }}
               statusSummary={(visible) => {
                 const cards = visible as WarehouseOutboundCard[];
@@ -605,7 +646,7 @@ export default function WarehouseOutboundWork() {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-label uppercase tracking-wide text-base-400">{label}</div>
+      <div className="text-label font-semibold text-kit-slate-11">{label}</div>
       <div className="truncate text-base-800">{value}</div>
     </div>
   );
@@ -616,6 +657,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
   const doId = card.deliveryOrderId ?? "";
   const prep = useRecordOutboundPrep(doId);
   const [scanValue, setScanValue] = useState("");
+  const [prepError, setPrepError] = useState<string | null>(null);
   const [loadOpen, setLoadOpen] = useState(false);
 
   const remaining = card.units.filter((u) => !u.unitHandedOverAt);
@@ -637,34 +679,35 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
 
   function recordPrep(fact: WarehousePrepFact, unitCodes: string[], done: string) {
     if (!doId) {
-      toast.error("This delivery order cannot be addressed — reload the page.");
+      setPrepError("This delivery order cannot be addressed — reload the page.");
       return;
     }
+    setPrepError(null);
     prep.mutate(
       { fact, unitCodes },
       {
-        onSuccess: () => toast.success(done),
-        onError: (e) => toast.error(e.message),
+      onSuccess: () => { toast.success(done); if (fact === "scanned") setScanValue(""); },
+        onError: (e) => setPrepError(e.message),
       },
     );
   }
 
   function scanUnit() {
+    if (prep.isPending) return;
     const code = scanValue.trim();
     if (!code) return;
     const match = card.units.find(
       (u) => u.unitId.toLowerCase() === code.toLowerCase(),
     );
     if (!match) {
-      toast.error(`${code} is not a Unit this delivery order requires.`);
+      setPrepError(`${code} is not a Unit this delivery order requires. Check the label and scan the required Unit.`);
       return;
     }
     if (match.unitHandedOverAt) {
-      toast.error(`${match.unitId} was already loaded.`);
+      setPrepError(`${match.unitId} was already loaded. Scan a Unit still to load.`);
       return;
     }
     recordPrep("scanned", [match.unitId], `${match.unitId} scanned`);
-    setScanValue("");
   }
 
   const operator =
@@ -680,6 +723,9 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       {/* The two evidence records, never merged (§8): the Warehouse's own
           submission and the driver's independent confirmation. */}
       <div className="mb-2 space-y-0.5 text-meta text-base-600">
+        <p>{card.fromLocation} → {card.toCustomer} · {card.logisticsPartner}</p>
+        <p>Scheduled handover {fmtDate(card.eventDate)}</p>
+        <Link className="font-mono text-kit-blue-11 hover:underline" to={card.deliveryOrderHref}>{card.doNumber}</Link>
         <p data-testid={`wo-loaded-${card.doNumber}`}>
           {warehouseLoadedLine(card)}
           {operator ? ` · recorded by ${operator}` : ""}
@@ -698,7 +744,18 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
         </p>
         {card.vehicle && <p>Vehicle {card.vehicle}</p>}
       </div>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      {remaining.length === 0 && card.units.length > 0 && (
+        <div className="mb-2 text-body text-base-700" data-testid="wo-loading-next-step">
+          <p>{card.driverConfirmed < card.unitsRequired
+            ? "Loading recorded. Awaiting driver confirmation."
+            : "Loading and driver confirmation recorded."}</p>
+          {card.evidenceNotSubmitted && <p>Loading evidence is still missing.</p>}
+          <Link className="text-kit-blue-11 hover:underline" to={card.deliveryOrderHref}>
+            Open Delivery Order
+          </Link>
+        </div>
+      )}
+      {remaining.length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-meta text-base-600">
           Scan Unit ID
           <input
@@ -768,7 +825,8 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             {warehouseRecordLoadedSentence(readyUnits.length, receiverWord)}
           </button>
         )}
-      </div>
+      </div>}
+      {prepError && <div className="mb-2"><FieldError>{prepError}</FieldError></div>}
       {readyUnits.length > 0 && (
         <p className="mb-2 text-label text-base-500" data-testid="wo-receiver-consequence">
           Recording the load moves the accepted Units to {card.logisticsPartner}. Name the person
@@ -784,17 +842,13 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           ))}
         </div>
       )}
-      <table className="w-full border-collapse text-[13px]">
+      <div className="overflow-x-auto"><table className="w-full border-collapse text-body">
         <thead>
-          <tr className="text-left text-label uppercase tracking-wide text-base-400">
+          <tr className="text-left text-label font-semibold text-kit-slate-11">
             <th className="py-1 pr-3 font-medium">Unit ID</th>
             <th className="py-1 pr-3 font-medium">Product</th>
-            <th className="py-1 pr-3 font-medium">Reservation</th>
-            <th className="py-1 pr-3 font-medium">Scanned</th>
-            <th className="py-1 pr-3 font-medium">Checked</th>
-            <th className="py-1 pr-3 font-medium">Packed</th>
-            <th className="py-1 pr-3 font-medium">Loaded</th>
-            <th className="py-1 pr-3 font-medium">Driver confirmed</th>
+            <th className="py-1 pr-3 font-medium">Scanned / Checked / Packed</th>
+            <th className="py-1 pr-3 font-medium">Loaded / Driver confirmed</th>
             <th className="py-1 font-medium">Still to do</th>
           </tr>
         </thead>
@@ -803,7 +857,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             <UnitRow key={u.unitId} unit={u} />
           ))}
         </tbody>
-      </table>
+      </table></div>
       {loadOpen && card.deliveryOrderId && (
         <RecordLoadedModal
           card={card}
@@ -821,26 +875,20 @@ function UnitRow({ unit }: { unit: DeliveryWarehouseScheduleEvent }) {
   return (
     <tr className="border-t border-kit-slate-5" data-testid={`wo-unit-${unit.unitId}`}>
       <td className="py-1.5 pr-3 font-mono text-base-800">{unit.unitId}</td>
-      <td className="max-w-48 truncate py-1.5 pr-3" title={unit.productName ?? unit.sku ?? undefined}>
+      <td className="py-1.5 pr-3" title={unit.productName ?? unit.sku ?? undefined}>
         {unit.productName ?? unit.sku ?? "—"}
+        <div className="text-meta text-base-600">{unit.sku} · Reserved for {unit.source}</div>
       </td>
-      <td className="py-1.5 pr-3">Reserved for {unit.source}</td>
-      <td className="py-1.5 pr-3 text-base-600">{at(unit.unitScannedAt)}</td>
-      <td className="py-1.5 pr-3 text-base-600">{at(unit.unitCheckedAt)}</td>
-      <td className="py-1.5 pr-3 text-base-600">{at(unit.unitPackedAt)}</td>
+      <td className="py-1.5 pr-3 text-base-600"><div>Scanned {at(unit.unitScannedAt)}</div><div>Checked {at(unit.unitCheckedAt)}</div><div>Packed {at(unit.unitPackedAt)}</div></td>
       <td className="py-1.5 pr-3 text-base-600">
+        <div>Loaded {" "}
         {unit.unitHandedOverAt
           ? `${at(unit.unitHandedOverAt)}${unit.unitDeliveryPerson ? ` · ${unit.unitDeliveryPerson}` : ""}`
-          : "—"}
-      </td>
-      <td
-        className="py-1.5 pr-3 text-base-600"
-        data-testid={`wo-unit-confirmed-${unit.unitId}`}
-      >
-        {at(unit.unitDriverConfirmedAt)}
+          : "—"}</div>
+        <div data-testid={`wo-unit-confirmed-${unit.unitId}`}>Driver confirmed {at(unit.unitDriverConfirmedAt)}</div>
       </td>
       <td className="py-1.5 text-base-600" data-testid={`wo-unit-reason-${unit.unitId}`}>
-        {reason ?? "Done"}
+        {reason ?? (unit.unitDriverConfirmedAt ? "Loaded · Driver confirmed" : "Loaded · Awaiting driver confirmation")}
       </td>
     </tr>
   );

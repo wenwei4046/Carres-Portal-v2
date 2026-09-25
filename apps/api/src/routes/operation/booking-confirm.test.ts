@@ -3,15 +3,8 @@
  * The gates live on the SERVER: date+slot both (invariant #1), no Sunday
  * (invariant #8), goods ready + balance ready (frozen §7 Stage 2).
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -24,17 +17,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 type Result = { data: unknown; error: unknown };
@@ -65,27 +50,27 @@ function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
     }),
     // T8 — the split confirm appends a plain-English activity line through the
     // existing SECURITY DEFINER annotation door (fail-soft, same as T4/T6).
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        /* 0575 · the allocator answers; nothing derives a number any more. */
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: null, error: null },
+      ),
+    ),
   };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
 afterAll(() => _setJwksForTesting(null));
 
 const ORDER_ID = "00000000-0000-0000-0000-00000000010a";
+/** What the database's allocator hands back (0575). */
+const DRAWN_DO = "DO2609-4827";
 /** CARD 3 (0346) — the logistics company assigned to the order under test. */
 const PARTNER_ID = "00000000-0000-0000-0000-0000000002be";
 const URL = `http://t/api/operation/orders/${ORDER_ID}/booking/confirm`;
@@ -741,12 +726,12 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       deliveryOrder: { do_number: string; issued: boolean } | null;
     };
     // The lib reports the number it MINTED (the locked scheme), and issued=true.
-    expect(body.deliveryOrder?.do_number).toMatch(/^DO-\d{6}-\d{4}$/);
+    expect(body.deliveryOrder?.do_number).toBe(DRAWN_DO);
     expect(body.deliveryOrder?.issued).toBe(true);
     // The mint went through the ONE shared write: an idempotent update guarded
     // on the empty column, never an unconditional set.
     expect(t.orders.update).toHaveBeenCalledWith(
-      expect.objectContaining({ do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/) }),
+      expect.objectContaining({ do_number: DRAWN_DO }),
     );
     expect(t.orders.is).toHaveBeenCalledWith("do_number", null);
   });

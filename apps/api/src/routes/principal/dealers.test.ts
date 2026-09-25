@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -11,7 +11,6 @@ vi.mock("../../lib/supabase", () => ({
 import { userClient } from "../../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -20,19 +19,11 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null = null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: `${role}@carres.com`,
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 type RpcCall = { name: string; args: unknown };
@@ -106,17 +97,8 @@ function buildSb(opts: {
   return { sb, rpcCalls, chainCalls };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -588,3 +570,81 @@ describe("POST /api/principal/dealers/:id/status", () => {
   });
 });
 
+
+describe("0543 — finance keeps the dealer master", () => {
+  it("finance PATCH goes through dealer_save_master with code and state", async () => {
+    const { sb, rpcCalls } = buildSb({
+      rpcResults: { dealer_save_master: { data: { id: DEALER_ID, code: "JB1" } } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "jb1", state: "Johor" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpcCalls[0]).toEqual({
+      name: "dealer_save_master",
+      args: { p_dealer_id: DEALER_ID, p_patch: { code: "JB1", state: "Johor" } },
+    });
+  });
+
+  // The bug this test exists for: dealers_code_unique (0543) raised 23505,
+  // mapPgError had no case for it, and Finance got HTTP 500 `rpc_failed` with
+  // `duplicate key value violates unique constraint "dealers_code_unique"` in
+  // the toast. A code another dealer holds is a 409 that names the code.
+  it("a code another dealer already has is a 409 that names the code", async () => {
+    const { sb } = buildSb({
+      rpcResults: {
+        dealer_save_master: {
+          error: {
+            code: "23505",
+            message: 'duplicate key value violates unique constraint "dealers_code_unique"',
+            details: "Key (code)=(JB1) already exists.",
+          },
+        },
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "JB1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string; code: string; message: string };
+    expect(body.error).toBe("conflict");
+    expect(body.code).toBe("dealer_code_taken");
+    expect(body.message).toContain("JB1");
+    expect(body.message).not.toContain("dealers_code_unique");
+  });
+
+  it("finance cannot invite a dealer or change its status", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("finance");
+    for (const path of ["invite", `${DEALER_ID}/status`]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/principal/dealers/${path}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "suspended", name: "X Y", region: "R", contact: "c" }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(403);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

@@ -69,7 +69,8 @@ export type DoTemplateData = {
 export type ReceiptTemplateData = {
   receipt_no: string;
   issue_date: string; // paid_on (yyyy-mm-dd)
-  order_code: string; // SO-123
+  /** SO-123. Null for a receipt that belongs to no order (an other receipt, RV). */
+  order_code: string | null;
   customer: { name: string };
   amount: number;
   method: string; // cash / bank / card / cheque / online / other
@@ -77,10 +78,50 @@ export type ReceiptTemplateData = {
   reference: string | null;
   note: string | null;
   currency: string;
+  /** §4 — the invoice number(s) this payment settles (live allocations). */
+  invoice_nos?: string[];
   /** §4: "Voided Payment keeps a visible VOIDED receipt." The receipt is not
    *  withdrawn when a payment is voided — it is reprinted saying so. */
   voided?: boolean;
   void_reason?: string | null;
+  /** Right-hand signature caption; defaults to "Customer signature". */
+  payer_sign_label?: string;
+};
+
+/** Other debtor invoice (ARI, migration 0478) — e.g. office rent billed to a
+ *  sister company. Only an issued or cancelled invoice prints: a draft has no
+ *  number yet. */
+export type OtherDebtorInvoiceTemplateData = {
+  invoice_no: string;
+  issue_date: string;
+  due_date: string | null;
+  reference: string | null;
+  narration: string | null;
+  party: { name: string; address: string | null; phone: string | null; registration_no: string | null };
+  lines: Array<{ description: string; amount: number }>;
+  total: number;
+  currency: string;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  issued_by: string | null;
+};
+
+/** Payment voucher (PV, 0477/0529) — printed for Finance's file, signed by
+ *  the three people who prepared, checked and approved it. */
+export type PaymentVoucherTemplateData = {
+  voucher_no: string;
+  voucher_date: string;
+  payee: string;
+  supplier: string | null;
+  pay_from: string;
+  pay_method: string;
+  reference: string | null;
+  narration: string | null;
+  lines: Array<{ description: string; amount: number }>;
+  total: number;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  signatures: Array<{ label: string; name: string | null; at: string | null }>;
 };
 
 /** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-
@@ -133,6 +174,9 @@ export type InvoiceTemplateData = {
   tax_amount: number;
   total: number;
   currency: string;
+  /** Goods money (deposit + payments) received before this invoice was
+   *  issued. Above 0, the totals card adds that line and the balance due. */
+  received_before?: number;
   /** Audit name for the footer's left cell (owner 2026-08-09) — who at
    *  Carres issued this invoice. Falls back to the invoice number. */
   issued_by?: string | null;
@@ -173,6 +217,12 @@ export type PoTemplateData = {
   destination: { name: string; address: string };
   delivery_instructions: string | null;
   eta_date: string | null;
+  /** The `{n}` of `PO {n}-Day Delivery Date` — supplier working days from the
+   *  PO Date to `eta_date`, from the shared engine (`poDeliveryWorkingDays`).
+   *  Absent on a kept version / draft → the plain `PO Delivery Date` label. */
+  delivery_working_days?: number | null;
+  /** `Delivery Method` — collection supplier → `we_collect`. Absent → no row. */
+  delivery_method?: "we_collect" | "supplier_delivers" | null;
   /** PO-level sales-order refs, from the document authority (0383). */
   so_refs?: number[] | null;
   /**
@@ -222,6 +272,12 @@ export type PoTemplateData = {
  */
 export type GrnTemplateData = {
   grn_no: string;
+  /** ISO — the date THIS document was created, i.e. when the numbered GRN was
+   *  posted (`warehouse_receipts.posted_at`). Every Carres document prints its
+   *  own `{DOC} Doc Date` (owner 2026-09-23, DOCUMENT-KIT.md §4), and it is NOT
+   *  `goods_received_on`: goods can arrive on Friday and be counted into a
+   *  numbered GRN on Monday. Null while the receipt is not yet posted. */
+  grn_doc_date: string | null;
   /** `Valid` | `Cancelled` — the document status words. */
   status_label: string;
   /** The linked source document — a PO, or a CO when consignment. */
@@ -243,6 +299,7 @@ export type GrnTemplateData = {
     damaged_qty: number;
     wrong_item_qty: number;
     pending_delivery_qty: number;
+    unit_results?: Array<{ unit_code: string; outcome_label: string }>;
   }>;
   /** Exact-Unit outcomes, when governed Units exist — the scan record is
    *  part of the paper. */
@@ -386,9 +443,39 @@ export type SalesOrderTemplateData = {
    *  a figure arrives. */
   expected_deposit?: number | null;
 
+  /** Footer audit cell — the `audit_log` actor who CREATED the order, the
+   *  same source the PO reads (0383). NOT the salesperson: that row answers
+   *  "who does the customer call". Absent → the footer prints `Not recorded`. */
+  issued_by?: string | null;
+
   signed: boolean;
   /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG captured at
    *  checkout. The template renders this inline as the customer signature.
    *  Null when the order has no signature on file. */
   signature_url?: string | null;
+
+  /* ─── A REBUILT SHEET SAYS SO, ON THE PAPER — owner ruling 2026-09-23 ───
+   *
+   * Both fields are OPTIONAL and both default to the behaviour that shipped
+   * before them, so the CURRENT document's bytes do not move. Only the
+   * historical-version path sets either one.
+   *
+   * The page already carried these two statements; a PDF is a separate
+   * artefact that is printed, downloaded and handed to a customer, so a
+   * statement that lives only on screen is not made at all by the time it
+   * matters. The owner approved the exact wording. */
+
+  /** Printed verbatim when this sheet was REBUILT from a version's saved facts
+   *  rather than being the file issued at the time. The owner-approved
+   *  sentence is `Reconstructed copy — original issued document unavailable.`
+   *  Absent/null on the current document and on every stored original. */
+  rebuilt_notice?: string | null;
+
+  /** The order HAS a customer signature, but nothing records which version it
+   *  was given on, so it may not be reproduced here — and this version may not
+   *  be called unsigned either (owner ruling 2026-09-23: unknown is not
+   *  unsigned). The signing box prints the owner-approved
+   *  `Signature version not recorded.` INSTEAD of standing empty, because an
+   *  empty box is what an unsigned document prints. */
+  signature_unknown?: boolean;
 };

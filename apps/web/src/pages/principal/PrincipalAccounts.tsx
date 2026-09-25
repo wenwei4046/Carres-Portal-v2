@@ -26,6 +26,7 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
 import { ColorDotPicker, tierLabel } from "@/pages/dealer/staff/staff-ui";
 import BirthdayWheelField from "@/pages/dealer/pos/date-keyin/BirthdayWheelField";
+import { personInitials } from "@/lib/staff-avatar";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -372,7 +373,7 @@ function KpiTile({ label, value, sub, tone }: { label: string; value: number; su
 }
 
 function UserRow({ user }: { user: AccountRow }) {
-  const initials = user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+  const initials = personInitials(user.name, user.email ?? "");
   // ROLE_COLORS is a total Record<AppRole, string>, so no fallback is needed
   // (the old grey hex fallback was dead code — dropped to keep the RULE A
   // hex ratchet at its baseline when the hr colour joined the record).

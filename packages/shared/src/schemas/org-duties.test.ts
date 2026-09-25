@@ -54,13 +54,19 @@ describe("checkDuty — resolution order", () => {
   });
 
   it("falls back to the legacy email list when the duty is absent", () => {
-    expect(checkDuty("ops_manager", "operation", JESS, []))
+    expect(checkDuty("ops_manager", "operation", SHARED_OPS, []))
       .toEqual({ allowed: true, via: "legacy_email" });
-    expect(usedLegacyFallback(checkDuty("ops_manager", "operation", JESS, []))).toBe(true);
+    expect(usedLegacyFallback(checkDuty("ops_manager", "operation", SHARED_OPS, []))).toBe(true);
   });
 
   it("is case-insensitive on the legacy email", () => {
-    expect(checkDuty("ops_manager", "operation", "Jess@Carres.com", []).allowed).toBe(true);
+    expect(checkDuty("ops_manager", "operation", "Operation@Carres.com", []).allowed).toBe(true);
+  });
+
+  it("0533 · no email names Jess any more — she is a principal person and passes by role", () => {
+    expect(checkDuty("ops_manager", "operation", JESS, [])).toEqual({ allowed: false, via: "none" });
+    expect(checkDuty("po_duty_editor", "operation", JESS, [])).toEqual({ allowed: false, via: "none" });
+    expect(checkDuty("ops_manager", "principal", JESS, [])).toEqual({ allowed: true, via: "role" });
   });
 
   it("denies when neither duty nor legacy email applies", () => {
@@ -119,9 +125,9 @@ describe("isPoDutyEditor is STRICTER than isOpsManager", () => {
     expect(isPoDutyEditor("operation", SHARED_OPS)).toBe(false);
   });
 
-  it("Jess passes both", () => {
-    expect(isOpsManager("operation", JESS)).toBe(true);
-    expect(isPoDutyEditor("operation", JESS)).toBe(true);
+  it("Jess passes both — by her principal role (0533), not by an email", () => {
+    expect(isOpsManager("principal", JESS)).toBe(true);
+    expect(isPoDutyEditor("principal", JESS)).toBe(true);
   });
 
   it("and both still pass her via the DUTY once 0260's COO grant is loaded", () => {
@@ -137,8 +143,8 @@ describe("isOpsManagerRow — the per-ROW question self-only cannot answer", () 
     expect(isOpsManagerRow(NOBODY, [])).toBe(false);
   });
 
-  it("still honours the legacy email for a row with no duties yet", () => {
-    expect(isOpsManagerRow(JESS, [])).toBe(true);
+  it("still honours the legacy email for the shared login's row — never Jess's (0533)", () => {
+    expect(isOpsManagerRow(JESS, [])).toBe(false);
     expect(isOpsManagerRow(SHARED_OPS, [])).toBe(true);
   });
 

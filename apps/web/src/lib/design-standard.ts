@@ -1,10 +1,10 @@
 /**
  * CARRES PORTAL — DESIGN STANDARD (the machine mirror)
  * =========================================================
- * FOLLOWS: **UI-KIT 2026-07-27** — the edition declared by `docs/UI-KIT.md`
- * §0.3. This module is a MIRROR of that law and nothing else.
+ * FOLLOWS: the design-token law, `docs/01-design-tokens.md` (successor of the
+ * retired `docs/UI-KIT.md`). This module is a MIRROR of that law and nothing else.
  *
- * ⚠️ **`docs/UI-KIT.md` WINS.** Its own first line says so, and §0.3 makes a
+ * ⚠️ **`docs/01-design-tokens.md` WINS.** The law file says so, and makes a
  * second authority claim a Build-Guard failure (D1). This header used to read
  * *"where any older doc, code comment, or token conflicts with UI-KIT v4, v4
  * wins"* — two bodies of one kit each declaring itself the winner. That claim
@@ -16,7 +16,7 @@
  * 2026-07-27 and several tokens moved (see the per-block notes). Correcting a
  * value is a VISUAL change and belongs to the codemod cards **D2 · D3 · D4** —
  * card D0.6 corrected this file's CLAIMS and deliberately touched no exported
- * value. Read a token from `docs/UI-KIT.md` §2–§5, never from here.
+ * value. Read a token from `docs/01-design-tokens.md`, never from here.
  *
  * Measured 2026-07-28, because it changes how much this file matters:
  *   real importers ............................ 1  (lib/staff-avatar.ts, for
@@ -50,7 +50,7 @@ export const COLOR = {
   // citation sits inside an EXPORTED string, and D0.6 may change no exported
   // value — so it is neutralised here and corrected by D3 with the hex.
   surface: { hex: "#FFFFFF", use: "content background, panels, rows", class: "bg-white" },
-  canvas:  { hex: "#F3F4F6", use: "page canvas behind white panels — v4 §11a COOL neutral (warm #F0EFE9 retired)", cssVar: "--background", class: "bg-background" },
+  canvas:  { hex: "#F7F8FA", use: "the ONE page canvas behind white panels — UI MASTER §6.7 (Jess 2026-09-17); #F3F4F6 retired", cssVar: "--background", class: "bg-background" },
 
   // Brand + selection. ⚠️ STALE: `flame` below is described as a PRIMARY
   // ACTION colour; UI-KIT 2026-07-27 §3.4 keeps the flame in exactly one

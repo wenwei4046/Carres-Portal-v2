@@ -3,10 +3,12 @@ import {
   MANUAL_PURCHASE_RAIL,
   MANUAL_PURCHASE_RAIL_CLEAR,
   MANUAL_PURCHASE_HISTORY_WORDS,
+  compareManualPurchaseRows,
   manualPurchaseApproverLine,
+  manualPurchaseGroupOf,
   manualPurchaseHistoryRecord,
   manualPurchaseLeadDayFacts,
-  manualPurchaseNotOrdered,
+  manualPurchaseOrderByCell,
   manualPurchaseOrderByLine,
   manualPurchaseOrderByOf,
   manualPurchaseRailFacts,
@@ -14,7 +16,6 @@ import {
   manualPurchaseStatusOf,
   manualPurchaseTimingOf,
   manualPurchaseWorkItems,
-  manualPurchaseWorkOrder,
   type ManualPurchaseRailFacts,
   type ManualPurchaseStatusKind,
   type ManualPurchaseWorkInput,
@@ -23,67 +24,41 @@ import { SO_BATCH_RAIL } from "./so-batch-purchase";
 import { DEMAND_PURPOSES } from "./to-order";
 
 /**
- * PURCHASING CARD 06 — the Manual Purchase date plan and rail contract
- * (owner-corrected 2026-08-29, superseding Card 03's four-section shape).
- * Seven sections in the approved order; counts are UNIQUE requests
- * cross-computed per section; `WORK TO DO` is an action lens over the same
- * server facts; `ORDER TIMING` reads the server-derived earliest Order By;
- * Product is the CATALOG's answer; Supplier is the demand line's
- * Catalog-derived name, dynamic and alphabetical.
+ * MANUAL PURCHASE ROUND 2 — the grouped Register and its rail (owner rulings
+ * R1–R4, 2026-09-16; `docs/purchasing/MASTER.md` §9.2). Five rail sections;
+ * `WORK TO DO` and `TO ORDER` retired; three mutually exclusive groups; ORDER
+ * TIMING counts only requests with quantity still to buy.
  */
 
 const facts = (
   over: Partial<ManualPurchaseRailFacts> & { requestId: string },
 ): ManualPurchaseRailFacts => ({
-  status: "ready_to_order",
+  group: "to-buy",
   purpose: "ready_stock",
   categories: new Set(),
   suppliers: new Set(),
   orderBy: null,
   timing: null,
-  needsApproval: false,
-  issuableRemaining: true,
   supplierGap: false,
   productionDaysMissing: false,
   transitDaysMissing: false,
   ...over,
 });
 
-describe("Card 06 · the rail words and order", () => {
-  it("renders exactly the seven approved sections, in the approved order", () => {
+describe("Round 2 · the rail words and order", () => {
+  it("renders exactly the five approved sections, in the approved order", () => {
     expect(Object.keys(MANUAL_PURCHASE_RAIL)).toEqual([
-      "work",
-      "toOrder",
       "timing",
       "purpose",
       "product",
       "supplier",
       "setup",
     ]);
-    expect(MANUAL_PURCHASE_RAIL.work.heading).toBe("WORK TO DO");
-    expect(MANUAL_PURCHASE_RAIL.toOrder.heading).toBe("TO ORDER");
-    expect(MANUAL_PURCHASE_RAIL.timing.heading).toBe("ORDER TIMING");
-    expect(MANUAL_PURCHASE_RAIL.purpose.heading).toBe("PURCHASE PURPOSE");
-    expect(MANUAL_PURCHASE_RAIL.product.heading).toBe("PRODUCT");
-    expect(MANUAL_PURCHASE_RAIL.supplier.heading).toBe("SUPPLIER");
-    expect(MANUAL_PURCHASE_RAIL.setup.heading).toBe("SETUP TO FIX");
-  });
-
-  it("WORK TO DO holds the five concrete actions, in order", () => {
-    expect(MANUAL_PURCHASE_RAIL.work.actions.map((a) => a.word)).toEqual([
-      "Approve purchase",
-      "Issue PO",
-      "Check the supplier",
-      "Add production days",
-      "Add transit days",
-    ]);
-  });
-
-  it("TO ORDER keeps only `All not ordered` — Need approval / Ready to order retired", () => {
-    expect(MANUAL_PURCHASE_RAIL.toOrder.all).toBe("All not ordered");
-    const words = JSON.stringify(MANUAL_PURCHASE_RAIL.toOrder);
-    expect(words).not.toContain("Need approval");
-    expect(words).not.toContain("Ready to order");
+    expect(MANUAL_PURCHASE_RAIL.timing.heading).toBe("Order timing");
+    expect(MANUAL_PURCHASE_RAIL.purpose.heading).toBe("Purpose");
+    expect(MANUAL_PURCHASE_RAIL.product.heading).toBe("Product");
+    expect(MANUAL_PURCHASE_RAIL.supplier.heading).toBe("Supplier");
+    expect(MANUAL_PURCHASE_RAIL.setup.heading).toBe("Setup to fix");
   });
 
   it("ORDER TIMING holds the three timing rows, in order", () => {
@@ -94,10 +69,8 @@ describe("Card 06 · the rail words and order", () => {
     ]);
   });
 
-  it("PURCHASE PURPOSE offers exactly the approved six under `All purposes`", () => {
+  it("PURPOSE offers exactly the approved six under `All purposes`", () => {
     expect(MANUAL_PURCHASE_RAIL.purpose.all).toBe("All purposes");
-    // The one creatable list — the same array the create form renders, so
-    // the rail and the door cannot drift (Law D).
     expect(MANUAL_PURCHASE_RAIL.purpose.rows).toBe(DEMAND_PURPOSES);
     expect(MANUAL_PURCHASE_RAIL.purpose.rows.map((p) => p.label)).toEqual([
       "Ready Stock",
@@ -111,89 +84,124 @@ describe("Card 06 · the rail words and order", () => {
 
   it("PRODUCT is SO Batch's own Catalog list — shared, not copied", () => {
     expect(MANUAL_PURCHASE_RAIL.product).toBe(SO_BATCH_RAIL.product);
-    expect(MANUAL_PURCHASE_RAIL.product.all).toBe("All products");
-    expect(MANUAL_PURCHASE_RAIL.product.categories.map((c) => c.word)).toEqual([
-      "Mattress",
-      "Bedframe",
-      "Sofa",
-    ]);
   });
 
-  it("SETUP TO FIX names the two exact configuration facts", () => {
+  it("SETUP TO FIX names the three exact configuration facts", () => {
     expect(MANUAL_PURCHASE_RAIL.setup.rows.map((r) => r.word)).toEqual([
+      "Supplier not set",
       "Production days not set",
       "Transit days not set",
     ]);
   });
 
-  it("carries none of the banned rows — and no Safety-days arithmetic", () => {
-    const words = JSON.stringify(MANUAL_PURCHASE_RAIL);
+  it("carries none of the retired or banned rows", () => {
+    const words = JSON.stringify(MANUAL_PURCHASE_RAIL).toLowerCase();
     for (const banned of [
+      "WORK TO DO",
+      "TO ORDER",
+      "All not ordered",
+      "Approve purchase",
       "Supplier not selected",
-      "No supplier",
-      "Not in catalog",
       "Need price",
-      "Part received",
-      "Received",
       "Arrived",
       "Cancelled",
-      "My drafts",
-      "Need correction",
-      "Queues",
-      "safety days",
       "Safety days",
       "Need approval",
       "Ready to order",
     ]) {
-      expect(words).not.toContain(banned);
+      expect(words).not.toContain(banned.toLowerCase());
     }
   });
 });
 
-describe("Card 06 · `All not ordered` is derived request truth", () => {
-  const statuses: ManualPurchaseStatusKind[] = [
-    "waiting_approval",
-    "waiting_sku",
-    "ready_to_order",
-    "ordered",
-    "arrived",
-    "not_going_ahead",
-  ];
-
-  it("live quantity not yet fully issued to a PO", () => {
-    const matches = statuses.filter((s) => manualPurchaseNotOrdered(s));
-    // Fully ordered / arrived requests leave it; a refused or fully-cancelled
-    // request (`Not going ahead`) is not awaiting ordering and never counts.
-    expect(matches).toEqual(["waiting_approval", "waiting_sku", "ready_to_order"]);
+const status = (over: Partial<Parameters<typeof manualPurchaseStatusOf>[0]> = {}) =>
+  manualPurchaseStatusOf({
+    approvedAt: null,
+    refusedAt: null,
+    refuseReason: null,
+    lines: [{ qty: 2, issuedQty: 0, cancelledAt: null, poId: null }],
+    ...over,
   });
 
-  it("rides the ONE status arithmetic — a fully issued request leaves, a refusal leaves", () => {
-    const ordered = manualPurchaseStatusOf({
-      approvalRequired: true,
-      approvedAt: "2026-08-20T00:00:00Z",
-      refusedAt: null,
-      refuseReason: null,
-      lines: [{ qty: 2, issuedQty: 2, cancelledAt: null, poId: "PO-1" }],
-    });
-    expect(manualPurchaseNotOrdered(ordered.kind)).toBe(false);
+describe("Round 2 · R1 — every request waits for approval", () => {
+  it("a stored `approval_required = false` row with no decision still waits", () => {
+    // The arithmetic no longer reads the switch at all: there is no exemption.
+    expect(status().kind).toBe("waiting_approval");
+  });
 
-    const refused = manualPurchaseStatusOf({
-      approvalRequired: true,
-      approvedAt: null,
-      refusedAt: "2026-08-20T00:00:00Z",
-      refuseReason: "duplicate",
-      lines: [{ qty: 2, issuedQty: 0, cancelledAt: null, poId: null }],
-    });
-    expect(manualPurchaseNotOrdered(refused.kind)).toBe(false);
+  it("sent back and withdrawn are their own states", () => {
+    expect(status({ sentBackAt: "t" }).kind).toBe("sent_back");
+    expect(status({ withdrawnAt: "t" }).kind).toBe("withdrawn");
+    // A withdrawal wins over anything else stored beside it.
+    expect(status({ withdrawnAt: "t", sentBackAt: "t" }).kind).toBe("withdrawn");
+  });
+});
 
-    const waiting = manualPurchaseStatusOf({
-      approvalRequired: true,
-      approvedAt: null,
-      refusedAt: null,
-      refuseReason: null,
-      lines: [{ qty: 2, issuedQty: 0, cancelledAt: null, poId: null }],
-    });
-    expect(manualPurchaseNotOrdered(waiting.kind)).toBe(true);
+describe("Round 2 · R2 — exactly one group per request", () => {
+  const group = (
+    approval: Parameters<typeof manualPurchaseGroupOf>[0]["approval"],
+    statusKind: ManualPurchaseStatusKind,
+    remainingQty: number,
+    remainderKnown = true,
+  ) => manualPurchaseGroupOf({ approval, status: statusKind, remainingQty, remainderKnown });
+
+  it("waiting and sent back are Need approval, however much they ask", () => {
+    expect(group("need_approval", "waiting_approval", 5)).toBe("need-approval");
+    expect(group("sent_back", "sent_back", 5)).toBe("need-approval");
+  });
+
+  it("a request NOT approved is never To buy — even with an unknown remainder", () => {
+    expect(group("need_approval", "waiting_approval", 0, false)).toBe("need-approval");
+    expect(group("sent_back", "sent_back", 3, false)).toBe("need-approval");
+  });
+
+  it("approved with remaining quantity is To buy", () => {
+    expect(group("approved", "ready_to_order", 2)).toBe("to-buy");
+  });
+
+  it("⭐ approved with an UNKNOWN remainder stays To buy — unknown is not zero", () => {
+    expect(group("approved", "ready_to_order", 0, false)).toBe("to-buy");
+    expect(group("approved", "ordered", 0, false)).toBe("to-buy");
+  });
+
+  it("approved with a CONFIRMED zero remainder needs no purchase", () => {
+    expect(group("approved", "ready_to_order", 0)).toBe("no-purchase-needed");
+    expect(group("approved", "ordered", 0)).toBe("no-purchase-needed");
+    expect(group("approved", "arrived", 0)).toBe("no-purchase-needed");
+    expect(group("approved", "not_going_ahead", 0)).toBe("no-purchase-needed");
+  });
+
+  it("refused and withdrawn need no purchase", () => {
+    expect(group("refused", "not_going_ahead", 4)).toBe("no-purchase-needed");
+    expect(group("withdrawn", "withdrawn", 4)).toBe("no-purchase-needed");
+  });
+
+  it("Order By: the date, `Not planned` while waiting or buying, blank when done", () => {
+    expect(manualPurchaseOrderByCell("to-buy", "2026-09-20")).toEqual({ date: "2026-09-20", notPlanned: false });
+    expect(manualPurchaseOrderByCell("to-buy", null)).toEqual({ date: null, notPlanned: true });
+    expect(manualPurchaseOrderByCell("need-approval", null)).toEqual({ date: null, notPlanned: true });
+    expect(manualPurchaseOrderByCell("no-purchase-needed", "2026-09-20")).toEqual({ date: null, notPlanned: false });
+  });
+
+  it("default order: Order By ascending → Not planned → newest Proceed Date; history newest first", () => {
+    const rows = [
+      { id: "done-old", group: "no-purchase-needed" as const, orderBy: "2026-09-01", proceedDate: "2026-08-01" },
+      { id: "buy-none", group: "to-buy" as const, orderBy: null, proceedDate: "2026-09-10" },
+      { id: "buy-late", group: "to-buy" as const, orderBy: "2026-09-30", proceedDate: "2026-09-01" },
+      { id: "wait", group: "need-approval" as const, orderBy: "2026-09-25", proceedDate: "2026-09-02" },
+      { id: "buy-early-new", group: "to-buy" as const, orderBy: "2026-09-18", proceedDate: "2026-09-05" },
+      { id: "buy-early-old", group: "to-buy" as const, orderBy: "2026-09-18", proceedDate: "2026-09-01" },
+      { id: "done-new", group: "no-purchase-needed" as const, orderBy: null, proceedDate: "2026-09-09" },
+    ];
+    expect([...rows].sort(compareManualPurchaseRows).map((r) => r.id)).toEqual([
+      "wait",
+      "buy-early-new",
+      "buy-early-old",
+      "buy-late",
+      "buy-none",
+      "done-new",
+      "done-old",
+    ]);
   });
 });
 
@@ -240,56 +248,56 @@ describe("Card 06 §3.4 · the missing-Settings facts", () => {
   });
 });
 
-describe("Card 06 · the facts projection", () => {
+describe("Round 2 · the facts projection", () => {
+  const row = (over: Partial<Parameters<typeof manualPurchaseRailFacts>[0][number]> = {}) => ({
+    requestId: "r1",
+    group: "to-buy" as const,
+    purpose: "ready_stock",
+    remainingQty: 2,
+    remainderKnown: true,
+    lineCategories: ["mattress", null, undefined, "mattress"] as const,
+    lineSupplierNames: ["Hooka", null, "", "Hooka"],
+    lineOrderBys: ["2026-09-10", "2026-09-03", null],
+    supplierGap: true,
+    productionDaysMissing: false,
+    transitDaysMissing: true,
+    ...over,
+  });
+
   it("keeps the CATALOG's categories, actual supplier names and the earliest Order By", () => {
-    const [f] = manualPurchaseRailFacts(
-      [
-        {
-          requestId: "r1",
-          status: "waiting_approval",
-          purpose: "ready_stock",
-          remainingQty: 2,
-          // A SKU whose TEXT screams mattress but whose Catalog category is
-          // absent contributes NOTHING — the projection carries only what the
-          // Catalog answered; SKU text never reaches this file.
-          lineCategories: ["mattress", null, undefined, "mattress"],
-          lineSupplierNames: ["Hooka", null, "", "Hooka"],
-          lineOrderBys: ["2026-09-10", "2026-09-03", null],
-          supplierGap: true,
-          productionDaysMissing: false,
-          transitDaysMissing: true,
-        },
-      ],
-      "2026-09-04",
-    );
-    expect([...f.categories]).toEqual(["mattress"]);
-    expect([...f.suppliers]).toEqual(["Hooka"]);
-    expect(f.orderBy).toBe("2026-09-03");
-    expect(f.timing).toBe("order_date_passed");
-    expect(f.needsApproval).toBe(true);
-    // Waiting for approval is not issuable remainder.
-    expect(f.issuableRemaining).toBe(false);
-    expect(f.supplierGap).toBe(true);
-    expect(f.transitDaysMissing).toBe(true);
+    const [f] = manualPurchaseRailFacts([row()], "2026-09-04");
+    expect([...f!.categories]).toEqual(["mattress"]);
+    expect([...f!.suppliers]).toEqual(["Hooka"]);
+    expect(f!.orderBy).toBe("2026-09-03");
+    expect(f!.timing).toBe("order_date_passed");
+    expect(f!.supplierGap).toBe(true);
+  });
+
+  it("⭐ ORDER TIMING counts ONLY requests with quantity still to buy", () => {
+    const [done] = manualPurchaseRailFacts([row({ group: "no-purchase-needed", remainingQty: 0 })], "2026-09-04");
+    const [unknown] = manualPurchaseRailFacts([row({ remainderKnown: false })], "2026-09-04");
+    const [zero] = manualPurchaseRailFacts([row({ remainingQty: 0 })], "2026-09-04");
+    const [waiting] = manualPurchaseRailFacts([row({ group: "need-approval" })], "2026-09-04");
+    expect(done!.timing).toBeNull();
+    expect(unknown!.timing).toBeNull();
+    expect(zero!.timing).toBeNull();
+    expect(waiting!.timing).toBe("order_date_passed");
   });
 });
 
-describe("Card 06 · the rail model", () => {
+describe("Round 2 · the rail model", () => {
   const base = [
     facts({
       requestId: "a",
-      status: "waiting_approval",
+      group: "need-approval",
       purpose: "ready_stock",
       categories: new Set(["mattress"]),
       suppliers: new Set(["Hooka"]),
-      needsApproval: true,
-      issuableRemaining: false,
       orderBy: "2026-09-01",
       timing: "order_date_passed",
     }),
     facts({
       requestId: "b",
-      status: "ready_to_order",
       purpose: "showroom_display",
       categories: new Set(["sofa"]),
       suppliers: new Set(["Dorsettloft"]),
@@ -298,15 +306,13 @@ describe("Card 06 · the rail model", () => {
     }),
     facts({
       requestId: "c",
-      status: "ordered",
+      group: "no-purchase-needed",
       purpose: "ready_stock",
       categories: new Set(["mattress", "bedframe"]),
       suppliers: new Set(["Hooka", "Ohana"]),
-      issuableRemaining: false,
     }),
     facts({
       requestId: "d",
-      status: "ready_to_order",
       purpose: "subsidiary_purchase",
       categories: new Set(["bedframe"]),
       suppliers: new Set(["Ohana"]),
@@ -314,74 +320,46 @@ describe("Card 06 · the rail model", () => {
       timing: "order_date_reached",
       productionDaysMissing: true,
     }),
-    // History under a retired purpose — visible in the Register, counted by
-    // no approved purpose row, never relabelled.
     facts({
       requestId: "e",
-      status: "arrived",
+      group: "no-purchase-needed",
       purpose: "office",
-      categories: new Set(),
       suppliers: new Set(["Ohana"]),
-      issuableRemaining: false,
     }),
   ];
 
-  it("the empty filter is the permanent Register — ordered history included", () => {
+  it("the empty filter is the permanent Register — every group included", () => {
     const m = manualPurchaseRailModel(base, MANUAL_PURCHASE_RAIL_CLEAR);
     expect([...m.visibleRequestIds].sort()).toEqual(["a", "b", "c", "d", "e"]);
   });
 
-  it("counts are UNIQUE requests — work, to-order, timing, purpose and product", () => {
+  it("counts are UNIQUE requests — timing, purpose, product and setup", () => {
     const m = manualPurchaseRailModel(base, MANUAL_PURCHASE_RAIL_CLEAR);
-    expect(m.workCounts).toEqual({
-      approve_purchase: 1, // a
-      issue_po: 2, // b, d
-      check_supplier: 0,
-      add_production_days: 1, // d
-      add_transit_days: 0,
-    });
-    expect(m.notOrderedCount).toBe(3); // a, b, d — c is Ordered, e Arrived
     expect(m.timingCounts).toEqual({
-      can_order_early: 1, // b
-      order_date_reached: 1, // d
-      order_date_passed: 1, // a
+      can_order_early: 1,
+      order_date_reached: 1,
+      order_date_passed: 1,
     });
     expect(m.productCounts).toEqual({ mattress: 2, bedframe: 2, sofa: 1 });
-    expect(m.purposeCounts).toEqual({
-      ready_stock: 2,
-      showroom_display: 1,
-      service_case: 0,
-      internal_staff_purchase: 0,
-      subsidiary_purchase: 1,
-      other_purchase: 0,
-    });
+    expect(m.purposeCounts.ready_stock).toBe(2);
     expect(m.setupCounts).toEqual({
-      production_days_not_set: 1, // d
+      supplier_not_set: 0,
+      production_days_not_set: 1,
       transit_days_not_set: 0,
     });
   });
 
-  it("SETUP TO FIX exists only while an affected request exists", () => {
-    expect(manualPurchaseRailModel(base, MANUAL_PURCHASE_RAIL_CLEAR).setupExists).toBe(true);
-    const clean = base.map((f) => ({
-      ...f,
-      productionDaysMissing: false,
-      transitDaysMissing: false,
-    }));
-    expect(manualPurchaseRailModel(clean, MANUAL_PURCHASE_RAIL_CLEAR).setupExists).toBe(
-      false,
-    );
-  });
-
-  it("a retired purpose matches no approved row and lives under `All purposes` only", () => {
+  it("SETUP TO FIX draws only the rows with an affected request", () => {
     const m = manualPurchaseRailModel(base, MANUAL_PURCHASE_RAIL_CLEAR);
-    const purposeTotal = Object.values(m.purposeCounts).reduce((s, n) => s + n, 0);
-    // e (office) is in the Register (5 rows) but in no purpose count (4).
-    expect(m.visibleRequestIds.has("e")).toBe(true);
-    expect(purposeTotal).toBe(4);
+    expect(m.setupExists).toBe(true);
+    expect(m.setupRows).toEqual(["production_days_not_set"]);
+    const clean = base.map((f) => ({ ...f, productionDaysMissing: false }));
+    expect(manualPurchaseRailModel(clean, MANUAL_PURCHASE_RAIL_CLEAR).setupExists).toBe(false);
+    const gap = [facts({ requestId: "g", supplierGap: true })];
+    expect(manualPurchaseRailModel(gap, MANUAL_PURCHASE_RAIL_CLEAR).setupRows).toEqual(["supplier_not_set"]);
   });
 
-  it("suppliers are actual names, alphabetical, dynamic — never hardcoded", () => {
+  it("suppliers are actual names, alphabetical", () => {
     const m = manualPurchaseRailModel(base, MANUAL_PURCHASE_RAIL_CLEAR);
     expect(m.suppliers).toEqual([
       { name: "Dorsettloft", count: 1 },
@@ -390,66 +368,23 @@ describe("Card 06 · the rail model", () => {
     ]);
   });
 
-  it("no missing-SKU or missing-supplier placeholder becomes a facet", () => {
-    const m = manualPurchaseRailModel(
-      [facts({ requestId: "x", categories: new Set(), suppliers: new Set() })],
-      MANUAL_PURCHASE_RAIL_CLEAR,
-    );
-    // The hole simply contributes nothing: no `No supplier`, no `Not in
-    // catalog` row — the request is named at its owning boundary instead.
-    expect(m.suppliers).toEqual([]);
-    expect(m.productCounts).toEqual({ mattress: 0, bedframe: 0, sofa: 0 });
-    expect(m.visibleRequestIds.has("x")).toBe(true);
-  });
-
-  it("sections combine with AND", () => {
+  it("sections combine with AND, and each count is under the OTHER sections", () => {
     const m = manualPurchaseRailModel(base, {
       ...MANUAL_PURCHASE_RAIL_CLEAR,
-      work: "issue_po",
       product: "bedframe",
       supplier: "Ohana",
     });
-    expect([...m.visibleRequestIds]).toEqual(["d"]);
-  });
-
-  it("a timing filter is a filter and fact — never an issue permission gate", () => {
-    // `Can order early` still shows the request; nothing about the filter
-    // strips selection or issuance — those stay derived elsewhere.
-    const m = manualPurchaseRailModel(base, {
-      ...MANUAL_PURCHASE_RAIL_CLEAR,
-      timing: "can_order_early",
-    });
-    expect([...m.visibleRequestIds]).toEqual(["b"]);
-  });
-
-  it("each section's counts are computed under the OTHER sections' selections", () => {
-    const m = manualPurchaseRailModel(base, {
-      ...MANUAL_PURCHASE_RAIL_CLEAR,
-      work: "issue_po",
-    });
-    // Under `Issue PO` (b, d): the numbers predict the click.
-    expect(m.productCounts).toEqual({ mattress: 0, bedframe: 1, sofa: 1 });
-    expect(m.purposeCounts.showroom_display).toBe(1);
-    expect(m.purposeCounts.ready_stock).toBe(0);
-    expect(m.suppliers).toEqual([
-      { name: "Dorsettloft", count: 1 },
-      { name: "Ohana", count: 1 },
-    ]);
-    // ...while its OWN section counts ignore its own selection:
-    expect(m.workCounts.approve_purchase).toBe(1);
-    // Another section's count is narrowed by the active work filter — the
-    // number predicts exactly the click (b and d are both not ordered):
-    expect(m.notOrderedCount).toBe(2);
+    expect([...m.visibleRequestIds].sort()).toEqual(["c", "d"]);
+    expect(m.timingCounts.order_date_reached).toBe(1);
+    expect(m.purposeCounts.subsidiary_purchase).toBe(1);
   });
 
   it("the selected supplier stays visible with its honest 0", () => {
     const m = manualPurchaseRailModel(base, {
       ...MANUAL_PURCHASE_RAIL_CLEAR,
-      work: "approve_purchase",
+      timing: "order_date_passed",
       supplier: "Dorsettloft",
     });
-    // Under `Approve purchase` only Hooka matches — but the SELECTED name must
-    // stay, or the operator is narrowed by a filter they can no longer see.
     expect(m.suppliers).toEqual([
       { name: "Dorsettloft", count: 0 },
       { name: "Hooka", count: 1 },
@@ -458,38 +393,12 @@ describe("Card 06 · the rail model", () => {
 
   it("fixed rows print zero rather than hiding it", () => {
     const m = manualPurchaseRailModel([], MANUAL_PURCHASE_RAIL_CLEAR);
-    expect(m.workCounts).toEqual({
-      approve_purchase: 0,
-      issue_po: 0,
-      check_supplier: 0,
-      add_production_days: 0,
-      add_transit_days: 0,
-    });
-    expect(m.notOrderedCount).toBe(0);
     expect(m.timingCounts).toEqual({
       can_order_early: 0,
       order_date_reached: 0,
       order_date_passed: 0,
     });
-    expect(m.suppliers).toEqual([]);
     expect(m.setupExists).toBe(false);
-  });
-});
-
-describe("Card 06 §6 · the work/timing lens order", () => {
-  it("sorts earliest Order By first, null-dated rows last, then newest Proceed Date", () => {
-    const rows = [
-      { id: "late", orderBy: "2026-09-10", proceedDate: "2026-08-01T00:00:00Z" },
-      { id: "none", orderBy: null, proceedDate: "2026-08-30T00:00:00Z" },
-      { id: "urgent", orderBy: "2026-09-01", proceedDate: "2026-08-02T00:00:00Z" },
-      { id: "urgent-newer", orderBy: "2026-09-01", proceedDate: "2026-08-20T00:00:00Z" },
-    ];
-    expect(manualPurchaseWorkOrder(rows).map((r) => r.id)).toEqual([
-      "urgent-newer",
-      "urgent",
-      "late",
-      "none",
-    ]);
   });
 });
 
@@ -497,7 +406,7 @@ describe("Card 03 §3 · the approval owner's sentence", () => {
   it("names one holder, joins several with `or`, and prints nothing for nobody", () => {
     expect(manualPurchaseApproverLine(["Jess"])).toBe("Jess approves");
     expect(manualPurchaseApproverLine(["Jess", "YJ"])).toBe("Jess or YJ approves");
-    expect(manualPurchaseApproverLine([])).toBeNull();
+    expect(manualPurchaseApproverLine([])).toBe("Nobody holds Purchasing Approver.");
     expect(manualPurchaseApproverLine([null, "", "  "])).toBeNull();
   });
 });
@@ -508,7 +417,7 @@ describe("Card 03 §3 · the approval owner's sentence", () => {
 describe("Card 06 §7 · the two Work actions", () => {
   const input = (over: Partial<ManualPurchaseWorkInput>): ManualPurchaseWorkInput => ({
     requestId: "r1",
-    context: "Manual Purchase \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
+    context: "Manual Purchase Request \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
     status: "ready_to_order",
     remainingQty: 2,
     orderBy: "2026-09-03",
@@ -529,7 +438,7 @@ describe("Card 06 §7 · the two Work actions", () => {
     expect(items[0]).toMatchObject({
       ruleKey: "manual_purchase.approve",
       module: "purchasing",
-      soRef: "Manual Purchase \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
+      soRef: "Manual Purchase Request \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
       orderId: "r1",
       action: "Approve purchase",
       ownerName: "Jess",
@@ -628,6 +537,7 @@ import {
   manualPurchaseApprovalOf,
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
+  manualPurchaseIssueDocuments,
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   manualPurchaseItemsSummary,
@@ -667,12 +577,19 @@ describe("the settled nine column words", () => {
     expect(words).not.toContain("Needed by");
   });
 
-  it("`For` survives as the OBJECT's fact and `Qty` leaves the dictionary", () => {
+  it("`For` survives as the OBJECT's fact, and `Qty` is the GOODS table's head", () => {
     /* The structured `For` still labels the object's Request section; it is
-       simply no longer a Register column. `colQty` is gone entirely — a word
-       nothing may print is a word that should not exist to be printed. */
+       simply no longer a Register column.
+
+       ⭐ `colQty` IS BACK, AND IT IS A DIFFERENT COLUMN (owner ruling
+       2026-09-18). It left the dictionary in 2026-09-11 because the PARENT row
+       may not carry a quantity — a request's total ask is not a buying
+       decision at row level, and that is still true. The approved goods table
+       carries `Qty` at the grain the quantity was actually allocated at, which
+       is where a number means something. A word earns its place by being
+       printed somewhere true. */
     expect(MANUAL_PURCHASE_WORDS.colFor).toBe("For");
-    expect("colQty" in MANUAL_PURCHASE_WORDS).toBe(false);
+    expect(MANUAL_PURCHASE_WORDS.colQty).toBe("Qty");
   });
 
   it("the form's date words and the lead-days Send gap are governed", () => {
@@ -684,30 +601,22 @@ describe("the settled nine column words", () => {
   });
 
   it("the toolbar's create words are COPY-STANDARD's own", () => {
-    expect(MANUAL_PURCHASE_WORDS.newRequest).toBe("+ Manual Purchase");
-    expect(MANUAL_PURCHASE_WORDS.createTitle).toBe("NEW MANUAL PURCHASE");
-    expect(MANUAL_PURCHASE_WORDS.emptyRegister).toBe("No Manual Purchase yet.");
+    expect(MANUAL_PURCHASE_WORDS.newRequest).toBe("+ Manual Purchase Request");
+    expect(MANUAL_PURCHASE_WORDS.createTitle).toBe("NEW MANUAL PURCHASE REQUEST");
+    expect(MANUAL_PURCHASE_WORDS.emptyRegister).toBe("No Manual Purchase Request yet.");
   });
 });
 
-describe("Card 04 · the approval fact", () => {
-  it("answers the four ways, decided states winning over the switch", () => {
-    expect(
-      manualPurchaseApprovalOf({ approvalRequired: true, approvedAt: null, refusedAt: null })
-        .label,
-    ).toBe(MANUAL_PURCHASE_APPROVAL_WORDS.need_approval);
-    expect(
-      manualPurchaseApprovalOf({ approvalRequired: true, approvedAt: "t", refusedAt: null })
-        .label,
-    ).toBe("Approved");
-    expect(
-      manualPurchaseApprovalOf({ approvalRequired: true, approvedAt: null, refusedAt: "t" })
-        .label,
-    ).toBe("Refused");
-    expect(
-      manualPurchaseApprovalOf({ approvalRequired: false, approvedAt: null, refusedAt: null })
-        .label,
-    ).toBe("No approval needed");
+describe("Round 2 · the approval fact", () => {
+  it("answers the five ways — no exemption, a withdrawal wins", () => {
+    const of = (f: Partial<Parameters<typeof manualPurchaseApprovalOf>[0]>) =>
+      manualPurchaseApprovalOf({ approvedAt: null, refusedAt: null, ...f }).label;
+    expect(of({})).toBe(MANUAL_PURCHASE_APPROVAL_WORDS.need_approval);
+    expect(of({ approvedAt: "t" })).toBe("Approved");
+    expect(of({ refusedAt: "t" })).toBe("Refused");
+    expect(of({ sentBackAt: "t" })).toBe("Sent back for changes");
+    expect(of({ withdrawnAt: "t" })).toBe("Withdrawn");
+    expect(Object.values(MANUAL_PURCHASE_APPROVAL_WORDS)).not.toContain("No approval needed");
   });
 });
 
@@ -722,7 +631,11 @@ describe("Card 04 · the one remainder arithmetic", () => {
 
 describe("Card 04 · the deterministic summaries", () => {
   it("PO No: absence sentence · the one number · a count", () => {
-    expect(manualPurchasePoSummary([])).toBe("\u2014");
+    /* ⭐ `No PO yet` — owner ruling 2026-09-21 (UI MASTER §6.0 rule 3), BUILT
+       in CARD 13. The retired `—` could not tell an operator the difference
+       between *no purchase order exists yet* and *this cell has nothing to
+       say*; the read's loading and failure states keep their own words. */
+    expect(manualPurchasePoSummary([])).toBe("No PO yet");
     expect(manualPurchasePoSummary(["PO-20260829-1234"])).toBe("PO-20260829-1234");
     expect(manualPurchasePoSummary(["PO-1", "PO-2", "PO-1"])).toBe("2 POs");
   });
@@ -870,6 +783,39 @@ describe("Card 06 · selection and the issue sentence", () => {
     expect(manualPurchaseIssueSentence(1, 1, 1)).toBe("1 selected · 1 unit · Issue 1 PO");
     expect(manualPurchaseIssueSentence(2, 5, 3)).toBe("2 selected · 5 units · Issue 3 POs");
   });
+
+  /**
+   * ⭐ THE REVIEW SURFACE READS THE SAME WALLS THE COUNT DOES (owner ruling
+   * 2026-09-22). `Review Purchase Orders` draws one draft per document; if it
+   * grouped the selection its own way, the operator would check three papers
+   * and the database would create four.
+   */
+  it("groups the selection into the documents the count predicts, keeping each document's lines", () => {
+    const line = (over: Partial<Parameters<typeof manualPurchaseIssueGroupCount>[0][number]> & { sku?: string }) => ({
+      supplierId: "s1",
+      category: "sofa",
+      destinationId: "d1",
+      purpose: "ready_stock",
+      deliveryDate: "2026-09-15",
+      remainingQty: 1,
+      sku: "A",
+      ...over,
+    });
+    const lines = [
+      line({ sku: "A" }),
+      line({ sku: "B" }),
+      line({ sku: "C", deliveryDate: "2026-09-22" }),
+      line({ sku: "D", supplierId: "s2" }),
+      line({ sku: "E", remainingQty: 0 }),
+    ];
+    const docs = manualPurchaseIssueDocuments(lines);
+    expect(docs).toHaveLength(manualPurchaseIssueGroupCount(lines));
+    expect(docs).toHaveLength(3);
+    // Each document keeps its OWN lines, in the order they were offered.
+    expect(docs.map((d) => d.lines.map((l) => l.sku))).toEqual([["A", "B"], ["C"], ["D"]]);
+    // Nothing left to buy is in no document at all.
+    expect(docs.flatMap((d) => d.lines.map((l) => l.sku))).not.toContain("E");
+  });
 });
 
 describe("Card 05 · the History record arithmetic", () => {
@@ -880,6 +826,9 @@ describe("Card 05 · the History record arithmetic", () => {
       "refused",
       "line_not_going_ahead",
       "po_issued",
+      "sent_back",
+      "resubmitted",
+      "withdrawn",
     ]);
   });
 
@@ -955,11 +904,18 @@ import {
   manualPurchaseWorkContext,
 } from "./manual-purchase";
 
-describe("Card 08 · no visible number anywhere", () => {
-  it("the governed words carry no MPR and no Manual Purchase No", () => {
+describe("the document identity — MPR No, and the names still banned", () => {
+  it("⭐ `MPR No` IS THE IDENTITY AGAIN, and the banned names stay banned", () => {
+    /* Owner ruling 2026-09-18, which OVERWRITES Card 08 (2026-09-04): each
+       Manual Purchase request carries `MPR-YYYYMMDD-RRRR`, and it opens the
+       document. What Card 08 banned is still banned — a request is not a
+       `Manual Purchase No`, not a `Request No`, not a `Draft PO`, and never
+       `MP`, which is already the Mattress Protector SKU code. */
+    expect(MANUAL_PURCHASE_WORDS.colMprNo).toBe("MPR No");
     const words = JSON.stringify(MANUAL_PURCHASE_WORDS);
-    expect(words).not.toContain("MPR");
     expect(words).not.toContain("Manual Purchase No");
+    expect(words).not.toContain("Request No");
+    expect(words).not.toContain("Draft PO");
   });
 
   it("the Work context speaks business facts, empty facts dropped", () => {
@@ -969,21 +925,21 @@ describe("Card 08 · no visible number anywhere", () => {
         forText: "Carres Klang",
         supplierSummary: "Nice Future",
       }),
-    ).toBe("Manual Purchase · Ready Stock · Carres Klang · Nice Future");
+    ).toBe("Manual Purchase Request · Ready Stock · Carres Klang · Nice Future");
     expect(
       manualPurchaseWorkContext({
         purposeLabel: "Service Case",
         forText: "SC-2041",
         supplierSummary: "",
       }),
-    ).toBe("Manual Purchase · Service Case · SC-2041");
+    ).toBe("Manual Purchase Request · Service Case · SC-2041");
     expect(
       manualPurchaseWorkContext({
         purposeLabel: null,
         forText: null,
         supplierSummary: null,
       }),
-    ).toBe("Manual Purchase");
+    ).toBe("Manual Purchase Request");
   });
 
   it("the two Work action sentences carry no number, name or UUID", () => {
@@ -999,23 +955,23 @@ describe("Card 08 · no visible number anywhere", () => {
       manualPurchaseObjectHeading({ purposeLabel: "Service Case", forText: "" }),
     ).toBe("Service Case");
     expect(manualPurchaseObjectHeading({ purposeLabel: null, forText: null })).toBe(
-      "Manual Purchase",
+      "Manual Purchase Request",
     );
   });
 
-  it("PO source wording: one `Manual Purchase`, several `{n} Manual Purchases`, zero nothing", () => {
+  it("PO source wording: one `Manual Purchase Request`, several `{n} Manual Purchase Requests`, zero nothing", () => {
     expect(manualPurchaseSourceSummary(0)).toBeNull();
-    expect(manualPurchaseSourceSummary(1)).toBe("Manual Purchase");
-    expect(manualPurchaseSourceSummary(3)).toBe("3 Manual Purchases");
+    expect(manualPurchaseSourceSummary(1)).toBe("Manual Purchase Request");
+    expect(manualPurchaseSourceSummary(3)).toBe("3 Manual Purchase Requests");
   });
 
   it("a detailed source line distinguishes by business facts, never a number", () => {
     expect(
       manualPurchaseSourceLine({ purposeLabel: "Ready Stock", proceedDateLabel: "Thu, 4 Sep" }),
-    ).toBe("Manual Purchase · Ready Stock · Thu, 4 Sep");
+    ).toBe("Manual Purchase Request · Ready Stock · Thu, 4 Sep");
     expect(
       manualPurchaseSourceLine({ purposeLabel: null, proceedDateLabel: null }),
-    ).toBe("Manual Purchase");
+    ).toBe("Manual Purchase Request");
   });
 
   it("`PO No` before issue is the bare fact `—`", () => {

@@ -26,7 +26,7 @@ import Icon, { type IconName } from "./Icon";
 import Loading from "./Loading";
 
 type Variant = "primary" | "neutral" | "ghost";
-type Size = "md" | "sm";
+type Size = "md" | "sm" | "touch";
 
 const VARIANT: Record<Variant, string> = {
   primary: "bg-kit-blue-9 text-white border border-kit-blue-9 hover:brightness-95",
@@ -35,13 +35,16 @@ const VARIANT: Record<Variant, string> = {
 };
 
 /** 32px is the live control height every form row already aligns to; 24px is
- *  the dense band. Both are heights, not spacing — Q1 does not reach them. */
+ *  the dense band. Both are heights, not spacing — Q1 does not reach them.
+ *  `touch` is the Work party-card button (owner density ruling 2026-09-25):
+ *  36px from 960px, 40px below, where a finger presses it. */
 const SIZE: Record<Size, string> = {
   md: "h-8 px-3 gap-2",
   sm: "h-6 px-2 gap-1",
+  touch: "h-10 px-3 gap-1.5 min-[960px]:h-9",
 };
 
-const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14 };
+const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14, touch: 14 };
 
 export type ButtonProps = {
   variant?: Variant;

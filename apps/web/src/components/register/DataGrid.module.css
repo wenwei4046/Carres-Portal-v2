@@ -11,15 +11,19 @@
 
 .root {
   /* ── Carres token aliases — the ONE styling adaptation ── */
-  --c-paper: #ffffff; /* white surface (card) */
-  --c-cream: #f9fafb; /* base-50 band */
-  --c-ink: #1a1a1a; /* text primary */
+  /* PORTAL-WIDE LISTING READABILITY (UI MASTER §6.7, Jess 2026-09-17): every
+     listing is white with a slate-3 header band — the slate palette R5 first
+     gave SO Batch is now the default for every grid, never an opt-in. */
+  --c-paper: theme("colors.white"); /* white toolbar, rows, footer */
+  --c-cream: theme("colors.kit.slate.3"); /* header band + hover */
+  --c-ink: theme("colors.kit.slate.12"); /* main text */
   --c-burnt: #9a3d22; /* flame-dark */
   --c-orange: #c44d2b; /* flame */
   --c-festive-b: #dc2626; /* destructive red-600 */
-  --line: #e5e7eb; /* base-200 border */
-  --fg-muted: #6b7280; /* base-500 */
-  --fg-soft: #9ca3af; /* base-400 */
+  --line: theme("colors.kit.slate.5"); /* 1px separators */
+  --fg-muted: theme("colors.kit.slate.11"); /* secondary facts — never slate-9 */
+  --fg-soft: theme("colors.kit.slate.11");
+  --grid-expansion: theme("colors.kit.slate.2");
   --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
   --font-button: "Inter", "DM Sans", system-ui, sans-serif;
   /* Figures: Carres sets numerals with Inter + tabular-nums (no mono face). */
@@ -84,9 +88,6 @@
    Manual Purchase · Warehouse Stock · SO Batch · Supplier Items) — the
    2026-08-14 "exactly one screen" note is history. A change here is a change
    to the Register template on all of them, which is the point: one grammar.
-   The frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
-   Claim) still render components/data-grid/DataGrid.tsx and never load this
-   file.
 
    No px font-size literal lives in this scope: the sizes are the `.root`
    token aliases, never a token redefined to a different value. */
@@ -100,6 +101,15 @@
   flex-wrap: nowrap;
   overflow: hidden;
 }
+.rootLabelledToolbar .toolbar {
+  height: auto;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.rootLabelledToolbar .searchWrap {
+  max-width: 100%;
+  min-width: 0;
+}
 .rootReference .th {
   box-sizing: border-box;
   height: 36px;
@@ -110,7 +120,8 @@
 }
 .rootReference .td {
   box-sizing: border-box;
-  height: 38px;
+  /* 38px baseline; a page with an owner-ruled exception sets --grid-row-h. */
+  height: var(--grid-row-h, 38px);
   padding: 0 8px;
   font-size: var(--fs-13);
   line-height: 18px;
@@ -131,6 +142,10 @@
 
 /* ── Toolbar ─────────────────────────────────────────────────────── */
 .toolbar {
+  /* Never shrink: a wrapped toolbar inside the fixed-height register column
+     was squeezed below its own rows and its last row slid under the table
+     header (390px, measured 2026-09-16). */
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -488,6 +503,16 @@ div:first-child > .columnsMenuGroup {
   font-size: var(--fs-12);
   font-variant-numeric: tabular-nums;
 }
+.tablePinnedBlock {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.tablePinnedBlock .td {
+  border-bottom: 1px solid var(--line);
+}
+.tablePinnedBlock .tr:last-child .td {
+  border-bottom: 0;
+}
 .thead {
   position: sticky;
   top: 0;
@@ -541,8 +566,11 @@ div:first-child > .columnsMenuGroup {
   letter-spacing: inherit;
 }
 .sortArrow {
-  font-size: 10px;
-  color: var(--c-burnt);
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  /* The header ink — the arrow is part of the label, not an accent. */
+  color: inherit;
   margin-left: 2px;
 }
 .resizeHandle {
@@ -558,6 +586,12 @@ div:first-child > .columnsMenuGroup {
 .resizeHandle:hover {
   background: var(--c-orange);
   opacity: 0.4;
+}
+/* The last column's handle stays inside the table: straddling the edge by 3px
+   gave every register that exactly fills its width a phantom sideways scroll
+   (measured 2026-09-16: grid 1140 · scroll 1143, the only overflowing node). */
+.th:last-child > .resizeHandle {
+  right: 0;
 }
 
 .tbody {
@@ -591,6 +625,21 @@ div:first-child > .columnsMenuGroup {
 }
 .td:last-child {
   border-right: 0;
+}
+/* ⭐ THE ELLIPSIS BELONGS TO WHATEVER HOLDS THE TEXT (2026-09-14).
+   `.td` already declares overflow:hidden + text-overflow:ellipsis, but a cell's
+   text almost never sits in the td itself — it sits in the button or span the
+   column's accessor returns. text-overflow applies to a box's OWN inline
+   content, not to an overflowing child box, so the child was drawn at its full
+   width, the td clipped it, and the operator saw a word sliced mid-glyph with
+   no `…` to say anything was missing (`Stage Three Fixture — Invoi`).
+   Measured on production 2026-09-14: td 179px, inner button 193px, no ellipsis.
+   Giving the child the same three declarations puts the mark back. Wrap columns
+   are untouched — they are the opt-in that says height beats one line. */
+.td:not(.tdWrap) > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* WRAP COLUMN (Warehouse unified Inbound/Outbound card, 2026-09-07).
    Information completeness outranks row height: a column that carries every
@@ -840,3 +889,558 @@ div:first-child > .columnsMenuGroup {
   gap: 1px;
   justify-content: center;
 }
+
+/* ── THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) ───────────────
+   A register can be narrowed from two places at once — the page's own
+   filter rail and the grid's per-column funnels — and until now neither
+   said what the other had done. An operator looking at four rows could
+   not see WHY there were four. This strip states every live condition in
+   one line, each one removable on its own, with one `Clear filters` that
+   removes them all.
+
+   Opt-in: a grid given no page conditions and carrying no column filter
+   renders nothing at all, so no existing register gains a band. */
+.conditionBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px var(--space-3);
+  background: var(--c-paper);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: var(--fs-11);
+  color: var(--fg-muted);
+}
+.conditionBarLabel {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.conditionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 1px 4px 1px 8px;
+  font-size: var(--fs-11);
+  color: var(--c-ink);
+}
+.conditionChipText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conditionChipRemove {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.conditionChipRemove:hover {
+  color: var(--c-festive-b, #dc2626);
+}
+.conditionClear {
+  background: transparent;
+  border: 0;
+  padding: 0 2px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--c-burnt, #c44d2b);
+  cursor: pointer;
+}
+.conditionClear:hover {
+  text-decoration: underline;
+}
+
+/* Opt-in two-line heading; keep the 36px register header and controls beside it. */
+.thTwoLine .sortBtn {
+  display: inline-flex;
+  align-items: center;
+  text-align: left;
+}
+.headerLines {
+  white-space: nowrap;
+  line-height: inherit;
+}
+
+/* ── RESPONSIVE REGISTER SEARCH — owner ruling R4, 2026-09-16 ─────────────
+   Opt-in (`searchPresentation="responsive"`), adopted on SO Batch first. The
+   toolbar's OWN width decides, never the device: with room the search box is
+   always readable; narrow, an icon opens it. An active query keeps the box and
+   its clear control visible at every width. Selection still replaces the
+   toolbar in place. */
+.rootSearchResponsive .toolbar {
+  container: grid-toolbar / inline-size;
+}
+.searchResponsiveBox {
+  display: none;
+  /* 340 = the governed placeholder (274px at 12px Inter) + icon, gaps, clear. */
+  flex: 0 1 340px;
+  min-width: 0;
+  width: auto;
+  height: 28px;
+  box-sizing: border-box;
+}
+.searchResponsiveBox[data-active="true"] {
+  display: inline-flex;
+  min-width: 132px;
+}
+.searchResponsiveIcon[data-hidden="true"] {
+  display: none;
+}
+@container grid-toolbar (min-width: 520px) {
+  .searchResponsiveBox {
+    display: inline-flex;
+    min-width: 160px;
+  }
+  .searchResponsiveIcon {
+    display: none;
+  }
+}
+.searchClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.searchClear:hover {
+  background: var(--c-cream);
+  color: var(--c-ink);
+}
+.searchWrap:focus-within {
+  border-color: theme("colors.kit.blue.9");
+}
+
+/* ── LISTING SURFACES — the Portal default (UI MASTER §6.7, Jess 2026-09-17) ──
+   Born as the opt-in slate palette (owner ruling R5, 2026-09-16, SO Batch
+   first); every listing now reads this way. Radix steps through the kit role
+   names; no hex, and no page may copy these rules into its own stylesheet.
+   White toolbar/rows/footer · slate-3 header with slate-11 11px/600 normal
+   casing · 1px separators. `palette="slate"` keeps ONLY its selection model
+   (ticked rows in blue-3) further below. */
+.root .toolbar,
+.root .statusLine {
+  background: theme("colors.white");
+}
+.root .statusLine {
+  color: theme("colors.kit.slate.11");
+  font-size: var(--fs-12);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.root .thead,
+.root .th,
+.root .thead .stickyCell {
+  background: theme("colors.kit.slate.3");
+}
+.root .th {
+  color: theme("colors.kit.slate.11");
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.root .sortArrow {
+  color: theme("colors.kit.slate.11");
+}
+.root .tr:hover,
+.root .tr:hover .stickyCell {
+  background: theme("colors.kit.slate.3");
+}
+/* A single-selected row (no `palette`) keeps its blue-3 across pinned cells
+   while hovered, exactly as before this default moved to `.root`. */
+.root .trSelected .stickyCell,
+.root .trSelected:hover .stickyCell {
+  background: var(--kit-blue-3, #e8f3ff);
+}
+.root .trExpansion,
+.root .trExpansion:hover {
+  background: theme("colors.kit.slate.2") !important;
+}
+.root .toolbarIcon,
+.root .toolbarPill {
+  color: theme("colors.kit.slate.11");
+}
+.root .toolbarIcon svg,
+.root .toolbarPill svg {
+  stroke-width: 2;
+}
+.root button:focus-visible,
+.root input[type="checkbox"]:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: 1px;
+}
+/* ⭐ A PALE-BLUE MAIN HEADER, OPT-IN — owner ruling 2026-09-18, UI §6.8.
+   "Headers reserve a common two-line height, 11px/600, normal casing; main
+   header pale blue in this SO Batch reference, child headers neutral slate.
+   This is not a new global blue-header ruling."
+
+   So the PARENT listing's header band takes blue-2 — the palest step the kit
+   has — and every child table inside an expansion keeps slate-3. Two stacked
+   headers eight pixels apart otherwise read as one table that lost its place.
+   Only `headerTone="paleBlue"` draws it; every other Register is untouched,
+   and no page may copy this rule into its own stylesheet.
+
+   THE INK DOES NOT MOVE: slate-11 on blue-2 is the same 11px/600 normal-cased
+   label, and the separator stays the slate rule — this changes a FILL, not a
+   type or contrast decision. */
+.rootHeaderPaleBlue .thead,
+.rootHeaderPaleBlue .th,
+.rootHeaderPaleBlue .thead .stickyCell {
+  background: theme("colors.kit.blue.2");
+}
+
+/* The ticked-row selection model stays opt-in (`palette="slate"`): a ticked
+   row is in the batch — blue-3 across the WHOLE row, pinned cells included,
+   and it outranks hover. An expanded row that is not ticked stays white. */
+.rootPaletteSlate .trTicked,
+.rootPaletteSlate .trTicked .stickyCell,
+.rootPaletteSlate .trTicked:hover,
+.rootPaletteSlate .trTicked:hover .stickyCell {
+  background: theme("colors.kit.blue.3");
+}
+
+/* Governed group headings (fixedGroups): white band, 13px/600, 38px minimum,
+   the label vertically centred and pinned to the visible left edge. */
+.fixedGroupRow,
+.fixedGroupRow:hover {
+  background: theme("colors.white");
+  cursor: default;
+}
+.fixedGroupRow .groupRowCell {
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0;
+  vertical-align: middle;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: theme("colors.kit.slate.12");
+}
+.fixedGroupLabel {
+  position: sticky;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  font: inherit;
+  color: inherit;
+}
+.fixedGroupLabel .groupCount {
+  margin-left: 2px;
+  font-weight: 400;
+  color: theme("colors.kit.slate.11");
+}
+.fixedGroupToggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.fixedGroupToggle:hover {
+  background: theme("colors.kit.slate.3");
+}
+.fixedGroupToggle svg {
+  color: theme("colors.kit.slate.11");
+  transition: transform 120ms ease;
+}
+.fixedGroupChevronOpen {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fixedGroupToggle svg {
+    transition: none;
+  }
+}
+/* A wrapped text column stays on the row's centre line while it is one line
+   long, so it never sits 4px above its neighbours. */
+.rootPaletteSlate .tdWrap {
+  vertical-align: middle;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+/* Measured 2026-09-16: blue-11 link ink on a blue-3 ticked row is 4.25:1,
+   under AA for 13px text. Inside a ticked row a link keeps its underline and
+   takes slate-12 ink (≈15:1) instead of dropping below the contrast floor. */
+.rootPaletteSlate .trTicked :global(.text-kit-blue-11) {
+  color: theme("colors.kit.slate.12");
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── LISTING STANDARD 2026-09-16 — shared keyboard, touch and overflow ───── */
+/* The condition strip never shrinks under the table either. */
+.conditionBar {
+  flex: none;
+}
+/* A focused row shows a ring the pinned cells cannot paint over. */
+.tr:focus {
+  outline: none;
+}
+.tr:focus-visible > td {
+  box-shadow: inset 0 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
+}
+.tr:focus-visible > td:first-child {
+  box-shadow: inset 2px 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
+}
+.tr:focus-visible > td:last-child {
+  box-shadow: inset -2px 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
+}
+.fixedGroupLabel:focus-visible,
+.contextMenuItem:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: -2px;
+}
+.contextMenuItem:focus {
+  background: var(--c-cream);
+}
+.checkHit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Below a 768px canvas: a 40×40 target around the row checkbox. */
+.checkHitNarrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: -1px 0;
+  cursor: pointer;
+}
+.overflowText {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overflowTrigger {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.overflowTrigger:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: -2px;
+}
+
+/* ── Personal saved layouts (opt-in, ui MASTER §6.7 rule 4) ───────────────
+   The Columns menu's own action list: text rows in the menu's existing type,
+   a panel under the row that opened it, and the refusal as a two-tone line. */
+.layoutActions {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.layoutAction,
+.layoutChoice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  text-align: left;
+  cursor: pointer;
+}
+.layoutAction:hover:not(:disabled),
+.layoutChoice:hover:not(:disabled) {
+  background: var(--c-cream);
+}
+.layoutAction:focus-visible,
+.layoutChoice:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: -2px;
+}
+.layoutAction:disabled,
+.layoutChoice:disabled {
+  color: var(--fg-muted);
+  cursor: default;
+}
+.layoutChoice {
+  padding-left: 24px;
+}
+.layoutPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 12px 8px;
+}
+.layoutChoice + .layoutChoice {
+  margin-top: -6px;
+}
+.layoutField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--fg-muted);
+  font-size: var(--fs-11);
+}
+.layoutField input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--c-ink);
+  font-size: var(--fs-12);
+}
+.layoutProblem {
+  margin: 0;
+  padding: 4px 12px;
+  color: theme("colors.kit.red.11");
+  font-size: var(--fs-11);
+}
+/* With the layout actions the menu needs more height; the column list keeps
+   its own scroll so the actions never scroll away. */
+.columnsMenuWithLayouts {
+  width: 260px;
+  max-height: min(600px, calc(100vh - 120px));
+}
+.columnsMenuWithLayouts .columnsMenuBody {
+  flex: 1 1 auto;
+  min-height: 96px;
+}
+
+/* ── Group-local headers — owner ruling, Jess 2026-09-18 ──────────────────
+   Supersedes the single header above all groups. Each governed group is its
+   own `<tbody>`, and a sticky cell is held by its table SECTION: that is what
+   makes the group's heading and its column header travel with the operator
+   through the group's own records and then STOP at the boundary, instead of
+   standing over the next group's rows.
+
+   Two stacked stops, in the order they are read:
+     0   the group heading (38px, the governed band)
+     38  that group's column header
+
+   Widths, visibility, sorting and resizing are not repeated here — one
+   `<colgroup>` and one `layout` serve every section, so there is nothing for
+   four headers to disagree about. */
+/* One table per group: `table-layout: fixed` so a long value in one group can
+   never widen a column in that group alone, and the width is the columns' own
+   sum so every group lines up with every other and with the scrollbar. */
+.tableGrouped {
+  table-layout: fixed;
+  min-width: 100%;
+}
+/* The group's heading rides in its own `<thead>` beside the column header, so
+   the two travel together and stop together. The band stays white against the
+   header's slate fill. */
+.tableGrouped .fixedGroupRow .groupRowCell {
+  background: theme("colors.white");
+}
+/* The header cell is already sticky through `.thead`; `.thInGroup` marks it
+   for the pinned-identity fill so a scrolled group header is opaque where the
+   columns slide under it. */
+.tableGrouped .thInGroup.stickyCell {
+  z-index: 3;
+}
+
+/* ⭐ §6.9 — THE EXPANSION CONNECTOR, ANCHORED TO THE CARET CELL (Card 12
+   review, 2026-09-21). Three 1px pieces, each placed by CSS inside the cell it
+   belongs to — never by arithmetic over widths. All hidden unless the row's
+   expansion holds the shared ConnectedSections stack, so every other
+   expansion is unchanged. */
+.expansionDrop,
+.expansionElbow,
+.expansionRun {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+  border-color: theme("colors.kit.slate.6");
+  z-index: 1;
+}
+/* The caret cell is the containing block for its drop (a pinned cell already
+   is, being sticky). */
+.expansionCaretCell:not(.stickyCell) {
+  position: relative;
+}
+/* From beneath the caret to the row's bottom edge. The caret is the `▸` text
+   glyph, about 6.5px tall and centred in its cell, so its lower edge sits ~3px
+   below the middle; the line starts 1px under it (measured, Card 12 walk
+   2026-09-22 — `+7px` assumed a 14px icon and left a 5px gap). */
+.expansionDrop {
+  left: calc(50% - 0.5px);
+  top: calc(50% + 4px);
+  bottom: 0;
+  border-left-width: 1px;
+}
+/* The curve: down the caret column to the join height, then to the cell edge.
+   It starts 2px up, over the parent row's bottom rule and this row's top rule,
+   so it meets the drop with no gap; +1px so its bottom rule lands on the same
+   pixel row as the section's run. */
+.expansionElbow {
+  left: calc(50% - 0.5px);
+  right: 0;
+  top: -2px;
+  height: calc(var(--expansion-join-y) + 3px);
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+  border-bottom-left-radius: 9px;
+}
+/* Straight across any data gutter between the caret and the child. */
+.expansionRun {
+  left: 0;
+  right: 0;
+  top: var(--expansion-join-y);
+  border-top-width: 1px;
+}
+.expansionGutter {
+  position: relative;
+}
+.tr:has(+ .trExpansion [data-connected-sections]) .expansionDrop,
+.trExpansion:has([data-connected-sections]) .expansionElbow,
+.trExpansion:has([data-connected-sections]) .expansionRun {
+  display: block;
+}
+/* The caret column pins, so the piece beneath it pins with it. */
+.trExpansion:has([data-connected-sections]) .expansionGutter[style*="left"] {
+  position: sticky;
+  z-index: 1;
+  background: var(--grid-expansion, var(--c-cream));
+}
+
+/* A disabled input must not swallow the existing row-fact tooltip. */
+.checkRefused { cursor: help; }
+.checkRefused input:disabled { pointer-events: none; }
+.checkRefused:focus-visible { outline: 2px solid theme("colors.kit.blue.9"); outline-offset: -2px; }

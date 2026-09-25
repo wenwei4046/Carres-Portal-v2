@@ -9,14 +9,19 @@ import type {
   SupplierBillDraftInput,
   SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
+import { defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
+import { roleAccount, type LedgerAccount } from "@carres/shared/finance-ledger";
+import { useLedgerChart } from "../ledger/ledger-queries";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
+import type { DepartmentType } from "@carres/shared";
+import { DepartmentFilter, DepartmentName, DepartmentPicker, useDepartmentParam } from "../department";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   fetchGrnLines,
   useApAccounts,
@@ -27,20 +32,25 @@ import {
   useSaveBill,
   useSupplierBill,
   useSupplierBills,
+  useApplyAdvance,
+  useSupplierAdvances,
+  useTakeAdvanceOff,
 } from "@/lib/payables-queries";
 import {
+  ADVANCE_APPLICATION_STATUS_WORD,
   BILL_STATUS_WORD,
   cents,
   creditorKindWord,
   money,
   num,
+  priceCheckWord,
   priceDiffWord,
   refusal,
-  todayIso,
   word,
   VOUCHER_STATUS_WORD,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { AdvanceModal, AmountField } from "./VoucherAdvance";
 
 /**
  * Finance → Bills (migration 0477). A supplier's invoice, entered once:
@@ -69,11 +79,12 @@ export default function SupplierBills() {
 
 function BillRegister() {
   const navigate = useNavigate();
-  const query = useSupplierBills();
+  const [dept, setDept] = useDepartmentParam();
+  const query = useSupplierBills(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierBillRegisterRow>[]>(() => [
     { key: "bill", label: "Bill No", width: 170,
-      accessor: (r) => <Link to={`/finance/bills/${r.id}`}>{r.bill_no ?? "Draft, no number yet"}</Link>,
+      accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${r.id}`}>{r.bill_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.bill_no ?? "", exportValue: (r) => r.bill_no ?? "Draft, no number yet" },
     { key: "date", label: "Bill Date", width: 130, accessor: (r) => fmtDate(r.bill_date),
       dateValue: (r) => r.bill_date, filterType: "date", exportValue: (r) => fmtDate(r.bill_date) },
@@ -95,9 +106,7 @@ function BillRegister() {
       accessor: (r) => r.status === "confirmed" ? money(r.unpaid) : r.status === "cancelled" ? "Cancelled" : "Not confirmed",
       numberValue: (r) => num(r.unpaid), filterType: "number" },
     { key: "price", label: "Price Check", width: 180,
-      accessor: (r) => r.price_flags > 0
-        ? `${r.price_flags} ${r.price_flags === 1 ? "line differs" : "lines differ"} from PO`
-        : r.grn_nos ? "Matches PO" : "No PO price",
+      accessor: (r) => priceCheckWord(r),
       filterValue: (r) => r.price_flags > 0 ? "Differs from PO" : "Matches PO", filterType: "enum" },
     { key: "files", label: "Files", width: 90, align: "right", accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
@@ -121,6 +130,7 @@ function BillRegister() {
             searchPlaceholder="Search bills…"
             toolbarStart={
               <span className="flex items-center gap-4">
+                <DepartmentFilter value={dept} onChange={setDept} />
                 <button
                   type="button"
                   data-testid="new-bill"
@@ -160,6 +170,9 @@ function BillDetail() {
   const act = useBillAct();
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [takeOff, setTakeOff] = useState<string | null>(null);
+  const takeOffAct = useTakeAdvanceOff();
   const doc = query.data;
 
   if (query.isError) {
@@ -228,15 +241,38 @@ function BillDetail() {
             )}
           </Facts>
           <BillLinesCard doc={doc} />
-          <Facts title="Payments">
+          <Facts
+            title="Payments"
+            testId="bill-payments"
+            right={doc.can.apply_advance && (num(doc.advance_open) ?? 0) > 0
+              ? <Button variant="primary" onClick={() => setApplying(true)}>Apply advance</Button>
+              : undefined}
+          >
             {doc.payments.length === 0
               ? <p>No payment voucher pays this bill yet.</p>
-              : doc.payments.map((p) => (
-                <p key={p.voucher_id}>
-                  <Link to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
-                  {" · "}{word(VOUCHER_STATUS_WORD, p.status)} · {fmtDate(p.voucher_date)} · {money(p.amount_applied)}
-                </p>
-              ))}
+              : doc.payments.map((p) => p.kind === "advance"
+                ? (
+                  <p key={p.application_id ?? `${p.voucher_id}-advance`}>
+                    Advance from{" "}
+                    <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
+                    {" · "}{word(ADVANCE_APPLICATION_STATUS_WORD, p.status)}
+                    {" · "}{fmtDate(p.applied_on ?? p.voucher_date)} · {money(p.amount_applied)}
+                    {doc.can.take_advance_off && p.status === "applied" && p.application_id && (
+                      <>
+                        {" "}
+                        <Button size="sm" variant="ghost" onClick={() => setTakeOff(p.application_id)}>
+                          Take advance off
+                        </Button>
+                      </>
+                    )}
+                  </p>
+                )
+                : (
+                  <p key={p.voucher_id}>
+                    <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
+                    {" · "}{word(VOUCHER_STATUS_WORD, p.status)} · {fmtDate(p.voucher_date)} · {money(p.amount_applied)}
+                  </p>
+                ))}
           </Facts>
           <FilesCard kind="bills" id={id} files={doc.files} canAdd={doc.can.add_file} />
           <HistoryCard events={doc.events} />
@@ -260,14 +296,99 @@ function BillDetail() {
         open={cancelling}
         title="Cancel this bill?"
         description={b.status === "confirmed"
-          ? "The ledger entry is reversed on the bill date. A bill already on a payment voucher cannot be cancelled."
+          ? "The ledger entry is reversed on the bill date. A bill already on a payment voucher, or with an advance applied, cannot be cancelled."
           : "The draft is kept, marked cancelled."}
         action="Cancel bill"
         busy={act.isPending}
         onClose={() => setCancelling(false)}
         onSubmit={cancel}
       />
+      <ReasonModal
+        open={takeOff !== null}
+        title="Take this advance off the bill?"
+        description="Nothing is entered in the ledger. The bill is unpaid again by this amount, and the advance is left to use."
+        action="Take advance off"
+        busy={takeOffAct.isPending}
+        onClose={() => setTakeOff(null)}
+        onSubmit={(reason) => takeOff && takeOffAct.mutate({ applicationId: takeOff, reason }, {
+          onSuccess: () => { setTakeOff(null); toast.success("Advance taken off"); },
+          onError: (e) => toast.error(refusal(e)),
+        })}
+      />
+      {applying && (
+        <ApplyToBillModal
+          billId={id}
+          supplierId={b.supplier_id}
+          apAccountCode={b.ap_account_code}
+          leftToPay={num(doc.left_to_pay) ?? 0}
+          onClose={() => setApplying(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/** From the bill: choose one of the supplier's approved advances on the same
+ *  payables account, and how much of it to knock off this bill. Posts nothing. */
+function ApplyToBillModal({ billId, supplierId, apAccountCode, leftToPay, onClose }: {
+  billId: string;
+  supplierId: string;
+  apAccountCode: string;
+  leftToPay: number;
+  onClose: () => void;
+}) {
+  const advances = useSupplierAdvances(supplierId);
+  const apply = useApplyAdvance();
+  const rows = (advances.data ?? [])
+    .filter((a) => (num(a.advance_open) ?? 0) > 0 && a.ap_account_code === apAccountCode);
+  const [voucherId, setVoucherId] = useState("");
+  const [amount, setAmount] = useState("");
+  const row = rows.find((a) => a.voucher_id === voucherId) ?? null;
+  const cap = row ? cents(Math.min(num(row.advance_open) ?? 0, leftToPay)) : leftToPay;
+  const n = num(amount);
+  const ready = row !== null && n !== null && n > 0 && n <= cap;
+
+  return (
+    <AdvanceModal
+      title="Apply advance to this bill?"
+      description="Nothing is entered in the ledger: the advance is already on the supplier's account. The bill shows it as paid by this amount."
+      action="Apply advance"
+      ready={ready}
+      busy={apply.isPending}
+      onClose={onClose}
+      onSubmit={() => apply.mutate({ voucherId, input: { billId, amount: n ?? 0 } }, {
+        onSuccess: () => { toast.success("Advance applied"); onClose(); },
+        onError: (e) => toast.error(refusal(e)),
+      })}
+    >
+      {advances.isError
+        ? <p role="alert">The advances could not be loaded. Try again.</p>
+        : !advances.isSuccess
+          ? <p>Loading advances…</p>
+          : rows.length === 0
+            ? <p>This supplier has no advance left.</p>
+            : (
+              <div className="flex flex-col gap-3">
+                <label className="block">
+                  Advance
+                  <select aria-label="Advance" className={`${fieldCls} mt-1`} value={voucherId}
+                    onChange={(e) => {
+                      setVoucherId(e.target.value);
+                      const a = rows.find((r) => r.voucher_id === e.target.value);
+                      setAmount(a ? String(cents(Math.min(num(a.advance_open) ?? 0, leftToPay))) : "");
+                    }}>
+                    <option value="">Choose the advance</option>
+                    {rows.map((a) => (
+                      <option key={a.voucher_id} value={a.voucher_id}>
+                        {a.voucher_no} · {fmtDate(a.voucher_date)} · {money(a.advance_open)} left
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <AmountField amount={amount} onChange={setAmount} cap={cap} capWord="More than can be applied" />
+              </div>
+            )}
+    </AdvanceModal>
   );
 }
 
@@ -285,6 +406,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
               <th className="py-1 pr-3 text-right">Qty</th>
               <th className="py-1 pr-3 text-right">Unit price</th>
               <th className="py-1 pr-3">Against PO</th>
+              <th className="py-1 pr-3">Department</th>
               <th className="py-1 text-right">Amount</th>
             </tr>
           </thead>
@@ -298,6 +420,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
                 <td className="py-1 pr-3 text-right">{l.qty ?? "—"}</td>
                 <td className="py-1 pr-3 text-right">{money(l.unit_price)}</td>
                 <td className="py-1 pr-3">{l.po_line_id ? priceDiffWord(num(l.price_diff)) : "No PO price"}</td>
+                <td className="py-1 pr-3"><DepartmentName type={l.department_type} id={l.department_id} /></td>
                 <td className="py-1 text-right">{money(l.amount)}</td>
               </tr>
             ))}
@@ -323,6 +446,8 @@ type LineDraft = {
   amount: string;
   poUnitCost: number | null;
   openQty: number | null;
+  departmentType: DepartmentType | null;
+  departmentId: string | null;
 };
 
 let lineSeq = 0;
@@ -331,7 +456,7 @@ function newKey() { lineSeq += 1; return `l${lineSeq}`; }
 function blankLine(): LineDraft {
   return {
     key: newKey(), warehouseReceiptId: null, poLineId: null, grnNo: null, sku: "", description: "",
-    accountCode: "", qty: "", unitPrice: "", amount: "", poUnitCost: null, openQty: null,
+    accountCode: "", qty: "", unitPrice: "", amount: "", poUnitCost: null, openQty: null, departmentType: null, departmentId: null,
   };
 }
 
@@ -350,12 +475,12 @@ function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
     return {
       warehouseReceiptId: l.warehouseReceiptId, poLineId: l.poLineId,
       accountCode: l.accountCode || null, sku: l.sku || null, description: l.description || null,
-      qty: q, unitPrice: p,
+      qty: q, unitPrice: p, departmentType: l.departmentType, departmentId: l.departmentId,
     };
   }
   return {
     accountCode: l.accountCode || null, sku: l.sku || null, description: l.description || null,
-    qty: q, unitPrice: p,
+    qty: q, unitPrice: p, departmentType: l.departmentType, departmentId: l.departmentId,
     amount: q !== null && p !== null ? null : (l.amount.trim() === "" ? null : Number(l.amount)),
   };
 }
@@ -367,12 +492,18 @@ function BillForm() {
   const existing = useSupplierBill(id);
   const suppliers = useApSuppliers();
   const accounts = useApAccounts();
+  const chart = useLedgerChart();
   const save = useSaveBill();
 
   const [supplierId, setSupplierId] = useState(params.get("supplier") ?? "");
   const [invoiceNo, setInvoiceNo] = useState("");
-  const [billDate, setBillDate] = useState(todayIso());
+  const [billDate, setBillDate] = useState(appTodayIso());
   const [dueDate, setDueDate] = useState("");
+  // 0530 — the due date follows bill date + terms until the user types one.
+  // A saved draft keeps what it has.
+  const [dueTouched, setDueTouched] = useState(Boolean(id));
+  // ponytail: the last picked GRN's PO; bills spanning two POs use that one's terms.
+  const [poTermsDays, setPoTermsDays] = useState<number | null>(null);
   const [apAccount, setApAccount] = useState("");
   const [narration, setNarration] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([]);
@@ -403,11 +534,17 @@ function BillForm() {
       amount: String(l.amount),
       poUnitCost: num(l.po_unit_cost),
       openQty: null,
+      departmentType: (l.department_type ?? null) as DepartmentType | null,
+      departmentId: l.department_id ?? null,
     })));
     setLoaded(true);
   }, [id, loaded, existing.data]);
 
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
+  const suggestedDue = defaultBillDueDate(billDate, poTermsDays, supplier?.terms_days) ?? "";
+  useEffect(() => {
+    if (!dueTouched) setDueDate(suggestedDue);
+  }, [dueTouched, suggestedDue]);
   const lineAccounts = (accounts.data ?? []).filter((a) => a.for_bill_line);
   const apAccounts = (accounts.data ?? []).filter((a) => a.for_ap);
   const total = cents(lines.reduce((s, l) => s + (lineAmount(l) ?? 0), 0));
@@ -437,11 +574,11 @@ function BillForm() {
   if (id && existing.isError) return <ReadFailed what="This bill" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading bill…</div>;
   if (id && existing.data && !existing.data.can.edit) {
-    return <div className="p-6 text-body">Only a draft bill can be changed. <Link to={`/finance/bills/${id}`}>Back to the bill</Link></div>;
+    return <div className="p-6 text-body">Only a draft bill can be changed. <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${id}`}>Back to the bill</Link></div>;
   }
 
   const ready = supplierId !== "" && invoiceNo.trim() !== "" && /^\d{4}-\d{2}-\d{2}$/.test(billDate)
-    && lines.length > 0 && lines.every((l) => (lineAmount(l) ?? 0) > 0);
+    && lines.length > 0 && lines.every((l) => (lineAmount(l) ?? 0) > 0 && l.departmentType !== null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -485,14 +622,21 @@ function BillForm() {
               <label className="block">
                 Due date
                 <input aria-label="Due date" type="date" className={`${fieldCls} mt-1`} value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)} />
+                  onChange={(e) => { setDueTouched(true); setDueDate(e.target.value); }} />
+                {!dueTouched && suggestedDue !== "" && (
+                  <span className="text-meta text-base-500" data-testid="due-from-terms">
+                    {poTermsDays != null
+                      ? `Bill date + ${poTermsDays} days, from the PO's terms`
+                      : `Bill date + ${supplier?.terms_days} days, from the supplier's terms`}
+                  </span>
+                )}
               </label>
               <label className="block">
                 Payables account
                 <select aria-label="Payables account" className={`${fieldCls} mt-1`} value={apAccount}
                   onChange={(e) => setApAccount(e.target.value)}>
                   <option value="">
-                    {supplier?.kind === "other_creditor" ? "2120 Other payables (usual)" : "2110 Trade payables (usual)"}
+                    {usualLabel(roleAccount(chart.data, supplier?.kind === "other_creditor" ? "OTHER_PAYABLE" : "TRADE_PAYABLE"))}
                   </option>
                   {apAccounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
                 </select>
@@ -523,12 +667,14 @@ function BillForm() {
                         <th className="py-1 pr-2">Unit price</th>
                         <th className="py-1 pr-2">Amount</th>
                         <th className="py-1 pr-2">Against PO</th>
+                        <th className="py-1 pr-2">Department</th>
                         <th className="py-1" />
                       </tr>
                     </thead>
                     <tbody>
                       {lines.map((l, i) => (
                         <BillLineRow key={l.key} line={l} index={i} accounts={lineAccounts}
+                          usualGoods={usualLabel(roleAccount(chart.data, "COST_OF_GOODS_SOLD"))}
                           onChange={(patch) => setLine(l.key, patch)}
                           onRemove={() => setLines((b) => b.filter((x) => x.key !== l.key))} />
                       ))}
@@ -545,8 +691,9 @@ function BillForm() {
         supplierId={supplierId || null}
         poId={params.get("po")}
         onClose={() => setGrnOpen(false)}
-        onPick={(picked, supplierOfGrn) => {
+        onPick={(picked, supplierOfGrn, poTerms) => {
           if (!supplierId) setSupplierId(supplierOfGrn);
+          setPoTermsDays(poTerms);
           setLines((before) => [...before.filter((l) => lineAmount(l) !== null || l.description !== ""), ...picked]);
           setGrnOpen(false);
         }}
@@ -572,10 +719,19 @@ function CreditorOptions({ rows }: { rows: ApCreditor[] }) {
   );
 }
 
-function BillLineRow({ line, index, accounts, onChange, onRemove }: {
+/* 0570: the account a blank choice falls back to is the chart's role, named
+   from the chart, never a number written here. Until the chart is read the
+   row says only that the usual account is used.
+   PROPOSAL - PENDING APPROVAL: "The usual account". */
+function usualLabel(a: LedgerAccount | undefined): string {
+  return a ? `${a.code} ${a.name} (usual)` : "The usual account";
+}
+
+function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: {
   line: LineDraft;
   index: number;
   accounts: ApAccountChoice[];
+  usualGoods: string;
   onChange: (patch: Partial<LineDraft>) => void;
   onRemove: () => void;
 }) {
@@ -597,7 +753,7 @@ function BillLineRow({ line, index, accounts, onChange, onRemove }: {
       <td className="py-1 pr-2">
         <select aria-label={`Line ${n} account`} className={fieldCls} value={line.accountCode}
           onChange={(e) => onChange({ accountCode: e.target.value })}>
-          <option value="">{fromGrn ? "5100 Cost of goods sold (usual)" : "Choose an account"}</option>
+          <option value="">{fromGrn ? usualGoods : "Choose an account"}</option>
           {accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
         </select>
       </td>
@@ -623,6 +779,10 @@ function BillLineRow({ line, index, accounts, onChange, onRemove }: {
       <td className="py-1 pr-2" data-testid={`line-${n}-price-check`}>
         {fromGrn ? priceDiffWord(diff) : "No PO price"}
       </td>
+      <td className="py-1 pr-2">
+        <DepartmentPicker label={`Line ${n} department`} type={line.departmentType} id={line.departmentId}
+          income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />
+      </td>
       <td className="py-1">
         <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
       </td>
@@ -637,7 +797,7 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
   supplierId: string | null;
   poId: string | null;
   onClose: () => void;
-  onPick: (lines: LineDraft[], supplierId: string) => void;
+  onPick: (lines: LineDraft[], supplierId: string, poTermsDays: number | null) => void;
 }) {
   const candidates = useGrnCandidates(supplierId, open);
   const [busy, setBusy] = useState<string | null>(null);
@@ -661,9 +821,11 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
           amount: "",
           poUnitCost: num(l.po_unit_cost),
           openQty: num(l.open_qty),
+          departmentType: (l.department_type ?? null) as DepartmentType | null,
+          departmentId: l.department_id ?? null,
         }));
       if (picked.length === 0) toast.error("Everything on that GRN is already billed.");
-      else onPick(picked, g.supplier_id);
+      else onPick(picked, g.supplier_id, g.po_terms_days ?? null);
     } catch (e) {
       toast.error(refusal(e));
     } finally {

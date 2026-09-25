@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -28,21 +21,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 const HOLDER = "00000000-0000-0000-0000-0000000000aa";
 const COVER = "00000000-0000-0000-0000-0000000000bb";
 const MANAGER = "00000000-0000-0000-0000-0000000000cc";
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 type Result = { data: unknown; error: unknown };
@@ -75,17 +60,8 @@ function makeSb(
   return sb;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -142,16 +118,6 @@ function dutyTables() {
         error: null,
       },
     },
-    app_users: {
-      list: {
-        data: [
-          { id: HOLDER, name: "Aina" },
-          { id: COVER, name: "Buddy cover" },
-          { id: MANAGER, name: "Jess" },
-        ],
-        error: null,
-      },
-    },
   };
 }
 
@@ -188,6 +154,13 @@ describe("GET /api/operation/workspace-duties", () => {
     const sb = makeSb(dutyTables(), {
       workspace_can_assign_duties: { data: true },
       workspace_resolve_duty: { data: RESOLVED },
+      actor_display_names: {
+        data: [
+          { id: HOLDER, name: "Aina" },
+          { id: COVER, name: "Buddy cover" },
+          { id: MANAGER, name: "Jess" },
+        ],
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -205,15 +178,16 @@ describe("GET /api/operation/workspace-duties", () => {
     expect(body.duties.map((d) => d.key)).toEqual([
       "po_duty",
       "grn_duty",
-      "payment_duty",
       "storage_waiver_approver",
       "purchasing_approver",
       "delivery_charge_approver",
       "payment_approver",
+      "finance_approver",
       "stock_adjustment_approver",
       "service_case_approver",
       "issue_triage_duty",
       "issue_review_approver",
+      "delivery_duty",
     ]);
     const grnDuty = body.duties.find((d) => d.key === "grn_duty")!;
     expect(grnDuty).toMatchObject({ key: "grn_duty", label: "GRN Duty" });
@@ -350,9 +324,10 @@ describe("POST /assign", () => {
       { dutyKey: "grn_duty", holderId: HOLDER, effectiveFrom: "2026-09-04" },
     );
     expect(res.status).toBe(403);
-    const body = (await res.json()) as { error: string; message: string };
-    expect(body.error).toBe("forbidden");
-    expect(body.message).toContain("only a duty manager");
+    const body = (await res.json()) as { code: string; message: string };
+    // S2-A: a code, never the database's sentence.
+    expect(body.code).toBe("unknown");
+    expect(body.message).not.toContain("only a duty manager");
   });
 
   it("403 for a dealer before the body is even read", async () => {
@@ -443,9 +418,9 @@ describe("POST /cover", () => {
     const sb = makeSb(dutyTables(), {
       workspace_cover_duty: {
         error: {
-          code: "P0001",
-          message: "this duty has no holder to cover for",
-          details: "no_holder_to_cover",
+          code: "22023",
+          message: "no one holds grn_duty on 2026-09-08 — assign the duty first",
+          details: "no_duty_holder",
         },
       },
     });
@@ -464,6 +439,126 @@ describe("POST /cover", () => {
     );
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("no_holder_to_cover");
+    expect(body.code).toBe("no_duty_holder");
+  });
+});
+
+describe("S2-A · refusals travel as codes, never as database text", () => {
+  const coverBody = {
+    dutyKey: "grn_duty",
+    actingUserId: COVER,
+    startsOn: "2026-09-08",
+    endsOn: "2026-09-10",
+  };
+  async function refuse(
+    path: "assign" | "cover",
+    error: { code: string; message: string; details: string },
+  ) {
+    const sb = makeSb(dutyTables(), {
+      [path === "assign" ? "workspace_assign_duty" : "workspace_cover_duty"]: { error },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/workspace-duties/${path}`,
+      "POST",
+      await makeJwt("operation"),
+      path === "assign"
+        ? { dutyKey: "grn_duty", holderId: HOLDER, effectiveFrom: "2026-09-04" }
+        : coverBody,
+    );
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  }
+
+  it.each([
+    ["cover", "22023", "no one holds grn_duty on 2026-09-20 — assign the duty first", "no_duty_holder", 422],
+    ["cover", "22023", "grn_duty already has cover between 2026-09-08 and 2026-09-10", "cover_overlap", 422],
+    ["cover", "22023", "the normal holder cannot cover their own duty", "cover_is_holder", 422],
+    ["cover", "22023", "the cover must be a different active internal staff member", "invalid_cover", 422],
+    ["cover", "22023", "the cover needs a valid date window", "invalid_dates", 422],
+    ["assign", "22023", "the holder must be an active internal staff member", "invalid_holder", 422],
+    ["assign", "42501", "you cannot assign a duty to yourself", "self_assignment_refused", 403],
+    ["assign", "22023", "an effective date is required", "invalid_dates", 422],
+    ["assign", "42501", "forbidden", "duty assignments are set by the manager", 403],
+  ] as const)("%s %s %s → code", async (path, code, message, details, status) => {
+    const r = await refuse(path, { code, message, details });
+    expect(r.status).toBe(status);
+    const expected = details === "duty assignments are set by the manager" ? "not_duty_manager" : details;
+    expect(r.body.code).toBe(expected);
+    // The database's own sentence never leaves the API.
+    expect(JSON.stringify(r.body)).not.toContain(message === "forbidden" ? "set by the manager" : message);
+  });
+
+  it("an unknown database failure is a plain unknown code", async () => {
+    const r = await refuse("cover", { code: "XX000", message: "relation boom", details: "" });
+    expect(r.status).toBe(500);
+    expect(r.body.code).toBe("unknown");
+    expect(JSON.stringify(r.body)).not.toContain("boom");
+  });
+});
+
+describe("S2-A · the success names the SERVER's normal owner", () => {
+  it("cover returns the normal and acting names for the ids the door wrote", async () => {
+    const sb = makeSb(dutyTables(), {
+      workspace_cover_duty: {
+        data: { id: "c2", duty_key: "grn_duty", normal_user_id: HOLDER, acting_user_id: COVER },
+      },
+      actor_display_names: {
+        data: [
+          { id: HOLDER, name: "Yu Jun" },
+          { id: COVER, name: "Shasha" },
+        ],
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/workspace-duties/cover", "POST", await makeJwt("operation"), {
+      dutyKey: "grn_duty",
+      actingUserId: COVER,
+      startsOn: "2026-10-08",
+      endsOn: "2026-10-10",
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      normal_user_id: HOLDER,
+      normal_user_name: "Yu Jun",
+      acting_user_name: "Shasha",
+    });
+  });
+});
+
+describe("S2-A · the scheduled cover is the one the resolver will use", () => {
+  it("asks the resolver on the next cover's first day and returns its cover_id", async () => {
+    const tables = dutyTables();
+    tables.workspace_duty_covers.list.data = [
+      { ...tables.workspace_duty_covers.list.data[0]!, id: "later", starts_on: "2030-10-20", ends_on: "2030-10-21" },
+      { ...tables.workspace_duty_covers.list.data[0]!, id: "soon", starts_on: "2030-10-05", ends_on: "2030-10-06" },
+    ];
+    const sb = makeSb(tables, {
+      workspace_can_assign_duties: { data: true },
+      workspace_resolve_duty: {
+        data: { ...RESOLVED, on_date: "2026-09-17", acting_user_id: null, is_cover: false, cover_id: null },
+      },
+    });
+    sb.rpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+      if (fn === "workspace_resolve_duty" && args?.p_on === "2030-10-05") {
+        return Promise.resolve({ data: { ...RESOLVED, cover_id: "soon" }, error: null });
+      }
+      if (fn === "workspace_resolve_duty") {
+        return Promise.resolve({
+          data: { ...RESOLVED, on_date: "2026-09-17", acting_user_id: null, is_cover: false, cover_id: null },
+          error: null,
+        });
+      }
+      if (fn === "workspace_can_assign_duties") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/workspace-duties", "GET", await makeJwt("operation"));
+    const body = (await res.json()) as { duties: Array<Record<string, unknown>> };
+    const grn = body.duties.find((d) => d.key === "grn_duty")!;
+    expect(grn.scheduled_cover_id).toBe("soon");
+    expect(body.duties.find((d) => d.key === "po_duty")!.scheduled_cover_id).toBeNull();
   });
 });

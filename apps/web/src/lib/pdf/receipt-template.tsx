@@ -85,14 +85,14 @@ const KIND_LABEL: Record<string, string> = {
 
 export function ReceiptTemplate(data: ReceiptTemplateData) {
   const { receipt_no, issue_date, order_code, customer, amount, method, kind, reference, note, currency,
-    voided, void_reason } = data;
+    voided, void_reason, payer_sign_label, invoice_nos } = data;
   const kindLabel = KIND_LABEL[kind] ?? kind;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <DocHeader
           docTitle={voided ? "PAYMENT RECEIPT · VOIDED" : "PAYMENT RECEIPT"}
-          docMetaRows={[receipt_no, `Date: ${issue_date}`, `Order: ${order_code}`]}
+          docMetaRows={[receipt_no, `Date: ${issue_date}`, ...(order_code ? [`Order: ${order_code}`] : [])]}
         />
 
         {voided ? <Text style={styles.note}>
@@ -113,6 +113,12 @@ export function ReceiptTemplate(data: ReceiptTemplateData) {
             <Text style={styles.detailLabel}>Method</Text>
             <Text style={styles.detailValue}>{method}</Text>
           </View>
+          {invoice_nos?.length ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Invoice</Text>
+              <Text style={styles.detailValue}>{invoice_nos.join(", ")}</Text>
+            </View>
+          ) : null}
           {reference ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Reference</Text>
@@ -133,7 +139,7 @@ export function ReceiptTemplate(data: ReceiptTemplateData) {
             <Text style={styles.signLabel}>Received by (Carres)</Text>
           </View>
           <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Customer signature</Text>
+            <Text style={styles.signLabel}>{payer_sign_label ?? "Customer signature"}</Text>
           </View>
         </View>
 

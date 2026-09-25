@@ -22,6 +22,12 @@
 
 # §1 · Overview
 
+**Purchase Returns rail — approved target, 2026-09-18:** reuse the Supplier Claims supplier-list
+pattern (heading icon, name + right-aligned document count, active state, click again to clear).
+Supplier filtering combines with operational conditions. Exact page fields and rail sections
+are governed by Purchasing MASTER §9.6; do not create a separate dropdown or page-specific
+geometry. This is UI approval, not a claim that production is built.
+
 ### MISSION
 Give every page ONE vocabulary, so an operator never re-learns a screen and a chat never invents
 a value.
@@ -265,6 +271,12 @@ The maintained mission state above and these transitions are part of every Plan/
    concise Constitution starters; do not make Jess reconstruct lane law in a giant prompt.
 
 Plan Decision Persistence makes the authoritative MASTER—not chat length—the memory mechanism.
+
+For Workspace Work, the complete owner-approved right-panel composition, exact 72px party-card
+geometry, one-line concurrent Order Route, Customer/Supplier states, shared communication behaviour
+and responsive acceptance are governed by `workspace/MASTER.md` §5.10. UI work must preserve the
+deployed §5.5 left/middle density and §5.9 Logistics behaviour; existing Customer/Supplier shells are
+implementation evidence, not proof that the approved target is complete.
 PLAN mode blocks application implementation but requires governing-document updates for approved
 truth. Once an approved READY scope is handed to BUILD/DELIVERY mode, §1.1 and the Constitution's
 Engineer-Owned Delivery law apply: engineering chooses its own compliant execution method and owns
@@ -365,6 +377,31 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **Widths and radii that have no home in a standard live as named config keys**, never as
   numbers inside a component.
 
+**⭐ THE CENTRED SURFACE'S WIDTH TABLE — closed at three, and every value carries its
+measurement (2026-09-11, adding the third).**
+
+| `width` | Config key | Value | The measurement that produced it |
+|---|---|---|---|
+| *(omitted)* | `max-w-modal` | 512px | The default: a question, a short form, a confirmation |
+| `"wide"` | `max-w-modal-wide` | 600px | P19, 2026-08-05 — a surface carrying a LINE LIST rather than a question |
+| `"viewer"` | `max-w-modal-viewer` | 880px | 2026-09-11 — a surface whose binding constraint is a PICTURE's height, not a column of text. The dialog caps at `85vh`; its chrome (header, footer, the caption line) takes 136px, leaving 629px of image. A 4:3 delivery photo 629px tall is 839px wide, so 880px shows it whole with 9px of headroom either side. Below this the photo is letterboxed and the operator zooms to read a door number |
+
+**A FOURTH WIDTH IS A DECISION FOR THIS TABLE, NOT FOR A CALLER.** `width` stays a union of
+literals with no number and no `style`, so what a page can express is one of these three. A page
+that needs a surface this table does not describe brings the gap here — it does not draw its own
+overlay.
+
+**⭐ RETURNING FOCUS IS `DialogFrame`'s JOB, AND IT WAS NOT BEING DONE (defect found and fixed
+2026-09-11).** The kit documented *"focus returned to the trigger"* as Radix behaviour it
+inherited. It was not: Radix restores focus to `Dialog.Trigger`, and the kit deliberately has
+none, because `open` is CONTROLLED and what opens a surface is an ordinary page button, a row
+action or a keyboard shortcut. Radix's modal content therefore called `preventDefault()` on its
+own close-focus event and then focused a trigger that was `null` — so **every modal and drawer in
+the portal dropped a keyboard user onto `<body>`**, with no way back to the row they opened.
+`DialogFrame` now remembers the element that had focus when it opened and restores it on close,
+skipping an opener the close itself removed from the document. One fix, every surface — which is
+the whole reason the two components share a frame.
+
 # §4 · Shells and grids
 
 ### FROZEN RULES
@@ -377,9 +414,43 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **A list table never scrolls sideways by growing.** A column RESIZE takes width from its RIGHT
   NEIGHBOUR, never from the table — AutoCount lets a column grow and hands the operator a
   horizontal scrollbar.
-- **Kit `DataTable` layout is NOT remembered across a reload.** Sales Orders uses the existing
-  `register/DataGrid` engine instead; Loo explicitly ruled that Stage A preserves that engine's
-  browser layout persistence. This is a page-scoped exception, not a new kit default.
+- **PERSONAL COLUMN LAYOUT IS REMEMBERED — Listing Standard, owner approved 2026-09-16.** Resize,
+  reorder and hide are personal: remembered in that staff member's browser for now and affecting
+  nobody else, with a visible `Reset columns` back to the governed default. `register/DataGrid`
+  remembers per page key (Sales Orders `carres.salesOrders.register.v4.{role}`) and labels the act
+  `Reset columns` (PR #1396). Kit `DataTable` does not remember yet: **APPROVED TARGET / NOT
+  BUILT** there.
+- **LISTING STANDARD ENGINE POWERS — owner approved 2026-09-16, BUILT in `register/DataGrid`
+  (PR #1396).** Default-on for every register unless marked opt-in:
+  ```
+  KEYBOARD    a grid is ONE Tab stop (roving row, always a RENDERED row); ↑/↓ one row,
+              Home/End first/last, PageUp/PageDown one screen — counted in the FULL row list
+              (group banners and expansions skipped); a virtual list scrolls to the target,
+              focuses it and corrects the scroll so it sits wholly below the sticky header
+              (the virtualizer's 30px estimate vs 38px rows left it off-screen, measured
+              2026-09-17, PR follow-up to #1396); Enter = what a double-click
+              opens; Space ticks; → / ← open and close the expansion; Shift+F10 or the Menu key
+              opens the row menu from the row or any control in it; the menu (role menu,
+              `Row actions`) takes focus, ↑/↓/Home/End move, Escape or Tab gives focus back.
+              A governed group heading is a Tab stop. Controls inside a row keep their own keys.
+  NARROW      the toolbar and condition strip never shrink (flex: none), so a wrapped toolbar
+              never slides under the header; below a 768px GRID canvas (not the device) the row
+              checkbox has a 40×40 target and a 40px column.
+  EDGE        the last column's resize handle stays inside the table — a register that exactly
+              fills its width has no phantom 3px sideways scroll.
+  opt-in errorState       a failed read drawn inside the work surface; the toolbar and its
+                          create action stay; the footer prints no count.
+  opt-in overflowText     per column: the value on one line; ONLY when the cell cuts it, a kit
+                          Popover trigger (`{column}: {value}`) opens it whole by click or keyboard.
+  searchPresentation="responsive"   the query is a `Search: {query}` condition chip; `Clear
+                          filters` clears search + header filters; a no-match state with its own
+                          `Clear filters` suppresses the strip's duplicate button.
+  ```
+  Measured on rendered fixture pages 2026-09-17 (not authenticated production): Sales Orders at
+  1440/1180/820/390 + 200% zoom; smoke on SO Batch, Manual Purchase, Purchase Orders, Delivery
+  Monitor and Payment Records — one Tab stop per grid, no page sideways scroll, no toolbar/header
+  overlap. Known 🟡: a keyboard user crosses every header sort/filter button (20 stops on Sales
+  Orders) before reaching the rows.
 - **⭐ STICKY IDENTITY IS AN ENGINE CAPABILITY — owner ruling 2026-08-15 (Chai).** When optional
   columns widen a register past its frame it scrolls sideways, and the row loses the only thing
   that says WHICH record it is. `register/DataGrid` takes an OPTIONAL `stickyIdentity`: the control
@@ -441,6 +512,16 @@ EDIT      full screen          split           left composes · right shows what
 means staff must remember which one can do what, and that memory is the thing this portal exists
 to remove.**
 
+**THE ONE GOVERNED WRITE STATE INSIDE AN INSPECT SURFACE — owner ruling 2026-09-13, Delivery
+Monitor.** The Monitor row's expansion is the delivery brief: four kit `Panel`s (`Customer,
+Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock`). Where a
+panel owns a Delivery write, the `Panel`'s one right-slot control (`Update date and time`,
+`Assign logistics` / `Change logistics`) flips that panel's own body into a focused edit state
+with its named Save (`Save confirmed delivery`); the operator stays on the same row, queue and
+narrowings. No overflow menu and no separate dialog is invented for these acts, and no other
+register may copy this without its own owner ruling. Sales facts inside the brief stay read-only
+behind `Open Sales Order to change`. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
+
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
 Header       which record · what state · ‹ 4 of 69 ›
@@ -481,11 +562,23 @@ went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 is the only way an operator can see what a supplier will read without printing it.
 ```
 SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
-               Purchase Return · Repair Order · Supplier Claim
-NEVER        Goods Receipt · Display Request · Manual Purchase
+               Purchase Return · Repair Order · Supplier Claim · Goods Receipt (GRN)
+NEVER        Display Request
+EXCEPTION    Manual Purchase create / returned-request edit: internal MPR preview
+             (owner 2026-09-22; APPROVED / NOT BUILT; Purchasing §9.2).
 ```
-Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
-half a screen on something no one outside will ever read.
+Manual Purchase creation uses the same Sales Order form composition: left form,
+right live MPR preview, with `Request Details → Delivery → Items` on both sides.
+Apply the governed readable split/stack behavior; ordinary saved MPR detail and
+its Register do not acquire this split. The preview is internal request content,
+not a supplier-facing PO. Purchasing §9.2 and COPY own fields and actions.
+The downstream MPR Issue PO journey reuses the existing Review Purchase Orders
+composition before creation, with the actual PO draft selected on the left;
+it does not relabel the internal MPR preview as a PO. Purchasing §9.2 owns the
+five grouping facts, request approval and distinct request/PO dates.
+
+The GRN is an official A4 document the supplier and auditors read, so its object and Amend
+Receiving use the 50/50 official preview (owner ruling 2026-09-06, Purchasing MASTER §9.4).
 
 ### A PANEL'S ACTIONS LIVE IN ITS OWN HEADER ⋮
 Already ruled (Jess, 2026-07-11) and it corrected nine surfaces at once —
@@ -496,13 +589,13 @@ gone."* It binds every object detail in the portal; it is not re-argued per modu
 **Remembered: whether a rail or a panel is collapsed.** Shipped and measured —
 `OrderDetailDrawer.tsx:2000` reads `ops-drawer-rail` from `localStorage`, and panel open/closed
 persists by panel title (`:656-673`).
-**Not remembered: the grid's shape** — width, order, visibility. A test asserts it
-(`OperationOrdersControl.test.tsx:614`: *"persists no column shape"*), and §4's reload-is-the-reset
-rule stands.
-**The line is whether the choice changes what the record MEANS to the next reader.** Collapsing a
-rail is where my eyes are now; re-cutting the columns redefines the table for everyone who opens
-it next. *(Written down because a 2026-08-18 chat read the layout-memory rule, did not read the
-shipped code, and stated the opposite.)*
+**Register column preferences are personal — APPROVED / NOT BUILT (Jess, 2026-09-17).**
+Purchase Orders pilots account-saved layouts under §6.7: up to 10 named layouts per listing,
+readable and changeable only by the signed-in owner. Save order, widths, visibility and sort;
+never search, filters or group expansion. Other listings keep their current behavior until owner
+acceptance of the pilot. This does not add customisation to object-detail goods tables.
+Measured gap: kit `DataTable` still persists no column shape (`OperationOrdersControl.test.tsx`); that capability remains APPROVED TARGET / NOT BUILT there.
+
 
 ---
 
@@ -513,9 +606,26 @@ shipped code, and stated the opposite.)*
 PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: a
 multi-page module uses one icon + name + chevron row, with its pages hanging from quiet rounded
 elbows. A destination with only one page is a direct icon + name row; it does not hide that page
-behind a chevron that reveals the same name again. Delivery follows this direct-row rule from the
-2026-08-24 owner ruling. The existing `PortalSidebar` is the only left navigation surface: 232px
+behind a chevron that reveals the same name again. **Payments is a module of two destinations
+(owner ruling 2026-09-12): `Monitor` — the named landing — and `Payment Records`; no
+`Payments · Invoices` tabs, no standalone Invoices or Receipts row, and the same two rows for the
+finance role, which is never a second Payment information architecture.** The existing `PortalSidebar` is the only left navigation surface: 232px
 expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
+
+**Sales Orders navigation — owner approved 2026-09-23 · BUILT 2026-09-23.** The existing
+PortalSidebar shows one expandable `Sales Orders` parent with `Outright Sales` and `Subscription`.
+Replace the previous standalone SO/legacy menu entries in this tree; retain existing records and
+valid deep links. No new sidebar dimensions or selection grammar. The owning Orders MASTER's
+“One purpose and one navigation home” governs destination scope; Rental/Subscription retains
+its own business authority. `Purchase` is not the name of the outright-sales child. This ruling
+changes navigation only and does not approve Subscription business implementation.
+
+Shipped exactly as ruled, and it moved no address: `Outright Sales` keeps `/operation/orders` and
+`Subscription` keeps `?tab=rental`, so every bookmark, in-page link and ⌘K jump still lands. The
+`Subscription` row MOVED out of Customer Care rather than being copied — two rows to one page are
+two rows the rail lights at once. `Old Orders (temporary)` left the rail; its routes stay mounted,
+so `CaseOrderLink` and every legacy deep link still resolve. The Admin area's jump to the same
+register carries the same word. No page, permission, quantity or report was touched.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
 the entire tree without navigating. `BUY`, `RECEIVE`, `PROBLEMS` and `SHOWROOM` are independent
@@ -687,7 +797,31 @@ directory only and said so.*
   A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
   instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
   avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
-  My Work, Team Work, the PO detail and Order Route.
+  My Work, Team Work, the PO detail and Order Route. **THE ONE RULED EXCEPTION — the Payment
+  Monitor's `Payment timing` cell (owner ruling 2026-09-12, `docs/payment/MASTER.md` §3):** the
+  Monitor is a CONTROL LISTING, not a document register, and the owner ruled its last column a
+  two-line fact/action surface — line 1 the fact, line 2 the shared Work item's own action with
+  its resolved owner as an avatar (hover/accessible name = full name, never a name in the
+  sentence; no Work item ⇒ no action and no person, only `Wait` stands alone — re-ruled
+  2026-09-16). It reads the Work feed's items; it resolves no owner and creates no second action.
+  No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
+  the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, journey rungs re-ruled
+  2026-09-14, `../delivery/MASTER.md` §8.4):** its status word names the actor and the fact in
+  primary-school English (`Operation must call the customer` · `Waiting for {partner} pickup` ·
+  `Collected by {partner}` · `On the way to customer`), one arithmetic, no owner avatar and no
+  second action. It is a status word, not an action sentence.
+  **THE DELIVERY SCHEDULE CARD CARRIES TWO FACTS ON TWO LINES — owner ruling 2026-09-14
+  (`../delivery/MASTER.md` §8.2 · §8.4):** line 1 the journey progress, line 2 the readiness or
+  blocker (`Ready` · `Stock risk` · `Payment blocked` · `Logistics details incomplete` ·
+  `DO not released`). The two never merge into one status, because a progress rung and a
+  readiness fact answer different questions and come from different arithmetics. Every card also
+  wears a TYPE label (`DELIVERY` · `TRANSFER`) whose two populations are never summed into one
+  total. No other surface adopts this grammar without its own owner ruling.
+- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner ruling 2026-09-13.** For Delivery
+  Work, line 1 is the act with its recipient (`Call NETS`) and line 2 the required result
+  (`Confirm the delivery date`); the row's status word carries the fact. Owner, source object and
+  the actual working date are structured metadata beside the sentence, never joined into it, and
+  no `—` appears in either line. The 13 / 11 sizes below apply unchanged.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -739,6 +873,10 @@ developer who knows the schema is not the acceptance reader; a new operator is.
      scheduled job or database automation acted — never inferred from a missing id.
   5. An old record whose individual actor cannot be recovered — including one written by a
      shared role login — says **`Staff identity not recorded`**. A person is never invented.
+  6. **The one COMPANY actor — owner ruling 2026-09-24.** A logistics company with no portal
+     login that answers through its external link (Delivery §5.5) is recorded and displayed as
+     **`{company} via external link`** (`AL Logistics via external link · Wed, 16 Sep`). It is an
+     organisation, never a person, and no screen may print a person's name for it.
 - A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
   `Original order`; a later approved/applied Revision names the governed change. Selecting a
   Revision opens the complete read-only version and its document truth.
@@ -1000,7 +1138,7 @@ scope capabilities such as All orders / Not delivered are saved/reusable Views, 
 row of pills. A View control is conditional on a useful, distinct view capability; do not render
 one merely to repeat status filters. Supplier Claims defaults to all permitted new and historical
 records and has no View selector (owner correction 2026-09-07; Purchasing §9.5). Header-column filters remain the direct per-column filter door; the Toolbar does not
-add a duplicate generic Filters button. `Reset layout` remains inside Columns.
+add a duplicate generic Filters button. `Reset columns` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
 permanent band. Left = truthful selected count + Clear + the primary work action and any structured
@@ -1077,6 +1215,15 @@ A rail SECTION whose facts are a long, open-ended list collapses into ONE contro
   left-edge marker — so a narrowed section is exactly as visible as a selected row was.
 - **STILL NAVIGATION, NOT BATCH SELECTION.** No checkbox, and no `multiple`.
 
+**SALES ORDERS RAIL — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
+Orders MASTER's monthly-demand/left-rail section owns the two views and their factual filters.
+Reuse FilterRail's shell, widths, wrapping and responsive grammar. No Clear filters is rendered
+inside the SO rail: selected facets toggle off and selects retain All. The shared active-condition
+bar/list-toolbar clear behaviour remains unchanged, as with the existing PO rail ruling.
+Dealer/product multi-selection is an SO-specific target, not a capability of the current
+single-slot FilterRailSelect and not a portal-wide change. Its governed kit interaction remains
+unbuilt; do not implement a page-local substitute or infer permission to alter other module rails.
+
 **LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
 block: the header stays put while the filter groups scroll independently beneath it, separated
@@ -1091,10 +1238,16 @@ Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the k
 DatePicker skin and dot markers) predates the kit component by hours and migrates onto it in its
 own card — §6.1's second-occurrence rule; nobody draws a third month grid. On Monitor, the month
 calendar is the persistent date picker: choosing a date opens that date's `Day` view. The page
-toolbar owns `Day · Week · Month`; `Calendar` is never repeated as a `WORK TO DO` rail row.
+toolbar owns `Day · 3 days · Work week · Month` (owner ruling 2026-09-14 — a layout never wears a
+word it does not honour, so a three-day half-week is never labelled `Week`); `Calendar` is never
+repeated as a `WORK TO DO` rail row. **Today is a ring and the selected date is the blue FILL, so
+the two never compete, and the current work week carries a subtle band** — a marker that marks a
+day by shape and position, never by colour alone.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
-one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
+one neutral `Hide filters` panel-left button. **S3 (BUILT 2026-09-17, SO Batch Purchase and Manual
+Purchase, `useFilterRailOpen`):** below an 896px canvas the rail starts hidden unless this browser
+opened it before; a browser that hid it keeps it hidden at any width. Hiding removes the whole local rail and gives its width
 to the Register; it never leaves a duplicate 60px icon strip beside the Portal navigation. The
 Register toolbar then carries `Show filters`. Reopening restores the same filters and the browser
 remembers the open/closed choice. Use the Portal sidebar's governed panel-left icon family and
@@ -1110,7 +1263,13 @@ card; new designs and mockups show the approved destination, not the legacy red 
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
 the Register baseline, expressed only through frozen Carres typography tokens: rendered 36px
 table header using `text-label` (11px / 14px); rendered 38px single-line parent row using
-`text-body` (13px / 18px). The remaining height is balanced vertical breathing room, with the
+`text-body` (13px / 18px). **THE TWO PAGE-SPECIFIC EXCEPTIONS — the Delivery Monitor work list
+(owner ruling 2026-09-12) and the Payment Monitor listing (owner ruling 2026-09-16): each parent
+row is a fixed 72px because it deliberately carries one primary fact and one supporting line in
+every cell (`../delivery/MASTER.md` §8.3 · `../payment/MASTER.md` §3). Both print the cell through
+the one shared `MonitorTwoLines`; a cell never grows the row or shows a third line, and a cut value
+opens whole by click or keyboard. The 38 versus 72 decision is not reopened, and no other register
+inherits 72px without its own owner ruling.** The remaining height is balanced vertical breathing room, with the
 row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
@@ -1198,7 +1357,7 @@ compact destination header / work toolbar
 
 breathing gap
 
-  ▸ | SO No | SO Date | Requested Delivery Date | Customer |
+  ▸ | SO Date | SO No | Requested Delivery Date | Customer |
     | Delivery Location | Showroom | PO No | DO No
 ```
 
@@ -1216,6 +1375,13 @@ breathing gap
   There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
   may not squeeze the default set.
+- **Sales Orders spacing correction — owner approved 2026-09-14.** The owning Orders MASTER
+  §0.1 / Sales Orders Card 11 governs six separate child columns, fixed content widths with Item
+  last, 8px side padding, its own four-sided border and 12px vertical gaps. The child follows the
+  actual SO No column after saved reordering and ends at the parent table edge. Requested Delivery
+  Date may use the deliberate two-line header `Requested` / `Delivery Date`; the exact accessible,
+  filter and export label stays unchanged. Narrow grids scroll internally. These are Sales Orders
+  opt-ins; Purchasing's approved goods composition and other consumers retain their layouts.
 - Expansion is goods-only: a small clean, non-filterable table beneath the parent row with the
   locked columns `Category | Unit ID | Deliver To | SKU | Qty | Item` (owner ruling 2026-08-15,
   moving `Deliver To` next to `Unit ID`: both answer *where is this piece*, and separating them by
@@ -1340,7 +1506,214 @@ breathing gap
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
 
+# §6.0 · LISTING TEMPLATE — every Portal listing · OWNER RULINGS 2026-09-21 (Jess)
+
+**Read this first for any listing.** It is the one-page current truth; the sections below it are the
+detailed record and lose to this page wherever they disagree. The reference page is the Sales Orders
+Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is not proof of build.
+
+```
+1  PAGE     Header 50px: page name + Jump to · alerts · help · settings only
+            Toolbar: one blue create button · Search · Export · Columns
+            Table · 32px footer. Nothing above the table (no KPI cards)
+2  COLUMNS  Order = the module MASTER's owner-approved list, never guessed
+            Record date(s) first, then the document number
+            The document number pins left and opens the record
+            Another document's number opens that document
+3  WORDS    Only words in COPY-STANDARD
+            A required fact prints no absence word (empty = system error)
+            A document not made yet: No PO yet · No DO yet
+            Loading · Could not be loaded + Try again · empty — never mixed
+4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
+5  ROW      A one-line listing row is 40px (aligned with SO Batch Purchase)
+            Text 13px / 18px line (text-body) · 11px top and bottom
+            8px left and right in every cell · 1px lines between cells
+            Header 36px, 11px/600 (text-label) · footer 32px · 8px gaps
+            Second fact in a cell (where approved): 11px grey (slate-11)
+            One line per cell. A long value ends in … and shows whole on
+            hover and focus; the column can be widened. Dates and numbers
+            never cut. The row never grows
+            Own approved designs, not this rule: SO Batch Purchase ·
+            Manual Purchase · Payment Monitor · Delivery Monitor
+6  HEADER   11px/600 grey band · the same simple filter icon on every column
+            Sort = a 12px arrow icon (ArrowUp / ArrowDown) in the header ink,
+            never a letter; its direction is spoken to a screen reader
+7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
+            Item = product name on line 1, configuration on line 2
+8  GROUPS   Only where the module MASTER approves them. Sales Orders: flat
+9  FILTER   Active conditions shown · one Clear filters · footer {n} of {m}
+10 SELECT   Ticking replaces the toolbar; no buttons inside rows
+11 PHONE    The document number is visible on first screen; the table
+            scrolls itself; the page never scrolls sideways
+12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard
+```
+
+**Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
+PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
+no other page moves until its own round. First adopter: Sales Orders (Card 12, NOT BUILT). The four pages
+named in rule 5 keep their own approved row design.
+
 # §6.7 · THE REGISTER SHELL — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
+
+### Shared listing standard — APPROVED / NOT BUILT, staged adoption (Jess, 2026-09-16)
+
+The common interaction standard applies across modules; initial adoption covers Sales Orders,
+SO Batch Purchase, Manual Purchase and Purchase Orders. It does not redefine module business
+facts, permissions, complete-record populations or task ownership.
+
+1. **Search and filters.** Show active conditions and `Clear filters` whenever search, rail or
+   header filters narrow the list. Clear all three together; preserve permissions and the
+   page's governed base population. Footer shows filtered versus total records (`5 of 62`).
+   Grouping/collapse is presentation, not a filter, and does not reduce the total.
+2. **Date and identity — APPROVED / NOT BUILT (Jess, 2026-09-17).** Every listing begins
+   with its own record date, then its document number/business identity. Canvas ≥768px pins
+   both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
+   layout changes. Identity opens the object. Mappings: Sales Orders `Proceed Date · SO Doc Date · SO No` (owner ruling 2026-09-21, orders MASTER; BUILT Card 12 — `Proceed Date` rides `leadingColumns.before`, `SO Doc Date · SO No` pin at ≥768px, and below 768px the page passes `SO No` alone so it leads on first paint);
+   SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
+   Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
+   **Supplier Claims is the one owner-approved exception (Jess, 2026-09-18):** its confirmed order
+   is `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …`, so status leads, identity is
+   second and the date is third. It pins the two leading controls plus `Claim status` and
+   `Supplier Claim No` at a ≥768px canvas, and `Supplier Claim No` alone below it; its date is
+   never pinned. The shipped `leadingColumns` capability forces `date · identity` to lead and
+   therefore cannot express this page — Supplier Claims does not adopt it as built, and the engine
+   needs a pinned-prefix that takes a page's own leading columns (Purchasing §9.5). Do not
+   "restore" the date-first pair there.
+   Other listings use their governed record date and identity, without inventing date facts.
+   PO Date is the PO issue/document date represented in its number, not the sent-mark date.
+   GRN Date is record creation; physical `Goods Received Date` is its own Receiving column (owner
+   ruling 2026-09-18). Full per-page column orders live in the module MASTERs (Purchasing §9.1–9.5);
+   exact owner-approved page orders must not be rearranged by a general ordering heuristic.
+   Purchasing labels are owned by [COPY-STANDARD: Purchasing UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
+   DO Date is the DO issue date. Use authoritative stored facts; never invent a missing date.
+   **Engine — BUILT 2026-09-17:** `DataGrid leadingColumns={{ date, identity }}` (opt-in) forces
+   the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser
+   (disabled), the header `Hide column` / `Pin left` menu and drag, and pins both at a ≥768px
+   canvas, identity alone below it. It replaces `stickyIdentity` on the page that sets it.
+   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6) — PR #1411,
+   merge `5b61f7fa`, live in production from `c6d8706e` (all five surfaces verified 2026-09-17
+   10:13 UTC; the ERP bundle carries the three layout keys). Purchase Orders adopts it in the PO
+   round (`PO Date · PO No`). Every other Register is unchanged until its own round. **Owed:** the
+   authenticated production walk of all four listings.
+   **Grouped listings: the header is group-local (§6.10, owner ruling 2026-09-18).** A Register
+   with governed groups draws no header above all groups; each open group carries its own between
+   its heading and its records, sticky inside that group only. The pinning rule above is unchanged.
+3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
+   judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
+   scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
+4. **Personal columns — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17, PO pilot only.**
+   Engine: `DataGrid personalLayouts={{ layouts, limit, onSave, onSetDefault }}` (opt-in; the
+   page owns storage, the engine owns the shape `DataGridSavedLayout = order · hidden · widths ·
+   sort`). The seven actions sit above the column list in that order; `Save layout as…` asks for a
+   `Layout name`; the person's default applies once when their layouts arrive; `Reset columns`
+   also clears the header sort; `Best fit` sizes each visible column to its longest cell text and
+   its full header; `Collapse all` never closes an always-open group. Storage: migration 0528
+   (Purchasing MASTER §9.3). DataGrid provides an
+   opt-in capability; only Purchase Orders enables the pilot, in its implementation round.
+   Columns offers show/hide, `Save layout as…` (name), `Load layout`, `Set as my default`,
+   `Reset columns`, `Best fit`, `Expand all` and `Collapse all`.
+   Save per signed-in user, up to 10 layouts per listing; enforce ownership on reads and writes.
+   Persist column order, widths, visibility and sort only. Never persist search, filters or group
+   open/closed state in a layout. Personal layouts never alter company defaults or another user's
+   view. Reset columns restores the company layout, leaving search, filters and records unchanged.
+   Date and identity cannot be hidden or moved from their leading positions; responsive pinning
+   follows rule 2 (both ≥768px, identity alone below768px). Expand/collapse respects mandatory-open
+   group headings and does not change filtering or totals. Other pages remain unchanged until
+   the owner accepts the PO pilot and authorizes rollout.
+5. **Actions.** Essential actions remain discoverable on the object opened via identity.
+   Right-click is a shortcut, not the sole door. Pages with batch actions replace the toolbar
+   with their selection actions; do not invent batch actions on read-only registers.
+6. **Presentation.** Reuse shared header, typography, palette, icons, row treatment and measured
+   column-width rules. Content drives default width; full two-line headers plus controls set
+   minimum width. No separate page theme to imitate the shared component. Where a governed grouped
+   listing is concerned, §6.10 owns where that header is drawn.
+7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
+   goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
+   Collapsed records remain in totals; missing/failed data must not imply zero or completion.
+8. **Group-local headers.** The ruling, the engine and the measurement that decides the structure
+   live in **§6.10** — one truth, not a second copy here. A listing round reads it there and
+   writes no page-local version of it.
+
+🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
+2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what
+another facet happens to have selected"; Purchase Returns §9.6 says counts "respect the other
+active dimensions"; Supplier Claims §9.5 says they cover "the complete permitted searched/filtered
+set". A register cannot obey all three, and an operator who learns one page learns the wrong thing
+about the next. **The standard facet semantics are the answer, and they belong to this shared
+contract, not to a page:** a count reflects every OTHER active filter and the search, and NOT the
+selections inside its own group — the only reading under which a count never promises rows it
+cannot deliver and never hides a row the operator could still reach. Purchasing §9.7 Repair Orders
+is written to it. **Owed:** converging the three built/confirmed pages, each in its own round; no
+page reaches into another's. *Falsifier: a measured operator journey in which whole-register counts
+read truer than filtered ones — then this contract changes once, here, and every page follows.*
+
+9. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
+   Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
+   overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
+
+### Portal-wide listing readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED
+
+**Build record (SLICE 1, 2026-09-17).** Owner-approved Jess 2026-09-17. Shared `FilterRail` style C
+is the kit default (`workspace-rail.tsx`: required kit icon per group, collapse remembered per
+browser under `carres.filterRail.<rail>.<group>`, chosen value derived from the group's own rows
+or select, `resets` marks an `All …` row). `DataGrid` draws the slate listing surfaces on `.root`
+for every grid; `palette="slate"` now means only the ticked-row selection model. Body `--background`
+and `kit.canvas` are one token, #F7F8FA. `PurchasingRegister.module.css` (blue-grey theme) is
+deleted. Kit `FieldError` carries the 13px error voice with icon. Evidence: seeded before/after
+captures of 23 listings at 1440/390 with identical fixtures — page text changed only by approved
+words and heading casing; header 5.2:1, rail title 16.4:1, rail count 5.9:1; no page scroll at
+200% zoom; keyboard collapse/choose/clear verified. **SHIPPED:** PR #1426 → `8209ce8c`, deploy run
+35244605132 converged ERP/POS Pages + Worker on that SHA; the served bundle carries
+`--background: 220 23% 97.5%`, `carres.filterRail` and `Confirm PO sent to supplier`. Evidence branch
+`evidence/slice1-listing-readability`. **OWED:** signed-in production walk of the listings.
+Not changed (not listings, still carry blue-grey `#b9c9d8`): Sales Order detail palette trial
+(`sales-order-detail-theme.css`) and the Manual Purchase create header (`.mp-create-header`).
+
+This is the shared default for ALL Portal listings, not a PO visual pilot. It supersedes older
+listing typography, rail appearance and blue-grey surface prescriptions in this document.
+Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
+
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, collapsible groups with remembered
+  expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
+  leave that space empty. Icons supplement labels and come from the existing kit. Each group
+  remains single-choice; no new multi-select. Preserve each page's filter content and control type:
+  an existing dropdown remains a dropdown inside its group. Collapse does not clear a filter.
+- **Special rails:** Payment Monitor weekly plans and Warehouse schedule day lists use the same
+  heading, divider and text treatment; preserve their content, date meaning and behavior.
+  Sales Orders has no local filter rail; do not add one for visual consistency.
+- **Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11;
+  form/button helper 12px slate-11; input error/save failure 13px error color with text and icon;
+  cannot-act reason 13px dark grey or warning color according to meaning. Never use slate-9 for
+  meaningful text. No opacity reduction or italics for helper text. Critical states stay legible.
+- **Surfaces:** white toolbar, rail, table and footer; slate-3 header, slate-11 11px/600 normal
+  casing; 1px separators. One canvas token resolves to #F7F8FA. Retire blue-grey register themes
+  and #F3F4F6 body background; do not copy literal colors into page styles.
+- **Scope:** Sales Orders; SO Batch, Manual Purchase, Purchase Orders, Receiving, Supplier Claims;
+  Delivery Monitor and Delivery Orders; Warehouse Inbound, Inventory, Outbound; Payment Monitor,
+  Payment Records and every Finance listing. Other Portal listings follow this same contract.
+- **Verification:** inventory all listing routes and shared/legacy/custom rails. Capture each page
+  before and after at 1440/390; test long labels, keyboard expand/choose/clear, 200% zoom and actual
+  contrast. Active zero-count filters remain readable and removable; unknown is not zero.
+  Any unintended content/behavior change is a defect. This appearance rollout does not approve
+  Receiving's pending date-filter/workflow proposals or change business permissions and arithmetic.
+
+**Different jobs, shared interaction:** Sales Orders remains the complete customer-transaction
+register governed by Orders MASTER, not a purchasing work queue. SO Batch uses `To buy` /
+`No purchase needed`. Manual Purchase uses `Need approval` / `To buy` / `No purchase needed`.
+Purchase Orders uses the approved groups in Purchasing MASTER §9.3: `Confirm PO sent to supplier`,
+`Waiting for goods from supplier`, `Completed`, `Cancelled`, classified cancelled → completed → marked with pending goods
+→ unmarked. Receiving remains a formal GRN register, not a work queue.
+
+**Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `PO sent to supplier`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
+not proof that no external send happened. Completed legacy documents must not become resend work
+solely because a send record is absent. Purchasing MASTER owns the full send/version contract.
+
+**Adoption order — Jess, 2026-09-17:** merge the documentation update, then wait for PR #1419
+to merge, then open a fresh Claude task with the updated Slice 1 handoff. Slice 1 covers PO copy
+and Portal-wide readability, not a visual pilot. An open PR editing FilterRail, DataGrid or
+register CSS is a build stop: report the overlap before implementation. Personal saved-layout
+rollout remains subject to separate owner acceptance. Approval is not build/deployment evidence.
+
 
 **This section overwrites every conflicting composition rule in §6.4–§6.6.** Those sections remain
 the measured implementation record; where they disagree with the shape below, this one rules. The
@@ -1369,7 +1742,45 @@ its own tools, and nothing that is not needed is on screen.*
    ── 8px ──
 ```
 
-**ROW 1 · DESTINATION HEADER, 50px.** Left = one short identity, **the word alone** — owner ruling
+**⭐ ROW 1's 50px IS A FLOOR, NOT A CEILING — BUILT 2026-09-18, a measured defect.**
+At a 390px canvas EVERY destination page scrolled sideways by 30px, which rule 8
+above forbids by name. The cause was one missing rule in `ModuleHeader`: the identity span was
+`shrink-0` at the governed 24px, so `SO Batch Purchase` demanded 260px beside the 144px utility
+cluster inside 366px of usable width. `Jump to…` had collapsed its label under `sm` since it
+shipped; the WORD had no narrow-canvas rule at all.
+
+The word may now WRAP (`min-w-0 break-words`) and the row's 50px became `min-h-[50px]`. **Nothing
+was truncated, nothing was hidden and no phone type step was invented** — a governed label is
+never cut and never sits behind a tooltip, and all four global utilities stay on the row. 50px
+stays EXACT at every width where the identity fits one line. Measured on all 29 real destination
+words: at 1440 every one is a single line in a 51px row (50 + the rule), unchanged; at 390, 11 of
+them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
+component, so all 28 destination pages carry it.
+
+**THE SAME MEASUREMENT EXPOSED ONE IDENTITY, AND IT IS FIXED — BUILT 2026-09-19.** The wrap rule
+made `Warehouse Unit detail` readable instead of page-breaking, but it also showed WHY that page
+wrapped worst: its word was `{unitCode} · {sku}` — two facts in the one slot this section rules is
+"one short identity, the word alone". A Unit page's destination word is the Unit. The word is now
+`{unitCode}` alone, and the SKU keeps the place it already had, printed under **Product** in
+Connected records beside the product name — nothing is lost from the screen, only moved out of the
+identity slot.
+
+**MEASURED ON THE REAL PAGE, not on a mock of its header** — the lesson #1475 paid for. An isolated
+header box said the old word cost two lines at 390. The actual page, rendered with a real SKU in the
+real font, was far worse, and the defect reached three desktop widths, not just the phone:
+
+| canvas | old word | new word |
+|---|---|---|
+| 1440 | 1 line · 51px | 1 line · 51px |
+| 1180 | **2 lines · 73px** | 1 line · 51px |
+| 820 | **3 lines · 105px** | 1 line · 51px |
+| 390 | **5 lines · 169px** | 1 line · 51px |
+
+Page overflow is 0px throughout — the floor fix already guaranteed that; the identity is what puts
+the row back on its exact 50px. This was not a presentation preference handed to the owner: §6.7
+already ruled it, and the page disagreed.
+
+**ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
 which is why the row grew from 44px to 50px. 24px inside 44px leaves 5.5px above and below and the
 word reads as if it is touching the rule; 50px leaves 8.5px. The module's icon still identifies it
@@ -1385,9 +1796,15 @@ search that belongs to every page, and a second box here would be a second globa
 action, written in full (`⊕ New Sales Order`) — it is the page's only blue. Right = how the operator
 looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
 
-- **Search is an icon** that expands leftward into an input on click or `/`, with the caret already
-  inside; `Esc` collapses it. While a query is active it stays collapsed but carries its result
-  count (`🔍⁷`) so a narrowed listing can never look like the whole listing.
+- **Register Search — owner ruling R4, 2026-09-16 (overwrites the icon-only rule for every
+  Register; adoption is staged).** The TOOLBAR's available width chooses, never a device label:
+  with room, a readable search box carrying its governed placeholder; narrow, a search icon that
+  opens the box with the caret inside. An active query keeps the box and its `Clear search` control
+  visible at every width, so a narrowed listing never looks like the whole listing. `Esc` clears
+  and closes the transient box. Selection still replaces the toolbar in place (`Clear` · owner ·
+  primary action first). Engine capability: `DataGrid searchPresentation="responsive"`. **Adopted
+  on SO Batch Purchase first (PR #1395); every other Register keeps its current icon search until
+  its own toolbar is migrated and walked — never with a page-local search component.**
 - **Columns is icon-only** (`▥`). Its hover/accessible name is `Columns`.
 - **Export is icon-only too** (`⤓`) — owner ruling 2026-08-15, correcting this section's first
   draft, which reserved icon-only for view controls and kept the word on the verb. The right side
@@ -1447,6 +1864,13 @@ looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
                                     └────────────────────────┘
 ```
 
+**Engine capabilities for kinds ② and the governed groups — BUILT 2026-09-17 (Manual Purchase
+Round 2).** `DataGrid warning` draws kind ② between the toolbar and the table (`role="alert"`,
+amber-3 fill, amber-6 rule, amber-11 ink, 40px minimum) and costs zero height while absent; Manual
+Purchase's `Issue PO` refusal is its first caller. `fixedGroups[].emptyLabel` lets an always-open
+group state its emptiness beside the zero (`Need approval 0 · Nothing waiting for approval`). Both
+are opt-in; every other Register renders unchanged.
+
 **A ticked checkbox may never move the table.** The 2990 reference grows a new band on selection and
 pushes the rows down; at 77 rows that moves the row under the operator's cursor and the next tick
 lands on the wrong order. Selection therefore replaces the toolbar in place. **Only kind ② may add
@@ -1488,31 +1912,200 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
   confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
   than filled with an `Add stock` control the Unit authority removed.
 
-## §6.8 · `GoodsMiniTable` — the shared child table, and its one opt-in buying order
+## §6.8 · Shared goods tables — approved SO Batch reference
 
-**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY. Sales Orders, Delivery and Manual Purchase
-render byte-identically to what they rendered before.**
+**Jess, 2026-09-18 · BUILT 2026-09-18 (SO Batch Purchase only) · authenticated production walk
+OWED.** SO Batch listing and stock-picker composition is the
+approved reference for shared component work. Business columns remain owned by each module MASTER;
+Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain
+editing or reservation powers implicitly, and this build gave none of them any.
 
-The child table is written ONCE so two pages cannot drift into two mini-tables that almost agree.
-That law holds. What changed is that the buying page may now ask for a second READING ORDER and for
-READ-ONLY record rows, and every sibling that does not ask gets the ruled layout unchanged.
+**Engine capabilities — BUILT 2026-09-18, all four opt-in, every other Register byte-identical:**
+`DataGrid leadingColumns.before` lets an owner-approved page order put a column AHEAD of the
+record date and identity (§6.7 rule 2 fixes the pair's ORDER, not that they are columns one and
+two); the pair still pins alone and the named column scrolls under the block like any other fact.
+`DataGrid headerTone="paleBlue"` draws the MAIN header band in blue-2, so the neutral slate child
+tables inside an expansion read as children — it is this reference's treatment and NOT a global
+blue-header ruling. `GoodsMiniTable soBatchGoodsLayout` draws the approved seven columns, a
+page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
+`ReadyStockTable layout="picker"` draws the approved six picker columns. **Manual Purchase's own
+§9.2 build inherits these four rather than growing a second set** — the geometry and the
+edit/save/cancel controls are the same; its business guards stay in Purchasing.
+Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
-- **`identityFirst`** puts `SKU` and the item's configuration ahead of `Category` and `Unit ID`. The
-  ruled order opened with the two least identifying facts, so a buying page read `Mattress` ·
-  `Not allocated` before it read what the goods were. Law ① is kept: exactly ONE column is flexible
-  and every other width is fixed, so two expansions opened together still line up column for
-  column. What moved is WHICH column is flexible and where it sits, not how many.
-- **A line's `units` render as read-only rows beneath it.** The demand row owns the checkbox, the
-  arrangement editor and the customer's quantity; each Unit row is a record — its own Unit ID, its
-  own document, that document's destination — and carries no control at all. The previous version
-  copied the line's key, selection state and editor into every Unit row, which drew N ticked boxes
-  for one ticked demand and put a destination editor beside purchase orders that were already sent.
-  A record wears the table header's own grey; a ticked demand wears the register's selected blue.
-- **`Covered by` is retired from the component.** It answered three questions in one heading. The
-  page now asks for `Ready Stock`, `On PO` (each document with the quantity it carries) and
-  `To buy`, so the arithmetic adds up on screen instead of hiding inside one word.
-- **A number is a door only where the page can open one.** `onPoClick` makes every PO number
-  navigable; a truth register that passes nothing keeps the printed text.
+**DEPLOYED + AUTHENTICATED READBACK 2026-09-24 (#1589):** DataGrid's optional
+`selectable.unselectableReason` adds an accessible description and the existing kit
+Tooltip to a refused checkbox. The label is keyboard-focusable and description IDs
+are unique per grid and row. It explains facts already visible on that owning page;
+never make the tooltip their only copy. Omitted callers retain their existing behavior,
+and no selectability or bulk-action rule changes.
+CI `35986102965` and deployment `35987154529` passed; all five canonical endpoints
+reported `96528e114129fb11d051a59fe81413dcb1c6a4d0`. Authenticated SO-1358 keyboard
+focus displayed `Already on a PO` with zero checked rows; SO-1206 exposed `SKU not found`,
+and the pending MPR row exposed `Need approval`. Purchasing §9.1 records the before/after
+and keeps stock/issue lifecycle verification separate.
+
+- Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
+  not equal widths or stretching to fill a canvas. Same field/role shares its default width.
+  Personal resizing remains supported. No global 144/160/192px type-width proposal was approved.
+- Headers reserve a common two-line height, 11px/600, normal casing; main header pale blue in
+  this SO Batch reference, child headers neutral slate. This is not a new global blue-header ruling.
+- Main/item text 13px; configuration and Unit ID on line two 11px/slate-11. All rows in a given
+  goods table use consistent two-line geometry, vertically centered checkbox and quantity.
+- SO Batch has separate leading checkbox and goods disclosure controls. SO No opens the object;
+  never concatenate a decorative arrow into the number. Keyboard disclosure exposes expanded state.
+- Ready Stock shows available count then reserved count, with a separate borderless disclosure
+  button in that cell. Saved selections have a single Change selection journey, not per-row Undo.
+- The stock table combines actual PO No / Ref No and Unit ID in one cell, identity on two lines.
+  It shows date only. Its six-column order and business safeguards live in Purchasing §9.1.
+- The reviewed local sample uses Supplier 136px consistently and Ready Stock 136px with two-line
+  counts. These are reference sample measurements, not hard-coded production limits: validate long
+  names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
+- Approval covers this composition and interaction, not production readiness or a 10/10 score.
+  Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
+- **Walked 2026-09-18 on the real components** (`so-batch-listing-preview`, a dev-only vite entry
+  that `vite build` cannot emit): 1440 / 1180 / 820 / 390 and 200% zoom carry no page-level
+  horizontal scroll; both tables take their measured content width and neither stretches to fill
+  the canvas; the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the
+  picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
+  was in the shared destination header and is fixed there — see §6.7 below.
+
+**THE SHARED TWO-LINE LISTING ROW IS 54px — owner ruling 2026-09-18, APPROVED / NOT BUILT.** A
+listing whose cells carry two-line identity or two-line goods uses one shared 54px row with
+vertically centred checkbox, disclosure and quantity. It is the goods-row geometry, NOT a
+portal-wide replacement: the engine's 38px single-line row (`--grid-row-h`) stays correct for
+single-line registers, and existing per-page exceptions keep their own approved heights
+(SO Batch 40px, Payment Monitor 72px). Short content fits 54px; long content and accessibility
+needs may grow the row — **a required party, number, document or date is never ellipsised to
+protect the height.** No page-local row or header height. *Falsifier: the DOM measurement owed at
+build. 54px is the owner's reviewed number from the 2026-09-18 mockups; no shipped surface states
+it yet, so the build measures it in the rendered shell at 1440/1180/820/390 and reports back
+rather than hard-coding a number nobody checked.*
+
+**ONE CELL MAY CARRY A DOCUMENT AND THE EXACT GOODS IT NAMES — NEVER TWO DOCUMENTS.** The stock
+picker's `PO No / Ref No` with the Unit ID on line two (§9.1) is the approved shape, and Supplier
+Claims reuses it exactly (`PO No` line one, Unit ID line two — Purchasing §9.5). Line one is the
+document number in full and never shortened. Line two is the goods identity that document names:
+one Unit ID, `{n} Units` as a disclosure link into that row's own expansion, `Counted stock` where
+there is no Unit ID and never will be, or the honest absence/failure word. **Never fabricate a
+Unit ID, and never put a second document's number in that cell** — a reader must never have to
+guess which document a number belongs to.
+
+**HEADER BANDS DO NOT OVERLAP AND DO NOT LEAVE BLANK BLOCKS.** Every header cell — the leading
+control cells included — belongs to the one opaque header band and reserves the shared two-line
+header height, so a one-word header centres instead of leaving a blank block above it. Paint order
+is fixed and shared: sticky header above body cells, pinned cells above unpinned ones, pinned
+header cells above both. A transparent sticky cell, a page-local z-index ladder and a page-local
+header height are all defects, not page style.
+
+**EVIDENCE CONTROLS INSIDE A ROW ARE ICON + TEXT, NEVER BUTTONS.** Beneath a row's problem text,
+saved evidence is offered as compact `Photos {n}` / `Video {n}` controls: icon plus text, shared
+control ink, 12px helper size, hover/focus tint only while hovered or focused, a visible focus
+ring, and `aria-expanded`. No large button, no pill, no border, no permanent filled background.
+Clicking expands that row's evidence directly beneath it; clicking again collapses it. Opening one
+never closes another and never moves the rows above it. A count is never printed when it is
+unknown.
+
+**KIT COMPONENT REQUEST — ONE SHARED SAVED-EVIDENCE VIEWER (does not exist; APPROVED TARGET /
+NOT BUILT).** Verified on 2026-09-18: `CaseEvidenceGallery.tsx` is a Service-Case list with an
+append-only uploader and no zoom, drag, Previous/Next or overlay; `ClaimPhotoUploadField.tsx` is an
+upload field; `SupplierClaimPanel.tsx:35` prints `Evidence: {n} photos` as text. **No viewer
+exists, so one joins the kit rather than being drawn inline on Supplier Claims** (Constitution §2).
+One implementation, reused by Supplier Claims, Receiving, Stock and Service Case:
+
+- **Photos:** zoom in · zoom out · drag to pan while enlarged · `Reset` · `Previous` · `Next` ·
+  `Close` · `Esc`. Closing restores focus to the control that opened it and the caller's scroll
+  position and open expansion.
+- **Video:** play/pause, seek, fullscreen. **Local video zoom is outside this approval.**
+- **Read-only.** No uploader, no delete, no rotate-and-save. Adding evidence stays with the owning
+  record and its own permission; the viewer never widens a permission.
+- **File-to-Unit and file-to-event relationships stay visible**, and per-file permission is
+  enforced on the server.
+- **Loading, failure and retry are distinct, and MISSING is not UNREADABLE.** A file the record
+  never had is absent; a file that exists but could not be read says
+  `Photo {n} could not be loaded` + `Try again`. The two never render alike.
+- **It is a viewer, and only a viewer.** Recording or attaching evidence stays with the owning
+  record's own governed write surface. On Supplier Claims that surface is the full-width claim
+  record, which is itself **APPROVED TARGET / NOT BUILT** and must reuse the existing server door
+  and the existing My Work deep link rather than grow a second editor (Purchasing §9.5).
+
+Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0546): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+
+**Shared saved-evidence viewer — DEPLOYED + RECEIVING PRODUCTION READBACK, 2026-09-24 (#1593).**
+`SavedEvidenceViewer` is admitted under Purchasing §9.5's approved contract and recorded
+in `02-components.md`, with a live `/ui` example. Existing Modal behavior owns focus,
+Escape and scroll lock. Source/event and any actual Unit associations stay with each file;
+permissions and refresh stay with the owning reader. Receiving is the first consumer;
+Claim-record photos are deployed with authenticated readback (#1594). Claims' working
+reply record and per-Unit expansion, Stock and Service adoption remain separate work; this kit
+addition does not claim those workflows delivered.
+Purchasing §9.5 records all-five-surface SHA proof, authenticated GRN failure/retry/focus
+readback and production example photo/video controls; synthetic media is not business proof.
+The fullscreen-exit focus correction is production-verified (#1595): native fullscreen
+exit restores viewer focus; the following Escape closes it and returns to the opener.
+
+## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
+
+**The connector belongs to the TABLE, because only the table knows where the `Ready Stock` column
+is.** `GoodsMiniTable` draws it inside that cell, in normal flow, as one unbroken 1px rule from
+beneath the disclosure caret to the TOP BORDER of the picker's frame — measured at 1440 in the
+rendered portal: centred on the caret to 0.2px, 1px below it, 0px from the frame's border, and
+unchanged after the goods box is scrolled horizontally. It exists only while that picker is open,
+so there is structurally no line that could run into the next item. The active goods context
+carries a blue boundary; the stock frame stays neutral white, and neither is evidence of a saved
+reservation — what a line holds is its `{n} reserved` count and the Unit IDs in the picker.
+Ready Stock is no longer a sibling SECTION of the expansion: the expansion is the goods table and
+`Purchase order details`, and the retired three-section arrangement does not return.
+
+Use the existing shared connector primitives. The SO row connects to its goods expansion.
+An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the
+TOP BORDER of its stock-detail frame. The line is 1px, visibly touches its destination, moves with
+the source under horizontal scrolling/resizing, and disappears when collapsed. No floating elbow,
+no line into the next item or SO. The active goods context has a blue boundary; the stock detail
+has a subtle bordered white frame. A context boundary is not evidence of a saved reservation.
+
+**HOW IT IS DRAWN — BUILT 2026-09-18, after two measured failures.** The line is rendered INSIDE
+the `Ready Stock` cell, hanging below it (`left: 11px; top: 100%; height: 13px` in a relatively
+positioned cell), and the stock frame spans the FULL goods row so the line always lands on its top
+border. Two earlier shapes were measured in the rendered shell and rejected:
+
+- **Summing the declared column widths** was wrong by ~900px on a wide canvas. The goods box is
+  `w-full table-fixed` with a `minWidth`, so a canvas wider than that minimum STRETCHES the columns
+  and the sum stops describing where anything is.
+- **Anchoring the frame at the `Ready Stock` column** put it beyond the fold whenever the goods box
+  scrolled sideways: pressing the disclosure gave a 300px white hole with the Units off-screen.
+
+Verified at 1440/1180/820/390px: the line starts within the cell's own bounds and touches the
+frame's top border at every width. **A connector may never be positioned by arithmetic over
+declared widths** — the table that placed the cell is the only thing that knows where it is.
+Other modules keep their existing business sections; do not recreate the retired three-sibling-section
+SO Batch arrangement. Use one component implementation, not page-local connector drawings.
+
+**THE ROW-TO-EXPANSION LINE STARTS AT THE CARET — BUILT 2026-09-21 (engine, Card 12 review).** The
+SO-row connector used to be drawn by `ConnectedSections` inside the expansion cell at a fixed 10px,
+which is not where the `▸` is: measured on SO Batch and Sales Orders alike, it began 26px right of
+the caret and ~22px below it. Only the grid knows its caret cell, so the grid now draws the part
+that starts there, positioned by CSS at 50% of that cell and never by arithmetic over widths:
+the **drop** from beneath the caret to the row's edge (in the caret cell), the **curve** down the
+same column to the join height and across to the expansion edge (in the expansion's caret-column
+gutter cell, pinned with the caret so the line holds under a sideways scroll), and
+`ConnectedSections` carries it as a flat **run** to its first child, later sections keeping their
+own elbows on the stack's trunk. The join height is stated: `EXPANSION_JOIN_Y` = 21px (8px air plus
+the 13px middle of a ruled header). It applies to a **flush** expansion holding `ConnectedSections`
+(SO Batch; Sales Orders with Card 12). A padded or viewport-fitted one (the Delivery Monitor brief,
+whose multi-leg route block sits above its panels) keeps the stack's own first elbow, and a plain
+child table gets nothing — their DOM is unchanged. Measured at 1440 on SO Batch: the drop is centred
+on the caret (x 293.5) and starts at its bottom edge; drop, curve and run are continuous; unchanged
+after a 200px sideways scroll. 🟡 SO Batch's goods header is 40px, so the line meets it 8px above
+its middle (inside the band, as before); passing `connectAt` 20px there is Purchasing's one-line
+follow-up.
+
+**ONE EXPANDED STATE PER ROW, AND A SECOND DOOR IS NOT A SECOND PANEL.** A row-leading disclosure
+and an in-cell disclosure (SO Batch's Ready Stock count, Supplier Claims' `{n} Units` link) may
+both exist; they open and close the SAME expansion, and the in-cell one additionally moves focus to
+the part it names. Inside an expansion, a per-item evidence disclosure is its own independent
+open/closed state beneath that item — it never collapses a sibling and never reflows the rows
+above it.
 
 # §7 · Approved Evolution
 
@@ -1523,4 +2116,186 @@ READ-ONLY record rows, and every sibling that does not ask gets the ruled layout
 | **Real pages rendering through `PageShell` / `DataTable` / `DetailShell`** | Approved. Components-only was the ruling, not a shortfall. The order drawer specifically is BLOCKED: L4 needs a persistent-facts 4-tuple that does not exist on it, and creating one reverses a frozen ruling. |
 | **A picker inside a dialog renders UNDER it** | A real P1 defect, scoped and approved, not yet built. |
 | **Splitting the grid's `layout` prop** | `resize` and `reorder` arrive through ONE prop, so **no page can justify one power without the other.** The day a page wants one and not the other, this is the kit's card. |
-| **Layout memory** | Refused as a kit-wide default. Sales Orders preserves its existing role-scoped browser layout key by owner ruling; no other page inherits that exception. |
+| **Layout memory** | Refused as a kit-wide default. Browser layout keys stay per page. Server-side personal saved layouts exist only on Purchase Orders (§6.7 rule 4, BUILT 2026-09-17); rollout to other listings waits for owner acceptance of that pilot. |
+
+
+### Shared Purchasing geometry — owner-approved consolidation, 2026-09-18
+
+One registry governs SO Batch, Manual Purchase and Purchase Orders. Existing page-local widths
+must converge; approval of this contract does not claim the three pages are already built or
+production-verified. Other Registers inherit the shared padding, typography and sticky-header
+behaviour, not Purchasing business fields or page-specific colours.
+
+| Geometry | Shared value / behaviour |
+|---|---|
+| Cell horizontal padding | 8px per side; adjacent content separated by 16px plus divider |
+| Dividers / connector | 1px |
+| Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
+| Single-line parent row | 38px minimum, existing density law |
+| Two-line goods / Unit rows | 54px minimum, shared across the same table; grow together if content requires |
+| Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
+| Standard control | 32px minimum; checkbox 16px, vertically centred |
+| Toolbar / footer | 45px / 32px minimum |
+| Expansion | 12px above, 16px below; begins after the parent's control gutter |
+| Sticky header | Each Register keeps its header inside its own scrolling viewport; on a grouped listing it is group-local per §6.10, and the groups share one width/visibility/sort/resize set |
+| Pinned identity | Date + number at canvas >=768px; number only below; headers and cells scroll together |
+
+**THE FIELD-WIDTH REGISTRY — ONE NUMBER PER FIELD (owner instruction 2026-09-18).**
+
+A page MASTER may not carry its own width for a registry field. When it does, one fact ends up
+with four widths — measured, this is exactly what had happened: `PO No` was 144 on SO Batch, 144 on
+Manual Purchase and 170 here, and a date was 120 / 112 / 118. So the number lives here, once, and a
+page MASTER records its MEASUREMENT as evidence the registry reads (Purchasing §9.1 R7, §9.2, §9.3).
+
+**The registry number is the WIDEST measured requirement across the pages that show the field**,
+because a field that fits on one page and clips on another is not one field. `MEASURED` means the
+rendered portal in the real font; `prototype` means not yet measured, and a prototype that clips a
+governed value is wrong — **fix the shared field definition, never squeeze the cell** (Law 2:
+reality outranks the document). Validate actual fonts, longest values, 200% zoom and
+1440/1180/820/390 before production. Required numbers never truncate; content may wrap, and user
+resizing remains available.
+
+| Field / role | Width | Status | Evidence, and the convergence owed |
+|---|---:|---|---|
+| Checkbox / disclosure (each) | 40 | prototype | |
+| Date (short date) | 120 | **MEASURED** | SO Batch: cross-year date 99px → 120. PO built 118 → widened to 120 (2026-09-18). **Owed:** Manual Purchase built 112 |
+| PO No / MPR No / GRN No | 170 | **MEASURED** | PO: `PO-20260903-4316` renders 125px in production's JetBrains Mono, and 142 cut 34 live rows. **Owed:** SO Batch and Manual Purchase built 144 off a 127px Inter measurement — the mono face is the wider one |
+| SO No | 90 | **MEASURED** | Sales Orders, 2026-09-21: `SO-1334` 54.6px + 16; the header and its controls set the floor |
+| SO No / MPR No mixed reference | 176 | **MEASURED** | PO, built 2026-09-18 |
+| Status | 144 | prototype | |
+| Approval Status | 188 | **MEASURED** | Manual Purchase: `Sent back for changes` pill 134px + requester avatar |
+| PO Safety Days | 110 | prototype | |
+| Order By | 112 | **MEASURED** | Manual Purchase |
+| Category (parent) | 112 | prototype | |
+| Qty | 64 | **MEASURED** | header floor 24px + 16 |
+| Item / Items | 208 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 180 |
+| Supplier / Ready Stock | 140 | **MEASURED** | Manual Purchase: longest live supplier 17 characters. PO built 136 → widened to 140 (2026-09-18) |
+| Supplier Deliver To | 150 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 132 |
+| Customer | 150 | prototype | Sales Orders shows it one line; a longer name ends in `…` and opens whole |
+| Sales Location | 168 | **MEASURED** | Sales Orders, 2026-09-22: `Carres Kota Damansara` (longest live, printed in full as on the SO PDF) 145.4px + 16 = 161.4 |
+| Salesperson | 120 | **MEASURED** | Sales Orders, 2026-09-22: `Khoo Aik Yean` (longest live) 89.2px + 16; the header word plus its filter icon (103px) is the floor |
+| Sales Orders optional catalog: amount 116 · party name 150 · reference 150 · phone 132 · email 200 · address 240 · place word 140 · short fact 96 · small count 120 | — | prototype | Sales Orders, 2026-09-21: the hidden-by-default catalog columns take a registry role instead of a typed number. **Owed:** measurement when a page shows one by default |
+| Customer Delivery Location | 176 | prototype | |
+| Customer Requested Delivery Date | 180 | prototype | **Owed:** SO Batch built 144 off `No delivery date yet` 124px; re-measure against the longest governed absence |
+| PO Delivery Date | 150 | **MEASURED** | PO column width, built 2026-09-18. Single-PO wording: `PO {n}-Day Delivery Date`; n is the recorded Settings working-day value, no transit added. Calculation correction APPROVED / NOT BUILT; Purchasing §5.7 and COPY own the rule. |
+| Supplier Confirmed Delivery Date | 180 | **MEASURED** | PO, built 2026-09-18, holding `Not confirmed` and the `Supplier changed from {date}` second line |
+| Goods Received Date | 140 | **MEASURED** | PO, built 2026-09-18, holding `{n} receipt dates` and the `Time not recorded` second line |
+| Purpose | 150 | **MEASURED** | Manual Purchase |
+| Requested By | 144 | prototype | **Owed:** Manual Purchase built 124 |
+| Stock Location | 160 | prototype | |
+| Unit ID standalone | 140 | prototype | |
+| Condition | 120 | prototype | |
+| PO Version with send evidence | 265 | **MEASURED** | PO, 2026-09-18, correcting the prototype 238: `PO sent to supplier · WhatsApp · Wed, 28 Sep` needs 247px of content at the 11px second line and 238 clipped it |
+| SO No / MPR No / CO No / RO No | 176 | prototype | Receiving, 2026-09-18. The FOUR-way header wraps inside the shared two-line header height, so the header does not set the width; the CONTENT does, and it is the same 17-character document number as the two-way entry above. Several references stack as lines in the cell and never widen it. **Owed:** the rendered-portal measurement |
+| Goods arrived at | 150 | prototype | Receiving, 2026-09-18. A receiving SITE name — deliberately NOT `Stock Location` (160), which names a stock position; §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same number. **Owed:** the rendered-portal measurement against the longest live site name |
+| Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty | 112 | prototype | Receiving, 2026-09-18. Four adjacent quantity columns read as ONE family and share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it. **Owed:** the rendered-portal measurement |
+| Supplier DO No | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
+| RO No | 170 | prototype | Repair Orders, 2026-09-20. Same 16-character `PREFIX-YYYYMMDD-RRRR` shape as `PO No` / `GRN No`, which the mono face measured at 170; it shares that number rather than inventing one. **Owed:** the rendered-portal measurement |
+| Supplier Claim No | 150 | prototype | Repair Orders, 2026-09-20, reading §9.5's measurement of `SC-20260916-0007` at 122.8px of text plus header chrome. **Owed:** the rendered-portal measurement on a page that actually ships the column |
+| Cost Responsibility | 144 | prototype | Repair Orders, 2026-09-20. Holds `Supplier pays` and the governed absence `Not decided`. It is a responsibility WORD, never an amount — no money field joins this registry through it |
+
+**THE GOODS TABLE IS THE SECOND SCOPE OF THE SAME REGISTRY**, because the same fact carries
+different content there: a parent `Supplier Deliver To` cell holds one destination name, while the
+child cell holds a destination list with counts (`AL Sungai Buloh ×10`, measured 200). The child
+numbers live in `GoodsMiniTable`'s `CHILD_COLUMNS` — ONE implementation, so the three pages cannot
+drift — and measure Category 132 · Unit ID 140 · Deliver To 200 · SKU 152 · Qty 64 · Supplier 140 ·
+`PO No / Unit ID` 230 · Item flexible, floor 220. Exactly one column in a goods table is flexible
+and it is always last.
+
+**Owed convergence is a page's own round, not another page's card.** A card that is building one
+page corrects the registry with what it measured and names the divergence here; it does not reach
+into a page it was not asked to build.
+
+**AND THE REGISTRY IS CODE — BUILT 2026-09-18 (Receiving, PURCHASING CARD 12).** A table nobody
+imports is a table the pages drift from, so the parent-scope numbers above live in one module the
+registers read: `apps/web/src/components/register/register-field-widths.ts`. A page passes
+`REGISTER_FIELD_WIDTH.poNo`, never `168`, which is what makes the next divergence a one-line
+change instead of an audit. The goods table's second scope stays in `GoodsMiniTable`'s
+`CHILD_COLUMNS`, unchanged. Receiving is the first page wired to it; the owed convergence of
+SO Batch, Manual Purchase and Purchase Orders remains each page's own round.
+
+PO rail section titles use the shared 16px Icon, Lucide stroke 2, inherited neutral colour and an 8px text gap: Supplier reply → message; Receiving → goods; Supplier → supplier; Supplier Deliver To → warehouse (the current Site destination filter). Keep the full visible label; icons are supplementary and aria-hidden when text already names the section. Do not add decorative icons to every filter row.
+
+Repeat no page title inside the toolbar. PO's rail has no Clear filters button (owner correction);
+clicking a selected facet again clears that facet. Selects retain their All option. The shared
+active-filter toolbar behaviour is unchanged. PO expansion gains real line-bound Unit IDs under
+Purchasing §9.3; quantity-managed lines have none. Do not infer new selection capabilities.
+
+## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · BUILT 2026-09-18 (#1462)
+
+**This ruling SUPERSEDES the earlier single global header above all groups.** A governed grouped
+listing reads, per group:
+
+```
+collapsed   heading + count
+expanded    heading  →  column header  →  records
+```
+
+There is no header above all groups. A collapsed group is its heading and its count and nothing
+else — a column header over no records names columns nobody is reading. The current group's header
+stays sticky within its own group and **stops at that group's boundary**; it never stands over the
+next group's rows. Pinned identity is preserved: date + number at a canvas ≥768px, number only
+below it.
+
+**Every group shares one setting, not four copies of it:** the same column widths, the same
+visibility, the same sorting and the same resizing. Sorting from any group's header sorts the whole
+register once.
+
+**It is the ENGINE's behaviour, implemented once** (`components/register/DataGrid`), for every
+Register that hands the grid governed `fixedGroups` — today SO Batch Purchase, Manual Purchase and
+Purchase Orders. **No page gains or loses a group, a default expansion, a collapse default or a
+business rule by it.** A flat register keeps the one sticky header it has always had. The embedded
+drill-down grid keeps its plain static header: it has no scroll container of its own for anything
+to stick to.
+
+**HOW, AND WHY IT IS STRUCTURAL — measured 2026-09-18.** Each group is its own `<table>` inside the
+one scroll container, its heading and its column header riding together in that table's `<thead>`.
+A sticky cell is constrained by the table it is in, so the header is pushed out with its own group
+at the boundary and the next group's takes the top. **One `<tbody>` per group does not work and was
+measured failing:** a table cell's containing block is the TABLE, so the first group's header
+escaped its section and came to rest on top of the second group's own header, both drawn at once
+6px apart (Chromium). The tables share one `<colgroup>` built from one `layout.widths` and use
+`table-layout: fixed`, so a long value in one group cannot widen a column in that group alone —
+which is what makes "every group shares the same widths" true by construction rather than by
+agreement.
+
+**Measured on the rendered Purchase Orders register, 2026-09-18:** the first group's header pinned
+at 40px while its rows scrolled 573px beneath it, then was pushed to −32px as its table bottom
+passed 4px, with the second group's header taking the top at 40px. No `<thead>` above all groups at
+1440 / 1180 / 820 / 390.
+
+**Falsifier:** a browser in which a sticky `<thead>` is not constrained by its own table, or a
+grouped listing whose groups drift out of column alignment, overturns the structure — not the
+ruling, which is about what the operator reads.
+
+**Repair Orders date and identity presentation — owner correction 2026-09-20; target, not built.**
+Purchasing §9.7 owns date semantics: read-only automatic RO Doc Date, no backdating; an automatic
+Carres target of 14 working days from evidenced Supplier receipt of the RO; a separate attributed
+Supplier return-date reply. Do not add an editable blank target date. Use existing form controls
+and history patterns; sending is not Supplier receipt. The governed calendar is not yet verified.
+For RO `PO No / Unit ID`, show all actual Unit IDs beneath their PO directly, not `{n} Units`.
+Allow the row to grow to fit these identities rather than clipping to the default two-line height.
+Items exposes a discoverable detail action; its exact review surface is not yet approved.
+
+**Repair Orders price placement — owner-confirmed 2026-09-19; APPROVED TARGET / NOT BUILT.**
+Purchasing §9.7 permits optional `Price` in RO creation/detail only. No price, quotation-amount,
+Finance, Credit, Payment or Work column is added to its register. Missing price/financial approval
+is not a placement/Issue blocker. This scoped placement ruling does not approve the remaining RO
+column sequence, rail wording, prototype or full UI, and changes no other register's composition.
+
+**Repair Orders owner-consent placement — owner ruling B, 2026-09-19; APPROVED TARGET / NOT BUILT.**
+Purchasing §9.7 permits Issue while non-Carres owner consent is outstanding. Show the unresolved
+fact and evidence in RO detail and its follow-up in the existing Workspace projection; do not
+disable Issue solely for missing consent or add a second repair task list. This ruling adds no
+financial/Work register column and does not approve the remaining RO prototype layout.
+
+
+### GRN document boundary — owner approved 2026-09-23 · NOT BUILT
+
+The GRN document composition and receipt arithmetic are owned by Purchasing MASTER
+§9.4, not by the register template or SO PDF. Retain the reviewed two information
+blocks, the PO-family company letterhead and grouped item/Unit evidence; creation
+time, physical arrival time, planned destination and actual site remain distinct.
+Use COPY's accepted `Received Qty` versus `Physical arrived Qty` distinction. This
+is not authority to redesign Manual Purchase, replace its PO with a GRN, or mark
+a PDF production-verified. Screen blue heading styles do not recolour printed PDFs.

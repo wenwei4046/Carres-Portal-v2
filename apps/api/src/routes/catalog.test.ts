@@ -1,12 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import type {
   CatalogResponse,
   OutletsListResponse,
@@ -25,7 +20,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -34,19 +28,11 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "test@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 /**
@@ -105,17 +91,8 @@ function buildSb(
   } as any;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -4353,7 +4330,7 @@ describe("Special add-ons CRUD (/api/catalog/special-addons)", () => {
   });
 });
 
-describe("0182 — global option pools (GET bundle + principal-gated CRUD)", () => {
+describe("0182 — global option pools (GET bundle)", () => {
   const POOL_ID = "00000000-0000-0000-0000-0000000f0001";
   const POOL_ROW = {
     id: POOL_ID,
@@ -4435,163 +4412,6 @@ describe("0182 — global option pools (GET bundle + principal-gated CRUD)", () 
       sortOrder: 2,
       active: true,
     });
-  });
-
-  it("POST /option-pools — principal inserts → 201 (camel→snake)", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: POOL_ROW }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/option-pools", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pool: "mattress_size", value: "Queen", label: "Queen", dimensions: "152x190", sortOrder: 2 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const ins = recorded.find((r) => r.op === "insert");
-    expect(ins?.table).toBe("catalog_option_pools");
-    expect(ins?.payload).toMatchObject({
-      pool: "mattress_size",
-      value: "Queen",
-      label: "Queen",
-      dimensions: "152x190",
-      sort_order: 2,
-    });
-    const body = (await res.json()) as { optionPool: { value: string; sortOrder: number } };
-    expect(body.optionPool).toMatchObject({ value: "Queen", sortOrder: 2 });
-  });
-
-  it("POST /option-pools — non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/option-pools", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pool: "mattress_size", value: "Queen" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
-  });
-
-  it("POST /option-pools — duplicate (pool,value) → 409", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      buildWriteSb({
-        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "catalog_option_pools_pool_value_key"' },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/option-pools", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pool: "mattress_size", value: "Queen" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
-  });
-
-  it("PATCH /option-pools/:id — principal updates → 200, maps camel→snake, never writes pool", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      buildWriteSb({ recorded, writeReturn: { ...POOL_ROW, value: "Super King", sort_order: 5 } }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: "Super King", sortOrder: 5 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const upd = recorded.find((r) => r.op === "update");
-    expect(upd?.payload).toMatchObject({ value: "Super King", sort_order: 5 });
-    expect(upd?.payload).not.toHaveProperty("pool");
-    const body = (await res.json()) as { optionPool: { value: string; sortOrder: number } };
-    expect(body.optionPool).toMatchObject({ value: "Super King", sortOrder: 5 });
-  });
-
-  it("PATCH /option-pools/:id — empty body → 422", async () => {
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("PATCH /option-pools/:id — non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: "X" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("PATCH /option-pools/:id — value rename collision (23505) → 409", async () => {
-    // A rename onto an existing (pool,value) must surface the SAME friendly 409
-    // as POST, not the generic 500 mapPgError defaults 23505 to.
-    vi.mocked(userClient).mockReturnValue(
-      buildWriteSb({
-        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "catalog_option_pools_pool_value_key"' },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: "Queen" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
-  });
-
-  it("DELETE /option-pools/:id — HARD delete → 200 { ok: true }", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
-    const del = recorded.find((r) => r.op === "delete");
-    expect(del?.table).toBe("catalog_option_pools");
-  });
-
-  it("DELETE /option-pools/:id — non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
   });
 });
 
@@ -6834,5 +6654,19 @@ describe("0202 — fabric master batch save + history", () => {
       supplierCode: "PC151-01",
       sofaTier: "PRICE_2",
     });
+  });
+});
+
+describe("catalog snapshots are dated with KL today (0520)", () => {
+  it("both batch-save doors no longer stamp the history row with the UTC clock", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../supabase/migrations/0520_catalog_snapshots_are_dated_kl_today.sql"),
+      "utf-8",
+    );
+    const bodies = mig.slice(mig.indexOf("-- 1. Option pools"));
+    expect(bodies).not.toContain("current_date");
+    expect(bodies).toContain("FUNCTION public.catalog_pool_batch_save(");
+    expect(bodies).toContain("FUNCTION public.catalog_fabrics_batch_save(");
+    expect(bodies.match(/\(timezone\('Asia\/Kuala_Lumpur', now\(\)\)\)::date/g)?.length).toBe(2);
   });
 });

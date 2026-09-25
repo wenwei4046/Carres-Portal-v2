@@ -1,5 +1,6 @@
 /**
- * KIT TOKENS — the machine-readable half of `docs/UI-KIT.md` §2 · §3 · §4 · §5.
+ * KIT TOKENS — the machine-readable half of `docs/01-design-tokens.md` (which
+ * replaced the retired `docs/UI-KIT.md` §2–§5).
  *
  * Card D0.5a. Every Foundation Component in `components/kit/` reads its type,
  * radius, tone and icon size FROM HERE, and `/ui` renders the same records — so
@@ -27,7 +28,7 @@ import type { OrderActionTone } from "@carres/shared";
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** The six type tokens. A seventh does not exist and does not compile. */
-export type TypeToken = "page" | "title" | "strong" | "body" | "meta" | "label";
+export type TypeToken = "page" | "title" | "strong" | "body" | "meta" | "label" | "control";
 
 export interface TypeTokenSpec {
   token: TypeToken;
@@ -54,6 +55,7 @@ export const TYPE_TOKENS: readonly TypeTokenSpec[] = [
   { token: "body", className: "text-body", px: 13, weight: 400, lineHeight: 18, use: "default — table rows, prose, buttons" },
   { token: "meta", className: "text-meta", px: 12, weight: 400, lineHeight: 16, use: "secondary info, captions, timestamps" },
   { token: "label", className: "text-label", px: 11, weight: 500, lineHeight: 14, use: "field labels, micro-labels, pill text" },
+  { token: "control", className: "text-control", px: 14, weight: 400, lineHeight: 20, use: "workspace toolbar controls (Work, 2026-09-25)" },
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -4,6 +4,9 @@ import {
   SO_BATCH_RAIL,
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
+  soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
+  soBatchToBuyState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchOrderRow,
@@ -12,6 +15,12 @@ import {
   soBatchOrderStatusOf,
   soBatchCellSummary,
   soBatchOrderSelection,
+  soBatchOrderPlanning,
+  soBatchOrderSafetyDays,
+  soBatchOrderStatusWord,
+  soBatchOrderByAbsenceWord,
+  soBatchOrderRemainingQty,
+  compareSoBatchPlanning,
   defaultAllocations,
   setDestination,
   splitAllocation,
@@ -77,6 +86,9 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean, and `false` — nothing
+       of this build sits on an open purchase order — is the ordinary case. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -96,11 +108,10 @@ const sel = (r: PurchaseDemandRow, allocations: DestinationAllocation[]): SoBatc
 });
 
 describe("the rail — latest Owner ruling 2026-08-30", () => {
-  it("puts REGION after SUPPLIER in the purchasing fact rail", () => {
+  it("puts Region after Supplier in the purchasing fact rail", () => {
     /* Section ORDER is the object's key order — a reader of this contract
        sees the rail top to bottom. */
     expect(Object.keys(SO_BATCH_RAIL)).toEqual([
-      "toOrder",
       "timing",
       "product",
       "supplier",
@@ -108,9 +119,13 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "setup",
     ]);
     expect(SO_BATCH_RAIL).not.toHaveProperty("work");
-    expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
-    expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
-    expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
+    /* ⛔ `TO ORDER / All not ordered` is RETIRED (owner correction
+       2026-09-11): the one row that named the page's own default rather than a
+       fact about a Sales Order. The heading may not return under any spelling,
+       and the section may not come back as a key. */
+    expect(SO_BATCH_RAIL).not.toHaveProperty("toOrder");
+    expect(JSON.stringify(SO_BATCH_RAIL)).not.toMatch(/not ordered/i);
+    expect(SO_BATCH_RAIL.timing.heading).toBe("Order timing");
     expect(SO_BATCH_RAIL.timing.states).toEqual([
       "can_order_early",
       "safety_days_full",
@@ -118,7 +133,7 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "safety_days_none",
       "not_enough_production_time",
     ]);
-    expect(SO_BATCH_RAIL.product.heading).toBe("PRODUCT");
+    expect(SO_BATCH_RAIL.product.heading).toBe("Product");
     expect(SO_BATCH_RAIL.product.all).toBe("All products");
     /* The approved product filters, in the approved order — the CATALOG's
        categories, never SKU-text inference. */
@@ -127,11 +142,11 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       { category: "bedframe", word: "Bedframe" },
       { category: "sofa", word: "Sofa" },
     ]);
-    expect(SO_BATCH_RAIL.supplier.heading).toBe("SUPPLIER");
+    expect(SO_BATCH_RAIL.supplier.heading).toBe("Supplier");
     expect(SO_BATCH_RAIL.supplier.all).toBe("All suppliers");
-    expect(SO_BATCH_RAIL.region.heading).toBe("REGION");
+    expect(SO_BATCH_RAIL.region.heading).toBe("Region");
     expect(SO_BATCH_RAIL.region.all).toBe("All regions");
-    expect(SO_BATCH_RAIL.setup.heading).toBe("SETUP TO FIX");
+    expect(SO_BATCH_RAIL.setup.heading).toBe("Setup to fix");
     expect(SO_BATCH_RAIL.setup.states).toEqual(["no_production_days"]);
   });
 
@@ -147,32 +162,54 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     expect(W.search).toBe("Search Sales Order, customer, SKU or supplier…");
     expect(W.empty).toBe("No proceeded Sales Orders.");
     expect(W.footerUnit).toBe("Sales Orders");
-    expect(W.deliverTo).toBe("Deliver To");
+    /* The shared Purchasing dictionary's own head for the destination
+       INSTRUCTED TO THE SUPPLIER (owner ruling 2026-09-18). */
+    expect(W.deliverTo).toBe("Supplier Deliver To");
     expect(W.multiple).toBe("Multiple");
   });
 
-  it("the nine business column heads, in the approved reading order exactly", () => {
+  it("the twelve business column heads, in the approved reading order exactly", () => {
     expect([
-      W.colSoNo,
-      W.colCustomer,
+      "Status",
       W.colProceedDate,
+      W.colSoNo,
+      W.colPoSafetyDays,
       W.colRequestedDelivery,
       W.colDeliveryLocation,
+      W.colCustomer,
+      W.colItems,
       W.colSupplier,
       W.deliverTo,
       W.colPoNo,
       W.colPoDeliveryDate,
     ]).toEqual([
-      "SO No",
-      "Customer",
+      "Status",
       "Proceed Date",
-      "Requested Delivery Date",
-      "Delivery Location",
+      "SO No",
+      "PO Safety Days",
+      "Customer Requested Delivery Date",
+      "Customer Delivery Location",
+      "Customer",
+      "Items",
       "Supplier",
-      "Deliver To",
+      "Supplier Deliver To",
       "PO No",
-      "PO Delivery Date",
+      "PO Default Delivery Date",
     ]);
+  });
+
+  /**
+   * ⭐ STATUS IS THE NEW-PO NEED, NOT PERMISSION (owner ruling 2026-09-18), and
+   * it reads the SAME group the table heading above the row reads — there is no
+   * second arithmetic and no stored status.
+   */
+  it("says `Need PO` / `No PO needed`, from the groups' own reading", () => {
+    expect(soBatchOrderStatusWord("to-buy")).toBe("Need PO");
+    expect(soBatchOrderStatusWord("no-purchase-needed")).toBe("No PO needed");
+    /* And the group headings themselves are untouched — the word on the row
+       does not rename them. */
+    expect(W.groupToBuy).toBe("To buy");
+    expect(W.groupNoPurchaseNeeded).toBe("No purchase needed");
   });
 
   it("the retired column heads left the dictionary and never come back", () => {
@@ -186,6 +223,13 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     ]) {
       expect(words, gone).not.toContain(gone);
     }
+    /* ⭐ RETIRED FOR THESE FACTS ON ALL FOUR REVIEWED PAGES, 2026-09-18. The
+       check is on the WHOLE head, not on a substring: the replacements say the
+       same fact with the owner in front of it, so `Customer Delivery Location`
+       legitimately contains the retired spelling. */
+    for (const gone of ["PO Delivery Date", "Delivery Location", "Requested Delivery Date", "Deliver To"]) {
+      expect(Object.values(W), gone).not.toContain(gone);
+    }
     expect(W).not.toHaveProperty("buy");
     expect(W).not.toHaveProperty("colWork");
     expect(W).not.toHaveProperty("goodsMustArrive");
@@ -194,8 +238,6 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
     const spelt = [
       ...Object.values(W),
-      SO_BATCH_RAIL.toOrder.heading,
-      SO_BATCH_RAIL.toOrder.all,
       SO_BATCH_RAIL.timing.heading,
       SO_BATCH_RAIL.product.heading,
       SO_BATCH_RAIL.product.all,
@@ -359,24 +401,154 @@ describe("the rail model — unique-SO counts that cross-update between sections
     /* oA has TWO leafs in the band and TWO mattress lines — one order. */
     expect(m.timingCounts.can_order_early).toBe(1);
     expect(m.productCounts.mattress).toBe(2); // oA + oB, not four lines
-    expect(m.notOrderedCount).toBe(3); // oA · oB · oD — outstanding only
+    expect(m).not.toHaveProperty("notOrderedCount");
   });
 
-  it("counts an uncovered Register line even when the issue leaf is absent", () => {
-    const uncovered = railOrder({
-      orderId: "open-po-pool-mismatch",
-      lines: [line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] })],
-      outstandingSuppliers: ["Ohana"],
+  /**
+   * ⭐ TWO CALCULATIONS, TWO SCOPES — recorded 2026-09-11 after the owner's
+   * `Qty 1 · On PO 14 · To buy 1` report.
+   *
+   * These assertions pin what `On PO` COUNTS, so nobody later "fixes" it into
+   * agreeing with the engine's number by netting deliveries out of it. It is
+   * the HISTORICAL document quantity and it is meant to be.
+   */
+  describe("the historical document quantity is not the effective remainder", () => {
+    it("counts a DELIVERED document's units — history is not netted by what arrived", () => {
+      /* The engine's pool reads `purchase_orders.status = 'open'` lines net of
+         `received_qty`, so a delivered document supplies it nothing. This
+         number is a different question — *what did this line's documents ever
+         carry* — and a received document answers it in full. */
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({ orderLineId: "delivered", qty: 3, stockTaken: 0, pos: [{ poId: "PO-1", qty: 3 }] }),
+        ),
+      ).toBe(0);
     });
-    const m = soBatchRailModel(soBatchRailFacts([uncovered], []), SO_BATCH_RAIL_CLEAR);
 
-    expect(m.notOrderedCount).toBe(1);
+    it("never lets exact lineage go negative, however many documents name the line", () => {
+      /* Fourteen documents naming a one-unit line is over-coverage, and the
+         screen must print it as it stands. What it may not do is turn it into
+         a negative requirement that would read as demand. */
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({
+            orderLineId: "fourteen",
+            qty: 1,
+            stockTaken: 0,
+            pos: Array.from({ length: 14 }, (_, i) => ({ poId: `PO-${i}`, qty: 1 })),
+          }),
+        ),
+      ).toBe(0);
+    });
+
+    it("nets Ready Stock BEFORE lineage, and never below zero", () => {
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({ orderLineId: "mixed", qty: 4, stockTaken: 1, pos: [{ poId: "PO-1", qty: 1 }] }),
+        ),
+      ).toBe(2);
+    });
+  });
+
+  /**
+   * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY.
+   *
+   * It is what makes the two scopes legible on screen: fourteen `Completed`
+   * documents and fourteen `Sending not confirmed` ones are opposite
+   * situations wearing the same `On PO 14`.
+   */
+  /**
+   * ⭐ `To buy` STATES A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY.
+   *
+   * The engine prints the COVERING document's quantity under `To buy` when the
+   * open-PO pool covers every unit (T6), and the Register drew it on a row it
+   * does not offer — a covering quantity wearing a purchasing heading. These
+   * four cases are the only four, and three of them print no figure at all.
+   */
+  describe("soBatchToBuyState", () => {
+    const buyable = (over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow =>
+      row({ toBuy: 3, fullyOnPo: false, ...over });
+
+    it("states the remainder ONLY when the engine verified it is uncovered", () => {
+      expect(soBatchToBuyState(buyable(), "blank")).toEqual({ kind: "buy", qty: 3 });
+    });
+
+    it("states no purchasing quantity for a covered build", () => {
+      /* `issue-batch` refuses this by name (`already_on_po`), so the figure is
+         the coverage, not a remainder — and it is not this column's to print. */
+      expect(soBatchToBuyState(buyable({ fullyOnPo: true }), "blank")).toEqual({
+        kind: "covered",
+      });
+    });
+
+    it("states no purchasing quantity when it could not check", () => {
+      /* UNKNOWN IS NOT YES. An older Worker sends no flag; the page says so
+         rather than reading the gap as permission. */
+      expect(soBatchToBuyState(buyable({ fullyOnPo: undefined }), "blank")).toEqual({
+        kind: "unchecked",
+      });
+    });
+
+    it("says nothing at all on an order that has finished buying", () => {
+      expect(soBatchToBuyState(buyable(), "ordered")).toEqual({ kind: "none" });
+    });
+
+    it("says nothing at all on a line this page cannot buy", () => {
+      expect(soBatchToBuyState(buyable({ toBuy: 0 }), "blank")).toEqual({ kind: "none" });
+      expect(soBatchToBuyState(buyable({ issueRef: null }), "blank")).toEqual({ kind: "none" });
+    });
+
+    /* THE TICK AND THE FIGURE AGREE, ALWAYS. A row that states a purchasing
+       quantity is exactly a row the page offers, and the reverse. */
+    it("prints a figure on exactly the rows the register offers", () => {
+      for (const row of [
+        buyable(),
+        buyable({ fullyOnPo: true }),
+        buyable({ fullyOnPo: undefined }),
+        buyable({ toBuy: 0 }),
+      ]) {
+        for (const status of ["blank", "partial", "ordered"] as const) {
+          expect(soBatchToBuyState(row, status).kind === "buy").toBe(
+            isSelectableForOrder(row, status),
+          );
+        }
+      }
+    });
+  });
+
+  describe("soBatchPoDocumentState", () => {
+    it("speaks the governed words, and never the raw database value", () => {
+      expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: true }))
+        .toBe("Completed");
+      /* Delivered goods with no send record stay honestly Completed — the
+         document is finished; missing send evidence is a different fact. */
+      expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: false }))
+        .toBe("Completed");
+      expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: true }))
+        .toBe("Waiting for goods from supplier");
+      expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: false }))
+        .toBe("Sending not confirmed");
+    });
+
+    it("⛔ never says the raw word — COPY-STANDARD bans the bare word as a PO status", () => {
+      for (const status of ["open", "received"] as const) {
+        for (const sent of [true, false]) {
+          expect(soBatchPoDocumentState({ status, sentCurrentVersion: sent })).not.toMatch(/open/i);
+        }
+      }
+    });
+  });
+
+  /* THE ROW WENT; THE ARITHMETIC DID NOT. `All not ordered` was retired as a
+     rail row, and the exact-evidence remainder it counted still governs the
+     tick and the Ready Stock door — so it keeps its own test rather than
+     leaving with the control that used to print it. */
+  it("an uncovered Register line is outstanding even when the issue leaf is absent", () => {
     expect(
-      soBatchRailModel(soBatchRailFacts([uncovered], []), {
-        ...SO_BATCH_RAIL_CLEAR,
-        notOrderedOnly: true,
-      }).visibleOrderIds,
-    ).toEqual(new Set(["open-po-pool-mismatch"]));
+      soBatchOrderLineOutstandingQty(
+        line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] }),
+      ),
+    ).toBe(1);
   });
 
   it("every timing band is present, zero included — an empty band prints 0, not silence", () => {
@@ -438,7 +610,6 @@ describe("the rail model — unique-SO counts that cross-update between sections
     const m = model({ product: "sofa" });
     /* Only oC (ordered) and oD (setup) are sofas. */
     expect(m.timingCounts.can_order_early).toBe(0);
-    expect(m.notOrderedCount).toBe(1); // oD
     expect(m.suppliers).toEqual([
       { name: "Nice Future", count: 1 },
       { name: "Ohana", count: 1 },
@@ -456,8 +627,8 @@ describe("the rail model — unique-SO counts that cross-update between sections
     expect([...kept.visibleOrderIds]).toEqual([]);
   });
 
-  it("filters from different sections combine — All not ordered + Mattress + Hooka", () => {
-    const m = model({ notOrderedOnly: true, product: "mattress", supplier: "Hooka" });
+  it("filters from different sections combine — Mattress + Hooka + can order early", () => {
+    const m = model({ product: "mattress", supplier: "Hooka", timing: "can_order_early" });
     expect([...m.visibleOrderIds]).toEqual(["oA"]);
   });
 
@@ -698,7 +869,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
   });
 
   it("one supplier split across two destinations becomes TWO documents", () => {
-    const r = row({ toBuy: 11 });
+    const r = row({ toBuy: 11, parts: [{ sku: "B1201S-K", qty: 11, unitCost: null }] });
     const docs = groupSelectionsIntoDocuments(
       [sel(r, [
         { destinationId: KLANG.id, qty: 10 },
@@ -707,10 +878,22 @@ describe("documents are grouped by supplier × Deliver To", () => {
       new Map([[r.id, r]]),
     );
     expect(docs).toHaveLength(2);
+    expect(docs.map((d) => d.lines[0]!.parts[0]!.qty)).toEqual([10, 1]);
     expect(docs.map((d) => d.destinationId).sort()).toEqual(
       [KLANG.id, SG_BULOH.id].sort(),
     );
     expect(docs.every((d) => d.supplierId === "s-hooka")).toBe(true);
+  });
+
+  it("carries the selected destination address and server dates to its own draft", () => {
+    const r = row({ toBuy: 2, supplierAddress: "Factory address", poDate: "2026-09-24",
+      poDeliveryDate: "2026-10-05", poDeliveryWorkingDays: 7 });
+    const [document] = groupSelectionsIntoDocuments(
+      [sel(r, [{ destinationId: SG_BULOH.id, qty: 2 }])], new Map([[r.id, r]]),
+      [{ ...KLANG, address: "Klang warehouse" }, { ...SG_BULOH, address: "Buloh warehouse" }],
+    );
+    expect(document).toMatchObject({ destinationName: "AL Sungai Buloh", destinationAddress: "Buloh warehouse",
+      supplierAddress: "Factory address", poDate: "2026-09-24", poDeliveryDate: "2026-10-05", poDeliveryWorkingDays: 7 });
   });
 
   it("two Sales Orders on one supplier and one destination share ONE document", () => {
@@ -742,7 +925,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
     expect(docs).toHaveLength(2);
   });
 
-  it("the grouping is a HINT — it carries no price, number or arrival date", () => {
+  it("the grouping carries only server-resolved draft facts, never an official identity", () => {
     const r = row({ toBuy: 2 });
     const [doc] = groupSelectionsIntoDocuments(
       [sel(r, [{ destinationId: KLANG.id, qty: 2 }])],
@@ -752,6 +935,8 @@ describe("documents are grouped by supplier × Deliver To", () => {
       [
         "destinationId", "key", "lines", "qty", "supplierId", "supplierName",
         "supplierKind", "supplierCollection", "category", "orderId",
+        "supplierAddress", "destinationName", "destinationAddress", "poDate",
+        "poDeliveryDate", "poDeliveryWorkingDays", "deliveryMethod",
       ].sort(),
     );
     // Still no price, no number and no arrival date on the GROUPING itself —
@@ -764,7 +949,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
 describe("the selection bar counts lines, units and documents", () => {
   it("says how many lines, how many units and how many POs will be created", () => {
     const a = row({ id: "a", toBuy: 2 });
-    const b = row({ id: "b", supplierId: "s-ohana", supplier: "Ohana", toBuy: 5 });
+    const b = row({ id: "b", orderId: "o2", lineIds: ["l2"], supplierId: "s-ohana", supplier: "Ohana", toBuy: 5 });
     const summary = soBatchSelectionSummary(
       [
         sel(a, [{ destinationId: KLANG.id, qty: 2 }]),
@@ -778,7 +963,7 @@ describe("the selection bar counts lines, units and documents", () => {
     expect(summary.lines).toBe(2);
     expect(summary.units).toBe(7);
     expect(summary.documents).toBe(3);
-    expect(summary.text).toBe("2 selected · 7 units · Issue 3 POs");
+    expect(summary.text).toBe("2 Sales Orders · 2 items · 7 units · Issue 3 POs");
   });
 
   it("says nothing at all when nothing is selected", () => {
@@ -793,7 +978,7 @@ describe("the selection bar counts lines, units and documents", () => {
       [sel(a, [{ destinationId: KLANG.id, qty: 1 }])],
       new Map([[a.id, a]]),
     );
-    expect(summary.text).toBe("1 selected · 1 unit · Issue 1 PO");
+    expect(summary.text).toBe("1 Sales Order · 1 item · 1 unit · Issue 1 PO");
   });
 });
 
@@ -995,5 +1180,161 @@ describe("soBatchOrderSelection — the parent checkbox is all eligible child de
       selectedIds: new Set(["remainder", "covered-line"]),
     });
     expect(s).toEqual({ selectable: true, checked: true, indeterminate: false });
+  });
+});
+
+
+describe("SO batch timing counts share the purchase selection gate", () => {
+  it("excludes covered, unverified and already ordered leaves while retaining setup blockers", () => {
+    const facts = soBatchRailFacts(RAIL_ORDERS, [
+      row({ orderId: "oA", state: "can_order_early", fullyOnPo: true }),
+      row({ orderId: "oB", state: "can_order_early", fullyOnPo: undefined }),
+      row({ orderId: "oC", state: "can_order_early", fullyOnPo: false }),
+      row({ orderId: "oD", state: "no_production_days", toBuy: null, issueRef: null }),
+    ]);
+    const result = soBatchRailModel(facts, SO_BATCH_RAIL_CLEAR);
+    expect(result.timingCounts.can_order_early).toBe(0);
+    expect(result.setupCount).toBe(1);
+    expect(result.visibleOrderIds.size).toBe(RAIL_ORDERS.length);
+  });
+});
+
+describe("soBatchOrderPlanning — groups by remaining demand, never by raw status (R1/R2)", () => {
+  const plan = (o: SoBatchOrderRow, leaves: PurchaseDemandRow[] = []) => soBatchOrderPlanning(o, leaves);
+
+  it("a Ready-Stock-only order with no PO needs no purchase", () => {
+    const o = railOrder({ orderId: "rs", status: "blank", lines: [line({ orderLineId: "x", qty: 2, stockTaken: 2 })] });
+    expect(soBatchOrderRemainingQty(o)).toBe(0);
+    expect(plan(o)).toEqual({ group: "no-purchase-needed", date: null, notPlanned: false, absence: null, rank: 2 });
+  });
+
+  it("a fully ordered order needs no purchase", () => {
+    expect(plan(RAIL_OC).group).toBe("no-purchase-needed");
+  });
+
+  it("a partly bought order with a selectable leaf is To buy with its engine Order By", () => {
+    const o = railOrder({ orderId: "p", status: "partial", lines: [line({ orderLineId: "x", qty: 3, pos: [{ poId: "PO-9", poLineId: null, qty: 1, destinationId: null }] })] });
+    const r = plan(o, [row({ orderId: "p", orderBy: "2026-09-20" }), row({ id: "b2", orderId: "p", orderBy: "2026-09-18" })]);
+    expect(r).toEqual({ group: "to-buy", date: "2026-09-18", notPlanned: false, absence: null, rank: 0 });
+  });
+
+  it("pool coverage without exact lineage never moves an order out of To buy", () => {
+    const o = railOrder({ orderId: "pool", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const r = plan(o, [row({ orderId: "pool", fullyOnPo: true, orderBy: "2026-09-18" })]);
+    expect(r).toEqual({ group: "to-buy", date: null, notPlanned: false, absence: "already_on_po", rank: 1 });
+  });
+
+  /* ⭐ S1 — `Not planned` used to print for all three of these. Each test below
+     fails on the pre-S1 engine, which returned `notPlanned: true` and no
+     `absence` for every undated `To buy` order. */
+  it("S1: missing setup is the only Not planned", () => {
+    const empty = railOrder({ orderId: "u" });
+    const r = plan(empty, [row({ orderId: "u", state: "no_production_days", toBuy: null, issueRef: null })]);
+    expect(r).toEqual({ group: "to-buy", date: null, notPlanned: true, absence: "not_planned", rank: 1 });
+    expect(soBatchOrderByAbsenceWord(r.absence!)).toBe("Not planned");
+  });
+
+  it("S1: a leaf another open PO covers reads Already on a PO", () => {
+    const empty = railOrder({ orderId: "c", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const r = plan(empty, [row({ orderId: "c", fullyOnPo: true })]);
+    expect(r.notPlanned).toBe(false);
+    expect(r.absence).toBe("already_on_po");
+    expect(soBatchOrderByAbsenceWord(r.absence!)).toBe("Already on a PO");
+  });
+
+  it("S1: unverified coverage reads Coverage not checked, never Already on a PO", () => {
+    const empty = railOrder({ orderId: "u" });
+    const r = plan(empty, [row({ orderId: "u", fullyOnPo: undefined }), row({ id: "b2", orderId: "u", fullyOnPo: true })]);
+    expect(r.group).toBe("to-buy");
+    expect(r.notPlanned).toBe(false);
+    expect(r.absence).toBe("coverage_not_checked");
+    expect(soBatchOrderByAbsenceWord(r.absence!)).toBe("Coverage not checked");
+  });
+
+  it("S1: an eligible leaf with no derivable Order By is setup, Not planned", () => {
+    const empty = railOrder({ orderId: "e", lines: [line({ orderLineId: "x", qty: 2 })] });
+    const r = plan(empty, [row({ orderId: "e", orderBy: null })]);
+    expect(r.absence).toBe("not_planned");
+  });
+
+  it("orders selectable Order By ascending, then not planned, then SO No descending", () => {
+    const items = [
+      { so: 10, plan: { group: "to-buy" as const, date: null, notPlanned: true, absence: "not_planned" as const, rank: 1 as const } },
+      { so: 11, plan: { group: "to-buy" as const, date: "2026-09-20", notPlanned: false, absence: null, rank: 0 as const } },
+      { so: 12, plan: { group: "to-buy" as const, date: "2026-09-18", notPlanned: false, absence: null, rank: 0 as const } },
+      { so: 13, plan: { group: "to-buy" as const, date: null, notPlanned: true, absence: "not_planned" as const, rank: 1 as const } },
+    ];
+    expect([...items].sort(compareSoBatchPlanning).map((i) => i.so)).toEqual([12, 11, 13, 10]);
+  });
+});
+
+/**
+ * ⭐ `PO Safety Days` — THE PARENT CELL, owner ruling 2026-09-18.
+ *
+ * One answer per Sales Order, over exactly the leaves the parent checkbox would
+ * tick: the TIGHTEST margin. The number is the ENGINE's; this only picks a
+ * minimum. Nothing to buy prints nothing; a margin nobody measured is stated as
+ * an absence and is NEVER a `0`.
+ */
+describe("soBatchOrderSafetyDays — the tightest measured margin, or a stated absence", () => {
+  it("nothing left to buy states no margin at all", () => {
+    const o = railOrder({
+      orderId: "rs",
+      status: "blank",
+      lines: [line({ orderLineId: "x", qty: 2, stockTaken: 2 })],
+    });
+    expect(soBatchOrderSafetyDays(o, [])).toEqual({ kind: "none" });
+  });
+
+  it("takes the TIGHTEST of the leaves the parent checkbox would tick", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 3 })] });
+    const cell = soBatchOrderSafetyDays(o, [
+      row({ orderId: "p", safetyDaysLeft: 9 }),
+      row({ id: "b2", orderId: "p", safetyDaysLeft: 2 }),
+    ]);
+    expect(cell).toEqual({ kind: "days", days: 2 });
+  });
+
+  it("keeps a negative margin negative — an overrun is not a margin of zero", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 1 })] });
+    expect(soBatchOrderSafetyDays(o, [row({ orderId: "p", safetyDaysLeft: -2 })])).toEqual({
+      kind: "days",
+      days: -2,
+    });
+  });
+
+  /**
+   * ⛔ ONE UNMEASURED LEAF MAKES THE TIGHTEST MARGIN UNKNOWABLE. A minimum over
+   * the rest would claim a floor nobody counted, and the lowest number on the
+   * page is exactly the one an operator acts on.
+   */
+  it("states an absence, never a number, when one eligible leaf was not measured", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 2 })] });
+    const cell = soBatchOrderSafetyDays(o, [
+      row({ orderId: "p", safetyDaysLeft: 9 }),
+      row({ id: "b2", orderId: "p", safetyDaysLeft: null }),
+    ]);
+    expect(cell.kind).toBe("absent");
+  });
+
+  it("names WHY a To-buy order has no margin, in the page's governed words", () => {
+    const covered = railOrder({ orderId: "c", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const cell = soBatchOrderSafetyDays(covered, [row({ orderId: "c", fullyOnPo: true })]);
+    expect(cell).toEqual({ kind: "absent", absence: "already_on_po" });
+    expect(soBatchOrderByAbsenceWord("already_on_po")).toBe("Already on a PO");
+
+    const blocked = railOrder({ orderId: "u" });
+    const unverified = soBatchOrderSafetyDays(blocked, [
+      row({ orderId: "u", state: "no_production_days", toBuy: null, issueRef: null }),
+    ]);
+    expect(unverified).toEqual({ kind: "absent", absence: "not_planned" });
+  });
+
+  it("agrees with the group beside it — no second arithmetic", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const leaves = [row({ orderId: "p", safetyDaysLeft: 4 })];
+    expect(soBatchOrderPlanning(o, leaves).group).toBe("to-buy");
+    expect(soBatchOrderStatusWord(soBatchOrderPlanning(o, leaves).group)).toBe("Need PO");
+    expect(soBatchOrderSafetyDays(o, leaves).kind).toBe("days");
   });
 });

@@ -39,9 +39,10 @@ does not exist.
 
 ## 1 · Typography
 
-Six tokens. A seventh does not exist and does not compile — each is one
+Seven tokens. An eighth does not exist and does not compile — each is one
 Tailwind `fontSize` entry carrying size + weight + line-height in ONE class, so
-a seventh cannot be written without editing the config.
+an eighth cannot be written without editing the config. The seventh, `control`,
+is the owner's Work toolbar ruling of 2026-09-25.
 
 | Token | Class | Size | Weight | Line | Use |
 |---|---|---:|---:|---:|---|
@@ -51,6 +52,7 @@ a seventh cannot be written without editing the config.
 | body | `text-body` | 13 | 400 | 18 | default — table rows, prose, buttons |
 | meta | `text-meta` | 12 | 400 | 16 | secondary info, captions, timestamps |
 | label | `text-label` | 11 | 500 | 14 | field labels, micro-labels, pill text |
+| control | `text-control` | 14 | 400 | 20 | workspace toolbar controls (Work) — 36px tall, 40px below 960px |
 
 **Weights: 400 · 500 · 600. There is no 700.** Frozen by Jess 2026-07-28 —
 600 and 700 were doing the same job at every size. A kit file writing
@@ -86,9 +88,10 @@ nobody can mistype a digit.** The law names the STEP; Tailwind resolves the hex.
 
 | Semantic | Step | Use |
 |---|---|---|
-| `background` | `slate-3` | page canvas |
+| `background` | `kit.canvas` (`#F7F8FA`) | page canvas — see the note below |
 | `surface` | `white` | card · panel |
-| `surface-alt` | `slate-3` | inset · nested surface |
+| `surface-alt` | `slate-3` | inset · nested surface · table header |
+| `surface-expansion` | `slate-2` | the area under an opened register row (ruling R5, 2026-09-16) |
 | `border` | `slate-5` | table lines · card edge |
 | `divider` | `slate-6` | section split |
 | `text-primary` | `slate-12` | primary text |
@@ -101,6 +104,29 @@ nobody can mistype a digit.** The law names the STEP; Tailwind resolves the hex.
 | `success` | `green-3` / `green-11` | |
 | `warning` | `amber-3` / `amber-11` | |
 | `error` | `red-3` / `red-11` | |
+
+**The canvas is the one step that is not a Radix step.** Jess specified `#F7F8FA` for the page
+canvas on 2026-08-02, and `tailwind.config.ts` publishes it as `kit.canvas` with that dated ruling.
+This table previously said `slate-3`; that text disagreed with the shipped pixels and is corrected
+here without changing any colour. `slate-3` remains the canvas only on pages not yet migrated to
+`bg-kit-canvas`. `slate-2` was added on 2026-09-16 (owner ruling R5, SO Batch Purchase) — additive,
+no existing step moved.
+
+### 2.1.1 · The Work palette — owner correction 2026-09-24, BUILT (Work page only)
+
+The Work shell and its 104px cards carry six page-scoped steps the owner specified by value. They
+live ONLY in `index.css` (`--work-*`) and `tailwind.config.ts` (`colors.work.*`), are used only
+under `pages/operation/work/**` and `OperationWork.tsx`, and never replace a kit step elsewhere.
+
+| Token | Value | Use |
+|---|---|---|
+| `work-line` | `#ccd7e5` | every Work section and card edge (1px) |
+| `work-line-hover` | `#aebfd3` | a card's hovered edge |
+| `work-ink` | `#17243a` | card fact and date numerals |
+| `work-slate` | `#40516a` | card module · party line |
+| `work-muted` | `#66758b` | card weekday and quiet text |
+| `work-tabs` | `#e9eef5` | the `To do · Waiting · Completed` tab track |
+| `work-missed-*` | fill / line / ink | the `Missed` date badge |
 
 `primary-hover` and `primary-active` are reserved on purpose: the token exists,
 the implementation is not required until something needs it.
@@ -157,6 +183,7 @@ own declaration, so a drift back to blue fails the suite.
 |---:|---|---|
 | 4 | `rounded-pill` | **checkbox** |
 | 6 | `rounded-control` | button · input · dropdown |
+| 9 | `rounded-work` | the Work page's sections and 104px cards only (owner correction 2026-09-24; density 2026-09-25) |
 | 10 | `rounded-card` | card · panel · modal · drawer |
 | — | `rounded-full` | **pill · small tag** · avatar · status dot |
 
@@ -253,8 +280,10 @@ line drawn in it would change colour at the header and read as two lines.
 
 **Three sizes: 14 · 16 · 18.**
 
-**One meaning, one glyph.** The 40 permitted meanings are the `IconName` union
+**One meaning, one glyph.** The 46 registered meanings are the `IconName` union
 in `apps/web/src/components/kit/Icon.tsx`; a name outside it does not compile.
+These include the original 40, mattress/bedframe/sofa, columnFilter, and the
+compact product-line card's pillow/protector. Stroke and size tokens are unchanged.
 Validated 2026-07-31: the kebab is `overflow`, and `more` does not exist.
 
 ---
@@ -309,8 +338,9 @@ test proves nothing.
 Approved business vocabulary only; a word that has not been ruled may not appear
 on a screen. The dictionary is `docs/COPY-STANDARD.md`.
 
-**Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` · `Scheduled` ·
-`Appointment Pending` · `Booking Pending` · `POD`.
+**Banned:** `Pending` · `Exception` · `Chase` · `Soon` · `Maybe` ·
+`Appointment Pending` · `Booking Pending` · `POD`. (`Scheduled` is the customer-leg delivery word
+since the owner ruling of 2026-09-24 — COPY-STANDARD.)
 
 A banned DISPLAY word may still exist as a database or API value where
 compatibility requires it. Never rename a stored value silently — the screen

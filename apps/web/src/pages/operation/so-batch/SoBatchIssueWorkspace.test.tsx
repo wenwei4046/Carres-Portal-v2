@@ -1,3 +1,8 @@
+import { useEffect } from "react";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+const HERE = dirname(fileURLToPath(import.meta.url));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { PurchasingDestination, SoBatchDocument } from "@carres/shared";
@@ -5,6 +10,19 @@ import type { PurchasingDestination, SoBatchDocument } from "@carres/shared";
 vi.mock("@/lib/pdf/render", () => ({
   renderPoPdf: vi.fn(async () => new Blob(["%PDF-1.4"], { type: "application/pdf" })),
 }));
+const previewState = vi.hoisted(() => ({ ready: true }));
+vi.mock("@/components/kit/PdfPreview", () => ({
+  default: ({ src, title, onReady, "data-testid": testId }: {
+    src: string; title: string; onReady: (ready: boolean) => void; "data-testid": string;
+  }) => {
+    useEffect(() => { onReady(previewState.ready); }, [src]);
+    return <section title={title} data-testid={testId} data-src={src} />;
+  },
+}));
+async function clickIssue() {
+  await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+}
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -139,18 +157,35 @@ const issuesOk = () =>
   stubReads((path) => (path.includes("issue-batch") ? { ok: true, pos: [] } : undefined));
 
 beforeEach(() => {
+  previewState.ready = true;
   onBack.mockClear();
   onDone.mockClear();
   apiFetch.mockReset();
   stubReads();
+  let blobNumber = 0;
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
-    value: vi.fn(() => "blob:so-batch-test"),
+    value: vi.fn(() => `blob:so-batch-test-${++blobNumber}`),
   });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
 
 describe("50% work + 50% the actual document", () => {
+  it("does not issue while the actual PDF has not finished painting", async () => {
+    previewState.ready = false;
+    renderWorkspace();
+    await screen.findByTitle("Draft purchase order preview");
+    expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    expect(apiFetch.mock.calls.some(([path]) => String(path).includes("issue-batch"))).toBe(false);
+  });
+
+  it("states the whole batch even when reviewing its first document", async () => {
+    renderWorkspace([doc(), SECOND]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Issue 2 POs" })).toBeEnabled());
+    expect(screen.getByTestId("so-batch-issue-count")).toHaveTextContent("1 of 2 · 3 units");
+  });
+
   it("resumes a covering PO with its saved supplier doors without issuing twice", async () => {
     stubReads((path) => {
       if (path.includes("issue-batch")) throw { body: { code: "already_on_po", po: "PO-existing" } };
@@ -162,7 +197,7 @@ describe("50% work + 50% the actual document", () => {
       return undefined;
     });
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTitle("PO-existing purchase order");
     expect(screen.queryByTestId("so-batch-issue-error")).not.toBeInTheDocument();
     expect(screen.queryByText("Open existing PO")).not.toBeInTheDocument();
@@ -179,10 +214,10 @@ describe("50% work + 50% the actual document", () => {
       return undefined;
     });
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByText("Could not open PO-existing.");
-    expect(screen.getByRole("button", { name: "Issue PO" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Issue PO" }));
+    expect(screen.getByRole("button", { name: "Issue 1 PO" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Issue 1 PO" }));
     await waitFor(() => expect(apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue-context"))).toHaveLength(2));
     expect(apiFetch.mock.calls.filter(([p]) => String(p).includes("issue-batch"))).toHaveLength(1);
   });
@@ -217,33 +252,27 @@ describe("50% work + 50% the actual document", () => {
     expect(apiFetch.mock.calls.some(([p]) => String(p).includes("issue-batch"))).toBe(false);
   });
   /**
-   * ⭐ 50 / 50 AT 1130px AND WIDER; STACKED BELOW IT (closure §10).
+   * ⭐ 50 / 50 AT 768px AND WIDER; STACKED BELOW IT (closure §10).
    *
    * The split used to be unconditional, so a narrower window gave each half
    * under 565px: the PDF page became unreadable and the decision controls
    * clipped. jsdom computes no media queries, so the CONTRACT is asserted on the
    * classes — the breakpoint itself is walked in the browser.
    */
-  it("gives each side half the content area from 1130px up, and stacks below it", () => {
+  it("gives each side half the content area from 768px of canvas up, and stacks below it", () => {
     renderWorkspace();
-    const split = screen.getByTestId("so-batch-issue-split");
+    expect(screen.getByTestId("so-batch-issue-split")).toBeInTheDocument();
     /* ⭐ A FLEX COLUMN when stacked, a two-column GRID from the breakpoint.
        Walked at 1129px on 2026-08-24: a one-column GRID compressed the work row
        to 208px and clipped the cost block, the blocker and both buttons with no
        scrollbar, because the row reported that it fitted. */
-    expect(split.className).toContain("flex-col");
-    expect(split.className).toContain("min-[1130px]:grid");
-    expect(split.className).toContain("min-[1130px]:grid-cols-2");
-    expect(split.className).not.toContain("grid-cols-1");
-    /* Stacked, the SPLIT scrolls; side by side, each half scrolls itself. */
-    expect(split.className).toContain("overflow-y-auto");
-    expect(split.className).toContain("min-[1130px]:overflow-hidden");
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("@container so-batch-issue (min-width: 768px)");
     const work = screen.getByTestId("so-batch-issue-work");
     const preview = screen.getByTestId("so-batch-issue-preview");
     /* Neither pane may be compressed below its content when stacked. */
     expect(work.className).toContain("shrink-0");
     expect(preview.className).toContain("shrink-0");
-    expect(work.className).toContain("min-[1130px]:min-h-0");
+    expect(work.className).toContain("issueWork");
     /* The work comes FIRST when stacked: the operator's next act is there, and
        a document they cannot read is not worth the top half. */
     expect(work.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -251,13 +280,13 @@ describe("50% work + 50% the actual document", () => {
     expect(preview.className).toContain("min-h-[70vh]");
     /* The divider follows the direction the panes sit in. */
     expect(work.className).toContain("border-b");
-    expect(work.className).toContain("min-[1130px]:border-r");
+    expect(work.className).toContain("issueWork");
   });
 
   it("never clips an action: the decision side scrolls rather than hiding its buttons", () => {
     renderWorkspace();
-    const work = screen.getByTestId("so-batch-issue-work");
-    expect(work.className).toContain("min-[1130px]:overflow-y-auto");
+    expect(screen.getByTestId("so-batch-issue-work")).toBeInTheDocument();
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("overflow-y: auto");
     /* And the 50px destination header truncates a long title instead of
        wrapping it into a row that cannot show the second line (walked 375px). */
     expect(screen.getByTestId("so-batch-issue-count").className).toContain("whitespace-nowrap");
@@ -361,7 +390,7 @@ describe("Issue PO creates every document in one request", () => {
   it("posts ONE batch request, not one per document", async () => {
     issued();
     renderWorkspace([doc(), SECOND]);
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     /* ONE issue request, however many documents and however many reads the
        surface made around it. */
     const writes = () =>
@@ -390,7 +419,7 @@ describe("Issue PO creates every document in one request", () => {
       });
     });
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await waitFor(() => {
       const err = screen.getByTestId("so-batch-issue-error");
       expect(err).toHaveTextContent("You arranged 10 units and must buy 11.");
@@ -404,7 +433,7 @@ describe("Issue PO creates every document in one request", () => {
   it("after creation the official number is shown and Issue PO is gone", async () => {
     issued();
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO-2041");
     expect(screen.queryByTestId("so-batch-issue-create")).not.toBeInTheDocument();
@@ -413,7 +442,7 @@ describe("Issue PO creates every document in one request", () => {
   it("Back to buying stays reachable after Issue PO, and it is the SAME door as before — not Purchase Orders", async () => {
     issued();
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
     /* Leaving is safe (file header): the numbered PO already exists, so the
        same `Back to buying` door stays open — same label, same handler,
@@ -450,7 +479,7 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
       return undefined;
     });
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
     apiFetch.mockReset();
     stubReads();
@@ -459,7 +488,7 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
   it("says what has not happened yet, naming the exact version", async () => {
     await reachEvidence();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · Version 2 has not reached Hooka",
+      "PO-2041 · PO V2 · Sending not confirmed",
     );
   });
 
@@ -474,13 +503,15 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
     expect(apiFetch).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "has not reached",
+      "Sending not confirmed",
     );
   });
 
-  it("Record the PDF sent needs a channel and a recipient", async () => {
+  it("PO sent to supplier needs a channel and a recipient — prefilled from the Supplier Master", async () => {
     await reachEvidence();
-    expect(screen.getByTestId("so-batch-evidence-confirm")).toBeDisabled();
+    /* The saved WhatsApp group is on file, so the recipient is already there. */
+    expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveValue("https://chat.whatsapp.com/hooka");
+    expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled();
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
       target: { value: "   " },
     });
@@ -551,11 +582,11 @@ describe("the issue review only reviews the purchase order", () => {
     expect(screen.queryByRole("button", { name: "Free of Charge" })).not.toBeInTheDocument();
   });
 
-  it("keeps the governed collection rule in Settings instead of repeating it in Issue review", () => {
+  it("keeps the governed collection rule in Settings instead of repeating it in Issue review", async () => {
     renderWorkspace([fixedPickup]);
     expect(screen.queryByText("NETS collects from Nice Future and delivers to Carres Klang.")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Procurement partner" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
   });
 
   /* The refusal names BOTH parties by name — the supplier that refused and the
@@ -578,7 +609,7 @@ describe("the issue review only reviews the purchase order", () => {
      destination is a setting nothing reads — and the server never refuses on
      it. The browser used to, which greyed out Issue PO for a document the
      server would have accepted, with no way past it from the screen. */
-  it("does not refuse a supplier that delivers its own goods", () => {
+  it("does not refuse a supplier that delivers its own goods", async () => {
     renderWorkspace([
       {
         ...fixedPickup,
@@ -587,13 +618,13 @@ describe("the issue review only reviews the purchase order", () => {
       },
     ]);
     expect(screen.queryByTestId("so-batch-issue-blocker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
   });
 
   it("sends only the selected demand and destination arrangement", async () => {
     issuesOk();
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await waitFor(() => expect(issueBody()).toBeTruthy());
     expect(Object.keys(issueBody())).toEqual(["selections"]);
   });
@@ -627,15 +658,15 @@ describe("after creation the preview is the real official PDF", () => {
           }),
     );
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-20260822-4041");
   }
 
   it("renders the PO template, not the JSON endpoint", async () => {
     await created();
     const frame = await screen.findByTestId("so-batch-pdf-PO-20260822-4041");
-    expect(frame.tagName).toBe("IFRAME");
-    const src = frame.getAttribute("src") ?? "";
+    expect(frame.tagName).toBe("SECTION");
+    const src = frame.getAttribute("data-src") ?? "";
     expect(src.startsWith("blob:")).toBe(true);
     expect(src).not.toContain("print-data");
     const { renderPoPdf } = await renderMod();
@@ -665,17 +696,17 @@ describe("after creation the preview is the real official PDF", () => {
         : Promise.reject(new Error("not_found")),
     );
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-pdf-placeholder-PO-2099")).toHaveTextContent(
-        "not_found",
+        "Could not load the preview.",
       ),
     );
     /* ⭐ NO VERSION MEANS NOTHING SAFE TO CONFIRM (0378). The document never
        rendered, so the operator cannot have seen a version, so the form that
        would declare one is not offered at all. */
     expect(screen.queryByTestId("so-batch-evidence-confirm")).not.toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-evidence-waiting")).toHaveTextContent("not_found");
+    expect(screen.getByTestId("so-batch-evidence-waiting")).toHaveTextContent("Could not load the preview.");
   });
 });
 
@@ -709,7 +740,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       return undefined;
     });
     renderWorkspace();
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId(`so-batch-evidence-${PO.id}`);
   }
 
@@ -732,7 +763,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       },
     ]);
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("Version 1 reached Hooka"));
+    await waitFor(() => expect(panel).toHaveTextContent("PO V1 · PO sent to supplier"));
     expect(panel).toHaveTextContent("WhatsApp to Hooka Purchasing Group by Shasha");
   });
 
@@ -758,10 +789,10 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       2,
     );
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("Version 2 has not reached Hooka"));
+    await waitFor(() => expect(panel).toHaveTextContent("PO V2 · Sending not confirmed"));
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
     expect(screen.getByTestId(`so-batch-evidence-history-${PO.id}`)).toHaveTextContent(
-      "Version 1 sent to Hooka Purchasing Group by WhatsApp · Shasha",
+      "PO V1 marked as sent · WhatsApp · Hooka Purchasing Group · Shasha",
     );
     expect(onDone).not.toHaveBeenCalled();
   });
@@ -778,7 +809,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       },
     ]);
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("has not reached Hooka"));
+    await waitFor(() => expect(panel).toHaveTextContent("Sending not confirmed"));
     expect(screen.getByTestId(`so-batch-evidence-history-${PO.id}`)).toHaveTextContent(
       "Email opened · Li Ching",
     );

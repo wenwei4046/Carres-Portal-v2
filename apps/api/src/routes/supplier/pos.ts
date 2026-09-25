@@ -5,7 +5,7 @@ import {
   supplierPosListQuery,
 } from "@carres/shared";
 import { requireSupplier } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -133,10 +133,7 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
     const { data: oRows, error: oErr } = await sb.rpc("supplier_orders_for_threads", {
       p_order_ids: orderIds,
     });
-    if (oErr) {
-      const m = mapPgError(oErr);
-      return c.json(m.body, m.status);
-    }
+    if (oErr) return fail(c, oErr);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ((oRows ?? []) as any[])) {
       orderInfo.set(String(r.id), {
@@ -312,10 +309,7 @@ supplierPosRouter.get("/:poId/threads", requireSupplier, async (c) => {
   // recursion (orders policy → threads → POs cycle). The RPC bypasses RLS,
   // gates internally on supplier_id = app_supplier_id().
   const { data, error } = await sb.rpc("supplier_threads_for_po", { p_po_id: poId });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? []);
 });
 
@@ -345,10 +339,7 @@ supplierPosRouter.get("/:poId/pickup-events", requireSupplier, async (c) => {
     .select("id, do_number, picked_up_at, ack_role")
     .eq("po_id", poId)
     .order("picked_up_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eventIds = ((data ?? []) as any[]).map((r) => r.id as string);
   const counts = new Map<string, number>();
@@ -357,10 +348,7 @@ supplierPosRouter.get("/:poId/pickup-events", requireSupplier, async (c) => {
       .from("order_supplier_threads")
       .select("pickup_event_id")
       .in("pickup_event_id", eventIds);
-    if (e2) {
-      const m = mapPgError(e2);
-      return c.json(m.body, m.status);
-    }
+    if (e2) return fail(c, e2);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const t of ((tcRows ?? []) as any[])) {
       const eid = t.pickup_event_id as string | null;
@@ -382,10 +370,7 @@ supplierPosRouter.post("/:id/acknowledge", requireSupplier, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("supplier_acknowledge", { p_po_id: id });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -396,10 +381,7 @@ supplierPosRouter.post("/:id/start-production", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("supplier_start_production", {
     p_po_id: id,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -410,10 +392,7 @@ supplierPosRouter.post("/:id/ready-for-pickup", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("operation_supplier_ready_confirm", {
     p_po_id: id,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -430,10 +409,7 @@ supplierPosRouter.post("/:id/mark-delivered", requireSupplier, async (c) => {
     p_do_file_path: body.data.doFilePath,
     p_do_note: body.data.doNote ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

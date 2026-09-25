@@ -14,7 +14,11 @@ export interface DeliveryWarehouseScheduleInput {
   leg: number;
   so: number;
   fromLocation: string;
+  warehouseSiteId?: string | null;
   toCustomer: string;
+  /** The customer THEMSELF. `toCustomer` is the delivery PLACE despite its
+   *  name; a party and a place are different facts and never substitute. */
+  toCustomerName?: string | null;
   logisticsPartner: string;
   driverName: string | null;
   vehicle: string | null;
@@ -58,7 +62,9 @@ export interface DeliveryWarehouseScheduleEvent {
   leg: number;
   source: string;
   fromLocation: string;
+  warehouseSiteId: string | null;
   toCustomer: string;
+  toCustomerName?: string | null;
   logisticsPartner: string;
   driverName: string | null;
   vehicle: string | null;
@@ -115,8 +121,12 @@ export function deliveryCustodyProjection(
 export function deliveryWarehouseScheduleEvents(
   input: DeliveryWarehouseScheduleInput,
 ): DeliveryWarehouseScheduleEvent[] {
+  /* Edit Delivery is retired (Delivery MASTER §8.6): the Monitor row, brief
+     unfolded, is the one address of a scope — a leg's row key is `id#legN`. */
   const deliveryHref =
-    `/operation/delivery/edit/${encodeURIComponent(input.orderId)}?leg=${input.leg}`;
+    `/operation?tab=delivery&view=all&open=${encodeURIComponent(
+      input.leg > 0 ? `${input.orderId}#leg${input.leg}` : input.orderId,
+    )}`;
   const deliveryOrderHref =
     `/operation/delivery-orders/${encodeURIComponent(input.doNumber)}`;
   const sourceHref =
@@ -141,7 +151,9 @@ export function deliveryWarehouseScheduleEvents(
     leg: input.leg,
     source: `SO-${input.so}`,
     fromLocation: input.fromLocation,
+    warehouseSiteId: input.warehouseSiteId ?? null,
     toCustomer: input.toCustomer,
+    toCustomerName: input.toCustomerName ?? null,
     logisticsPartner: input.logisticsPartner,
     driverName: input.driverName,
     vehicle: input.vehicle,

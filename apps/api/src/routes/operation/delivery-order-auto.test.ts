@@ -8,16 +8,8 @@
  * issuance hiccup must never undo or refuse the booking the operator just
  * recorded.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
-import { docNumber } from "@carres/shared";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -30,30 +22,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -102,7 +77,13 @@ function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
       if (!b) throw new Error(`unmocked table ${t}`);
       return b;
     }),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: DO_NUMBER, error: null }
+          : { data: null, error: null },
+      ),
+    ),
   };
 }
 
@@ -114,12 +95,14 @@ const OK_BODY = {
   confirmedTimeSlot: "Afternoon (12pm–3pm)",
 };
 const URL = `http://t/api/operation/orders/${ORDER_ID}/booking/confirm`;
-const DO_NUMBER = docNumber({
-  prefix: "DO",
-  date: new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10),
-  seed: ORDER_ID,
-  digits: 4,
-});
+/**
+ * ⭐ 0575 · THE NUMBER IS DRAWN, NOT DERIVED. It used to be
+ * `docNumber({ seed: ORDER_ID })` — a hash of the order id, which is exactly
+ * the defect 0575 removes (two orders, one day, one number). The fake
+ * allocator below answers the way the database's own does, so this test now
+ * proves the API STORES WHAT IT WAS GIVEN instead of re-deriving it.
+ */
+const DO_NUMBER = "DO2609-4827";
 
 function post(jwt: string) {
   return app.fetch(

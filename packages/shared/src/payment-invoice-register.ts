@@ -11,7 +11,7 @@
  *   `Goods ready` · `Arriving Monday, 7 Sep` · `Arrival not confirmed`
  */
 import { z } from "zod";
-import { collectionClock, type CollectionClock } from "./collection-clock";
+import { collectionClock, type CollectionClock, type CollectionTiming, type OwnerCalendar } from "./collection-clock";
 import { orderMoney } from "./order-money";
 import { paymentCollectionReadiness } from "./payment-collection";
 import type { WorkingDayOptions } from "./working-days";
@@ -64,6 +64,8 @@ export interface InvoiceRegisterRow {
     delivery_date: string | null;
     delivery_date_tbd: boolean | null;
     delivered_at: string | null;
+    /** When the order was placed (timestamptz). */
+    placed_at?: string | null;
     ops_assigned_logistic?: string | null;
     delivery_partners?: { name: string; contact: string | null } | null;
     order_payments?: Array<{
@@ -79,13 +81,37 @@ export interface InvoiceRegisterRow {
      *  through the shared `storageHold` (the 2026-09-08 correction) so the
      *  Payment screens, Work and the gate cannot disagree on a legacy order. */
     legacy_storage_owing?: number;
+    /** The customer's latest standing promise (0446 `will_pay_on_date`),
+     *  attached server-side so the Monitor's `Customer promised to pay
+     *  today` reads the same ledger the Work feed does. */
+    latest_promise?: { promised_date: string; recorded_at: string } | null;
     order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
     order_addons: Array<{ qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
       balance: number | string | null;
       confirmed_date: string | null;
+      /** The D1 booking overlay (0277). Only `confirmed` makes its date a
+       *  confirmed delivery — Delivery's own `bookingDayOf` rule. Absent on a
+       *  row read before this field rode the wire: the date stands alone. */
+      booking_stage?: string | null;
+      confirmed_time_slot?: string | null;
       line_etas: Record<string, string> | null;
       line_stock_status: Record<string, string> | null;
+    }>;
+    /** Delivery's own arrangement per leg (0386) — leg 0 an ordinary order,
+     *  1…n a Journey. The record Delivery's `Save confirmed delivery` writes. */
+    ops_delivery_arrangements?: Array<{
+      leg: number;
+      confirmed_date: string | null;
+      confirmed_time: string | null;
+    }>;
+    /** Delivery Orders per leg — the issued snapshot outranks everything. */
+    ops_delivery_orders?: Array<{
+      leg: number;
+      delivery_date: string | null;
+      time_slot: string | null;
+      voided_at: string | null;
+      issued_at?: string | null;
     }>;
   } | null;
 }
@@ -137,8 +163,15 @@ export function invoiceGoodsFacts(row: InvoiceRegisterRow): {
   return { completed, goodsReady, arrivalIso };
 }
 
+/* ⭐ ONE DATE SPELLING — COPY-STANDARD's own date law (`Wed, 12 Aug`), which
+   `fmtDate` spells everywhere else in the portal. These names used to be the
+   FULL weekday (`Monday`), so the same day read `Sunday, 4 Oct` on the Payment
+   Monitor and `Sun, 4 Oct` in the collection workspace the row opens — and
+   COPY-STANDARD is explicit that a second date spelling is itself the defect.
+   The Payment MASTER's own examples carried the long form; they are corrected
+   in the same change, because the date law outranks a module's example. */
 const WEEKDAYS = [
-  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+  "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
 ] as const;
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -228,19 +261,89 @@ export function soRemaining(
   };
 }
 
+/**
+ * ⭐ THE CONFIRMED DELIVERY IS DELIVERY'S FACT (Law D, Payment Monitor Card 02,
+ * 2026-09-16). Payment used to read `ops_order_control.confirmed_date` alone,
+ * but Delivery's `Save confirmed delivery` writes `ops_delivery_arrangements`
+ * and never touches that column — so a day Delivery had agreed with the
+ * customer never started Payment's collection clock or its Work item.
+ *
+ * This is Delivery's own ladder (`confirmedDeliveryOf`), for the leg that
+ * reaches the customer (the highest leg; 0 on an ordinary order):
+ *
+ *   the live Delivery Order's day and window
+ *   → Delivery's arrangement
+ *   → the booking overlay, only while its stage is `confirmed`
+ *
+ * A day without a time is still a confirmed DAY for the clock; `time` is null
+ * and the listing prints the date alone (time is optional, owner ruling 2026-09-24).
+ */
+export function invoiceConfirmedDelivery(row: InvoiceRegisterRow): {
+  dateIso: string | null;
+  time: string | null;
+} {
+  const order = row.orders;
+  const docs = (order?.ops_delivery_orders ?? []).filter((d) => !d.voided_at);
+  const arrangements = order?.ops_delivery_arrangements ?? [];
+  const leg = Math.max(0, ...docs.map((d) => d.leg ?? 0), ...arrangements.map((a) => a.leg ?? 0));
+  const doc = docs
+    .filter((d) => (d.leg ?? 0) === leg && d.delivery_date && ISO_DATE.test(d.delivery_date.slice(0, 10)))
+    .sort((a, b) => (b.issued_at ?? "").localeCompare(a.issued_at ?? ""))[0];
+  if (doc) return { dateIso: doc.delivery_date!.slice(0, 10), time: doc.time_slot ?? null };
+  const arrangement = arrangements.find((a) => (a.leg ?? 0) === leg);
+  const arranged = arrangement?.confirmed_date?.slice(0, 10) ?? null;
+  if (arranged && ISO_DATE.test(arranged)) return { dateIso: arranged, time: arrangement!.confirmed_time ?? null };
+  const ctrl = ctrlOf(row);
+  const booked = ctrl?.confirmed_date?.slice(0, 10) ?? null;
+  const stageAllows = ctrl?.booking_stage === undefined || ctrl.booking_stage === "confirmed";
+  if (booked && ISO_DATE.test(booked) && stageAllows) {
+    return { dateIso: booked, time: ctrl?.confirmed_time_slot ?? null };
+  }
+  return { dateIso: null, time: null };
+}
+
 /** The Customer Delivery cell fact: the customer-confirmed day, else the
  *  requested day, else the honest absence. */
+export type CustomerDeliveryStatus = "confirmed" | "requested" | "customer_not_sure" | "no_date";
+
+/**
+ * ⭐ THE ONE CUSTOMER-DELIVERY READ (ERP-ARCHITECTURE Law D).
+ *
+ * The Monitor row and the collection workspace the row opens used to derive
+ * this fact SEPARATELY, and they disagreed: an order whose customer is not sure
+ * read `No delivery date` on the row and `Customer not sure` inside. Worse, the
+ * workspace computed the status and then printed the bare date, so a date the
+ * customer had NOT confirmed looked exactly like one they had. Both surfaces
+ * now read this function and print `deliveryWords` below it.
+ */
 export function invoiceCustomerDelivery(row: InvoiceRegisterRow): {
   dateIso: string | null;
-  word: "confirmed" | "requested" | "customer_not_sure" | "no_date";
+  word: CustomerDeliveryStatus;
 } {
-  const confirmed = ctrlOf(row)?.confirmed_date ?? null;
-  if (confirmed && ISO_DATE.test(confirmed)) return { dateIso: confirmed, word: "confirmed" };
+  const confirmed = invoiceConfirmedDelivery(row).dateIso;
+  if (confirmed) return { dateIso: confirmed, word: "confirmed" };
   const order = row.orders;
   if (order?.delivery_date_tbd) return { dateIso: null, word: "customer_not_sure" };
   const requested = order?.delivery_date ?? null;
   if (requested && ISO_DATE.test(requested)) return { dateIso: requested, word: "requested" };
   return { dateIso: null, word: "no_date" };
+}
+
+/**
+ * The governed words for that status — the SAME line on the row and in the
+ * workspace. `Not confirmed yet` is a second line, never a replacement for the
+ * date: the operator still needs the day they are working towards.
+ */
+export function deliveryWords(d: { dateIso: string | null; word: CustomerDeliveryStatus }): {
+  word: string;
+  note: string | null;
+} {
+  switch (d.word) {
+    case "confirmed": return { word: invoiceArrivalDayWord(d.dateIso!), note: null };
+    case "requested": return { word: invoiceArrivalDayWord(d.dateIso!), note: "Not confirmed yet" };
+    case "customer_not_sure": return { word: "Customer not sure", note: null };
+    case "no_date": return { word: "No delivery date", note: null };
+  }
 }
 
 export type InvoiceTiming =
@@ -261,15 +364,23 @@ export function invoicePaymentTiming(
    *  but owing storage is NOT `paid`. Absent, the goods arithmetic answers
    *  (a caller holding one row alone). */
   rows?: InvoiceRegisterRow[],
+  /** `Settings → Payments → Collection timing` — the effective pair for this
+   *  invoice's clock (owner ruling 2026-09-12). Absent ⇒ the ruled default. */
+  timing?: CollectionTiming,
+  /** The action owner's governed working days (owner ruling 2026-09-13).
+   *  Absent ⇒ the Operation week — the collection owner is Operation staff. */
+  owner?: OwnerCalendar,
 ): { timing: InvoiceTiming; clock: CollectionClock } {
   const goods = invoiceGoodsFacts(row);
   const clock = collectionClock(
     {
-      confirmedDateIso: ctrlOf(row)?.confirmed_date ?? null,
+      confirmedDateIso: invoiceConfirmedDelivery(row).dateIso,
       promisedDateIso: row.orders?.delivery_date_tbd ? null : row.orders?.delivery_date ?? null,
     },
     todayIso,
     opts,
+    timing,
+    owner,
   );
   const money = rows ? soRemaining(rows, row.order_id) : invoiceNeeded(row);
   if (money.known && money.outstanding <= 0) return { timing: { kind: "paid" }, clock };

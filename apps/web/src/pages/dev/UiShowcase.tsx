@@ -1,7 +1,8 @@
 /**
  * `/ui` — THE live showcase (UI-KIT's third body, card D0.5a).
  *
- * `docs/UI-KIT.md` explains what the kit means; `lib/design-standard.ts`
+ * `docs/01-design-tokens.md` · `docs/02-components.md` explain what the kit
+ * means (they replaced the retired `docs/UI-KIT.md`, 2026-07-31); `lib/design-standard.ts`
  * records it; **this page IS it.** It imports the real components and renders
  * the real tokens, so it structurally cannot describe something the code does
  * not do — which is the one failure the first two bodies cannot rule out.
@@ -25,7 +26,7 @@
  * to the components' own declarations so they can never drift into a
  * hand-painted lookalike.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Badge from "@/components/kit/Badge";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
@@ -42,6 +43,8 @@ import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import PageShell from "@/components/kit/PageShell";
 import Panel from "@/components/kit/Panel";
+import PdfPreview from "@/components/kit/PdfPreview";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SectionHeader from "@/components/kit/SectionHeader";
 import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
@@ -71,6 +74,47 @@ const FORCED_FOCUS_INPUT = "[&_input]:ring-2 [&_input]:ring-kit-blue-9 [&_input]
 
 const LONG =
   "Kuala Lumpur Sri Damansara warehouse transfer — customer requested the whole set delivered together";
+
+function SavedEvidenceSample() {
+  const [active, setActive] = useState<string | null>(null);
+  return <>
+    <Button onClick={() => setActive("example")}>View</Button>
+    <SavedEvidenceViewer activeId={active} onClose={() => setActive(null)}
+      files={[
+        { id: "example", kind: "photo", url: "/carres-logo.png", context: "Example · Arrival evidence", unitCodes: ["U1-000-001"] },
+        { id: "unreadable", kind: "photo", url: null, context: "Example · Arrival evidence" },
+        { id: "video", kind: "video", url: "/ui-evidence-example.mp4", context: "Example · Arrival evidence" },
+      ]}
+      onRetry={async (id) => id === "example" ? "/carres-logo.png" : id === "video" ? "/ui-evidence-example.mp4" : null} />
+  </>;
+}
+
+function PdfPreviewSample() {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
+  async function openSample(broken: boolean) {
+    setLoading(true);
+    try {
+      const { renderPoPdf } = await import("@/lib/pdf/render");
+      const blob = broken ? new Blob(["Unavailable document"], { type: "application/pdf" }) : await renderPoPdf({
+        draft: true, po_number: "DRAFT", po_id: "", version: 0, issue_date: "2026-09-24",
+        supplier: { name: "Example supplier", address: "Example address", contact: null },
+        destination: { name: "Example destination", address: "Example warehouse address" },
+        delivery_instructions: null, eta_date: "2026-10-02", terms: null,
+        lines: [{ sku: "EXAMPLE", description: "Example item", qty: 2, unit: "unit" }],
+      });
+      setSrc(URL.createObjectURL(blob));
+    } finally { setLoading(false); }
+  }
+  return <div className="flex flex-col gap-3">
+    <div className="flex flex-wrap gap-2">
+      <Button loading={loading} onClick={() => void openSample(false)}>Show preview</Button>
+      <Button disabled={loading} onClick={() => void openSample(true)}>Show failed preview</Button>
+    </div>
+    {src && <div className="flex h-[70vh] min-w-0 bg-kit-canvas p-4"><PdfPreview src={src} title="Example document" /></div>}
+  </div>;
+}
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -208,7 +252,8 @@ export default function UiShowcase() {
           <h1 className="text-page text-kit-slate-12">Carres UI-KIT</h1>
           <p className="text-body text-kit-slate-11">
             The live showcase. Every box below is the real component — if it renders here, it exists in
-            the code. Read the law in <span className="font-mono">docs/UI-KIT.md</span>.
+            the code. Read the law in <span className="font-mono">docs/01-design-tokens.md</span> ·{" "}
+            <span className="font-mono">docs/02-components.md</span> · <span className="font-mono">docs/ui/MASTER.md</span>.
           </p>
         </header>
 
@@ -274,6 +319,14 @@ export default function UiShowcase() {
         </Section>
 
         {/* ─── 2 · Tokens ─────────────────────────────────────────────────── */}
+        <Section id="saved-evidence" title="Saved evidence" note="Read-only photos and video. Source, Unit and failure states remain visible.">
+          <SavedEvidenceSample />
+        </Section>
+
+        <Section id="pdf-preview" title="PDF preview" note="Actual pages, fit width, enlargement, loading and retry. Issuance remains with the owning page.">
+          <PdfPreviewSample />
+        </Section>
+
         <Section id="type" title="Typography — §2.1" note="Six tokens. Nothing above 24, nothing below 11.">
           <Card>
             <div className="flex flex-col gap-4">

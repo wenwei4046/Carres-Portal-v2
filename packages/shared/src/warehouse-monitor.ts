@@ -142,7 +142,7 @@ export function warehouseMonitorPickupEvents(
       open: {
         tab: "warehouse-outbound",
         date: card.eventDate,
-        site: card.fromLocation || null,
+        site: card.warehouseSiteId ?? (card.fromLocation || null),
         do: card.doNumber,
       },
       sourceHref: card.deliveryOrderHref,

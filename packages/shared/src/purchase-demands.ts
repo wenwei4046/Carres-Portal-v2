@@ -146,7 +146,7 @@ export function purchaseDemandStateWords(
     no_sku: "SKU not found",
     no_supplier: "Supplier not assigned",
     no_cost: "Catalog cost is missing",
-    no_production_days: "Production days are missing",
+    no_production_days: "Production days not set",
     no_pickup_partner: "Collection is not configured",
   };
 }
@@ -216,6 +216,17 @@ export interface PurchaseDemandRow {
   customer: string | null;
   /** The customer's promised day. `null` = TBD or never set. */
   customerDelivery: IsoDate | null;
+  /** Server planning fact; optional for older Workers, never calculated in React. */
+  orderBy?: IsoDate | null;
+  /**
+   * `PO Safety Days` for this demand — the working-day margin that would remain
+   * if it were ordered today (`purchaseDemandSafetyDaysLeft`, the expression
+   * the timing state is classified from). Server planning fact; optional for
+   * older Workers, never calculated in React. `null` on a blocked or undated
+   * row: an unmeasured margin is UNKNOWN, and a `0` would claim it was counted.
+   * Negative means production overruns the customer's date.
+   */
+  safetyDaysLeft?: number | null;
   /** `product_models.name` — or the raw SKU when Catalog has no such SKU. */
   item: string;
   /** `product_skus.variant` — the size or the module code. */
@@ -240,6 +251,26 @@ export interface PurchaseDemandRow {
   readyStock: number | null;
   takenFromStock: number | null;
   onPo: number | null;
+  /**
+   * ⭐ THE ENGINE'S OWN ANSWER TO *IS THERE ANYTHING LEFT TO BUY* — carried
+   * 2026-09-11, computed since T6. It is READ here, never derived.
+   *
+   * TRUE means every unit of this build was drawn from the open-purchase-order
+   * pool, so `toBuy` below is NOT a remainder: it is the quantity the covering
+   * document carries, and ticking the row raises a SECOND purchase order. That
+   * is DELIBERATELY still allowed (YH, 2026-09-03) — the pool has no customer
+   * attribution, so the covering document routinely belongs to somebody else
+   * and refusing here would block a first purchase for this customer. But the
+   * two cases print the same number, and a screen that cannot tell them apart
+   * invites a buy the operator did not mean to make.
+   *
+   * It cannot be inferred from the numbers: `toBuy === onPo` is also true of a
+   * genuine remainder that happens to equal the coverage.
+   *
+   * Optional, so a browser on this build against an older Worker reads it as
+   * absent and says nothing rather than guessing.
+   */
+  fullyOnPo?: boolean;
   poNumbers: string[];
   toBuy: number | null;
   /**
@@ -285,6 +316,10 @@ export interface PurchaseDemandRow {
    * Whether this supplier's goods are collected from the factory. The
    * collector is resolved from Purchasing Settings, never chosen per PO.
    */
+  supplierAddress?: string | null;
+  poDate?: string | null;
+  poDeliveryDate?: string | null;
+  poDeliveryWorkingDays?: number | null;
   supplierKind: "own_logistics" | "factory_pickup" | null;
   /** The governed factory-collection rule from Purchasing Settings. */
   supplierCollection?: {
@@ -349,7 +384,7 @@ const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
  * OBSERVE — a date exists, a relationship exists, a document reached a
  * supplier. None of them is a person saying they are done.
  */
-const BUY_COMPLETION_FACT = "Current PO version reached supplier with evidence";
+const BUY_COMPLETION_FACT = "Current PO version marked as sent";
 const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   can_order_early: BUY_COMPLETION_FACT,
   safety_days_full: BUY_COMPLETION_FACT,
@@ -479,14 +514,38 @@ export function purchaseDemandTimingOf(
   if (f.orderBy != null && f.today < f.orderBy) return "can_order_early";
   if (f.orderBy != null && f.today === f.orderBy) return "safety_days_full";
   if (f.readyIfOrderedToday > f.customerDelivery) return "not_enough_production_time";
-  const left = countWorkingDays(f.readyIfOrderedToday, f.customerDelivery, {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
-    holidays: f.holidays,
-  });
+  const left = purchaseDemandSafetyDaysLeft(f);
   if (left === 0) return "safety_days_none";
   if (left > f.safetyDays) return "can_order_early";
   if (left === f.safetyDays) return "safety_days_full";
   return "safety_days_low";
+}
+
+/**
+ * ⭐ `PO Safety Days` — THE NUMBER THE CLASSIFICATION IS ALREADY MADE OF
+ * (owner ruling 2026-09-18; `docs/COPY-STANDARD.md` — Purchasing UI dictionary).
+ *
+ * The working-day margin that would REMAIN if this demand were ordered today:
+ * the office-calendar distance from the engine's expected production
+ * completion to the customer's required date. It is the SAME expression
+ * `purchaseDemandTimingOf` classifies from — extracted, not re-derived, so one
+ * derived fact keeps one arithmetic (ERP Architecture Law D) and the column can
+ * never disagree with the rail row beside it.
+ *
+ * ⛔ IT IS NOT CLAMPED. A demand whose production overruns the customer's date
+ * answers a NEGATIVE margin, and the caller decides what to print — this page
+ * prints its governed `Not enough production days`, which is the same fact the
+ * timing state already carries. Clamping it to 0 here would make an overrun
+ * indistinguishable from a margin that lands exactly on the day.
+ */
+export function purchaseDemandSafetyDaysLeft(f: PurchaseDemandTimingInput): number {
+  const forward = f.readyIfOrderedToday <= f.customerDelivery;
+  const days = countWorkingDays(
+    forward ? f.readyIfOrderedToday : f.customerDelivery,
+    forward ? f.customerDelivery : f.readyIfOrderedToday,
+    { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: f.holidays },
+  );
+  return forward ? days : -days;
 }
 
 /**
@@ -511,6 +570,10 @@ export function purchaseDemandQuantities(build: {
   takenFromStock: number;
   onPo: number;
   toBuy: number;
+  /** The engine's own flag, passed through so a screen can say which kind of
+   *  number `toBuy` is. Never derived from the numbers — see the field's own
+   *  note on `PurchaseDemandRow`. */
+  fullyOnPo: boolean;
 } {
   const modular = isOnePoPerOrder(category) && build.lines.length > 1;
   const fully = build.fullyOnPo === true;
@@ -543,6 +606,7 @@ export function purchaseDemandQuantities(build: {
     takenFromStock: build.takenFromStock,
     onPo: build.coveredByOpenPo,
     toBuy,
+    fullyOnPo: fully,
   };
 }
 
@@ -597,6 +661,26 @@ export function purchaseDemandCoverageLine(row: {
   readyStock: number | null;
   takenFromStock: number | null;
   onPo: number | null;
+  /**
+   * ⭐ THE ENGINE'S OWN ANSWER TO *IS THERE ANYTHING LEFT TO BUY* — carried
+   * 2026-09-11, computed since T6. It is READ here, never derived.
+   *
+   * TRUE means every unit of this build was drawn from the open-purchase-order
+   * pool, so `toBuy` below is NOT a remainder: it is the quantity the covering
+   * document carries, and ticking the row raises a SECOND purchase order. That
+   * is DELIBERATELY still allowed (YH, 2026-09-03) — the pool has no customer
+   * attribution, so the covering document routinely belongs to somebody else
+   * and refusing here would block a first purchase for this customer. But the
+   * two cases print the same number, and a screen that cannot tell them apart
+   * invites a buy the operator did not mean to make.
+   *
+   * It cannot be inferred from the numbers: `toBuy === onPo` is also true of a
+   * genuine remainder that happens to equal the coverage.
+   *
+   * Optional, so a browser on this build against an older Worker reads it as
+   * absent and says nothing rather than guessing.
+   */
+  fullyOnPo?: boolean;
   poNumbers: readonly string[];
 }): string {
   if (row.onPo == null) return PURCHASE_DEMAND_WORDS.coverageUnknown;
@@ -777,6 +861,14 @@ export const purchaseDemandRowSchema = z.object({
   so: z.number().nullable(),
   customer: z.string().nullable(),
   customerDelivery: z.string().nullable(),
+  orderBy: z.string().nullable().optional(),
+  /**
+   * `PO Safety Days` for THIS demand — the server planning engine's own
+   * margin (`purchaseDemandSafetyDaysLeft`). Optional on the wire: an older
+   * Worker sends none and the column says so rather than printing a `0` it did
+   * not measure. Negative means production overruns the customer's date.
+   */
+  safetyDaysLeft: z.number().int().nullable().optional(),
   item: z.string(),
   variant: z.string().nullable(),
   /* The catalog's own enum, so the wire type and the domain type are ONE type
@@ -792,6 +884,9 @@ export const purchaseDemandRowSchema = z.object({
   readyStock: z.number().nullable(),
   takenFromStock: z.number().nullable(),
   onPo: z.number().nullable(),
+  /* Optional on the wire: an older Worker sends none and the screen says
+     nothing rather than guessing which kind of number `toBuy` is. */
+  fullyOnPo: z.boolean().optional(),
   poNumbers: z.array(z.string()),
   toBuy: z.number().nullable(),
   goodsMustArrive: z.string().nullable(),
@@ -800,6 +895,10 @@ export const purchaseDemandRowSchema = z.object({
     .nullable(),
   action: soBatchPurchaseActionSchema.nullable(),
   parts: z.array(z.object({ sku: z.string(), qty: z.number(), unitCost: z.number().nullable() })),
+  supplierAddress: z.string().nullable().optional(),
+  poDate: z.string().nullable().optional(),
+  poDeliveryDate: z.string().nullable().optional(),
+  poDeliveryWorkingDays: z.number().nullable().optional(),
   supplierKind: z.enum(["own_logistics", "factory_pickup"]).nullable(),
   supplierCollection: z
     .object({

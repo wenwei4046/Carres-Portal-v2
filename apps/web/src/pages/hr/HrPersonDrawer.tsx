@@ -24,6 +24,7 @@ import {
   useHrSetAccess,
   useHrToggleChecklist,
 } from "@/lib/queries";
+import { personInitials } from "@/lib/staff-avatar";
 
 /**
  * The employee record (HR-P4, migration 0269).
@@ -471,7 +472,7 @@ export default function HrPersonDrawer({
         <div className="border-b border-base-200 px-[18px] py-4">
           <div className="flex items-center gap-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-base-100 text-body font-semibold text-base-700">
-              {person.name.slice(0, 2).toUpperCase()}
+              {personInitials(person.name, "")}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-strong truncate font-semibold">{person.name}</div>

@@ -210,6 +210,7 @@ const DETAIL = {
     ...POSTED_ROW,
     unit_results: [
       {
+        po_line_id: "l1",
         stock_item_id: "u1",
         unit_code: "U1-000-101",
         outcome: "received",
@@ -217,6 +218,7 @@ const DETAIL = {
         note: null,
       },
       {
+        po_line_id: "l1",
         stock_item_id: "u2",
         unit_code: "U1-000-102",
         outcome: "received",
@@ -224,6 +226,7 @@ const DETAIL = {
         note: null,
       },
       {
+        po_line_id: "l1",
         stock_item_id: "u3",
         unit_code: "U1-000-103",
         outcome: "received_with_issue",
@@ -231,6 +234,7 @@ const DETAIL = {
         note: null,
       },
       {
+        po_line_id: "l1",
         stock_item_id: "u4",
         unit_code: "U1-000-104",
         outcome: "not_received",
@@ -432,13 +436,18 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     // The paged GRN Register — the SAME shared arithmetic the Worker runs.
     const params = new URLSearchParams(url.split("?")[1] ?? "");
     const grn = [POSTED_ROW, VOIDED_ROW];
+    const received = params.get("receivedWith");
     const view = buildGrnRegisterView(
       grn.map((r) => ({
         id: r.id,
         categories: r.categories,
         supplierName: r.supplier_name,
         siteName: r.actual_site_name ?? r.warehouse_name,
-        supplierDeliveryDateIso: r.supplier_delivery_date,
+        grnDateIso: (r.posted_at ?? "").slice(0, 10) || null,
+        damaged: r.lines.some((l) => l.damaged_qty > 0),
+        wrongItem: r.lines.some((l) => l.wrong_item_qty > 0),
+        extra: (r.extra_lines ?? []).length > 0,
+        cancelled: r.status === "voided",
         searchText: [r.grn_no, r.po_id, r.do_number, r.supplier_name]
           .filter(Boolean)
           .join(" "),
@@ -447,7 +456,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         category: params.get("category"),
         supplier: params.get("supplier"),
         site: params.get("site"),
-        expected: params.get("expected"),
+        receivedWith:
+          received === "damaged" || received === "wrong_item" || received === "extra"
+            ? received
+            : null,
+        from: params.get("from"),
+        to: params.get("to"),
+        cancelled: params.get("cancelled") === "1" ? true : null,
         q: params.get("q"),
       },
       Number(params.get("offset") ?? 0),
@@ -455,9 +470,18 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     );
     const byId = new Map(grn.map((r) => [r.id, r]));
     return json({
-      receipts: view.pageIds.map((id) => byId.get(id)),
+      receipts: view.pageIds.map((id) => ({
+        ...byId.get(id)!,
+        grn_date: byId.get(id)!.posted_at,
+        source_refs: ["SO-1303"],
+        unit_ids_by_line: { l1: ["id-abc000001"], l3: [] },
+      })),
       page: { offset: Number(params.get("offset") ?? 0), limit: 50, total: view.total },
       facets: view.facets,
+      line_info: {
+        "MS01-K King Mattress": { description: "Mattress Forte King", category: "Mattress" },
+        "SOFA-3 Jager Sofa": { description: "Jager Sofa", category: "Sofa" },
+      },
       counts: { waiting: 1 },
     });
   }

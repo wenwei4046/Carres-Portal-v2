@@ -1,0 +1,760 @@
+{
+  "body": [
+    847,
+    847
+  ],
+  "cells": [
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "client": 132,
+      "height": 55,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 132,
+      "size": "13px",
+      "text": "Sofa",
+      "whiteSpace": "normal",
+      "width": 132,
+      "x": 131,
+      "y": 217
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 139,
+      "height": 55,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 139,
+      "size": "13px",
+      "text": "U1-000-074",
+      "whiteSpace": "normal",
+      "width": 140,
+      "x": 263,
+      "y": 217
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 199,
+      "height": 55,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 199,
+      "size": "13px",
+      "text": "AL Sungai Buloh",
+      "whiteSpace": "normal",
+      "width": 200,
+      "x": 403,
+      "y": 217
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 151,
+      "height": 55,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 151,
+      "size": "13px",
+      "text": "5539-1A(LHF)",
+      "whiteSpace": "normal",
+      "width": 152,
+      "x": 603,
+      "y": 217
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 63,
+      "height": 55,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 63,
+      "size": "13px",
+      "text": "1",
+      "whiteSpace": "normal",
+      "width": 64,
+      "x": 755,
+      "y": 217
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 426,
+      "height": 55,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 426,
+      "size": "13px",
+      "text": "Booqit · 1A(LHF)Sofa height: 24",
+      "whiteSpace": "normal",
+      "width": 426,
+      "x": 819,
+      "y": 217
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "client": 132,
+      "height": 72.5,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 132,
+      "size": "13px",
+      "text": "Mattress protector",
+      "whiteSpace": "normal",
+      "width": 132,
+      "x": 131,
+      "y": 272
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 139,
+      "height": 72.5,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 139,
+      "size": "13px",
+      "text": "Unit ID (14)",
+      "whiteSpace": "normal",
+      "width": 140,
+      "x": 263,
+      "y": 272
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 199,
+      "height": 72.5,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 199,
+      "size": "13px",
+      "text": "AL Sungai Buloh ×10Carres Klang ×4",
+      "whiteSpace": "normal",
+      "width": 200,
+      "x": 403,
+      "y": 272
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 151,
+      "height": 72.5,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 151,
+      "size": "13px",
+      "text": "SOFA-LONG-SKU-5539-CONFIGURATION-XL-SS",
+      "whiteSpace": "normal",
+      "width": 152,
+      "x": 603,
+      "y": 272
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 63,
+      "height": 72.5,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 63,
+      "size": "13px",
+      "text": "14",
+      "whiteSpace": "normal",
+      "width": 64,
+      "x": 755,
+      "y": 272
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 426,
+      "height": 72.5,
+      "line": "18px",
+      "padding": [
+        "8px",
+        "8px",
+        "8px",
+        "8px"
+      ],
+      "scroll": 426,
+      "size": "13px",
+      "text": "Long configured sofa with removable cushions and adjustable legsColour: Sand · Fabric code: CG-012",
+      "whiteSpace": "normal",
+      "width": 426,
+      "x": 819,
+      "y": 272
+    }
+  ],
+  "child": {
+    "borders": [
+      "1px",
+      "1px",
+      "1px",
+      "1px"
+    ],
+    "client": 1114,
+    "height": 156,
+    "line": "18px",
+    "padding": [
+      "0px",
+      "0px",
+      "0px",
+      "0px"
+    ],
+    "scroll": 1114,
+    "size": "12px",
+    "text": "CategoryUnit IDDeliver ToSKUQtyItemSofaU1-000-074AL Sungai Buloh5539-1A(LHF)1Booqit · 1A(LHF)Sofa height: 24Mattress protectorUnit ID (14)AL Sungai Buloh ×10Carres Klang ×4SOFA-LONG-SKU-5539-CONFIGURATION-XL-SS14Long configured sofa with removable cushions and adjustable legsColour: Sand · Fabric code: CG-012",
+    "whiteSpace": "normal",
+    "width": 1116,
+    "x": 130,
+    "y": 189.5
+  },
+  "childHeaders": [
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "client": 132,
+      "height": 26.5,
+      "line": "14px",
+      "padding": [
+        "6px",
+        "8px",
+        "6px",
+        "8px"
+      ],
+      "scroll": 132,
+      "size": "11px",
+      "text": "Category",
+      "whiteSpace": "normal",
+      "width": 132,
+      "x": 131,
+      "y": 190.5
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 139,
+      "height": 26.5,
+      "line": "14px",
+      "padding": [
+        "6px",
+        "8px",
+        "6px",
+        "8px"
+      ],
+      "scroll": 139,
+      "size": "11px",
+      "text": "Unit ID",
+      "whiteSpace": "normal",
+      "width": 140,
+      "x": 263,
+      "y": 190.5
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 199,
+      "height": 26.5,
+      "line": "14px",
+      "padding": [
+        "6px",
+        "8px",
+        "6px",
+        "8px"
+      ],
+      "scroll": 199,
+      "size": "11px",
+      "text": "Deliver To",
+      "whiteSpace": "normal",
+      "width": 200,
+      "x": 403,
+      "y": 190.5
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 151,
+      "height": 26.5,
+      "line": "14px",
+      "padding": [
+        "6px",
+        "8px",
+        "6px",
+        "8px"
+      ],
+      "scroll": 151,
+      "size": "11px",
+      "text": "SKU",
+      "whiteSpace": "normal",
+      "width": 152,
+      "x": 603,
+      "y": 190.5
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 63,
+      "height": 26.5,
+      "line": "14px",
+      "padding": [
+        "6px",
+        "8px",
+        "6px",
+        "8px"
+      ],
+      "scroll": 63,
+      "size": "11px",
+      "text": "Qty",
+      "whiteSpace": "normal",
+      "width": 64,
+      "x": 755,
+      "y": 190.5
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "0px",
+        "1px"
+      ],
+      "client": 426,
+      "height": 26.5,
+      "line": "14px",
+      "padding": [
+        "6px",
+        "8px",
+        "6px",
+        "8px"
+      ],
+      "scroll": 426,
+      "size": "11px",
+      "text": "Item",
+      "whiteSpace": "normal",
+      "width": 426,
+      "x": 819,
+      "y": 190.5
+    }
+  ],
+  "expansion": {
+    "borders": [
+      "1px",
+      "0px",
+      "1px",
+      "0px"
+    ],
+    "client": 1116,
+    "height": 181,
+    "line": "18px",
+    "padding": [
+      "12px",
+      "0px",
+      "12px",
+      "0px"
+    ],
+    "scroll": 1116,
+    "size": "12px",
+    "text": "CategoryUnit IDDeliver ToSKUQtyItemSofaU1-000-074AL Sungai Buloh5539-1A(LHF)1Booqit · 1A(LHF)Sofa height: 24Mattress protectorUnit ID (14)AL Sungai Buloh ×10Carres Klang ×4SOFA-LONG-SKU-5539-CONFIGURATION-XL-SS14Long configured sofa with removable cushions and adjustable legsColour: Sand · Fabric code: CG-012",
+    "whiteSpace": "normal",
+    "width": 1116,
+    "x": 130,
+    "y": 177
+  },
+  "head": [
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 30,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 30,
+      "size": "11px",
+      "text": "",
+      "whiteSpace": "nowrap",
+      "width": 30,
+      "x": 68,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 31,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 34,
+      "size": "11px",
+      "text": "",
+      "whiteSpace": "nowrap",
+      "width": 32,
+      "x": 98,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 79,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 82,
+      "size": "11px",
+      "text": "SO No",
+      "whiteSpace": "nowrap",
+      "width": 80,
+      "x": 130,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 103,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 106,
+      "size": "11px",
+      "text": "SO Date",
+      "whiteSpace": "nowrap",
+      "width": 104,
+      "x": 210,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 127,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 130,
+      "size": "11px",
+      "text": "Requested Delivery Date",
+      "whiteSpace": "nowrap",
+      "width": 128,
+      "x": 314,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 207,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 210,
+      "size": "11px",
+      "text": "Customer",
+      "whiteSpace": "nowrap",
+      "width": 208,
+      "x": 442,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 183,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 186,
+      "size": "11px",
+      "text": "Delivery Location",
+      "whiteSpace": "nowrap",
+      "width": 184,
+      "x": 650,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 111,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 114,
+      "size": "11px",
+      "text": "Showroom",
+      "whiteSpace": "nowrap",
+      "width": 112,
+      "x": 834,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "1px",
+        "1px",
+        "0px"
+      ],
+      "client": 155,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 158,
+      "size": "11px",
+      "text": "PO No",
+      "whiteSpace": "nowrap",
+      "width": 156,
+      "x": 946,
+      "y": 103
+    },
+    {
+      "borders": [
+        "0px",
+        "0px",
+        "1px",
+        "0px"
+      ],
+      "client": 144,
+      "height": 36,
+      "line": "14px",
+      "padding": [
+        "0px",
+        "8px",
+        "0px",
+        "8px"
+      ],
+      "scroll": 147,
+      "size": "11px",
+      "text": "DO No",
+      "whiteSpace": "nowrap",
+      "width": 144,
+      "x": 1102,
+      "y": 103
+    }
+  ],
+  "scroll": {
+    "borders": [
+      "0px",
+      "0px",
+      "0px",
+      "0px"
+    ],
+    "client": 727,
+    "height": 561,
+    "line": "24px",
+    "padding": [
+      "0px",
+      "0px",
+      "0px",
+      "0px"
+    ],
+    "scroll": 1181,
+    "size": "16px",
+    "text": "SO NoSO DateRequested Delivery DateCustomerDelivery LocationShowroomPO NoDO No▸SO-1339Sun, 9 AugSun, 30 AugNur Aisyah Binti AbdullahNot recordedNot recordedNot recordedNo delivery order yetCategoryUnit IDDeliver ToSKUQtyItemSofaU1-000-074AL Sungai Buloh5539-1A(LHF)1Booqit · 1A(LHF)Sofa height: 24Mattress protectorUnit ID (14)AL Sungai Buloh ×10Carres Klang ×4SOFA-LONG-SKU-5539-CONFIGURATION-XL-SS14Long configured sofa with removable cushions and adjustable legsColour: Sand · Fabric code: CG-012▸SO-1340Sun, 9 AugSun, 30 AugMyHouse Management PLTNot recordedNot recordedNot recordedNo delivery order yet▸SO-1338Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1337Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1336Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1335Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1334Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1333Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1332Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1331Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1330Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1329Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1328Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1327Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1326Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1325Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1324Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1323Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet▸SO-1322Sun, 9 AugSun, 30 AugAina RahmanNot recordedNot recordedNot recordedNo delivery order yet▸SO-1321Sun, 9 AugSun, 30 AugLIM KUAN YANGNot recordedNot recordedNot recordedNo delivery order yet",
+    "whiteSpace": "normal",
+    "width": 727,
+    "x": 68,
+    "y": 103
+  },
+  "viewport": [
+    847,
+    704
+  ]
+}

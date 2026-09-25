@@ -1,8 +1,10 @@
 // design-standard: not-a-list-page — the external Warehouse role's minimum
 // responsive customer-DO handover door (Warehouse Card 03 §9/§13).
 import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   warehouseOutboundCards,
+  filterOutboundCards,
   type DeliveryWarehouseScheduleEvent,
 } from "@carres/shared";
 import { useDeliveryWarehouseSchedule } from "@/lib/queries";
@@ -20,12 +22,13 @@ import { OutboundUnitWork } from "@/pages/operation/WarehouseOutboundWork";
  * price, payment, Delivery Result or customer proof exists on this surface.
  */
 export default function WarehouseOutboundDoor() {
+  const [params] = useSearchParams();
   const { data, isLoading, error } = useDeliveryWarehouseSchedule();
   const events = useMemo(
     () => (data?.events ?? []) as DeliveryWarehouseScheduleEvent[],
     [data],
   );
-  const cards = useMemo(() => warehouseOutboundCards(events), [events]);
+  const cards = useMemo(() => filterOutboundCards(warehouseOutboundCards(events), params), [events, params]);
   const dates = [...new Set(cards.map((c) => c.eventDate))].sort();
 
   return (
@@ -35,7 +38,7 @@ export default function WarehouseOutboundDoor() {
         Goods scheduled for pickup from this warehouse. Scan, check and pack
         each Unit, then record which exact Units were loaded and attach proof.
       </div>
-      {isLoading ? (
+      {!error && (isLoading || !data) ? (
         <p className="text-body text-base-500">Loading…</p>
       ) : error ? (
         <p className="text-body text-base-600">
@@ -55,7 +58,7 @@ export default function WarehouseOutboundDoor() {
               .filter((c) => c.eventDate === date)
               .map((card) => (
                 <div
-                  key={card.doNumber}
+                  key={`${card.deliveryOrderId ?? card.doNumber}:${card.warehouseSiteId ?? card.fromLocation}`}
                   className="mb-3 rounded border border-base-200 bg-white"
                   data-testid={`wod-card-${card.doNumber}`}
                 >

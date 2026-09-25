@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });
@@ -305,6 +288,9 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
     clear_evidence: "Bank confirmed — ref 8821",
   };
 
+  /** What the database's allocator hands back (0575): `DO` + YYMM + 4 digits. */
+  const DRAWN_DO = "DO2609-4827";
+
   function adminTables(over?: { doNumber?: string | null }) {
     return {
       orders: issueOrdersMock(
@@ -347,7 +333,18 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
       if (!b) throw new Error(`unmocked table ${t}`);
       return b;
     });
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    /* ⭐ 0575 · THE NUMBER IS DRAWN BY THE DATABASE, and this is the path with
+       NOBODY WATCHING: Finance clears the exception and the SYSTEM issues. So
+       the fake answers the allocator the way the real one does — if the draw
+       ever stops answering here, this test goes red rather than a background
+       issue silently minting nothing. */
+    const rpc = vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: null, error: null },
+      ),
+    );
     vi.mocked(adminClient).mockReturnValue({ from, rpc } as never);
     return { from, rpc };
   }
@@ -364,9 +361,7 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
     // The attempt ran as the system, wrote only into an empty column, and
     // stamped the LOCKED scheme's number.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((t.orders as any).update).toHaveBeenCalledWith({
-      do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/),
-    });
+    expect((t.orders as any).update).toHaveBeenCalledWith({ do_number: DRAWN_DO });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((t.orders as any).is).toHaveBeenCalledWith("do_number", null);
   });

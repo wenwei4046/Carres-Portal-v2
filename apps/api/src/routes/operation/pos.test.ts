@@ -113,6 +113,7 @@ describe("GET /api/operation/pos", () => {
       demands?: Record<string, unknown>[];
       requests?: Record<string, unknown>[];
       sends?: Record<string, unknown>[];
+      grns?: Record<string, unknown>[];
       referencedDestinations?: Record<string, unknown>[];
       onPoLineRange?: (phase: "start" | "end") => void;
     } = {},
@@ -134,6 +135,7 @@ describe("GET /api/operation/pos", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const builder: any = {};
       builder.order = vi.fn(() => builder);
+      builder.not = vi.fn(() => builder);
       builder.range = vi.fn(async (from: number, to: number) => {
         onRange?.("start");
         if (onRange) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -188,6 +190,9 @@ describe("GET /api/operation/pos", () => {
     const demandIn = vi.fn(() => paged(lineage.demands ?? []));
     const demandSelect = vi.fn(() => ({ in: demandIn }));
     const requestIn = vi.fn(() => paged(lineage.requests ?? []));
+    const grnPaged = paged(lineage.grns ?? []);
+    const grnIn = vi.fn(() => grnPaged);
+    const grnSelect = vi.fn(() => ({ in: grnIn }));
     const requestSelect = vi.fn(() => ({ in: requestIn }));
 
     vi.mocked(userClient).mockReturnValue({
@@ -202,13 +207,79 @@ describe("GET /api/operation/pos", () => {
         if (table === "purchase_requests") return { select: requestSelect };
         if (table === "purchasing_destinations") return { select: destSelect };
         if (table === "po_sends") return { select: sendsSelect };
+        if (table === "warehouse_receipts") return { select: grnSelect };
         if (table === "purchasing_settings") return { select: tmplSelect };
         return { select };
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, range, promiseIn, promiseSelect, ordersIn, skusIn, sendsRange: sendsPaged.range };
+    return { eq, order, range, promiseIn, promiseSelect, ordersIn, skusIn, sendsRange: sendsPaged.range, grnSelect, grnNot: grnPaged.not };
   }
+
+  it("carries each PO's numbered GRNs with their real arrival date and good-unit count, and each SO source's order id (§9.3)", async () => {
+    const { grnSelect, grnNot } = mockPosList([PO_ROW], [], [], [], {
+      poLineSources: [{ id: "s1", po_id: "PO-2030", po_line_id: "line-a", order_id: "order-4001", order_line_id: "ol-1", so: 4001, qty: 2 }],
+      grns: [
+        {
+          id: "receipt-1", po_id: "PO-2030", grn_no: "GRN-20260910-1001",
+          /* The goods arrived on the 9th and the record was filed on the 10th.
+             The register prints the ARRIVAL, which is why the two differ here. */
+          goods_received_at: "2026-09-09", created_at: "2026-09-10T02:00:00Z",
+          lines: [
+            { id: "line-a", sku: "MAT-K", received_now: 2, damaged_qty: 1, wrong_item_qty: 0, wrong_item_claim_type: null },
+          ],
+        },
+        {
+          id: "receipt-2", po_id: "PO-2030", grn_no: "GRN-20260912-1002",
+          goods_received_at: "2026-09-12", created_at: "2026-09-12T02:00:00Z",
+          lines: [{ id: "line-a", sku: "MAT-K", received_now: 3, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null }],
+        },
+      ],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ grns: unknown; sources: unknown }> };
+    expect(body.pos[0]?.grns).toEqual([
+      /* Damaged units are not received — the one shared arithmetic, not a
+         second one invented for this listing. */
+      { id: "receipt-1", grn_no: "GRN-20260910-1001", goods_received_at: "2026-09-09", received_qty: 2 },
+      { id: "receipt-2", grn_no: "GRN-20260912-1002", goods_received_at: "2026-09-12", received_qty: 3 },
+    ]);
+    expect(body.pos[0]?.sources).toEqual([{ kind: "sales_order", reference: "SO-4001", order_id: "order-4001" }]);
+    expect(grnSelect).toHaveBeenCalledWith("id, po_id, grn_no, goods_received_at, lines, created_at");
+    // A draft receipt has no number and is not a GRN.
+    expect(grnNot).toHaveBeenCalledWith("grn_no", "is", null);
+  });
+
+  it("a Manual Purchase request with no stored number keeps the governed label, and never an invented one", async () => {
+    const row = {
+      ...PO_ROW,
+      so: null,
+      so_refs: null,
+      purchase_order_lines: [{ ...PO_ROW.purchase_order_lines[0], demand_id: "demand-1" }],
+    };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
+      /* A pre-numbering request. `MPR` is READ, so there is nothing to print
+         and the listing says so with the governed word — it does not mint one,
+         and it does not fall back to the UUID. */
+      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z", req_no: null }],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ sources: Array<{ reference: string; req_no: string | null }> }> };
+    expect(body.pos[0]?.sources).toEqual([
+      expect.objectContaining({ kind: "manual_purchase", reference: "Manual Purchase Request", req_no: null }),
+    ]);
+  });
 
   it("returns POs for operation with default 'all' status", async () => {
     const { order, range } = mockPosList([PO_ROW]);
@@ -325,7 +396,7 @@ describe("GET /api/operation/pos", () => {
         },
       ],
       demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
-      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z" }],
+      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z", req_no: "MPR-20260828-0533" }],
     });
 
     const jwt = await makeJwt("operation");
@@ -345,13 +416,16 @@ describe("GET /api/operation/pos", () => {
         }>;
       }>;
     };
-    /* Card 08 §3.5 — the visible reference is the LABEL; identity is the
-       request UUID plus the business facts, never a request number. */
+    /* ⭐ MPR IS THE VISIBLE IDENTITY AGAIN (owner ruling 2026-09-18, which
+       overwrites Card 08 §3.5's retirement): the request's own stored number
+       is the reference. Identity is still the request UUID plus the business
+       facts, and the number is READ, never minted here. */
     expect(body.pos[0]?.sources).toEqual([
-      { kind: "sales_order", reference: "SO-4001" },
+      { kind: "sales_order", reference: "SO-4001", order_id: "order-1" },
       {
         kind: "manual_purchase",
-        reference: "Manual Purchase",
+        reference: "MPR-20260828-0533",
+        req_no: "MPR-20260828-0533",
         request_id: "request-1",
         purpose: "showroom",
         proceed_date: "2026-08-28",
@@ -365,7 +439,8 @@ describe("GET /api/operation/pos", () => {
         { kind: "sales_order", reference: "SO-4001", qty: 1 },
         {
           kind: "manual_purchase",
-          reference: "Manual Purchase",
+          reference: "MPR-20260828-0533",
+          req_no: "MPR-20260828-0533",
           qty: 1,
           request_id: "request-1",
           purpose: "showroom",

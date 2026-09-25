@@ -5,7 +5,7 @@ import {
   setDealerStatusInput,
   updateDealerInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -29,10 +29,12 @@ import type { AppEnv } from "../../types";
  */
 const principalDealersRouter = new Hono<AppEnv>();
 
-// Inline principal-only guard (matches dashboard.ts/approvals.ts pattern).
+// 0543 — Finance may view the list and detail and edit the master fields
+// (PATCH). Inviting a dealer and changing its status stay principal-only.
 principalDealersRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "principal") {
+  const financeMayUse = role === "finance" && c.req.method !== "POST";
+  if (role !== "principal" && !financeMayUse) {
     throw new HTTPException(403, { message: "Principal only" });
   }
   await next();
@@ -42,10 +44,7 @@ principalDealersRouter.use("*", async (c, next) => {
 principalDealersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("dealers_with_stats_list");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // 2026-07-19 (Loo) — a showroom is Carres' OWN store, a dealer is an external
   // reseller, and HQ lists them on two separate pages. `dealers_with_stats_list`
@@ -59,19 +58,14 @@ principalDealersRouter.get("/", async (c) => {
   // stores gone from the portal) and every dealer row would raise a false
   // "no outlet" alarm. A visible error beats confidently wrong data.
   const [chanRes, outletRes] = await Promise.all([
-    sb.from("dealers").select("id, channel"),
+    sb.from("dealers").select("id, channel, code"),
     sb.from("outlets").select("dealer_id"),
   ]);
   const joinErr = chanRes.error ?? outletRes.error;
-  if (joinErr) {
-    const m = mapPgError(joinErr);
-    return c.json(m.body, m.status);
-  }
+  if (joinErr) return fail(c, joinErr);
   const chanRows = chanRes.data;
   const outletRows = outletRes.data;
-  const channelById = new Map<string, string>(
-    (chanRows ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
-  );
+  const rowById = new Map((chanRows ?? []).map((r) => [r.id as string, r]));
   const outletCountById = new Map<string, number>();
   for (const o of outletRows ?? []) {
     const k = o.dealer_id as string;
@@ -93,8 +87,9 @@ principalDealersRouter.get("/", async (c) => {
     gmv: Number(d.gmv ?? 0),
     outstanding: Number(d.outstanding ?? 0),
     // Unknown id → 'dealer', matching the column's own DB default.
-    channel: channelById.get(d.id) === "showroom" ? "showroom" : "dealer",
+    channel: rowById.get(d.id)?.channel === "showroom" ? "showroom" : "dealer",
     outletCount: outletCountById.get(d.id) ?? 0,
+    code: (rowById.get(d.id)?.code as string | null) ?? null,
   }));
   return c.json({ dealers });
 });
@@ -106,10 +101,7 @@ principalDealersRouter.get("/:id", async (c) => {
 
   // 1. Fetch dealer (basic record + stats) via the legacy RPC.
   const { data: dealerRows, error: e1 } = await sb.rpc("dealer_with_stats", { p_id: id });
-  if (e1) {
-    const m = mapPgError(e1);
-    return c.json(m.body, m.status);
-  }
+  if (e1) return fail(c, e1);
   if (!dealerRows || (Array.isArray(dealerRows) && dealerRows.length === 0)) {
     return c.json(
       { error: "not_found", code: "not_found", message: "Dealer not found" },
@@ -125,7 +117,7 @@ principalDealersRouter.get("/:id", async (c) => {
   // dealer or one of Carres' own showrooms (which carry no SSM / PIC).
   const { data: extra } = await sb
     .from("dealers")
-    .select("address, ssm_code, contact_name, contact_phone, channel")
+    .select("address, ssm_code, contact_name, contact_phone, channel, code, state")
     .eq("id", id)
     .maybeSingle();
   // Always present, so the drawer's `channel` is never undefined; an absent
@@ -142,6 +134,10 @@ principalDealersRouter.get("/:id", async (c) => {
     (dealer as any).contact_name  = extra.contact_name ?? null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dealer as any).contact_phone = extra.contact_phone ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).code          = extra.code ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).state         = extra.state ?? null;
   }
 
   // 2. Fetch last 8 orders with line/addon for total computation.
@@ -153,10 +149,7 @@ principalDealersRouter.get("/:id", async (c) => {
     .eq("dealer_id", id)
     .order("placed_at", { ascending: false })
     .limit(8);
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
+  if (e2) return fail(c, e2);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recentOrders = (ordRows ?? []).map((o: any) => {
@@ -193,10 +186,7 @@ principalDealersRouter.post("/invite", async (c) => {
     p_region: parsed.data.region,
     p_contact: parsed.data.contact,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data); // { dealer, approval, idempotent }
 });
 
@@ -220,6 +210,8 @@ principalDealersRouter.patch("/:id", async (c) => {
   if (body.ssmCode     !== undefined) patch.ssm_code = body.ssmCode;
   if (body.contactName !== undefined) patch.contact_name = body.contactName;
   if (body.contactPhone !== undefined) patch.contact_phone = body.contactPhone;
+  if (body.code        !== undefined) patch.code = body.code;
+  if (body.state       !== undefined) patch.state = body.state;
 
   // Legacy `contact` text column mirrors contact_name + contact_phone for
   // back-compat reads. Recompute only when one of the two changed (otherwise
@@ -241,17 +233,28 @@ principalDealersRouter.patch("/:id", async (c) => {
     return c.json({ ok: true, dealer: null });
   }
 
+  // 0543 — one write door for principal and finance; it touches the master
+  // columns only (finance has no direct write on dealers).
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("dealers")
-    .update(patch)
-    .eq("id", id)
-    .select("id, name, region, contact, address, ssm_code, contact_name, contact_phone")
-    .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+  const { data, error } = await sb.rpc("dealer_save_master", {
+    p_dealer_id: id,
+    p_patch: patch,
+  });
+  // `code` is the one master field the keyer invents, and 0543's
+  // dealers_code_unique is the only unique constraint this door can trip. Name
+  // it here, the way the catalog's option pools and the supplier slug do;
+  // mapPgError's generic "that value is already used" is the fallback under it.
+  if (error?.code === "23505" && patch.code !== undefined) {
+    return c.json(
+      {
+        error: "conflict",
+        code: "dealer_code_taken",
+        message: `Another dealer already uses the code ${patch.code}. Pick a different code.`,
+      },
+      409,
+    );
   }
+  if (error) return fail(c, error);
   return c.json({ ok: true, dealer: data });
 });
 
@@ -265,10 +268,7 @@ principalDealersRouter.post("/:id/status", async (c) => {
     p_new_status: parsed.data.status,
     p_reason: parsed.data.reason ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ dealer: data });
 });
 

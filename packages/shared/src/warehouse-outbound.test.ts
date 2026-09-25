@@ -44,6 +44,20 @@ function unitInput(
 }
 
 describe("warehouseOperatingDates", () => {
+  it("keeps the same DO separate by Site and opens the exact UUID destination", () => {
+    const events = ["site-1", "site-2"].flatMap((warehouseSiteId) =>
+      deliveryWarehouseScheduleEvents(unitInput({
+        unitId: warehouseSiteId, warehouseSiteId, deliveryOrderId: "do-1",
+        fromLocation: "Same display name",
+      })),
+    );
+    const cards = warehouseOutboundCards(events);
+    expect(cards).toHaveLength(2);
+    expect(cards.map((card) => card.unitsRequired)).toEqual([1, 1]);
+    const matched = filterOutboundCards(cards, new URLSearchParams("site=site-2&do=DO-2609-019"));
+    expect(matched).toHaveLength(1);
+    expect(matched[0].units[0].unitId).toBe("site-2");
+  });
   it("prints six operating dates and omits Sunday", () => {
     // Thu 3 Sep 2026 … Wed 9 Sep 2026; Sunday 6 Sep is absent.
     expect(warehouseOperatingDates("2026-09-03")).toEqual([
@@ -330,7 +344,7 @@ describe("one scope for rail counts, list and totals (§8)", () => {
 
   it("the default scope is every unfinished arrangement under its original date", () => {
     const rows = filterOutboundCards(cards, new URLSearchParams("view=open"));
-    expect(rows.map((c) => c.doNumber)).toEqual(["DO-2609-102"]);
+    expect(rows.map((c) => c.doNumber)).toEqual(["DO-2609-101", "DO-2609-102"]);
   });
 
   it("a day's Loaded count never claims work from another day", () => {

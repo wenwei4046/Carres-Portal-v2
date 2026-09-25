@@ -7,7 +7,9 @@ import {
   GUARANTEE_ENTITLEMENTS,
   GUARANTEE_TERMS,
   invoicesListQuery,
+  receivedBeforeInvoice,
 } from "@carres/shared";
+import { ORDER_PAYMENTS } from "@carres/shared/tables";
 import {
   invoicePrepareInput,
   invoiceRegisterQuery,
@@ -21,6 +23,8 @@ import { requireFinance } from "../../lib/auth-guards";
 // renderInvoicePdf removed — see file header note re: Workers WASM limit.
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { departmentQuery } from "../../lib/line-departments";
+import { todayIsoMYT } from "../../lib/today";
 import type { InvoiceTemplateData } from "../../lib/pdf/types";
 import type { AppEnv } from "../../types";
 
@@ -56,6 +60,9 @@ const INVOICE_REGISTER_SELECT =
   "id,invoice_no,status,kind,amount,tax_amount,issued_at,voided_at,void_reason," +
   "replaces_invoice_id,created_at,order_id," +
   "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
+  // The Finance Dashboard's A/R Aging counts an order's age from the day it
+  // was placed — the same date finance_ar_aging (0062/0125) aged it by.
+  "placed_at," +
   "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact)," +
   // §5 likely-duplicate: the comparison needs the reference and the method
   // beside the amount and the paid date, so the operator inspects the RIGHT
@@ -63,7 +70,14 @@ const INVOICE_REGISTER_SELECT =
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
   "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
-  "ops_order_control(balance,confirmed_date,line_etas,line_stock_status," +
+  // Payment Monitor Card 02 (2026-09-16): the confirmed delivery is
+  // DELIVERY'S fact — its Delivery Orders and its arrangement per leg, then
+  // the booking overlay only while its stage is `confirmed`. The shared
+  // `invoiceConfirmedDelivery` reads these for the Monitor AND the Work feed,
+  // so the clock starts on the day Delivery actually agreed.
+  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time)," +
+  "ops_delivery_orders(leg,delivery_date,time_slot,voided_at,issued_at)," +
+  "ops_order_control(balance,confirmed_date,booking_stage,confirmed_time_slot,line_etas,line_stock_status," +
   // The 2026-09-08 correction: the Payment screens must see the LEGACY
   // C9 storage fee too, or they disagree with Work and the gate on a
   // pure-legacy order. The columns ride the wire; the shared
@@ -116,10 +130,20 @@ financeInvoicesRouter.get("/register", async (c) => {
   const parsed = invoiceRegisterQuery.safeParse(c.req.query());
   if (!parsed.success) return c.json({ message: "Choose a valid invoice range." }, 422);
   const { offset, limit } = parsed.data;
+  const dept = departmentQuery(c);
+  if (!dept.ok) return dept.res;
+  const { departmentType, departmentId } = dept.value;
   const sb = userClient(c.env, auth.jwt);
-  const { data, error, count } = await sb
+  // 0540: a department narrows through invoice_department (the order's).
+  let req = sb
     .from("invoices")
-    .select(INVOICE_REGISTER_SELECT, { count: "exact" })
+    .select(
+      departmentType ? `${INVOICE_REGISTER_SELECT},invoice_department!inner(department_type,department_id)` : INVOICE_REGISTER_SELECT,
+      { count: "exact" },
+    );
+  if (departmentType) req = req.eq("invoice_department.department_type", departmentType);
+  if (departmentId) req = req.eq("invoice_department.department_id", departmentId);
+  const { data, error, count } = await req
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -128,8 +152,38 @@ financeInvoicesRouter.get("/register", async (c) => {
   }
   const rows = data as unknown as Array<Record<string, unknown>>;
   await attachLegacyStorage(sb, rows);
+  await attachLatestPromise(sb, rows);
   return c.json({ rows, total: count });
 });
+
+/**
+ * The customer's latest standing promise (0446 `will_pay_on_date`), one per
+ * order, attached as a source fact so the Payment Monitor's `Customer promised
+ * to pay today` reads the SAME ledger the Work feed's missed-promise rule
+ * reads — never a second store. Batched over the page's order ids; a read
+ * failure refuses the page rather than presenting promises as absent.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachLatestPromise(sb: any, rows: Array<Record<string, unknown>>) {
+  const orderIds = [...new Set(rows.map((r) => String(r.order_id)))];
+  if (orderIds.length === 0) return;
+  const { data, error } = await sb
+    .from("payment_collection_outcomes")
+    .select("order_id,promised_date,recorded_at")
+    .eq("outcome", "will_pay_on_date")
+    .in("order_id", orderIds)
+    .order("recorded_at", { ascending: false });
+  if (error) throw new HTTPException(500, { message: "Invoices could not be loaded. Try again." });
+  const latest = new Map<string, { promised_date: string; recorded_at: string }>();
+  for (const o of (data ?? []) as Array<{ order_id: string; promised_date: string | null; recorded_at: string }>) {
+    if (!o.promised_date || latest.has(o.order_id)) continue;
+    latest.set(o.order_id, { promised_date: o.promised_date, recorded_at: o.recorded_at });
+  }
+  for (const r of rows) {
+    const o = r.orders as { latest_promise?: unknown } | null;
+    if (o) o.latest_promise = latest.get(String(r.order_id)) ?? null;
+  }
+}
 
 /**
  * The legacy C9 storage figure, derived server-side through the SAME shared
@@ -148,7 +202,7 @@ async function attachLegacyStorage(sb: any, rows: Array<Record<string, unknown>>
     for (const l of o?.order_lines ?? []) if (l.sku) allSkus.add(String(l.sku));
   }
   const categories = await storageSkuCategories(sb, [...allSkus]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoMYT();
   const legacyByOrder = new Map<string, number>();
   for (const r of rows) {
     const o = r.orders as {
@@ -741,6 +795,14 @@ financeInvoicesRouter.post("/:id/void", (c) =>
 //   - invoice not voided
 //   - order.status='delivered'
 //   - order.paid >= invoice.amount  (full payment received before tax doc)
+/** The order's payments, for the invoice's "received before this invoice" line. */
+export async function invoicePayments(sb: ReturnType<typeof userClient>, orderId: string) {
+  const { data, error } = await sb.from(ORDER_PAYMENTS)
+    .select("amount, kind, voided_at, created_at").eq("order_id", orderId);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return data ?? [];
+}
+
 financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
@@ -905,6 +967,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     tax_amount: taxAmount,
     total,
     currency: "MYR",
+    received_before: receivedBeforeInvoice(await invoicePayments(sb, inv.order_id), String(inv.issued_at)),
     guarantees: gRows.map((g) => ({
       label: termsBySku[String(g.guarantee_sku)]?.label ?? String(g.guarantee_sku),
       guarantee_id: g.guarantee_id

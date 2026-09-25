@@ -30,7 +30,7 @@
 import { myHolidaySet } from "./my-holidays";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { z } from "zod";
-import { addWorkingDays, DEFAULT_OFF_DAYS, subtractWorkingDays } from "./working-days";
+import { addWorkingDays, countWorkingDays, DEFAULT_OFF_DAYS, subtractWorkingDays } from "./working-days";
 
 /** The categories purchasing can buy. A guarantee or a service has no factory. */
 export const PURCHASING_CATEGORIES = ["sofa", "bedframe", "mattress"] as const;
@@ -98,6 +98,8 @@ export interface PurchasingSupplierRow {
    * without one — a built, deployed supplier call that could never fire.
    */
   transitDays: number | null;
+  /** 0530 — payment terms in days after the bill date. Null = not set. */
+  termsDays?: number | null;
 }
 
 /** One edit: who, when, and what it was before. */
@@ -278,6 +280,82 @@ export function expectedArrivalOf(
 }
 
 /**
+ * ⭐ THE PO DELIVERY DATE — OWNER RULING (Jess, 2026-09-22), the ONE arithmetic
+ * behind the date a Purchase Order is born with.
+ *
+ * ```
+ * PO Delivery Date = PO Date + n Settings working days
+ * ```
+ *
+ * `n` is EXACTLY the recorded Supplier × Category production number: Settings
+ * 14 means 14, Settings 10 means 10. **No transit days are added** — that is
+ * the correction this function exists for. Weekends and public holidays are
+ * skipped on THIS supplier's own work week, because the number is a promise
+ * the factory makes about its own days.
+ *
+ * ⛔ IT IS NOT `expectedArrivalOf`. That one answers a different question —
+ * when the goods reach Carres, production PLUS the transit leg — and it stays
+ * the arrival-planning arithmetic behind `Order By` and the register's timing
+ * facts. Two questions, two functions, neither one guessing the other's
+ * answer: printing the arrival date under a `PO 14-Day` label was how a
+ * 13-day Settings number came to print `14-Day` on a supplier's paper.
+ *
+ * NULL IS A REAL ANSWER: no production number for this supplier × category,
+ * or no PO Date → no date at all. The paper then prints `PO Delivery Date :
+ * Not recorded` rather than a date nobody chose (P1's rule).
+ *
+ * `poDateIso` is the CALLER's fact — the day the purchase order is raised.
+ */
+export function poDeliveryDateOf(
+  settings: Pick<PurchasingSettings, "productionDays" | "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    category: string | null | undefined;
+    poDateIso: string | null | undefined;
+    /** Malaysian public holidays. Omitted → the live Selangor set. */
+    holidays?: ReadonlySet<string>;
+  },
+): string | null {
+  const from = (args.poDateIso ?? "").slice(0, 10);
+  if (from.length !== 10) return null;
+  const production = productionWorkingDaysFor(settings, args.supplierId, args.category);
+  if (production == null) return null;
+  return addWorkingDays(from, production, {
+    offDays: workWeekOffDaysFor(settings, args.supplierId),
+    holidays: args.holidays ?? myHolidaySet(),
+  });
+}
+
+/**
+ * The `{n}` in the PO's printed `PO {n}-Day Delivery Date` (owner ruling
+ * 2026-09-22, PO-PDF-STANDARD §2): the supplier's working days from the PO Date
+ * to the PO Delivery Date — counted on THIS supplier's work week and the
+ * holiday set, by the same working-day functions that stamped the date. It is
+ * never the raw Settings number: every supplier carries a transit day, so a
+ * 13-day production setting prints `14-Day`, which is what the dates say.
+ *
+ * NULL IS A REAL ANSWER: no PO Date or no delivery date → no number, and the
+ * paper prints the plain `PO Delivery Date` label instead of inventing one.
+ */
+export function poDeliveryWorkingDays(
+  settings: Pick<PurchasingSettings, "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    poDateIso: string | null | undefined;
+    deliveryDateIso: string | null | undefined;
+    holidays?: ReadonlySet<string>;
+  },
+): number | null {
+  const from = (args.poDateIso ?? "").slice(0, 10);
+  const to = (args.deliveryDateIso ?? "").slice(0, 10);
+  if (from.length !== 10 || to.length !== 10 || to <= from) return null;
+  return countWorkingDays(from, to, {
+    offDays: workWeekOffDaysFor(settings, args.supplierId),
+    holidays: args.holidays ?? myHolidaySet(),
+  });
+}
+
+/**
  * THE TRANSIT LEG on its own — when the goods reach us, counted from a day the
  * factory says they are FINISHED (Slice 1, Loo 2026-08-06: *"a ready date the
  * factory gives MOVES the expected arrival — and never overwrites it"*).
@@ -437,6 +515,7 @@ export const purchasingSettingsResponseSchema = z.object({
       categories: z.array(purchasingCategorySchema),
       offDays: z.array(z.number().int().min(0).max(6)).nullable(),
       transitDays: z.number().int().min(0).max(60).nullable(),
+      termsDays: z.number().int().min(0).nullable().optional(),
     }),
   ),
   productionDays: z.array(
@@ -578,6 +657,15 @@ export const purchasingSetTransitDaysInput = z
   })
   .strict();
 export type PurchasingSetTransitDaysInput = z.infer<typeof purchasingSetTransitDaysInput>;
+
+/** 0530 — one supplier's payment terms in days; null clears it. */
+export const purchasingSetSupplierTermsDaysInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    days: z.number().int().min(0).max(365).nullable(),
+  })
+  .strict();
+export type PurchasingSetSupplierTermsDaysInput = z.infer<typeof purchasingSetSupplierTermsDaysInput>;
 
 export const purchasingSetWorkWeekInput = z
   .object({

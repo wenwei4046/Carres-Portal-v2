@@ -94,15 +94,23 @@ export function purchasingRefusal(
       };
 
     // ── THE DECISION (0360 · Card 05) — the Manual Purchase approval door ─
+    /* Owner ruling 2026-09-18 (0533): unheld is its own governed answer —
+       never a fallback to the operations manager or an email list. */
     case "no_purchase_approver":
       return {
-        wrong: "No purchase approver is set.",
-        todo: "Ask management to set the purchase approver.",
+        wrong: "Nobody holds Purchasing Approver.",
+        todo: "Set the holder in Workspace → Staff & Duties.",
+      };
+    /* Owner ruling 2026-09-18 (0533): nobody approves a purchase they raised. */
+    case "own_request":
+      return {
+        wrong: "You cannot decide a purchase you raised.",
+        todo: "Withdraw it if the goods are no longer needed.",
       };
     case "already_decided":
       return {
         wrong: "This purchase was already decided.",
-        todo: "Reload the Manual Purchase to see the decision.",
+        todo: "Reload the Manual Purchase Request to see the decision.",
       };
     case "reason_required":
       return {
@@ -117,10 +125,47 @@ export function purchasingRefusal(
           "the requested quantity",
         )}.`,
       };
+    /* ── ROUND 2 (owner rulings R3/R4, 2026-09-16, migration 0522) — the four
+       round doors race on one request and the loser is refused BY NAME. */
+    case "request_withdrawn":
+      return {
+        wrong: "This request was withdrawn.",
+        todo: "Raise a new request if the goods are still needed.",
+      };
+    case "request_sent_back":
+      return {
+        wrong: "This request was sent back for changes.",
+        todo: "Wait for the requester to edit it and send it again.",
+      };
+    case "not_requester":
+      return {
+        wrong: "Only the person who asked for this purchase may do this.",
+        todo: `Ask ${some(facts.actor, "the requester")} to do it.`,
+      };
+    case "not_sent_back":
+      return {
+        wrong: "This request was not sent back for changes.",
+        todo: "Reload the Manual Purchase Request to see where it is now.",
+      };
+    case "request_already_ordered":
+      return {
+        wrong: "This request already has a purchase order.",
+        todo: "Reload the Manual Purchase Request. It can no longer be withdrawn.",
+      };
+    case "lines_required":
+      return {
+        wrong: "The request has no items.",
+        todo: "Add at least one item, then send it again.",
+      };
+    case "delivery_date_required":
+      return {
+        wrong: "The Delivery Date is missing.",
+        todo: "Pick a Delivery Date, then send it again.",
+      };
     case "decision_not_recorded":
       return {
         wrong: "The decision was not recorded.",
-        todo: "Reload the Manual Purchase and try once more. Tell IT if it happens again.",
+        todo: "Reload the Manual Purchase Request and try again. Tell IT if it happens again.",
       };
 
     // ── THE MONEY (0380) ──────────────────────────────────────────────────
@@ -246,17 +291,17 @@ export function purchasingRefusal(
        and each gets its own sentence — fact first, in the operator's words. */
     case "unknown_request":
       return {
-        wrong: "One Manual Purchase on this list is no longer there.",
+        wrong: "One Manual Purchase Request on this list is no longer there.",
         todo: "Reload the page, then tick the ones that are left and issue again.",
       };
     case "not_ready_to_order":
       return {
-        wrong: "One Manual Purchase has not been approved yet.",
+        wrong: "One Manual Purchase Request has not been approved yet.",
         todo: "Ask its approver to Approve it, then issue again.",
       };
     case "request_refused":
       return {
-        wrong: "One Manual Purchase was refused.",
+        wrong: "One Manual Purchase Request was refused.",
         todo: "Go back and untick the refused one, then issue again.",
       };
     /* The Deliver To door on an existing request (0421). A request whose line
@@ -437,10 +482,18 @@ export const PURCHASING_REFUSAL_CODES = [
   "no_po_duty_holder",
   "not_purchase_approver",
   "no_purchase_approver",
+  "own_request",
   "already_decided",
   "reason_required",
   "invalid_cut_qty",
   "decision_not_recorded",
+  "request_withdrawn",
+  "request_sent_back",
+  "not_requester",
+  "not_sent_back",
+  "request_already_ordered",
+  "lines_required",
+  "delivery_date_required",
   "supplier_price_changed",
   "stale_catalog_cost",
   "expected_cost_required",

@@ -2,15 +2,15 @@
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
-import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
+import type { IconName } from "@/components/kit/Icon";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import { ArrowLeft, Download, FileCheck2, RotateCcw, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
-  manualPurchaseSourceSummary,
   poRecordedReplyOf,
   poReplyDateOf,
   poSupplierDeliveryDateOf,
@@ -25,14 +25,17 @@ import {
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
 } from "@carres/shared";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   DataGrid,
   type DataGridColumn,
   type DataGridContextMenuItem,
+  type DataGridPersonalLayouts,
 } from "@/components/register/DataGrid";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
+import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
+import Input from "@/components/kit/Input";
 import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
@@ -52,7 +55,11 @@ import {
   usePoReceiving,
   useRecordSend,
   useRecordSupplierDate,
+  useRegisterLayouts,
   useRevisePo,
+  useSaveRegisterLayout,
+  useSetDefaultRegisterLayout,
+  useSetPoTermsDays,
   useWorkspaceDuties,
   type operationPoListRow,
   type SupplierRow,
@@ -60,91 +67,214 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
+import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
+import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
+import { personInitials } from "@/lib/staff-avatar";
 
-// Card 07 (owner correction 2026-08-31): the rail explains the business
-// dimension, never the UI mechanism — grouped rows, no visible `Filters`
-// heading. `action` renders a deliberate second line (fact, then the act),
-// not a wrapped sentence; the row stays ONE button with ONE count on the
-// same `supplier_update_required` key.
-type RailRow = { key: PurchaseOrderRegisterFilter; label: string; action?: string };
+/* ⭐ THE RAIL — Purchasing MASTER §9.3, owner correction 2026-09-18. Facts that
+   narrow the listing, and nothing that the four groups already say: no `All
+   purchase orders` row, no DOCUMENT group, no action sentence. SUPPLIER REPLY
+   counts only current versions marked as sent with goods still pending.
 
-const RAIL_GROUPS: Array<{ heading: string; rows: RailRow[] }> = [
+   ⭐ THE LABEL IS THE WHOLE SENTENCE, EVERYWHERE. `Date changed` is three
+   words that do not say WHICH date or WHOSE answer moved it, and the page
+   carries three different dates — a PO Default Delivery Date, a Supplier
+   Confirmed Delivery Date and a Goods Received Date. A row that shortens the
+   only word distinguishing them saves 90px and costs the operator the fact.
+   The group heading is not a reliable qualifier either: it scrolls away, and
+   the same condition is read again on a chip where no heading exists at all.
+   So one complete label serves the row, the chip and the export, which also
+   removes the row/chip pair that could drift apart.
+
+   ⭐ AND THE ICONS NAME WHAT THE GROUP IS ABOUT: a supplier's reply is a
+   message, receiving is goods, a supplier is a supplier, and `Supplier Deliver
+   To` is the warehouse the current Site filter is choosing between. They are
+   the shared kit's own glyphs at its 16px / stroke 2 / inherited neutral ink,
+   beside a label that still carries the meaning on its own. */
+type RailRow = { key: PurchaseOrderRegisterFilter; label: string };
+
+const RAIL_GROUPS: Array<{ heading: string; icon: IconName; rows: RailRow[] }> = [
   {
-    heading: "DOCUMENT",
-    rows: [
-      { key: "pdf_not_sent", label: "PDF not sent" },
-      {
-        key: "supplier_update_required",
-        label: "Version changed",
-        action: "Send the new version to supplier",
-      },
-    ],
-  },
-  {
-    heading: "SUPPLIER REPLY",
+    heading: "Supplier reply",
+    icon: "message",
     rows: [
       { key: "supplier_date_missing", label: "Supplier has not confirmed the PO date" },
+      { key: "supplier_date_changed", label: "Supplier Confirmed Delivery Date changed" },
       { key: "supplier_date_passed", label: "Supplier delivery date passed" },
     ],
   },
   {
-    heading: "RECEIVING",
-    rows: [
-      { key: "partly_received", label: "Partly received" },
-      { key: "completed", label: "Completed" },
-    ],
-  },
-  /* A cancelled purchase order is kept, never deleted — so there must be a way
-     to look at one. Until 2026-09-01 the only door was the `PO Issued` funnel,
-     which offered document states on a column of timestamps (defect 27). The
-     funnel is a date filter now, so the state gets a row of its own. */
-  {
-    heading: "DOCUMENT STATE",
-    rows: [{ key: "cancelled", label: "Cancelled" }],
+    heading: "Receiving",
+    icon: "goods",
+    rows: [{ key: "partly_received", label: "Partly received" }],
   },
 ];
 
 const RAIL_ROWS: RailRow[] = RAIL_GROUPS.flatMap((group) => group.rows);
+
+/* The four governed groups, in display order: the two open headings first,
+   then the collapsed history. Membership is the shared classifier's. */
+const PO_GROUPS = [
+  { key: "not_marked_as_sent", label: "Confirm PO sent to supplier", alwaysOpen: true },
+  { key: "issued", label: "Waiting for goods from supplier", alwaysOpen: true },
+  { key: "completed", label: "Completed", initiallyCollapsed: true },
+  { key: "cancelled", label: "Cancelled", initiallyCollapsed: true },
+] as const;
+
+type RailFilter = {
+  facet: PurchaseOrderRegisterFilter | null;
+  supplier: string | null;
+  deliverTo: string | null;
+};
+const RAIL_CLEAR: RailFilter = { facet: null, supplier: null, deliverTo: null };
+
+/**
+ * One governed reference behind the PO, as the `SO No / MPR No` column reads
+ * it: the real document number and the door it opens. Card 08 §3.5's label
+ * `Manual Purchase` survives only where the request has no stored MPR number —
+ * a number is READ, never minted for a screen.
+ */
+type SourceRef = {
+  kind: "sales_order" | "manual_purchase";
+  reference: string;
+  /** A Sales Order's own id, so its number opens its order. */
+  orderId: string | null;
+  /** A Manual Purchase request's id, so its number opens the request. */
+  requestId: string | null;
+};
+
+/** One posted receipt of this PO, as `Goods Received Date` / `GRN No` read it. */
+type Receipt = {
+  id: string;
+  grnNo: string;
+  /** The PHYSICAL arrival day. Null = the Worker did not send it — unknown,
+   *  never "today" and never the GRN's own creation date. */
+  receivedOn: string | null;
+  /** Good units on THIS receipt. Null = not sent by this Worker. */
+  receivedQty: number | null;
+};
 
 type RegisterRow = {
   id: string;
   po: operationPoListRow;
   supplier: SupplierRow | null;
   supplierName: string;
-  source: string;
   sourceSearch: string;
   deliverTo: string;
   supplierDate: string | null;
+  /** `PO Date` — the issue/document date the PO number carries. */
+  poDate: string | null;
+  sources: SourceRef[];
+  receipts: Receipt[];
+  items: string[];
   input: PurchaseOrderRegisterInput;
   facts: PurchaseOrderRegisterFacts;
   work: ReturnType<typeof purchaseOrderWork>;
 };
 
+/**
+ * `PO Date` (ui MASTER §6.7 rule 2): the document date the number itself
+ * carries (`PO-YYYYMMDD-NNNN`), never the sent-mark date. A number without a
+ * date (legacy) falls back to the stored placement date; nothing is invented.
+ */
+export function poDateOf(po: Pick<operationPoListRow, "id" | "placed_at">): string | null {
+  const m = /^PO-(\d{4})(\d{2})(\d{2})-/.exec(po.id);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (!po.placed_at) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date(po.placed_at));
+}
+
+/** One name per distinct item, in line order: `Cody · King`, else the SKU. */
+function itemNamesOf(po: operationPoListRow): string[] {
+  const names: string[] = [];
+  for (const line of po.purchase_order_lines ?? []) {
+    const name = [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku;
+    if (!names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/** `{first item} + {n} more` (COPY-STANDARD, Purchase Orders register). */
+function itemsSummary(names: readonly string[]): string {
+  if (names.length === 0) return "";
+  return names.length === 1 ? names[0]! : `${names[0]} + ${names.length - 1} more`;
+}
+
+/* Default reading order per group (MASTER §9.3): not marked by PO Delivery
+   Date, Issued by Expected Delivery Date, history newest PO Date first.
+   An unknown date sorts after every known one — explicit, never invented. */
+const GROUP_RANK: Record<string, number> = { not_marked_as_sent: 0, issued: 1, completed: 2, cancelled: 3 };
+function compareDefault(a: RegisterRow, b: RegisterRow): number {
+  const ga = a.facts.group;
+  const gb = b.facts.group;
+  if (ga !== gb) return GROUP_RANK[ga]! - GROUP_RANK[gb]!;
+  const asc = (x: string | null, y: string | null) =>
+    x === y ? 0 : x == null ? 1 : y == null ? -1 : x.localeCompare(y);
+  if (ga === "not_marked_as_sent") return asc(a.po.official_delivery_date ?? null, b.po.official_delivery_date ?? null) || a.id.localeCompare(b.id);
+  if (ga === "issued") return asc(a.facts.expected.date, b.facts.expected.date) || a.id.localeCompare(b.id);
+  return asc(b.poDate, a.poDate) || b.id.localeCompare(a.id);
+}
+
 function todayMYT(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date());
 }
 
-function sourceText(po: operationPoListRow): { display: string; search: string } {
-  const sources = po.sources ?? [];
-  if (sources.length === 0) return { display: "Not recorded", search: "Not recorded" };
-  /* Card 08 §3.5 — SO sources keep their real numbers; Manual Purchase
-     sources have no number: one prints `Manual Purchase`, several print
-     `{n} Manual Purchases`, counted by DISTINCT source request UUIDs. */
-  const soRefs = sources
-    .filter((source) => source.kind !== "manual_purchase")
-    .map((source) => source.reference);
-  const manualCount = new Set(
-    sources
-      .filter((source) => source.kind === "manual_purchase")
-      .map((source) => source.request_id ?? source.reference),
-  ).size;
-  const manualLabel = manualPurchaseSourceSummary(manualCount);
-  const refs = [...soRefs, ...(manualLabel ? [manualLabel] : [])];
-  if (refs.length === 0) return { display: "Not recorded", search: "Not recorded" };
-  return {
-    display: refs.length === 1 ? refs[0]! : `${refs[0]} +${refs.length - 1}`,
-    search: refs.join(" "),
-  };
+/**
+ * ⭐ `SO No / MPR No` — THE REAL DOCUMENTS BEHIND THE PO (MASTER §9.3, owner
+ * ruling 2026-09-18; the MPR half overwrites Card 08 §3.5's 2026-09-04
+ * retirement).
+ *
+ * Every governed source keeps its own number and its own door. A Manual
+ * Purchase request prints `MPR-YYYYMMDD-RRRR` where one is stored and the
+ * governed label `Manual Purchase` where none is — the number is read from
+ * the request, never minted for a listing, and a UUID is never shown. Manual
+ * sources still dedupe by request identity, not by label, so two purchases
+ * that happen to share a word stay two rows.
+ *
+ * There is no `CO No`: a PO marked consignment does not prove a consignment
+ * order created it (owner ruling 2026-09-18).
+ */
+function sourceRefsOf(po: operationPoListRow): SourceRef[] {
+  const seen = new Set<string>();
+  const out: SourceRef[] = [];
+  for (const source of po.sources ?? []) {
+    const identity =
+      source.kind === "manual_purchase"
+        ? `mp:${source.request_id ?? source.reference}`
+        : `so:${source.reference}`;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    out.push({
+      kind: source.kind,
+      reference: source.reference,
+      orderId: source.kind === "sales_order" ? source.order_id ?? null : null,
+      requestId: source.kind === "manual_purchase" ? source.request_id ?? null : null,
+    });
+  }
+  return out;
+}
+
+/** The cell's own summary. One reference prints itself; several print the
+ *  approved count when they are all Sales Orders, and otherwise the first
+ *  number and how many more ride with it. Every one of them stays reachable
+ *  through the PO's Order Route. */
+function sourceSummary(sources: readonly SourceRef[]): string {
+  if (sources.length === 0) return "Not recorded";
+  if (sources.length === 1) return sources[0]!.reference;
+  if (sources.every((source) => source.kind === "sales_order")) return `${sources.length} SOs`;
+  return `${sources[0]!.reference} +${sources.length - 1}`;
+}
+
+/** The posted receipts of this PO, oldest arrival first. An absent `grns` is
+ *  an older Worker — unknown, and the cells stay empty rather than claiming
+ *  nothing ever arrived. */
+function receiptsOf(po: operationPoListRow): Receipt[] {
+  return (po.grns ?? []).map((grn) => ({
+    id: grn.id,
+    grnNo: grn.grn_no,
+    receivedOn: grn.goods_received_at ?? null,
+    receivedQty: grn.received_qty ?? null,
+  }));
 }
 
 function supplierDateOf(po: operationPoListRow): string | null {
@@ -158,11 +288,15 @@ function toRegisterInput(po: operationPoListRow, supplierName: string): Purchase
     status: po.status,
     version: po.version ?? 1,
     supplierDate: supplierDateOf(po),
+    originalDate: po.official_delivery_date ?? null,
     expectedReadyDate: po.expected_ready_date ?? null,
-    lines: po.purchase_order_lines.map((line) => ({
-      qty: line.qty,
-      receivedQty: line.received_qty,
-    })),
+    /* A missing line read stays unknown — never zero, never Completed. */
+    lines: Array.isArray(po.purchase_order_lines)
+      ? po.purchase_order_lines.map((line) => ({
+          qty: line.qty ?? null,
+          receivedQty: line.received_qty ?? null,
+        }))
+      : null,
     sends: (po.sends ?? []).map((send) => ({
       kind: send.kind ?? null,
       channel: send.channel,
@@ -184,9 +318,7 @@ function OwnerBadge({
   name: string | null;
 }) {
   const label = name?.trim() || "PO Duty not assigned";
-  const initials = name
-    ? name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")
-    : "PO";
+  const initials = name?.trim() ? personInitials(name, "") : "PO";
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1.5"
@@ -203,7 +335,7 @@ function OwnerBadge({
 }
 
 function Absence({ children = "Not recorded" }: { children?: string }) {
-  return <span className="text-kit-slate-9">{children}</span>;
+  return <span className="text-kit-slate-11">{children}</span>;
 }
 
 export default function PurchaseOrdersPage() {
@@ -213,23 +345,44 @@ export default function PurchaseOrdersPage() {
   const dutyQ = useWorkspaceDuties();
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
   const [params, setParams] = useSearchParams();
-  const [filter, setFilter] = useState<PurchaseOrderRegisterFilter | null>(null);
-  const [railOpen, setRailOpen] = useState(() => {
-    try {
-      return localStorage.getItem("carres.purchaseOrders.filterRail") !== "0";
-    } catch {
-      return true;
-    }
-  });
-  const setRailVisible = (open: boolean) => {
-    setRailOpen(open);
-    try {
-      localStorage.setItem("carres.purchaseOrders.filterRail", open ? "1" : "0");
-    } catch {
-      // The toggle still works when browser storage is unavailable.
-    }
-  };
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
+  /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
+     leaves the Columns menu without saved layouts; the register still works. */
+  const layoutsQ = useRegisterLayouts("purchase_orders");
+  const saveLayout = useSaveRegisterLayout("purchase_orders");
+  const setDefaultLayout = useSetDefaultRegisterLayout("purchase_orders");
+  const personalLayouts = useMemo<DataGridPersonalLayouts>(() => ({
+    layouts: (layoutsQ.data?.layouts ?? []).map((l) => ({ id: l.id, name: l.name, layout: l.layout, isDefault: l.is_default })),
+    limit: layoutsQ.data?.limit ?? 10,
+    onSave: async (name, layout) => {
+      try {
+        await saveLayout.mutateAsync({ name, layout });
+      } catch (e) {
+        const code = (e as { body?: { code?: string } }).body?.code;
+        throw new Error(code === "register_layout_limit"
+          ? "You can keep 10 layouts. Save under an existing name to replace one."
+          : "The layout could not be saved. Try again.");
+      }
+    },
+    onSetDefault: async (id) => {
+      try {
+        await setDefaultLayout.mutateAsync(id);
+      } catch {
+        throw new Error("Your default could not be saved. Try again.");
+      }
+    },
+  }), [layoutsQ.data, saveLayout, setDefaultLayout]);
+  /* The shared purchasing rail law (S3): a remembered choice wins; with none,
+     the rail starts hidden on a canvas narrower than 896px, where it would
+     float over the very rows the operator came to read. */
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef);
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
+  /* The PO whose receipts are open. `{n} receipt dates` and `{n} GRNs` are
+     two doors into the SAME list, because they are two facts about one set of
+     receipts — not two different collections. */
+  const [receiptsFor, setReceiptsFor] = useState<RegisterRow | null>(null);
   const today = todayMYT();
 
   const suppliers = useMemo(
@@ -260,21 +413,24 @@ export default function PurchaseOrdersPage() {
       const supplierName = supplier?.name ?? "Supplier not recorded";
       const input = toRegisterInput(po, supplierName);
       const facts = purchaseOrderRegisterFacts(input, today);
-      const source = sourceText(po);
+      const sources = sourceRefsOf(po);
       return {
         id: po.id,
         po,
         supplier,
         supplierName,
-        source: source.display,
-        sourceSearch: source.search,
+        sourceSearch: sources.map((source) => source.reference).join(" ") || "Not recorded",
         deliverTo: destinationName(po),
         supplierDate: supplierDateOf(po),
+        poDate: poDateOf(po),
+        sources,
+        receipts: receiptsOf(po),
+        items: itemNamesOf(po),
         input,
         facts,
         work: purchaseOrderWork(input, facts),
       };
-    });
+    }).sort(compareDefault);
   }, [destinations, posQ.data, suppliers, today, warehouses]);
 
   /* ⛔ A DECORATIVE BADGE MAY NOT BLANK THE REGISTER (YH, 2026-09-01, defect 14).
@@ -288,7 +444,7 @@ export default function PurchaseOrdersPage() {
   const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError;
   if (requiredReadError) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+      <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
         <div className="m-4 max-w-[720px]">
           <ReadProblem
@@ -310,9 +466,9 @@ export default function PurchaseOrdersPage() {
   const requiredReadLoading = posQ.isLoading || suppliersQ.isLoading || warehouseQ.isLoading;
   if (requiredReadLoading) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+      <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
-        <div className="m-4 text-body text-kit-slate-9">Loading purchase orders…</div>
+        <div className="m-4 text-body text-kit-slate-11">Loading purchase orders…</div>
       </div>
     );
   }
@@ -329,7 +485,7 @@ export default function PurchaseOrdersPage() {
   const selected = allRows.find((row) => row.id.toUpperCase() === selectedPoId) ?? null;
   if (selectedPoId && !selected) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+      <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
         <div className="m-4 max-w-[720px]" data-testid="po-not-found">
           <ReadProblem
@@ -369,33 +525,98 @@ export default function PurchaseOrdersPage() {
     );
   }
 
-  const visibleRows = filter
-    ? allRows.filter((row) => row.facts.filters.includes(filter))
-    : allRows;
+  const matchesRail = (row: RegisterRow, rail: RailFilter) =>
+    (rail.facet == null || row.facts.filters.includes(rail.facet)) &&
+    (rail.supplier == null || row.supplierName === rail.supplier) &&
+    (rail.deliverTo == null || row.deliverTo === rail.deliverTo);
+  const visibleRows = allRows.filter((row) => matchesRail(row, filter));
+  /* Counts describe the whole register, so a facet's number never depends on
+     which other facet happens to be open. */
   const counts = new Map(
     RAIL_ROWS.map(({ key }) => [key, allRows.filter((row) => row.facts.filters.includes(key)).length]),
   );
-  const openObject = (row: RegisterRow) => {
+  const optionsOf = (valueOf: (row: RegisterRow) => string) => {
+    const tally = new Map<string, number>();
+    for (const row of allRows) tally.set(valueOf(row), (tally.get(valueOf(row)) ?? 0) + 1);
+    return [...tally.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([value, count]) => ({ value, label: value, count }));
+  };
+  const supplierOptions = optionsOf((row) => row.supplierName);
+  const deliverToOptions = optionsOf((row) => row.deliverTo);
+  const facetRow = RAIL_ROWS.find((r) => r.key === filter.facet);
+  const activeConditions = [
+    ...(filter.facet ? [{ key: "facet", label: facetRow?.label ?? filter.facet, onClear: () => setFilter((f) => ({ ...f, facet: null })) }] : []),
+    ...(filter.supplier ? [{ key: "supplier", label: `Supplier: ${filter.supplier}`, onClear: () => setFilter((f) => ({ ...f, supplier: null })) }] : []),
+    ...(filter.deliverTo ? [{ key: "deliverTo", label: `Supplier Deliver To: ${filter.deliverTo}`, onClear: () => setFilter((f) => ({ ...f, deliverTo: null })) }] : []),
+  ];
+  const openObject = (row: RegisterRow, view?: ObjectView) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set("po", row.id);
+      if (view) next.set("view", view);
+      else next.delete("view");
       return next;
     });
   };
+  /** The actual receipt, in Receiving, which owns it. */
+  const openReceipt = (receiptId: string) =>
+    navigate(`/operation?tab=receiving&session=${encodeURIComponent(receiptId)}`);
+  const link = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+  const supporting = "text-[11px] leading-4 text-kit-slate-11";
 
+  /**
+   * ⭐ THE ELEVEN COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-18):
+   *
+   * ```
+   * PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
+   * PO Default Delivery Date · Supplier Confirmed Delivery Date ·
+   * Goods Received Date · GRN No · PO Version
+   * ```
+   *
+   * ⭐ AND THE THREE DATES ARE THREE COLUMNS, NEVER ONE. The retired
+   * `Expected Delivery Date` cell printed whichever of the two it had and a
+   * word underneath saying which — so an operator comparing what we planned
+   * against what the factory actually promised had to read a sentence to
+   * discover which number was in front of them, and the two could never be
+   * sorted or filtered against each other at all. What we planned, what the
+   * supplier confirmed and when the goods actually landed are three different
+   * questions; none of them may ever be filled in from another.
+   *
+   * WIDTHS COME FROM THE SHARED FIELD REGISTRY (ui MASTER §6.8), not from a
+   * fresh per-page guess: the same field is the same width on SO Batch,
+   * Manual Purchase and here. They are prototype starting widths — the page
+   * scrolls sideways under the pinned `PO Date · PO No` rather than squeezing
+   * any of them, and no document number truncates.
+   */
   const columns: Array<DataGridColumn<RegisterRow>> = [
     {
-      /* ⛔ EVERY COLUMN NAMES ITS GROUP (YH, 2026-09-01, defect 39).
-         `chooserGroupOrder` asked the grid for five business groups while NO
-         column declared a `chooserGroup`, so the grid short-circuited to a flat
-         list: the Columns popover showed 13 ungrouped checkboxes, and the next
-         reader believed the grouping shipped. A prop that orders nothing is
-         worse than no prop. */
+      key: "po_date",
+      chooserGroup: "Document",
+      label: "PO Doc Date",
+      /* The registry's number, not this page's: SO Batch measured a cross-year
+         date at 99px and landed on 120, which is the widest measurement of the
+         field, so the field is 120 here too (ui MASTER §6.8). */
+      width: 120,
+      sortable: true,
+      accessor: (row) => (row.poDate ? <span className="tabular-nums">{fmtDate(row.poDate)}</span> : <Absence />),
+      searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
+      exportValue: (row) => row.poDate ?? "Not recorded",
+      dateValue: (row) => row.poDate,
+      filterType: "date",
+      sortFn: (a, b) => (a.poDate ?? "").localeCompare(b.poDate ?? ""),
+    },
+    {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
-      width: 182,
+      width: 170,
       sortable: true,
+      filterType: "numbering",
+      /* ⭐ THE NUMBER OPENS THE PO, AND NOTHING ELSE SHARES IT (§6.8). The
+         goods disclosure is the grid's own separate control in the gutter: a
+         decorative arrow concatenated into a document number makes one target
+         out of two different acts. */
       accessor: (row) => (
         <button
           type="button"
@@ -405,191 +626,257 @@ export default function PurchaseOrdersPage() {
           {row.id}
         </button>
       ),
-      searchValue: (row) => row.id,
+      /* The document states stay findable by typing them (defect 27). */
+      searchValue: (row) => `${row.id} ${row.facts.documentState}`,
       filterValue: (row) => row.id,
+      exportValue: (row) => row.id,
     },
     {
-      key: "issued",
+      key: "source",
       chooserGroup: "Document",
-      label: "PO Issued",
-      width: 174,
+      label: "SO No / MPR No",
+      headerLines: ["SO No /", "MPR No"],
+      width: 176,
       sortable: true,
-      accessor: (row) => row.facts.currentSend
-        ? fmtDate(row.facts.currentSend.sentAt, { time: true })
-        : <Absence>Not sent</Absence>,
-      /* ⭐ ONE COLUMN, ONE FACT (defect 27). The funnel used to offer Issued /
-         Not sent to supplier / Completed / Cancelled — words that appear
-         NOWHERE in the column being filtered, on a column of timestamps. So an
-         operator could not narrow the register to POs issued this month, which
-         is the commonest thing anyone asks of an issue date.
-
-         The state words stay in SEARCH, where they cost nothing and someone
-         typing "cancelled" still finds what they meant; the FUNNEL is a date
-         filter, matching what the column actually shows. The states that were
-         only reachable through the old funnel now have the rail's own
-         `Cancelled` row and `PDF not sent` / `Completed` above it. */
-      searchValue: (row) => row.facts.documentState,
-      filterValue: (row) =>
-        row.facts.currentSend ? row.facts.currentSend.sentAt : "Not sent",
-      dateValue: (row) => row.facts.currentSend?.sentAt ?? null,
-      filterType: "date",
-      sortFn: (a, b) =>
-        (a.facts.currentSend?.sentAt ?? "").localeCompare(b.facts.currentSend?.sentAt ?? ""),
+      /* One reference is its own door; several open the PO's Order Route,
+         where each one is a row. The listing never picks one of them to stand
+         for the rest, and never invents a reference the PO does not carry. */
+      accessor: (row) => {
+        if (row.sources.length === 0) return <Absence />;
+        if (row.sources.length === 1) {
+          const [only] = row.sources;
+          const href = sourceHref(only!);
+          return href ? (
+            <button
+              type="button"
+              className={`${link} font-mono`}
+              data-testid={`po-source-${row.id}`}
+              onClick={(event) => { event.stopPropagation(); navigate(href); }}
+            >
+              {only!.reference}
+            </button>
+          ) : <span className="font-mono">{only!.reference}</span>;
+        }
+        return (
+          <button
+            type="button"
+            className={link}
+            data-testid={`po-source-${row.id}`}
+            onClick={(event) => { event.stopPropagation(); openObject(row, "Order Route"); }}
+          >
+            {sourceSummary(row.sources)}
+          </button>
+        );
+      },
+      /* Every governed reference and the legacy CR/TCF mirrors stay
+         searchable, without a Source column. */
+      searchValue: (row) => [row.sourceSearch, row.po.so ?? "", ...(row.po.so_refs ?? [])].join(" "),
+      filterValue: (row) => sourceSummary(row.sources),
+      exportValue: (row) => row.sources.map((source) => source.reference).join(" · ") || "Not recorded",
     },
     {
       key: "supplier",
       chooserGroup: "Supplier",
       label: "Supplier",
-      width: 150,
+      /* 140, the registry's number: Manual Purchase measured a 17-character
+         live supplier name, which is wider than anything this page's fixtures
+         carry. One field, one width (ui MASTER §6.8). */
+      width: 140,
       sortable: true,
+      overflowText: (row) => row.supplierName,
       accessor: (row) => row.supplierName,
       searchValue: (row) => row.supplierName,
       filterValue: (row) => row.supplierName,
     },
     {
-      key: "source",
-      chooserGroup: "Supplier",
-      label: "Source",
-      width: 164,
+      key: "items",
+      chooserGroup: "Goods",
+      label: "Items",
+      width: 208,
       sortable: true,
-      accessor: (row) => row.source === "Not recorded" ? <Absence /> : row.source,
-      searchValue: (row) => row.sourceSearch,
-      filterValue: (row) => row.source,
+      overflowText: (row) => itemsSummary(row.items),
+      accessor: (row) => itemsSummary(row.items),
+      searchValue: (row) => [...row.items, ...(row.po.purchase_order_lines ?? []).map((line) => line.sku)].join(" "),
+      filterValue: (row) => itemsSummary(row.items),
     },
     {
       key: "deliver_to",
       chooserGroup: "Receiving",
-      label: "Deliver To",
-      width: 160,
+      /* `Supplier Deliver To` — where the SUPPLIER was told to deliver. It is
+         not the customer's address and not the site the goods actually
+         reached; both of those are other columns on other pages. */
+      label: "Supplier Deliver To",
+      headerLines: ["Supplier", "Deliver To"],
+      width: 150,
       sortable: true,
       accessor: (row) => row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo,
       searchValue: (row) => row.deliverTo,
       filterValue: (row) => row.deliverTo,
     },
     {
-      key: "po_delivery_date",
+      key: "default_delivery",
       chooserGroup: "Goods",
+      /* The ORIGINAL planned date, preserved when the supplier replies and
+         when Settings later change (0428). A supplier's answer never
+         overwrites it and it is never back-filled from one. */
+      /* `PO Delivery Date` — the column name (owner ruling Jess, 2026-09-22).
+         `PO Default Delivery Date` is retired; the single-PO fact on the paper
+         reads `PO {n}-Day Delivery Date`. */
       label: "PO Delivery Date",
+      headerLines: ["PO", "Delivery Date"],
       width: 150,
       sortable: true,
-      accessor: (row) => row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : <Absence />,
-      searchValue: (row) => row.po.official_delivery_date ?? "Not recorded",
-      filterValue: (row) => row.po.official_delivery_date ?? "Not recorded",
-      dateValue: (row) => row.po.official_delivery_date,
+      accessor: (row) => {
+        const date = row.po.official_delivery_date ?? null;
+        return date ? <span className="tabular-nums">{fmtDate(date)}</span> : <Absence />;
+      },
+      searchValue: (row) => (row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"),
+      exportValue: (row) => row.po.official_delivery_date ?? "Not recorded",
+      dateValue: (row) => row.po.official_delivery_date ?? null,
       filterType: "date",
-      /* ⛔ A DATE COLUMN SORTS BY DATE (defect 26). Without this the grid falls
-         back to comparing the RENDERED text — and these render as "Wed, 12
-         Aug", so the register sorted alphabetically by WEEKDAY NAME: every
-         "Fri, …" together, then "Mon, …", then "Sat, …". "Which POs land
-         first" is the register's main question, and the header that promises
-         to answer it produced a meaningless order that still looked plausible,
-         because dates do increase inside each weekday block. ISO, so the
-         string comparison IS the chronological one. */
-      sortFn: (a, b) => (a.po.official_delivery_date ?? "").localeCompare(b.po.official_delivery_date ?? ""),
+      sortFn: (a, b) => (a.po.official_delivery_date ?? "9999").localeCompare(b.po.official_delivery_date ?? "9999"),
     },
     {
-      key: "supplier_delivery_date",
+      key: "supplier_delivery",
       chooserGroup: "Goods",
-      label: "Supplier Delivery Date",
-      width: 166,
+      /* The supplier's EVIDENCED current-version answer. No answer reads
+         `Not confirmed by supplier` — it is never filled with the PO default,
+         which is the whole reason these are two columns. */
+      label: "Supplier Confirmed Delivery Date",
+      headerLines: ["Supplier Confirmed", "Delivery Date"],
+      width: 180,
       sortable: true,
-      /* ⛔ NO PROMISE ON FILE IS NOT A CONFIRMED DATE (YH, 2026-09-01).
-         The test was `!row.supplierDate || row.supplierDate === row.po.official_delivery_date`,
-         and the first half turned "the supplier has said nothing" into "the
-         supplier confirmed our date" — asserted on the same row whose Work
-         column says the date is MISSING. A buyer skips the chase call; a
-         manager reads a factory promise that does not exist. It also broke the
-         column's own date filter, because the shown value had no date behind
-         it. Absence first, THEN the equality. */
-      accessor: (row) =>
-        !row.supplierDate
-          ? <Absence>Not confirmed</Absence>
-          : row.supplierDate === row.po.official_delivery_date
-            ? "Same as PO"
-            : fmtDate(row.supplierDate),
-      searchValue: (row) =>
-        !row.supplierDate
-          ? "Not confirmed"
-          : row.supplierDate === row.po.official_delivery_date
-            ? "Same as PO"
-            : row.supplierDate,
-      filterValue: (row) =>
-        !row.supplierDate
-          ? "Not confirmed"
-          : row.supplierDate === row.po.official_delivery_date
-            ? "Same as PO"
-            : row.supplierDate,
-      /* The real date, always — a row that prints `Same as PO` still HAS one,
-         and hiding it from the filter made the column's own funnel lie too. */
+      accessor: (row) => (
+        <span className="flex flex-col leading-4" data-testid={`po-supplier-date-${row.id}`}>
+          <span className="tabular-nums">
+            {/* The dictionary's word for THIS column (COPY-STANDARD,
+                Purchasing UI dictionary). `Not confirmed by supplier` was the
+                second line of the retired merged cell, where the column head
+                did not say whose date it was; here the head already does. */}
+            {row.supplierDate ? fmtDate(row.supplierDate) : <Absence>Not confirmed</Absence>}
+          </span>
+          {row.facts.expected.supplier === "changed" ? (
+            <span className={supporting}>
+              Supplier changed from {row.facts.expected.changedFrom ? fmtDate(row.facts.expected.changedFrom) : "Not recorded"}
+            </span>
+          ) : null}
+        </span>
+      ),
+      searchValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"),
+      filterValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"),
+      exportValue: (row) => row.supplierDate ?? "Not confirmed",
       dateValue: (row) => row.supplierDate,
       filterType: "date",
-      sortFn: (a, b) => (a.supplierDate ?? "").localeCompare(b.supplierDate ?? ""),
+      sortFn: (a, b) => (a.supplierDate ?? "9999").localeCompare(b.supplierDate ?? "9999"),
     },
-    /* The quantity words are the plain receiving facts an inexperienced reader
-       can act on: `Order Qty` is what the current PO says, `Received Qty` is
-       what Receiving posted as correct and accepted, `Pending Delivery Qty` is
-       their difference — pieces of goods, never money. `Open Balance` read as
-       an amount owed and is retired. */
-    ...(["ordered", "received", "open"] as const).map((key): DataGridColumn<RegisterRow> => ({
-      key,
-      label: key === "open" ? "Pending Delivery Qty" : key === "received" ? "Received Qty" : "Order Qty",
-      width: key === "open" ? 152 : 110,
-      align: "right",
+    {
+      key: "goods_received",
+      chooserGroup: "Receiving",
+      /* ⭐ NEVER ONE DATE FOR SEVERAL TRUCKS. A PO with three receipts has
+         three arrival dates, and printing the latest as if all the goods
+         landed then is the defect this column's count link exists to stop. */
+      label: "Goods Received Date",
+      headerLines: ["Goods Received", "Date"],
+      width: 140,
       sortable: true,
-      chooserGroup: "Goods",
-      accessor: (row) => row.facts.quantities[key],
-      searchValue: (row) => String(row.facts.quantities[key]),
-      filterValue: (row) => String(row.facts.quantities[key]),
-      numberValue: (row) => row.facts.quantities[key],
-      filterType: "number",
-      footerTotal: (rows) => rows.reduce((sum, row) => sum + row.facts.quantities[key], 0),
-    })),
+      accessor: (row) => {
+        if (row.receipts.length === 0) return <span />;
+        if (row.receipts.length > 1) {
+          return (
+            <button
+              type="button"
+              className={link}
+              data-testid={`po-receipt-dates-${row.id}`}
+              onClick={(event) => { event.stopPropagation(); setReceiptsFor(row); }}
+            >
+              {row.receipts.length} receipt dates
+            </button>
+          );
+        }
+        const only = row.receipts[0]!;
+        return (
+          <span className="flex flex-col leading-4" data-testid={`po-received-${row.id}`}>
+            <span className="tabular-nums">{only.receivedOn ? fmtDate(only.receivedOn) : <Absence />}</span>
+            {/* The receipt record carries a DATE and no clock (0314), so the
+                time is stated as missing rather than guessed from the moment
+                somebody filed the paperwork. */}
+            <span className={supporting}>Time not recorded</span>
+          </span>
+        );
+      },
+      searchValue: (row) => row.receipts.map((receipt) => (receipt.receivedOn ? fmtDate(receipt.receivedOn) : "")).join(" "),
+      filterValue: (row) => {
+        if (row.receipts.length === 0) return "";
+        if (row.receipts.length > 1) return `${row.receipts.length} receipt dates`;
+        return row.receipts[0]!.receivedOn ? fmtDate(row.receipts[0]!.receivedOn) : "Not recorded";
+      },
+      exportValue: (row) => row.receipts.map((receipt) => receipt.receivedOn ?? "Not recorded").join(" · "),
+      dateValue: (row) => (row.receipts.length === 1 ? row.receipts[0]!.receivedOn : null),
+      sortFn: (a, b) => (firstArrival(a) ?? "9999").localeCompare(firstArrival(b) ?? "9999"),
+    },
+    {
+      key: "grn",
+      chooserGroup: "Receiving",
+      label: "GRN No",
+      width: 170,
+      sortable: true,
+      /* One GRN opens it in Receiving; several open this PO's receipts, where
+         each date, number and quantity is its own row with its own door. A
+         Worker that sent no GRN list is not "no GRN". */
+      accessor: (row) => {
+        if (row.receipts.length === 0) return <span />;
+        if (row.receipts.length === 1) {
+          const only = row.receipts[0]!;
+          return (
+            <button
+              type="button"
+              className={`${link} font-mono`}
+              onClick={(event) => { event.stopPropagation(); openReceipt(only.id); }}
+            >
+              {only.grnNo}
+            </button>
+          );
+        }
+        return (
+          <button
+            type="button"
+            className={link}
+            data-testid={`po-grns-${row.id}`}
+            onClick={(event) => { event.stopPropagation(); setReceiptsFor(row); }}
+          >
+            {row.receipts.length} GRNs
+          </button>
+        );
+      },
+      searchValue: (row) => row.receipts.map((receipt) => receipt.grnNo).join(" "),
+      filterValue: (row) =>
+        row.receipts.length === 1 ? row.receipts[0]!.grnNo
+          : row.receipts.length > 1 ? `${row.receipts.length} GRNs` : "",
+      exportValue: (row) => row.receipts.map((receipt) => receipt.grnNo).join(" · "),
+    },
     {
       key: "current_version",
       chooserGroup: "Document",
       label: "PO Version",
-      width: 138,
+      /* MEASURED, not the registry's prototype 238: the longest evidence line
+         `PO sent to supplier · WhatsApp · Wed, 28 Sep` needs 247px of content
+         at the register's 11px second line, and 238 clipped it. Content
+         decides the width (CLAUDE.md §2); the registry entry is corrected in
+         ui MASTER §6.8 rather than the cell being squeezed to fit it. */
+      width: 265,
       sortable: true,
-      /* `PO V{n}` is the current OFFICIAL document version — never the
-         WhatsApp or email copy. The quieter second line is the document's
-         state, a fact, never an instruction. */
+      /* The CURRENT version only; earlier marks stay in Revisions. A mark is
+         a person's statement of sending, never supplier receipt — and its
+         ABSENCE is not proof that no send happened. */
       accessor: (row) => (
-        <span className="flex flex-col leading-4">
+        <span className="flex flex-col leading-4" data-testid={`po-version-${row.id}`}>
           <span>PO V{row.facts.version}</span>
-          <span className="text-[11px] text-kit-slate-9">
-            {row.facts.operationStatus ?? row.facts.documentState}
-          </span>
+          <span className={supporting}>{versionLine(row)}</span>
         </span>
       ),
-      searchValue: (row) => `PO V${row.facts.version} ${row.facts.operationStatus ?? row.facts.documentState}`,
+      searchValue: (row) => `PO V${row.facts.version} ${versionLine(row)}`,
       filterValue: (row) => `PO V${row.facts.version}`,
-    },
-    {
-      key: "supplier_has",
-      chooserGroup: "Document",
-      label: "Sent to Supplier",
-      width: 148,
-      sortable: true,
-      /* The latest PO version with confirmed-send evidence, beside the current
-         PO Version so a mismatch (`PO V2` vs `PO V1`) is visible at a glance.
-         The second line is the evidence — channel and date — never an
-         instruction. Only `confirmed_sent` counts: opening or downloading the
-         PDF proves nothing, and a legacy PO without a send record stays
-         honestly `Not sent`. */
-      accessor: (row) => row.facts.latestConfirmedSend ? (
-        <span className="flex flex-col leading-4">
-          <span>{row.facts.sentToSupplier}</span>
-          <span className="text-[11px] text-kit-slate-9">
-            {CHANNEL_WORD[row.facts.latestConfirmedSend.channel] ?? row.facts.latestConfirmedSend.channel}
-            {" · "}
-            {fmtDate(row.facts.latestConfirmedSend.sentAt)}
-          </span>
-        </span>
-      ) : <Absence>Not sent</Absence>,
-      searchValue: (row) => row.facts.latestConfirmedSend
-        ? `${row.facts.sentToSupplier} ${CHANNEL_WORD[row.facts.latestConfirmedSend.channel] ?? row.facts.latestConfirmedSend.channel}`
-        : "Not sent",
-      filterValue: (row) => row.facts.sentToSupplier,
+      exportValue: (row) => `PO V${row.facts.version} · ${versionLine(row)}`,
     },
   ];
 
@@ -607,7 +894,7 @@ export default function PurchaseOrdersPage() {
   ];
 
   return (
-    <div className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
+    <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
@@ -617,30 +904,40 @@ export default function PurchaseOrdersPage() {
           ariaLabel="Purchase order filters"
           testId="po-filter-rail"
         >
-          <FilterRailGroup title="PURCHASE ORDERS">
-            <FilterRailRow
-              label="All purchase orders"
-              count={allRows.length}
-              active={filter == null}
-              onClick={() => setFilter(null)}
-              testId="po-filter-all"
-            />
-          </FilterRailGroup>
           {RAIL_GROUPS.map((group) => (
-            <FilterRailGroup key={group.heading} title={group.heading}>
+            <FilterRailGroup key={group.heading} title={group.heading} icon={group.icon}>
               {group.rows.map((item) => (
                 <FilterRailRow
                   key={item.key}
                   label={item.label}
-                  supportingText={item.action}
                   count={counts.get(item.key) ?? 0}
-                  active={filter === item.key}
-                  onClick={() => setFilter(filter === item.key ? null : item.key)}
+                  active={filter.facet === item.key}
+                  onClick={() => setFilter((f) => ({ ...f, facet: f.facet === item.key ? null : item.key }))}
                   testId={`po-filter-${item.key}`}
                 />
               ))}
             </FilterRailGroup>
           ))}
+          <FilterRailGroup title="Supplier" icon="supplier">
+            <FilterRailSelect
+              label="Supplier"
+              allLabel="All suppliers"
+              testId="po-supplier-select"
+              value={filter.supplier}
+              options={supplierOptions}
+              onChange={(supplier) => setFilter((f) => ({ ...f, supplier }))}
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title="Supplier Deliver To" icon="warehouse">
+            <FilterRailSelect
+              label="Supplier Deliver To"
+              allLabel="All destinations"
+              testId="po-deliver-to-select"
+              value={filter.deliverTo}
+              options={deliverToOptions}
+              onChange={(deliverTo) => setFilter((f) => ({ ...f, deliverTo }))}
+            />
+          </FilterRailGroup>
         </FilterRail>
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
@@ -652,44 +949,236 @@ export default function PurchaseOrdersPage() {
           ) : null}
             <DataGrid<RegisterRow>
               appearance="reference"
+              palette="slate"
+              searchPresentation="responsive"
               rows={visibleRows}
               columns={columns}
-              storageKey="carres.purchaseOrders.register.v1"
+              /* v2 — the nine-column date-first register replaces v1's twelve. */
+              storageKey="carres.purchaseOrders.register.v2"
               rowKey={(row) => row.id}
+              rowTestId={(row) => `grid-row-${row.id}`}
               exportName="Purchase Orders"
               searchPlaceholder="Search purchase orders…"
               isLoading={posQ.isLoading}
-              emptyMessage={filter ? "No purchase orders match this filter." : "No purchase orders yet."}
-              /* 0430 — the pinned identity is PO NO BY NAME, not "whatever
-                 column the saved layout happens to put first": a reordered
-                 chooser layout must never unpin the number the operator
-                 navigates by while scrolling the wide register. */
-              stickyIdentity={{ columnKey: "po" }}
+              emptyMessage={allRows.length === 0 ? "No purchase orders yet" : "No purchase orders match these filters"}
+              noMatchMessage="No purchase orders match these filters"
+              activeConditions={activeConditions}
+              onClearConditions={() => setFilter(RAIL_CLEAR)}
+              leadingColumns={{ date: "po_date", identity: "po" }}
+              personalLayouts={personalLayouts}
               groupBanner={false}
+              fixedGroups={{
+                groups: PO_GROUPS,
+                groupOf: (row) => row.facts.group,
+                revealMatches: activeConditions.length > 0,
+              }}
               chooserGroupOrder={["Document", "Supplier", "Goods", "Receiving"]}
               onRowDoubleClick={openObject}
               contextMenu={contextMenu}
-              toolbarStart={!railOpen && (
-                <button
-                  type="button"
-                  aria-label="Show filters"
-                  title="Show filters"
-                  data-testid="purchase-orders-show-filters"
-                  className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-                  onClick={() => setRailVisible(true)}
-                >
-                  <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-                </button>
-              )}
-              statusSummary={(filtered) => {
-                const ordered = filtered.reduce((sum, row) => sum + row.facts.quantities.ordered, 0);
-                const received = filtered.reduce((sum, row) => sum + row.facts.quantities.received, 0);
-                const open = filtered.reduce((sum, row) => sum + row.facts.quantities.open, 0);
-                return <span>{filtered.length} purchase orders · Order Qty {ordered} · Received Qty {received} · Pending Delivery Qty {open}</span>;
+              expandTitle="Show goods"
+              expandable={{
+                flush: true,
+                alignToColumn: "po_date",
+                testId: (row) => `po-expand-${row.id}`,
+                renderExpansion: (row) => <OrderedGoods row={row} destinations={destinations} />,
               }}
+              toolbarStart={!railOpen && (
+                <ShowFiltersButton
+                  onShow={() => setRailVisible(true)}
+                  testId="purchase-orders-show-filters"
+                />
+              )}
+              /* One total, including collapsed groups; no quantity totals. */
+              statusSummary={(filtered) => (
+                <span data-testid="po-footer">
+                  {filtered.length === allRows.length
+                    ? allRows.length === 1 ? "1 purchase order" : `${allRows.length} purchase orders`
+                    : `${filtered.length} of ${allRows.length} purchase orders`}
+                </span>
+              )}
             />
         </div>
       </div>
+      {receiptsFor ? (
+        <ReceiptsDialog
+          row={receiptsFor}
+          onOpenReceipt={(id) => { setReceiptsFor(null); openReceipt(id); }}
+          onClose={() => setReceiptsFor(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * ⭐ EVERY RECEIPT, ONE ROW EACH — MASTER §9.3 (Jess, 2026-09-18).
+ *
+ * A PO that took three deliveries has three arrival dates, three GRN numbers
+ * and three quantities. The listing cell states HOW MANY and this is where
+ * they are named, one per row, each with the door to the actual receipt.
+ * Nothing here is summed and nothing is picked to stand for the rest: a single
+ * latest date printed as if all the goods landed then is exactly the lie the
+ * count link exists to prevent.
+ */
+function ReceiptsDialog({
+  row,
+  onOpenReceipt,
+  onClose,
+}: {
+  row: RegisterRow;
+  onOpenReceipt: (receiptId: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title={`Receipts on ${row.id}`} onClose={onClose}>
+      <div data-testid="po-receipts-dialog" className="overflow-x-auto rounded-control border border-kit-slate-5">
+        <table className="w-full text-left text-body" aria-label={`Receipts on ${row.id}`}>
+          <thead className="border-b border-kit-slate-5 bg-kit-slate-3">
+            <tr>
+              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">Goods Received Date</th>
+              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">GRN No</th>
+              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">Received Qty</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-kit-slate-5">
+            {row.receipts.map((receipt) => (
+              <tr key={receipt.id} data-testid={`po-receipt-${receipt.grnNo}`}>
+                <td className="px-2 py-1.5 align-top">
+                  <span className="flex flex-col leading-4">
+                    <span className="tabular-nums">
+                      {receipt.receivedOn ? fmtDate(receipt.receivedOn) : <Absence />}
+                    </span>
+                    <span className="text-[11px] leading-4 text-kit-slate-11">Time not recorded</span>
+                  </span>
+                </td>
+                <td className="px-2 py-1.5 align-top">
+                  <button
+                    type="button"
+                    className="font-mono font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                    onClick={() => onOpenReceipt(receipt.id)}
+                  >
+                    {receipt.grnNo}
+                  </button>
+                </td>
+                {/* An older Worker sends no quantity. That is unknown, and
+                    unknown is never printed as zero. */}
+                <td className="px-2 py-1.5 align-top tabular-nums">
+                  {receipt.receivedQty == null ? <Absence /> : receipt.receivedQty}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
+  );
+}
+
+/** Where one governed reference opens. A Manual Purchase request with no
+ *  stored identity opens nothing — it prints its governed label as a fact. */
+function sourceHref(source: SourceRef): string | null {
+  if (source.kind === "sales_order") return source.orderId ? `/operation/orders/so/${source.orderId}` : null;
+  return source.requestId ? `/operation?tab=manual-purchase&request=${encodeURIComponent(source.requestId)}` : null;
+}
+
+/** The first arrival this PO recorded — the sort key for Goods Received Date.
+ *  An unknown arrival sorts after every known one; it is never treated as
+ *  today and never as "never arrived". */
+function firstArrival(row: RegisterRow): string | null {
+  const dates = row.receipts.map((receipt) => receipt.receivedOn).filter((date): date is string => !!date);
+  return dates.length === 0 ? null : dates.reduce((a, b) => (a <= b ? a : b));
+}
+
+/** Line 2 of PO Version — the CURRENT version's sent mark, or its absence. */
+function versionLine(row: RegisterRow): string {
+  const mark = row.facts.currentSend;
+  return mark
+    ? `PO sent to supplier · ${CHANNEL_WORD[mark.channel] ?? mark.channel} · ${fmtDate(mark.sentAt)}`
+    : "Sending not confirmed";
+}
+
+/**
+ * ⭐ THE ORDERED GOODS — READ ONLY (Purchasing MASTER §9.3, Jess 2026-09-18):
+ *
+ * ```
+ * Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+ * ```
+ *
+ * It is a TRUTH table: no purchasing checkbox, no Ready Stock allocation
+ * control, nothing that could commit a unit. The Purchase Orders register
+ * states what was ordered; buying happens at SO Batch Purchase and Manual
+ * Purchase, which own those acts and their guards.
+ *
+ * ⭐ AND THE UNIT IDs ARE THE REAL ONES. Every piece of an exact-unit line got
+ * a permanent `U1-000-001` in the SAME transaction that issued the PO (§6.2,
+ * migrations 0442–0444), bound to that line's immutable id. They are read from
+ * the PO's own units, never generated for the screen and never copied from a
+ * sample — a Unit ID is a thing written on a package in a factory, and an
+ * invented one sends somebody to look for furniture that does not exist.
+ *
+ * The three states a cell can honestly be in, and they are three different
+ * sentences:
+ *   · a QUANTITY line has no Unit IDs by law and prints `—`;
+ *   · an EXACT-UNIT line whose units came back empty is an INTEGRITY FAILURE
+ *     and says so — never an ordinary empty state;
+ *   · a read that failed or has not answered yet says that instead, because
+ *     "we have not looked" and "they are missing" are not the same fact.
+ */
+function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: Array<{ id: string; name: string }> }) {
+  const unitsQ = useOperationPoUnits(row.id);
+  const unitsByLine = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const unit of unitsQ.data?.units ?? []) {
+      if (!unit.po_line_id) continue;
+      const current = map.get(unit.po_line_id) ?? [];
+      current.push(unit.unit_code);
+      map.set(unit.po_line_id, current);
+    }
+    for (const codes of map.values()) codes.sort((a, b) => a.localeCompare(b));
+    return map;
+  }, [unitsQ.data]);
+
+  const lines: GoodsMiniLine[] = (row.po.purchase_order_lines ?? []).map((line) => {
+    const destination = line.destination_id
+      ? destinations.find((d) => d.id === line.destination_id)?.name ?? null
+      : row.deliverTo === "Not recorded" ? null : row.deliverTo;
+    const config = lineConfigBits(line.attrs as Record<string, unknown> | null | undefined).join(" · ");
+    const unitIds = unitsByLine.get(line.id) ?? [];
+    const counted = line.identity_mode === "quantity";
+    return {
+      key: line.id,
+      category: goodsCategoryOf(line),
+      unitIds: counted ? [] : unitIds,
+      unitNode: counted
+        ? <Absence>—</Absence>
+        : unitsQ.isError
+        ? <span className="text-kit-amber-11">Unit IDs could not be read</span>
+        : unitsQ.isLoading
+        ? <Absence>Reading Unit IDs…</Absence>
+        : unitIds.length === 0
+        ? <span className="text-kit-amber-11">Unit IDs missing on this line — do not send this PO</span>
+        : undefined,
+      unitAbsence: "",
+      deliverTo: destination ? [destination] : [],
+      deliverToAbsence: "Not recorded",
+      supplier: row.supplierName,
+      poNos: [row.id],
+      sku: line.sku,
+      qty: line.qty,
+      item: [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku,
+      itemDetail: config || undefined,
+      selectable: false,
+    };
+  });
+  return (
+    <div className="px-2 py-3" data-testid={`po-goods-${row.id}`}>
+      <GoodsMiniTable
+        label={`Goods on ${row.id}`}
+        lines={lines}
+        purchaseOrderLayout
+        showSupplier
+        itemHeading="Items"
+      />
     </div>
   );
 }
@@ -785,14 +1274,14 @@ function PurchaseOrderObject({
       <PurchasingTabs />
       <header className="shrink-0 border-b border-kit-slate-5 bg-white px-4 pt-3">
         <div className="flex flex-wrap items-start gap-3">
-          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-9 hover:text-kit-slate-12" onClick={onBack}>
+          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-11 hover:text-kit-slate-12" onClick={onBack}>
             <ArrowLeft size={18} />
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-page font-semibold text-kit-slate-12">
               <span className="font-mono">{po.id}</span> · {row.supplierName}
             </h1>
-            <p className="text-meta text-kit-slate-9">PO V{row.facts.version} · {row.facts.operationStatus ?? row.facts.documentState}</p>
+            <p className="text-meta text-kit-slate-11">PO V{row.facts.version} · {row.facts.operationStatus ?? row.facts.documentState}</p>
           </div>
           <div className="ml-auto flex flex-wrap justify-end gap-2 max-[960px]:basis-full max-[960px]:pl-7" data-testid="po-object-actions">
             {po.status === "open" && mode === "read" ? (
@@ -854,7 +1343,7 @@ function PurchaseOrderObject({
             <button
               key={item}
               type="button"
-              className={`h-8 border-b-2 px-3 text-meta font-medium ${view === item ? "border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-9 hover:text-kit-slate-12"}`}
+              className={`h-8 border-b-2 px-3 text-meta font-medium ${view === item ? "border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"}`}
               onClick={() => { setView(item); setMode("read"); }}
             >
               {item}
@@ -883,7 +1372,7 @@ function PurchaseOrderObject({
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
                   <h2 className="text-body font-semibold">{mode === "issue" ? "Issue purchase order" : "Revise purchase order"}</h2>
-                  <p className="text-meta text-kit-slate-9">Check the official document beside these fields before you finish.</p>
+                  <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
                 <button type="button" aria-label="Close document work" onClick={() => setMode("read")}><X size={16} /></button>
               </div>
@@ -1098,32 +1587,31 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
       <Block title="Purchase order">
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Supplier" value={row.supplierName} />
-          <Fact label="Deliver To" value={row.deliverTo} />
-          <Fact label="Source" value={row.source} />
-          <Fact label="PO Issued" value={row.facts.currentSend ? fmtDate(row.facts.currentSend.sentAt, { time: true }) : "Not sent"} />
+          <Fact label="Supplier Deliver To" value={row.deliverTo} />
+          <Fact label="Source" value={sourceSummary(row.sources)} />
           <Fact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
-          {/* Same law as the register column: absence FIRST, then equality.
-              `Same as PO` is a claim about what the supplier said. */}
-          <Fact label="Supplier Delivery Date" value={!row.supplierDate ? "Not confirmed" : row.supplierDate === row.po.official_delivery_date ? "Same as PO" : fmtDate(row.supplierDate)} />
-          <Fact label="PO Version" value={`PO V${row.facts.version}`} />
-          <Fact label="Sent to Supplier" value={row.facts.sentToSupplier} />
+          {/* Show the actual evidenced date, even when it matches the PO. */}
+          <Fact label="Supplier Confirmed Delivery Date" value={row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"} />
+          {/* The CURRENT version and its sent mark, in the register's own words;
+              earlier versions' marks stay in Revisions (MASTER §9.3). */}
+          <Fact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
+        <PoTermsBlock key={`${row.id}:terms:${row.po.terms_days ?? ""}`} poId={row.id} saved={row.po.terms_days ?? null} />
         <SupplierDateBlock key={`${row.id}:${row.facts.version}`} row={row} onSaved={onSupplierDateSaved} />
       </Block>
       <Block title="Goods lines">
-        {/* The table bleeds to the card edge so its own scroller, not the
-            card, is what moves sideways. */}
-        <div className="-mx-4 -mb-3 overflow-x-auto">
+        {/* Keep horizontal scrolling inside the card's padded content. */}
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
-            <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
-              <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Unit ID</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Order Qty</th><th className="px-3 text-right">Received Qty</th><th className="px-3 text-right">Pending Delivery Qty</th></tr>
+            <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-11">
+              <tr><th className="px-3 py-2.5 align-top text-left">SKU</th><th className="px-3 py-2.5 align-top text-left">Item</th><th className="px-3 py-2.5 align-top text-left">Unit ID</th><th className="px-3 py-2.5 align-top text-left">Source</th><th className="px-3 py-2.5 align-top text-left">Deliver To</th><th className="px-3 py-2.5 align-top text-left">Order Qty</th><th className="px-3 py-2.5 align-top text-left">Received Qty</th><th className="px-3 py-2.5 align-top text-left">Pending Delivery Qty</th></tr>
             </thead>
             <tbody>
               {po.purchase_order_lines.map((line) => (
                 <tr key={line.id} className="h-[38px] border-b border-kit-slate-4">
-                  <td className="px-3 font-mono">{line.sku}</td>
-                  <td className="px-3">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
+                  <td className="px-3 py-2.5 align-top text-left whitespace-nowrap font-mono">{line.sku}</td>
+                  <td className="px-3 py-2.5 align-top text-left">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
                   {/* The Units are the line's own rows: one permanent Unit ID
                       per physical piece, born with the official PO and bound
                       to this line (0442/0443). A quantity line has none by
@@ -1131,18 +1619,18 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       integrity failure, never an ordinary empty state. They
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
-                  <td className="px-3 py-1.5 align-top" data-testid={`po-line-units-${line.id}`}>{
-                    unitLoading ? <span className="text-kit-slate-9">Loading…</span>
+                  <td className="px-3 py-2.5 align-top text-left" data-testid={`po-line-units-${line.id}`}>{
+                    unitLoading ? <span className="text-kit-slate-11">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
                       ? <Absence>—</Absence>
                     : unitsOf(line).length
-                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
+                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
                       ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line — do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
                   }</td>
-                  <td className="px-3">{line.governed_sources?.length ? line.governed_sources.map((source) => {
+                  <td className="px-3 py-2.5 align-top text-left">{line.governed_sources?.length ? line.governed_sources.map((source) => {
                     /* Card 08 §3.5 — several Manual Purchases behind one
                        document stay apart by business facts, never by a
                        number: the purpose and Proceed Date join the label
@@ -1155,14 +1643,14 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       : source.reference;
                     return source.qty == null ? label : `${label} ×${source.qty}`;
                   }).join(" · ") : <Absence />}</td>
-                  <td className="px-3">{
+                  <td className="px-3 py-2.5 align-top text-left">{
                     line.destination_id
                       ? destinations.find((destination) => destination.id === line.destination_id)?.name ?? <Absence />
                       : row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo
                   }</td>
-                  <td className="px-3 text-right tabular-nums">{line.qty}</td>
-                  <td className="px-3 text-right tabular-nums">{line.received_qty}</td>
-                  <td className="px-3 text-right tabular-nums">{Math.max(0, line.qty - line.received_qty)}</td>
+                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{line.qty}</td>
+                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{line.received_qty}</td>
+                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{Math.max(0, line.qty - line.received_qty)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1197,7 +1685,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
             that can only fill with an error strip. */}
         {row.po.status === "cancelled" ? (
           <section className="border border-kit-slate-5 bg-white px-3 py-2" data-testid="po-cancelled-no-document">
-            <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
+            <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">Official document</div>
             <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
           </section>
         ) : (
@@ -1226,6 +1714,53 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
  * A supplier can confirm the original PO date or give a different date with a
  * reason. Both answers require evidence tied to the exact sent version.
  */
+/** 0530 — the PO's own payment terms. They win over the supplier's when a
+ *  bill's due date is filled in. Empty = not set; nothing waits on it. */
+function PoTermsBlock({ poId, saved }: { poId: string; saved: number | null }) {
+  const [draft, setDraft] = useState(saved == null ? "" : String(saved));
+  const [problem, setProblem] = useState<string | null>(null);
+  const save = useSetPoTermsDays(poId);
+  const n = draft.trim() === "" ? null : Number(draft);
+  const valid = n === null || (Number.isInteger(n) && n >= 0 && n <= 365);
+  const dirty = valid && n !== saved;
+  return (
+    <div className="mt-4 flex items-end gap-2 border-t border-kit-slate-4 pt-3" data-testid="po-terms">
+      <div className="w-40">
+        <Input
+          id={`po-terms-days-${poId}`}
+          label="Terms (days)"
+          type="number"
+          min={0}
+          max={365}
+          step={1}
+          value={draft}
+          hint="Blank uses the supplier's terms"
+          error={valid ? undefined : "0 to 365"}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={!dirty || save.isPending}
+        onClick={() => {
+          setProblem(null);
+          save.mutate(n, {
+            onError: (e: unknown) => {
+              const body = (e as { body?: { message?: string } }).body;
+              setProblem(body?.message ?? "The terms could not be saved");
+            },
+          });
+        }}
+        data-testid="po-terms-save"
+        className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
+      >
+        {save.isPending ? "Saving..." : "Save"}
+      </button>
+      {problem ? <div className="text-meta text-kit-red-11">{problem}</div> : null}
+    </div>
+  );
+}
+
 function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => void }) {
   const [date, setDate] = useState("");
   /* 0430 — NO pre-selected delay reason. "Production Delay" used to ship on
@@ -1290,12 +1825,12 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
 
   return (
     <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-date">
-      <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+      <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">
         SUPPLIER REPLY
       </div>
       <p className="mt-1 text-meta text-kit-slate-11">
         {known
-          ? `Supplier Delivery Date · ${fmtDate(known)}`
+          ? `Supplier Confirmed Delivery Date · ${fmtDate(known)}`
           : recordedReply
             ? `Supplier reply recorded without evidence · ${fmtDate(poReplyDateOf(recordedReply)!)}`
             : "Supplier has not confirmed the PO date"}
@@ -1316,7 +1851,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           that); here it is history the operator can still open and check. */}
       {allReplies.length > 0 ? (
         <div className="mt-2" data-testid="po-supplier-reply-history">
-          <div className="text-label text-kit-slate-9">Reply history</div>
+          <div className="text-label text-kit-slate-11">Reply history</div>
           <ul className="mt-1 flex flex-col gap-0.5">
             {allReplies.map((p) => (
               <li key={`${p.recorded_at}:${p.new_date ?? p.about_date}`} className="text-meta text-kit-slate-11">
@@ -1340,7 +1875,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
       ) : null}
       {canRecord ? <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Supplier Delivery Date</span>
+          <span className="text-label text-kit-slate-11">Supplier Confirmed Delivery Date</span>
           <input
             type="date"
             value={date}
@@ -1361,7 +1896,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
                 0430 — only a LATER date asks why, and nothing is pre-chosen:
                 an earlier or matching date is not a delay and gets no delay
                 reason, silently or otherwise. */}
-            <span className="text-label text-kit-slate-9">Why has it moved?</span>
+            <span className="text-label text-kit-slate-11">Why has it moved?</span>
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -1374,7 +1909,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           </label>
         ) : null}
         <label className="flex min-w-[200px] flex-1 flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Remarks</span>
+          <span className="text-label text-kit-slate-11">Remarks</span>
           <input
             type="text"
             value={remarks}
@@ -1385,7 +1920,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Channel</span>
+          <span className="text-label text-kit-slate-11">Channel</span>
           <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta">
             <option value="whatsapp">WhatsApp</option><option value="email">Email</option>
             <option value="phone">Phone</option><option value="in_person">In person</option>
@@ -1396,7 +1931,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           ["Reported by", reportedBy, setReportedBy],
         ] as const).map(([label, value, setValue]) => (
           <label key={label} className="flex flex-col gap-1">
-            <span className="text-label text-kit-slate-9">{label}</span>
+            <span className="text-label text-kit-slate-11">{label}</span>
             <input value={value} onChange={e => setValue(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
           </label>
         ))}
@@ -1404,7 +1939,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           paths={evidence ? [evidence] : []} onChange={paths => setEvidence(paths[paths.length - 1] ?? "")}
           label="Reply evidence" testId="po-supplier-reply-evidence" />
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Reported at</span>
+          <span className="text-label text-kit-slate-11">Reported at</span>
           <input type="datetime-local" value={reportedAt} onChange={e => setReportedAt(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
         </label>
         <button
@@ -1412,7 +1947,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           disabled={!ready}
           onClick={save}
           data-testid="po-supplier-date-save"
-          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
+          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11"
         >
           {record.isPending ? "Recording..." : "Record supplier answer"}
         </button>
@@ -1441,7 +1976,7 @@ function replyAnswerWord(answer: string, reason: string | null | undefined): str
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-label text-kit-slate-9">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;
+  return <div><dt className="text-label text-kit-slate-11">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
@@ -1449,11 +1984,11 @@ function ConnectionBlock({ title, empty, children, hasContent, loading, problem,
 }
 
 function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {
-  return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-9">{secondary}</div></div>;
+  return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-11">{secondary}</div></div>;
 }
 
 function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-9">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
+  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
 }
 
 function ReadProblem({ problem, action, onRetry }: { problem: string; action: string; onRetry?: () => void }) {
@@ -1475,15 +2010,18 @@ function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, r
   const problemCount = claims.length + returnRows.length;
   const problemLoading = claimsLoading || receivingLoading;
   const problemError = claimsError || receivingError;
-  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={row.source} detail={row.sourceSearch === "Not recorded" ? "No governed source is recorded" : row.sourceSearch} /><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
+  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={sourceSummary(row.sources)} detail={row.sources.length === 0 ? "No governed source is recorded" : ""}>{row.sources.map((source) => { const href = sourceHref(source); return href ? <Link key={source.reference} to={href} className="block font-mono text-meta text-kit-blue-11 underline-offset-2 hover:underline">{source.reference}</Link> : <span key={source.reference} className="block font-mono text-meta text-kit-slate-11">{source.reference}</span>; })}</RouteNode><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
 }
 
-function RouteNode({ title, main, detail }: { title: string; main: string; detail: string }) {
-  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-9">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div><div className="mt-1 text-meta text-kit-slate-9">{detail}</div></div>;
+/** `children` — where a node's facts are individually REACHABLE rather than
+ *  summarised: the Source node names every SO and MPR behind this PO, each
+ *  one a door (MASTER §9.3, "individually reachable"). */
+function RouteNode({ title, main, detail, children }: { title: string; main: string; detail: string; children?: ReactNode }) {
+  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-11">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
 }
 
 function RouteProblem({ title, problem, action, onRetry }: { title: string; problem: string; action: string; onRetry: () => void }) {
-  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-9">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
+  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
 }
 
 function OfficialPreview({ poId }: { poId: string }) {
@@ -1562,6 +2100,6 @@ function RevisionForm({
     const pickerDestinations = activeDestinations.some((destination) => destination.id === currentDestinationId) || !currentDestination
       ? activeDestinations
       : [currentDestination, ...activeDestinations];
-    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body font-semibold">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-9">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
+    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body font-semibold">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
   })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : `Save PO V${(po.version ?? 1) + 1}`}</button></div></div>;
 }

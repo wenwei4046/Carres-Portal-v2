@@ -2,47 +2,36 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
 import {
-  DEMAND_PURPOSE_DEFAULT,
-  DEMAND_PURPOSE_VALUES,
   composeDocumentLines,
   documentPartitionKey,
-  expectedArrivalOf,
-  isToOrderCategory,
+  poDeliveryDateOf,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
-  readyStockDrawNote,
-  READY_STOCK_DRAW_REASON,
   stockMatchKey,
   railItemLabel,
   type DemandPickItem,
-  type ProductCategory,
   type IssueDocument,
   type PoDocumentAllocation,
   type ToOrderBuild,
-  type ToOrderOrderedRow,
   type ToOrderRow,
 } from "@carres/shared";
 import { validateIssuePlan } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import {
-  attr,
-  chunk,
   loadToOrder,
   readFreeStock,
-  stockRefOf,
   todayIso,
-  type CatalogFact,
 } from "../../lib/purchase-demand-read";
 import type { AppEnv } from "../../types";
 
 /**
  * /api/operation/purchase/to-order — the Planning Workspace.
  *
- *   GET  /            the proposals the Review Grid shows
- *   POST /issue       the ONE act that creates formal purchase orders
+ *   GET  /demand/pick-items   what the Manual Purchase picker chooses from
+ *   POST /issue-batch         the ONE act that creates formal purchase orders
  *
  * **Nothing here stores a proposal.** The read recomputes it every time, which
  * is the whole reason To Order has no status, no hold and no audit of its own.
@@ -65,598 +54,6 @@ import type { AppEnv } from "../../types";
  */
 const toOrderRouter = new Hono<AppEnv>();
 
-/** How far back the grid answers "what did we order". Older → Purchase Orders. */
-const ORDERED_WINDOW_DAYS = 14;
-
-/**
- * Rows that already became purchase orders — the grid's `Ordered` answer
- * (Jess, 2026-08-01: Today + PO filter `Ordered` = 今天已经下了哪些).
- *
- * RECENT ONLY, on purpose: real history belongs to Purchase Orders, so this
- * reads the last {@link ORDERED_WINDOW_DAYS} days and nothing more. A row is
- * one PO × one customer order; its lines are matched by SKU against the
- * customer's own order lines, so the quantity is what THAT customer ordered —
- * the same voice as a demand row. A PO with no SO refs (a manual purchase)
- * still gets one row: it was ordered, and ordered work must be answerable.
- *
- * Failures here degrade to an empty list rather than failing the page — the
- * demand half is the work; the ordered half is the receipt.
- */
-async function loadOrderedRows(
-  sb: ReturnType<typeof userClient>,
-  today: string,
-  catalog: Map<string, CatalogFact>,
-  supplierNames: ReadonlyMap<string, string>,
-  scopeSo: number | null = null,
-): Promise<ToOrderOrderedRow[]> {
-  const since = new Date(`${today}T00:00:00Z`);
-  since.setUTCDate(since.getUTCDate() - ORDERED_WINDOW_DAYS);
-  const sinceIso = since.toISOString().slice(0, 10);
-
-  let poQuery = sb
-    .from("purchase_orders")
-    .select("id, supplier_id, placed_at, so_refs");
-  // A scoped entrance must explain an older PO too. The ordinary workspace
-  // deliberately keeps its 14-day receipt window; only the explicit SO lens
-  // asks history for that one order.
-  if (scopeSo == null) poQuery = poQuery.gte("placed_at", sinceIso);
-  const { data: allPoRows, error: poErr } = await poQuery.order("placed_at", {
-    ascending: false,
-  });
-  const poRows =
-    scopeSo == null
-      ? allPoRows
-      : (allPoRows ?? []).filter((p) =>
-          ((p.so_refs as number[] | null) ?? []).some(
-            (so) => Number(so) === scopeSo,
-          ),
-        );
-  if (poErr || !poRows || poRows.length === 0) return [];
-
-  // The catalog arrives from loadToOrder — but its no-open-orders early
-  // return carries an EMPTY map, and recent POs can outlive their orders.
-  // Read it here in that one case, whole, same rule as loadToOrder (§: a SKU
-  // never goes into an `.in()`).
-  if (catalog.size === 0) {
-    const { data: skuRows } = await sb
-      .from("product_skus")
-      .select(
-        "sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)",
-      );
-    for (const row of (skuRows ?? []) as Record<string, unknown>[]) {
-      const pm = row.product_models as {
-        category?: string | null;
-        name?: string | null;
-      } | null;
-      catalog.set(row.sku as string, {
-        supplierId: (row.supplier_id as string | null) ?? null,
-        cost: row.cost != null ? Number(row.cost) : null,
-        variant: (row.variant as string | null) ?? null,
-        variantKind: (row.variant_kind as string | null) ?? null,
-        category: (pm?.category as string | undefined) ?? undefined,
-        modelName: (pm?.name as string | null) ?? null,
-      });
-    }
-  }
-
-  const poIds = poRows.map((p) => p.id as string);
-  const linesByPo = new Map<string, { sku: string; qty: number }[]>();
-  for (const batch of chunk(poIds)) {
-    const { data, error } = await sb
-      .from("purchase_order_lines")
-      .select("po_id, sku, qty")
-      .in("po_id", batch);
-    if (error) return [];
-    for (const l of data ?? []) {
-      const arr = linesByPo.get(l.po_id as string) ?? [];
-      arr.push({ sku: l.sku as string, qty: Number(l.qty ?? 0) });
-      linesByPo.set(l.po_id as string, arr);
-    }
-  }
-
-  const soRefs = [
-    ...new Set(poRows.flatMap((p) => (p.so_refs as number[] | null) ?? [])),
-  ];
-  const orderBySo = new Map<number, Record<string, unknown>>();
-  const orderLinesByOrder = new Map<
-    string,
-    { sku: string; qty: number; attrs: unknown }[]
-  >();
-  if (soRefs.length > 0) {
-    for (const batch of chunk(soRefs)) {
-      const { data, error } = await sb
-        .from("orders")
-        .select(
-          "id, so, customer_name, delivery_date, delivery_date_tbd, proceed_date",
-        )
-        .in("so", batch);
-      if (error) return [];
-      for (const o of data ?? [])
-        orderBySo.set(Number(o.so), o as Record<string, unknown>);
-    }
-    const orderIds = [...orderBySo.values()].map((o) => o.id as string);
-    for (const batch of chunk(orderIds)) {
-      const { data, error } = await sb
-        .from("order_lines")
-        .select("order_id, sku, qty, attrs")
-        .in("order_id", batch);
-      if (error) return [];
-      for (const l of data ?? []) {
-        const arr = orderLinesByOrder.get(l.order_id as string) ?? [];
-        arr.push({
-          sku: l.sku as string,
-          qty: Number(l.qty ?? 0),
-          attrs: l.attrs,
-        });
-        orderLinesByOrder.set(l.order_id as string, arr);
-      }
-    }
-  }
-
-  /** One build, one MODEL NAME — `2 items` is banned from the Model column
-   *  (Jess, 2026-08-01), so ordered rows split exactly like demand rows. */
-  const labelOf = (sku: string): string => {
-    const f = catalog.get(sku);
-    const size = f?.variantKind === "size" ? f.variant : null;
-    return railItemLabel(f?.modelName ?? sku, size);
-  };
-  const categoryOf = (skus: readonly string[]): ProductCategory | null => {
-    for (const s of skus) {
-      const c = catalog.get(s)?.category;
-      if (c && isToOrderCategory(c)) return c;
-    }
-    return null;
-  };
-
-  const rows: ToOrderOrderedRow[] = [];
-  for (const po of poRows) {
-    const poLines = linesByPo.get(po.id as string) ?? [];
-    const poSkus = new Set(poLines.map((l) => l.sku));
-    const refs = (po.so_refs as number[] | null) ?? [];
-    const placedAt = ((po.placed_at as string | null) ?? today).slice(0, 10);
-    const category = categoryOf([...poSkus]);
-    if (!category) continue; // not this page's goods (accessory restock etc.)
-
-    if (refs.length === 0) {
-      // A manual PO: one row per LINE, each naming its model.
-      for (const l of poLines) {
-        rows.push({
-          poId: po.id as string,
-          placedAt,
-          category,
-          supplierId: (po.supplier_id as string | null) ?? "",
-          supplierName:
-            supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
-          orderId: null,
-          customer: null,
-          so: null,
-          delivery: null,
-          // P18 — a manual purchase order has no customer order behind it, so
-          // there is no planned production start to state. Null for the same
-          // reason `so`, `customer` and `delivery` above are null.
-          proceedDate: null,
-          model: labelOf(l.sku),
-          qty: l.qty,
-        });
-      }
-      continue;
-    }
-
-    for (const so of refs) {
-      const order = orderBySo.get(Number(so));
-      const covered = order
-        ? (orderLinesByOrder.get(order.id as string) ?? []).filter((l) =>
-            poSkus.has(l.sku),
-          )
-        : [];
-      const tbd = Boolean(order?.delivery_date_tbd);
-      const base = {
-        poId: po.id as string,
-        placedAt,
-        category,
-        supplierId: (po.supplier_id as string | null) ?? "",
-        supplierName:
-          supplierNames.get((po.supplier_id as string | null) ?? "") ?? null,
-        orderId: (order?.id as string | null) ?? null,
-        customer: (order?.customer_name as string | null) ?? null,
-        so: Number(so),
-        delivery:
-          !tbd && order?.delivery_date
-            ? (order.delivery_date as string).slice(0, 10)
-            : null,
-        // P18 — the same order fact on the receipt row. Required, not tidy: an
-        // order whose every line is bought has no demand rows left, so its group
-        // is receipts alone and this is the only place the header could read it.
-        proceedDate:
-          ((order?.proceed_date as string | null) ?? null)?.slice(0, 10) ??
-          null,
-      };
-      if (covered.length === 0) {
-        // Nothing matched — still one honest row per PO line.
-        for (const l of poLines)
-          rows.push({ ...base, model: labelOf(l.sku), qty: l.qty });
-        continue;
-      }
-      // One row per BUILD — a sofa's modules collapse to one sofa; every
-      // other line stands alone, exactly the demand grid's grouping.
-      const byBuild = new Map<string, { sku: string; qty: number }[]>();
-      for (const l of covered) {
-        const k = attr(l.attrs, "sofa_build_key") ?? `line::${l.sku}`;
-        const arr = byBuild.get(k) ?? [];
-        arr.push({ sku: l.sku, qty: l.qty });
-        byBuild.set(k, arr);
-      }
-      for (const members of byBuild.values()) {
-        rows.push({
-          ...base,
-          model: labelOf(members[0]!.sku),
-          qty:
-            category === "sofa"
-              ? 1
-              : members.reduce((sum, m) => sum + m.qty, 0),
-        });
-      }
-    }
-  }
-  return rows;
-}
-
-toOrderRouter.get("/", requireOperation, async (c) => {
-  const rawSo = c.req.query("so");
-  const scopeSo = rawSo == null || rawSo === "" ? null : Number(rawSo);
-  if (scopeSo != null && (!Number.isInteger(scopeSo) || scopeSo <= 0)) {
-    return c.json({ error: "invalid_so", code: "invalid_param" }, 400);
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  const res = await loadToOrder(sb);
-  if (!res.ok)
-    return c.json(res.body as Record<string, unknown>, res.status as 400);
-
-  const { data: destRows, error: destErr } = await sb
-    .from("purchasing_destinations")
-    .select("id, name, is_default")
-    .eq("active", true)
-    .order("is_default", { ascending: false })
-    .order("name");
-  if (destErr) {
-    const m = mapPgError(destErr);
-    return c.json(m.body, m.status);
-  }
-
-  // The factory names, read here rather than threaded out of loadToOrder: its
-  // no-live-orders early return never reads `suppliers`, and an ordered row's
-  // supplier is exactly the one that may have no demand today. 10 rows.
-  const { data: supRows, error: supErr } = await sb
-    .from("suppliers")
-    .select("id, name, kind");
-  if (supErr) {
-    const m = mapPgError(supErr);
-    return c.json(m.body, m.status);
-  }
-  const supplierNames = new Map<string, string>(
-    (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
-  );
-  const { data: partnerRows, error: partnerErr } = await sb
-    .from("delivery_partners")
-    .select("id, name")
-    .order("name");
-  if (partnerErr) {
-    const m = mapPgError(partnerErr);
-    return c.json(m.body, m.status);
-  }
-
-  const ordered = await loadOrderedRows(
-    sb,
-    res.data.today,
-    res.data.catalog,
-    supplierNames,
-    scopeSo,
-  );
-
-  // Scope AFTER the full recomputation. Stock and open-PO allocation therefore
-  // stay global and authoritative; `?so=` is only a lens over that answer.
-  const proposals =
-    scopeSo == null
-      ? res.data.proposals
-      : res.data.proposals
-          .map((proposal) => ({
-            ...proposal,
-            rows: proposal.rows.filter((row) => row.so === scopeSo),
-          }))
-          .filter((proposal) => proposal.rows.length > 0);
-  const unresolved =
-    scopeSo == null
-      ? res.data.unresolved
-      : res.data.unresolved.filter((row) => row.so === scopeSo);
-  const scopedOrdered =
-    scopeSo == null ? ordered : ordered.filter((row) => row.so === scopeSo);
-
-  // Card 2's blocked-demand read model is deliberately demand-local. Pickup
-  // partner is NOT represented here: it is a fact of the governed Issue
-  // document after supplier/document construction.
-  const blockedDemand: {
-    code: "blocked_delivery_date" | "unresolved_supplier" | "cost_required";
-    orderId: string;
-    so: number | null;
-    sku: string;
-  }[] = unresolved.map((row) => ({ code: "unresolved_supplier", ...row }));
-  for (const proposal of proposals) {
-    for (const row of proposal.rows) {
-      for (const build of row.builds) {
-        if (build.fullyOnPo) continue;
-        for (const line of build.lines) {
-          if (!row.readyStock && row.delivery == null) {
-            blockedDemand.push({
-              code: "blocked_delivery_date",
-              orderId: row.orderId,
-              so: row.so,
-              sku: line.sku,
-            });
-          }
-          if (line.cost == null || line.cost <= 0) {
-            blockedDemand.push({
-              code: "cost_required",
-              orderId: row.orderId,
-              so: row.so,
-              sku: line.sku,
-            });
-          }
-        }
-      }
-    }
-  }
-
-  let scope: null | {
-    so: number;
-    orderFound: boolean;
-    issuable: number;
-    blockedProductionDays: number;
-    blockedDeliveryDate: number;
-    unresolved: number;
-    alreadyCovered: number;
-    alreadyIssued: number;
-  } = null;
-  if (scopeSo != null) {
-    const { data: order } = await sb
-      .from("orders")
-      .select("id, proceed_date")
-      .eq("so", scopeSo)
-      .maybeSingle();
-    let issuable = 0;
-    let blockedProductionDays = res.data.blocked.filter(
-      (row) => row.so === scopeSo,
-    ).length;
-    let blockedDeliveryDate = 0;
-    let alreadyCovered = 0;
-    for (const proposal of proposals) {
-      for (const row of proposal.rows) {
-        for (const build of row.builds) {
-          /* `alreadyCovered` reports, it no longer excludes. A build sitting
-             wholly on an open purchase order is issuable like any other since
-             the SO Batch register began offering it a tick, so counting it
-             here as NOT issuable would have this door and that one disagree
-             about the same build. The tally stays because "these units are
-             already on order" is worth saying; it just no longer decides. */
-          if (proposal.blocked === "production_days")
-            blockedProductionDays += 1;
-          else if (row.delivery == null) blockedDeliveryDate += 1;
-          else {
-            issuable += 1;
-            if (build.fullyOnPo) alreadyCovered += 1;
-          }
-        }
-      }
-    }
-    scope = {
-      so: scopeSo,
-      orderFound: order != null,
-      issuable,
-      blockedProductionDays,
-      blockedDeliveryDate,
-      unresolved: unresolved.length,
-      alreadyCovered,
-      alreadyIssued: scopedOrdered.length,
-    };
-  }
-
-  return c.json({
-    today: res.data.today,
-    poDays: res.data.poDays,
-    proposals,
-    unresolved,
-    blockedDemand,
-    ordered: scopedOrdered,
-    ...(scope ? { scope } : {}),
-    // P10 — the warehouse the offer was counted at, by its own name. The page
-    // states WHERE the stock is, and it may not invent the word `Klang`: a
-    // second warehouse is a rename away, and a sentence naming the wrong shed
-    // is worse than one naming none.
-    stockWarehouse: res.data.stockWarehouse?.name ?? null,
-    destinations: (destRows ?? []).map((d) => ({
-      id: d.id as string,
-      name: d.name as string,
-      isDefault: Boolean(d.is_default),
-    })),
-    procurementPartners: (partnerRows ?? []).map((p) => ({
-      id: p.id as string,
-      name: p.name as string,
-    })),
-  });
-});
-
-/**
- * `Reserve` — ready stock is SUGGESTED; the human decides whether to reserve
- * it (card P10, Loo 2026-08-04; the word is P13's, same day — the goods do not
- * leave, they are LOCKED until delivery, and the order drawer's picker has
- * said `Reserve` for this act since 2026-06-30).
- *
- * THE ROUTE PATH STAYS `/take-stock`. It is a wire contract, not a word on a
- * screen, and renaming it would break a browser open across the deploy for
- * nothing. P13 rules the VOCABULARY the operator reads.
- *
- * THE BODY CARRIES NO QUANTITY, and that is his ruling 3 built as a contract
- * rather than as a screen rule: *"我要的就是有一个自动建议补货，不过我们可以
- * 手动选择要不要拉。"* The system suggests, the human accepts — so there is
- * nothing to type, nothing to mistype, and the REASON is recorded by
- * construction, because pressing this can mean exactly one thing.
- *
- * The server recomputes the whole workspace and reads the offer off its OWN
- * projection, so a stale tab cannot take stock against last hour's demand and
- * a browser cannot name a quantity, a SKU or a unit.
- */
-const takeStockBody = z.object({
-  orderId: z.string().min(1),
-  buildKey: z.string().min(1),
-});
-toOrderRouter.post("/take-stock", requireOperation, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    return c.json({ error: "invalid_json" }, 400);
-  }
-  const parsed = takeStockBody.safeParse(raw);
-  if (!parsed.success)
-    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
-  const { orderId, buildKey } = parsed.data;
-
-  const res = await loadToOrder(sb);
-  if (!res.ok)
-    return c.json(res.body as Record<string, unknown>, res.status as 400);
-
-  let found: { row: ToOrderRow; build: ToOrderBuild } | null = null;
-  for (const p of res.data.proposals) {
-    for (const row of p.rows) {
-      if (row.orderId !== orderId) continue;
-      const build = row.builds.find((b) => b.key === buildKey);
-      if (build) found = { row, build };
-    }
-  }
-  // The row moved, was ordered, or was covered since the page loaded. Absent
-  // from the recomputation IS the refusal — there is nothing to take.
-  if (!found)
-    return c.json({ error: "unknown_build", code: "unknown_build" }, 409);
-
-  const { row, build } = found;
-  if (build.freeStock <= 0 || build.freeStockItemIds.length === 0) {
-    return c.json({ error: "no_free_stock", code: "no_free_stock" }, 409);
-  }
-  const ref = stockRefOf(row.readyStock, row.so, row.destination);
-  if (!ref) {
-    // A customer row with no SO cannot say what the unit is committed to, and
-    // `ops_stock_pool_draw` refuses an empty reference by name. Refused here
-    // rather than there, so the operator gets the reason and not a 500.
-    return c.json({ error: "no_reference", code: "no_reference" }, 422);
-  }
-
-  /**
-   * K4'S DOOR, and only K4's door (0292/0294). It makes the draw and its
-   * reason ONE transaction, flips the unit to `reserved` under this reference,
-   * writes the ledger row, the audit row and the order's own timeline. A
-   * fourth door writing `ops_stock_items` its own way would be a second truth
-   * about the same units.
-   *
-   * ONE CALL PER RECORD, because that is the door's shape — and it is what
-   * makes *"taking twice cannot over-draw"* structural rather than hopeful:
-   * each call claims its unit only `where status = 'free'`, so a unit somebody
-   * else took a second ago comes back null and is simply not counted.
-   */
-  const note = readyStockDrawNote(build.title);
-  let taken = 0;
-  const drawn: string[] = [];
-  for (const itemId of build.freeStockItemIds) {
-    const { data, error } = await sb.rpc("ops_stock_pool_draw", {
-      p_ref: ref,
-      // P13 (0322) — K4's own sixth reason. P10 wrote `other` + a note because
-      // the five had no row for *taken instead of buying it*; Loo added the
-      // word on 2026-08-04, so the ledger now says it in its own vocabulary
-      // and the monthly split stops reading as an unexplained `Other`.
-      p_reason: READY_STOCK_DRAW_REASON,
-      p_note: note,
-      p_item_id: itemId,
-      p_sku: null,
-      p_condition: null,
-      p_wh: null,
-      /* 0471 — a Ready Stock destination row names no Sales Order line; a
-         customer row has its line resolved by the draw door. */
-      p_order_line_id: null,
-    });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json({ ...(m.body as object), taken }, m.status);
-    }
-    if (!data) continue; // no longer free — somebody else got there first
-    drawn.push(itemId);
-    taken += res.data.stockQtyById.get(itemId) ?? 1;
-  }
-
-  if (taken === 0) {
-    return c.json({ error: "no_free_stock", code: "no_free_stock" }, 409);
-  }
-
-  /**
-   * A TYPED DEMAND'S REMAINDER FALLS THROUGH ITS OWN DOOR (0320).
-   *
-   * A customer line needs nothing here: the ledger row just written IS the
-   * record, and the next read nets it. A typed demand carries a counter, and
-   * `purchasing_demand_record_issue` is the only thing allowed to move it —
-   * additive, `FOR UPDATE`, and refusing an over-issue by name.
-   *
-   * It runs AFTER the draw on purpose. If it fails, the units are reserved and
-   * the demand still asks for them: we would buy too many, which is visible on
-   * the next read and recoverable. The other order would have us buy too few,
-   * and a customer short of goods is not recoverable by looking at a screen.
-   */
-  if (row.readyStock) {
-    const m = /^demand:(.+)$/.exec(row.orderId);
-    if (m) {
-      const { error } = await sb.rpc("purchasing_demand_record_issue", {
-        p_id: m[1]!,
-        p_qty: taken,
-        p_po_id: null,
-      });
-      if (error) {
-        console.error(
-          "purchase_demands stock take not recorded",
-          m[1],
-          error.message,
-        );
-        return c.json(
-          {
-            error: "demand_not_recorded",
-            code: "demand_not_recorded",
-            message: `${taken} unit(s) were reserved but the demand was not reduced.`,
-            taken,
-          },
-          500,
-        );
-      }
-    }
-  }
-
-  return c.json({ taken, reference: ref, items: drawn.length });
-});
-
-/**
- * `+ Create Purchase` — the manual entrance (Jess, 2026-08-03).
- *
- * V1 buys READY STOCK and nothing else. Display begins at the Dealer/Sales
- * portal as a Display Request and Office at a future internal request
- * workflow; both will reach purchasing through this same table, and neither
- * starts here — so neither appears in this body, and there is no disabled
- * option anywhere to suggest otherwise.
- *
- * THE PURPOSE IS SENT EXPLICITLY, not inferred from the absence of others
- * (her correction, same day). The CLIENT cannot choose it: it is written here,
- * so a browser can never file a demand as something else.
- *
- * THE SUPPLIER IS NOT IN THE BODY EITHER — the RPC derives it from the SKU. A
- * product has one factory, and a demand pointed at the wrong one becomes a
- * purchase order pointed at the wrong one.
- */
 /**
  * `GET /demand/pick-items` — what the Create Purchase picker chooses from
  * (card P15, Loo 2026-08-04).
@@ -697,18 +94,12 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
     .from("product_skus")
     .select("sku, variant, variant_kind, supplier_id, model_id")
     .not("supplier_id", "is", null);
-  if (skuErr) {
-    const m = mapPgError(skuErr);
-    return c.json(m.body, m.status);
-  }
+  if (skuErr) return fail(c, skuErr);
 
   const { data: modelRows, error: modelErr } = await sb
     .from("product_models")
     .select("id, name");
-  if (modelErr) {
-    const m = mapPgError(modelErr);
-    return c.json(m.body, m.status);
-  }
+  if (modelErr) return fail(c, modelErr);
   const modelName = new Map(
     (modelRows ?? []).map((m) => [m.id as string, (m.name as string) ?? ""]),
   );
@@ -716,10 +107,7 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
   const { data: supRows, error: supErr } = await sb
     .from("suppliers")
     .select("id, name");
-  if (supErr) {
-    const m = mapPgError(supErr);
-    return c.json(m.body, m.status);
-  }
+  if (supErr) return fail(c, supErr);
   const supplierName = new Map(
     (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
   );
@@ -779,130 +167,6 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
   items.sort((a, b) => a.sku.localeCompare(b.sku));
 
   return c.json({ items, stockWarehouse: stockWarehouse?.name ?? null });
-});
-
-const demandBody = z.object({
-  sku: z.string().min(1),
-  qty: z.number().int().min(1),
-  destinationId: z.string().uuid(),
-  requiredBy: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullish(),
-  remark: z.string().max(500).nullish(),
-  /**
-   * P15 — the Source. **The enum is the SHARED constant, not a list retyped
-   * here**: `DEMAND_PURPOSES` mirrors `purchase_demands.purpose`'s CHECK and
-   * `purchasing_create_demand`'s own gate, so the picker, this validator and
-   * the database cannot come to hold three different lists — which is exactly
-   * what 0322 had to repair on the pool's reasons.
-   *
-   * OPTIONAL, and that is a compatibility decision rather than an oversight: a
-   * browser still holding the pre-P15 bundle posts no `purpose`, and it must
-   * keep working. It falls to `ready_stock` — the RPC's own default, and the
-   * only value that browser could ever have meant.
-   *
-   * THERE IS NO `supplier` KEY AND THERE MAY NEVER BE ONE. The supplier is
-   * derived from the SKU inside the RPC; the dialog SHOWS it as a fact. A
-   * client that could name it is a client that could name the wrong factory.
-   */
-  purpose: z.enum(DEMAND_PURPOSE_VALUES as [string, ...string[]]).optional(),
-});
-
-toOrderRouter.post("/demand", requireOperation, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    return c.json({ error: "invalid_json" }, 400);
-  }
-  const parsed = demandBody.safeParse(raw);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
-  }
-  const { sku, qty, destinationId, requiredBy, remark, purpose } = parsed.data;
-
-  const { data, error } = await sb.rpc("purchasing_create_demand", {
-    p_sku: sku,
-    p_qty: qty,
-    p_destination_id: destinationId,
-    p_required_by: requiredBy ?? null,
-    p_remark: remark ?? null,
-    p_purpose: purpose ?? DEMAND_PURPOSE_DEFAULT,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data ?? { ok: true });
-});
-
-/**
- * `Cancel` on a demand row — and on the REMAINDER of a part-ordered one
- * (Loo, 2026-08-04, card P12).
- *
- * IT SHIPS WITH ITS BUTTON, in the same card, because C1 deleted a live route
- * whose only caller had gone: *a route with no caller is a bypass one curl
- * away.* The inverse is the same fault — a button with no door is a lie.
- *
- * NO QUANTITY IS IN THE BODY, and that is the design rather than an omission.
- * A cancel takes the whole remainder or it is not a cancel, and `remaining_qty`
- * is GENERATED in the database (0320), so the number nobody typed is also a
- * number nobody can get wrong. What the RPC answers with — `cancelled` — is
- * read back off the row, so the figure the operator is told is the figure the
- * record now holds.
- *
- * `issued_qty` and `po_id` are untouched by the door: what was already ordered
- * keeps its purchase order, and stopping THAT is the purchase order's own
- * business (`PURCHASING-WORKING-FLOW.md` §9).
- *
- * There is no DELETE route here and there may never be one. Cancel keeps the
- * record; test rubbish is cleaned by SQL on request and the database starts
- * clean at go-live, so nothing is owed. A delete built for testing survives
- * into production as a way to erase a real purchase record leaving no trace.
- */
-const cancelDemandBody = z.object({
-  // Mandatory, and refused in three places rather than one: here, in the RPC by
-  // name (`reason_required`), and by the table's own `cancel_pair` CHECK. A
-  // cancellation without a reason is half a record.
-  reason: z.string().trim().min(1).max(500),
-});
-
-toOrderRouter.post("/demand/:id/cancel", requireOperation, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  const id = c.req.param("id");
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-  ) {
-    return c.json({ error: "invalid_id", code: "invalid_param" }, 400);
-  }
-
-  let raw: unknown;
-  try {
-    raw = await c.req.json();
-  } catch {
-    return c.json({ error: "invalid_json" }, 400);
-  }
-  const parsed = cancelDemandBody.safeParse(raw);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
-  }
-
-  const { data, error } = await sb.rpc("purchasing_cancel_demand", {
-    p_id: id,
-    p_reason: parsed.data.reason,
-  });
-  if (error) {
-    // `already_cancelled` and `nothing_to_cancel` arrive as P0001 and reach the
-    // page as their own named codes — an operator meeting one must be told
-    // which of the two happened, not that something went wrong.
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data ?? { ok: true });
 });
 
 /**
@@ -1038,83 +302,6 @@ type BatchLineDecision = z.infer<
   typeof soBatchIssueInput
 >["documentDecisions"][number]["lineDecisions"][number];
 
-/**
- * GET /cost-approvals?supplierId=…&skus=a,b,c — WHICH EXCEPTIONS ALREADY HAVE A
- * MANAGER'S APPROVAL (closure §2; 0380).
- *
- * A hand-entered price or a Free of Charge needs an approval record that PO Duty
- * cannot write for itself. Without this read the operator meets that rule only
- * as a refusal, after typing everything — and cannot tell "nobody has approved
- * this yet" from "somebody already did". The surface reads it so it can say
- * which, in advance.
- *
- * It is a READ of approvals that are still OPEN — unused and unexpired. RLS
- * decides who may see them; this route adds no authority of its own.
- */
-toOrderRouter.get("/cost-approvals", requireOperation, async (c) => {
-  const supplierId = (c.req.query("supplierId") ?? "").trim();
-  const skus = (c.req.query("skus") ?? "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
-  if (supplierId === "" || skus.length === 0 || skus.length > 500) {
-    return refuse(c, 400, "invalid_param");
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  /* ⭐ NO SKU IN A POSTGREST `.in()` LIST. `sku` is free text and live rows carry
-     a DOUBLE QUOTE (`Leg 4"`); PostgREST wraps a reserved-character value in
-     double quotes, so one inside breaks the filter and the server answers with
-     whatever it could parse. That defect put seven customer requirements on no
-     purchase order on 2026-07-30. This supplier's OPEN approvals are a small
-     slice, so they are read whole and matched here. */
-  const { data, error } = await sb
-    .from("po_cost_approvals")
-    .select("id, sku, treatment, unit_cost, reason, expires_on, approved_at, approved_by")
-    .eq("supplier_id", supplierId)
-    .is("used_by_po", null)
-    .order("approved_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-
-  const today = todayIso();
-  const wanted = new Set(skus);
-  const rows = ((data ?? []) as Record<string, unknown>[]).filter((r) => {
-    if (!wanted.has(r.sku as string)) return false;
-    const expires = r.expires_on as string | null;
-    /* An approval is for a decision, not for ever. */
-    return expires == null || expires >= today;
-  });
-
-  const byId = [
-    ...new Set(
-      rows
-        .map((r) => r.approved_by as string | null)
-        .filter((v): v is string => typeof v === "string" && v.length > 0),
-    ),
-  ];
-  const named = new Map<string, string>();
-  if (byId.length > 0) {
-    const { data: people } = await sb.from("app_users").select("id, name, email").in("id", byId);
-    for (const u of (people ?? []) as Record<string, unknown>[]) {
-      const label = ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
-      if (label) named.set(u.id as string, label);
-    }
-  }
-
-  return c.json({
-    approvals: rows.map((r) => ({
-      sku: r.sku as string,
-      treatment: r.treatment as "hand_entered" | "free_of_charge",
-      unitCost: (r.unit_cost as number | null) ?? null,
-      reason: (r.reason as string | null) ?? null,
-      approvedBy: named.get(r.approved_by as string) ?? null,
-      expiresOn: (r.expires_on as string | null) ?? null,
-    })),
-  });
-});
-
 toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -1134,16 +321,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
    * The application and SQL both ask the governed capability. Duty/cover is
    * still resolved below when a refusal needs to name the normal owner. */
   const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
-  if (authority.error) {
-    const m = mapPgError(authority.error);
-    return c.json(m.body, m.status);
-  }
+  if (authority.error) return fail(c, authority.error);
   if (!authority.mayIssue) {
     const actorRes = await sb.rpc("purchasing_po_actor");
-    if (actorRes.error) {
-      const m = mapPgError(actorRes.error);
-      return c.json(m.body, m.status);
-    }
+    if (actorRes.error) return fail(c, actorRes.error);
     const actor = (actorRes.data ?? {}) as { actor_user_id?: string | null };
     const actorId = actor.actor_user_id ?? null;
     if (!actorId) return refuse(c, 403, "no_po_duty_holder");
@@ -1196,10 +377,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const destRes = await sb
     .from("purchasing_destinations")
     .select("id, name, is_default, active");
-  if (destRes.error) {
-    const m = mapPgError(destRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (destRes.error) return fail(c, destRes.error);
   const destById = new Map(
     ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => [
       d.id as string,
@@ -1328,10 +506,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         .from("purchasing_supplier_settings")
         .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
     ]);
-    if (partners.error || configured.error) {
-      const m = mapPgError(partners.error ?? configured.error!);
-      return c.json(m.body, m.status);
-    }
+    if (partners.error || configured.error) return fail(c, partners.error ?? configured.error!);
     validPartners = new Set((partners.data ?? []).map((p) => p.id as string));
     for (const row of (configured.data ?? []) as Record<string, unknown>[]) {
       const partnerId = row.collected_by_partner_id as string | null;
@@ -1458,7 +633,38 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
          rechecks the same live value inside the creation transaction. */
       if (!d) {
         const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
-        if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
+        /**
+         * ⭐ PRICE NOT RECORDED DOES NOT STOP THE ORDER — owner instruction
+         * 2026-09-23, the same ruling Manual Purchase shipped under 0573, and
+         * the gap MASTER §9.2 named on this lane.
+         *
+         * A SKU Carres has never been quoted for is issued carrying NO
+         * commercial claim: no cost, no cost source, no treatment. That is the
+         * one shape `purchase_order_lines`' own CHECK keeps for an absence, and
+         * the door's `v_price_not_recorded` verdict skips the cost-source gate
+         * and the approval engine for exactly that line — so it neither needs
+         * nor spends an approval.
+         *
+         * ⛔ AND AN ABSENCE IS NOT A ZERO. A price that IS recorded but is not
+         * positive is a Catalog mistake, not an unknown, and it keeps refusing
+         * by name: filling it with RM0 would put a number nobody agreed on a
+         * supplier's paper. Free of charge remains its own declared decision
+         * with its own reason.
+         */
+        if (liveCost == null) {
+          lines.push({
+            sku: line.sku,
+            qty: line.qty,
+            cost: null,
+            cost_source: null,
+            commercial_treatment: null,
+            commercial_reason: null,
+            expected_catalog_cost: null,
+            sources,
+          });
+          continue;
+        }
+        if (liveCost <= 0) return refuse(c, 422, "cost_required", facts);
         lines.push({
           sku: line.sku,
           qty: line.qty,
@@ -1492,7 +698,13 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
            (`purchasing_check_line_commercials`). */
         const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
         /* CATALOG HAS NO PRICE is a configuration hole, not a price that moved,
-           and the two need different acts. */
+           and the two need different acts.
+           ⛔ THIS BRANCH IS NOT THE ABSENCE CASE (owner instruction 2026-09-23).
+           A `catalog` decision means the operator REVIEWED a number — the
+           schema requires a positive `unitCost` — so a line whose Catalog price
+           has since gone is a review that no longer holds, not an unknown
+           price. The absence path is the no-decision one above, where nobody
+           claimed to have seen a figure. */
         if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
         /* Nothing declared means nothing reviewed. */
         if (d.expectedCatalogCost == null) {
@@ -1533,12 +745,23 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       supplier_id: group.proposal.supplierId,
       warehouse_id: warehouse.id,
       destination_id: group.destinationId,
-      /* The frozen estimate, from the ONE arithmetic (`expectedArrivalOf`).
-         A PO being born starts its clock today. */
-      eta_date: expectedArrivalOf(res.data.settings, {
+      /* ⭐ THE PO's OWN DELIVERY DATE — `PO Date + n Settings working days`,
+         NO transit added (owner correction 2026-09-22, converged across both
+         buying doors on 2026-09-23). `expectedArrivalOf` answers a DIFFERENT
+         question — when the goods reach Carres, production PLUS the transit
+         leg — and it stays the arrival-planning arithmetic behind `Order By`
+         and the register's timing facts. Printing the arrival under a
+         `PO {n}-Day` label was how a 13-day Settings number came to promise
+         14 days on a supplier's paper.
+ 
+         ⛔ WHAT THIS DOES NOT TOUCH: the customer arrival projection
+         (`purchasing_project_line_etas`, which reads supplier dates and not
+         this one) and every PO already issued — `official_delivery_date` is
+         stamped once at birth and no UPDATE may move it (0428). */
+      eta_date: poDeliveryDateOf(res.data.settings, {
         supplierId: group.proposal.supplierId,
         category: group.proposal.category,
-        fromIso: todayIso(),
+        poDateIso: todayIso(),
       }),
       procurement_partner_id: partnerId,
       so_refs: soRefs,
@@ -1605,8 +828,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       }
       return refuse(c, status, detail, facts);
     }
-    const m = mapPgError(batchErr);
-    return c.json(m.body, m.status);
+    return fail(c, batchErr);
   }
   const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ??
     []) as string[];

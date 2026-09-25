@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { resolvePaymentMethods } from "@carres/shared";
+import { requiredPaymentReference, resolvePaymentMethods } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useCatalog, useTopUpOrder } from "@/lib/queries";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 
@@ -74,8 +75,9 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
     }
   }, [payMethods, method]);
   const [reference, setReference] = useState("");
+  const refWord = requiredPaymentReference(method); // §16 (0535)
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => appTodayIso());
   const [photos, setPhotos] = useState<PhotoSlot[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -134,6 +136,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
     amount > 0 &&
     amount <= balanceToFull &&
     photos.length > 0 &&
+    (!refWord || reference.trim() !== "") &&
     !uploading &&
     !topUpMut.isPending &&
     !!dealerId;
@@ -300,7 +303,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
               />
             </label>
             <label className="block">
-              <span className="label block mb-1.5">Reference #</span>
+              <span className="label block mb-1.5">{refWord ? `${refWord} *` : "Reference #"}</span>
               <input
                 type="text"
                 value={reference}
@@ -426,9 +429,8 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
 // Helpers
 // -----------------------------------------------------------------------------
 
-/** Shared modal chrome — proto-style backdrop + 620px card with the full
- *  three-row layout (header + scrollable body + footer). All three action
- *  modals (TopUp / Date / Address) reuse this shell. */
+/** Modal chrome — proto-style backdrop + 620px card with the full
+ *  three-row layout (header + scrollable body + footer). */
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
@@ -451,5 +453,3 @@ function extensionFromMime(mime: string): string | null {
   if (mime === "image/heic" || mime === "image/heif") return "heic";
   return null;
 }
-
-export { ModalShell };

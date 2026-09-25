@@ -8,7 +8,6 @@ import {
   type operationOrderDetailWarehouse,
   type operationOrderDetailLine,
 } from "@/lib/queries";
-import { docNumber } from "@carres/shared";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 import SignaturePad from "../../dealer/new-order/SignaturePad";
 import { dataUrlToBlob } from "../../dealer/new-order/draft";
@@ -52,28 +51,19 @@ function totalItems(lines: Array<Pick<operationOrderDetailLine, "qty">>): number
 
 /**
  * C7 (Jess 2026-07-27) — **an operator never types a delivery order number
- * again.** This used to hand them a RANDOM `DO-98xx` to edit, which is the
- * opposite of the `Issue` verb ("the SYSTEM produces a formal document"): a
- * hand-typed number cannot be reproduced on a reprint, and the paper the
- * customer signed must be.
- *
- * The number is whatever the order already carries — the one minted when the
- * delivery order was ISSUED. An order that reaches delivery without ever having
- * been issued (a walk-in dispatched outside the booking flow) still needs one,
- * so it falls back to the same locked scheme with the same stable seed: the
- * same order always yields the same number.
+ * again**, and (0575, owner ruling 2026-09-23) **the browser never invents
+ * one either.** The number is whatever the order already carries — the one
+ * drawn when the delivery order was ISSUED. An order that reaches delivery
+ * without a document sends no number, and the server draws one from the one
+ * allocator: unique across every order, never reused, and the same paper on
+ * every reprint because it is stored. The old fallback built a number from
+ * TODAY's date, which a reprint on another day could not reproduce.
  */
 function deliveryOrderNumber(
-  order: Pick<operationOrderDetailOrder, "id" | "do_number">,
-): string {
+  order: Pick<operationOrderDetailOrder, "do_number">,
+): string | null {
   const existing = (order.do_number ?? "").trim();
-  if (existing) return existing;
-  return docNumber({
-    prefix: "DO",
-    date: new Date().toISOString().slice(0, 10),
-    seed: order.id,
-    digits: 4,
-  });
+  return existing || null;
 }
 
 export default function DOAttachModal({ order, warehouse, lines, onClose }: Props) {
@@ -131,7 +121,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
           method: "POST",
           body: JSON.stringify({
             order_id:   order.id,
-            do_number:  doNumber.trim() || "DO-PENDING",
+            do_number:  doNumber ?? "DO-PENDING",
             mime_type:  file.type,
             size_bytes: file.size,
           }),
@@ -171,7 +161,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
           method: "POST",
           body: JSON.stringify({
             order_id:   order.id,
-            do_number:  doNumber.trim() || "DO-PENDING",
+            do_number:  doNumber ?? "DO-PENDING",
             mime_type:  "image/png",
             size_bytes: blob.size,
             kind:       "signature",
@@ -183,7 +173,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
         .uploadToSignedUrl(sign.path, sign.token, blob);
       if (upErr) throw upErr;
       await attach.mutateAsync({
-        doNumber: doNumber.trim(),
+        ...(doNumber ? { doNumber } : {}),
         doNote: doNote.trim() || undefined,
         signed: true,
         doFilePath,
@@ -212,7 +202,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
         <div>
           <span className="label mb-1.5 block">DO number</span>
           <div className="font-mono text-body font-semibold text-base-900">
-            {doNumber}
+            {doNumber ?? "No DO yet"}
           </div>
         </div>
         <div>

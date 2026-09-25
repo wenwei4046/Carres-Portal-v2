@@ -265,6 +265,20 @@ export interface RouteLoan {
   label: string;
   qty: number;
   returned: boolean;
+  /** The loaned Unit's permanent Carres Unit ID (0492 / Card 15), when ours. */
+  unitId?: string | null;
+}
+
+/** `ops_loan_offers` (0492, Delivery MASTER §14.2) — the offer and the
+ *  customer's answer, recorded on the Sales Order. The whole history rides
+ *  the input; the map renders the CURRENT state. */
+export interface RouteLoanOffer {
+  id: string;
+  seq?: number;
+  event: "offered" | "accepted" | "declined";
+  label: string | null;
+  reason: string | null;
+  recordedAt: string;
 }
 
 export interface RouteDeliveryPhoto {
@@ -357,6 +371,8 @@ export interface SalesOrderRouteInput {
     status: "pending" | "approved" | "refused";
   }>;
   loans?: ReadonlyArray<RouteLoan>;
+  /** 0492 — the loan offer conversation, newest first or not; sorted here. */
+  loanOffers?: ReadonlyArray<RouteLoanOffer>;
   cases: ReadonlyArray<RouteLinkedCase>;
   claims: ReadonlyArray<RouteLinkedClaim>;
   /** Malaysian public holidays as `YYYY-MM-DD`. A confirmed date landing on one
@@ -741,7 +757,7 @@ function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
     kind: "logistics",
     title: "LOGISTICS",
     complete: Boolean(name),
-    lines: name ? [name] : ["No logistics chosen yet"],
+    lines: name ? [name] : ["Logistics not assigned"],
     action: {
       ownerKey: "delivery",
       label: "Assign logistics",
@@ -760,10 +776,12 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
     id: "delivery-date",
     kind: "delivery-date",
     title: "DELIVERY DATE",
-    complete: Boolean(confirmed && booking?.slot),
+    /* Owner ruling 2026-09-24: the Scheduled date completes it; the time is
+       optional and printed only when recorded. */
+    complete: Boolean(confirmed),
     lines: confirmed
-      ? [dated("Delivery appointment", confirmed), booking?.slot ?? "Slot not confirmed"]
-      : ["Date + slot not confirmed", dated("Customer requested", input.order.deliveryDate)],
+      ? [dated("Scheduled delivery", confirmed), ...(booking?.slot ? [booking.slot] : [])]
+      : ["Not scheduled yet", dated("Requested delivery", input.order.deliveryDate)],
     action: {
       ownerKey: "sales",
       label: "Confirm delivery date",
@@ -836,7 +854,40 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
  *  delivery — it is an independent obligation (Card 6, card §8). */
 function loanDrafts(input: SalesOrderRouteInput): NodeDraft[] {
   const out = (input.loans ?? []).filter((loan) => !loan.returned);
-  if (out.length === 0) return [];
+  if (out.length === 0) {
+    /* 0492 (Card 15) — before any item is out, the OFFER conversation is the
+       loan's current state: an open offer waits for the customer's answer, an
+       accepted offer waits for the loan Unit to go out. A declined offer
+       renders nothing on the map — the history stays on the Sales Order. */
+    const latest = [...(input.loanOffers ?? [])].sort(
+      (a, b) => b.recordedAt.localeCompare(a.recordedAt) || (b.seq ?? 0) - (a.seq ?? 0),
+    )[0];
+    if (!latest || latest.event === "declined") return [];
+    const what = latest.label?.trim() || "item";
+    return [
+      {
+        id: `loan-offer:${latest.id}`,
+        kind: "loan" as const,
+        title: "LOAN",
+        complete: false,
+        /* Amber, like the loan itself: an open obligation, never a gate. */
+        blocked: true,
+        lines:
+          latest.event === "offered"
+            ? [`Loan offered · ${what}`, "Waiting for the customer's answer"]
+            : [`Customer accepted the loan · ${what}`, "Prepare the loan Unit"],
+        action: {
+          ownerKey: latest.event === "offered" ? ("sales" as const) : ("delivery" as const),
+          label: latest.event === "offered" ? "Record the customer's answer" : "Lend out the loan Unit",
+          context: { detail: dated("Offered", latest.recordedAt) ?? "Offered" },
+        },
+        door:
+          latest.event === "offered"
+            ? door("Open Sales Order →", `/operation/orders/so/${encodeURIComponent(input.order.id)}`)
+            : open("Delivery", deliveryHref(input.order.id)),
+      },
+    ];
+  }
   return out.map((loan) => ({
     id: `loan:${loan.id}`,
     kind: "loan" as const,
@@ -1007,12 +1058,12 @@ function gateRequirements(
     {
       id: "logistics",
       met: Boolean(logisticsName),
-      text: logisticsName ? `Logistics chosen (${logisticsName})` : "No logistics chosen",
+      text: logisticsName ? `Logistics chosen (${logisticsName})` : "Logistics not assigned",
     },
     {
       id: "appointment",
-      met: Boolean(confirmed && booking?.slot),
-      text: confirmed && booking?.slot ? "Date + slot confirmed" : "Date + slot not confirmed",
+      met: Boolean(confirmed),
+      text: confirmed ? "Scheduled delivery recorded" : "Scheduled delivery not recorded",
     },
     moneyRequirement(input),
     financeExceptionRequirement(input),

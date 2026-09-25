@@ -146,16 +146,12 @@ export type OpsStockFlagRepairInput = z.infer<typeof opsStockFlagRepairInputSche
 
 /** POST /api/ops/stock/refurbish — send a Free unit (typically Display) into
  *  repair: it leaves the ready-stock pool (needs_repair=true) until completed. */
-export const opsStockRefurbishInputSchema = z.object({
-  itemId: z.string().uuid(),
-});
+export const opsStockRefurbishInputSchema = opsStockReleaseInputSchema;
 export type OpsStockRefurbishInput = z.infer<typeof opsStockRefurbishInputSchema>;
 
 /** POST /api/ops/stock/refurbish-complete — repair done: grade the unit up to
  *  'refurbished' (sellable as new) and return it to the Free ready-stock pool. */
-export const opsStockRefurbishCompleteInputSchema = z.object({
-  itemId: z.string().uuid(),
-});
+export const opsStockRefurbishCompleteInputSchema = opsStockReleaseInputSchema;
 export type OpsStockRefurbishCompleteInput = z.infer<
   typeof opsStockRefurbishCompleteInputSchema
 >;

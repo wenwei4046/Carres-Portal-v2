@@ -162,6 +162,45 @@ describe("ApprovalDrawer", () => {
     expect(mocks.decideAsync).not.toHaveBeenCalled();
   });
 
+  // 0551 §16 — bank transfer / cheque / DuitNow QR are matched by their
+  // reference. `finance_topup_approve` writes `payments` itself, so no
+  // database guard stands behind this one: the form is the whole gate.
+  it("top_up Approve refuses a blank reference, then goes through once it is typed", async () => {
+    render(
+      wrap(
+        <ApprovalDrawer
+          approval={{
+            id: "appr-77",
+            kind: "top_up",
+            title: "Top-up · RM 3000",
+            status: "pending",
+            actor: "Dealer",
+            created_at: "2026-05-03T00:00:00Z",
+            refers_to: null,
+            amount: 3000,
+          }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+
+    // The form opens on bank_transfer, whose reference is required.
+    expect(screen.getByTestId("topup-method")).toHaveValue("bank_transfer");
+    fireEvent.click(screen.getByTestId("approval-approve"));
+    await Promise.resolve();
+    expect(mocks.topupAsync).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId("topup-reference"), { target: { value: "MBB-778812" } });
+    fireEvent.click(screen.getByTestId("approval-approve"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mocks.topupAsync).toHaveBeenCalledWith({
+      approvalId: "appr-77",
+      method:     "bank_transfer",
+      reference:  "MBB-778812",
+    });
+  });
+
   it("top_up Reject → calls generic decide (not the wrap RPC)", async () => {
     render(
       wrap(

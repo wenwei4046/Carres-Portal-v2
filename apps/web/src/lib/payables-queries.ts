@@ -2,21 +2,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AP_FILE_MAX_BYTES,
   AP_FILE_MIME,
+  type AdvanceApplyInput,
   type ApAccountChoice,
   type ApBillOutstandingRow,
   type ApCreditor,
   type ApOutstandingRow,
   type GrnCandidateRow,
   type GrnLineRow,
+  type MoneyBackInput,
   type OtherCreditorInput,
   type PaymentVoucherDocument,
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
+  type SupplierAdvanceRow,
   type SupplierBillDocument,
   type SupplierBillDraftInput,
   type SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
 import { apiFetch, ApiError } from "./api";
+import { withDepartment } from "@/pages/finance/department";
 import { supabase } from "./supabase";
 
 /**
@@ -45,6 +49,8 @@ export const payablesKeys = {
   grnLines: (receiptId: string) => ["finance", "payables", "grn-lines", receiptId] as const,
   vouchers: () => ["finance", "payables", "vouchers"] as const,
   voucher: (id: string) => ["finance", "payables", "voucher", id] as const,
+  advances: (supplierId: string | null) =>
+    ["finance", "payables", "advances", supplierId ?? "all"] as const,
 };
 
 type Rows<T> = { rows: T[] };
@@ -85,10 +91,11 @@ export function useApBillOutstanding(supplierId: string | null, enabled = true) 
   });
 }
 
-export function useSupplierBills() {
+export function useSupplierBills(dept = "") {
+  const d = withDepartment(payablesKeys.bills(), `${BASE}/bills`, dept);
   return useQuery({
-    queryKey: payablesKeys.bills(),
-    queryFn: async () => (await apiFetch<Rows<SupplierBillRegisterRow>>(`${BASE}/bills`)).rows,
+    queryKey: d.queryKey,
+    queryFn: async () => (await apiFetch<Rows<SupplierBillRegisterRow>>(d.url)).rows,
     staleTime: 15_000,
   });
 }
@@ -112,10 +119,11 @@ export function useGrnCandidates(supplierId: string | null, enabled = true) {
   });
 }
 
-export function usePaymentVouchers() {
+export function usePaymentVouchers(dept = "") {
+  const d = withDepartment(payablesKeys.vouchers(), `${BASE}/vouchers`, dept);
   return useQuery({
-    queryKey: payablesKeys.vouchers(),
-    queryFn: async () => (await apiFetch<Rows<PaymentVoucherRegisterRow>>(`${BASE}/vouchers`)).rows,
+    queryKey: d.queryKey,
+    queryFn: async () => (await apiFetch<Rows<PaymentVoucherRegisterRow>>(d.url)).rows,
     staleTime: 15_000,
   });
 }
@@ -194,6 +202,70 @@ export function useVoucherAct() {
       apiFetch<{ id: string }>(`${BASE}/vouchers/${id}/${act}`, {
         method: "POST",
         body: act === "reject" || act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+// ── supplier advances (migrations 0484–0485) ─────────────────────────────────
+
+/** Approved advances with money left, for one supplier or all. */
+export function useSupplierAdvances(supplierId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.advances(supplierId),
+    queryFn: async () =>
+      (await apiFetch<Rows<SupplierAdvanceRow>>(
+        `${BASE}/advances${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`,
+      )).rows,
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+/** Knock part of an advance off a bill. Posts nothing; the ledger already has it. */
+export function useApplyAdvance() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { voucherId: string; input: AdvanceApplyInput }>({
+    mutationFn: ({ voucherId, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/vouchers/${voucherId}/advance-applications`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useTakeAdvanceOff() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { applicationId: string; reason: string }>({
+    mutationFn: ({ applicationId, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/advance-applications/${applicationId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useRecordMoneyBack() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { voucherId: string; input: MoneyBackInput }>({
+    mutationFn: ({ voucherId, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/vouchers/${voucherId}/money-back`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useCancelMoneyBack() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { moneyBackId: string; reason: string }>({
+    mutationFn: ({ moneyBackId, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/money-back/${moneyBackId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
       }),
     onSuccess: () => { void refresh(); },
   });

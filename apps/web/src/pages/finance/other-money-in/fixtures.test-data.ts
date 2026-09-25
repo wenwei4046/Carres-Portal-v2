@@ -20,12 +20,26 @@ export const I_CANCELLED = "aaaaaaaa-0000-4000-8000-000000000004";
 export const R1 = "bbbbbbbb-0000-4000-8000-000000000001";
 export const R2 = "bbbbbbbb-0000-4000-8000-000000000002";
 
+/** 0540: the department list the line pickers read. */
+export const DEPARTMENTS = { rows: [
+  { department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
+  { department_type: "OFFICE", department_id: null, name: "Office" },
+] };
+
 export const ACCOUNTS: MoneyInAccountOption[] = [
   { code: "1110", name: "Cash on hand", kind: "ASSET", parent_code: "1100", for_money: true, for_receipt_line: false, for_invoice_line: false },
   { code: "1120", name: "Bank — current account", kind: "ASSET", parent_code: "1100", for_money: true, for_receipt_line: false, for_invoice_line: false },
   { code: "2360", name: "Loans received", kind: "LIABILITY", parent_code: "2350", for_money: false, for_receipt_line: true, for_invoice_line: false },
   { code: "4900", name: "Other income", kind: "INCOME", parent_code: "4000", for_money: false, for_receipt_line: true, for_invoice_line: true },
   { code: "6200", name: "Rent", kind: "EXPENSE", parent_code: "6000", for_money: false, for_receipt_line: true, for_invoice_line: true },
+];
+
+/** The one money-account list (0512) — what Received into offers. */
+export const MONEY_ACCOUNTS = [
+  { code: "1110", name: "Cash on hand", money_kind: "CASH", is_active: true },
+  { code: "1120", name: "Bank — current account", money_kind: "BANK", is_active: true },
+  { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: false },
+  { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
 ];
 
 const partyBase = {
@@ -100,8 +114,8 @@ const detailExtras = {
 export const DRAFT_DETAIL: OtherDebtorInvoiceDetail = {
   invoice: { ...INVOICES[0], ...detailExtras },
   lines: [
-    { line_no: 1, account_code: "6200", account_name: "Rent", description: "Office rent September", amount: 1400 },
-    { line_no: 2, account_code: "4900", account_name: "Other income", description: "Service charge", amount: 100 },
+    { line_no: 1, account_code: "6200", account_name: "Rent", description: "Office rent September", amount: 1400, department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "4900", account_name: "Other income", description: "Service charge", amount: 100, department_type: "SUBSCRIPTION", department_id: null },
   ],
   receipts: [],
 };

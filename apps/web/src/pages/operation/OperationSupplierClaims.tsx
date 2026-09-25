@@ -7,23 +7,25 @@
 // BOUNDARY).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { carresExecutionLabel, customerResolutionLabel, supplierClaimRequestLabel, supplierClaimResponseLabel, supplierClaimTypeLabel } from "@carres/shared";
 import { useOperationSupplierClaims, type SupplierClaimListRow } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
+import type { IconName } from "@/components/kit/Icon";
 import StatusPill from "@/components/kit/StatusPill";
 import { fmtDate } from "@/lib/fmt-date";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow, ShowFiltersButton } from "./components/workspace-rail";
 import SupplierClaimPanel, { SupplierClaimInspector } from "./components/SupplierClaimPanel";
 
 const absent = "Not recorded";
 const statusLabel = (row: SupplierClaimListRow) => ({ open: "Open", closed: "Closed", cancelled: "Cancelled" })[row.status] ?? absent;
 type Facet = "supplier" | "problem" | "status" | "response" | "evidence";
 const titles: Record<Facet, string> = { supplier: "Supplier", problem: "Problem", status: "Claim status", response: "Supplier Response", evidence: "Evidence" };
+const facetIcons: Record<Facet, IconName> = { supplier: "supplier", problem: "late", status: "flag", response: "message", evidence: "attach" };
 /** Rail predicates are FACTS about the row (§9.5: factual predicates with
  *  truthful counts). `null` means the predicate does not apply to this row,
  *  so it is never counted — an absent source is a fact; a linked one is not
@@ -109,14 +111,14 @@ export default function OperationSupplierClaims() {
       {query.isError ? <div role="alert"><EmptyState title={errorTitle} detail={query.error?.message} action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} /></div>
         : <div className="flex min-h-0 flex-1 overflow-hidden">
           {railOpen && <FilterRail testId="supplier-claims-rail" onHide={() => setRailVisible(false)}>
-            {po && <FilterRailGroup title="Source">
+            {po && <FilterRailGroup title="Source" icon="order">
               <FilterRailRow label={`PO: ${po}`} active onClick={clearSource} title="Clear the purchase order filter" testId="claims-rail-source" />
             </FilterRailGroup>}
             {(Object.keys(titles) as Facet[]).map((facet) => {
               const counts = new Map<string, number>();
               inSource.filter((row) => matches(row, facet)).forEach((row) => { const value = valueOf(row, facet); if (value != null) counts.set(value, (counts.get(value) ?? 0) + 1); });
               if (counts.size === 0) return null;
-              return <FilterRailGroup key={facet} title={titles[facet]}>
+              return <FilterRailGroup key={facet} title={titles[facet]} icon={facetIcons[facet]}>
                 {[...counts].sort(([a], [b]) => a.localeCompare(b)).map(([value, count]) => <FilterRailRow key={value} label={value} count={count} active={picks[facet] === value} testId={`claims-rail-${facet}-${value}`}
                   onClick={() => setPicks((previous) => { const next = { ...previous }; if (next[facet] === value) delete next[facet]; else next[facet] = value; return next; })} />)}
               </FilterRailGroup>;
@@ -127,11 +129,7 @@ export default function OperationSupplierClaims() {
             <DataGrid rows={rows} columns={columns} rowKey={(row) => row.id} storageKey="carres.supplier-claims.register.v2"
               appearance="reference" exportName="Supplier Claims" groupBanner={false}
               isLoading={query.isLoading} emptyMessage="No matching claims." searchPlaceholder="Search claims…"
-              toolbarStart={<>{!railOpen ? <button type="button" aria-label="Show filters" title="Show filters" data-testid="claims-show-filters"
-                onClick={() => setRailVisible(true)}
-                className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12">
-                <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-              </button> : null}</>}
+              toolbarStart={<>{!railOpen ? <ShowFiltersButton onShow={() => setRailVisible(true)} testId="claims-show-filters" /> : null}</>}
               onFilteredRowsChange={setVisibleRows} onRowDoubleClick={open}
               expandable={{ renderExpansion: (row) => <SupplierClaimInspector claim={row} onOpen={() => open(row)} />, testId: (row) => `claim-inspect-${row.claim_no}` }}
               selectable={{ selectedKeys, onToggle: (key) => setSelectedKeys((previous) => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; }), onToggleAll: (keys, all) => setSelectedKeys((previous) => { const next = new Set(previous); keys.forEach((key) => { if (all) next.delete(key); else next.add(key); }); return next; }) }}

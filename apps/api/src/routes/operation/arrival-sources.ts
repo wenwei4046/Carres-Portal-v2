@@ -7,7 +7,7 @@ import {
   arrivalCancelInput,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { parseJsonBody, mapPgError } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 const router = new Hono<AppEnv>();
@@ -43,10 +43,7 @@ router.get("/options", requireOperation, async (c) => {
       .select("order_id,evidence")
       .eq("id", caseId)
       .single();
-    if (res.error) {
-      const m = mapPgError(res.error);
-      return c.json(m.body, m.status);
-    }
+    if (res.error) return fail(c, res.error);
     if (!res.data?.order_id)
       return c.json({ message: "The Case must name its Sales Order" }, 422);
     caseEvidence = Array.isArray(res.data.evidence) ? res.data.evidence : [];
@@ -63,10 +60,7 @@ router.get("/options", requireOperation, async (c) => {
     q,
   ]);
   for (const r of results)
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return c.json(m.body, m.status);
-    }
+    if (r.error) return fail(c, r.error);
   return c.json({
     sites: results[0].data,
     parties: results[1].data,
@@ -95,10 +89,7 @@ router.post("/:id/proof", requireOperation, async (c) => {
     .select("id")
     .eq("id", id)
     .single();
-  if (source.error) {
-    const m = mapPgError(source.error);
-    return c.json(m.body, m.status);
-  }
+  if (source.error) return fail(c, source.error);
   const ext = {
     "application/pdf": "pdf",
     "image/jpeg": "jpg",
@@ -148,10 +139,7 @@ router.get("/:id", requireOperation, async (c) => {
       .order("posted_at"),
   ]);
   for (const r of [source, units, events, receipts])
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return c.json(m.body, m.status);
-    }
+    if (r.error) return fail(c, r.error);
   if (
     !units.data?.length ||
     (units.data as unknown as Array<{ unit: unknown }>).some((u) => !u.unit)
@@ -174,10 +162,7 @@ router.post("/", requireOperation, async (c) => {
     "arrival_source_create",
     { p_input: p.data },
   );
-  if (r.error) {
-    const m = mapPgError(r.error);
-    return c.json(m.body, m.status);
-  }
+  if (r.error) return fail(c, r.error);
   return c.json(r.data, 201);
 });
 router.post("/:id/handover", requireOperation, async (c) => {
@@ -189,10 +174,7 @@ router.post("/:id/handover", requireOperation, async (c) => {
     "arrival_source_handover",
     { p_id: c.req.param("id"), p_input: p.data },
   );
-  if (r.error) {
-    const m = mapPgError(r.error);
-    return c.json(m.body, m.status);
-  }
+  if (r.error) return fail(c, r.error);
   return c.json(r.data);
 });
 for (const action of ["dates", "cancel"] as const)
@@ -212,10 +194,7 @@ for (const action of ["dates", "cancel"] as const)
         p_cancel: action === "cancel",
       },
     );
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return c.json(m.body, m.status);
-    }
+    if (r.error) return fail(c, r.error);
     return c.json(r.data);
   });
 export default router;

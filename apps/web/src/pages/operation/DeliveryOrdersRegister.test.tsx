@@ -73,12 +73,21 @@ const doRow = (over: Partial<DeliveryOrderRow> = {}): DeliveryOrderRow => ({
   ...over,
 });
 
+/**
+ * ⭐ THE RAIL'S WIDTH DEFAULT IS ITSELF A TESTED BEHAVIOUR (owner ruling
+ * 2026-09-11): below 1100px it starts collapsed. jsdom reports 1024px, so
+ * every test that wants to click a rail row states the operator's REMEMBERED
+ * choice first - exactly the path a real operator takes once they open it.
+ * The narrow-default and its `Show filters` entry get their own test below.
+ */
 function mount(
   rows: DeliveryOrderRow[],
   attempts: DeliveryOrderAttemptRow[] = [],
   handoverEvents: DeliveryHandoverKindRow[] = [],
   initialEntry = "/operation/delivery-orders",
+  { rail = true }: { rail?: boolean } = {},
 ) {
+  if (rail) localStorage.setItem("carres.deliveryOrders.filterRail", "1");
   hookState = {
     data: { deliveryOrders: rows, attempts, handoverEvents },
     isLoading: false,
@@ -113,6 +122,19 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrdersRegister", () => {
+  it.each([false, true])("an intermediate arrival owes no customer proof and preserves recorded photos (%s)", (hasPhoto) => {
+    const row = doRow({ leg: 1, orders: { ...doRow().orders,
+      do_number: "DO-FINAL", do_file_path: "final-signed.pdf",
+      delivery_stops: [{ leg: 1, from_loc: "Klang", to_loc: "JB transit", partner_id: "NETS", partner_name: "NETS", status: "handed_off" }, { leg: 2, from_loc: "JB transit", to_loc: "Customer", partner_id: "AL", partner_name: "AL", status: "delivered" }],
+      ops_order_control: { delivery_photos: hasPhoto ? [{ path: "arrival.jpg", by: "operation", doNumber: "DO-180826-3035", kind: "photo", at: "2026-08-20T02:00:00Z" }] : [] },
+    } });
+    mount([row], [{ do_number: row.do_number, result: "delivered", reason_key: null, recorded_at: "2026-08-20T02:00:00Z" }]);
+    expect(Boolean(screen.queryByTestId("do-submission-photos"))).toBe(hasPhoto);
+    expect(screen.queryByText("No delivery photo yet")).toBeNull();
+    expect(screen.queryByText("No signed document yet")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Signed Delivery Order" })).toBeNull();
+  });
+
   it("asks Delivery for only the source Sales Order named by the URL", () => {
     mount([], [], [], "/operation/delivery-orders?order=order-1");
     expect(useDeliveryOrdersRegisterSpy).toHaveBeenCalledWith({ orderId: "order-1" });
@@ -125,33 +147,39 @@ describe("DeliveryOrdersRegister", () => {
     return screen.getAllByRole("columnheader").map((h) => (h.textContent ?? "").trim());
   }
 
-  it("renders the corrected default columns in the ruled order, `Requested Delivery Date` visible", () => {
+  it("renders the approved default columns in the ruled order (owner ruling 2026-09-11)", () => {
     mount([doRow()]);
-    /* ⭐ THE OWNER'S ORDER (correction 2026-09-09): the customer's request and
-       the confirmed answer stand together near the front; `DO date` — the day
-       the paper was issued, and neither delivery date — falls to the end. */
+    /* ⭐ THE OWNER'S ORDER (ruling 2026-09-11, overwriting 2026-09-09):
+       identity and the day the paper issued stand together; the document's
+       state answers next; the customer's request and the confirmed answer
+       stay ADJACENT; the trip's own facts close the row. */
     const ruled = [
       "DO No",
+      "DO date",
       "SO No",
       "Customer",
-      "Requested Delivery Date",
-      "Confirmed Delivery",
-      "Confirmed Time",
-      "Logistics Partner",
-      "Delivery Location",
-      "Delivery Result",
-      "Proof Status",
       "Status",
-      "DO date",
+      "Requested Delivery Date",
+      "Scheduled delivery",
+      "Scheduled time",
+      "Logistics",
+      "Delivery Location",
+      "Driver submission",
     ];
     const headers = headerOrder();
     expect(ruled.every((label) => headers.some((h) => h.includes(label)))).toBe(true);
     const at = (label: string) => headers.findIndex((h) => h.includes(label));
     expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
     /* ADJACENT — nothing may be inserted between the request and the answer. */
-    expect(at("Confirmed Delivery") - at("Requested Delivery Date")).toBe(1);
-    /* `DO date` is LAST of the twelve: it answers when the document issued. */
-    expect(at("DO date")).toBe(Math.max(...ruled.map(at)));
+    expect(at("Scheduled delivery") - at("Requested Delivery Date")).toBe(1);
+    /* `DO date` follows the number it dates, not the far end of the sheet. */
+    expect(at("DO date") - at("DO No")).toBe(1);
+    /* ONE status column: the separate default `Delivery Result` is retired,
+       and so is `Proof Status`. */
+    expect(headers.filter((h) => h.includes("Status")).length).toBe(1);
+    for (const retired of ["Delivery Result", "Proof Status", "Logistics Partner"]) {
+      expect(screen.queryByRole("columnheader", { name: retired })).toBeNull();
+    }
     /* Still in the chooser, off by default. */
     for (const hidden of ["Goods", "Created"]) {
       expect(screen.queryByRole("columnheader", { name: hidden })).toBeNull();
@@ -184,7 +212,7 @@ describe("DeliveryOrdersRegister", () => {
     const cellUnder = (label: string) =>
       cells[headers.findIndex((h) => h.includes(label))] ?? "";
     expect(cellUnder("Requested Delivery Date")).toContain("20 Aug");
-    expect(cellUnder("Confirmed Delivery")).toContain("24 Aug");
+    expect(cellUnder("Scheduled delivery")).toContain("24 Aug");
     expect(cellUnder("DO date")).toContain("17 Aug");
   });
 
@@ -253,8 +281,8 @@ describe("DeliveryOrdersRegister", () => {
       }),
     ]);
     const rail = screen.getByTestId("delivery-orders-rail");
-    expect(within(rail).getByText("WORK TO DO")).toBeTruthy();
-    expect(within(rail).getByText("DOCUMENT STATUS")).toBeTruthy();
+    expect(within(rail).getByText("Work to do")).toBeTruthy();
+    expect(within(rail).getByText("Document status")).toBeTruthy();
     for (const queue of [
       "Record delivery result",
       "Upload delivery photo",
@@ -262,13 +290,18 @@ describe("DeliveryOrdersRegister", () => {
     ]) {
       expect(within(rail).getByText(queue)).toBeTruthy();
     }
-    /* The canonical document ladder, plus All. */
-    for (const status of ["All", "Created", "Out for delivery", "Delivered", "Delivery exception", "Cancelled"]) {
-      expect(within(rail).getByText(status)).toBeTruthy();
+    /* ⭐ DOCUMENT STATUS is the kit's own dropdown (owner ruling
+       2026-09-11), offering `All` plus the ladder's five words - each with
+       its live count, because the number is why a row is picked. */
+    const status = within(rail).getByRole("combobox");
+    expect(status.textContent).toContain("All");
+    fireEvent.click(status);
+    for (const word of ["Created", "Out for delivery", "Delivered", "Delivery exception", "Cancelled"]) {
+      expect(screen.getAllByText(new RegExp(word)).length).toBeGreaterThan(0);
     }
   });
 
-  it("a DOCUMENT STATUS pick narrows the listing and rides the URL", () => {
+  it("a DOCUMENT STATUS pick narrows the listing and rides the URL", async () => {
     const { locations } = mount([
       doRow(),
       doRow({
@@ -278,11 +311,67 @@ describe("DeliveryOrdersRegister", () => {
         void_reason: "rescheduled",
       }),
     ]);
-    fireEvent.click(screen.getByTestId("delivery-orders-status-cancelled"));
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: /Cancelled/ }));
     expect(locations.at(-1)).toContain("status=cancelled");
     expect(screen.getByText("DO-170826-5050")).toBeTruthy();
     expect(screen.queryByText("DO-180826-3035")).toBeNull();
     expect(screen.getByText("1 of 2 delivery orders")).toBeTruthy();
+  });
+
+  it("a DOCUMENT STATUS already on the URL narrows the listing", () => {
+    mount(
+      [
+        doRow(),
+        doRow({
+          id: "00000000-0000-0000-0000-0000000d0002",
+          do_number: "DO-170826-5050",
+          voided_at: "2026-08-19T02:00:00Z",
+          void_reason: "rescheduled",
+        }),
+      ],
+      [],
+      [],
+      "/operation/delivery-orders?status=cancelled",
+    );
+    expect(screen.getByText("DO-170826-5050")).toBeTruthy();
+    expect(screen.queryByText("DO-180826-3035")).toBeNull();
+    expect(screen.getByText("1 of 2 delivery orders")).toBeTruthy();
+    /* ⭐ The narrowing SAYS ITSELF above the table, with one way out. */
+    const conditions = screen.getByTestId("active-conditions");
+    expect(within(conditions).getByText("Cancelled")).toBeTruthy();
+    expect(within(conditions).getByTestId("clear-filters")).toBeTruthy();
+  });
+
+  it("Clear filters removes the rail's picks as well as the column funnels", () => {
+    const { locations } = mount(
+      [doRow()],
+      [],
+      [],
+      "/operation/delivery-orders?status=created",
+    );
+    fireEvent.click(screen.getByTestId("clear-filters"));
+    expect(locations.at(-1)).not.toContain("status=");
+    expect(screen.queryByTestId("active-conditions")).toBeNull();
+  });
+
+  it("an unnarrowed register shows no condition strip at all", () => {
+    mount([doRow()]);
+    expect(screen.queryByTestId("active-conditions")).toBeNull();
+  });
+
+  /**
+   * ⭐ COLLAPSED IS NOT GONE (owner ruling 2026-09-11). At the observed
+   * narrow viewport the 240px rail starts hidden so the dates the register
+   * exists to answer stay on screen - and its door stays in the toolbar.
+   */
+  it("at a narrow viewport the rail starts collapsed, its entry still visible", () => {
+    mount([doRow()], [], [], "/operation/delivery-orders", { rail: false });
+    expect(screen.queryByTestId("delivery-orders-rail")).toBeNull();
+    const open = screen.getByTestId("delivery-orders-show-filters");
+    expect(open).toBeTruthy();
+    fireEvent.click(open);
+    expect(screen.getByTestId("delivery-orders-rail")).toBeTruthy();
   });
 
   it("Record delivery result queues exactly the out-for-delivery documents", () => {
@@ -344,7 +433,15 @@ describe("DeliveryOrdersRegister", () => {
             ...doRow().orders,
             do_file_path: null,
             ops_order_control: {
-              delivery_photos: [{ path: "p.jpg", at: "2026-08-20T10:00:00Z", by: null }],
+              delivery_photos: [
+                {
+                  path: "p.jpg",
+                  at: "2026-08-20T10:00:00Z",
+                  by: null,
+                  doNumber: "DO-180826-3035",
+                  kind: "photo",
+                },
+              ],
             },
           },
         }),
@@ -360,9 +457,158 @@ describe("DeliveryOrdersRegister", () => {
     );
     fireEvent.click(screen.getByTestId("delivery-orders-work-upload_signed_do"));
     expect(screen.getByText("DO-180826-3035")).toBeTruthy();
-    /* And the Proof Status cell states both facts. */
-    expect(screen.getByText("Delivery photo saved")).toBeTruthy();
+    /* ⭐ Driver submission opens the file it counted, and still says the
+       signed paper is missing - the work stays visible. */
+    const photos = screen.getByTestId("do-submission-photos");
+    expect(photos.textContent).toContain("Photos");
+    expect(photos.textContent).toContain("1");
+    expect(screen.queryByTestId("do-submission-videos")).toBeNull();
     expect(screen.getByText("No signed document yet")).toBeTruthy();
+  });
+
+  /**
+   * ⭐ THE DEFECT THIS TEST EXISTS TO KEEP DEAD (owner ruling 2026-09-11):
+   * one Sales Order, TWO Delivery Orders, ONE photo ledger. Before the stamp,
+   * both rows counted every file.
+   */
+  it("counts each document's own files - never the whole Sales Order's ledger", () => {
+    const ledger = {
+      delivery_photos: [
+        { path: "a.jpg", at: "t", by: null, doNumber: "DO-180826-3035", kind: "photo" as const },
+        { path: "b.jpg", at: "t", by: null, doNumber: "DO-180826-3035", kind: "photo" as const },
+        { path: "c.mp4", at: "t", by: null, doNumber: "DO-180826-3035", kind: "video" as const },
+        { path: "d.jpg", at: "t", by: null, doNumber: "DO-190826-7070", kind: "photo" as const },
+      ],
+    };
+    mount(
+      [
+        doRow({ orders: { ...doRow().orders, ops_order_control: ledger } }),
+        doRow({
+          id: "00000000-0000-0000-0000-0000000d0002",
+          do_number: "DO-190826-7070",
+          orders: { ...doRow().orders, ops_order_control: ledger },
+        }),
+      ],
+      [
+        { do_number: "DO-180826-3035", result: "delivered", reason_key: null, recorded_at: "t1" },
+        { do_number: "DO-190826-7070", result: "delivered", reason_key: null, recorded_at: "t1" },
+      ],
+    );
+    const counts = screen.getAllByTestId("do-submission-photos").map((b) => b.textContent ?? "");
+    expect(counts.some((t) => t.includes("2"))).toBe(true);
+    expect(counts.some((t) => t.includes("1"))).toBe(true);
+    /* Only the trip that actually carries a video offers a player. */
+    expect(screen.getAllByTestId("do-submission-videos")).toHaveLength(1);
+  });
+
+  it("a video is never automatically a shortage - no video, no button, no absence word", () => {
+    mount(
+      [
+        doRow({
+          orders: {
+            ...doRow().orders,
+            ops_order_control: {
+              delivery_photos: [
+                { path: "a.jpg", at: "t", by: null, doNumber: "DO-180826-3035", kind: "photo" as const },
+              ],
+            },
+          },
+        }),
+      ],
+      [{ do_number: "DO-180826-3035", result: "delivered", reason_key: null, recorded_at: "t" }],
+    );
+    expect(screen.getByTestId("do-submission-photos")).toBeTruthy();
+    expect(screen.queryByTestId("do-submission-videos")).toBeNull();
+    expect(screen.queryByText("No delivery video")).toBeNull();
+  });
+
+  /**
+   * ⭐ A VOIDED DOCUMENT IS OWED NOTHING (walk finding, 2026-09-11). The
+   * retired `Proof Status` column printed two absences against a cancelled
+   * row, which reads as two outstanding jobs on a trip that will never happen.
+   */
+  it("a cancelled document with nothing submitted says nothing at all", () => {
+    mount([
+      doRow({
+        voided_at: "2026-08-19T02:00:00Z",
+        void_reason: "rescheduled",
+        orders: { ...doRow().orders, ops_order_control: { delivery_photos: [] } },
+      }),
+    ]);
+    expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Not delivered yet")).toBeNull();
+    expect(screen.queryByText("No signed document yet")).toBeNull();
+  });
+
+  it("...but a void never erases what a driver already sent", () => {
+    mount([
+      doRow({
+        voided_at: "2026-08-19T02:00:00Z",
+        void_reason: "rescheduled",
+        orders: {
+          ...doRow().orders,
+          ops_order_control: {
+            delivery_photos: [
+              { path: "a.jpg", at: "t", by: null, doNumber: "DO-180826-3035", kind: "photo" as const },
+            ],
+          },
+        },
+      }),
+    ]);
+    expect(screen.getByTestId("do-submission-photos").textContent).toContain("1");
+  });
+
+  it("an UNKNOWN ledger prints an unknown - never a fabricated zero", () => {
+    mount(
+      [doRow({ orders: { ...doRow().orders, ops_order_control: null } })],
+      [{ do_number: "DO-180826-3035", result: "delivered", reason_key: null, recorded_at: "t" }],
+    );
+    expect(screen.getAllByText("Not recorded").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("do-submission-photos")).toBeNull();
+  });
+
+  it("picking a work queue opens a row-level door onto the existing operation", () => {
+    mount(
+      [doRow({ id: "00000000-0000-0000-0000-0000000d0002", do_number: "DO-190826-7070" })],
+      [],
+      [
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0002", kind: "ready_for_handover" },
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0002", kind: "handed_over" },
+        { delivery_order_id: "00000000-0000-0000-0000-0000000d0002", kind: "received_by_logistics" },
+      ],
+    );
+    /* Before a queue is picked the register carries no action column. */
+    expect(screen.queryByTestId("do-result-primary-action")).toBeNull();
+    fireEvent.click(screen.getByTestId("delivery-orders-work-record_result"));
+    /* The DO object page's OWN component, rendered on the row - not a copy. */
+    expect(screen.getByTestId("do-result-primary-action")).toBeTruthy();
+  });
+
+  it("§6.1 (0489) — `Check delivery proof` queues a delivered document whose files nobody has judged, and its door opens the DO object", () => {
+    const { locations } = mount(
+      [
+        doRow({
+          orders: {
+            ...doRow().orders,
+            do_number: "DO-180826-3035",
+            do_file_path: "order-x/do.pdf",
+            do_uploaded_at: "2026-08-20T11:00:00Z",
+            ops_order_control: {
+              delivery_photos: [
+                { path: "p.jpg", at: "2026-08-20T10:00:00Z", by: null, doNumber: "DO-180826-3035", kind: "photo" },
+              ],
+            },
+          },
+        }),
+      ],
+      [{ do_number: "DO-180826-3035", result: "delivered", reason_key: null, recorded_at: "2026-08-20T09:00:00Z" }],
+    );
+    const rail = screen.getByTestId("delivery-orders-work-check_proof");
+    expect(rail).toHaveTextContent("Check delivery proof");
+    expect(rail).toHaveTextContent("1");
+    fireEvent.click(rail);
+    fireEvent.click(screen.getByTestId("do-queue-check-proof"));
+    expect(locations.at(-1)).toBe("/operation/delivery-orders/DO-180826-3035");
   });
 
   it("prints the ruled facts: number, SO door, capitalised customer, the document dates, locality, partner", () => {
@@ -398,9 +644,30 @@ describe("DeliveryOrdersRegister", () => {
     );
     expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Delivery exception").length).toBeGreaterThan(0);
-    expect(screen.getByText("Customer unreachable")).toBeTruthy();
-    /* The Delivery Result column speaks the governed result word. */
-    expect(screen.getAllByText("Failed Delivery").length).toBeGreaterThan(0);
+    /* ⭐ ONE status column (owner ruling 2026-09-11): line 2 carries the
+       RESULT that was actually recorded AND its reason, which is what the
+       retired `Delivery Result` column used to print three columns away. */
+    const detail = screen.getByTestId("do-status-detail");
+    expect(detail.textContent).toContain("Failed Delivery");
+    expect(detail.textContent).toContain("Customer unreachable");
+  });
+
+  it("a partial trip says Partially Delivered on the status line, not just an exception", () => {
+    mount(
+      [doRow()],
+      [
+        {
+          do_number: "DO-180826-3035",
+          result: "partial",
+          reason_key: "customer_unreachable",
+          recorded_at: "2026-08-20T09:00:00Z",
+        },
+      ],
+    );
+    expect(screen.getAllByText("Delivery exception").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("do-status-detail").textContent).toContain(
+      "Partially Delivered",
+    );
   });
 
   it("a received-not-yet-resulted document reads Out for delivery — earlier chain facts alone do not", () => {
@@ -441,10 +708,19 @@ describe("DeliveryOrdersRegister", () => {
   });
 
   it("absences read as words, never a dash", () => {
-    mount([doRow({ delivery_date: null, time_slot: null, logistics_partner: null })]);
-    expect(screen.getAllByText("No confirmed date").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("No logistics picked").length).toBeGreaterThan(0);
+    mount([
+      doRow({
+        delivery_date: null,
+        time_slot: null,
+        logistics_partner: null,
+        orders: { ...doRow().orders, ops_order_control: { delivery_photos: [] } },
+      }),
+    ]);
+    expect(screen.getAllByText("Not scheduled").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Logistics not assigned").length).toBeGreaterThan(0);
+    /* Nothing recorded yet: nothing is due, and the cell says so. */
     expect(screen.getAllByText("Not delivered yet").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No signed document yet").length).toBeGreaterThan(0);
     expect(screen.queryByText("—")).toBeNull();
   });
 

@@ -496,34 +496,163 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     expect(inCalls).toContainEqual(["status", ["posted", "voided"]]);
   });
 
-  it("a picked Supplier Delivery Date that matches nothing answers an EMPTY page, total 0", async () => {
-    const sb = makeSb({
-      warehouse_receipts: { list: { data: [POSTED], error: null }, count: 0 },
-      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
-      purchase_orders: {
-        list: {
-          data: [
-            { id: "PO-1001", version: 1, supplier_id: "s1", suppliers: { name: "Ohana" } },
-          ],
-          error: null,
-        },
+  /* ── PURCHASING CARD 12 — the six rail groups, the source column and the
+     read-only goods expansion (§9.4, owner rulings 2026-09-17 / 2026-09-18).
+     `GRN date` is the CREATION stamp, `Received with` is a record of what was
+     found, and every linked document the receipt genuinely has is preserved
+     while nothing stands in for one it does not. ──────────────────────────── */
+
+  /** `Save Receiving` created this GRN on Wed 16 Sep, Kuala Lumpur time. */
+  const CREATED = {
+    ...POSTED,
+    posted_at: "2026-09-16T09:00:00Z",
+    extra_lines: [{ sku: "MS01-Q", qty: 2 }],
+  };
+
+  const cardTables = (over: Record<string, unknown> = {}) => ({
+    warehouse_receipts: { list: { data: [CREATED], error: null }, count: 0 },
+    warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+    purchase_orders: {
+      list: {
+        data: [
+          { id: "PO-1001", version: 1, supplier_id: "s1", suppliers: { name: "Ohana" } },
+        ],
+        error: null,
       },
-      po_supplier_promises: { list: { data: [], error: null } },
-      product_skus: { list: { data: [], error: null } },
-      app_users: { list: { data: [], error: null } },
-    });
-    vi.mocked(userClient).mockReturnValue(sb as never);
+    },
+    po_supplier_promises: { list: { data: [], error: null } },
+    product_skus: {
+      list: {
+        data: [
+          { sku: "MS01-K", variant: "Dream King" },
+          { sku: "MS01-Q", variant: "Dream Queen" },
+        ],
+        error: null,
+      },
+    },
+    purchase_order_lines: { list: { data: [{ id: "l1", demand_id: "d1" }], error: null } },
+    po_line_sources: { list: { data: [{ po_line_id: "l1", so: 1303 }], error: null } },
+    purchase_demands: { list: { data: [{ id: "d1", request_id: "r1" }], error: null } },
+    purchase_requests: {
+      list: { data: [{ id: "r1", req_no: "MPR-20260904-8935" }], error: null },
+    },
+    receiving_unit_results: {
+      list: {
+        data: [
+          { receipt_id: RECEIPT, stock_item_id: "u1", unit_code: "id-abc000001" },
+          { receipt_id: RECEIPT, stock_item_id: "u2", unit_code: "id-abc000002" },
+        ],
+        error: null,
+      },
+    },
+    ops_stock_items: {
+      list: {
+        data: [
+          { id: "u1", po_line_id: "l1", identity_scope: "unit" },
+          // A quantity row carries a technical register key and is NEVER
+          // shown as a Unit ID (§9.4, 0453).
+          { id: "u2", po_line_id: "l1", identity_scope: "quantity" },
+        ],
+        error: null,
+      },
+    },
+    arrival_sources: { list: { data: [], error: null } },
+    app_users: { list: { data: [], error: null } },
+    ...over,
+  });
+
+  const ask = async (query: string) => {
     const res = await req(
-      "/api/operation/warehouse-receipts?scope=grn&expected=2026-09-08",
+      `/api/operation/warehouse-receipts?scope=grn${query}`,
       "GET",
       await makeJwt("operation"),
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, never>;
-    // No evidenced supplier reply → no GRN carries that date; the register
-    // answers honestly rather than ignoring the filter.
-    expect(body.page).toEqual({ offset: 0, limit: 50, total: 0 });
-    expect(body.receipts).toEqual([]);
+    return (await res.json()) as Record<string, never>;
+  };
+
+  it("carries GRN Date, the genuine linked documents and the expansion's line facts", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(cardTables()) as never);
+    const body = await ask("");
+    const row = (body.receipts as Array<Record<string, unknown>>)[0]!;
+    // Creation, never the physical arrival date — the two are separate facts.
+    expect(row.grn_date).toBe("2026-09-16T09:00:00Z");
+    expect(row.goods_received_at).toBe("2026-09-01");
+    // Every ACTUAL linked document, and nothing invented for the ones absent.
+    expect(row.source_refs).toEqual(["SO-1303", "MPR-20260904-8935"]);
+    expect(row.po_id).toBe("PO-1001");
+    // The source number's own line-bound Units — the quantity row is not one.
+    expect(row.unit_ids_by_line).toEqual({ l1: ["id-abc000001"] });
+    // The expansion's `Items` and `Category` are the GRN document's own two
+    // reads, extra goods included.
+    const info = body.line_info as Record<string, { description: string | null }>;
+    expect(info["MS01-K"]!.description).toBe("Dream King");
+    expect(info["MS01-Q"]!.description).toBe("Dream Queen");
+  });
+
+  it("the GRN date group filters by an inclusive range, in Kuala Lumpur time", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(cardTables()) as never);
+    const week = await ask("&from=2026-09-14&to=2026-09-20");
+    expect(week.page).toMatchObject({ total: 1 });
+    // The day counts the rail folds into weeks and months.
+    expect((week.facets as Record<string, unknown>).grnDate).toEqual({
+      "2026-09-16": 1,
+    });
+
+    vi.mocked(userClient).mockReturnValue(makeSb(cardTables()) as never);
+    const before = await ask("&from=2026-09-01&to=2026-09-07");
+    expect(before.page).toMatchObject({ total: 0 });
+    expect(before.receipts).toEqual([]);
+  });
+
+  it("`Received with` counts GRNs by what was found — damaged, wrong items, extra goods", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(cardTables()) as never);
+    const body = await ask("");
+    // This GRN carries BOTH a damaged unit and extra goods, so it is counted
+    // in two rows — which is why the three counts are never added together.
+    expect((body.facets as Record<string, unknown>).receivedWith).toEqual({
+      damaged: 1,
+      wrong_item: 0,
+      extra: 1,
+    });
+
+    vi.mocked(userClient).mockReturnValue(makeSb(cardTables()) as never);
+    const wrong = await ask("&receivedWith=wrong_item");
+    expect(wrong.page).toMatchObject({ total: 0 });
+  });
+
+  it("Cancelled GRNs is its own row; the default listing holds valid and cancelled alike", async () => {
+    const voided = { ...CREATED, id: "r-void", status: "voided", grn_no: "GRN-20260906-9999" };
+    const both = cardTables({
+      warehouse_receipts: { list: { data: [CREATED, voided], error: null }, count: 0 },
+    });
+    vi.mocked(userClient).mockReturnValue(makeSb(both) as never);
+    const all = await ask("");
+    expect(all.page).toMatchObject({ total: 2 });
+    expect((all.facets as Record<string, unknown>).cancelled).toBe(1);
+  });
+
+  it("an arrival-source receipt keeps its own number and gets NO purchase order", async () => {
+    const repair = {
+      ...CREATED,
+      id: "r-repair",
+      po_id: null,
+      arrival_source_id: "as1",
+      lines: [],
+      extra_lines: [],
+    };
+    const tables = cardTables({
+      warehouse_receipts: { list: { data: [repair], error: null }, count: 0 },
+      arrival_sources: {
+        list: { data: [{ id: "as1", source_no: "RO-20260916-0042" }], error: null },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as never);
+    const body = await ask("");
+    const row = (body.receipts as Array<Record<string, unknown>>)[0]!;
+    expect(row.source_refs).toEqual(["RO-20260916-0042"]);
+    // No fabricated PO for a receipt that genuinely has none.
+    expect(row.po_id).toBeNull();
   });
 });
 
@@ -706,6 +835,7 @@ describe("GET /duty", () => {
 describe("GET /:id — one Receiving Session / GRN record", () => {
   const DETAIL_ROW = {
     ...RECEIPT_ROW,
+    lines: RECEIPT_ROW.lines.map((line) => ({ ...line, id: LINE })),
     status: "posted",
     grn_no: "GRN-20260904-0001",
     actual_site_id: SITE,
@@ -735,6 +865,9 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
           ],
           error: null,
         },
+      },
+      ops_stock_items: {
+        list: { data: [{ id: "si1", po_line_id: LINE, identity_scope: "unit" }], error: null },
       },
       receiving_events: {
         list: {
@@ -823,6 +956,7 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     expect(body.receipt.unit_results).toEqual([
       {
         stock_item_id: "si1",
+        po_line_id: LINE,
         unit_code: "MS01-K-0001",
         outcome: "good",
         issue_kind: null,
@@ -834,6 +968,44 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
       event: "posted",
       actor_name: "Buddy cover",
     });
+  });
+
+  it.each(["receiving_unit_results", "receiving_events", "purchase_orders", "ops_stock_items"])(
+    "refuses an incomplete document when %s cannot be read",
+    async (table) => {
+      const failure = { data: null, error: { code: "XX000", message: "read failed" } };
+      const sb = makeSb({ ...detailTables(), [table]: { list: failure, single: failure } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(await res.json()).not.toHaveProperty("receipt");
+    },
+  );
+
+  it("keeps unknown lineage unassigned and suppresses counted-stock technical IDs", async () => {
+    const tables = detailTables();
+    const sb = makeSb({
+      ...tables,
+      receiving_unit_results: { list: { data: [
+        ...tables.receiving_unit_results.list.data,
+        { stock_item_id: "si2", unit_code: "COUNTED", outcome: "received" },
+        { stock_item_id: "si3", unit_code: "U-003", outcome: "received" },
+      ], error: null } },
+      ops_stock_items: { list: { data: [
+        { id: "si1", po_line_id: "other-receipt-line", identity_scope: "unit" },
+        { id: "si2", po_line_id: LINE, identity_scope: "quantity" },
+      ], error: null } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { receipt: { unit_results: unknown[] } };
+    expect(body.receipt.unit_results).toEqual([
+      expect.objectContaining({ stock_item_id: "si1", po_line_id: null }),
+      expect.objectContaining({ stock_item_id: "si3", po_line_id: null }),
+    ]);
   });
 
   it("404 when the record is not there", async () => {

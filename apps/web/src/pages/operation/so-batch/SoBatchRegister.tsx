@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PanelLeftOpen } from "lucide-react";
+import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
   SO_BATCH_RAIL,
@@ -14,9 +15,17 @@ import {
   setDestination,
   soBatchCellSummary,
   soBatchOrderSelection,
+  soBatchOrderLineOutstandingQty,
+  soBatchOrderPlanning,
+  soBatchOrderUnselectableReason,
+  soBatchOrderSafetyDays,
+  soBatchOrderStatusWord,
+  soBatchOrderByAbsenceWord,
+  compareSoBatchPlanning,
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
+  soBatchToBuyState,
   soBatchSelectionSummary,
   type DestinationAllocation,
   type PurchaseDemandRow,
@@ -26,6 +35,7 @@ import {
   type SoBatchProductCategory,
   type SoBatchPurchaseResponse,
   type SoBatchRailFilter,
+  type SoBatchSafetyDaysCell,
   type SoBatchSelection,
 } from "@carres/shared";
 import {
@@ -42,11 +52,23 @@ import {
   FilterRailGroup,
   FilterRailRow,
   FilterRailSelect,
+  useFilterRailOpen,
+  ShowFiltersButton,
 } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
-import ReadyStockPanel from "./ReadyStockPanel";
+import { useSoBatchReadyStock } from "./ReadyStockCell";
+import { ReadyStockDisclosure } from "../components/ReadyStockTable";
+import ConnectedSections, {
+  CONNECT_AT_DISCLOSURE,
+  CONNECT_AT_TABLE_HEADER,
+  type ConnectedSection,
+} from "../components/ConnectedSections";
+import PoDetailsTable, {
+  poDetailRowsForLine,
+  type UnitReadState,
+} from "./PoDetailsTable";
 import GoodsMiniTable, {
   categoryWord,
   type GoodsMiniLine,
@@ -85,7 +107,21 @@ import GoodsMiniTable, {
 /* v3 — the DEFAULT column order changed (Status retired, SO No leading), and a
    stored v2 arrangement would have pinned every returning operator to the old
    one. The key is the only thing that retires a saved layout. */
-const STORAGE_KEY = "carres.soBatchPurchase.register.v3";
+/* v5 — owner ruling R3 2026-09-16 moved Supplier beside Customer. Only THIS
+   register's saved layout is retired; no other page's key moves. */
+/* v6 — date-first ruling (Jess 2026-09-17): Proceed Date · SO No lead and pin. */
+/* v7 — the owner's 2026-09-18 order: `Status` leads, `PO Safety Days` replaces
+   `Order By`, `Items` joins, and the customer's date/location rise above the
+   customer's name. A stored v6 arrangement holds a column that no longer
+   exists and an order nobody approved, so the key is retired — it is the only
+   thing that retires a saved layout, and only THIS register's key moves. */
+const STORAGE_KEY = "carres.soBatchPurchase.register.v7";
+/* R7 widths, MEASURED 2026-09-16 in the rendered portal (Inter, real header
+   chrome): a column's default width is its content (cell padding 16 + rule 1 +
+   the longest governed value — a cross-year date is 99px, `No delivery date
+   yet` 124px, `PO-20260930-4827` 127px); its minWidth is the complete two-line
+   header plus its controls (text + 46px of padding, sort mark and filter). Long
+   names never ellipsise: those columns take an inline second line. */
 const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
 
 /**
@@ -102,6 +138,34 @@ const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
  * own expansion, where every number is its own door beside the item line it
  * actually covers. No measurement, no truncation, no resize behaviour.
  */
+/**
+ * `{first item} + {n} more` — the `Items` summary. ONE statement, whatever the
+ * width: it never measures itself, so the screen, the export and the accessible
+ * name are the same answer.
+ */
+function itemsSummary(order: SoBatchOrderRow): string {
+  const items = order.lines.map((l) => l.item).filter(Boolean);
+  if (items.length === 0) return "";
+  const rest = items.length - 1;
+  return rest > 0 ? `${items[0]} + ${rest} more` : items[0]!;
+}
+
+/**
+ * The sort key of a `PO Safety Days` cell. Tightest margin first; a row that
+ * states no margin sorts AFTER every row that does, because an unknown is not a
+ * very large margin and must never be read as the safest row on the page.
+ */
+function safetyDaysValue(cell: SoBatchSafetyDaysCell | undefined): number {
+  return cell?.kind === "days" ? cell.days : Number.POSITIVE_INFINITY;
+}
+
+/** The same cell as ONE string, for the column filter and every export. */
+function safetyDaysWord(cell: SoBatchSafetyDaysCell | undefined): string {
+  if (cell == null || cell.kind === "none") return "";
+  if (cell.kind === "absent") return soBatchOrderByAbsenceWord(cell.absence);
+  return cell.days < 0 ? W.safetyDaysOverrun : String(cell.days);
+}
+
 function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
   const navigate = useNavigate();
   const numbers = useMemo(() => [...new Set(order.pos.map((po) => po.poId))], [order.pos]);
@@ -172,12 +236,40 @@ function summaryText(
 export interface SoBatchRegisterProps {
   data: SoBatchPurchaseResponse;
   isLoading: boolean;
+  initialSearch?: string;
+  /** Kept mounted but hidden while the Issue workspace is open (R8). */
+  hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
   onIssue: (selections: SoBatchSelection[]) => void;
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false }: SoBatchRegisterProps) {
   const navigate = useNavigate();
+  /* R8 — a `display:none` box forgets its scroll offset, and by the time a
+     render hides it the offset already reads 0. So the offset is remembered
+     from the grid's own scroll events while visible, and put back the moment
+     the Register shows again. */
+  const pageRef = useRef<HTMLDivElement>(null);
+  const lastScroll = useRef({ top: 0, left: 0 });
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const remember = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.getAttribute?.("data-testid") !== "grid-scroll") return;
+      if (target.clientHeight === 0) return;
+      lastScroll.current = { top: target.scrollTop, left: target.scrollLeft };
+    };
+    page.addEventListener("scroll", remember, true);
+    return () => page.removeEventListener("scroll", remember, true);
+  }, []);
+  useLayoutEffect(() => {
+    if (hidden) return;
+    const scroller = pageRef.current?.querySelector<HTMLElement>('[data-testid="grid-scroll"]');
+    if (!scroller) return;
+    scroller.scrollTop = lastScroll.current.top;
+    scroller.scrollLeft = lastScroll.current.left;
+  }, [hidden]);
 
   /* ⭐ THE ROW IS A DOOR (YH, 2026-09-01).
    *
@@ -263,6 +355,20 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     return m;
   }, [orders, leafsByOrder, selectable]);
 
+  const orderByFacts = useMemo(() => new Map(orders.map((order) => [
+    order.orderId, soBatchOrderPlanning(order, leafsByOrder.get(order.orderId) ?? []),
+  ])), [orders, leafsByOrder]);
+  const compareOrderBy = useCallback((a: SoBatchOrderRow, b: SoBatchOrderRow) =>
+    compareSoBatchPlanning(
+      { plan: orderByFacts.get(a.orderId)!, so: a.so },
+      { plan: orderByFacts.get(b.orderId)!, so: b.so },
+    ), [orderByFacts]);
+  /* `PO Safety Days`, one answer per row, over exactly the leaves the parent
+     checkbox would tick. The SERVER measured every number in it. */
+  const safetyDaysFacts = useMemo(() => new Map(orders.map((order) => [
+    order.orderId, soBatchOrderSafetyDays(order, leafsByOrder.get(order.orderId) ?? []),
+  ])), [orders, leafsByOrder]);
+
   /* ── The rail (fact sections, one selection per section) ────────────────
    *
    * The DEFAULT no-filter view shows every proceeded record, Ordered ones
@@ -271,27 +377,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
    * cross-updated against the other sections so the printed number predicts
    * the rows a click would show. This file picks; it never counts. */
   const [filter, setFilter] = useState<SoBatchRailFilter>(SO_BATCH_RAIL_CLEAR);
-  const [filterRailOpen, setFilterRailOpen] = useState(() => {
-    try {
-      return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
-    } catch {
-      return true;
-    }
-  });
-  const setFilterRailVisible = useCallback((open: boolean) => {
-    setFilterRailOpen(open);
-    try {
-      localStorage.setItem(FILTER_RAIL_STORAGE_KEY, open ? "1" : "0");
-    } catch {
-      // Storage may be unavailable in a locked-down browser; the live state
-      // still works for this visit.
-    }
-  }, []);
+  /* S3 — below an 896px canvas the rail starts hidden unless this browser
+     opened it before (`useFilterRailOpen`). */
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
   const shown = useMemo(
-    () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)),
-    [orders, rail.visibleOrderIds],
+    () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)).sort(compareOrderBy),
+    [orders, rail.visibleOrderIds, compareOrderBy],
   );
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
@@ -546,11 +640,65 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
     () => [
       {
-        /* THE IDENTITY — explicitly sticky, so horizontal scrolling never
+        /**
+         * ⭐ STATUS IS BACK, AND IT IS A DIFFERENT COLUMN — owner ruling
+         * 2026-09-18.
+         *
+         * What was retired was blank · `Partial` · `Ordered`: a generic
+         * progress badge for an arithmetic the row already showed under
+         * `PO No`, and an operator could act on none of the three. What is here
+         * now answers the one question a BUYING page exists for — *does this
+         * still need a purchase order?* — in the page's own two words.
+         *
+         * IT IS THE GROUPS' OWN READING, not a second one: the same
+         * `soBatchOrderPlanning().group` that puts the row under `To buy` or
+         * `No purchase needed`, so the word on the row and the heading above it
+         * can never disagree. And it is a NEED, never a permission: every
+         * coverage gate, every blocker and the issue door's own recomputation
+         * are untouched, and a row can read `Need PO` and still refuse the tick
+         * with its own stated reason.
+         */
+        key: "status",
+        label: "Status",
+        width: 112, minWidth: 96,
+        sortable: true,
+        chooserGroup: "Buying",
+        accessor: (o) => (
+          <span data-testid={`so-batch-status-${o.orderId}`}>
+            {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
+          </span>
+        ),
+        filterValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
+        sortFn: (a, b) =>
+          soBatchOrderStatusWord(orderByFacts.get(a.orderId)!.group).localeCompare(
+            soBatchOrderStatusWord(orderByFacts.get(b.orderId)!.group),
+          ),
+        exportValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
+      },
+      {
+        /* THE RECORD DATE leads (ui MASTER §6.7 rule 2, Jess 2026-09-17): the
+           actual hand-off to Operations, `orders.proceeded_at`. */
+        key: "proceededAt",
+        label: W.colProceedDate,
+        width: 120, minWidth: 118,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-proceed-${o.orderId}`}>
+            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
+          </span>
+        ),
+        dateValue: (o) => o.proceededAt,
+        filterType: "date",
+        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
+        exportValue: (o) => o.proceededAt ?? "",
+      },
+      {
+        /* THE IDENTITY — pinned with the date, so horizontal scrolling never
            loses WHICH record a row is (Card §9). */
         key: "soNo",
         label: W.colSoNo,
-        width: 90,
+        width: 90, minWidth: 80,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -582,39 +730,79 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         exportValue: (o) => (o.so == null ? "" : `SO-${o.so}`),
       },
       {
-        key: "customer",
-        label: W.colCustomer,
-        width: 130,
+        /**
+         * ⭐ `PO Safety Days` REPLACES `Order By` ON THE PARENT — owner ruling
+         * 2026-09-18 (`docs/COPY-STANDARD.md` — Purchasing UI dictionary).
+         *
+         * `Order By` answered *when should this be ordered*, which is a date an
+         * operator then has to subtract today from. The margin answers the
+         * question directly: *if I order this today, how many working days of
+         * safety are left?* — the tightest of the order's outstanding lines.
+         *
+         * THE NUMBER IS THE SERVER'S (`purchaseDemandSafetyDaysLeft`), the same
+         * expression the timing state on the rail is classified from, so the
+         * column and the facet can never be measured against two sets of dates.
+         * No client calendar arithmetic is admitted here, exactly as before.
+         *
+         * ⛔ AND UNKNOWN IS NEVER `0`. Nothing to buy prints nothing; a margin
+         * that cannot be stated prints the page's own governed absence word;
+         * production that overruns the customer's date prints the sentence that
+         * says so, never a negative number in a days column. `Order By` itself
+         * stays a planning/detail fact — it is not a column on either table.
+         */
+        key: "poSafetyDays",
+        label: W.colPoSafetyDays,
+        headerLines: ["PO Safety", "Days"],
+        width: 120, minWidth: 104,
         sortable: true,
-        chooserGroup: "Order",
-        accessor: (o) => (
-          <span className="truncate" data-testid={`so-batch-customer-${o.orderId}`}>
-            {o.customer ?? ""}
-          </span>
-        ),
-        searchValue: (o) => o.customer ?? "",
-        exportValue: (o) => o.customer ?? "",
-      },
-      {
-        key: "proceededAt",
-        label: W.colProceedDate,
-        width: 104,
-        sortable: true,
-        chooserGroup: "Order",
-        accessor: (o) => (
-          <span data-testid={`so-batch-proceed-${o.orderId}`}>
-            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
-          </span>
-        ),
-        dateValue: (o) => o.proceededAt,
-        filterType: "date",
-        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
-        exportValue: (o) => o.proceededAt ?? "",
+        chooserGroup: "Buying",
+        accessor: (o) => {
+          const cell = safetyDaysFacts.get(o.orderId)!;
+          /* ⚠️ MEASURED, 2026-09-18: at this column's width a Register cell
+             clips with an ellipsis at 119px, and three of the four governed
+             sentences are longer than that — `Already on a PO` 121px,
+             `Coverage not checked` 162px, `Not enough production days` 201px.
+             An ellipsis does not shorten a fact, it DESTROYS it, so the whole
+             sentence rides in `title` and stays recoverable at any width the
+             operator has dragged the column to. Whether the column itself
+             should be wider is this listing's own ruling to make; the fact
+             being unreadable is not something to leave until it does. */
+          const word =
+            cell.kind === "absent"
+              ? soBatchOrderByAbsenceWord(cell.absence)
+              : cell.kind === "days" && cell.days < 0
+                ? W.safetyDaysOverrun
+                : null;
+          return (
+            <span
+              className="tabular-nums"
+              data-testid={`so-batch-safety-days-${o.orderId}`}
+              title={word ?? undefined}
+            >
+              {/* NOTHING LEFT TO BUY PRINTS NOTHING — the cell is empty, not a
+                  `0`, because there is no margin to state about a purchase
+                  nobody has to make. */}
+              {word != null ? (
+                <Absent>{word}</Absent>
+              ) : cell.kind === "days" ? (
+                cell.days
+              ) : null}
+            </span>
+          );
+        },
+        /* Tightest first, and the rows that state no margin sort after every
+           row that does — an unknown is not a very large margin. */
+        sortFn: (a, b) =>
+          safetyDaysValue(safetyDaysFacts.get(a.orderId)) -
+          safetyDaysValue(safetyDaysFacts.get(b.orderId)),
+        filterValue: (o) => safetyDaysWord(safetyDaysFacts.get(o.orderId)),
+        exportValue: (o) => safetyDaysWord(safetyDaysFacts.get(o.orderId)),
       },
       {
         key: "requestedDelivery",
         label: W.colRequestedDelivery,
-        width: 158,
+        headerLines: ["Customer Requested", "Delivery Date"],
+        width: 144, minWidth: 118,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -637,8 +825,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            shared rule Sales Orders reads (`conciseLocality`), so two registers
            cannot print two localities for one order. */
         key: "deliveryLocation",
+        /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
+        wrap: true,
         label: W.colDeliveryLocation,
-        width: 160,
+        headerLines: ["Customer Delivery", "Location"],
+        width: 140, minWidth: 92,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => {
@@ -654,9 +845,54 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         exportValue: (o) => conciseLocality(o.deliveryCity, o.deliveryState),
       },
       {
+        key: "customer",
+        /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
+        wrap: true,
+        label: W.colCustomer,
+        width: 136, minWidth: 100,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-customer-${o.orderId}`}>
+            {o.customer ?? ""}
+          </span>
+        ),
+        searchValue: (o) => o.customer ?? "",
+        exportValue: (o) => o.customer ?? "",
+      },
+      {
+        /**
+         * ⭐ `Items` — owner ruling 2026-09-18. `{first item} + {n} more`, with
+         * every item and its exact references in the expansion.
+         *
+         * A Register that says what a customer ordered lets an operator scan
+         * for goods without opening a row, and the summary states exactly one
+         * thing: the first item and HOW MANY more there are. It never measures
+         * its own text against its own width and never prints as much of the
+         * list as happens to fit — that presentation is retired on this page
+         * (owner correction 2026-09-11), because the visible text, the export
+         * and the accessible name were three different answers.
+         */
+        key: "items",
+        wrap: true,
+        label: W.colItems,
+        width: 180, minWidth: 92,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-items-${o.orderId}`}>{itemsSummary(o)}</span>
+        ),
+        searchValue: (o) => o.lines.map((l) => l.item).join(" "),
+        filterValue: (o) => itemsSummary(o),
+        sortFn: (a, b) => itemsSummary(a).localeCompare(itemsSummary(b)),
+        exportValue: (o) => itemsSummary(o),
+      },
+      {
         key: "supplier",
+        /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
+        wrap: true,
         label: W.colSupplier,
-        width: 110,
+        width: 136, minWidth: 92,
         sortable: true,
         chooserGroup: "Buying",
         /* ⭐ A SUMMARY SAYS ONE THING (owner correction 2026-09-11). It used
@@ -668,7 +904,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         accessor: (o) => {
           const s = supplierSummaryOf(o);
           return (
-            <span className="truncate" data-testid={`so-batch-supplier-${o.orderId}`}>
+            <span data-testid={`so-batch-supplier-${o.orderId}`}>
               {summaryText(s, (n) => `${n} suppliers`) ?? null}
             </span>
           );
@@ -702,8 +938,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
          * row in the expansion — where `Split` already lives.
          */
         key: "deliverTo",
+        /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
+        wrap: true,
         label: W.deliverTo,
-        width: 150,
+        width: 120, minWidth: 100,
         chooserGroup: "Buying",
         accessor: (o) => {
           const issued = soBatchCellSummary(
@@ -711,29 +949,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           );
           if (issued.kind !== "none") {
             return (
-              <span className="truncate" data-testid={`so-batch-deliver-to-${o.orderId}`}>
+              <span data-testid={`so-batch-deliver-to-${o.orderId}`}>
                 {summaryText(issued, () => W.multiple)}
-              </span>
-            );
-          }
-          /* THE EMPTY CELL SAYS WHY IT IS EMPTY (YH, 2026-09-02). Nothing is
-             issued, so there are two very different reasons and they are not
-             the same answer: the order is simply not bought yet, or it CANNOT
-             be bought because a SKU has no catalog cost, no supplier, no
-             production days, no customer date or no SKU. The blocker is named
-             here rather than only inside the expansion. */
-          const blocked = (leafsByOrder.get(o.orderId) ?? []).filter(
-            (leaf) => !isPurchaseDemandTimingState(leaf.state),
-          );
-          if (blocked.length > 0) {
-            const reasons = [...new Set(blocked.map((leaf) => stateWords[leaf.state]))];
-            return (
-              <span
-                className="truncate text-kit-amber-11"
-                data-testid={`so-batch-deliver-to-${o.orderId}`}
-                title="Open the row to see what to do about it"
-              >
-                {reasons.length === 1 ? reasons[0] : W.multiple}
               </span>
             );
           }
@@ -749,7 +966,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       {
         key: "poNo",
         label: W.colPoNo,
-        width: 144,
+        width: 144, minWidth: 80,
         sortable: true,
         chooserGroup: "Documents",
         /* ⭐ THE DOCUMENT COLUMN SAYS THERE IS NO DOCUMENT — once, and here.
@@ -776,7 +993,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
            `Goods Must Arrive`, never an "if ordered today" estimate. */
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
-        width: 126,
+        headerLines: ["PO", "Delivery Date"],
+        width: 120, minWidth: 110,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
@@ -813,7 +1031,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         },
       },
     ],
-    [
+    [orderByFacts, safetyDaysFacts, compareOrderBy,
       navigate,
       data.destinations,
       leafsByOrder,
@@ -823,6 +1041,36 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       destinationName,
       supplierSummaryOf,
     ],
+  );
+
+  /**
+   * ⭐ A PURCHASE MAY NOT BE ISSUED OVER AN UNDECIDED STOCK CHANGE — owner
+   * ruling 2026-09-18.
+   *
+   * A pending Ready Stock edit is a change to the very quantity the purchase
+   * would be raised against: if the operator meant to take two Units off the
+   * shelf, `Issue PO` must not buy those two units first. So the act waits for
+   * `Save changes` or `Cancel` on the orders it is about — the orders in the
+   * selection, never the whole page.
+   *
+   * A collapsed row has no pending edit, because collapsing DISCARDS the draft
+   * exactly as `Cancel` does: nothing was written, and a hidden draft blocking
+   * a button the operator cannot connect it to would be worse than losing it.
+   */
+  const [pendingStock, setPendingStock] = useState<ReadonlySet<string>>(new Set());
+  const onStockPending = useCallback((orderId: string, pending: boolean) => {
+    setPendingStock((prev) => {
+      if (prev.has(orderId) === pending) return prev;
+      const next = new Set(prev);
+      if (pending) next.add(orderId);
+      else next.delete(orderId);
+      return next;
+    });
+  }, []);
+  const selectionHasPendingStock = useMemo(
+    () => [...new Set(selections.map((sel) => leafById.get(sel.demandId)?.orderId))]
+      .some((orderId) => orderId != null && pendingStock.has(orderId)),
+    [selections, leafById, pendingStock],
   );
 
   /* ── The expansion — the shared child table, and only it ──────────────── */
@@ -839,35 +1087,46 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       destinationName={destinationName}
       safetyDays={data.safetyDays}
       onReserved={dropTicksForLines}
+      onStockPending={onStockPending}
     />
   );
 
   /* ── The page ─────────────────────────────────────────────────────────── */
   return (
     <div
-      className={`${styles.page} flex h-full min-h-0 w-full flex-1 flex-col`}
+      ref={pageRef}
+      className={`${styles.page} ${hidden ? "hidden" : "flex"} h-full min-h-0 w-full flex-1 flex-col`}
       data-testid="so-batch-page"
+      aria-hidden={hidden || undefined}
     >
       <PurchasingTabs />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* `relative` is what lets the rail LEAVE the flow on a narrow window —
+          see the rail's own class below. */}
+      <div ref={canvasRef} className={`${styles.canvas} relative flex min-h-0 flex-1 overflow-hidden`}>
         {/* Card 02-C — the readable 240px shell. Navigation, not batch
             selection: no rail row carries a checkbox, one filter per section,
             sections combine, and the fixed rows print their live count, zero
             included. */}
-        {filterRailOpen && <FilterRail testId="so-batch-rail" onHide={() => setFilterRailVisible(false)}>
-          <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
-            <FilterRailRow
-              active={filter.notOrderedOnly}
-              onClick={() =>
-                setFilter((prev) => ({ ...prev, notOrderedOnly: !prev.notOrderedOnly }))
-              }
-              testId="so-batch-all-not-ordered"
-              label={SO_BATCH_RAIL.toOrder.all}
-              count={rail.notOrderedCount}
-              title={`${rail.notOrderedCount} ${W.footerUnit} not ordered`}
-            />
-          </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading}>
+        {filterRailOpen && <FilterRail
+          testId="so-batch-rail"
+          onHide={() => setFilterRailVisible(false)}
+          /* ⭐ THE RAIL DOES NOT EAT THE TABLE ON A NARROW WINDOW — the shared
+             purchasing responsive pattern, already shipped on Purchase Orders
+             (`PurchaseOrdersPage.tsx`). Below 896px of canvas the 240px rail floats over
+             the Register instead of taking 240 of its 459 pixels, so the
+             primary action and the goods stay reachable; `Hide filters` puts
+             it away exactly as it does on a wide screen. On a wider canvas nothing
+             changes at all. */
+          className={styles.rail}
+        >
+          {/* ⛔ `TO ORDER / All not ordered` IS GONE (owner correction
+              2026-09-11). It was the one row on this rail that named no fact
+              about a Sales Order — it named the page's own default, which is
+              what an operator sees with nothing selected — and it sat ABOVE
+              `ORDER TIMING`, the section that answers what to buy today. The
+              outstanding arithmetic behind it is untouched and still governs
+              the tick and the Ready Stock door. */}
+          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading} icon="date">
             {SO_BATCH_RAIL.timing.states.map((s) => (
               <FilterRailRow
                 key={s}
@@ -889,7 +1148,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               rows wrote, so `All …` still clears only its own section and
               sections still combine with AND. The counts ride in the option
               text; `TO ORDER` and `ORDER TIMING` keep their visible rows. */}
-          <FilterRailGroup title={SO_BATCH_RAIL.product.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.product.heading} icon="goods">
             {/* The CATALOG's categories, never SKU-text inference. `All
                 products` is the section's clear — and where the uncommon
                 categories live. */}
@@ -911,7 +1170,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading} icon="supplier">
             {/* Actual names from the Register's own supplier projection —
                 dynamic, alphabetical, never hardcoded. A name with no match
                 under the other filters drops off; the SELECTED name stays,
@@ -929,7 +1188,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               onChange={(supplier) => setFilter((prev) => ({ ...prev, supplier }))}
             />
           </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.region.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.region.heading} icon="delivery">
             {/* ⭐ REGION JOINS PRODUCT AND SUPPLIER (owner correction
                 2026-09-11). It is the third FACT list on this rail and it grows
                 with the business — every outstation state Carres delivers to
@@ -954,7 +1213,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           {/* The one Purchasing-owned setup exception, and only while it
               exists — an empty exception section is noise wearing a heading. */}
           {rail.setupExists && (
-            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading}>
+            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading} icon="settings">
               {SO_BATCH_RAIL.setup.states.map((s) => (
                 <FilterRailRow
                   key={s}
@@ -986,7 +1245,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               To dropdown and Split's Apply were already doing without ever
               reading the default. The warning that remains is the one that is
               still true. */}
-          {data.destinations.length === 0 ? (
+          {!isLoading && data.destinations.length === 0 ? (
             <p
               className="mb-2 rounded-control bg-kit-amber-3 px-3 py-2 text-meta text-kit-amber-11"
               data-testid="so-batch-no-destination"
@@ -994,7 +1253,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               No Deliver To destinations are set, so nothing can be bought on
               this page. Set one in Purchasing → Settings.
             </p>
-          ) : !data.defaultDestinationId ? (
+          ) : !isLoading && !data.defaultDestinationId ? (
             /* Not a blocker — a heads-up. Buying works; it just opens on a
                destination nobody nominated, so say WHICH one before the
                operator discovers it on a purchase order. */
@@ -1023,6 +1282,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           >
             <DataGrid<SoBatchOrderRow>
               appearance="reference"
+              wrapToolbar
+              palette="slate"
+              /* §6.8 — the MAIN header is pale blue on this reference; the
+                 child tables in the expansion keep neutral slate, so two
+                 stacked headers read as parent and child. */
+              headerTone="paleBlue"
+              searchPresentation="responsive"
               rows={shown}
               columns={columns}
               storageKey={STORAGE_KEY}
@@ -1030,24 +1296,36 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               rowTestId={(o) => `so-batch-row-${o.orderId}`}
               exportName={W.destination}
               searchPlaceholder={W.search}
+              initialSearch={initialSearch}
+              noMatchMessage={W.noMatch}
+              onClearConditions={() => setFilter(SO_BATCH_RAIL_CLEAR)}
               toolbarStart={
                 !filterRailOpen ? (
-                  <button
-                    type="button"
-                    aria-label="Show filters"
-                    title="Show filters"
-                    data-testid="so-batch-show-filters"
-                    onClick={() => setFilterRailVisible(true)}
-                    className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-                  >
-                    <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-                  </button>
+                  <ShowFiltersButton
+                    onShow={() => setFilterRailVisible(true)}
+                    testId="so-batch-show-filters"
+                  />
                 ) : null
               }
               isLoading={isLoading}
-              emptyMessage={W.empty}
+              /* MESSAGE KIND ② (§6.7): a real business blocker, between the
+                 toolbar and the table, costing zero height while its fact is
+                 false. */
+              warning={selectionHasPendingStock ? W.readyStockPendingBlocksIssue : undefined}
+              emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
               groupBanner={false}
-              stickyIdentity={{ columnKey: "soNo" }}
+              fixedGroups={{
+                groups: [
+                  { key: "to-buy", label: W.groupToBuy, alwaysOpen: true },
+                  { key: "no-purchase-needed", label: W.groupNoPurchaseNeeded, initiallyCollapsed: true },
+                ],
+                groupOf: (o) => orderByFacts.get(o.orderId)!.group,
+                revealMatches: Object.values(filter).some((value) => value != null && value !== false),
+              }}
+              /* The owner's approved order opens with `Status`, then the
+                 date/identity pair §6.7 rule 2 fixes. All three are protected
+                 from hiding and dragging; only the pair pins. */
+              leadingColumns={{ date: "proceededAt", identity: "soNo", before: ["status"] }}
               chooserGroupOrder={["Order", "Documents", "Buying"]}
               onRowDoubleClick={openOrder}
               contextMenu={rowMenu}
@@ -1067,6 +1345,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 },
                 isSelectable: (o: SoBatchOrderRow) =>
                   (eligibleByOrder.get(o.orderId) ?? []).length > 0,
+                unselectableReason: (o: SoBatchOrderRow) =>
+                  soBatchOrderUnselectableReason(o, leafsByOrder.get(o.orderId) ?? [], stateWords),
                 isIndeterminate: (o: SoBatchOrderRow) =>
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
@@ -1079,15 +1359,19 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                 >
                   <SoBatchPoDutyChip data={data} />
                   {data.mayIssue ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary" size="md"
                       data-testid="so-batch-issue"
-                      className="inline-flex h-7 shrink-0 items-center rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white hover:opacity-90"
+                      /* An undecided stock change is a change to the very
+                         quantity this act would buy. The button states the
+                         reason in the warning band above rather than failing
+                         at the door. */
+                      disabled={selectionHasPendingStock}
                       onClick={() => onIssue(selections)}
                     >
                       {W.issuePo}
-                    </button>
-                  ) : null}
+                    </Button>
+                  ) : <span className="text-meta text-kit-slate-11">{W.issueNeedsPoDuty}</span>}
                 </span>
               ) : null}
               statusSummary={(filtered) => {
@@ -1102,7 +1386,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
                    in the toolbar, and never repeated down here. */
                 const line =
                   filtered.length === orders.length
-                    ? `${orders.length} ${W.footerUnit}`
+                    ? `${orders.length} ${orders.length === 1 ? W.footerUnitOne : W.footerUnit}`
                     : `${filtered.length} of ${orders.length} ${W.footerUnit}`;
                 return (
                   <span className="block truncate" data-testid="so-batch-footer" title={line}>
@@ -1163,17 +1447,46 @@ function poDutyLabel(data: SoBatchPurchaseResponse): string {
 }
 
 /**
- * ▸ THE ORDER'S OWN GOODS — the shared `GoodsMiniTable`, and nothing else
- * (owner ruling 2026-08-15; Card 02-B §5).
+ * ▸ ONE SALES ORDER, THREE CONNECTED SECTIONS — owner correction 2026-09-11.
  *
- * The expansion says only what the parent row cannot: per item line, what
- * covers it (`Ready Stock` · the exact PO numbers · `Not ordered yet`), the
- * Unit ID where one is allocated, the exact supplier / `Deliver To` /
- * `PO Delivery Date` mapping when the parent cell could only summarise, and
- * the arrangement editor for the lines still being bought.
+ * ```
+ *   ▼ SO-1303
+ *     │
+ *     ├─ Goods on SO-1303           the ACTIONABLE demand: what the customer
+ *     │                             ordered, what is left, and the one tick
+ *     │                             and one destination editor per demand
+ *     ├─ ▸ Ready Stock              what is on the shelf for it
+ *     │
+ *     ╰─ ▾ Purchase order details   the READ-ONLY record: every document, every
+ *                                   Unit, and no control at all
+ *   ▸ SO-1302
+ * ```
  *
- * Unit IDs include incoming goods bound to this SO line through its PO line.
- * Shared PO-line goods need a physical allocation before naming an SO's Units.
+ * ── WHY THE RECORD LEFT THE ITEM TABLE ──────────────────────────────────────
+ *
+ * It was inside it twice. `On PO` stacked every covering purchase order in one
+ * cell — a line fourteen documents touch drew a fourteen-line-tall item row and
+ * filled the screen with one item — and the same fourteen numbers were then
+ * repeated in the rows underneath. A collection of documents was deciding how
+ * tall a demand row is, and the demand it belonged to had become the smallest
+ * thing on screen.
+ *
+ * Nothing was truncated to fix it. `On PO` states the QUANTITY documents carry,
+ * which is the number the arithmetic `Qty · Ready Stock · On PO · To buy`
+ * actually needs, and it is a door: pressing it opens the details, where each
+ * document is its own row with its own Unit, quantity, destination, supplier
+ * and original date. Every reference is still on the page, in the section that
+ * is about references.
+ *
+ * ── AND THE TWO TABLES ANSWER TWO DIFFERENT QUESTIONS ───────────────────────
+ *
+ * The goods table is about what can still be BOUGHT, so every row on it carries
+ * a checkbox and an arrangement editor. The details table is about what has
+ * already BEEN bought, so nothing on it carries either — a sent purchase order
+ * is not re-arranged from a register, and a Unit that exists is not bought
+ * again. Keeping them in one table is what put a destination editor beside a
+ * historical document in the first place.
+ *
  * Unit IDs are read LAZILY through the Sales Order expansion endpoint — the
  * same read the Sales Orders register uses (Law D: Stock owns the fact, both
  * disclosures ask the same door), and only when a row is actually opened.
@@ -1190,6 +1503,7 @@ function SoBatchOrderExpansion({
   destinationName,
   safetyDays,
   onReserved,
+  onStockPending,
 }: {
   order: SoBatchOrderRow;
   leafs: PurchaseDemandRow[];
@@ -1203,14 +1517,49 @@ function SoBatchOrderExpansion({
   safetyDays: number;
   /** Ready Stock answered these item lines — every tick on them is now stale. */
   onReserved: (orderId: string, orderLineIds: readonly string[]) => void;
+  /** This order has a Ready Stock edit nobody has saved or cancelled yet. */
+  onStockPending: (orderId: string, pending: boolean) => void;
 }) {
   /* Its own handle on the router: this box is a top-level component, not a
      closure inside the register, so the multi-PO door below cannot borrow the
      register's `navigate`. */
   const navigate = useNavigate();
   const expansion = useSalesOrderExpansion(order.orderId);
+  /* ⭐ READY STOCK IS READ FOR AN OPENED ROW, AND ONLY FOR AN OPENED ROW.
+     This component only exists inside an expansion, so a Register full of
+     collapsed rows still counts no warehouse — the same laziness the section
+     disclosure used to buy, one step earlier. It has to be earlier: the cell
+     states its two counts BEFORE anything is pressed, and a count that waits
+     for a disclosure would have to be guessed until then. */
+  const readyStock = useSoBatchReadyStock({
+    orderId: order.orderId,
+    so: order.so,
+    onSaved: onReserved,
+    onPendingChange: onStockPending,
+  });
   const unitIdsByLine = useMemo(
     () => new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l.unitIds])),
+    [expansion.data],
+  );
+  /**
+   * ⭐ UNKNOWN IS NOT `None` (2026-09-11). Three different things can be true
+   * of a Unit cell — the goods exist, no Unit is tied to this line yet, or the
+   * read has not answered — and printing the third as the second is how an
+   * operator concludes goods do not exist because a request was slow.
+   */
+  const unitRead: UnitReadState = expansion.isError
+    ? "error"
+    : expansion.isPending
+      ? "loading"
+      : "ready";
+  /**
+   * ⭐ AN ANSWER THAT DID NOT COVER THIS LINE IS NOT AN ANSWER ABOUT IT
+   * (2026-09-11). The read answers for the ORDER; a line it carries no entry
+   * for has not been looked at, and `Not allocated` — which claims Carres
+   * looked and found nothing — would be a fact the read never established.
+   */
+  const linesAnswered = useMemo(
+    () => new Set((expansion.data?.lines ?? []).map((l) => l.lineId)),
     [expansion.data],
   );
   const leafByLineId = useMemo(() => {
@@ -1219,6 +1568,18 @@ function SoBatchOrderExpansion({
     return m;
   }, [leafs]);
   const poById = useMemo(() => new Map(order.pos.map((p) => [p.poId, p])), [order.pos]);
+
+  /**
+   * The details section opens with the row, because the parent's `2 POs`
+   * summary is a door and a door that opens onto a closed box has not answered
+   * anything.
+   *
+   * ⭐ NOTHING SCROLLS TO IT ANY MORE. `Ordered Qty` was the door that did, and
+   * the owner's 2026-09-18 goods table has no such column: the section is
+   * already open beneath the goods when the row opens, so a scroll handler
+   * pointing at a box the operator can see is a moving screen for nothing.
+   */
+  const [poOpen, setPoOpen] = useState(true);
 
   /* ⭐ THE TICK AND THE EDITOR BELONG TO THE DEMAND, NOT TO EVERY ROW THAT
      SHOWS IT (owner correction 2026-09-11). A matched set spans several item
@@ -1240,47 +1601,67 @@ function SoBatchOrderExpansion({
     if (drawEditor) editorDrawn.add(leaf.id);
     const setSize = leaf ? (linesPerLeaf.get(leaf.id) ?? 1) : 1;
     const arranged = eligible ? leafAllocations(leaf) : [];
+    /* ⭐ THE DOCUMENT LINE'S OWN `Deliver To`, never the parent document's
+       (owner correction 2026-09-11). The server resolves it per lineage entry
+       and falls back to the document only where the LINE records none. */
     const issuedDest = soBatchCellSummary(
-      linePos.map((p) => destinationName(p!.destinationId)),
+      l.pos.map((p) => destinationName(p.destinationId ?? poById.get(p.poId)?.destinationId ?? null)),
     );
     const supplier = soBatchCellSummary([
       ...(leaf ? [leaf.supplier] : []),
       ...linePos.map((p) => p!.supplierName),
     ]);
-    const poDate = soBatchCellSummary(linePos.map((p) => p!.officialDeliveryDate));
     return {
       key: l.orderLineId,
       testId: `so-batch-part-${l.sku}`,
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: [],
-      unitAbsence: expansion.isError
-        ? "Unit IDs could not be loaded"
-        : expansion.isPending
-          ? "Loading…"
-          : (unitIdsByLine.get(l.orderLineId) ?? []).length > 0
-            ? "—"
-            : "Not allocated",
-      /* ⭐ THE EXACT RECORDS, AS READ-ONLY ROWS. Each Unit names the document
-         it came in on, and that document's own supplier, date and destination
-         — never the plan for whatever is still to buy. */
-      units: (unitIdsByLine.get(l.orderLineId) ?? []).map((unitId) => {
-        const poNo = expansion.data?.unitCoverage?.[unitId] ?? null;
-        const po = poNo ? poById.get(poNo) : undefined;
-        return {
-          unitId,
-          poNo,
-          deliverTo: po ? destinationName(po.destinationId) : null,
-          supplier: po?.supplierName ?? null,
-          poDeliveryDate: po?.officialDeliveryDate ? fmtDate(po.officialDeliveryDate) : null,
-        };
-      }),
-      /* The four numbers that used to hide inside `Covered by` — and they add
-         up in front of the operator: what the customer ordered, what the shelf
-         already answered, what documents already carry, what is left. */
+      unitAbsence: "—",
+      /* The four numbers that used to hide inside `Covered by`: what the
+         customer ordered, what the shelf already answered, how much documents
+         have ORDERED for this line, and what is left.
+
+         ⭐ `Ordered Qty` is HISTORY, and its head says so (owner correction
+         2026-09-11). It is the exact `po_line_sources` quantity for THIS item
+         line — every non-cancelled document, `Completed` ones included, never
+         netted by what has arrived. It is NOT `On PO`, which is the
+         dictionary's head for the engine's pooled, netted, still-outstanding
+         coverage; printing this figure under that head said "still on order"
+         about goods that may already be in the warehouse. */
       fromStock: l.stockTaken > 0 ? l.stockTaken : null,
-      toBuy: drawEditor ? (leaf!.toBuy ?? 0) : null,
-      poAllocations: l.pos.map((p) => ({ poId: p.poId, qty: p.qty })),
-      onPoAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
+      /* THE CELL IS THE PAGE'S: two counts and the disclosure that opens the
+         stock picker under this very row. */
+      fromStockNode: readyStock.cell(l.orderLineId),
+      /* `Need PO` / `No PO needed` for THIS item line — the same outstanding
+         arithmetic the tick and the parent group read
+         (`soBatchOrderLineOutstandingQty`), never a second one. It states the
+         need for a document; it grants no permission, and a line that reads
+         `Need PO` can still refuse the tick with its own stated reason. */
+      status: soBatchOrderLineOutstandingQty(l) > 0 ? W.statusNeedPo : W.statusNoPoNeeded,
+      /* ⭐ A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY (owner correction
+         2026-09-11). `To buy` means *what is left to buy*, so printing the
+         engine's covering quantity there on a row nobody may tick presented a
+         COVERING quantity as a PURCHASING one. The shared reading of the
+         engine's own flag decides; the cell prints its existing governed
+         absence in every non-actionable state, and the row says which state it
+         is in. The customer's `Qty` and the historical `Ordered Qty` are two
+         columns away and untouched, and the documents are one section below —
+         nothing is hidden and no arithmetic is invented. */
+      ...(() => {
+        const state = leaf ? soBatchToBuyState(leaf, order.status) : { kind: "none" as const };
+        if (state.kind === "buy" && drawEditor) return { toBuy: state.qty };
+        if (state.kind === "covered") {
+          return { toBuy: null, toBuyNote: W.toBuyAlreadyOnPo, toBuyNoteWhy: W.toBuyAlreadyOnPoWhy };
+        }
+        if (state.kind === "unchecked") {
+          return { toBuy: null, toBuyNote: W.toBuyNotChecked, toBuyNoteWhy: W.toBuyNotCheckedWhy };
+        }
+        return { toBuy: null };
+      })(),
+      orderBy: eligible ? leaf.orderBy ?? null : null,
+      orderByAbsence: leaf && !isPurchaseDemandTimingState(leaf.state) && order.status !== "ordered" ? "Not planned" : "—",
+      orderedQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
+      orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
          line states the destination the issued document carries. */
       ...(drawEditor
@@ -1308,17 +1689,10 @@ function SoBatchOrderExpansion({
             ? []
             : issuedDest.kind === "one"
               ? [issuedDest.value]
-              : issuedDest.values,
+              : [W.multiple],
       deliverToAbsence: eligible ? "Not chosen" : "—",
       supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? undefined,
       supplierAbsence: "—",
-      poDeliveryDate:
-        poDate.kind === "none"
-          ? undefined
-          : poDate.kind === "one"
-            ? fmtDate(poDate.value)
-            : W.multiple,
-      poDeliveryDateAbsence: "—",
       sku: l.sku,
       qty: l.qty,
       item: l.item,
@@ -1352,13 +1726,12 @@ function SoBatchOrderExpansion({
         testId: `so-batch-part-${part.sku}`,
         category: leaf.category ? categoryWord(leaf.category) : "Other goods",
         unitIds: [],
-        unitAbsence: "Not allocated",
-        onPoAbsence: "Not ordered yet",
+        unitAbsence: "—",
+        orderedQtyAbsence: "Not ordered yet",
         deliverTo: [],
         deliverToAbsence: "—",
         supplierAbsence: "—",
         supplier: leaf.supplier ?? undefined,
-        poDeliveryDateAbsence: "—",
         sku: part.sku,
         qty: part.qty,
         item: leaf.item,
@@ -1366,6 +1739,33 @@ function SoBatchOrderExpansion({
       });
     }
   }
+
+  /**
+   * THE RECORD, RESOLVED ONCE PER ITEM LINE.
+   *
+   * `po_line_sources` is the only visible attribution (Card 02-B), so a row
+   * exists for every unit of it — named by its Unit where the read can evidence
+   * one, and stated as a quantity where it cannot. Nothing is counted as
+   * coverage without that lineage, and nothing with it is dropped.
+   */
+  const poRows = order.lines.flatMap((l) =>
+    poDetailRowsForLine({
+      lineKey: l.orderLineId,
+      sku: l.sku,
+      item: l.item,
+      itemDetail: l.variant,
+      lineage: l.pos,
+      unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
+      unitCoverage: expansion.data?.unitCoverage ?? {},
+      unitLines: expansion.data?.unitLines,
+      unitScopes: expansion.data?.unitScopes,
+      orderLineId: l.orderLineId,
+      unitRead,
+      lineRead: linesAnswered.has(l.orderLineId) ? "answered" : "absent",
+      po: (poId) => poById.get(poId),
+      destinationName,
+    }),
+  );
 
   if (lines.length === 0) {
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
@@ -1376,79 +1776,130 @@ function SoBatchOrderExpansion({
      any. They fail `isSelectableForOrder` because the order is FINISHED
      buying, not because something is wrong with them — printing
      "Issue PO to Ohana" in an amber panel on an order whose purchase orders
-     are already sent would be an instruction to duplicate work. The `Ordered`
-     pill and the `PO No` column are the explanation, and both read the same
-     lineage that closed the tick. */
+     are already sent would be an instruction to duplicate work. The
+     `PO No` column and the details section are the explanation, and both read
+     the same lineage that closed the tick. */
   const blockers =
     order.status === "ordered"
       ? []
       : leafs.filter((leaf) => !isSelectableForBuying(leaf) && leaf.action != null);
 
+  const goodsTable = (
+    <GoodsMiniTable
+      label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
+      lines={lines}
+      /**
+       * ⭐ THE APPROVED ACTIONABLE EXPANSION (Jess 2026-09-18, §9.1):
+       * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+       * Supplier Deliver To`.
+       *
+       * `SKU`, `Ordered Qty`, `To buy`, `Order By` and `Unit ID` leave this
+       * table and every one of their FACTS stays on the page: the document
+       * quantities and Units in `Purchase order details` below, the planning
+       * margin on the parent row's `PO Safety Days`, and the remaining
+       * purchasing quantity where the ACT is — the selection bar and the issue
+       * review, both of which read the authoritative recomputation. No
+       * coverage rule, no eligibility gate and no duplicate-order safeguard
+       * moved with them: `isSelectableForBuying`,
+       * `soBatchOrderLineOutstandingQty`, `fullyOnPo` and the issue door's own
+       * refusal are byte-for-byte what they were.
+       */
+      soBatchGoodsLayout
+      showStatus
+      showSku={false}
+      showFromStock
+      showSupplier
+      showUnitId={false}
+      /* THE PICKER OPENS UNDER ITS OWN ITEM, inside this table, so it scrolls
+         with the columns the connector is aligned to (§6.9). */
+      detailRow={(line) => readyStock.detail(line.key)}
+      selection={{
+        selectedKeys: new Set(
+          order.lines
+            .filter((l) => {
+              const leaf = leafByLineId.get(l.orderLineId);
+              return leaf != null && selectedIds.has(leaf.id);
+            })
+            .map((l) => l.orderLineId),
+        ),
+        onToggle: (lineKey) => {
+          const leaf = leafByLineId.get(lineKey);
+          if (leaf) onToggleLeaf(leaf.id);
+        },
+      }}
+    />
+  );
+
+  /**
+   * ⭐ TWO SECTIONS, NOT THREE — owner ruling 2026-09-18.
+   *
+   * `Ready Stock` was the middle one. It is not a section any more: the
+   * question is per ITEM LINE, so it is answered on the item line, in its own
+   * cell, and its Units open directly beneath that row. What is left is the
+   * pair that answers two different questions about the whole order — what can
+   * still be bought, and what has already been bought.
+   */
+  const sections: ConnectedSection[] = [
+    { key: "goods", connectAt: CONNECT_AT_TABLE_HEADER, node: goodsTable },
+    ...(poRows.length > 0
+      ? [
+          {
+            key: "po-details",
+            connectAt: CONNECT_AT_DISCLOSURE,
+            node: (
+              <ReadyStockDisclosure
+                testId={`so-batch-po-details-${order.orderId}`}
+                open={poOpen}
+                onToggle={() => setPoOpen((v) => !v)}
+                title={W.poDetails}
+                className=""
+              >
+                <PoDetailsTable
+                  label={
+                    order.so == null
+                      ? "Purchase order details"
+                      : `Purchase order details for SO-${order.so}`
+                  }
+                  rows={poRows}
+                  onPoClick={(poId) =>
+                    navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
+                  }
+                />
+              </ReadyStockDisclosure>
+            ),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div data-testid={`so-batch-inspector-${order.orderId}`}>
       {expansion.isError && (
-        <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void expansion.refetch()}>
+        <button
+          type="button"
+          className="px-2 pt-2 text-kit-blue-11 hover:underline"
+          onClick={() => void expansion.refetch()}
+        >
           Unit IDs could not be loaded. Try again
         </button>
       )}
       {blockers.length > 0 && (
-        <div className="mb-2 overflow-hidden rounded-control border border-warning/40 bg-warning-soft/40">
+        <div className="mt-2 overflow-hidden rounded-control border border-kit-slate-5 bg-kit-amber-3">
           {blockers.map((leaf) => (
             <div
               key={leaf.id}
-              className="border-b border-warning/30 px-3 py-2 last:border-b-0"
+              className="border-b border-kit-slate-5 px-3 py-2 last:border-b-0"
               data-testid={`so-batch-blocker-${leaf.id}`}
             >
               <div className="text-body font-medium text-kit-slate-12">
-                {stateWords[leaf.state]}
+                <Icon name="late" /> {stateWords[leaf.state]}
               </div>
               <div className="text-meta text-kit-slate-11">{leaf.action!.action}</div>
             </div>
           ))}
         </div>
       )}
-      <GoodsMiniTable
-        label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
-        lines={lines}
-        /* ⭐ THE GOODS IDENTIFY THEMSELVES FIRST (owner correction 2026-09-11),
-           and the arithmetic is explicit: `Qty` the customer's order, `On PO`
-           the documents already carrying it with the quantity each holds, and
-           `To buy` the remainder this page can still act on. */
-        identityFirst
-        showFromStock
-        showOnPo
-        showToBuy
-        showSupplier
-        showPoDeliveryDate
-        /* ⭐ THE EXPANSION IS THE MULTI-PO DOOR (YH, 2026-09-01). The parent
-           `PO No` cell links only when there is exactly one; with several it
-           prints `2 POs` and sends the reader here, where every number is a
-           door of its own. */
-        onPoClick={(poId) =>
-          navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
-        }
-        selection={{
-          selectedKeys: new Set(
-            order.lines
-              .filter((l) => {
-                const leaf = leafByLineId.get(l.orderLineId);
-                return leaf != null && selectedIds.has(leaf.id);
-              })
-              .map((l) => l.orderLineId),
-          ),
-          onToggle: (lineKey) => {
-            const leaf = leafByLineId.get(lineKey);
-            if (leaf) onToggleLeaf(leaf.id);
-          },
-        }}
-      />
-      {/* ⭐ READY STOCK — an INDEPENDENTLY collapsible table directly below
-          the order's own goods (owner-accepted design, 2026-09-10). It is a
-          sibling section, not a column and not a second mini-table: the
-          goods table answers *what was ordered and what covers it*, this one
-          answers *what is on the shelf for it*. Its selection is its own —
-          choosing a Unit never touches the purchasing tick above. */}
-      <ReadyStockPanel orderId={order.orderId} so={order.so} onReserved={onReserved} />
+      <ConnectedSections sections={sections} testId={`so-batch-sections-${order.orderId}`} />
     </div>
   );
 }

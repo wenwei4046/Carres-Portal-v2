@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -244,6 +227,17 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
             select: vi.fn().mockResolvedValue({ data: guaranteeTerms, error: null }),
           };
         }
+        if (table === "order_payments") {
+          // A deposit before the invoice, the balance after it.
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [
+                { amount: 2000, kind: "deposit", voided_at: null, created_at: "2026-04-01T00:00:00Z" },
+                { amount: 3970, kind: "payment", voided_at: null, created_at: "2026-05-02T00:00:00Z" },
+              ], error: null }),
+            }),
+          };
+        }
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -273,6 +267,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     expect(body.invoice_no).toBe("INV-2026-1240");
     expect(body.order_code).toBe("SO-1240");
     expect(body.total).toBe(5970);
+    expect(body.received_before).toBe(2000);
     expect(body.lines).toHaveLength(1);
     // No guarantee sold on this order → the block is empty, not absent-and-broken.
     expect(body.guarantees).toEqual([]);

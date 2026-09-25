@@ -74,5 +74,10 @@ export function registerNotoSansSC(): void {
       { src: NOTO_SANS_SC_700, fontWeight: 700 },
     ],
   });
+  /* react-pdf's default hyphenation cuts words at the line end —
+     `Deliv-` / `ery`, `Ware-` / `house` (measured on the PO, 2026-09-21). A
+     document a supplier or customer reads never splits a word: the whole word
+     moves to the next line. Family-wide (SO-PDF-STANDARD §9). */
+  Font.registerHyphenationCallback((word) => [word]);
   registered = true;
 }

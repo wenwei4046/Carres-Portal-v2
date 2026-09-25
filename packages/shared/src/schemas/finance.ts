@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { departmentFilterFields, departmentFilterMessage, departmentFilterOk } from '../department';
 import { paymentMethodKeySchema } from './order-payments';
+import { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE } from '../finance-ledger';
 
 /**
  * Phase 5 — HQ Finance role inputs.
@@ -76,6 +78,13 @@ export const refundPayInput = z.object({
 }).strict();
 export type RefundPayInput = z.infer<typeof refundPayInput>;
 
+/** Inclusive YYYY-MM-DD `from`/`to` filters plus the row cap, shared by the four finance list queries. */
+const dateWindow = {
+  from:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+};
+
 /**
  * `paymentsListQuery` — GET /api/finance/payments?orderId&dealerId&direction&from&to.
  * Query string parser for the payments list. All fields optional. The
@@ -89,9 +98,7 @@ export const paymentsListQuery = z.object({
   orderId:    z.string().uuid().optional(),
   dealerId:   z.string().uuid().optional(),
   direction:  z.enum(['in', 'out']).optional(),
-  from:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit:      z.coerce.number().int().min(1).max(500).optional(),
+  ...dateWindow,
 }).strict();
 export type PaymentsListQuery = z.infer<typeof paymentsListQuery>;
 
@@ -136,9 +143,7 @@ export type FinanceInvoiceVoidInput = z.infer<typeof financeInvoiceVoidInput>;
 export const invoicesListQuery = z.object({
   status:    z.enum(['all', 'unpaid', 'partial', 'paid', 'voided']).optional(),
   dealerId:  z.string().uuid().optional(),
-  from:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit:     z.coerce.number().int().min(1).max(500).optional(),
+  ...dateWindow,
 }).strict();
 export type InvoicesListQuery = z.infer<typeof invoicesListQuery>;
 
@@ -176,9 +181,7 @@ export type RefundCreateInput = z.infer<typeof refundCreateInput>;
 export const refundsListQuery = z.object({
   status:    z.enum(['all', 'pending', 'approved', 'rejected', 'paid', 'issued', 'applied']).optional(),
   dealerId:  z.string().uuid().optional(),
-  from:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit:     z.coerce.number().int().min(1).max(500).optional(),
+  ...dateWindow,
 }).strict();
 export type RefundsListQuery = z.infer<typeof refundsListQuery>;
 
@@ -246,10 +249,8 @@ export type BankStatementCreateInput = z.infer<typeof bankStatementCreateInput>;
  * left join check on reconciliations).
  */
 export const bankStatementsListQuery = z.object({
-  from:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  ...dateWindow,
   matched: z.enum(['true', 'false']).optional(),
-  limit:   z.coerce.number().int().min(1).max(500).optional(),
 }).strict();
 export type BankStatementsListQuery = z.infer<typeof bankStatementsListQuery>;
 
@@ -275,24 +276,14 @@ export const reconciliationCreateInput = z.object({
 export type ReconciliationCreateInput = z.infer<typeof reconciliationCreateInput>;
 
 /**
- * `cashflowSeriesQuery` / `monthlyPlQuery` / `topSkusQuery` — report params.
- * Each clamps the period parameter to a sensible range before passing to
+ * `cashflowSeriesQuery` — report params.
+ * It clamps the period parameter to a sensible range before passing to
  * the SQL RPC (which also clamps server-side).
  */
 export const cashflowSeriesQuery = z.object({
   weeks: z.coerce.number().int().min(1).max(52).optional(),
 }).strict();
 export type CashflowSeriesQuery = z.infer<typeof cashflowSeriesQuery>;
-
-export const monthlyPlQuery = z.object({
-  months: z.coerce.number().int().min(1).max(24).optional(),
-}).strict();
-export type MonthlyPlQuery = z.infer<typeof monthlyPlQuery>;
-
-export const topSkusQuery = z.object({
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-}).strict();
-export type TopSkusQuery = z.infer<typeof topSkusQuery>;
 
 /**
  * `refundApplyInput` — POST /api/finance/refunds/:id/apply.
@@ -338,8 +329,11 @@ export const ledgerEntriesQuery = z.object({
              .optional(),
   offset:  z.coerce.number().int().min(0).default(0),
   limit:   z.coerce.number().int().min(1).max(1000).default(500),
+  ...departmentFilterFields,
 }).strict().refine((v) => !v.from || !v.to || v.from <= v.to, {
   message: 'The start date is after the end date', path: ['to'],
+}).refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerEntriesQuery = z.infer<typeof ledgerEntriesQuery>;
 
@@ -349,19 +343,103 @@ export const ledgerEntryRef = z.union([
   z.string().trim().regex(/^[0-9A-Za-z][0-9A-Za-z-]{1,39}$/, 'Use an entry number like JE-202609-0003'),
 ]);
 
+// The shape and its sentence live in finance-ledger.ts, which imports nothing,
+// so order-payments.ts can use them without an import cycle through this file.
+export { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE };
+
+/** A number as typed: the letter may be lower case (900-a001) and is stored in
+ *  capitals, as gl_account_update does. The check runs BEFORE the capitals, so
+ *  a non-ASCII letter that JavaScript would turn into A-Z (the dotless i) is
+ *  still refused. */
+export const ledgerAccountCodeInput = z.string().trim()
+  .regex(/^([0-9]{4}|[0-9]{3}-[0-9A-Za-z][0-9]{3})$/, LEDGER_ACCOUNT_CODE_MESSAGE)
+  .transform((c) => c.toUpperCase());
+
+/** Rename or renumber one account on Finance Settings → Chart of accounts
+ *  (0539, renumber added by 0550). `code` left out means the number stays;
+ *  a number that is given cascades to every row that names it. */
+export const ledgerAccountUpdateInput = z.object({
+  name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  code: ledgerAccountCodeInput.optional(),
+}).strict();
+
+/** Add an account under a heading on Finance Settings → Chart of accounts
+ *  (0577). The kind follows the heading. A heading is added with its first
+ *  account (`first`), because a heading is an account with an account under it. */
+export const ledgerAccountAddInput = z.object({
+  parentCode: z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.'),
+  code: ledgerAccountCodeInput,
+  name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  first: z.object({
+    code: ledgerAccountCodeInput,
+    name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  }).strict().optional(),
+}).strict();
+export type LedgerAccountAddInput = z.infer<typeof ledgerAccountAddInput>;
+
+/**
+ * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
+ *
+ * BOTH ORDERS TRAVEL. `was` is the order the screen READ, `now` is the order it
+ * wants; `gl_accounts_reorder` refuses when `was` is no longer the stored order,
+ * which is what stops a second dragger throwing the first one's move away.
+ * Sending `now` twice would pass that check every time and silently turn it off.
+ *
+ * `parentCode` is null for a top-level account — the chart's roots are siblings
+ * of each other. The refusal sentences are the database's (COPY-STANDARD 0557).
+ */
+/* A code in a move or reorder body. Both shapes 0570 accepts, so an account
+   renumbered to 100-0001 or 900-A001 can still be dragged. */
+const chartCode = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.');
+
+export const ledgerAccountReorderInput = z.object({
+  parentCode: chartCode.nullable(),
+  was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
+  now: z.array(chartCode).min(1, 'Send every account under this heading, in the order you want them.'),
+}).strict();
+export type LedgerAccountReorderInput = z.infer<typeof ledgerAccountReorderInput>;
+
+/**
+ * Put one account under another heading (0570). The number and name stay.
+ *
+ * Two before/after pairs travel, one per heading: `from` is the heading it
+ * leaves, `to` the heading it joins. `gl_account_move` refuses when either
+ * `was` is no longer the stored order. The last account under a heading never
+ * leaves it, so `from.now` always names at least one account.
+ */
+export const ledgerAccountMoveInput = z.object({
+  code: chartCode,
+  toParentCode: chartCode,
+  from: z.object({
+    was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
+    now: z.array(chartCode).min(1, 'Send every account under this heading, in the order you want them.'),
+  }).strict(),
+  to: z.object({
+    was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
+    now: z.array(chartCode).min(1, 'Send every account under this heading, in the order you want them.'),
+  }).strict(),
+}).strict();
+export type LedgerAccountMoveInput = z.infer<typeof ledgerAccountMoveInput>;
+
 /** A trial balance or a balance sheet as it stood at the end of one day.
  *  Omitted = today in Malaysia. */
 export const ledgerAsOfQuery = z.object({
   asOf: ledgerIsoDate.optional(),
-}).strict();
+  ...departmentFilterFields,
+}).strict().refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
+});
 export type LedgerAsOfQuery = z.infer<typeof ledgerAsOfQuery>;
 
 /** A profit and loss for a period, both days included. */
 export const ledgerPeriodQuery = z.object({
   from: ledgerIsoDate,
   to:   ledgerIsoDate,
+  ...departmentFilterFields,
 }).strict().refine((v) => v.from <= v.to, {
   message: 'The start date is after the end date', path: ['to'],
+}).refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerPeriodQuery = z.infer<typeof ledgerPeriodQuery>;
 
@@ -370,7 +448,10 @@ export const ledgerAccountLedgerQuery = z.object({
   account: ledgerAccountCode,
   from:    ledgerIsoDate,
   to:      ledgerIsoDate,
+  ...departmentFilterFields,
 }).strict().refine((v) => v.from <= v.to, {
   message: 'The start date is after the end date', path: ['to'],
+}).refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerAccountLedgerQuery = z.infer<typeof ledgerAccountLedgerQuery>;

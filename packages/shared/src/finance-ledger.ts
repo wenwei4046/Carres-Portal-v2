@@ -77,12 +77,42 @@ export interface LedgerAccount {
   is_active: boolean;
   /** A header groups other accounts and can never be posted to (0461, 0468). */
   is_header: boolean;
+  /** Where Finance dragged it among the accounts under the same parent (0557).
+   *  Ties break on code, so 0 everywhere reads exactly as by-code order. It is
+   *  the order, never the account number. */
+  sort_order: number;
 }
 
 export interface LedgerChart {
   go_live_on: string | null;
   accounts: LedgerAccount[];
+  /** The headings no account moves into or out of, because their accounts
+   *  decide how money may be recorded (0570 `gl_rule_headings`). Sent by
+   *  GET /accounts only; absent elsewhere. */
+  rule_headings?: string[];
+  /** Which account does each job, role -> code (0570 `gl_account_roles_read`).
+   *  A screen that needs "the bank charges account" reads it here, never
+   *  writes the number. Sent by GET /accounts only. */
+  roles?: Record<string, string>;
+  /** Every money account (0570 reads `gl_money_accounts`), wherever it sits in
+   *  the chart. Sent by GET /accounts only. */
+  money_accounts?: string[];
 }
+
+/** The account that does a job, from the chart's roles; undefined when the
+ *  chart is still loading, the role read failed, or no account holds it. */
+export function roleAccount(chart: LedgerChart | undefined, role: string): LedgerAccount | undefined {
+  const code = chart?.roles?.[role];
+  return code === undefined ? undefined : chart?.accounts.find((a) => a.code === code);
+}
+
+/** An account's number: four digits (1210), or AutoCount's form: three
+ *  digits, a dash, then a digit or capital letter and three digits (100-0001,
+ *  900-A001). ASCII only. The shape, and the sentence below, are 0570's own:
+ *  gl_account_update checks the same thing, so the two must not drift apart. */
+export const ledgerAccountCodeShape = /^([0-9]{4}|[0-9]{3}-[0-9A-Z][0-9]{3})$/;
+export const LEDGER_ACCOUNT_CODE_MESSAGE =
+  "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.";
 
 export interface TrialBalanceAccountRow {
   account_code: string;
@@ -250,6 +280,11 @@ export const LEDGER_SOURCE_WORDS: Readonly<Record<string, string>> = {
   OTHER_DEBTOR_INVOICE: "Other debtor invoice",
   OTHER_RECEIPT: "Other receipt",
   RENTAL_PAYMENT: "Rental payment",
+  SUPPLIER_MONEY_BACK: "Supplier money back",
+  MONEY_TRANSFER: "Bank transfer",
+  CARD_PAYOUT: "Card payout",
+  BANK_CHARGE: "Bank charge",
+  BANK_CREDIT: "Bank credit",
   MANUAL: "Manual journal",
 };
 
@@ -277,6 +312,19 @@ export const LEDGER_KIND_WORDS: Readonly<Record<string, string>> = {
   INCOME: "Income",
   EXPENSE: "Expense",
 };
+
+/** The chart as a tree: every account right after its parent, siblings in the
+ *  order Finance dragged them and then by code (0557), each with its depth
+ *  (0 = top). An account whose parent is not in the list sits at the top. */
+export function chartTree(accounts: readonly LedgerAccount[]): Array<LedgerAccount & { depth: number }> {
+  const sorted = [...accounts].sort((x, y) => x.sort_order - y.sort_order || x.code.localeCompare(y.code));
+  const codes = new Set(sorted.map((a) => a.code));
+  const parentOf = (a: LedgerAccount) => (a.parent_code && codes.has(a.parent_code) ? a.parent_code : null);
+  // ponytail: O(n²) over a chart of a few dozen accounts; index by parent if it ever grows past a thousand.
+  const walk = (parent: string | null, depth: number): Array<LedgerAccount & { depth: number }> =>
+    sorted.filter((a) => parentOf(a) === parent).flatMap((a) => [{ ...a, depth }, ...walk(a.code, depth + 1)]);
+  return walk(null, 0);
+}
 
 export function ledgerKindWord(kind: string | null | undefined): string {
   return (kind && LEDGER_KIND_WORDS[kind]) || "Other account";
@@ -386,24 +434,24 @@ export function receivablesVerdict(r: ReceivablesCheck, money: Money): SectionVe
     findings.push(`${money(r.storage_uncollected)} of storage money was collected without reducing what customers owe in the ledger.`);
   }
   if (r.comparable && !isZeroMoney(r.difference)) {
-    findings.push(`The ledger says customers owe ${money(r.ledger_total)}. Invoices less payments say ${money(r.documents_total)}. Difference ${money(Math.abs(r.difference))}.`);
+    findings.push(`The ledger says ${owedWords("customers", r.ledger_total, money)}. Invoices less payments say ${owedWords("customers", r.documents_total, money)}. Difference ${money(Math.abs(r.difference))}.`);
   }
   if (r.pre_go_live_open_count > 0) {
     notes.push(`${r.pre_go_live_open_count} ${r.pre_go_live_open_count === 1 ? "invoice" : "invoices"} worth ${money(r.pre_go_live_open_amount)} ${r.pre_go_live_open_count === 1 ? "was" : "were"} issued before the ledger started. The ledger does not hold ${r.pre_go_live_open_count === 1 ? "it" : "them"}.`);
   }
-  return { findings, notes, clean: `The ledger and invoices less payments agree: customers owe ${money(r.ledger_total)}.` };
+  return { findings, notes, clean: `The ledger and invoices less payments agree: ${owedWords("customers", r.ledger_total, money)}.` };
 }
 
 export function payablesVerdict(p: PayablesCheck, money: Money): SectionVerdict {
   const findings: string[] = [];
   if (p.account_codes.length === 0) findings.push("The chart has no supplier account for money owed.");
   if (!isZeroMoney(p.difference)) {
-    findings.push(`The ledger says Carres owes suppliers ${money(p.ledger_total)}. Bills less payments say ${money(p.bills_total)}. Difference ${money(Math.abs(p.difference))}.`);
+    findings.push(`The ledger says ${owedWords("suppliers", p.ledger_total, money)}. Bills less payments say ${owedWords("suppliers", p.bills_total, money)}. Difference ${money(Math.abs(p.difference))}.`);
   }
   if (p.supplier_difference_count > 0) {
     findings.push(`${p.supplier_difference_count} ${p.supplier_difference_count === 1 ? "supplier does" : "suppliers do"} not agree.`);
   }
-  return { findings, notes: [], clean: `The ledger and bills less payments agree: Carres owes suppliers ${money(p.ledger_total)}.` };
+  return { findings, notes: [], clean: `The ledger and bills less payments agree: ${owedWords("suppliers", p.ledger_total, money)}.` };
 }
 
 /** Who owes whom on a control account. An asset control is money owed TO
@@ -416,6 +464,15 @@ export function controlBalanceSentence(kind: string, controlFor: string | null, 
   const owedToCarres = kind === "LIABILITY" ? naturalBalance < 0 : naturalBalance > 0;
   const amount = money(Math.abs(naturalBalance));
   return owedToCarres ? `${Who} owe Carres ${amount}.` : `Carres owes ${who} ${amount}.`;
+}
+
+/** One owed figure in words. Below zero turns it round, never a minus:
+ *  customers paid before their invoice, or Carres paid a supplier ahead. */
+function owedWords(party: "customers" | "suppliers", n: number, money: Money): string {
+  const round = n < 0 && !isZeroMoney(n);
+  const amount = money(Math.abs(n));
+  if (party === "customers") return round ? `Carres owes customers ${amount}` : `customers owe ${amount}`;
+  return round ? `suppliers owe Carres ${amount}` : `Carres owes suppliers ${amount}`;
 }
 
 /** `RM 5.00` when the lines sit on one side; both sides named when they do not. */

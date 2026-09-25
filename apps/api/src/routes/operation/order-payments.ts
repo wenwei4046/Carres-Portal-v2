@@ -14,8 +14,9 @@ import {
   docNumber,
   storageHold,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 import { storageSkuCategories } from "../../lib/sku-categories";
 
@@ -65,14 +66,11 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
     .from("order_payments")
-    .select(PAYMENT_COLS)
+    .select(`${PAYMENT_COLS}, source_channel, source_metadata`)
     .eq("order_id", idCheck.data)
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const rows = (data ?? []) as Array<Record<string, unknown>>;
 
   /* WHO RECORDED IT, AS A NAME (Sales Order payment card, 2026-09-10). The
@@ -93,10 +91,20 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
   }
 
   return c.json({
-    payments: rows.map((r) => ({
-      ...r,
-      recorded_by_name: r.recorded_by ? (recorderNames.get(String(r.recorded_by)) ?? null) : null,
-    })),
+    payments: rows.map(({ source_channel, source_metadata, ...r }) => {
+      // Sale-time deposits keep their uploaded proof in source metadata (0476).
+      // Resolve that exact payment's evidence for both old and new deposits;
+      // never borrow the order's initial slip for a later collection.
+      const metadata = source_metadata as { payment_slip_url?: unknown } | null;
+      const originalSlip = source_channel === "order_create" && r.kind === "deposit"
+        && typeof metadata?.payment_slip_url === "string"
+        ? metadata.payment_slip_url.trim() : null;
+      return {
+        ...r,
+        receipt_url: r.receipt_url || originalSlip || null,
+        recorded_by_name: r.recorded_by ? (recorderNames.get(String(r.recorded_by)) ?? null) : null,
+      };
+    }),
   });
 });
 
@@ -128,10 +136,7 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     idempotencyKey: parsed.data.idempotencyKey,
     duplicateAck: parsed.data.duplicateAck,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const out = data as { payment: unknown; orders_paid: number | null };
   return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
 });
@@ -162,10 +167,7 @@ orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
     p_payment_id: pidCheck.data,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -192,10 +194,7 @@ orderPaymentsRouter.get("/:id/refunds", async (c) => {
     .select(REFUND_COLS)
     .eq("order_id", idCheck.data)
     .order("requested_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refunds: data ?? [] });
 });
 
@@ -215,10 +214,7 @@ orderPaymentsRouter.post("/:id/refunds", async (c) => {
     p_amount: parsed.data.amount,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data }, 201);
 });
 
@@ -240,10 +236,7 @@ orderPaymentsRouter.post("/:id/refunds/:rid/decide", async (c) => {
     p_decision: parsed.data.decision,
     p_note: parsed.data.note ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data });
 });
 
@@ -263,10 +256,7 @@ orderPaymentsRouter.post("/:id/refunds/:rid/paid", async (c) => {
     p_method: parsed.data.method,
     p_reference: parsed.data.reference ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data });
 });
 
@@ -305,20 +295,14 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
     idempotencyKey: parsed.data.idempotencyKey,
     duplicateAck: parsed.data.duplicateAck,
   });
-  if (payErr) {
-    const m = mapPgError(payErr);
-    return c.json(m.body, m.status);
-  }
+  if (payErr) return fail(c, payErr);
 
   const { data: control, error: ctrlErr } = await sb
     .from("ops_order_control")
     .select(CONTROL_GATE_COLS)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (ctrlErr) {
-    const m = mapPgError(ctrlErr);
-    return c.json(m.body, m.status);
-  }
+  if (ctrlErr) return fail(c, ctrlErr);
 
   const out = data as { payment: unknown };
   return c.json({ payment: out.payment, control }, 201);
@@ -354,10 +338,7 @@ orderPaymentsRouter.post("/:id/storage/waiver/request", async (c) => {
     )
     .select(CONTROL_GATE_COLS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ control: data });
 });
 
@@ -424,10 +405,7 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
     .eq("order_id", orderId)
     .select(CONTROL_GATE_COLS)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       {
@@ -488,7 +466,7 @@ async function storageFeeOf(
       importedSof: ctrl.storage_fee_sof ?? null,
       skus: storageSkus,
       categories: storageCats,
-      asOf: new Date().toISOString().slice(0, 10),
+      asOf: todayIsoMYT(),
       collectedAt: ctrl.storage_collected_at ?? null,
       waiverStatus: ctrl.storage_waiver_status ?? null,
     }).fee;
@@ -530,10 +508,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     .select("id, delivery_date, ops_order_control(extension_count, extension_original_date)")
     .eq("id", orderId)
     .maybeSingle();
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
 
   const ctrl = Array.isArray(order.ops_order_control)
@@ -580,10 +555,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     )
     .select(CONTROL_EXTENSION_COLS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // T4 done-when: the reason lands in activity history. The 0211 trigger does
   // not watch the extension columns, so append the fact through the existing

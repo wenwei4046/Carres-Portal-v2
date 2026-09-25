@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import NiceFutureMattressTab from "./NiceFutureMattressTab";
+import ProcurementTabContent from "./ProcurementTabContent";
 import type {
   operationPosListResponse,
   operationPoListRow,
@@ -11,9 +11,9 @@ import type {
 /**
  * NiceFutureMattressTab — Phase 4.5 Chunk 2 Sprint F Task 34.
  *
- * The tab is a thin wrapper around `ProcurementTabContent` keyed to
- * 'nice-future'. We verify it renders fetched POs as rows AND that the
- * underlying hook is called with that slug — slug correctness matters because
+ * The tab is `ProcurementTabContent` with slug 'nice-future'. We verify it
+ * renders fetched POs as rows AND that the underlying hook is called with
+ * that slug — slug correctness matters because
  * the Hono route at T33 owns the per-channel filtering.
  */
 const useProcurementTabSpy = vi.fn();
@@ -114,7 +114,7 @@ function wrap(node: React.ReactNode) {
 
 describe("NiceFutureMattressTab", () => {
   it("calls useProcurementTab with slug='nice-future' and renders fetched POs", () => {
-    render(wrap(<NiceFutureMattressTab />));
+    render(wrap(<ProcurementTabContent slug="nice-future" />));
     // The hook spy fires on mount with the wrapper's slug — failing this
     // assertion would mean the wrapper picked the wrong slug, and the Hono
     // route would return the wrong tab's data.
@@ -146,7 +146,7 @@ describe("NiceFutureMattressTab", () => {
    * names the ruling that would have to be reopened first.
    */
   it("does NOT put the supplier or the warehouse on the row — C+D dropped both columns", () => {
-    render(wrap(<NiceFutureMattressTab />));
+    render(wrap(<ProcurementTabContent slug="nice-future" />));
     const row = screen.getByTestId("po-row-PO-NF-001");
     expect(row.textContent).not.toContain("Nice Future Bedding");
     expect(row.textContent).not.toContain("KL Warehouse");

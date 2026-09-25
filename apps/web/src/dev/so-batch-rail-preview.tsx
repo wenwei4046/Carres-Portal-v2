@@ -322,6 +322,52 @@ registerRows.push(
     ],
     outstandingSuppliers: [],
   },
+  /**
+   * ⭐ THE ROW FROM THE OWNER'S REPORT (2026-09-11): Qty 1, FOURTEEN purchase
+   * orders naming the same item line, and `To buy` still 1.
+   *
+   * It is here because it is the case the layout has to survive, and because
+   * the numbers must stay readable AS a disagreement: the exact lineage says
+   * fourteen units are on documents for a line the customer ordered one of,
+   * while the engine's own pooled remainder still says one is to buy. The
+   * screen states both and hides neither — it is not this page's business to
+   * silently pick a winner between two authoritative reads.
+   */
+  {
+    orderId: "o93",
+    so: 1442,
+    customer: "FOURTEEN DOCUMENTS",
+    status: "partial",
+    proceededAt: "2026-08-27T08:15:00+08:00",
+    requestedDeliveryDate: "2026-10-10",
+    deliveryCity: "Klang",
+    deliveryState: "Selangor",
+    pos: Array.from({ length: 14 }, (_, i) => ({
+      poId: `PO-2026090${(i % 9) + 1}-${4665 + i}`,
+      status: "open" as const,
+      supplierId: "s-ohana",
+      supplierName: "Ohana",
+      destinationId: KLANG,
+      officialDeliveryDate: null,
+      sentCurrentVersion: false,
+    })),
+    lines: [
+      {
+        orderLineId: "l931",
+        sku: "JAGER-SS",
+        qty: 1,
+        stockTaken: 0,
+        item: "Jager",
+        variant: "Super Single · Fabric 1",
+        category: "bedframe",
+        pos: Array.from({ length: 14 }, (_, i) => ({
+          poId: `PO-2026090${(i % 9) + 1}-${4665 + i}`,
+          qty: 1,
+        })),
+      },
+    ],
+    outstandingSuppliers: ["Ohana"],
+  },
 );
 
 const data: SoBatchPurchaseResponse = {
@@ -371,6 +417,37 @@ function OldRail() {
 }
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+/**
+ * The Unit read, SEEDED — the one door the Register opens by itself.
+ *
+ * `VITE_API_BASE_URL` points at a dead port in a preview, deliberately: a dev
+ * page must not be able to reach production with an unauthenticated read. So
+ * the answers the expansion would have fetched are put in the cache instead,
+ * and the sections render with real data rather than with an error state. An
+ * order left out of this map still exercises the failure path, which is also
+ * worth looking at.
+ */
+for (const [orderId, lines, unitCoverage, unitLines] of [
+  [
+    "o90",
+    [
+      { lineId: "l901", sku: "B1201S-K", unitIds: ["U1-000-078"], deliverTo: [] },
+      { lineId: "l902", sku: "H1401S-Q", unitIds: ["U1-000-079"], deliverTo: [] },
+    ],
+    { "U1-000-078": "PO-20260818-1042", "U1-000-079": "PO-20260819-2210" },
+    { "U1-000-078": "l901", "U1-000-079": null },
+  ],
+  ["o93", [{ lineId: "l931", sku: "JAGER-SS", unitIds: [], deliverTo: [] }], {}, {}],
+] as const) {
+  client.setQueryData(["operation", "orders", orderId, "expansion"], {
+    defaultDeliverTo: "Carres Klang",
+    unitCoverage,
+    unitLines,
+    place: [],
+    lines,
+  });
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

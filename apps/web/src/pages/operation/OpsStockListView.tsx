@@ -14,6 +14,7 @@ import {
   type OpsStockListResponse,
   type PoolUseReason,
   unitIdOf,
+  READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
@@ -367,7 +368,7 @@ export default function OpsStockListView(props: Props) {
                   value={add.condition}
                   onChange={(e) => setAdd((a) => ({ ...a, condition: e.target.value }))}
                 >
-                  {Object.entries(CONDITION_LABEL).map(([v, l]) => (
+                  {Object.entries(READY_STOCK_CONDITION_WORDS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </select>
@@ -694,14 +695,6 @@ export default function OpsStockListView(props: Props) {
   );
 }
 
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
-
 function RowItem({
   row,
   actions,
@@ -761,7 +754,7 @@ function RowItem({
           disabled={busy}
           className="rounded border border-base-200 bg-white px-1.5 py-0.5 text-meta text-base-700 focus:border-primary focus:outline-none disabled:opacity-50"
         >
-          {Object.entries(CONDITION_LABEL).map(([v, l]) => (
+          {Object.entries(READY_STOCK_CONDITION_WORDS).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
           ))}
         </select>

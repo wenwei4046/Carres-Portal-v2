@@ -131,3 +131,39 @@ export function DocHeader({
     </View>
   );
 }
+
+/** `2026-08-24` → `Mon, 24 Aug 2026`.
+ *  FOUR-DIGIT YEAR (owner, Jess 2026-09-23; DOCUMENT-KIT.md §4 — every
+ *  printed date reads `Fri, 9 Oct 2026`). It printed `26` until then, which
+ *  contradicted the kit and disagreed with the PO on the same day's paper.
+ *  A Carres document outlives the year it was issued in — a guarantee, a
+ *  rental agreement, a claim — and `26` on a fax or a WhatsApp photo reads
+ *  as part of the day. Costs 3.1mm per date at 8pt (measured). */
+export function niceDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  if (!m) return String(iso);
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+    new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
+  ];
+  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][mo - 1];
+  return `${dow}, ${d} ${mon} ${y}`;
+}
+
+/** Table cells print DIGITS only — the column header carries `(RM)` once
+ *  (owner round 7: a dozen repeated "RM" was noise; Stripe/IKEA print the
+ *  currency once). The money zone keeps the full `RM x` form. */
+export function moneyDigits(value: number): string {
+  return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Customer-facing money: `RM 1,495.00` (MYR prints as RM — the word the
+ *  customer reads on every Malaysian receipt). */
+export function formatMoney(value: number, currency: string): string {
+  const unit = currency === "MYR" ? "RM" : currency;
+  return `${unit} ${value.toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}

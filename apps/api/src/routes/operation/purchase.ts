@@ -21,8 +21,9 @@ import {
   loadPurchasingNumbers,
   loadPurchasingSettings,
 } from "../../lib/purchasing-settings";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 
 /**
@@ -52,7 +53,7 @@ const purchaseRouter = new Hono<AppEnv>();
 const PROCURABLE: ReadonlyArray<ProductCategory> = [...PURCHASING_CATEGORIES];
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoMYT();
 }
 
 /**
@@ -181,10 +182,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
 
   // ── 0. ②③ Chase / Receive — over the OPEN POs, independent of ① demand. ────
   const cr = await loadChaseReceive(sb);
-  if (!cr.ok) {
-    const m = mapPgError(cr.err);
-    return c.json(m.body, m.status);
-  }
+  if (!cr.ok) return fail(c, cr.err);
   const chaseReceive = { chase: cr.chase, receive: cr.receive };
 
   // ── 1. Candidate orders: live (place / proceed_order), any source. ────────
@@ -201,10 +199,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       "id, so, customer_name, source_ref, status, source_system, delivery_date, delivery_date_tbd, placed_at, created_at",
     )
     .in("status", ["place", "proceed_order"]);
-  if (orderErr) {
-    const m = mapPgError(orderErr);
-    return c.json(m.body, m.status);
-  }
+  if (orderErr) return fail(c, orderErr);
   const orders = orderRows ?? [];
   const orderIds = orders.map((o) => o.id as string);
   const orderById = new Map(orders.map((o) => [o.id as string, o]));
@@ -259,10 +254,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
     .from("order_lines")
     .select("id, order_id, sku, qty, excluded_from_plan, exclude_from_plan_until")
     .in("order_id", orderIds);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const lines = lineRows ?? [];
   const lineSkus = [...new Set(lines.map((l) => l.sku as string))];
 
@@ -280,10 +272,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       .from("product_skus")
       .select("sku, supplier_id, cost, product_models!inner(category, name)")
       .in("sku", lineSkus);
-    if (skuErr) {
-      const m = mapPgError(skuErr);
-      return c.json(m.body, m.status);
-    }
+    if (skuErr) return fail(c, skuErr);
     for (const s of skuRows ?? []) {
       const pm = (s as Record<string, unknown>).product_models as
         | { category?: string | null; name?: string | null }
@@ -380,10 +369,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       .select("sku, qty, received_qty, purchase_orders!inner(status)")
       .in("sku", demandSkus)
       .eq("purchase_orders.status", "open");
-    if (poErr) {
-      const m = mapPgError(poErr);
-      return c.json(m.body, m.status);
-    }
+    if (poErr) return fail(c, poErr);
     for (const r of poLines ?? []) {
       const remaining = Number(r.qty ?? 0) - Number(r.received_qty ?? 0);
       if (remaining <= 0) continue;
@@ -401,10 +387,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       .from("warehouses")
       .select("id, name")
       .or("name.ilike.%klang%,name.ilike.%klg%");
-    if (whErr) {
-      const m = mapPgError(whErr);
-      return c.json(m.body, m.status);
-    }
+    if (whErr) return fail(c, whErr);
     // TODO(klg-resolution): 0 or >1 name matches → sum ALL warehouses' free
     // stock as the safest default (never under-report advisory stock). Tighten
     // once warehouses carry a stable code / the Klg row is unambiguous.
@@ -418,10 +401,7 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       .in("sku", demandSkus);
     if (klgWarehouseId) stockQ = stockQ.eq("warehouse_id", klgWarehouseId);
     const { data: stockRows, error: stockErr } = await stockQ;
-    if (stockErr) {
-      const m = mapPgError(stockErr);
-      return c.json(m.body, m.status);
-    }
+    if (stockErr) return fail(c, stockErr);
     for (const r of stockRows ?? []) {
       const free = Number((r as { sellable?: number }).sellable ?? 0);
       if (free <= 0) continue;
@@ -536,10 +516,7 @@ purchaseRouter.post("/line/skip", requireOperation, async (c) => {
     .from("order_lines")
     .update({ excluded_from_plan: true })
     .in("id", lineIds);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, skipped: lineIds.length });
 });
 
@@ -593,10 +570,7 @@ purchaseRouter.post("/line/push-next", requireOperation, async (c) => {
     .from("order_lines")
     .update({ exclude_from_plan_until: untilIso })
     .in("id", lineIds);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, pushed: lineIds.length, until: untilIso });
 });
 
@@ -630,10 +604,7 @@ purchaseRouter.post("/snooze", requireOperation, async (c) => {
       .from("purchase_snoozes")
       .delete()
       .eq("supplier_id", supplierId);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     return c.json({ ok: true, action: "cleared", supplierId });
   }
   const { error } = await sb
@@ -642,10 +613,7 @@ purchaseRouter.post("/snooze", requireOperation, async (c) => {
       { supplier_id: supplierId, snooze_until: until, reason },
       { onConflict: "supplier_id" },
     );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, action: "snoozed", supplierId, until });
 });
 

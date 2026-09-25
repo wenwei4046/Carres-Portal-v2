@@ -1,232 +1,147 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import ListPageShell from "@/components/ListPageShell";
+import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import ModuleHeader from "@/pages/operation/components/ModuleHeader";
+import { useInvoiceRegister } from "@/lib/queries";
+import { DepartmentFilter, useDepartmentParam } from "./department";
+import { appTodayIso } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
+import ARDrawer, { type OrderPaymentRow } from "./ARDrawer";
 import {
-  useFinanceArAging,
-  type FinanceArAgingRow,
-} from "@/lib/queries";
-import { rm, rmCompact } from "@/lib/format-currency";
-import { FinanceKpi } from "@/components/FinanceKpi";
-import ARDrawer from "./ARDrawer";
+  customerOwingRows,
+  isAgeScope,
+  invoiceAgeDays,
+  outstandingTotal,
+  rowsInAgeScope,
+  type AgeScope,
+  type CustomerOwingRow,
+} from "./money-owed";
 
-type StatusFilter = "open" | "settled" | "all";
-type AgingFilter  = "all" | "0-30" | "31-60" | "61-90" | "90+";
+const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
+const ageWord = (days: number | null) =>
+  days === null ? "Not issued yet" : `${days} ${days === 1 ? "day" : "days"}`;
+
+/** The words for an age scope — the same words the Dashboard's tile and A/R Aging rows print. */
+export function ageScopeWord(scope: AgeScope): string {
+  return scope === "over-30" ? "Overdue (>30d)" : `${scope} days`;
+}
 
 /**
- * Finance AR (Receivables) page — Phase 5 Chunk A.
+ * Finance → AR · Receivables. Every order a customer still owes money on, and
+ * Finance's door to record a receipt against it.
  *
- * Visual reference: `reference/proto/finance-ar.jsx:1-109`. Renders a
- * filterable table of customer-order receivables sourced from the
- * `finance_ar_aging` RPC (single round-trip; rows + buckets in one
- * payload — Q6=A locked).
+ * It reads the Invoices Register wire and lists `customerOwingRows` — the
+ * shared `soRemaining` per order, storage included — so this list, the
+ * Dashboard's Outstanding and Reports → Payment's Customer balances are one
+ * arithmetic. (It used to read `finance_ar_aging` from migration 0062, which
+ * counted money owed its own way.) Orders with no price yet are left out.
  *
- * Filters live in component state; the API itself returns all rows so
- * the user can re-filter without round-trips. Drawer opens on row View
- * click; ARDrawer wires the Record-receipt mutation (0476: no Issue invoice)
- * (A1 + A2 acceptance flows).
+ * `?age=0-30` · `31-60` · `61-90` · `90+` · `over-30` narrows the list to one
+ * age scope — the door from the Dashboard's A/R Aging rows and Overdue tile,
+ * so the footer then prints the same figure the Dashboard printed. The scope
+ * shows as a removable condition beside the column filters.
  */
 export default function FinanceAR() {
-  const aging = useFinanceArAging();
-  const rows  = aging.data?.rows ?? [];
+  const [dept, setDept] = useDepartmentParam();
+  const query = useInvoiceRegister(dept);
+  const invoiceRows = query.data;
+  const [params, setParams] = useSearchParams();
+  const askedAge = params.get("age");
+  const ageScope = isAgeScope(askedAge) ? askedAge : null;
+  const today = appTodayIso();
+  const rows = useMemo(() => {
+    const owing = customerOwingRows(invoiceRows ?? []);
+    return ageScope ? rowsInAgeScope(owing, ageScope, today) : owing;
+  }, [invoiceRows, ageScope, today]);
+  const clearAge = () => setParams((before) => {
+    const next = new URLSearchParams(before);
+    next.delete("age");
+    return next;
+  });
+  const [openId, setOpenId] = useState<string | null>(null);
+  // The row's Record receipt button opens the form; a double-click only opens the order.
+  const [recording, setRecording] = useState(false);
+  const open = openId ? rows.find((r) => r.orderId === openId) ?? null : null;
+  const payments: readonly OrderPaymentRow[] = useMemo(() => {
+    if (!open) return [];
+    return (invoiceRows ?? []).find((r) => r.id === open.doorId)?.orders?.order_payments ?? [];
+  }, [open, invoiceRows]);
 
-  const [search, setSearch]             = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
-  const [agingFilter, setAgingFilter]   = useState<AgingFilter>("all");
-  const [drawer, setDrawer]             = useState<FinanceArAgingRow | null>(null);
-
-  const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (statusFilter === "open"    && r.outstanding <= 0) return false;
-      if (statusFilter === "settled" && r.outstanding > 0)  return false;
-      if (agingFilter !== "all" && r.aging !== agingFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const c = (r.customer_name ?? "").toLowerCase();
-        const d = (r.dealer_name   ?? "").toLowerCase();
-        const i = r.invoice_no.toLowerCase();
-        if (!c.includes(q) && !d.includes(q) && !i.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [rows, search, statusFilter, agingFilter]);
-
-  const totals = useMemo(() => {
-    return filtered.reduce(
-      (acc, r) => ({
-        gross:       acc.gross       + r.total,
-        paid:        acc.paid        + r.paid,
-        outstanding: acc.outstanding + r.outstanding,
-      }),
-      { gross: 0, paid: 0, outstanding: 0 },
-    );
-  }, [filtered]);
+  const columns = useMemo<DataGridColumn<CustomerOwingRow>[]>(() => [
+    { key: "so", label: "SO No", width: 120, accessor: soWord, searchValue: soWord },
+    { key: "customer", label: "Customer", width: 240, accessor: (r) => r.customer,
+      searchValue: (r) => r.customer },
+    // Days since the invoice was issued, Malaysia time — the age the Dashboard's A/R Aging buckets by.
+    { key: "age", label: "Age", width: 110, align: "right",
+      accessor: (r) => ageWord(invoiceAgeDays(r.issuedAt, today)),
+      numberValue: (r) => invoiceAgeDays(r.issuedAt, today), filterType: "number",
+      // By the number of days, never the words: "120 days" sorts after "45 days". No issued invoice sorts first.
+      sortFn: (a, b) => (invoiceAgeDays(a.issuedAt, today) ?? -1) - (invoiceAgeDays(b.issuedAt, today) ?? -1),
+      exportValue: (r) => invoiceAgeDays(r.issuedAt, today) ?? "", searchValue: () => "" },
+    { key: "outstanding", label: "Outstanding", width: 180, align: "right",
+      accessor: (r) => (
+        <span className="flex flex-col items-end">
+          <span className="tabular-nums">{rm(r.outstanding)}</span>
+          {r.storageOwing > 0 && <span className="text-label font-normal">includes storage {rm(r.storageOwing)}</span>}
+        </span>
+      ),
+      numberValue: (r) => r.outstanding, filterType: "number", exportValue: (r) => r.outstanding },
+    { key: "act", label: "Record receipt", width: 150, filterable: false,
+      accessor: (r) => (
+        <button type="button" className="btn-secondary" data-testid={`ar-record-${r.orderId}`}
+          onClick={(e) => { e.stopPropagation(); setRecording(true); setOpenId(r.orderId); }}>
+          Record receipt
+        </button>
+      ),
+      /* A door is not a fact: it never joins the search or the export. */
+      searchValue: () => "", exportValue: () => "" },
+  ], [today]);
 
   return (
-    <div className="p-9 max-w-[1400px] mx-auto">
-      <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
-        <div>
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
-            Finance · Receivables
-          </div>
-          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
-            A/R · Receivables
-          </h1>
-          <div className="text-body text-muted-foreground">
-            Money customers owe Carres. Each row is one customer order.
-          </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <ModuleHeader destinationHeader testId="ar-destination-header" word="AR · Receivables"
+        docTitle="AR · Receivables — Carres" />
+      {query.isError ? (
+        <div role="alert" className="p-6 text-body">
+          <p>Invoices could not be loaded. Try again.</p>
+          <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
         </div>
-      </header>
-
-      <div className="grid grid-cols-3 gap-3.5 mb-5">
-        <FinanceKpi label="Gross billed"  value={rmCompact(totals.gross)}       hint={`${filtered.length} invoices`} />
-        <FinanceKpi label="Collected"     value={rmCompact(totals.paid)}        hint={totals.gross > 0 ? `${Math.round((totals.paid / totals.gross) * 100)}% of gross` : "—"} tone="ok" />
-        <FinanceKpi label="Outstanding"   value={rmCompact(totals.outstanding)} hint="What we still need to collect" tone="warn" accent />
-      </div>
-
-      <FilterBar
-        search={search}        onSearch={setSearch}
-        status={statusFilter}  onStatus={setStatusFilter}
-        aging={agingFilter}    onAging={setAgingFilter}
-      />
-
-      <div className="bg-card rounded-md border border-border overflow-auto">
-        <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
-          style={{ gridTemplateColumns: "120px 1.2fr 1fr 90px 110px 110px 110px 90px", minWidth: 980 }}
-        >
-          <span>Invoice</span>
-          <span>Customer</span>
-          <span>Dealer</span>
-          <span>Aging</span>
-          <span className="text-right">Total</span>
-          <span className="text-right">Paid</span>
-          <span className="text-right">Outstanding</span>
-          <span className="text-right">Action</span>
-        </div>
-
-        {aging.isLoading ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">
-            Nothing matches those filters.
-          </div>
-        ) : (
-          filtered.map((r) => (
-            <ARRow key={r.order_id} row={r} onView={() => setDrawer(r)} />
-          ))
-        )}
-      </div>
-
-      {drawer && <ARDrawer row={drawer} onClose={() => setDrawer(null)} />}
-
-      {aging.error && (
-        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Failed to load receivables: {String(aging.error)}
-        </div>
+      ) : (
+        <ListPageShell register>
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            rowKey={(r) => r.orderId}
+            storageKey="carres.finance.ar.v2"
+            appearance="reference"
+            exportName="AR · Receivables"
+            groupBanner={false}
+            stickyIdentity
+            isLoading={!query.isSuccess}
+            searchPlaceholder="Search orders…"
+            toolbarStart={<DepartmentFilter value={dept} onChange={setDept} />}
+            emptyMessage={ageScope ? "No order owing money is this old." : "No customer owes money."}
+            activeConditions={ageScope
+              ? [{ key: "age", label: ageScopeWord(ageScope), onClear: clearAge }]
+              : undefined}
+            onClearConditions={ageScope ? clearAge : undefined}
+            onRowDoubleClick={(r) => { setRecording(false); setOpenId(r.orderId); }}
+            statusSummary={(visible) => {
+              const t = outstandingTotal(visible);
+              return (
+                <span data-testid="ar-summary">
+                  {t.orders} {t.orders === 1 ? "order" : "orders"} · {rm(t.total)} outstanding
+                </span>
+              );
+            }}
+          />
+        </ListPageShell>
+      )}
+      {open && (
+        <ARDrawer key={open.orderId} balance={open} payments={payments} open startRecording={recording}
+          onOpenChange={(o) => { if (!o) setOpenId(null); }} />
       )}
     </div>
   );
 }
-
-// ---------- Filter bar ----------
-function FilterBar({
-  search, onSearch,
-  status, onStatus,
-  aging,  onAging,
-}: {
-  search: string;       onSearch: (v: string) => void;
-  status: StatusFilter; onStatus: (v: StatusFilter) => void;
-  aging:  AgingFilter;  onAging:  (v: AgingFilter)  => void;
-}) {
-  return (
-    <div className="bg-card rounded-md border border-border p-3 mb-3.5 flex items-center gap-3 flex-wrap">
-      <input
-        value={search}
-        onChange={(e) => onSearch(e.target.value)}
-        placeholder="Search customer, dealer, or INV-…"
-        className="flex-1 min-w-[240px] px-2.5 py-1.5 border border-border rounded text-meta bg-background outline-none"
-      />
-      <Segmented
-        options={[["open", "Open"], ["settled", "Settled"], ["all", "All"]]}
-        value={status}
-        onChange={(v) => onStatus(v as StatusFilter)}
-      />
-      <Segmented
-        options={[["all", "All ages"], ["0-30", "0-30"], ["31-60", "31-60"], ["61-90", "61-90"], ["90+", "90+"]]}
-        value={aging}
-        onChange={(v) => onAging(v as AgingFilter)}
-      />
-    </div>
-  );
-}
-
-function Segmented({
-  options, value, onChange,
-}: {
-  options: [string, string][];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex gap-px bg-muted rounded p-0.5">
-      {options.map(([k, l]) => (
-        <button
-          key={k}
-          type="button"
-          onClick={() => onChange(k)}
-          className={`px-2.5 py-1 rounded text-label font-semibold transition-colors ${
-            value === k
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ---------- Row ----------
-function ARRow({ row, onView }: { row: FinanceArAgingRow; onView: () => void }) {
-  return (
-    <div
-      className="grid items-center px-4 py-3 border-b border-border text-meta"
-      style={{ gridTemplateColumns: "120px 1.2fr 1fr 90px 110px 110px 110px 90px", minWidth: 980 }}
-    >
-      <span className="font-mono font-semibold">{row.invoice_no}</span>
-      <span>{row.customer_name}</span>
-      <span className="text-muted-foreground uppercase">{row.dealer_name ?? "—"}</span>
-      <span>
-        <AgingPill bucket={row.aging} />
-      </span>
-      <span className="font-mono text-right">{rm(row.total)}</span>
-      <span className="font-mono text-right text-muted-foreground">{rm(row.paid)}</span>
-      <span className={`font-mono text-right font-semibold ${row.outstanding > 0 ? "text-primary" : "text-muted-foreground"}`}>
-        {rm(row.outstanding)}
-      </span>
-      <span className="text-right">
-        <button
-          type="button"
-          onClick={onView}
-          className="px-2.5 py-1 text-label border border-border rounded hover:bg-accent/50"
-        >
-          View
-        </button>
-      </span>
-    </div>
-  );
-}
-
-function AgingPill({ bucket }: { bucket: FinanceArAgingRow["aging"] }) {
-  const tone =
-    bucket === "0-30"  ? "bg-success/10 text-success"        :
-    bucket === "31-60" ? "bg-primary/10 text-primary"        :
-                         "bg-destructive/10 text-destructive";
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label font-semibold ${tone}`}>
-      <span className="w-1 h-1 rounded-full bg-current mr-1.5" />
-      {bucket}d
-    </span>
-  );
-}
-
-// ---------- KPI ----------

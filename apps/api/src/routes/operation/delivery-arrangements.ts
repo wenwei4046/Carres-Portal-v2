@@ -1,15 +1,23 @@
 import { Hono } from "hono";
 import {
   assignLogisticsInputSchema,
+  deliveryContactInputSchema,
   deliveryWarehouseScheduleEvents,
+  isSundayIso,
+  laterThanRequested,
+  myHolidaySet,
+  operationCannotDeliverInput,
   saveDeliveryArrangementInputSchema,
   signHandoverProofUploadInput,
   isLogisticsChange,
+  type DeliveryContactInput,
   type DeliveryScopeRef,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
+import { attemptLegDocumentIssue } from "../../lib/delivery-order-issue";
 import { adminClient, userClient } from "../../lib/supabase";
+import { revokeLinksForOtherPartners } from "./delivery-links";
 import type { AppEnv } from "../../types";
 
 /**
@@ -95,15 +103,106 @@ const shape = (r: ArrangementRecord) => ({
   updated_by: r.updated_by,
 });
 
-/** Every arrangement — the workspace reads them all in one round trip. */
+const CONTACT_SELECT =
+  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, acting_user_id, contacted_at, " +
+  "result_key, reply_evidence_path, next_action, note, on_behalf_of_partner_id, recorded_by, recorded_at";
+
+/**
+ * THE ONE CONTACT WRITER (0487, Delivery MASTER §5.1). Both the standalone
+ * contact door and the arrangement save that carries a contact land here, so
+ * a record can never be written two ways.
+ *
+ * FOUR IDENTITIES, SEPARATELY (0499, owner ruling 2026-09-13): the NORMAL
+ * responsible Operation person for this order and today's ACTING person
+ * (buddy cover) come from the one responsibility read
+ * (`delivery_responsible_operation` — the order's collection-owner ledger,
+ * else the individual on its earliest contact, else the configured normal
+ * Delivery Duty holder); the actual RECORDER is the signed-in account, which
+ * may be a shared login or a cover and is evidence, never responsibility;
+ * PARTNER provenance is the caller's `onBehalfOfPartnerId`. A recorder is
+ * never written as the responsible person merely because they recorded.
+ */
+async function recordContact(
+  sb: ReturnType<typeof adminClient>,
+  scope: { orderId: string; leg: number },
+  input: DeliveryContactInput,
+  userId: string | null,
+) {
+  const responsibility = await sb.rpc("delivery_responsible_operation", {
+    p_order_id: scope.orderId, p_on: null,
+  });
+  if (responsibility.error) return { data: null, error: responsibility.error };
+  const who = (responsibility.data ?? {}) as { normal_user_id?: string | null; acting_user_id?: string | null };
+  return sb
+    .from("ops_delivery_contacts")
+    .insert({
+      order_id: scope.orderId,
+      leg: scope.leg,
+      purpose_key: input.purpose,
+      channel: input.channel,
+      contacted_person: input.contactedPerson,
+      contact_owner_user_id: who.normal_user_id ?? null,
+      acting_user_id: who.acting_user_id ?? null,
+      contacted_at: new Date().toISOString(),
+      result_key: input.result,
+      reply_evidence_path: input.replyEvidencePath ?? null,
+      next_action: input.nextAction ?? null,
+      note: input.note ?? null,
+      on_behalf_of_partner_id: input.onBehalfOfPartnerId ?? null,
+      recorded_by: userId,
+    })
+    .select(CONTACT_SELECT)
+    .single();
+}
+
+/** A delivery day is never a Sunday or a Malaysian public holiday (§8.6). */
+function refusedDeliveryDay(dateIso: string): string | null {
+  if (isSundayIso(dateIso)) return "Sunday is not a delivery day";
+  if (myHolidaySet().has(dateIso)) return "A Malaysian public holiday is not a delivery day";
+  return null;
+}
+
+/** Every arrangement — and every contact record — the workspace reads them
+ *  all in one round trip; the status ladder reads the latest contact. */
 deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT);
+  const [{ data, error }, contactsRes, cannotRes] = await Promise.all([
+    sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT),
+    sb.from("ops_delivery_contacts").select(CONTACT_SELECT).order("contacted_at", { ascending: false }),
+    /* Card 17 — every recorded `Cannot Deliver` (0417), for the central
+       Delivery report's partner measures. Its own read; a failure here leaves
+       the field ABSENT (the report prints `Not available`, never 0) and the
+       workspace still opens. */
+    sb
+      .from("ops_delivery_arrangement_events")
+      .select("id, order_id, leg, from_partner_id, reason_key, note, recorded_at")
+      .eq("event", "cannot_deliver")
+      .order("recorded_at", { ascending: false }),
+  ]);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape) });
+  if (contactsRes.error) {
+    const m = mapPgError(contactsRes.error);
+    return c.json(m.body, m.status);
+  }
+  const cannotDeliver = cannotRes.error
+    ? undefined
+    : ((cannotRes.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
+        id: e.id as string,
+        order_id: e.order_id as string,
+        leg: Number(e.leg ?? 0),
+        partner_id: (e.from_partner_id as string | null) ?? null,
+        reason_key: (e.reason_key as string | null) ?? null,
+        note: (e.note as string | null) ?? null,
+        recorded_at: e.recorded_at as string,
+      }));
+  return c.json({
+    arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape),
+    contacts: contactsRes.data ?? [],
+    ...(cannotDeliver ? { cannotDeliver } : {}),
+  });
 });
 
 /**
@@ -137,13 +236,15 @@ deliveryArrangementsRouter.get(
       return c.json(m.body, m.status);
     }
 
+    /* 0491 — a Journey leg joins the feed once it carries its OWN document
+       (whose 0424 scope names the exact Units); a leg with no document is
+       still absence, never an invented row. */
     const arrangements = (
       (arrangementsRes.data ?? []) as unknown as ArrangementRecord[]
     )
       .map(shape)
       .filter(
         (row) =>
-          row.leg === 0 &&
           Boolean(row.confirmed_date) &&
           Boolean(row.partner_name),
       );
@@ -154,12 +255,12 @@ deliveryArrangementsRouter.get(
       sb
         .from("orders")
         .select(
-          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
+          "id, so, customer_name, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
         )
         .in("id", orderIds),
       sb
         .from("ops_delivery_orders")
-        .select("id, order_id, do_number, trip_groups, voided_at")
+        .select("id, order_id, do_number, leg, trip_groups, voided_at")
         .in("order_id", orderIds),
     ]);
     const firstError = ordersRes.error ?? deliveryOrdersRes.error;
@@ -171,6 +272,7 @@ deliveryArrangementsRouter.get(
     type OrderFact = {
       id: string;
       so: number;
+      customer_name: string | null;
       customer_address: string | null;
       delivered_at: string | null;
       do_file_path: string | null;
@@ -182,6 +284,7 @@ deliveryArrangementsRouter.get(
       id: string;
       order_id: string;
       do_number: string;
+      leg?: number | null;
       trip_groups: string[] | null;
       voided_at: string | null;
     };
@@ -264,7 +367,7 @@ deliveryArrangementsRouter.get(
         ? sb.from("warehouses").select("id, name").in("id", warehouseIds)
         : Promise.resolve({ data: [], error: null }),
       skus.length
-        ? sb.from("product_skus").select("sku, variant").in("sku", skus)
+        ? sb.from("product_skus").select("sku, variant, model_id").in("sku", skus)
         : Promise.resolve({ data: [], error: null }),
     ]);
     const nameError = warehousesRes.error ?? skusRes.error;
@@ -277,11 +380,58 @@ deliveryArrangementsRouter.get(
         (row) => [row.id, row.name],
       ),
     );
-    const productName = new Map(
-      ((skusRes.data ?? []) as Array<{ sku: string; variant: string | null }>).map(
-        (row) => [row.sku, row.variant],
+    /* PRODUCT IDENTITY IS MODEL + VARIANT, and the CATALOG owns the category.
+       This feed had the same two defects the Inbound read had (2026-09-14):
+       it named a product by its `variant` alone — so a whole delivery read
+       `King`, `King`, `King` — and it carried no category at all, leaving the
+       Schedule's governed ladder with only its keyword classifier. The model
+       row holds both answers and was simply never joined.
+
+       Read here rather than inferred: no supplier rule, no SKU-text parsing.
+       A SKU with no model keeps its variant, and a model with no category
+       stays `null` — "asked and silent" — which is the documented fall to the
+       classifier, not a guess dressed as an answer. */
+    const modelIds = [
+      ...new Set(
+        (
+          (skusRes.data ?? []) as Array<{ model_id: string | null }>
+        )
+          .map((row) => row.model_id)
+          .filter((id): id is string => Boolean(id)),
       ),
+    ];
+    const modelsRes = modelIds.length
+      ? await sb.from("product_models").select("id, name, category").in("id", modelIds)
+      : { data: [], error: null };
+    if (modelsRes.error) {
+      const m = mapPgError(modelsRes.error);
+      return c.json(m.body, m.status);
+    }
+    const model = new Map(
+      (
+        (modelsRes.data ?? []) as Array<{
+          id: string;
+          name: string | null;
+          category: string | null;
+        }>
+      ).map((row) => [row.id, row]),
     );
+    const skuRows = (skusRes.data ?? []) as Array<{
+      sku: string;
+      variant: string | null;
+      model_id: string | null;
+    }>;
+    const productName = new Map(
+      skuRows.map((row) => {
+        const m = row.model_id ? model.get(row.model_id) : undefined;
+        const name = [m?.name ?? null, row.variant].filter(Boolean).join(" ").trim();
+        return [row.sku, name || null];
+      }),
+    );
+    const skuCategories = skuRows.map((row) => ({
+      sku: row.sku,
+      category: (row.model_id ? model.get(row.model_id)?.category : null) ?? null,
+    }));
 
     const handovers = (handoversRes.data ?? []) as Array<{
       id: string;
@@ -339,7 +489,11 @@ deliveryArrangementsRouter.get(
       const order = orderById.get(arrangement.order_id);
       if (!order) return [];
       return deliveryOrders
-        .filter((row) => row.order_id === arrangement.order_id)
+        .filter(
+          (row) =>
+            row.order_id === arrangement.order_id &&
+            (row.leg ?? 0) === arrangement.leg,
+        )
         .flatMap((deliveryOrder) => {
           const doScope = scopeRows.filter(
             (row) => row.delivery_order_id === deliveryOrder.id,
@@ -386,7 +540,14 @@ deliveryArrangementsRouter.get(
           fromLocation: unit.warehouse_id
             ? warehouseName.get(unit.warehouse_id) ?? "Not recorded"
             : "Not recorded",
+          warehouseSiteId: unit.warehouse_id,
           toCustomer: order.customer_address ?? "Not recorded",
+          /* The PARTY, beside the place. `toCustomer` has always carried the
+             ADDRESS despite its name — correct for the Register's `To`
+             column, which COPY-STANDARD defines as a place, and wrong for the
+             Schedule card's header, which the approved card defines as the
+             party. Both facts now travel; neither is guessed from the other. */
+          toCustomerName: order.customer_name ?? null,
           logisticsPartner: arrangement.partner_name as string,
           driverName: arrangement.driver_name,
           vehicle: arrangement.vehicle,
@@ -419,7 +580,13 @@ deliveryArrangementsRouter.get(
           });
         });
     });
-    return c.json({ events });
+    /* ADDITIVE, READ-ONLY. `skuCategories` rides beside the events so the
+       Warehouse Schedule's governed category ladder can consult the CATALOG on
+       the pickup side exactly as it already does on the arrival side. Existing
+       consumers that ignore the field are unaffected; without it the two
+       directions disagree about the same SKU, which is visible the moment the
+       boards are put side by side. */
+    return c.json({ events, skuCategories });
   },
 );
 
@@ -496,17 +663,33 @@ deliveryArrangementsRouter.get("/:orderId", requireOperationOrPrincipal, async (
     });
   }
 
-  return c.json({ order, arrangement: arrangement ? shape(arrangement) : null, history });
+  const { data: contacts, error: contactsErr } = await sb
+    .from("ops_delivery_contacts")
+    .select(CONTACT_SELECT)
+    .eq("order_id", orderId)
+    .eq("leg", leg)
+    .order("contacted_at", { ascending: false });
+  if (contactsErr) {
+    const m = mapPgError(contactsErr);
+    return c.json(m.body, m.status);
+  }
+
+  return c.json({
+    order,
+    arrangement: arrangement ? shape(arrangement) : null,
+    history,
+    contacts: contacts ?? [],
+  });
 });
 
 /** The current partner on each named scope — arrangement first, order as fallback. */
 async function currentPartners(
   sb: ReturnType<typeof adminClient>,
   scopes: DeliveryScopeRef[],
-): Promise<Map<string, { arrangementId: string | null; partnerId: string | null }>> {
+): Promise<Map<string, { arrangementId: string | null; partnerId: string | null; confirmedDate?: string | null; confirmedTime?: string | null }>> {
   const orderIds = [...new Set(scopes.map((s) => s.orderId))];
   const [{ data: arrangements }, { data: orders }] = await Promise.all([
-    sb.from("ops_delivery_arrangements").select("id, order_id, leg, partner_id").in("order_id", orderIds),
+    sb.from("ops_delivery_arrangements").select("id, order_id, leg, partner_id, confirmed_date, confirmed_time").in("order_id", orderIds),
     sb.from("orders").select("id, delivery_partner_id, ops_assigned_logistic").in("id", orderIds),
   ]);
   const byOrder = new Map(
@@ -514,18 +697,25 @@ async function currentPartners(
       (o) => [o.id, o.delivery_partner_id ?? o.ops_assigned_logistic ?? null],
     ),
   );
-  const out = new Map<string, { arrangementId: string | null; partnerId: string | null }>();
+  const out = new Map<string, { arrangementId: string | null; partnerId: string | null; confirmedDate?: string | null; confirmedTime?: string | null }>();
   const arrRows = (arrangements ?? []) as Array<{
     id: string;
     order_id: string;
     leg: number;
     partner_id: string | null;
+    confirmed_date?: string | null;
+    confirmed_time?: string | null;
   }>;
   for (const s of scopes) {
     const key = `${s.orderId}#${s.leg}`;
     const existing = arrRows.find((a) => a.order_id === s.orderId && a.leg === s.leg);
     if (existing) {
-      out.set(key, { arrangementId: existing.id, partnerId: existing.partner_id });
+      out.set(key, {
+        arrangementId: existing.id,
+        partnerId: existing.partner_id,
+        confirmedDate: existing.confirmed_date ?? null,
+        confirmedTime: existing.confirmed_time ?? null,
+      });
       continue;
     }
     /* NO ARRANGEMENT ROW YET. The whole-order scope inherits whatever Sales'
@@ -603,7 +793,7 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
     const { data: saved, error: upsertErr } = await sb
       .from("ops_delivery_arrangements")
       .upsert(
-        { order_id: s.orderId, leg: s.leg, partner_id: partnerId, updated_at: stamp, updated_by: userId },
+        { order_id: s.orderId, leg: s.leg, partner_id: partnerId, updated_at: stamp, updated_by: userId, updated_via: "operation" },
         { onConflict: "order_id,leg" },
       )
       .select("id")
@@ -624,12 +814,15 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
       reason_key: event === "changed" ? reason ?? null : null,
       note: note ?? null,
       recorded_by: userId,
+      source: "operation",
     });
     if (evErr) {
       const m = mapPgError(evErr);
       return c.json(m.body, m.status);
     }
     results.push({ orderId: s.orderId, leg: s.leg, event });
+    /* 0581 — the old company's external link dies with the change. */
+    if (event === "changed") await revokeLinksForOtherPartners(sb, s.orderId, s.leg, partnerId, userId);
   }
 
   return c.json({ assigned: results.length, partner: partner.name, results });
@@ -659,7 +852,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
 
   const { data: order, error: orderErr } = await sb
     .from("orders")
-    .select("id")
+    .select("id, delivery_date, delivery_date_tbd")
     .eq("id", orderId)
     .maybeSingle();
   if (orderErr) {
@@ -667,6 +860,28 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     return c.json(m.body, m.status);
   }
   if (!order) return c.json({ error: "Order not found" }, 404);
+
+  /* ⭐ A DELIVERY DAY IS NEVER A SUNDAY OR A PUBLIC HOLIDAY (§8.6). */
+  if (input.confirmedDate) {
+    const refused = refusedDeliveryDay(input.confirmedDate);
+    if (refused) return c.json({ error: refused, code: "not_a_delivery_day" }, 400);
+  }
+
+  /* ⭐ A LATER DATE IS NEVER A SILENT EDIT (§8.6). When the new day is later
+     than the customer's Requested Delivery Date, Operation must have
+     contacted the customer and the save must carry the WhatsApp reply. The
+     Sales promise itself is never touched here. */
+  const requestedDate = order.delivery_date_tbd ? null : (order.delivery_date as string | null);
+  const later = laterThanRequested(input.confirmedDate, requestedDate);
+  if (later && !input.replyProofPath) {
+    return c.json(
+      {
+        error: "Save scheduled delivery — upload the WhatsApp reply",
+        code: "later_date_needs_reply_proof",
+      },
+      409,
+    );
+  }
 
   const current = await currentPartners(sb, [{ orderId, leg }]);
   const before = current.get(`${orderId}#${leg}`) ?? { arrangementId: null, partnerId: null };
@@ -700,6 +915,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
         condo_registration: input.condoRegistration ?? null,
         updated_at: new Date().toISOString(),
         updated_by: userId,
+        updated_via: "operation",
       },
       { onConflict: "order_id,leg" },
     )
@@ -723,6 +939,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
       to_partner_id: nextPartner,
       reason_key: event === "changed" ? input.reason ?? null : null,
       recorded_by: userId,
+      source: "operation",
     });
     if (evErr) {
       const m = mapPgError(evErr);
@@ -730,7 +947,174 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     }
   }
 
-  return c.json({ arrangement: shape(saved as unknown as ArrangementRecord) });
+  /* THE CONTACT THAT PRODUCED THIS SAVE (0487): `Information received from`
+     names who was contacted and whether Operation stood proxy; a later day
+     records the purpose `Confirm New Delivery Date` with the customer's reply
+     as its evidence. Recorded in the same request as the arrangement. */
+  let contact: unknown = null;
+  if (input.informationReceivedFrom && (input.confirmedDate || input.confirmedTime)) {
+    const from = input.informationReceivedFrom;
+    const contactInput: DeliveryContactInput = {
+      purpose: later
+        ? "confirm_new_delivery_date"
+        : input.confirmedTime && !input.confirmedDate
+          ? "confirm_delivery_time"
+          : "confirm_delivery_date",
+      channel: input.replyProofPath ? "whatsapp" : "call",
+      contactedPerson: from === "partner" ? "partner" : "customer",
+      result: input.confirmedDate && input.confirmedTime ? "confirmed" : "requested_another_date",
+      replyEvidencePath: input.replyProofPath ?? null,
+      onBehalfOfPartnerId: from === "customer" ? null : nextPartner,
+      nextAction: null,
+      note: null,
+    };
+    const { data: contactRow, error: contactErr } = await recordContact(
+      sb,
+      { orderId, leg },
+      contactInput,
+      userId ?? null,
+    );
+    if (contactErr) {
+      const m = mapPgError(contactErr);
+      return c.json(m.body, m.status);
+    }
+    contact = contactRow;
+  }
+
+  /* 0491 — A JOURNEY LEG ISSUES ITS OWN DOCUMENT the moment its partner and
+     its agreed day are both on record, through the ONE issuing discipline.
+     FAIL-SOFT: the arrangement just saved is never undone by an issuance
+     hiccup; the next save (or the manual backstop) tries again. */
+  let deliveryOrder: { do_number: string | null; issued: boolean } | null = null;
+  if (leg > 0 && nextPartner && input.confirmedDate) {
+    try {
+      const attempt = await attemptLegDocumentIssue(userClient(c.env, c.var.auth.jwt), orderId, leg);
+      if (attempt.outcome === "issued" || attempt.outcome === "already") {
+        deliveryOrder = { do_number: attempt.doNumber, issued: attempt.outcome === "issued" };
+      }
+    } catch {
+      /* not issued yet — the facts persist */
+    }
+  }
+
+  /* 0581 — the SCHEDULED date is a fact with its own history line, so a
+     partner's older `Requested another date` / `Cannot deliver` answer is
+     known to be superseded. Only a real change of date or time is a save. */
+  if (
+    input.confirmedDate &&
+    (input.confirmedDate !== (before.confirmedDate ?? null) || (input.confirmedTime ?? null) !== (before.confirmedTime ?? null))
+  ) {
+    await sb.from("ops_delivery_arrangement_events").insert({
+      arrangement_id: (saved as unknown as ArrangementRecord).id,
+      order_id: orderId,
+      leg,
+      event: "arrangement_saved",
+      source: "operation",
+      from_partner_id: nextPartner,
+      note: [input.confirmedDate, input.confirmedTime].filter(Boolean).join(" · "),
+      recorded_by: userId,
+    });
+  }
+  /* 0581 — a change of company kills the old company's link. */
+  if (before.partnerId !== nextPartner) {
+    await revokeLinksForOtherPartners(sb, orderId, leg, nextPartner, userId);
+  }
+
+  return c.json({ arrangement: shape(saved as unknown as ArrangementRecord), contact, deliveryOrder });
+});
+
+/**
+ * POST /:orderId/contacts?leg= — the ONE customer-contact door (0487, §5.1).
+ * A contact that changes nothing on the arrangement (a call with no answer,
+ * a reply still awaited) is recorded here with its purpose and result.
+ */
+deliveryArrangementsRouter.post("/:orderId/contacts", requireOperationOrPrincipal, async (c) => {
+  const orderId = c.req.param("orderId");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    return c.json({ error: "not_found", message: "Order not found" }, 404);
+  }
+  const leg = Number(c.req.query("leg") ?? "0") || 0;
+  const parsed = deliveryContactInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = adminClient(c.env);
+  const { data: order, error: orderErr } = await sb.from("orders").select("id").eq("id", orderId).maybeSingle();
+  if (orderErr) {
+    const m = mapPgError(orderErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) return c.json({ error: "not_found", message: "Order not found" }, 404);
+  const { data, error } = await recordContact(sb, { orderId, leg }, parsed.data, c.var.auth.id ?? null);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ contact: data });
+});
+
+/**
+ * POST /:orderId/cannot-deliver?leg= — Operation records the partner's
+ * Cannot Deliver ON ITS BEHALF (§8.6): the same 0417 event and the same
+ * governed reason list as the partner's own door, the partner named as the
+ * reporter and the proxy recorded on the history line.
+ */
+deliveryArrangementsRouter.post("/:orderId/cannot-deliver", requireOperationOrPrincipal, async (c) => {
+  const orderId = c.req.param("orderId");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    return c.json({ error: "not_found", message: "Order not found" }, 404);
+  }
+  const leg = Number(c.req.query("leg") ?? "0") || 0;
+  const parsed = operationCannotDeliverInput.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = adminClient(c.env);
+  const [{ data: order, error: orderErr }, { data: partner, error: partnerErr }] = await Promise.all([
+    sb.from("orders").select("id").eq("id", orderId).maybeSingle(),
+    sb.from("delivery_partners").select("id, name").eq("id", parsed.data.partnerId).maybeSingle(),
+  ]);
+  const firstErr = orderErr ?? partnerErr;
+  if (firstErr) {
+    const m = mapPgError(firstErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) return c.json({ error: "not_found", message: "Order not found" }, 404);
+  if (!partner) return c.json({ error: "not_found", message: "Logistics partner not found" }, 404);
+
+  const { error } = await sb.from("ops_delivery_arrangement_events").insert({
+    order_id: orderId,
+    leg,
+    event: "cannot_deliver",
+    from_partner_id: parsed.data.partnerId,
+    reason_key: parsed.data.reason,
+    note: [parsed.data.note, parsed.data.evidencePath ? `evidence: ${parsed.data.evidencePath}` : null]
+      .filter(Boolean)
+      .join(" · ") || null,
+    recorded_by: c.var.auth.id ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const { error: histErr } = await sb.from("order_history").insert({
+    order_id: orderId,
+    text: `${partner.name} cannot deliver — ${parsed.data.reason}${
+      parsed.data.note ? `: ${parsed.data.note}` : ""
+    } (recorded by Operation on behalf of ${partner.name})`,
+    by_role: "operation",
+  });
+  if (histErr) {
+    const m = mapPgError(histErr);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ reported: true });
 });
 
 /**

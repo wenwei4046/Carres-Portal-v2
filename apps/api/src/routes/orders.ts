@@ -34,7 +34,9 @@ import {
   updateOrderInputSchema,
   type AutocountImportResult,
   type StaffTierDto,
+  receivedBeforeInvoice,
 } from "@carres/shared";
+import { invoicePayments } from "./finance/invoices";
 import { userClient, adminClient } from "../lib/supabase";
 import { getStaffContext, isStoreActivated } from "../lib/staff-token";
 import {
@@ -117,6 +119,9 @@ type SalesOrderData = {
   }>;
   addons: Array<{
     label: string;
+    /** The Item Code: `addons.service_sku` for a linked service, else the
+     *  stored `addon_key` as saved. An absent code printed `ADD-ON`. */
+    sku: string;
     qty: number;
     unit_price: number;
     line_total: number;
@@ -1799,42 +1804,6 @@ ordersRouter.post("/import", async (c) => {
     results,
   };
   return c.json(autocountImportResponseSchema.parse(resp));
-});
-
-/**
- * POST /api/orders/:id/accept-autocount-items — one-shot unlock for the
- * portal-wins-AutoCount guard. Clears `orders.items_edited`, so the next
- * AutoCount re-import REPLACES the order's items array with AutoCount's
- * version (instead of preserving the portal-edited one).
- *
- * Use when AutoCount has the truer items list (e.g. customer changed
- * configuration after order, ops's earlier edit is now stale).
- *
- * Allowed: operation, principal (mirrors /import gate). Only valid while
- * the order is at status='place' — past that, items are frozen anyway by
- * the proceed flow.
- */
-ordersRouter.post("/:id/accept-autocount-items", async (c) => {
-  const auth = c.var.auth;
-  if (auth.role !== "operation" && auth.role !== "principal") {
-    throw new HTTPException(403, { message: "Operation or principal only" });
-  }
-  const id = c.req.param("id");
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb
-    .from("orders")
-    .update({ items_edited: false, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("status", "place")
-    .select("id, items_edited")
-    .maybeSingle();
-  if (error) throw new HTTPException(500, { message: error.message });
-  if (!data) {
-    throw new HTTPException(404, {
-      message: "Order not found, not at status='place', or RLS-hidden",
-    });
-  }
-  return c.json({ id: data.id, items_edited: data.items_edited });
 });
 
 /**
@@ -4101,14 +4070,21 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 
   // Add-on labels: human `addons.name` over the raw key ("dispose-mattress").
   const addonNameByKey = new Map<string, string>();
+  /* The catalogue's own Service SKU for a linked service (0172 — `addons.service_sku`,
+     e.g. `dispose-mattress` → `SVC-DISPOSE-MATTRESS`). An unlinked service
+     (`DELIVERY`, `STAIR_CARRY` — bare by design, 0393) has none. */
+  const addonSkuByKey = new Map<string, string>();
   try {
     const addonKeys = [...new Set(addons.map((a) => String(a.addon_key)))];
     if (addonKeys.length > 0) {
-      const { data: addonDefs } = await sb.from("addons").select("key, name").in("key", addonKeys);
+      const { data: addonDefs } = await sb.from("addons").select("key, name, service_sku").in("key", addonKeys);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const r of (addonDefs ?? []) as any[]) {
         if (typeof r.name === "string" && r.name.trim().length > 0) {
           addonNameByKey.set(String(r.key), r.name.trim());
+        }
+        if (typeof r.service_sku === "string" && r.service_sku.trim().length > 0) {
+          addonSkuByKey.set(String(r.key), r.service_sku.trim());
         }
       }
     }
@@ -4188,6 +4164,11 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     const unitPrice = Number(a.unit_price);
     return {
       label: addonNameByKey.get(String(a.addon_key)) ?? String(a.addon_key),
+      /* The Item Code: the catalogue Service SKU when the service is linked,
+         otherwise the saved key exactly as stored — never rewritten. Without a
+         code the paper printed the `ADD-ON` placeholder (a defect by the owner
+         review 2026-08-09, `lib/pdf/types.ts`). */
+      sku: addonSkuByKey.get(String(a.addon_key)) ?? String(a.addon_key),
       qty,
       unit_price: unitPrice,
       line_total: qty * unitPrice,
@@ -4470,6 +4451,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     tax_amount: taxAmount,
     total,
     currency: "MYR",
+    received_before: receivedBeforeInvoice(await invoicePayments(sb, id), String(i.issued_at)),
   });
 });
 

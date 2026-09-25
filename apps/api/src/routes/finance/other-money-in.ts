@@ -8,8 +8,9 @@ import {
   otherReceiptInput,
 } from "@carres/shared/other-money-in";
 import { requireFinance } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
 import type { AppEnv } from "../../types";
 
 /**
@@ -45,10 +46,8 @@ const financeOtherMoneyInRouter = new Hono<AppEnv>();
 
 const uuid = z.string().uuid();
 
-function fail(c: Context<AppEnv>, error: { code?: string; message?: string; details?: string }) {
-  const m = mapPgError(error);
-  return c.json(m.body, m.status);
-}
+const INVOICE_LINES = { table: "other_debtor_invoice_lines", parent: "invoice_id" } as const;
+const RECEIPT_LINES = { table: "other_receipt_lines", parent: "receipt_id" } as const;
 
 function notFound(c: Context<AppEnv>, what: string) {
   return c.json({ error: "not_found", code: "not_found", message: `${what} not found.` }, 404);
@@ -122,9 +121,15 @@ financeOtherMoneyInRouter.patch("/parties/:id", requireFinance, async (c) => {
 
 financeOtherMoneyInRouter.get("/invoices", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  const f = departmentQuery(c);
+  if (!f.ok) return f.res;
   const { data, error } = await sb.rpc("other_debtor_invoice_list", { p_party_id: null });
   if (error) return fail(c, error);
-  return c.json(data ?? []);
+  const rows = (data ?? []) as Array<{ invoice_id: string }>;
+  const kept = await keepByDepartment(sb, INVOICE_LINES, rows, (r) => r.invoice_id, f.value);
+  if ("tooMany" in kept) return tooManyDepartmentLines(c);
+  if ("error" in kept) return fail(c, kept.error);
+  return c.json(kept.rows);
 });
 
 function invoiceArgs(p: z.infer<typeof otherDebtorInvoiceInput>) {
@@ -135,6 +140,8 @@ function invoiceArgs(p: z.infer<typeof otherDebtorInvoiceInput>) {
       account_code: l.account_code,
       description: l.description ?? null,
       amount: l.amount,
+      department_type: l.department_type ?? null,
+      department_id: l.department_id ?? null,
     })),
     p_due_date: p.due_date ?? null,
     p_reference: p.reference ?? null,
@@ -158,7 +165,9 @@ financeOtherMoneyInRouter.get("/invoices/:id", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("other_debtor_invoice_detail", { p_invoice_id: id });
   if (error) return fail(c, error);
-  return c.json(data);
+  const merged = await withLineDepartments(sb, INVOICE_LINES, id, data);
+  if ("error" in merged) return fail(c, merged.error);
+  return c.json(merged.doc);
 });
 
 financeOtherMoneyInRouter.put("/invoices/:id", requireFinance, async (c) => {
@@ -202,9 +211,15 @@ financeOtherMoneyInRouter.post("/invoices/:id/cancel", requireFinance, async (c)
 
 financeOtherMoneyInRouter.get("/receipts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  const f = departmentQuery(c);
+  if (!f.ok) return f.res;
   const { data, error } = await sb.rpc("other_receipt_list");
   if (error) return fail(c, error);
-  return c.json(data ?? []);
+  const rows = (data ?? []) as Array<{ receipt_id: string }>;
+  const kept = await keepByDepartment(sb, RECEIPT_LINES, rows, (r) => r.receipt_id, f.value);
+  if ("tooMany" in kept) return tooManyDepartmentLines(c);
+  if ("error" in kept) return fail(c, kept.error);
+  return c.json(kept.rows);
 });
 
 financeOtherMoneyInRouter.post("/receipts", requireFinance, async (c) => {
@@ -219,6 +234,8 @@ financeOtherMoneyInRouter.post("/receipts", requireFinance, async (c) => {
       account_code: l.account_code,
       description: l.description ?? null,
       amount: l.amount,
+      department_type: l.department_type ?? null,
+      department_id: l.department_id ?? null,
     })),
     p_allocations: r.allocations.map((a) => ({ invoice_id: a.invoice_id, amount: a.amount })),
     p_party_id: r.party_id ?? null,
@@ -237,7 +254,9 @@ financeOtherMoneyInRouter.get("/receipts/:id", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("other_receipt_detail", { p_receipt_id: id });
   if (error) return fail(c, error);
-  return c.json(data);
+  const merged = await withLineDepartments(sb, RECEIPT_LINES, id, data);
+  if ("error" in merged) return fail(c, merged.error);
+  return c.json(merged.doc);
 });
 
 financeOtherMoneyInRouter.post("/receipts/:id/void", requireFinance, async (c) => {

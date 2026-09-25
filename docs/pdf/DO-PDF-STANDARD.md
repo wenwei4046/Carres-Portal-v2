@@ -1,5 +1,9 @@
 # Delivery Order PDF Standard
 
+**Start at [`DOCUMENT-KIT.md`](DOCUMENT-KIT.md)** — the shared shape, words and
+owner rulings for every Carres document. This file holds only what this
+document decides for itself.
+
 **Status** — Law
 **Owner** — Loo (approved 2026-08-09, reviewed on rendered PDFs alongside the SO)
 **This is the ONLY copy.** Amend in place; the Change Log records every amendment.
@@ -28,8 +32,13 @@ never money.
   — who the driver calls when the customer is unreachable (sales portal
   collects it; 32/77 filled at review time).
 - **DELIVERY DETAILS**: `DO No · SO No · Delivery date · Logistic · Access`.
-  Number labels say WHICH number — never "Doc No"/"SO Ref". No Issued date —
-  the delivery date is the date this paper works by.
+  Number labels say WHICH number — never "Doc No"/"SO Ref".
+  🔴 **`DO Doc Date` is OWED.** The 2026-08-09 rule *"No Issued date — the
+  delivery date is the date this paper works by"* is OVERWRITTEN by the owner
+  ruling of 2026-09-23 (DOCUMENT-KIT.md §4): every document prints its own
+  `{DOC} Doc Date`, and `DO Doc Date` is named there explicitly. The delivery
+  date answers a different question — when the goods move. The payload carries
+  no document date today, so this lands with Delivery's next build.
 - **Items table**: `# · ITEM CODE · DESCRIPTION · UNIT ID · PO NO · QTY`.
   - **UNIT ID** = `ops_stock_items.unit_code` (0153) — the scannable per-unit
     ids, one per physical unit, stacked; the warehouse's loading checklist and
@@ -37,7 +46,9 @@ never money.
   - **PO NO** = the PO(s) that supplied the line (2990's Source PO picking
     aid — production holds the link; the earlier "no such data" claim was
     false and is recorded as such).
-  - QTY right-inset 5mm; `—` for untraced cells; closing `TOTAL` row sums
+  - **QTY is centred, one weight** (owner 2026-09-22; DOCUMENT-KIT.md §3
+    rule 5). The old right-inset-5mm rule is RETIRED with the right-alignment
+    it existed to soften. `—` for untraced cells; closing `TOTAL` row sums
     quantity only (no money to name it SUBTOTAL after).
   - 2990's m³ and Rack columns are NOT copied — no such Carres data.
 

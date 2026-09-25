@@ -189,12 +189,17 @@ action last, after a divider.
 
 ## Icon
 
+`panelToggle` is the approved shared filter-panel control (2026-09-16):
+`PanelLeftOpen` by default, `PanelLeftClose` with `panelOpen`, using the kit’s 2px stroke.
+
 **Purpose.** One meaning, one glyph.
 
-**Behaviour.** `name` is a union of 43 meanings — §5.3's 40 verbatim, plus the
+**Behaviour.** `name` is a union of 50 meanings — §5.3's 40 verbatim, plus the
 three made-to-order categories `mattress` · `bedframe` · `sofa` (Loo,
 2026-07-31, for the To Order rail's category level; Lucide `BedDouble` ·
-`Bed` · `Sofa`). A name outside it does not compile — which is the
+`Bed` · `Sofa`), `columnFilter`, `pillow`, `protector`, `panelToggle`, and the
+Work left rail's `previous` (`ChevronLeft`) · `noDate` (`CalendarOff`) ·
+`modules` (`LayoutGrid`) (owner-approved UI, 2026-09-24). A name outside it does not compile — which is the
 enforcement, not a convention. Sizes 14 · 16 · 18. Stroke is Lucide's 2 and
 there is no prop to change it.
 
@@ -296,6 +301,16 @@ must touch the edges — a table, an empty state.
 
 ---
 
+## ScheduleCard
+
+Below 768px, embedded button and link targets have a 40px minimum height; product buttons
+also have a 40px minimum width. The dense desktop controls retain their kit dimensions.
+
+Shared calendar-card composition for Delivery and Warehouse (owner direction 2026-09-14).
+Header, body and footer have fixed positions. Uses existing card border/radius, body/label text and spacing tokens, without shadow. The event owner supplies recorded facts; this component computes no status, quantity or route. Product lines may use kit Button + Popover for accessible details; the footer holds one link to the owning work. No nested interactive elements inside a card-wide link.
+
+Product category icons retain the existing mattress / bedframe / sofa mapping. Pillow uses RectangleHorizontal and Mattress protector uses Layers2, via the shared Icon registry. Other/unverified categories use the generic goods icon and expose the recorded product name through the same detail control. No category may be inferred by the glyph component. Every product line remains separate, including repeated categories; no hidden +N more.
+
 ## EmptyState
 
 **Purpose.** What a region says when it holds nothing — an ANSWER, not an
@@ -319,6 +334,53 @@ bars, the last one short so it cannot be mistaken for a table).
 loading; this component only draws.
 
 **Used by.** `Button loading` · `DataTable` loading · To Order's queue rail.
+
+---
+
+## PdfPreview
+
+**Purpose.** Display actual PDF pages inside a document review, using the shared
+`lib/pdf/paint.ts` renderer also used by Sales Order review. The component takes
+an already-rendered PDF URL; it does not fetch business facts or issue documents.
+
+**Behaviour.** Fit to pane width, Zoom in/out and Fit width; enlarged pages scroll
+inside their pane. Loading and decode/render errors are explicit, with Try again.
+A ready callback fires only after every page has painted. Source changes, resize,
+retry and unmount cancel old rendering and release its PDF worker resources.
+The caller owns the source URL and its lifetime. A failed preview is not a completed
+review. The live `/ui` example includes a real draft and a failed-preview sample.
+
+**Used by.** The shared SO Batch / Manual Purchase PO review. Purchasing MASTER §8.2
+owns its approved desktop composition and completion gate; this is not the image
+and evidence viewer promised for Supplier Claims.
+
+---
+
+## SavedEvidenceViewer
+
+**Purpose.** The approved shared read-only saved-photo/video viewer (Purchasing MASTER
+§9.5). Deployed in #1593, with authenticated Receiving and production example readback
+2026-09-24 (evidence in Purchasing MASTER §9.5). Receiving's existing
+arrival-evidence controls are the first consumer. Claim-record photos also adopt it
+in production (#1594; authenticated readback 2026-09-24); Stock/Service and per-Unit Claim expansion
+integrations remain separate work and must reuse this component.
+
+**Contract.** The owning authorised reader supplies stable file IDs, kind, signed URL
+(or null for an unreadable existing file), recorded source/event context and any proven
+Unit associations. The viewer never fetches a storage list, widens permissions, uploads,
+deletes, or rewrites evidence. Retry calls the owning reader again. Empty evidence has
+no opening control; a known file without a readable URL remains visible as a failure.
+
+**Behaviour.** Existing Modal viewer width, focus trap, Escape/Close, focus restoration
+and scroll lock; photo zoom, drag, Reset, Previous/Next; native video playback, seeking
+and fullscreen. Each file switch resets enlargement and keeps its own context. Loading,
+media failure and retry differ; a late retry cannot replace a newly selected file.
+The fullscreen-focus correction (#1595; production-verified 2026-09-24) returns focus
+to the viewer after native fullscreen exit so a subsequent Escape can close it.
+The `/ui` example includes a clearly marked photo, an unreadable file and an eight-second
+synthetic H.264 video (`ui-evidence-example.mp4`, generated colour/motion test pattern,
+320×180 at 12fps; no recorded business or personal content). Receiving
+keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 
 ---
 

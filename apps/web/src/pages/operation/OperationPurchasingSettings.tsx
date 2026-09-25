@@ -23,12 +23,14 @@ import {
   useCreatePurchasingDestination,
   useSetProductionDays,
   useSetSupplierTransitDays,
+  useSetSupplierTermsDays,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetSupplierWorkWeek,
   useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
+import Input from "@/components/kit/Input";
 import { fmtDate } from "@/lib/fmt-date";
 import { INPUT_CLS } from "./components/Modal";
 import PurchasingTabs from "./PurchasingTabs";
@@ -275,6 +277,7 @@ export default function OperationPurchasingSettings({
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
   const setTransit = useSetSupplierTransitDays();
+  const setTerms = useSetSupplierTermsDays();
   const setWorkWeek = useSetSupplierWorkWeek();
   const createDestination = useCreatePurchasingDestination();
   const updateDestination = useUpdatePurchasingDestination();
@@ -284,6 +287,7 @@ export default function OperationPurchasingSettings({
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
   const [transitDraft, setTransitDraft] = useState<Record<string, string>>({});
+  const [termsDraft, setTermsDraft] = useState<Record<string, string>>({});
   const [destinationDraft, setDestinationDraft] = useState<DestinationDraft | null>(null);
   const [collectionDrafts, setCollectionDrafts] = useState<Record<string, CollectionDraft>>({});
 
@@ -842,6 +846,76 @@ export default function OperationPurchasingSettings({
           </p>
         </section>
 
+        {/* ── Payment terms, per supplier (0530) ───────────────────────────
+            Days after the bill date. A PO's own terms win over these; the
+            bill form fills in the due date from whichever is set. Empty = not
+            set, and nothing waits on it. */}
+        <section className="mb-8 max-w-[860px]" data-testid="terms-days-settings">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
+            Payment terms
+          </h2>
+          <p className="text-meta text-base-500 mb-3">
+            Days after the supplier&rsquo;s bill date that the bill is due. A PO&rsquo;s own terms come first.
+          </p>
+          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+            {data.suppliers.map((s) => {
+              const saved = s.termsDays ?? null;
+              const draft = termsDraft[s.id] ?? (saved == null ? "" : String(saved));
+              const n = draft.trim() === "" ? null : Number(draft);
+              const valid = n === null || (Number.isInteger(n) && n >= 0 && n <= 365);
+              const dirty = valid && n !== saved;
+              return (
+                <div
+                  key={s.id}
+                  className="py-3 border-b border-base-100 last:border-b-0 flex items-end justify-between gap-4 flex-wrap"
+                  data-testid={`terms-row-${s.id}`}
+                >
+                  <div className="min-w-[240px] text-body text-base-900">{s.name}</div>
+                  <div className="flex items-end gap-2">
+                    <div className="w-32">
+                      <Input
+                        id={`terms-days-${s.id}`}
+                        label="Terms (days)"
+                        type="number"
+                        min={0}
+                        max={365}
+                        step={1}
+                        value={draft}
+                        disabled={!canEdit}
+                        error={valid ? undefined : "0 to 365"}
+                        onChange={(e) => setTermsDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                      />
+                    </div>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        disabled={!dirty || setTerms.isPending}
+                        onClick={() =>
+                          setTerms
+                            .mutateAsync({ supplierId: s.id, days: n })
+                            .then(() => {
+                              setTermsDraft((d) => {
+                                const next = { ...d };
+                                delete next[s.id];
+                                return next;
+                              });
+                              toast.success("Saved");
+                            })
+                            .catch(fail)
+                        }
+                        className="btn-primary text-meta disabled:opacity-40"
+                        data-testid={`terms-save-${s.id}`}
+                      >
+                        Save
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* ── Supplier work week ───────────────────────────────────────────── */}
         <section className="mb-8 max-w-[860px]">
           <h2 className="text-strong font-semibold text-base-900 mb-1">
@@ -963,8 +1037,8 @@ export default function OperationPurchasingSettings({
                 The Manual Purchase create door refuses a Delivery Date
                 earlier than Proceed Date + this; 0 means no floor. */}
             <NumberRow
-              label="Earliest Delivery Date a Manual Purchase may ask for"
-              hint="A Manual Purchase cannot ask for a Delivery Date closer than this to its Proceed Date."
+              label="Earliest Delivery Date a Manual Purchase Request may ask for"
+              hint="A Manual Purchase Request cannot ask for a Delivery Date closer than this to its Proceed Date."
               unit="days"
               value={data.manualPurchaseMinDeliveryDays}
               min={PURCHASING_NUMBER_RANGE.manual_purchase_min_delivery_days.min}

@@ -100,7 +100,7 @@ function bucketOf(p: DashboardPickupRow): Bucket | null {
   return null;
 }
 
-function lineSummary(lines: DashboardPickupLine[]): { head: string; rest: number; totalQty: number } {
+export function lineSummary(lines: DashboardPickupLine[]): { head: string; rest: number; totalQty: number } {
   const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0);
   const head = lines[0];
   if (!head) return { head: "—", rest: 0, totalQty };

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import OhanaBedFrameTab from "./OhanaBedFrameTab";
+import ProcurementTabContent from "./ProcurementTabContent";
 import type {
   operationPosListResponse,
   operationPoListRow,
@@ -11,7 +11,7 @@ import type {
 /**
  * OhanaBedFrameTab — Phase 4.5 Chunk 2 Sprint F Task 34.
  *
- * Verifies the wrapper passes slug='hookka-bedframe' through to the hook +
+ * Verifies slug='hookka-bedframe' reaches the hook +
  * renders the seeded bedframe PO. Bedframe is the 'STANDARD' SOP (not sofa-
  * special), so the action button should resolve to the catch-all "Receive →".
  */
@@ -115,7 +115,7 @@ function wrap(node: React.ReactNode) {
 
 describe("OhanaBedFrameTab", () => {
   it("calls useProcurementTab with slug='hookka-bedframe' and renders fetched bedframe POs", () => {
-    render(wrap(<OhanaBedFrameTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-bedframe" />));
     expect(useProcurementTabSpy).toHaveBeenCalledWith("hookka-bedframe");
     expect(screen.getByTestId("po-row-PO-BF-001")).toBeInTheDocument();
     expect(screen.getByText("Oak Bedframe · Queen")).toBeInTheDocument();

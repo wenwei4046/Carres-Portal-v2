@@ -7,8 +7,6 @@ import type {
   SofaFabricDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
-  ModelSofaCompartmentDto,
-  SofaCompartmentDto,
 } from "@carres/shared";
 import type { DraftLine } from "./draft";
 import { lockedCategoriesFor, ConfiguratorForModel } from "./configurators";
@@ -248,135 +246,59 @@ describe("SofaConfigurator — fabric tier delta", () => {
 });
 
 // -----------------------------------------------------------------------------
-// Phase 3 builder gate (sofa engine): ConfiguratorForModel opens the visual
-// builder for a sofa model that OFFERS compartments; every other model keeps
-// the existing dropdown configurator UNCHANGED.
+// ConfiguratorForModel — a sofa that reaches the drawer gets the dropdown.
 // -----------------------------------------------------------------------------
-function compartment(id: string, code: string): SofaCompartmentDto {
-  return {
-    id,
-    code,
-    description: null,
-    seatCount: 1,
-    armConfig: null,
-    iconUrl: null,
-    defaultPrice: 1000,
-    sortOrder: 0,
-    active: true,
-  };
-}
-function offered(modelId: string, compartmentId: string): ModelSofaCompartmentDto {
-  return { modelId, compartmentId, priceOverride: null, sortOrder: 0 };
-}
-
-describe("ConfiguratorForModel — Phase 3 builder gate", () => {
-  it("shows the 'Build your sofa' CTA for a sofa model WITH offered compartments", () => {
-    const model = sofaModel("m-ohana", "Ohana");
-    render(
-      <ConfiguratorForModel
-        model={model}
-        skus={[presetSku("s1", "m-ohana", "3-seater", 3000)]}
-        fabrics={[]}
-        sofaCompartments={[compartment("c1", "1A(LHF)")]}
-        modelSofaCompartments={[offered("m-ohana", "c1")]}
-        sofaCombos={[]}
-        onAdd={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId("sofa-open-builder")).toBeTruthy();
-    expect(screen.getByText("Build your sofa")).toBeTruthy();
-    // The legacy dropdown is NOT rendered for an offered-compartment model.
-    expect(screen.queryByText(/pick preset/i)).toBeNull();
-  });
-
-  it("shows the dropdown (no CTA) for a sofa model with NO offered compartments", () => {
+describe("ConfiguratorForModel — sofa", () => {
+  it("shows the preset dropdown for a sofa model", () => {
     const model = sofaModel("m-kestrel", "Kestrel");
     render(
       <ConfiguratorForModel
         model={model}
         skus={[presetSku("s1", "m-kestrel", "3-seater", 3000)]}
         fabrics={[]}
-        sofaCompartments={[compartment("c1", "1A(LHF)")]}
-        modelSofaCompartments={[offered("m-other", "c1")]} // offered for a DIFFERENT model
-        sofaCombos={[]}
         onAdd={vi.fn()}
       />,
     );
-    expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
     expect(screen.getByText(/pick preset/i)).toBeTruthy();
   });
+});
 
-  it("disables the CTA + shows a note when an offered-compartment sofa model has no sku", () => {
-    const model = sofaModel("m-ohana", "Ohana");
-    render(
-      <ConfiguratorForModel
-        model={model}
-        skus={[]} // no sku → can't emit a contract-safe DraftLine
-        fabrics={[]}
-        sofaCompartments={[compartment("c1", "1A(LHF)")]}
-        modelSofaCompartments={[offered("m-ohana", "c1")]}
-        sofaCombos={[]}
-        onAdd={vi.fn()}
-      />,
-    );
-    expect((screen.getByTestId("sofa-open-builder") as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId("sofa-builder-no-sku")).toBeTruthy();
-  });
-
-  it("renders the unchanged mattress configurator (no CTA, has a size dropdown)", () => {
+// A service model reaches the drawer from a bundle slot (the walker opens it
+// when the slot has 2+ skus or offered specials). It gets the same option
+// picker as an accessory — before, ConfiguratorForModel returned null and the
+// drawer opened empty.
+describe("ConfigureDrawer — service model", () => {
+  it("shows the option picker for a service with 2 skus and adds the picked one", () => {
+    const onAdd = vi.fn();
     const model: ProductModelDto = {
-      id: "m-mat",
-      category: "mattress",
-      modelKey: "cloud",
-      name: "Cloud",
+      id: "m-svc",
+      category: "service",
+      modelKey: "dispose",
+      name: "Dispose old mattress",
       blurb: null,
       colors: null,
       gaps: null,
       sofaMode: null,
     };
     render(
-      <ConfiguratorForModel
+      <ConfigureDrawer
         model={model}
+        meta={undefined}
         skus={[
-          { id: "ms1", modelId: "m-mat", sku: "MA-Q", variant: "Queen", variantKind: "size", price: 2000, cost: null, supplierId: null },
+          { id: "sv1", modelId: "m-svc", sku: "SVC-DISP-S", variant: "Single", variantKind: "size", price: 30, cost: null, supplierId: null },
+          { id: "sv2", modelId: "m-svc", sku: "SVC-DISP-K", variant: "King", variantKind: "size", price: 50, cost: null, supplierId: null },
         ]}
         fabrics={[]}
-        sofaCompartments={[compartment("c1", "1A(LHF)")]}
-        modelSofaCompartments={[]}
-        sofaCombos={[]}
-        onAdd={vi.fn()}
+        onAdd={onAdd}
+        onClose={() => {}}
       />,
     );
-    expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
-    expect(screen.getByText(/pick size/i)).toBeTruthy();
-  });
-
-  it("renders the unchanged bedframe configurator (no CTA, has color/gap)", () => {
-    const model: ProductModelDto = {
-      id: "m-bf",
-      category: "bedframe",
-      modelKey: "oak",
-      name: "Oak Frame",
-      blurb: null,
-      colors: ["Walnut"],
-      gaps: ["10mm"],
-      sofaMode: null,
-    };
-    render(
-      <ConfiguratorForModel
-        model={model}
-        skus={[
-          { id: "bs1", modelId: "m-bf", sku: "BF-Q", variant: "Queen", variantKind: "size", price: 1500, cost: null, supplierId: null },
-        ]}
-        fabrics={[]}
-        sofaCompartments={[compartment("c1", "1A(LHF)")]}
-        modelSofaCompartments={[offered("m-other", "c1")]}
-        sofaCombos={[]}
-        onAdd={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
-    expect(screen.getByText("Walnut")).toBeTruthy();
+    expect(screen.getByText(/pick option/i)).toBeTruthy();
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "sv2" } });
+    fireEvent.click(screen.getByText("+ Add"));
+    const ln = onAdd.mock.calls[0][0] as DraftLine;
+    expect(ln.sku).toBe("SVC-DISP-K");
+    expect(ln.unitPrice).toBe(50);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   ShoppingBag,
   Boxes,
   Repeat,
+  ArrowLeftRight,
   Wallet,
   BookOpen,
   Calculator,
@@ -30,13 +31,14 @@ import {
   ShieldCheck,
   HandCoins,
   UserCheck,
-  History,
   ListTodo,
   CircleAlert,
   Library,
   SlidersHorizontal,
   Receipt,
   Banknote,
+  CalendarClock,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -81,7 +83,7 @@ export type PortalSection =
   | "Purchasing"
   | "Delivery"
   | "Warehouse"
-  | "Finance"
+  | "Payments"
   | "Customer Care"
   | "Suppliers"
   | "Master Data"
@@ -94,7 +96,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Purchasing",
   "Delivery",
   "Warehouse",
-  "Finance",
+  "Payments",
   "Customer Care",
   "Suppliers",
   "Master Data",
@@ -107,13 +109,16 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
  * A section listed here draws a parent row: icon + name + chevron, its pages
  * hanging beneath it on rounded elbows. A section NOT listed here has no
  * parent row and its pages stay plain top-level rows — `Workspace`
- * (Dashboard · Work · Issue Tracker, ruled plain by the card) and `Finance`,
- * whose single `Payments` page would otherwise hide behind a chevron that
- * reveals one row of the same name. A control that opens nothing new is the
- * dead control `docs/03-page-patterns.md:149` bans. `Payments` stays ONE row
- * after the 2026-09-09 entry-point correction: Payment MASTER §16 puts the
- * `Payments · Invoices` switch in the Register's own toolbar, so a second
- * rail row for Invoices would be a second control for one act.
+ * (Dashboard · Work · Issue Tracker, ruled plain by the card). A control
+ * that opens nothing new is the dead control `docs/03-page-patterns.md:149`
+ * bans.
+ *
+ * ⭐ PAYMENTS IS A MODULE OF TWO DESTINATIONS (owner ruling 2026-09-12):
+ * `Monitor` — the full-width collection control listing — and `Payment
+ * Records` — the permanent incoming-money listing. No `Payments · Invoices`
+ * tabs, no standalone Invoices or Receipts page, no clickable parent. For an
+ * ordinary ERP user Payments is not a Finance Portal; the finance-only
+ * capabilities keep their own area below.
  *
  * The icon is the module's ONE face — the same law the Purchasing `ShoppingBag`
  * already followed (Loo, 2026-08-02). Children carry no icon at all now, so
@@ -128,12 +133,24 @@ export interface PortalModule {
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
  *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
- *  `Monitor` is the module's Calendar-summary page and the daily journey
- *  OPENS on it (Stock MASTER §7) — by name, never derived from row order. */
-export const WAREHOUSE_LANDING_KEY = "wh-monitor";
+ *  `Arrival Schedule` is where the warehouse day OPENS (Stock MASTER §7): the
+ *  first question of the morning is what is coming in, because goods that have
+ *  not arrived are the ones that stop every other job. Named, never derived
+ *  from row order — owner ruling 2026-09-14 moved it off the retired Monitor. */
+export const WAREHOUSE_LANDING_KEY = "wh-arrival-schedule";
+
+/** The collapsed Payments icon lands on `Monitor` — the daily collection
+ *  desk — by name, never by row order (owner ruling 2026-09-12). */
+export const PAYMENTS_LANDING_KEY = "payments";
 
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
-  { section: "Sales", label: "Sales", icon: ClipboardList },
+  /* ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23;
+   * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
+   * COPY-STANDARD table "Sales Orders navigation"). The module row is the
+   * customer-order parent and its two destinations are `Outright Sales` and
+   * `Subscription`. It is a NAVIGATION ruling: no contract, transaction,
+   * permission or calculation is merged by the shared parent. */
+  { section: "Sales", label: "Sales Orders", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are navigation,
@@ -141,6 +158,7 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
   { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
+  { section: "Payments", label: "Payments", icon: Wallet },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
      PARTY the business deals with, not a reference list — the same kind of
@@ -240,17 +258,40 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "Workspace" },
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
-        // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is now the NEW
+        // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is the NEW
         // Sales Order register (`SalesOrdersRegister`), and it is the OFFICIAL
-        // Sales Orders entry. The old control table moved out to its own
-        // temporary door below.
+        // customer-order entry. The old control table kept a temporary door
+        // beside it until the 2026-09-23 ruling took that row off the rail.
+        //
+        // ⭐ THE WORD IS `Outright Sales` (Jess, owner ruling 2026-09-23). The
+        // module row above now carries `Sales Orders`, so the child says which
+        // KIND of customer order it opens: the ordinary outright sale, as
+        // against `Subscription` beside it. `Purchase` is rejected by name in
+        // COPY-STANDARD — it reads as Purchasing. The ADDRESS is unchanged
+        // (`/operation/orders`), so every bookmark, deep link and in-page link
+        // still lands on the same register, the same detail and the same
+        // governed amendment journey.
         key: "orders",
-        label: "Sales Orders",
+        label: "Outright Sales",
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
         section: "Sales",
       },
+      /* ⭐ `Subscription` — THE SECOND CUSTOMER-ORDER DESTINATION (Jess, owner
+       * ruling 2026-09-23). It opens the Subscription-owned journey governed by
+       * `docs/rental/MASTER.md` — the agreements + deployed-unit registry this
+       * row has always pointed at. The row MOVED out of Customer Care; it was
+       * not copied, because two rows to one page are two rows the rail would
+       * light at once (Law C, a door never a duplicate).
+       *
+       * The `?tab=rental` ADDRESS is unchanged, so every existing link and
+       * bookmark still lands, and the page, its permissions, its quantities and
+       * its reporting are untouched: this ruling "changes navigation only and
+       * does not approve Subscription business implementation"
+       * (`docs/ui/MASTER.md`). The inner Subscription destinations proposed in
+       * the Rental Blueprint remain PROPOSAL / NOT LAW and are NOT built here. */
+      { key: "rental", label: "Subscription", icon: Repeat, section: "Sales" },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
       // two filters over the ONE open work set the Card 9 engine composes.
       // Sits directly under the register on the Constitution's own mission —
@@ -264,25 +305,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * second person list. */
       { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
-      // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
-      //
-      // The old Orders control table is NOT deleted and NOT hidden — it keeps
-      // its own separate route because it still carries the Delivery, Payment
-      // and Purchasing work that has not been migrated yet, plus the AutoCount
-      // import (today the ONLY import surface, which is what blocks the final
-      // delete).
-      //
-      // The label says `(temporary)` on purpose: a legacy surface that looks
-      // permanent BECOMES permanent. This item is deleted, not renamed, when
-      // the last box on the cutover map is empty. Its icon is deliberately NOT
-      // ClipboardList — two doors sharing one icon read as the same page.
-      {
-        key: "old-orders",
-        label: "Old Orders (temporary)",
-        icon: History,
-        path: "/operation/old-orders",
-        section: "Sales",
-      },
+      /* ⭐ `Old Orders (temporary)` LEFT THE RAIL (Jess, owner ruling
+       * 2026-09-23): "Replace the previous standalone Sales Orders entry;
+       * remove the old/legacy order menu entry from this tree."
+       *
+       * THE MENU ROW IS REMOVED. THE PAGE IS NOT. `/operation/old-orders` and
+       * `/operation/old-orders/:stage` stay mounted in `OperationApp`, so every
+       * order, every history row, every document and every existing deep link
+       * still resolves — including `CaseOrderLink`, which still sends a Service
+       * Case to `/operation/old-orders?order=…`. "Menu removal does not delete
+       * orders, history, documents or valid existing deep links."
+       *
+       * The `History` icon import goes with the row; nothing else used it. */
       /* ⭐ THE FINAL PURCHASING MAP — FOUR NAMED GROUPS, ELEVEN PAGES
        * (Jess, 2026-08-22 — CARD-2026-08-22-purchasing-01-final-sidebar-listing;
        * the approved tree is `docs/purchasing/MASTER.md` §4).
@@ -332,7 +366,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Purchasing",
         pageGroup: "purchasing-buy",
       },
-      { key: "manual-purchase", label: "Manual Purchase", icon: ClipboardList, section: "Purchasing", pageGroup: "purchasing-buy" },
+      { key: "manual-purchase", label: "Manual Purchase Request", icon: ClipboardList, section: "Purchasing", pageGroup: "purchasing-buy" },
       {
         // `operation:procurement` counts POs in the Pickup-action bucket —
         // this is the page that bucket belongs to.
@@ -358,7 +392,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },
-      { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-problems" },
+      { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, section: "Purchasing", pageGroup: "purchasing-problems" },
       { key: "repair-orders", label: "Repair Orders", icon: ArrowUpRight, soon: true, section: "Purchasing", pageGroup: "purchasing-problems" },
 
       /* SHOWROOM — the goods standing on a Carres floor. Some Carres bought
@@ -398,14 +432,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
-      /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner replacement Card,
-       * 2026-09-06 — Stock MASTER §2, ERP-ARCHITECTURE §2.1): `Monitor ·
-       * Inbound · Inventory · Outbound`. The ERP keeps ONE global Dashboard;
-       * the Warehouse Calendar-summary page is `Monitor` (the same word
-       * Delivery's calendar page already speaks). `Inventory` is the one
-       * current Unit Register — the `?tab=stock-onhand` address is unchanged,
-       * so no bookmark moves, and `?tab=warehouse-dashboard` still lands on
-       * Monitor for the same reason.
+      /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
+       * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
+       *
+       * The single combined `Monitor` is SUPERSEDED. It carried both
+       * directions on one board, and receiving goods and loading a lorry are
+       * two jobs, done by two people, on two sides of the building — one board
+       * meant every operator read past half of it all day. The two Schedules
+       * are independent destinations for that reason, which is also why
+       * neither page carries an internal direction tab.
+       *
+       * `?tab=warehouse-monitor` and `?tab=warehouse-dashboard` both still
+       * land — on Arrival Schedule, carrying their `date` and `site` — so no
+       * bookmark breaks (the `stock-onhand` precedent). `Inventory` is the one
+       * current Unit Register and its address is unchanged.
        * Reports and Settings stay central: NO Report row, NO Settings row.
        *
        * The de-navigated legacy pages keep their routes (`?tab=stock-plan` ·
@@ -413,10 +453,27 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * points/urgent restock and the event history are named next scopes in
        * Stock MASTER §13; a direct URL still lands. */
       {
-        key: "wh-monitor",
-        label: "Monitor",
+        key: "wh-arrival-schedule",
+        label: "Arrival Schedule",
         icon: CalendarDays,
-        tab: "warehouse-monitor",
+        tab: "warehouse-arrival-schedule",
+        /* `activeFor` REPLACES the default tab match (PortalSidebar), so this
+         * row's OWN tab has to be listed beside the two retired addresses —
+         * otherwise the page lights nothing while it is the page you are on.
+         * The retired addresses light it while they resolve, so the sidebar
+         * never shows "nowhere" on a working bookmark. */
+        activeFor: [
+          "tab:warehouse-arrival-schedule",
+          "tab:warehouse-monitor",
+          "tab:warehouse-dashboard",
+        ],
+        section: "Warehouse",
+      },
+      {
+        key: "wh-pickup-schedule",
+        label: "Pickup Schedule",
+        icon: CalendarDays,
+        tab: "warehouse-pickup-schedule",
         section: "Warehouse",
       },
       {
@@ -434,38 +491,40 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
-      /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE COLLECTION LISTING FIRST.
+      /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
        *
-       * This row used to link to `/operation?tab=payments`, the Master-Sheet
-       * "Balance" collections desk: its own Summary band, its own queue chips
-       * and its own EDITABLE balance / storage-fee fields. Payment MASTER §16
-       * approved one destination with a `Payments · Invoices` toolbar. The
-       * Invoice listing says what money is still needed and its object owns the
-       * writing, and the §17 Calendar behind the Invoice date cells — and
-       * every one of those shipped at `/finance/*` while this row still
-       * pointed at the old desk. Two forms for one act make two records
-       * (`docs/ERP-ARCHITECTURE.md` ownership Law C), so the desk is gone and
-       * this is the one door.
+       * `Monitor` is the full-width collection control listing keyed on the
+       * Sales Order — what money is still needed, whether the goods are ready,
+       * the storage fact, the customer's delivery day and the governed next
+       * action with its resolved owner. `Payment Records` is the permanent
+       * listing of money actually received, one row per Payment. The former
+       * `Payments · Invoices` toolbar switch and the standalone Invoices
+       * Register are retired: an Invoice belongs to its Sales Order, and the
+       * Monitor opens the collection workspace for the exact one.
        *
        * `path` (not `financePath`) on purpose: `navItemHref` reads `path` for
-       * every non-finance area, so the row links absolutely out of
-       * `/operation` and lights on the destination it actually opens. Both
-       * `operation` and `principal` may stand there — `/finance/*` admits
-       * operation staff to Payments and Invoices (§12), and `FinanceApp`
-       * bounces them off every finance-only page. */
+       * every non-finance area, so the rows link absolutely out of
+       * `/operation`. Both `operation` and `principal` may stand there —
+       * `/finance/*` admits operation staff to these two destinations (§12),
+       * and `FinanceApp` bounces them off every finance-only page. */
       {
         key: "payments",
-        label: "Payments",
+        label: "Monitor",
         icon: Wallet,
-        path: "/finance/invoices",
-        // The Invoices Register is the same destination's second listing (its
-        // toolbar switches between the two), so the row stays lit there.
-        activeFor: ["path:/finance/payments", "path:/finance/invoices"],
-        section: "Finance",
+        path: "/finance/monitor",
+        // The retired `/finance/invoices` address forwards here and must
+        // light the same row while it resolves.
+        activeFor: ["path:/finance/monitor", "path:/finance/invoices"],
+        section: "Payments",
       },
-      // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
-      // the deployed-unit asset registry. Dormant until the POS rental lane.
-      { key: "rental", label: "Rental", icon: Repeat, section: "Customer Care" },
+      {
+        key: "payment-records",
+        label: "Payment Records",
+        icon: Receipt,
+        path: "/finance/payments",
+        activeFor: ["path:/finance/payments"],
+        section: "Payments",
+      },
       // Catalog split (Loo 2026-07-25) — Operations carries ONLY the costing
       // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
       // money there is buying cost, isolated from POS selling). The selling
@@ -502,19 +561,23 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/dashboard",
       },
       {
+        // Owner ruling 2026-09-14: the sidebar word is `AP · Payables` again,
+        // above AR. It opens what is still unpaid per supplier (0477); the old
+        // PO-cost page is gone and /finance/ap redirects here.
+        key: "ap",
+        label: "AP · Payables",
+        icon: ArrowUpRight,
+        financePath: "/finance/ap-outstanding",
+      },
+      {
         key: "ar",
         label: "AR · Receivables",
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
       },
-      {
-        key: "ap",
-        label: "AP · Payables",
-        icon: ArrowUpRight,
-        financePath: "/finance/ap",
-      },
-      // 0477 — a supplier's bill, and the voucher that pays it. Unpaid by
-      // Supplier is the Bills destination's third listing (toolbar switch).
+      // 0477 — a supplier's bill and the voucher that pays it. What is still
+      // unpaid per supplier is the `ap` row above (and the third listing of the
+      // Bills toolbar switch).
       {
         key: "bills",
         label: "Bills",
@@ -527,25 +590,25 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: Banknote,
         financePath: "/finance/payment-vouchers",
       },
+      /* The finance role sees the SAME two Payments destinations, as the same
+       * module — never a second Payment information architecture (owner
+       * ruling 2026-09-12). `Order Payments`, `Invoices` and `Refunds &
+       * Credits` are retired as employee doors: customer Money In has one
+       * home, and routine Refunds are a Payment MASTER §13 intentional reject
+       * (history stays readable on the payment object). */
       {
         key: "payments",
-        // Payment MASTER §16 — the destination word is `Payments`; the row
-        // opens the canonical receipt Register.
-        label: "Payments",
+        label: "Monitor",
         icon: Wallet,
+        financePath: "/finance/monitor",
+        section: "Payments",
+      },
+      {
+        key: "payment-records",
+        label: "Payment Records",
+        icon: Receipt,
         financePath: "/finance/payments",
-      },
-      {
-        key: "invoices",
-        label: "Invoices",
-        icon: FileText,
-        financePath: "/finance/invoices",
-      },
-      {
-        key: "refunds",
-        label: "Refunds & Credits",
-        icon: Undo2,
-        financePath: "/finance/refunds",
+        section: "Payments",
       },
       {
         // 0268 — the rent-to-own credit gate. Sits next to the money tabs
@@ -556,11 +619,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: UserCheck,
         financePath: "/finance/rental-approver",
       },
+      // 0538 — due, collected and unpaid subscription months across every agreement.
+      { key: "subscriptions", label: "Subscriptions", icon: CalendarClock, financePath: "/finance/subscriptions" },
       // 0478 — money in that is not a sale. A party that is not a customer
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.
       { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
+      // 0529 — Finance moving its own money: bank transfers and card payouts.
+      { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      // 0572 — the card companies' files, matched to the recorded card payments.
+      { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement" },
+      // 0543 — Finance keeps the dealer master (code, state, address, contact)
+      // on the same list the principal uses; inviting stays principal-only.
+      { key: "dealers", label: "Dealers", icon: Users, financePath: "/finance/dealers" },
       // The Finance Ledger — three rows, not one row with tabs: the Journal,
       // the Trial Balance and the Self-check are three different objects
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
@@ -632,7 +704,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "pos", label: "Catalog", icon: LayoutGrid },
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
-      { key: "orders", label: "Sales Orders", icon: ClipboardList, path: "/operation/orders" },
+      //
+      // ONE DESTINATION, ONE WORD (owner ruling 2026-09-23). A principal stands
+      // in Operations AND Admin at once, so this row and the Operations child
+      // above point at the same page and light together. Two different words on
+      // two rows for one register is the duplicate the ruling names; the
+      // dictionary word for that register is now `Outright Sales`. The address
+      // is unchanged, so the principal's bookmark still lands.
+      { key: "orders", label: "Outright Sales", icon: ClipboardList, path: "/operation/orders" },
       // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
       // principal-level decision, but its only editor lived under Operations
       // Settings. `role === "principal"` already grants edit there (checkDuty

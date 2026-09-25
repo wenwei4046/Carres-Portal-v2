@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +14,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -44,7 +29,7 @@ afterAll(() => _setJwksForTesting(null));
 describe("GET /api/finance/payment-settings", () => {
   function tables(fail = false) {
     const table = (rows: unknown[]) => {
-      const chain = { select: vi.fn(), order: vi.fn() };
+      const chain = { select: vi.fn(), order: vi.fn(), limit: vi.fn() };
       chain.select.mockReturnValue(chain);
       // Two chained .order calls resolve on await — a thenable chain.
       const result = fail
@@ -54,6 +39,7 @@ describe("GET /api/finance/payment-settings", () => {
         then: (resolve: (v: unknown) => void) => resolve(result),
       });
       chain.order.mockReturnValue(thenable);
+      chain.limit.mockReturnValue(thenable);
       return thenable;
     };
     const sb = { from: vi.fn().mockImplementation((name: string) =>
@@ -111,10 +97,13 @@ describe("the payment method registry (0476)", () => {
     const rpc = vi.fn().mockImplementation(async (name: string) => ({
       data: name === "payment_method_registry" ? REGISTRY : ACCOUNTS, error: null,
     }));
-    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const SYSTEM = [{ method: "card", source_channel: "*", account_code: "1130" }];
+    const chain = { select: vi.fn(), in: vi.fn(), order: vi.fn(), then: (r: (v: unknown) => void) => r({ data: SYSTEM, error: null }) };
+    chain.select.mockReturnValue(chain); chain.in.mockReturnValue(chain); chain.order.mockReturnValue(chain);
+    vi.mocked(userClient).mockReturnValue({ rpc, from: vi.fn().mockReturnValue(chain) } as never);
     const res = await get(role);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ methods: REGISTRY, money_accounts: ACCOUNTS });
+    expect(await res.json()).toEqual({ methods: REGISTRY, money_accounts: ACCOUNTS, system_rows: SYSTEM });
     expect(rpc).toHaveBeenCalledWith("payment_method_registry");
     expect(rpc).toHaveBeenCalledWith("payment_method_money_accounts");
   });
@@ -126,6 +115,19 @@ describe("the payment method registry (0476)", () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "down" } });
     vi.mocked(userClient).mockReturnValue({ rpc } as never);
     expect((await get("finance")).status).toBe(500);
+  });
+  it("moving POS card sends the row and the account to the 0541 door", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { method: "card" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/system-method", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ method: "card", sourceChannel: "*", accountCode: "1131" }),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("payment_system_account_save", {
+      p_method: "card", p_source_channel: "*", p_account_code: "1131",
+    });
   });
   it("adding a method sends a null key, the name and the money account", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { method: "grab_pay", label: "Grab Pay" }, error: null });
@@ -172,6 +174,19 @@ describe("the payment method registry (0476)", () => {
     }), env);
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("payment_set_method_active", { p_method: "grab_pay", p_active: false });
+  });
+  it("a method save waits on its money account row before the account check (0518)", async () => {
+    // The refusal and the wait live in the database door, so a curl round the API meets them too.
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0518_a_payment_method_save_waits_on_its_money_account.sql"),
+      "utf-8",
+    );
+    const door = mig.slice(mig.indexOf("function public.payment_method_save"), mig.indexOf("grant execute on function public.payment_method_save"));
+    const wait = door.indexOf("from public.gl_money_accounts where account_code = p_account_code for share");
+    const check = door.indexOf("if not public.gl_money_account_ok(p_account_code) then");
+    expect(wait).toBeGreaterThan(0);
+    expect(check).toBeGreaterThan(wait);
+    expect(door).toContain("detail = 'account_not_money'");
   });
 });
 
@@ -253,10 +268,125 @@ describe("POST /api/finance/payment-settings/*", () => {
     const res = await post("storage-rule", "principal", {
       productGroup: "sofa", freeDays: 14, chargeAmount: 200, cycleDays: 14,
       extraFreeAllowed: false, inspectionDays: 30, effectiveFrom: "2026-10-01",
+      reason: "Owner ruling",
     });
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("payment_set_storage_rule", expect.objectContaining({
       p_product_group: "sofa", p_charge_amount: 200, p_extra_free_allowed: false,
+      p_reason: "Owner ruling",
     }));
+  });
+  it("a storage rule change without its reason is refused before SQL (0486)", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("storage-rule", "principal", {
+      productGroup: "sofa", freeDays: 14, chargeAmount: 200, cycleDays: 14,
+      extraFreeAllowed: false, inspectionDays: 30, effectiveFrom: "2026-10-01",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("free days > Operation limit is refused before SQL — free ≤ Operation ≤ Approver", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("storage-rule", "principal", {
+      productGroup: "mattress_bedframe", freeDays: 25, chargeAmount: 150, cycleDays: 30,
+      operationLimitDay: 21, waiverLimitDay: 30, extraFreeAllowed: true, inspectionDays: 30,
+      effectiveFrom: "2026-10-01", reason: "typo",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Collection timing (0486)", () => {
+  async function post(path: string, role: string, body: unknown) {
+    return app.fetch(new Request(`http://t/api/finance/payment-settings/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+  it("GET carries the effective-dated rules, the change log and the provider fact", async () => {
+    const table = (rows: unknown[]) => {
+      const chain = { select: vi.fn(), order: vi.fn(), limit: vi.fn() };
+      const thenable = Object.assign(chain, {
+        then: (resolve: (v: unknown) => void) => resolve({ data: rows, error: null }),
+      });
+      chain.select.mockReturnValue(chain); chain.order.mockReturnValue(thenable); chain.limit.mockReturnValue(thenable);
+      return thenable;
+    };
+    const sb = { from: vi.fn().mockImplementation((name: string) =>
+      table(name === "payment_collection_timing_rules"
+        ? [{ ask_days_before: 3, deadline_days_before: 2, effective_from: "2026-08-19" }]
+        : name === "payment_setting_changes"
+          ? [{ what: "collection_timing", reason: "ruling", effective_from: "2026-08-19" }]
+          : [])) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings", {
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      collection_timing: unknown[]; setting_changes: unknown[]; online_provider: { name: string; configured: boolean };
+    };
+    expect(body.collection_timing).toEqual([{ ask_days_before: 3, deadline_days_before: 2, effective_from: "2026-08-19" }]);
+    expect(body.setting_changes).toHaveLength(1);
+    // No STRIPE_SECRET_KEY in the test env → the provider is honestly not configured.
+    expect(body.online_provider).toEqual({ name: "Stripe", configured: false });
+  });
+  it("a change reaches the manager-gated SQL door with its reason and effective date", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { id: "t1" }, error: null }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("collection-timing", "principal", {
+      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "  Give staff a day more  ",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_set_collection_timing", {
+      p_ask_days_before: 4, p_deadline_days_before: 3, p_effective_from: "2026-10-01",
+      p_reason: "Give staff a day more",
+    });
+  });
+  it("asking must start EARLIER than the deadline — refused before SQL", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    for (const body of [
+      { askDaysBefore: 2, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
+      { askDaysBefore: 1, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
+    ]) {
+      expect((await post("collection-timing", "principal", body)).status).toBe(422);
+    }
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("a reason is required", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("collection-timing", "principal", {
+      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: " ",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("the SQL manager refusal maps to 403", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({
+      data: null, error: { code: "42501", message: "forbidden", details: "payment settings are set by the manager" },
+    }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("collection-timing", "operation", {
+      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "x",
+    });
+    expect(res.status).toBe(403);
+  });
+  it("both effective-date doors compare with today in Kuala Lumpur, not the UTC clock (0524)", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0524_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql"),
+      "utf-8",
+    );
+    for (const door of ["payment_set_collection_timing", "payment_set_storage_rule"]) {
+      const body = mig.slice(mig.indexOf(`function public.${door}`), mig.indexOf(`grant execute on function public.${door}`));
+      expect(body).toContain("p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date");
+      expect(body).not.toContain("< current_date");
+      expect(body).toContain("detail = 'bad_effective_from'");
+    }
   });
 });

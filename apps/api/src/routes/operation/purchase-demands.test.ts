@@ -2,16 +2,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, it, expect, afterAll, beforeAll, beforeEach, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
-import { _setJwksForTesting } from "../../middleware/auth";
+import { readyStockDatabase } from "../../test/ready-stock-reservation-database";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import {
@@ -42,17 +35,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 /**
@@ -138,7 +123,7 @@ const TABLES = () => ({
   purchasing_setting_changes: { data: [], error: null },
   suppliers: {
     data: [
-      { id: NICE, name: "Nice Future", kind: "own_logistics" },
+      { id: NICE, name: "Nice Future", kind: "own_logistics", address: "Supplier address" },
       { id: OHANA, name: "Ohana", kind: "own_logistics" },
     ],
     error: null,
@@ -257,14 +242,23 @@ const TABLES = () => ({
     ],
     error: null,
   },
+  /* Two reads share this table: the open-PO POOL read (`po_id, sku, qty,
+     received_qty, status`) and the register's per-LINE `destination_id` read.
+     The ids and destinations below feed the second; the first ignores them. */
   purchase_order_lines: {
     data: [
-      { po_id: "PO-2051", sku: "COV-K", qty: 3, received_qty: 0,
-        purchase_orders: { status: "open" } },
-      { po_id: "PO-2052", sku: "PART-K", qty: 2, received_qty: 0,
-        purchase_orders: { status: "open" } },
-      { po_id: "PO-2053", sku: "COV2-K", qty: 1, received_qty: 0,
-        purchase_orders: { status: "open" } },
+      { id: "pol-2051", po_id: "PO-2051", sku: "COV-K", qty: 3, received_qty: 0,
+        destination_id: null, purchase_orders: { status: "open" } },
+      { id: "pol-2052", po_id: "PO-2052", sku: "PART-K", qty: 2, received_qty: 0,
+        destination_id: null, purchase_orders: { status: "open" } },
+      { id: "pol-2053", po_id: "PO-2053", sku: "COV2-K", qty: 1, received_qty: 0,
+        destination_id: null, purchase_orders: { status: "open" } },
+      /* ⭐ ONE DOCUMENT, TWO LINES, TWO DESTINATIONS — the governed Split. The
+         document itself is addressed to Carres Klang; this line is not. */
+      { id: "pol-split-a", po_id: "PO-9001", sku: "SPLIT-K", qty: 1, received_qty: 0,
+        destination_id: KLANG_DEST, purchase_orders: { status: "open" } },
+      { id: "pol-split-b", po_id: "PO-9001", sku: "SPLIT-K", qty: 2, received_qty: 0,
+        destination_id: BULOH_DEST, purchase_orders: { status: "open" } },
     ],
     error: null,
   },
@@ -281,7 +275,7 @@ const TABLES = () => ({
   },
   purchasing_destinations: {
     data: [
-      { id: KLANG_DEST, name: "Carres Klang", is_default: true, active: true },
+      { id: KLANG_DEST, name: "Carres Klang", is_default: true, active: true, warehouse_id: WAREHOUSE, address: "Stale destination copy", warehouses: { address: "Warehouse authority" } },
       { id: BULOH_DEST, name: "AL Sungai Buloh", is_default: false, active: true },
       { id: CLOSED_DEST, name: "Old Yard", is_default: false, active: false },
     ],
@@ -295,7 +289,7 @@ type Tbl = ReturnType<typeof TABLES>;
 /** Records every question asked, and every write attempted. */
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   const CHAIN = [
-    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit",
+    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit", "range",
   ];
   const writes: { table: string; kind: string }[] = [];
   const filters: { table: string; method: string; col: unknown; val: unknown }[] = [];
@@ -407,16 +401,10 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   return { from, rpc, writes, filters, rpcCalls };
 }
 
-beforeAll(async () => {
+beforeAll(() => {
   // Only Date is faked — timers stay real so the in-process fetches run.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(`${TODAY}T04:00:00Z`));
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
 });
 
 afterAll(() => {
@@ -424,7 +412,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -470,6 +458,12 @@ describe("GET /api/operation/purchase/demands — one read, two projections", ()
     expect(demands).not.toMatch(/operation_create_po|purchasing_issue_pos_batch/);
     expect(demands).not.toMatch(/\.(insert|update|upsert|delete)\(/);
     expect(demands).not.toMatch(/router\.post\(/);
+  });
+
+  it("carries the server Order By fact and gives refused planning no invented date", async () => {
+    const { rows } = await rowsOf();
+    expect(rows.find((r) => r.state === "safety_days_full")?.orderBy).toBe(TODAY);
+    expect(rows.find((r) => r.state === "no_production_days")?.orderBy).toBeNull();
   });
 
   it("the arithmetic on the wire is the engine's own, not a second count", async () => {
@@ -880,7 +874,7 @@ describe("the buying facts SO Batch Purchase needs", () => {
     expect(ready.action).toMatchObject({
       trigger: "can_order_early",
       ownerRule: "Current PO Duty",
-      completionFact: "Current PO version reached supplier with evidence",
+      completionFact: "Current PO version marked as sent",
       sourceObject: { type: "sales_order", id: "o1", number: "SO-1207" },
     });
     expect(ready.action!.action).toBe("Issue PO to Nice Future");
@@ -916,6 +910,17 @@ describe("the destinations a buy may be sent to", () => {
     const klang = body.destinations.find((d) => d.id === KLANG_DEST)!;
     expect(klang.isDefault).toBe(true);
     expect(klang.active).toBe(true);
+    expect(klang.address).toBe("Warehouse authority");
+  });
+
+  it("carries provisional supplier and date facts without substituting the goods deadline", async () => {
+    const { body, rows } = await rowsOf();
+    const line = rows.find((row) => row.supplierId === NICE && row.issueRef)!;
+    expect(line.supplierAddress).toBe("Supplier address");
+    expect(line.poDate).toBe(body.today);
+    expect(line.poDeliveryWorkingDays).toBe(7);
+    expect(line.poDeliveryDate).toBeTruthy();
+    expect(line.poDeliveryDate).not.toBe(line.goodsMustArrive);
   });
 
   it("a closed destination is RETURNED but marked inactive — history still reads", async () => {
@@ -1161,12 +1166,18 @@ function registerTables() {
   };
   t.po_line_sources = {
     data: [
-      { id: "src1", po_id: "PO-9001", order_id: "o8", order_line_id: "l13", qty: 2 },
-      { id: "src2", po_id: "PO-9002", order_id: "o9", order_line_id: "l14", qty: 1 },
-      { id: "src3", po_id: "PO-9003", order_id: "o10", order_line_id: "l15", qty: 1 },
-      { id: "src4", po_id: "PO-9004", order_id: "o11", order_line_id: "l16", qty: 1 },
-      { id: "src5", po_id: "PO-2051", order_id: "o4", order_line_id: "l7", qty: 3 },
-      { id: "src6", po_id: "PO-2052", order_id: "o4", order_line_id: "l8", qty: 2 },
+      /* ⭐ ONE ITEM LINE, ONE DOCUMENT, TWO DOCUMENT LINES to two destinations.
+         Keyed by `po_id` alone these collapse into one fact and the register
+         is left with only the PARENT document's destination to print. */
+      { id: "src1a", po_id: "PO-9001", po_line_id: "pol-split-a", order_id: "o8",
+        order_line_id: "l13", qty: 1 },
+      { id: "src1b", po_id: "PO-9001", po_line_id: "pol-split-b", order_id: "o8",
+        order_line_id: "l13", qty: 1 },
+      { id: "src2", po_id: "PO-9002", po_line_id: null, order_id: "o9", order_line_id: "l14", qty: 1 },
+      { id: "src3", po_id: "PO-9003", po_line_id: null, order_id: "o10", order_line_id: "l15", qty: 1 },
+      { id: "src4", po_id: "PO-9004", po_line_id: null, order_id: "o11", order_line_id: "l16", qty: 1 },
+      { id: "src5", po_id: "PO-2051", po_line_id: "pol-2051", order_id: "o4", order_line_id: "l7", qty: 3 },
+      { id: "src6", po_id: "PO-2052", po_line_id: "pol-2052", order_id: "o4", order_line_id: "l8", qty: 2 },
     ],
     error: null,
   };
@@ -1269,7 +1280,40 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     expect(o4.pos.map((p) => p.poId)).toEqual(["PO-2051", "PO-2052"]);
     const part = o4.lines.find((l) => l.sku === "PART-K")!;
     expect(part.qty).toBe(3);
-    expect(part.pos).toEqual([{ poId: "PO-2052", qty: 2 }]);
+    expect(part.pos).toEqual([
+      { poId: "PO-2052", poLineId: "pol-2052", qty: 2, destinationId: KLANG_DEST },
+    ]);
+  });
+
+  /**
+   * ⭐ THE DOCUMENT LINE'S OWN `Deliver To` — owner correction 2026-09-11.
+   *
+   * A purchase order may carry one SKU to two destinations through two lines
+   * and source both to the same customer item line. Aggregated by `po_id` the
+   * two collapsed, and the only destination left to print was the PARENT
+   * document's — a summary standing in for a line's own recorded fact, which
+   * is precisely what this page spent the correction removing from the row
+   * above.
+   */
+  it("keeps a split document's two LINES apart, each with its own Deliver To", async () => {
+    const { body } = await rowsOf(registerTables());
+    const line = registerRow(body, "o8")!.lines.find((l) => l.orderLineId === "l13")!;
+    expect(line.pos).toHaveLength(2);
+    expect(line.pos.map((p) => [p.poId, p.poLineId, p.qty, p.destinationId])).toEqual([
+      ["PO-9001", "pol-split-a", 1, KLANG_DEST],
+      ["PO-9001", "pol-split-b", 1, BULOH_DEST],
+    ]);
+    /* The HISTORICAL quantity is unchanged by the split: two units, two facts. */
+    expect(line.pos.reduce((s, p) => s + p.qty, 0)).toBe(2);
+  });
+
+  it("falls back to the DOCUMENT's destination only where the line records none", async () => {
+    const { body } = await rowsOf(registerTables());
+    const line = registerRow(body, "o4")!.lines.find((l) => l.orderLineId === "l7")!;
+    /* `pol-2051` carries no destination of its own, so the document's stands —
+       which is how the paper itself works, and the ONLY case in which a parent
+       summary may speak for a line. */
+    expect(line.pos[0]!.destinationId).toBe(KLANG_DEST);
   });
 
   it("visible PO attribution comes ONLY from po_line_sources — a document with no lineage never appears", async () => {
@@ -1306,6 +1350,47 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
        ROW is the only thing keeping the order visible. */
     expect(rows.find((r) => r.lineIds.includes("l10"))).toBeUndefined();
   });
+
+  it.each(["ops_stock_items", "ops_stock_pool_usage", "ops_activity_log"])("refuses an unknown coverage result when %s is unavailable", async (table) => {
+    const t: Record<string, { data: unknown; error: unknown }> = registerTables();
+    t.ops_stock_pool_usage = { data: [{ item_id: "unit-1", sku: "B1201S-Q", qty: 1, ref: "SO-1212" }], error: null };
+    t[table] = { data: null, error: { message: "unavailable" } };
+    const { res } = await getDemands(t);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: "stock_coverage_unavailable" });
+  });
+
+  it.each(["release", "reassign"])("%s returns modern reserved demand while usage remains", async (action) => {
+    const t: Record<string, { data: unknown; error: unknown }> = registerTables();
+    const db = await readyStockDatabase();
+    const orderId = "11111111-1111-4111-8111-111111111111";
+    const lineId = "22222222-2222-4222-8222-222222222222";
+    const itemId = "33333333-3333-4333-8333-333333333333";
+    try {
+      await db.exec(`insert into orders values ('${orderId}',1212);
+        insert into order_lines values ('${lineId}','${orderId}','B1201S-Q',1);
+        insert into ops_stock_items(id,unit_code,sku,status,condition) values
+          ('${itemId}','U1-001','B1201S-Q','free','new');
+        select ops_stock_pool_draw('SO-1212','used_instead_of_ordering',null,'${itemId}',null,null,null,'${lineId}');`);
+      const snapshot = async () => {
+        const units = (await db.query<Record<string, unknown>>("select * from ops_stock_items where reserved_order_line_id is not null and status in ('reserved','sold')")).rows;
+        t.ops_stock_items = { data: units.map((u) => ({ ...u, reserved_order_line_id: u.reserved_order_line_id === lineId ? "l10" : u.reserved_order_line_id })), error: null };
+        t.ops_stock_pool_usage = { data: (await db.query("select * from ops_stock_pool_usage")).rows, error: null };
+        t.ops_activity_log = { data: (await db.query("select * from ops_activity_log where action='stock_reserve'")).rows, error: null };
+        return rowsOf(t);
+      };
+      const before = await snapshot();
+      expect(registerRow(before.body, "o5")!.lines.find((l) => l.orderLineId === "l10")!.stockTaken).toBe(1);
+      const usage = t.ops_stock_pool_usage.data;
+      await db.exec(action === "release" ? `select ops_stock_release('${itemId}')` : `select ops_stock_reassign('${itemId}','SO-1207')`);
+      const after = await snapshot();
+      expect(t.ops_stock_pool_usage.data).toEqual(usage);
+      expect((await db.query<{ reserved_order_line_id: string | null }>("select reserved_order_line_id from ops_stock_items")).rows[0].reserved_order_line_id).toBeNull();
+      expect(registerRow(after.body, "o5")!.lines.find((l) => l.orderLineId === "l10")!.stockTaken).toBe(0);
+      expect(after.rows.find((r) => r.lineIds.includes("l10"))).toMatchObject({ toBuy: 1 });
+    } finally { await db.close(); }
+
+  }, 30_000);
 
   it("the wire schema parses the whole payload, registerRows included", async () => {
     const { res } = await getDemands(registerTables());

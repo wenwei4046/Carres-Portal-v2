@@ -39,7 +39,7 @@ import SettingsWorkspace from "./SettingsWorkspace";
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
-import EditDelivery from "./EditDelivery";
+import EditDeliveryRedirect from "./EditDeliveryRedirect";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
@@ -48,14 +48,16 @@ import OperationManualPurchase from "./OperationManualPurchase";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
-import OperationPurchaseOrders from "./OperationPurchaseOrders";
+import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
+import OperationDeliveryReport from "./OperationDeliveryReport";
 import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPurchaseReturns from "./OperationPurchaseReturns";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 // Q3 (Loo, 2026-08-04) — Purchasing → Report: the "look at the numbers" layer.
 import OperationPurchasingReport from "./OperationPurchasingReport";
@@ -81,6 +83,7 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import WarehouseWorkspace from "./WarehouseWorkspace";
+import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseInbound from "./WarehouseInbound";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
@@ -242,10 +245,12 @@ export default function OperationApp() {
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
-    /* 2026-09-06 replacement Card renamed the Warehouse Calendar page to
-       Monitor; the old `?tab=warehouse-dashboard` address still lands there
-       so no bookmark breaks (the stock-onhand precedent). */
-    setTab(urlTab === "warehouse-dashboard" ? "warehouse-monitor" : urlTab);
+    /* WAREHOUSE SCHEDULE (owner ruling 2026-09-14) — the combined Monitor is
+       replaced by two pages. Both retired addresses resolve to Arrival
+       Schedule and keep every other parameter they arrived with, so a
+       bookmarked `date`/`site` still opens the day it was bookmarked for
+       (the stock-onhand precedent). */
+    setTab(LEGACY_SCHEDULE_TABS.has(urlTab) ? "warehouse-arrival-schedule" : urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
 
@@ -361,6 +366,19 @@ export default function OperationApp() {
           tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
+          /* §9.6 Purchase Returns — the SIXTH page to ship this exact defect.
+             It draws PurchasingTabs, which is a ModuleHeader and embeds
+             TopBarIcons, so the slim bar put a second Jump to, a second bell,
+             a second Help and a second gear on one screen. Found on the
+             production walk, like every one before it; the test below now
+             catches the whole CLASS instead of waiting for the next walk. */
+          tab !== "purchase-returns" &&
+          /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
+             live rail destination that draws its own ModuleHeader and has been
+             showing two top rows. The class test above found it the minute it
+             existed, which is the whole reason that test is a rule and not a
+             list of six names. */
+          tab !== "supplier-items" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" &&
           /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw
@@ -368,6 +386,9 @@ export default function OperationApp() {
              row (the same defect the Warehouse walks caught, found live on
              this card's production walk). */
           tab !== "receiving-report" &&
+          /* 【DELIVERY】 CARD 17 — Reports → Delivery draws the Delivery
+             destination header (ModuleHeader embeds TopBarIcons). */
+          tab !== "delivery-report" &&
           tab !== "staff-duties" &&
           /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
              de-navigated legacy Stock pages and Unit Detail all draw their own
@@ -380,9 +401,15 @@ export default function OperationApp() {
           tab !== "movements" &&
           /* WAREHOUSE — Monitor, Inbound and Outbound draw their own
              Destination Header; the slim bar would be a second top row. */
-          tab !== "warehouse-monitor" &&
+          tab !== "warehouse-arrival-schedule" &&
+          tab !== "warehouse-pickup-schedule" &&
           tab !== "warehouse-inbound" &&
           tab !== "warehouse-outbound" &&
+          tab !== "arrival-source" &&
+          /* WORK — its one-row workspace header carries TopBarIcons (density
+             ruling 2026-09-25); the slim bar was a second 44px top row that
+             pushed the 743×704 detail below the fold. */
+          tab !== "work" &&
           !isStockUnitUrl && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
@@ -454,7 +481,10 @@ export default function OperationApp() {
                 scope. It is a REAL route, so the shell suppresses its slim top
                 bar the same way it does for every other page that draws its own
                 Destination Header. */}
-            <Route path="delivery/edit/:orderId" element={<EditDelivery />} />
+            {/* Edit Delivery is RETIRED (owner ruling 2026-09-13): the
+                Delivery-owned writes live inside the Monitor row's brief. A
+                saved or pasted link lands on that row, brief unfolded. */}
+            <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
@@ -504,6 +534,9 @@ export default function OperationApp() {
             {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
                 reachable by direct URL, like the Purchasing Report. */}
             {tab === "receiving-report" && <OperationReceivingReport />}
+            {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
+                reachable by direct URL, like the Receiving report. */}
+            {tab === "delivery-report" && <OperationDeliveryReport />}
             {/* Workspace → Staff & Duties — the ONE duty assignment door
                 (workspace/MASTER.md, LOCKED 2026-09-03). */}
             {tab === "staff-duties" && <StaffDuties />}
@@ -511,6 +544,10 @@ export default function OperationApp() {
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}
             {tab === "claims" && <OperationSupplierClaims />}
+            {/* §9.6 — Purchase Returns: the goods an approved claim outcome
+                sends back. Read-only; issuing a return is §7.4's own door and
+                moving the goods is Stock's. */}
+            {tab === "purchase-returns" && <OperationPurchaseReturns />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and
                 the RPCs refuse the write regardless. */}
@@ -538,7 +575,7 @@ export default function OperationApp() {
                 reads as `?order=<SO No>`. */}
             {tab === "payments" && (
               <Navigate
-                to={`/finance/payments${
+                to={`/finance/monitor${
                   legacyPaymentsSo ? `?order=${encodeURIComponent(legacyPaymentsSo)}` : ""
                 }`}
                 replace
@@ -580,10 +617,15 @@ export default function OperationApp() {
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
-            {/* WAREHOUSE (2026-09-06 replacement Card) — Monitor is the one
-                Calendar-summary page; Inbound and Outbound are their own
-                rail + Register work pages. */}
-            {tab === "warehouse-monitor" && <WarehouseWorkspace />}
+            {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
+                Pickup Schedule are two independent dated boards; Inbound and
+                Outbound are their own rail + Register work pages. */}
+            {tab === "warehouse-arrival-schedule" && (
+              <WarehouseWorkspace direction="arrival" />
+            )}
+            {tab === "warehouse-pickup-schedule" && (
+              <WarehouseWorkspace direction="pickup" />
+            )}
             {tab === "warehouse-inbound" && <WarehouseInbound />}
             {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
             {/* Non-PO inbound source object. Inbound owns the register; this

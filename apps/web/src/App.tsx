@@ -27,6 +27,8 @@ import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
  * reference, not a portal page, so it must not ride the main bundle that every
  * operator downloads (CF `phase-10-bundle-size-regression`). */
 const UiShowcase = lazy(() => import("@/pages/dev/UiShowcase"));
+/* 0581 — the external logistics link: public, lazy, its own chunk. */
+const DeliveryLinkPage = lazy(() => import("@/pages/public/DeliveryLinkPage"));
 
 function HomeRedirect() {
   const location = useLocation();
@@ -149,7 +151,7 @@ export default function App() {
           path="/finance/*"
           element={
             <RequireAuth>
-              {/* Payment MASTER §12 — Payment Duty and Delivery Operation
+              {/* Payment MASTER §12 — the Responsible Delivery Operation
                   (role: operation) do daily collection, so the Payments and
                   Invoices destinations must open for them. FinanceApp itself
                   bounces operation off the finance-only pages. */}
@@ -234,6 +236,16 @@ export default function App() {
           element={
             <Suspense fallback={<div className="p-8 text-body text-kit-slate-11">Loading…</div>}>
               <UiShowcase />
+            </Suspense>
+          }
+        />
+        {/* 0581 — a logistics company with no portal login answers here.
+            NOT behind RequireAuth: the link's token is the whole boundary. */}
+        <Route
+          path="/delivery-link/:token"
+          element={
+            <Suspense fallback={<div className="p-4 text-body text-kit-slate-11">Loading…</div>}>
+              <DeliveryLinkPage />
             </Suspense>
           }
         />

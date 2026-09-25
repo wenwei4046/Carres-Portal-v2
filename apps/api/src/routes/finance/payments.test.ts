@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -584,6 +567,21 @@ describe("GET /api/finance/payments/:id/receipt-document", () => {
     expect(body.voided).toBe(true);
     expect(body.void_reason).toBe("keyed twice");
     expect(body.document).toMatchObject({ receipt_no: "RC-080926-0001" });
+  });
+
+  it("lists the invoice numbers the payment settles, skipping voided allocations", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-080926-0001", voided_at: null, void_reason: null,
+      amount: 250, paid_on: "2026-09-08", method: "cash", kind: "payment",
+      reference: null, note: null, snapshot: SNAPSHOT, orders: { so: 2099, customer_name: "x" },
+      payment_allocations: [
+        { voided_at: "2026-09-09T00:00:00Z", invoices: { invoice_no: "INV-OLD" } },
+        { voided_at: null, invoices: { invoice_no: "INV-080926-0042" } },
+        { voided_at: null, invoices: null },
+      ],
+    });
+    const body = await (await request("finance")).json() as { document: { invoice_nos: string[] } };
+    expect(body.document.invoice_nos).toEqual(["INV-080926-0042"]);
   });
 
   it("a payment with no receipt number has no receipt", async () => {

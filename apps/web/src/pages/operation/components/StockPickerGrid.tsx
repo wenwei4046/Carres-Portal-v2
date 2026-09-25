@@ -5,9 +5,33 @@ import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { READY_STOCK_CONDITION_WORDS } from "@carres/shared";
 import { resolvedCategory, stockMatchKey } from "@/lib/line-category";
-import type { ReserveFreeUnit } from "./ReserveStockDialog";
 import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
+
+/** One free warehouse unit, as the stock pickers receive it. */
+export interface ReserveFreeUnit {
+  id: string;
+  unitCode: string | null;
+  sku: string;
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
+  poNo: string | null;
+  sourceRef: string | null;
+  dateIn: string | null;
+  /** Warehouse location (§7.8 Location column) — optional: older API builds
+   *  don't return it; the grid shows "—" until they do. */
+  location?: string | null;
+  /** Units this record represents (0218 bulk rows). Optional for the same
+   *  reason as `location`; absent reads as 1, which under-states a reserve
+   *  level warning rather than inventing one. */
+  qty?: number | null;
+  /** The CATALOG's category for this unit's SKU (D9, 2026-08-20), resolved
+   *  server-side by the one shared reader. `null` = the catalog was asked and
+   *  holds no row; the key ABSENT = this payload's endpoint does not carry it.
+   *  Read it through `resolvedCategory`, never `lineCategory` — the difference
+   *  between the two is a real sofa disappearing from the loan picker. */
+  category?: string | null;
+}
 
 /**
  * StockPickerGrid — the EMBEDDED stock-reserve grid (Jess 2026-06-30) that lives
@@ -27,14 +51,6 @@ import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
  * project-catalog-empty-sku-naming); within the loan view, a token-overlap score
  * surfaces the closest sofas first.
  */
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 type Category = "Mattress" | "Bedframe" | "Sofa" | "Other";
 type Size = "King" | "Queen" | "Other";
@@ -161,7 +177,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           ...u,
           cat: unitCategory(u.sku),
           size: unitSize(u.sku),
-          cond: CONDITION_LABEL[u.condition] ?? u.condition,
+          cond: READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
           dateLabel: u.dateIn ? fmtDate(u.dateIn) : "",
           ageDays,
           score,

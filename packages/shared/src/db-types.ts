@@ -6,15 +6,13 @@
 import type { DefaultFreeGift } from "./free-gift";
 import type { BundleComponent, BundleSlot } from "./product-bundle";
 import type { RuleTarget } from "./rule-target";
+import type { PRODUCT_CATEGORIES } from "./constants";
+import type { APP_ROLES } from "./schemas/principal-accounts";
 
-// Mirrors the `app_role` enum. `hr` was added by 0244 and never reached this
-// list — the drift was invisible until R6 (0301) added `warehouse` and the two
-// Role types stopped assigning to each other. Both are here now, so this type
-// says what the database actually holds.
-export type Role =
-  | "principal" | "dealer" | "salesperson" | "showroom"
-  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr"
-  | "warehouse";
+// Mirrors the `app_role` enum. `hr` was added by 0244 and never reached a
+// hand-written copy of this list; R6 (0301) added `warehouse` and the copies
+// stopped assigning to each other. So it is read from APP_ROLES, the one list.
+export type Role = (typeof APP_ROLES)[number];
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
 // `in_production` and `waiting` added in migration 0028 (v3-S3).
@@ -54,7 +52,7 @@ export type ApprovalKind      = "refund" | "discount" | "new_dealer" | "top_up" 
 export type ApprovalStatus    = "pending" | "approved" | "rejected";
 export type InquiryKind       = "new_dealer" | "expansion" | "product";
 export type InquiryStage      = "new" | "contacted" | "qualified" | "converted" | "lost";
-export type ProductCategory   = "mattress" | "bedframe" | "sofa" | "accessory" | "service" | "guarantee"; // 0169 + 0261
+export type ProductCategory   = (typeof PRODUCT_CATEGORIES)[number]; // 0169 + 0261
 export type VariantKind       = "size" | "preset" | "part";
 export type StockMovementKind = "in" | "out" | "adjust";
 // Migration 0027 (v3-S3). 'own' = HQ-controlled warehouse (default for legacy

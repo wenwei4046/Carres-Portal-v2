@@ -50,9 +50,10 @@ describe("ERP Shell V1 quick rail contract", () => {
 
   it("makes My Work derived and removes generic manual workflow controls", () => {
     const src = read("rail/TasksPanel.tsx");
-    expect(src).toContain('label: "Late"');
-    expect(src).toContain('label: "Due today"');
-    expect(src).toContain('label: "Later"');
+    expect(src).toContain('label: "Missed"');
+    expect(src).toContain('label: "Today"');
+    expect(src).not.toContain('label: "Later"');
+    expect(src).toContain('day=missed');
     expect(src).toContain("useOpenWorkSet");
     expect(src).not.toContain("/api/ops/tasks");
     expect(src).not.toContain("Add a task");

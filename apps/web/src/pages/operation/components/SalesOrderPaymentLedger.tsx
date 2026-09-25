@@ -33,11 +33,16 @@
 // it in ListPageShell would draw a second page chrome inside one card.
 import { isLivePayment, type OrderPaymentRow } from "@carres/shared";
 import { fmtMoney } from "@carres/shared";
+import FieldFrame from "@/components/kit/FieldFrame";
+import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Loading from "@/components/kit/Loading";
 import EmptyState from "@/components/kit/EmptyState";
 import { fmtDate } from "@/lib/fmt-date";
-import { payMethodWord, viewSlip } from "@/lib/payment-display";
+import { atSalePaymentWord, payMethodWord, viewSlip } from "@/lib/payment-display";
 import { useOrderPayments } from "@/lib/queries";
+import { SO_AMOUNT, SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "./so-document-table";
+
+const CAPTURE_FIELD = `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`;
 
 /** What the row is FOR, when it is not the ordinary case. A `payment` needs no
  *  word; a deposit and a storage collection are different debts and say so. */
@@ -47,49 +52,100 @@ function kindWord(kind: OrderPaymentRow["kind"]): string | null {
   return null;
 }
 
-export default function PaymentLedger({ orderId }: { orderId: string | null }) {
+export interface SavedPaymentDetails {
+  paid: number;
+  method?: string | null;
+  months?: number | null;
+  reference?: string | null;
+  slip?: string | null;
+}
+
+export default function PaymentLedger({ orderId, saved }: {
+  orderId: string | null;
+  saved?: SavedPaymentDetails;
+}) {
   const q = useOrderPayments(orderId);
 
   if (!orderId) return null;
-  if (q.isLoading) return <Loading label="Opening the payments" />;
+  const hasSavedEvidence = Boolean(saved && (saved.paid > 0 || saved.method || saved.reference || saved.slip));
+  const capture = hasSavedEvidence && saved ? (
+    /* No outer margin: the Payment section body spaces its groups (12px). The
+       small heading is the in-card label rank, 13/600 — the same as
+       `Emergency contact` and `Billing`. */
+    <div className="text-body" data-testid="so-payment-saved">
+      <p className="font-semibold text-kit-slate-11">Payment details recorded at sale</p>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <FieldFrame id="so-payment-method" label="Method">
+          <div id="so-payment-method" className={CAPTURE_FIELD} data-testid="money-instalment">
+            {atSalePaymentWord(saved.method, saved.months) || "Not recorded"}
+          </div>
+        </FieldFrame>
+        <FieldFrame id="so-payment-reference" label="Reference">
+          <div id="so-payment-reference" className={CAPTURE_FIELD}>{saved.reference || "Not recorded"}</div>
+        </FieldFrame>
+        <FieldFrame id="so-payment-slip" label="Slip">
+          <div id="so-payment-slip" className={CAPTURE_FIELD}>
+            {saved.slip ? (
+              <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
+                className="text-body font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
+            ) : "Not recorded"}
+          </div>
+        </FieldFrame>
+      </div>
+    </div>
+  ) : null;
+  if (q.isLoading || q.isPending) return <>{capture}<Loading label="Opening the payments" /></>;
 
-  /* A LEDGER THE READER MAY NOT SEE IS NOT AN EMPTY LEDGER. The route answers
-     403 to anyone who is not operation/principal, and printing "No payments"
-     at a salesperson would state, as a fact, that a customer has paid nothing.
-     Absence is not zero. */
+  // Saved order evidence remains visible when the separate transaction read fails.
   if (q.isError) {
     const forbidden = (q.error as { status?: number } | null)?.status === 403;
-    return (
+    return <>{capture}
       <p className="text-meta text-base-500" data-testid="so-payments-unreadable">
         {forbidden
           ? "Payments are not available to your role — open the order in Payments."
           : "The payments could not be opened."}
       </p>
-    );
+    </>;
   }
 
   const rows = q.data?.payments ?? [];
   if (rows.length === 0) {
-    return (
-      <div data-testid="so-payments-empty">
-        <EmptyState title="No payment has been recorded on this order" />
-      </div>
-    );
+    if (saved && (saved.paid > 0 || saved.reference || saved.slip)) {
+      return <>{capture}<p className="text-meta text-base-600">
+        {saved.paid > 0
+          ? "The order records a paid amount. Individual payment transactions are not available."
+          : "Payment evidence is saved, but the recorded paid amount is zero. Check this order in Payments."}
+      </p></>;
+    }
+    return <>{capture}<div data-testid="so-payments-empty">
+      <EmptyState title="No payment transactions to show" />
+    </div></>;
   }
 
   return (
     /* The page never scrolls sideways; a narrow container scrolls THIS box. */
-    <div className="overflow-x-auto">
-      <table className="w-full text-body" data-testid="so-payments">
+    <>{capture}<div className="overflow-x-auto">
+      <table className={SO_TABLE} data-testid="so-payments">
         <thead>
-          <tr className="text-label text-base-500">
-            <th className="py-1 pr-3 text-left font-medium">Date</th>
-            <th className="py-1 pr-3 text-left font-medium">Method</th>
-            <th className="py-1 pr-3 text-right font-medium">Amount</th>
-            <th className="py-1 pr-3 text-left font-medium">Reference</th>
-            <th className="py-1 pr-3 text-left font-medium">Receipt</th>
-            <th className="py-1 pr-3 text-left font-medium">Slip</th>
-            <th className="py-1 text-left font-medium">Recorded by</th>
+          {/* ⭐ THE APPROVED PAYMENT TABLE — OWNER APPROVAL (Jess, 2026-09-22),
+              `docs/orders/MASTER.md` § "Order view" → PAYMENT:
+              `Date · Payment received · Approval code · Collected by · Amount (RM)`,
+              in that order, sharing ONE table grammar with `Items`
+              (`so-document-table.ts`): 11px grey headers over a 1px line, 13px
+              rows divided by 1px lines, amounts right-aligned, and the amount
+              column last. The approval code is an ordinary 13px value in the
+              UI font, not monospace.
+              ⛔ NO EVIDENCE IS DISCARDED. The receipt number and the slip are
+              the PROOF of the approval code, so they ride under it rather than
+              occupying two columns the ruling does not list — the same
+              "detail beneath its fact" grammar `Items` uses for a line's
+              configuration. Nothing is hidden and no read is removed. */}
+          <tr className={SO_HEAD_ROW}>
+            <th className={`${SO_TH} whitespace-nowrap text-left`}>Date</th>
+            <th className={`${SO_TH} text-left`}>Payment received</th>
+            <th className={`${SO_TH} text-left`}>Approval code</th>
+            <th className={`${SO_TH} text-left`}>Collected by</th>
+            <th className={`${SO_TH} whitespace-nowrap text-right`}>Amount (RM)</th>
           </tr>
         </thead>
         <tbody>
@@ -99,33 +155,38 @@ export default function PaymentLedger({ orderId }: { orderId: string | null }) {
             return (
               <tr
                 key={p.id}
-                className={`border-t border-kit-slate-5 ${live ? "" : "text-base-500"}`}
+                className={`${SO_ROW} ${live ? "" : "text-base-500"}`}
                 data-testid={live ? "so-payment-row" : "so-payment-row-voided"}
               >
-                <td className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(p.paid_on)}</td>
-                <td className="py-1.5 pr-3">
+                <td className={`${SO_TD} whitespace-nowrap`}>{fmtDate(p.paid_on)}</td>
+                <td className={SO_TD}>
                   <div>{payMethodWord(p.method)}</div>
                   {kind && <div className="mt-0.5 text-meta text-base-600">{kind}</div>}
                 </td>
-                <td className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap ${live ? "" : "line-through"}`}>
-                  {fmtMoney(Number(p.amount ?? 0))}
+                <td className={SO_TD}>
+                  <div>{p.reference || "Not recorded"}</div>
+                  {/* the proof of that code, beneath it */}
+                  <div className="mt-0.5 text-meta text-base-500">
+                    Receipt {p.receipt_no || "not recorded"}
+                    {" · "}
+                    {/* ⭐ AN ABSENT SLIP IS NAMED, NOT LEFT BLANK. Riding under
+                        the approval code does not make the slip optional to
+                        state: a missing control and a missing fact would read
+                        the same, which is the one thing a blank may never do. */}
+                    {p.receipt_url ? (
+                      <button
+                        type="button"
+                        onClick={() => void viewSlip(p)}
+                        className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                      >
+                        View slip
+                      </button>
+                    ) : (
+                      "Slip not recorded"
+                    )}
+                  </div>
                 </td>
-                <td className="py-1.5 pr-3 font-mono text-meta">{p.reference || "Not recorded"}</td>
-                <td className="py-1.5 pr-3 font-mono text-meta">{p.receipt_no || "Not recorded"}</td>
-                <td className="py-1.5 pr-3">
-                  {p.receipt_url ? (
-                    <button
-                      type="button"
-                      onClick={() => void viewSlip(p)}
-                      className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                    >
-                      View slip
-                    </button>
-                  ) : (
-                    <span className="text-meta text-base-500">Not recorded</span>
-                  )}
-                </td>
-                <td className="py-1.5">
+                <td className={SO_TD}>
                   <div>{p.recorded_by_name || "Not recorded"}</div>
                   {!live && (
                     <div className="mt-0.5 text-meta font-medium text-danger">
@@ -133,11 +194,14 @@ export default function PaymentLedger({ orderId }: { orderId: string | null }) {
                     </div>
                   )}
                 </td>
+                <td className={`${SO_TD} ${SO_AMOUNT} ${live ? "" : "line-through"}`}>
+                  {fmtMoney(Number(p.amount ?? 0))}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
-    </div>
+    </div></>
   );
 }

@@ -60,7 +60,157 @@
   color: #26384a;
   letter-spacing: 0.02em;
 }
-@media (max-width: 640px) {
-  .mp-create-body, .mp-create-header, .mp-create-general { padding: 1rem; }
-  .mp-create-items { overflow-x: auto; }
+/* ⭐ D1 · THE FORM REFLOWS BY ITS OWN WIDTH, NOT THE DEVICE'S (2026-09-17).
+   Measured at 390px: the goods input was ~42px wide and Send sat past the
+   right edge of the header. Below 640px of form the item search takes a whole
+   row, Qty · Note · Remove sit under it with their own captions, and the
+   action pair moves from the header into a bar pinned to the bottom. */
+.mp-create-shell { container: mp-create / inline-size; }
+.mp-line-item, .mp-line-qty, .mp-line-note { display: block; }
+.mp-line-caption { display: none; }
+.mp-create-footer { display: none; }
+@container mp-create (width < 640px) {
+  /* Scoped under the shell so it outranks the button row's own `flex`. */
+  .mp-create-shell .mp-create-actions-header { display: none; }
+  .mp-create-footer {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    padding: 0.5rem 1rem;
+    background: #fff;
+    border-top: 1px solid #d0d7e0;
+  }
+  /* The governed refusal can be longer than the phone's content canvas.
+     Keep both actions inside the footer, including the full next-step word. */
+  .mp-create-footer .mp-create-actions {
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .mp-create-footer .mp-create-actions > button {
+    max-width: 100%;
+    min-height: 32px;
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .mp-create-page { padding: 0.5rem; }
+  .mp-create-body { padding: 0.75rem; }
 }
+
+/* ⭐ THE LINES REFLOW BY THE FORM's OWN WIDTH, NOT THE PAGE's (2026-09-22).
+   The reflow used to hang off `mp-create`, the PAGE container — correct while
+   the form WAS the page. With the 50/50 split the form pane is about half of
+   it, so at 1130px the four tracks had ~550px and the item search shrank to a
+   stub while the page container still reported 1130. The form is its own
+   container now, and the same measured 640px rule answers to it. */
+.mp-create-form { container: mp-create-form / inline-size; }
+@container mp-create-form (width < 640px) {
+  .mp-create-lines { grid-template-columns: 72px minmax(0, 1fr) !important; }
+  .mp-create-lines .mp-line-head { display: none; }
+  .mp-create-lines .mp-line-item { grid-column: 1 / -1; }
+  .mp-create-lines .mp-line-caption { display: block; margin-bottom: 2px; }
+  .mp-create-lines .mp-line-action { grid-column: 1 / -1; justify-self: end; }
+}
+
+/* ⭐ THE 50/50 CREATE WORKSPACE (owner 2026-09-22) — the Sales Order
+   composition: the form left, the live internal MPR preview right, ONE
+   reading order across both.
+
+   THE HALVES BIND FROM 1130px and stack below it — the measured narrowest
+   readable pair (`docs/purchasing/MASTER.md` §8.2). It is a CONTAINER query,
+   like every other rule in this file, so the split answers to the width the
+   form actually has (rail open or closed), never to the device's. */
+.mp-create-heading {
+  padding: 0 0 0.75rem;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #26384a;
+}
+.mp-create-split {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+.mp-create-form { min-width: 0; }
+
+.mp-create-preview-pane { min-width: 0; }
+@container mp-create (min-width: 1130px) {
+  .mp-create-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+/* THE PREVIEW — a quiet reading surface, not a second form and not a
+   supplier document: no controls, no borders around every fact, nothing that
+   invites a click. */
+.mp-preview {
+  background: #fff;
+  border: 1px solid #d0d7e0;
+  border-radius: 8px;
+  padding: 1rem;
+}
+.mp-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.mp-preview-draft {
+  padding: 1px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+}
+.mp-preview-section { padding-top: 0.875rem; }
+.mp-preview-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.mp-preview-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.5rem;
+  padding-top: 0.5rem;
+}
+.mp-preview-facts dt { font-size: 11px; color: #64748b; }
+.mp-preview-facts dd { font-size: 13px; color: #0f172a; min-height: 18px; }
+.mp-preview-table { width: 100%; margin-top: 0.5rem; border-collapse: collapse; }
+.mp-preview-table th {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid #d0d7e0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: left;
+  color: #24364b;
+}
+.mp-preview-table td {
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid #eef2f6;
+  font-size: 13px;
+  color: #0f172a;
+  vertical-align: top;
+}
+.mp-preview-table tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+.mp-preview-num { text-align: right; padding-right: 0 !important; }
+.mp-preview-sku { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+.mp-preview-note { display: block; font-size: 11px; color: #64748b; }

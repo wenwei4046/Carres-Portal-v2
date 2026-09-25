@@ -12,9 +12,10 @@ import {
   type ReceivingArrivalEvidence,
   type WarehouseReceiptLine,
 } from "@carres/shared";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useOperationWarehouse,
+  fetchReceivingSessionDetail,
   useReceivingAmendMutation,
   useReceivingDuty,
   useReceivingSessionDetail,
@@ -24,10 +25,12 @@ import {
 import { renderGrnPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 import DropdownMenu from "@/components/kit/DropdownMenu";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import { DOC_BTN, DocSection as Section, Prop } from "./workspace-doc";
 import { grnTemplateDataOf, type GrnAmendDraft } from "./grn-template-data";
+import "./receiving-workspace.css";
 
 /**
  * ReceivingRecord — one Receiving Session / formal GRN object
@@ -64,6 +67,7 @@ export default function ReceivingRecord({
   const q = useReceivingSessionDetail(sessionId);
   const dutyQ = useReceivingDuty();
   const [amending, setAmending] = useState(false);
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [draft, setDraft] = useState<AmendFormDraft | null>(null);
 
@@ -72,7 +76,7 @@ export default function ReceivingRecord({
   const isGrn = r?.status === "posted" || r?.status === "voided";
 
   // ── the live document — ONE arithmetic feeds preview, Print and Download ──
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = useMemo(() => appTodayIso(), []);
   const previewDraft: GrnAmendDraft | null = useMemo(() => {
     if (!amending || !draft || !r) return null;
     return {
@@ -179,7 +183,7 @@ export default function ReceivingRecord({
 
   /* ── the LEFT half — the Receiving Record, or the correction form ──────── */
   const record = (
-    <div className="mx-auto w-full max-w-4xl px-4 py-3">
+    <div className="receiving-workspace receiving-record-sheet mx-auto w-full min-w-0 max-w-4xl px-4 py-3">
       {/* ── ONE Object Header — back, the identity, the state ── */}
       <button
         type="button"
@@ -198,19 +202,17 @@ export default function ReceivingRecord({
             {r.supplier_name ?? ""} · <span className="font-mono">{r.po_id}</span>
           </div>
         </div>
-        <span
+        {r.status !== "posted" && <span
           data-testid="receiving-record-state"
           className={[
             "shrink-0 rounded-full px-2.5 py-0.5 text-label font-medium",
-            r.status === "posted"
-              ? "bg-kit-green-3 text-kit-green-11"
-              : r.status === "voided"
-                ? "bg-kit-slate-3 text-kit-slate-11"
-                : "bg-kit-amber-3 text-kit-amber-11",
+            r.status === "voided"
+              ? "bg-kit-slate-3 text-kit-slate-11"
+              : "bg-kit-amber-3 text-kit-amber-11",
           ].join(" ")}
         >
           {warehouseReceiptStatusLabel(r.status)}
-        </span>
+        </span>}
       </div>
 
       {r.status === "voided" && (
@@ -238,13 +240,14 @@ export default function ReceivingRecord({
               <span className="font-mono">{r.po_id}</span>
             </Prop>
             <Prop label="Supplier">{r.supplier_name ?? ""}</Prop>
-            <Prop label="Deliver To">{r.warehouse_name ?? ""}</Prop>
+            <Prop label="Supplier Deliver To">{r.warehouse_name ?? ""}</Prop>
             <Prop label="Goods arrived at">
               {r.actual_site_name ?? r.warehouse_name ?? ""}
             </Prop>
-            <Prop label="Goods received on">
+            <Prop label="Goods Received Date">
               <span className="tabular-nums">
                 {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
+                {r.goods_received_at && /^\d{4}-\d{2}-\d{2}$/.test(r.goods_received_at) ? " · Time not recorded" : ""}
               </span>
             </Prop>
             {r.submitted_from === "warehouse" && r.submitted_at ? (
@@ -263,7 +266,7 @@ export default function ReceivingRecord({
                 </span>
               </Prop>
             ) : null}
-            <Prop label="Supplier DO No.">
+            <Prop label="Supplier DO No">
               <span className="font-mono">{r.do_number}</span>
               {r.do_file_url ? (
                 <a
@@ -281,21 +284,23 @@ export default function ReceivingRecord({
                 <span className="text-body text-kit-slate-12">
                   {evidenceSentence(r.arrival_evidence ?? [])}
                 </span>
-                {/* Saved evidence can be RE-SEEN, not only counted (§9). */}
-                {(r.arrival_evidence_files ?? []).map((f, i) =>
-                  f.url ? (
-                    <a
-                      key={f.path}
-                      href={f.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-2 text-body text-kit-blue-11 hover:underline"
-                      data-testid="arrival-evidence-view"
-                    >
-                      {f.kind === "video" ? "Video" : "Photo"} {i + 1}
-                    </a>
-                  ) : null,
-                )}
+                {(r.arrival_evidence ?? []).map((f, i) => (
+                  <button key={f.path} type="button" onClick={() => setEvidenceId(f.path)}
+                    className="ml-2 text-body text-kit-blue-11 hover:underline"
+                    data-testid="arrival-evidence-view">
+                    {f.kind === "video" ? "Video" : "Photo"} {i + 1}
+                  </button>
+                ))}
+                <SavedEvidenceViewer activeId={evidenceId} onClose={() => setEvidenceId(null)}
+                  files={(r.arrival_evidence ?? []).map((f) => ({
+                    id: f.path, kind: f.kind,
+                    url: r.arrival_evidence_files?.find((saved) => saved.path === f.path)?.url ?? null,
+                    context: `${receivingDisplayNo(r)} · Arrival evidence`,
+                  }))}
+                  onRetry={async (id) => {
+                    const refreshed = await fetchReceivingSessionDetail(sessionId);
+                    return refreshed.receipt.arrival_evidence_files?.find((f) => f.path === id)?.url ?? null;
+                  }} />
               </Prop>
             )}
             {isGrn ? (
@@ -384,8 +389,8 @@ export default function ReceivingRecord({
           {/* ── Lines ─────────────────────────────────────────────────── */}
           <Section title="Items">
             {lines.map((l) => (
-              <div key={l.id} className="flex gap-2 py-1 text-body border-b border-kit-slate-4">
-                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
+              <div key={l.id} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
+                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
                   {l.sku}
                 </span>
                 <span className="w-24 text-right tabular-nums">
@@ -404,8 +409,8 @@ export default function ReceivingRecord({
               </div>
             ))}
             {(r.extra_lines ?? []).map((x, i) => (
-              <div key={`x${i}`} className="flex gap-2 py-1 text-body border-b border-kit-slate-4">
-                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
+              <div key={`x${i}`} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
+                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
                   {x.sku}
                 </span>
                 <span className="w-40 text-right tabular-nums text-kit-amber-11">
@@ -888,7 +893,7 @@ function AmendPanel({
         source. Damaged and wrong quantities are corrected through their
         claims, not here.
       </p>
-      <div className="mt-2 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-2 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Correction reason
         </span>
@@ -902,9 +907,9 @@ function AmendPanel({
         />
       </div>
       {/* Original → Corrected, per fact. */}
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
-          Goods received on
+          Goods Received Date
         </span>
         <span className="tabular-nums text-kit-slate-9">
           {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : "—"}
@@ -914,12 +919,12 @@ function AmendPanel({
           type="date"
           value={draft.goodsReceivedAt}
           onChange={(e) => set({ goodsReceivedAt: e.target.value })}
-          aria-label="Goods received on"
+          aria-label="Goods Received Date"
           data-testid="amend-received-at"
           className={FIELD}
         />
       </div>
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Goods arrived at
         </span>
@@ -946,9 +951,9 @@ function AmendPanel({
           ))}
         </select>
       </div>
-      <div className="mt-1 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
-          Supplier DO No.
+          Supplier DO No
         </span>
         <span className="font-mono text-kit-slate-9">{receipt.do_number}</span>
         <span className="text-kit-slate-9">→</span>
@@ -956,7 +961,7 @@ function AmendPanel({
           type="text"
           value={draft.doNumber}
           onChange={(e) => set({ doNumber: e.target.value })}
-          aria-label="Supplier DO No."
+          aria-label="Supplier DO No"
           data-testid="amend-do-number"
           className={`${FIELD} flex-1`}
         />
@@ -993,8 +998,8 @@ function AmendPanel({
         />
       </div>
       {lines.map((l) => (
-        <div key={l.id} className="mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 truncate font-mono text-label text-kit-slate-9">
+        <div key={l.id} className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 break-words font-mono text-label text-kit-slate-9">
             {l.sku}
           </span>
           {/* Original → Corrected. */}
@@ -1025,7 +1030,7 @@ function AmendPanel({
           {err}
         </p>
       )}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="receiving-actions mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onClose}
@@ -1110,7 +1115,7 @@ function VoidPanel({
         already moved on, or claims were opened, the void is refused with the
         exact blocker.
       </p>
-      <div className="mt-2 flex items-center gap-2 text-body leading-6">
+      <div className="receiving-details-row mt-2 flex items-center gap-2 text-body leading-6">
         <span className="w-32 shrink-0 text-label text-kit-slate-9">
           Void reason
         </span>
@@ -1128,7 +1133,7 @@ function VoidPanel({
           {err}
         </p>
       )}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="receiving-actions mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onClose}

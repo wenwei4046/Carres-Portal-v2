@@ -121,7 +121,7 @@ export function historyWords(text: string): string {
   for (const [key, word] of Object.entries(HISTORY_FIELD_WORDS)) {
     result = result.replace(new RegExp(`\\b${key}\\b`, "g"), word);
   }
-  return result.replace(/\s+-\s+/g, " · ");
+  return result.replace(/\bRev\s+(\d+)\b/g, "($1)").replace(/\s+-\s+/g, " · ");
 }
 
 /**
@@ -231,6 +231,7 @@ export function historyRecordWords(
 export function revisionRecordWords(
   r: SalesOrderRevisionRow,
   currentRevision: number | null,
+  orderReference = "",
 ): LedgerRecordWords {
   const title =
     r.revision === 1
@@ -238,7 +239,7 @@ export function revisionRecordWords(
       : r.change_type
         ? COMMITMENT_CHANGE_WORDS[r.change_type]
         : "Order changed";
-  const identity = `Rev ${r.revision}${r.revision === currentRevision ? " · Current" : ""}`;
+  const identity = `${orderReference}(${r.revision})${r.revision === currentRevision ? " · Current" : ""}`;
   const when = fmtDate(r.created_at, { time: true });
   const name = (r.created_by_name ?? "").trim();
   const kind = r.actor_kind ?? (name ? "human" : "missing");
@@ -324,6 +325,7 @@ export default function SalesOrderLedger({
   view: controlledView,
   onViewChange,
   showViewTabs = true,
+  orderReference = "",
 }: {
   revisions: SalesOrderRevisionRow[];
   history: HistoryEvent[];
@@ -334,6 +336,7 @@ export default function SalesOrderLedger({
   view?: "revisions" | "history";
   onViewChange?: (view: "revisions" | "history") => void;
   showViewTabs?: boolean;
+  orderReference?: string;
 }) {
   const [internalView, setInternalView] = useState<"revisions" | "history">("revisions");
   const view = controlledView ?? internalView;
@@ -369,7 +372,7 @@ export default function SalesOrderLedger({
             {[...revisions].reverse().map((r) => {
               const current = r.revision === currentRevision;
               const selected = viewedRevision == null ? current : viewedRevision === r.revision;
-              const words = revisionRecordWords(r, currentRevision);
+              const words = revisionRecordWords(r, currentRevision, orderReference);
               return (
                 <li key={r.revision} className="py-1 first:pt-0 last:pb-0">
                   <button

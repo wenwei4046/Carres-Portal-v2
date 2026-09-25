@@ -41,6 +41,22 @@ export const COLLECTION_CONDITIONS = [
   ["correct_item", "Correct item"],
   ["safe_wrapped", "Safe and wrapped for transport"],
 ] as const;
+export const COLLECTION_REFUSAL_REASONS = [
+  ["stain", "Stain"],
+  ["liquid_odour", "Liquid or odour"],
+  ["pests", "Bed bugs or other pest evidence"],
+  ["saliva_unsanitary", "Saliva or unsanitary condition"],
+  ["tear_burn_cut", "Tear, burn or cut"],
+  ["customer_damage", "Customer damage"],
+  ["wrong_item", "Wrong item"],
+  ["unsafe_unwrapped", "Unsafe or unwrapped for transport"],
+] as const;
+export const collectionRefusalReason = z.enum(
+  COLLECTION_REFUSAL_REASONS.map(([key]) => key) as [
+    (typeof COLLECTION_REFUSAL_REASONS)[number][0],
+    ...(typeof COLLECTION_REFUSAL_REASONS)[number][0][],
+  ],
+);
 const caseApprovalInput = z
   .object({
     approved: z.literal(true),
@@ -127,11 +143,34 @@ export const arrivalHandoverInput = z
       .object({
         passed_conditions: z.array(z.string()),
         evidence_paths: z.array(words).min(1),
+        failed_reason: collectionRefusalReason.optional(),
       })
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.kind === "collection_refused" &&
+      !value.collection_review?.failed_reason
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["collection_review", "failed_reason"],
+        message: "Choose the observed condition that stopped collection",
+      });
+    }
+    if (
+      value.kind === "collected" &&
+      value.collection_review?.failed_reason
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["collection_review", "failed_reason"],
+        message: "An accepted collection cannot carry a refusal reason",
+      });
+    }
+  });
 export const arrivalPlanChangeInput = z
   .object({
     expected_date: date,
@@ -194,6 +233,9 @@ export interface ArrivalSource {
   kind: Exclude<ArrivalSourceType, "supplier-delivery">;
   claim_id: string | null;
   case_id: string | null;
+  /** 0490 — a failed-delivery return bound to the Delivery Visit that failed
+   *  (Delivery MASTER §7); such a source names the DO the goods went out on. */
+  attempt_id?: string | null;
   from_site_id: string | null;
   to_site_id: string;
   party_id: string;

@@ -1,31 +1,20 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
   Plus,
-  Trash2,
   ShieldCheck,
   Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  computeStorageFee,
-  defaultStorageStart,
-  DELIVERY_TIME_SLOTS,
-  PAYMENT_STATUSES,
-  PAYMENT_KINDS,
   DELIVERY_REASONS,
   DELIVERY_REASON_CATEGORY_LABEL,
   deliveryReasonLabel,
-  summarizePayments,
   type DeliveryReasonCategory,
   type DeliveryReasonKey,
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
   type LineStockStatus,
-  type OrderPaymentRow,
-  type PaymentKind,
+  requiredPaymentReference,
 } from "@carres/shared";
 import {
   useDeliveryPartners,
@@ -33,17 +22,15 @@ import {
   useOrderControl,
   useSaveOrderControl,
   useSetOpsAssignedLogistic,
-  useOrderPayments,
-  useRecordPayment,
-  useVoidPayment,
   useCollectStorage,
   useRequestStorageWaiver,
   useDecideStorageWaiver,
   useExtendStorage,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
-import { methodLabel, useManualMethods } from "@/lib/payment-methods";
-import { renderReceiptPdf, renderExtensionAgreementPdf } from "@/lib/pdf/render";
+import { appTodayIso } from "@/lib/fmt-date";
+import { useManualMethods } from "@/lib/payment-methods";
+import { renderExtensionAgreementPdf } from "@/lib/pdf/render";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
 
 /**
@@ -112,8 +99,6 @@ const EMPTY: Draft = {
   line_stock_status: {},
   called_customer: false,
 };
-
-const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -515,774 +500,6 @@ export function LogisticEtaField({
   );
 }
 
-/** Delivery time slot → the Delivery section. */
-export function DeliveryTimeSlotField({ form }: { form: OrderControlForm }) {
-  const { draft, set } = form;
-  return (
-    <FieldRow label="Time slot">
-      <select
-        value={draft.delivery_time_slot}
-        onChange={(e) => set("delivery_time_slot", e.target.value)}
-        className={CELL}
-      >
-        <option value="">—</option>
-        {DELIVERY_TIME_SLOTS.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-    </FieldRow>
-  );
-}
-
-const todayIso = () => new Date().toISOString().slice(0, 10);
-
-/** Payment section. With an `orderId` it renders the real multi-entry ledger
- *  (migration 0184) — list + add-payment form + Outstanding from the ledger.
- *  Without one (the unit-test harness) it keeps the legacy keyed Paid /
- *  Outstanding so older callers don't regress. */
-export function PaymentControlFields({
-  form,
-  paid,
-  total,
-  orderId,
-  receiptMeta,
-}: {
-  form: OrderControlForm;
-  paid: number;
-  total: number;
-  orderId?: string;
-  receiptMeta?: { orderCode: string; customerName: string };
-}) {
-  const { draft, set } = form;
-  // Operation has NO Bill/Total (Jess 2026-07-02): AutoCount + Master carry only the
-  // OUTSTANDING owed, if any (the total bill surfaces in a future non-operation panel).
-  // So `balance` IS the amount owed; payments in the ledger reduce it. No `total` fallback.
-  const owing = draft.balance.trim() ? Number(draft.balance) : 0;
-  void total;
-  return (
-    <div data-testid="payment-summary">
-      <FieldRow label="Owing (RM)">
-        <input
-          type="number"
-          min={0}
-          value={draft.balance}
-          onChange={(e) => set("balance", e.target.value)}
-          placeholder="amount owed (from import)"
-          className={CELL}
-        />
-      </FieldRow>
-      <DueDateRow form={form} bill={owing} orderId={orderId} />
-      {orderId ? (
-        <PaymentLedger orderId={orderId} bill={owing} receiptMeta={receiptMeta} />
-      ) : (
-        <LegacyPaidOutstanding form={form} paid={paid} bill={owing} />
-      )}
-      <FieldRow label="Pay status">
-        <select
-          value={draft.payment_status}
-          onChange={(e) => set("payment_status", e.target.value)}
-          aria-label="Payment follow-up status"
-          className={CELL}
-        >
-          <option value="">—</option>
-          {PAYMENT_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </FieldRow>
-    </div>
-  );
-}
-
-/** Balance due-date key-in + overdue flag (Jess: the simple tracker's one real
- *  gap). Overdue = due < today AND there's still an outstanding goods balance. */
-function DueDateRow({
-  form,
-  bill,
-  orderId,
-}: {
-  form: OrderControlForm;
-  bill: number;
-  orderId?: string;
-}) {
-  const { draft, set } = form;
-  const { data } = useOrderPayments(orderId ?? null);
-  const goodsPaid = (data?.payments ?? [])
-    .filter((p) => p.kind !== "storage")
-    .reduce((s, p) => s + Number(p.amount || 0), 0);
-  const outstanding = Math.max(0, bill - goodsPaid);
-  const due = draft.balance_due_date.trim();
-  const overdue = !!due && due < todayIso() && outstanding > 0;
-  return (
-    <FieldRow label="Due date">
-      <div className="flex items-center gap-2 px-1 w-full">
-        <input
-          type="date"
-          value={draft.balance_due_date}
-          onChange={(e) => set("balance_due_date", e.target.value)}
-          aria-label="Balance due date"
-          className={CELL + " flex-1"}
-        />
-        {overdue && (
-          <span className="pill pill-overdue inline-flex items-center gap-1 shrink-0">
-            <AlertTriangle size={14} strokeWidth={2.5} />
-            Overdue
-          </span>
-        )}
-      </div>
-    </FieldRow>
-  );
-}
-
-/** Legacy keyed Paid / Outstanding — kept for callers without an orderId. */
-function LegacyPaidOutstanding({
-  form,
-  paid,
-  bill,
-}: {
-  form: OrderControlForm;
-  paid: number;
-  bill: number;
-}) {
-  const { draft, set } = form;
-  const effPaid = draft.paid_amount.trim() ? Number(draft.paid_amount) : paid;
-  const hasBill = bill > 0;
-  const outstanding = Math.max(0, bill - effPaid);
-  const settled = hasBill && outstanding <= 0;
-  return (
-    <>
-      <FieldRow label="Paid">
-        <input
-          type="number"
-          min={0}
-          value={draft.paid_amount}
-          onChange={(e) => set("paid_amount", e.target.value)}
-          placeholder={paid > 0 ? `${paid} (deposit)` : "key amount paid"}
-          className={CELL}
-        />
-      </FieldRow>
-      <FieldRow label="Outstanding">
-        <div
-          className={`px-2 py-1.5 font-mono text-body font-semibold ${
-            !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
-          }`}
-        >
-          {!hasBill ? "—" : settled ? "Settled" : RM(outstanding)}
-        </div>
-      </FieldRow>
-    </>
-  );
-}
-
-const KIND_LABEL: Record<PaymentKind, string> = {
-  payment: "payment",
-  deposit: "deposit",
-  storage: "storage",
-};
-
-/** The real payment ledger for an order: list of entries + an inline
- *  "Add payment" form, with Paid / Outstanding derived live (storage excluded
- *  from the goods balance). Principal can void a mis-keyed row. */
-function PaymentLedger({
-  orderId,
-  bill,
-  receiptMeta,
-}: {
-  orderId: string;
-  bill: number;
-  receiptMeta?: { orderCode: string; customerName: string };
-}) {
-  const role = useAuth((s) => s.role);
-  const isPrincipal = role === "principal";
-  const { data, isLoading } = useOrderPayments(orderId);
-  const payments = data?.payments ?? [];
-  const summary = summarizePayments(
-    // `voided_at` must ride along — a void is a stamp, not a delete (0343), so a
-    // reversed payment is still in this array. `summarizePayments` asks
-    // `isLivePayment` (0347); mapping the field away silently re-opens the hole.
-    payments.map((p) => ({ amount: Number(p.amount), kind: p.kind, voided_at: p.voided_at })),
-    bill,
-  );
-  const hasBill = bill > 0;
-  const settled = hasBill && summary.outstanding <= 0;
-  const paidSoFar = summary.byKind.payment + summary.byKind.deposit;
-  // Auto status pill (Jess 2026-07-02): Paid (cleared) · Partial (some paid) ·
-  // Owing (nothing paid yet) · —(nothing owed). The red "On hold" comes from the
-  // delivery gate in the panel header, not here.
-  const status = !hasBill
-    ? { t: "—", c: "pill-neutral" }
-    : settled
-      ? { t: "Paid", c: "pill-confirmed" }
-      : paidSoFar > 0
-        ? { t: "Partial", c: "pill-warning" }
-        : { t: "Owing", c: "pill-neutral" };
-
-  const record = useRecordPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
-  });
-  // 0430 — a void wears its reason: the ✕ opens this inline ask instead of
-  // firing one-click; the SQL door refuses a blank reason anyway.
-  const [voidingId, setVoidingId] = useState<string | null>(null);
-  const [voidReason, setVoidReason] = useState("");
-  const voidPay = useVoidPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't void — ${e.message}`),
-    onSuccess: () => {
-      setVoidingId(null);
-      setVoidReason("");
-    },
-  });
-  const [adding, setAdding] = useState(false);
-
-  return (
-    <FieldRow label="Balance">
-      <div className="px-1.5 py-1.5 w-full space-y-1.5">
-        {/* Outstanding headline + auto status (Jess 2026-07-02). */}
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <div className="text-meta uppercase tracking-[0.05em] text-base-400">
-              Outstanding
-            </div>
-            <div
-              className={`font-mono text-strong font-semibold leading-tight ${
-                !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
-              }`}
-            >
-              {!hasBill ? "—" : settled ? "Settled" : RM(summary.outstanding)}
-            </div>
-          </div>
-          <span className={`pill ${status.c} mb-0.5`}>{status.t}</span>
-        </div>
-        {hasBill && (
-          <div className="text-meta text-base-500">
-            Paid {RM(paidSoFar)} of {RM(bill)} owed
-          </div>
-        )}
-        {isLoading && <div className="text-meta text-base-400">Loading…</div>}
-        {!isLoading && payments.length === 0 && (
-          <div className="text-meta text-base-400">No payments recorded yet.</div>
-        )}
-        {payments.map((p) => (
-          <div key={p.id}>
-            <LedgerRow
-              row={p}
-              canVoid={isPrincipal && !voidPay.isPending}
-              onVoid={() => {
-                setVoidingId(voidingId === p.id ? null : p.id);
-                setVoidReason("");
-              }}
-              receiptMeta={receiptMeta}
-            />
-            {voidingId === p.id && p.voided_at == null && (
-              <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={voidReason}
-                  onChange={(e) => setVoidReason(e.target.value)}
-                  placeholder="Why is this payment wrong?"
-                  aria-label="Void reason"
-                  autoFocus
-                  className="w-full rounded-md border border-base-200 px-2 py-1 text-meta"
-                />
-                <button
-                  type="button"
-                  onClick={() => voidPay.mutate({ paymentId: p.id, reason: voidReason.trim() })}
-                  disabled={voidPay.isPending || !voidReason.trim()}
-                  className="text-meta font-semibold text-danger shrink-0 disabled:opacity-40"
-                >
-                  Void payment
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVoidingId(null)}
-                  className="text-meta text-base-500 shrink-0"
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-
-        {adding ? (
-          <AddPaymentForm
-            pending={record.isPending}
-            onCancel={() => setAdding(false)}
-            onSubmit={(input) =>
-              record.mutate(input, { onSuccess: () => setAdding(false) })
-            }
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 text-meta font-semibold text-primary hover:underline"
-          >
-            <Plus size={14} strokeWidth={2.5} /> Record payment
-          </button>
-        )}
-      </div>
-    </FieldRow>
-  );
-}
-
-/** Render + open a receipt PDF for one ledger entry (on-demand, client-side). */
-async function printReceipt(
-  row: OrderPaymentRow,
-  meta: { orderCode: string; customerName: string },
-) {
-  try {
-    const blob = await renderReceiptPdf({
-      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
-      issue_date: row.paid_on,
-      order_code: meta.orderCode,
-      customer: { name: meta.customerName },
-      amount: Number(row.amount),
-      method: row.method,
-      kind: row.kind,
-      reference: row.reference,
-      note: row.note,
-      currency: "MYR",
-    });
-    window.open(URL.createObjectURL(blob), "_blank");
-  } catch (e) {
-    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
-  }
-}
-
-/** One ledger line: date · amount · kind · method · receipt, with a receipt
- *  print + a void ✕ for the principal. */
-function LedgerRow({
-  row,
-  canVoid,
-  onVoid,
-  receiptMeta,
-}: {
-  row: OrderPaymentRow;
-  canVoid: boolean;
-  onVoid: () => void;
-  receiptMeta?: { orderCode: string; customerName: string };
-}) {
-  // 0343 — a void is a stamp, not a delete, so a reversed payment stays in this
-  // list. It must LOOK reversed: the amount is struck through and the row is
-  // dimmed, or the ledger reads as if the money is still there while the total
-  // (which skips it) says otherwise.
-  const voided = row.voided_at != null;
-  return (
-    <div className={`flex items-center gap-2 text-meta${voided ? " opacity-55" : ""}`}>
-      <span className="text-base-500 tabular-nums w-[68px] shrink-0">{row.paid_on}</span>
-      <span
-        className={`font-mono font-semibold w-[78px] shrink-0 ${
-          voided ? "text-base-500 line-through" : "text-base-900"
-        }`}
-      >
-        {RM(Number(row.amount))}
-      </span>
-      <span className="text-base-600 capitalize flex-1 truncate">
-        {KIND_LABEL[row.kind]} · {methodLabel(row.method)}
-        {row.receipt_no ? ` · ${row.receipt_no}` : ""}
-        {voided ? " · Voided" : ""}
-      </span>
-      {receiptMeta && (
-        <button
-          type="button"
-          onClick={() => void printReceipt(row, receiptMeta)}
-          title="Print receipt"
-          aria-label={`Receipt ${row.receipt_no ?? row.id}`}
-          className="text-base-400 hover:text-primary shrink-0"
-        >
-          <Receipt size={14} strokeWidth={2} />
-        </button>
-      )}
-      {/* An already-voided row offers no void button — the RPC answers
-          `already_voided`, so the control could only ever produce an error. */}
-      {canVoid && !voided && (
-        <button
-          type="button"
-          onClick={onVoid}
-          title="Void this entry"
-          aria-label={`Void payment ${row.receipt_no ?? row.id}`}
-          className="text-base-400 hover:text-danger shrink-0"
-        >
-          <Trash2 size={14} strokeWidth={2} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Inline add-payment form: amount · date · method · kind → Record. */
-function AddPaymentForm({
-  pending,
-  onCancel,
-  onSubmit,
-}: {
-  pending: boolean;
-  onCancel: () => void;
-  onSubmit: (input: {
-    amount: number;
-    paidOn: string;
-    method: string;
-    kind: PaymentKind;
-  }) => void;
-}) {
-  const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState(todayIso());
-  // 0476 — the Active methods in Settings → Payment, never a fixed list.
-  const { methods } = useManualMethods();
-  const [chosenMethod, setMethod] = useState<string>("cash");
-  const method = methods.some((m) => m.value === chosenMethod) ? chosenMethod : methods[0].value;
-  const [kind, setKind] = useState<PaymentKind>("payment");
-  const amt = Number(amount);
-  const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
-  return (
-    <div className="border border-base-200 rounded-[3px] p-2 space-y-1.5 bg-base-50">
-      <div className="grid grid-cols-2 gap-1.5">
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount (RM)"
-          aria-label="Payment amount"
-          className={CELL}
-        />
-        <input
-          type="date"
-          value={paidOn}
-          onChange={(e) => setPaidOn(e.target.value)}
-          aria-label="Payment date"
-          className={CELL}
-        />
-        <select
-          value={method}
-          onChange={(e) => setMethod(e.target.value)}
-          aria-label="Payment method"
-          className={CELL}
-        >
-          {methods.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as PaymentKind)}
-          aria-label="Payment kind"
-          className={CELL}
-        >
-          {PAYMENT_KINDS.filter((k) => k !== "storage").map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={!valid}
-          onClick={() => onSubmit({ amount: amt, paidOn, method, kind })}
-          className="btn-primary text-meta py-1 px-2.5 disabled:opacity-50"
-        >
-          {pending ? "Recording…" : "Record"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-meta text-base-500 hover:text-base-700"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Storage block (§7.5, 2026-07-13): fee = START→END window. START (From) is
- *  auto-suggested as the next SAME WEEKDAY after the delivery deadline
- *  (`defaultStorageStart`, deadline + 7 days); END = the actual delivery /
- *  collection date (else the logistic ETA, else today while accruing). MS/BF
- *  RM150 per commenced month; sofa free for the window's first 14 days then a
- *  flat RM200. Leave the fee blank for the auto amount or key an override. */
-export function StorageControlFields({
-  form,
-  hasMsbf = false,
-  hasSof = false,
-  orderId,
-  deadline,
-  meta,
-}: {
-  form: OrderControlForm;
-  hasMsbf?: boolean;
-  hasSof?: boolean;
-  orderId?: string;
-  /** The order's delivery deadline — basis for the auto START (deadline+7d). */
-  deadline?: string | null;
-  meta?: { orderCode: string; customerName: string; customerPhone: string };
-}) {
-  const { draft, set } = form;
-  const today = new Date().toISOString().slice(0, 10);
-  // S1 (Jess 2026-07-18, thin inputs): waiver + extension fold away by
-  // default — they auto-open only when one is already in play.
-  const hasWaiverOrExt =
-    (form.control?.storage_waiver_status ?? "none") !== "none" ||
-    form.control?.storage_collected_at != null ||
-    (form.control?.extension_count ?? 0) > 0;
-  const [moreOpen, setMoreOpen] = useState(hasWaiverOrExt);
-  // The control row loads async — pop the fold open once data shows a live
-  // waiver / extension (never auto-closes).
-  useEffect(() => {
-    if (hasWaiverOrExt) setMoreOpen(true);
-  }, [hasWaiverOrExt]);
-  // End of the storage window: explicit storage_to (the actual delivery /
-  // collection), else the logistic's committed ETA, else today (still
-  // accruing). Auto-shown but editable — set it to freeze the fee.
-  const endEff = draft.storage_to.trim() || draft.logistic_eta.trim() || today;
-  const storage = computeStorageFee({
-    startDate: form.storageFrom,
-    asOf: endEff,
-    hasMsbf,
-    hasSof,
-  });
-  // Shown so the operator sees WHY the auto fee is what it is — the chargeable
-  // months / the sofa free-window / the flat fee.
-  const fmtShort = (iso: string | null) =>
-    iso
-      ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "2-digit",
-        })
-      : "—";
-  // Master-imported storage fees (migration 0207, Jess 2026-07-06) — the fee Jess
-  // hand-computes in the Master. When present it REPLACES the auto number in the
-  // tile + is the Charge default (a manual override still wins); and a Master fee
-  // auto-counts the order as incurred (Jess: "有费用自动标 incurred").
-  const impMsbf = form.control?.storage_fee_msbf ?? null;
-  const impSof = form.control?.storage_fee_sof ?? null;
-  const hasImportedFee = (impMsbf ?? 0) > 0 || (impSof ?? 0) > 0;
-  const dispMsbf = impMsbf ?? storage.msbf;
-  const dispSof = impSof ?? storage.sof;
-  // Effective auto/imported total (before a manual override) — imported wins.
-  const effAutoTotal = hasImportedFee ? (impMsbf ?? 0) + (impSof ?? 0) : storage.total;
-  const incurred = draft.storage_from.trim() !== "" || hasImportedFee;
-  // Storage alert (Jess) — countdown to the To date, SAME pills as the Deadline
-  // column (amber pill-warning / red pill-overdue + ⚠), NOT emoji. Shows only
-  // when ≤3 days out, overdue, OR the logistic ETA is missing / later than To
-  // (storage extending → collect payment). Healthy (>3d) shows nothing.
-  const toDiff = Math.round(
-    (new Date(`${endEff}T00:00:00`).getTime() -
-      new Date(`${today}T00:00:00`).getTime()) /
-      86_400_000,
-  );
-  const extending =
-    !draft.logistic_eta.trim() || draft.logistic_eta.trim() > endEff;
-  const storageAlert =
-    !incurred || (toDiff > 3 && !extending)
-      ? null
-      : toDiff < 0
-        ? { label: `Overdue ${-toDiff}d`, pill: "pill-overdue", urgent: true }
-        : toDiff <= 1
-          ? {
-              label: toDiff === 0 ? "Due today" : "Due soon 1d",
-              pill: "pill-overdue",
-              urgent: true,
-            }
-          : { label: `Due soon ${toDiff}d`, pill: "pill-warning", urgent: false };
-  return (
-    <>
-      <FieldRow label="Storage?">
-        <select
-          value={incurred ? "yes" : "no"}
-          onChange={(e) => {
-            if (e.target.value === "yes") {
-              // §7.5 auto START — the next same weekday AFTER the deadline
-              // (deadline + 7d); today only when there's no deadline to anchor.
-              if (!draft.storage_from.trim())
-                set(
-                  "storage_from",
-                  defaultStorageStart(deadline ?? null) ?? today,
-                );
-            } else {
-              set("storage_from", "");
-              set("storage_fee_override", "");
-            }
-          }}
-          className={CELL}
-        >
-          <option value="no">No</option>
-          <option value="yes">Yes — incurred</option>
-        </select>
-      </FieldRow>
-      {incurred && (
-        <>
-          {/* From – End on ONE row (§7.5). From auto = deadline+7d, editable;
-              End = the actual delivery / collection date. */}
-          <FieldRow label="From – End">
-            <div className="flex items-center gap-1 w-full min-w-0">
-              <input
-                type="date"
-                value={draft.storage_from}
-                onChange={(e) => set("storage_from", e.target.value)}
-                aria-label="Storage from"
-                title="Storage START — auto: the next same weekday after the deadline"
-                className={`${CELL} flex-1 min-w-0`}
-              />
-              <span className="text-base-300 shrink-0">–</span>
-              <input
-                type="date"
-                value={endEff}
-                onChange={(e) => set("storage_to", e.target.value)}
-                aria-label="Storage end"
-                title="Storage END — the actual delivery / collection date"
-                className={`${CELL} flex-1 min-w-0`}
-              />
-            </div>
-          </FieldRow>
-          {storageAlert && (
-            <FieldRow label="Alert">
-              <div className="px-2 py-1">
-                <span
-                  className={`pill ${storageAlert.pill} ${storageAlert.urgent ? "inline-flex items-center gap-1" : ""}`}
-                >
-                  {storageAlert.urgent && (
-                    <AlertTriangle size={14} strokeWidth={2.5} />
-                  )}
-                  {storageAlert.label}
-                </span>
-              </div>
-            </FieldRow>
-          )}
-          {/* Auto breakdown — separate MS/BF (per month) and Sofa (per 2 weeks)
-              lines (Jess), each = rate × commenced periods between From and To. */}
-          {/* Category fees 2-col (Jess: MS/BF vs Sofa side by side) — display-only
-              readout of the auto-computed fee + its free-window; the shared
-              controls below (Charge / Paid / waiver / extension) stay full-width. */}
-          <div
-            className={`px-1 py-1 grid gap-2 ${hasMsbf && hasSof ? "grid-cols-2" : "grid-cols-1"}`}
-          >
-            {hasMsbf && (
-              <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-meta uppercase tracking-[0.04em] text-base-400">
-                    MS / BF
-                  </span>
-                  {impMsbf != null && (
-                    <span className="text-meta uppercase tracking-[0.04em] text-primary font-semibold">
-                      Master
-                    </span>
-                  )}
-                </div>
-                <div className="text-body font-semibold text-base-900">
-                  RM {dispMsbf.toLocaleString()}
-                </div>
-                <div className="text-meta text-base-500">
-                  {impMsbf != null
-                    ? "imported fee"
-                    : storage.msbf > 0
-                      ? `${storage.msbfMonths} mth × RM150`
-                      : `runs from ${fmtShort(storage.freeUntilMsbf)}`}
-                </div>
-              </div>
-            )}
-            {hasSof && (
-              <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-meta uppercase tracking-[0.04em] text-base-400">
-                    Sofa
-                  </span>
-                  {impSof != null && (
-                    <span className="text-meta uppercase tracking-[0.04em] text-primary font-semibold">
-                      Master
-                    </span>
-                  )}
-                </div>
-                <div className="text-body font-semibold text-base-900">
-                  RM {dispSof.toLocaleString()}
-                </div>
-                <div className="text-meta text-base-500">
-                  {impSof != null
-                    ? "imported fee"
-                    : storage.sofCharged
-                      ? "flat RM200 / order"
-                      : `free until ${fmtShort(storage.freeUntilSof)}`}
-                </div>
-              </div>
-            )}
-          </div>
-          <FieldRow label="Charge">
-            <input
-              type="number"
-              min={0}
-              value={draft.storage_fee_override}
-              onChange={(e) => set("storage_fee_override", e.target.value)}
-              placeholder={
-                effAutoTotal > 0
-                  ? `${hasImportedFee ? "Master" : "auto"} RM ${effAutoTotal.toLocaleString()}${hasImportedFee ? "" : ` (${storage.days}d)`}`
-                  : "override auto"
-              }
-              className={CELL}
-            />
-          </FieldRow>
-          <FieldRow label="Paid?">
-            <select
-              value={draft.storage_paid ?? ""}
-              onChange={(e) => set("storage_paid", e.target.value)}
-              className={CELL}
-            >
-              <option value="">—</option>
-              <option value="Unpaid">Unpaid</option>
-              <option value="Paid">Paid</option>
-            </select>
-          </FieldRow>
-          {orderId && (
-            <>
-              <button
-                type="button"
-                onClick={() => setMoreOpen((v) => !v)}
-                className="flex items-center gap-1 text-meta text-base-500 hover:text-base-700 px-1 py-0.5"
-              >
-                {moreOpen ? (
-                  <ChevronDown size={14} strokeWidth={2} />
-                ) : (
-                  <ChevronRight size={14} strokeWidth={2} />
-                )}
-                Waiver &amp; extension
-              </button>
-              {moreOpen && (
-                <>
-                  <StorageCollectWaiver
-                    orderId={orderId}
-                    control={form.control}
-                    charge={
-                      draft.storage_fee_override.trim()
-                        ? Number(draft.storage_fee_override)
-                        : effAutoTotal
-                    }
-                  />
-                  <StorageExtensionRow
-                    orderId={orderId}
-                    control={form.control}
-                    hasMsbf={hasMsbf}
-                    hasSof={hasSof}
-                    meta={meta}
-                  />
-                </>
-              )}
-            </>
-          )}
-        </>
-      )}
-    </>
-  );
-}
-
 /** One-time storage delivery-extension (migration 0196; the two Delivery-
  *  Extension Google Forms, Jess 2026-06-30). Operation may record ONE extension;
  *  a 2nd needs a principal (the route 403s `extension_used`). The free storage
@@ -1565,6 +782,8 @@ export function StorageCollectWaiver({
   const [chosenMethod, setMethod] = useState<string>("cash");
   const { methods } = useManualMethods();
   const method = methods.some((m) => m.value === chosenMethod) ? chosenMethod : methods[0].value;
+  const [reference, setReference] = useState("");
+  const refWord = requiredPaymentReference(method); // §16 (0535)
 
   // Already cleared → just confirm the gate is open.
   if (collectedAt) {
@@ -1624,6 +843,16 @@ export function StorageCollectWaiver({
                 ))}
               </select>
             </div>
+            {refWord && (
+              <input
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder={refWord}
+                aria-label={refWord}
+                className={CELL}
+              />
+            )}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1634,8 +863,13 @@ export function StorageCollectWaiver({
                     toast.error("Enter the amount collected");
                     return;
                   }
+                  if (refWord && !reference.trim()) {
+                    toast.error(`Enter the ${refWord.toLowerCase()}`);
+                    return;
+                  }
                   collect.mutate(
-                    { amount: amt, paidOn: todayIso(), method },
+                    { amount: amt, paidOn: appTodayIso(), method,
+                      reference: refWord ? reference.trim() : null },
                     { onSuccess: () => setCollecting(false) },
                   );
                 }}

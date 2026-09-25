@@ -688,8 +688,8 @@ export function soCountLabel(n: number): string {
 //   3. IT NAMES THE PARTY. `Reserve 2 to SO-1209` says who it is for.
 //
 // THE DRAWER IS NOT TOUCHED. This card moves the NEWER screen onto the older
-// one, never the reverse — `ReserveStockDialog` and `StockPickerGrid` keep
-// their wording byte for byte, and a test asserts it.
+// one, never the reverse — `StockPickerGrid` keeps its wording byte for
+// byte, and a test asserts it.
 
 /** `Carres Klang: 2 available` — the expanded row's one sentence. */
 export function freeStockLine(warehouse: string, n: number): string {

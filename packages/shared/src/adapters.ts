@@ -494,67 +494,6 @@ export const pwpDiscoverFromRow = (r: DB.PwpDiscoverRow): D.PwpDiscover => ({
   nameMatches: r.name_matches ?? true,
 });
 
-export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
-  id: r.id,
-  name: r.name,
-  address: r.address,
-});
-
-export const supplierFromRow = (r: DB.SupplierRow): D.Supplier => ({
-  id: r.id,
-  name: r.name,
-  contact: r.contact,
-  leadTime: r.lead_time,
-  kind: r.kind,
-  catCovered: r.cat_covered,
-  slug: r.slug,
-});
-
-export const partnerFromRow = (r: DB.DeliveryPartnerRow): D.DeliveryPartner => ({
-  id: r.id,
-  name: r.name,
-  contact: r.contact,
-  zones: r.zones,
-  onboardedDate: r.onboarded_date,
-  rateCard: r.rate_card
-    ? Object.fromEntries(
-        Object.entries(r.rate_card).map(([k, v]) => [
-          k,
-          { base: v.base, perFloorWalkUp: v.per_floor_walk_up, perKm: v.per_km },
-        ]),
-      )
-    : null,
-});
-
-export const fleetFromRow = (r: DB.PartnerFleetRow): D.PartnerFleet => ({
-  id: r.id,
-  partnerId: r.partner_id,
-  plate: r.plate,
-  vehicleType: r.vehicle_type,
-  capacity: r.capacity,
-  driverName: r.driver_name,
-  driverPhone: r.driver_phone,
-});
-
-export const stockBalanceFromRow = (r: DB.StockBalanceRow): D.StockBalance => ({
-  sku: r.sku,
-  warehouseId: r.warehouse_id,
-  qty: r.qty,
-  reserved: r.reserved,
-});
-
-export const stockMovementFromRow = (r: DB.StockMovementRow): D.StockMovement => ({
-  id: r.id,
-  sku: r.sku,
-  warehouseId: r.warehouse_id,
-  qty: r.qty,
-  kind: r.kind,
-  ref: r.ref,
-  note: r.note,
-  byRole: r.by_role,
-  occurredAt: r.occurred_at,
-});
-
 export const orderLineFromRow = (r: DB.OrderLineRow): D.OrderLine => ({
   id: r.id,
   orderId: r.order_id,
@@ -688,110 +627,6 @@ export const orderSupplierThreadFromRow = (
   updatedAt: r.updated_at,
 });
 
-export const purchaseOrderLineFromRow = (
-  r: DB.PurchaseOrderLineRow,
-): D.PurchaseOrderLine => ({
-  poId: r.po_id,
-  sku: r.sku,
-  qty: r.qty,
-  receivedQty: r.received_qty,
-  // Migration 0055 (Phase 4.5 Chunk 2 Sprint E). `cost` is numeric(14,2) so
-  // PostgREST may surface it as either string or number depending on driver
-  // settings; coerce via Number() but preserve null for legacy rows. `?? null`
-  // keeps the adapter safe against rows fetched before the migration shipped.
-  cost: r.cost === null || r.cost === undefined ? null : Number(r.cost),
-  costSource: r.cost_source ?? null,
-});
-
-export const purchaseOrderFromRow = (
-  r: DB.PurchaseOrderRow,
-  rels?: { lines?: DB.PurchaseOrderLineRow[] },
-): D.PurchaseOrder => ({
-  id: r.id,
-  so: r.so,
-  soRefs: r.so_refs,
-  supplierId: r.supplier_id,
-  warehouseId: r.warehouse_id,
-  status: r.status,
-  supStatus: r.sup_status,
-  // Procurement-leg LP — renamed from `delivery_partner_id` in Phase 4.5 Chunk 2
-  // Sprint C migration 0052. Customer-leg LP fields previously on the PO
-  // (confirm_delivery_date / request_for_delivery_at / partner_accepted_at /
-  // partner_rejected_at) were dropped by 0052 — they live on
-  // `order_supplier_threads` and surface via `orderSupplierThreadFromRow`.
-  procurementPartnerId: r.procurement_partner_id,
-  expectedReadyDate: r.expected_ready_date,
-  pickupDate: r.pickup_date,
-  etaDate: r.eta_date,
-  payStatus: r.pay_status,
-  placedAt: r.placed_at,
-  lines: rels?.lines?.map(purchaseOrderLineFromRow),
-});
-
-export const paymentFromRow = (r: DB.PaymentRow): D.Payment => ({
-  id: r.id,
-  direction: r.direction,
-  amount: Number(r.amount),
-  method: r.method,
-  reference: r.reference,
-  note: r.note,
-  paidAt: r.paid_at,
-  orderId: r.order_id,
-  poId: r.po_id,
-  refundId: r.refund_id,
-  receiptUrl: r.receipt_url,
-});
-
-export const invoiceFromRow = (r: DB.InvoiceRow): D.Invoice => ({
-  id: r.id,
-  invoiceNo: r.invoice_no,
-  orderId: r.order_id,
-  amount: Number(r.amount),
-  taxAmount: Number(r.tax_amount),
-  issuedAt: r.issued_at,
-  voidedAt: r.voided_at,
-  pdfUrl: r.pdf_url,
-});
-
-export const refundFromRow = (r: DB.RefundRow): D.Refund => ({
-  id: r.id,
-  orderId: r.order_id,
-  dealerId: r.dealer_id,
-  amount: Number(r.amount),
-  reason: r.reason,
-  status: r.status,
-  approvalId: r.approval_id,
-  approvedAt: r.approved_at,
-  paidAt: r.paid_at,
-  creditNoteNo: r.credit_note_no,
-});
-
-export const approvalFromRow = (r: DB.ApprovalRow): D.Approval => ({
-  id: r.id,
-  kind: r.kind,
-  title: r.title,
-  actor: r.actor,
-  refersTo: r.refers_to,
-  amount: r.amount === null ? null : Number(r.amount),
-  dealerId: r.dealer_id,
-  reason: r.reason,
-  payload: r.payload,
-  status: r.status,
-  decidedAt: r.decided_at,
-  decisionNote: r.decision_note,
-  createdAt: r.created_at,
-});
-
-export const auditFromRow = (r: DB.AuditLogRow): D.AuditEntry => ({
-  id: r.id,
-  role: r.role,
-  actorText: r.actor_text,
-  action: r.action,
-  dealerId: r.dealer_id,
-  ref: r.ref,
-  occurredAt: r.occurred_at,
-});
-
 /** 0231/0233 — change-request row → DTO (P3 submission/approval flow). */
 export const orderChangeRequestFromRow = (r: DB.OrderChangeRequestRow): D.OrderChangeRequest => ({
   id: r.id,
@@ -877,19 +712,6 @@ export const orderInputToRpcPayload = (
     attrs: a.attrs ?? null,
   })),
   deposit_pct: input.depositPct,
-});
-
-export const inquiryFromRow = (r: DB.InquiryRow): D.Inquiry => ({
-  id: r.id,
-  kind: r.kind,
-  company: r.company,
-  region: r.region,
-  contact: r.contact,
-  stage: r.stage,
-  ownerUserId: r.owner_user_id,
-  note: r.note,
-  linkedDealerId: r.linked_dealer_id,
-  createdAt: r.created_at,
 });
 
 // ---------------------------------------------------------------------------

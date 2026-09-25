@@ -44,10 +44,11 @@ const ORDER = {
   placed_at: "2026-08-21T02:00:00Z", delivery_date: "2026-09-24",
   delivery_date_tbd: false, proceed_date: "2026-08-26",
   source_ref: ["CR-2207", "TCF-8891"], source_system: "native",
-  paid: 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
+  paid: STATE === "evidence-zero" ? 0 : STATE === "saved" ? 1250 : 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
   dealers: { name: "Carres HQ" }, outlets: { name: "PJ Showroom" },
   salespersons: { name: "Bernard" },
-  installment_months: 12, payment_method: "credit_card",
+  installment_months: 12, payment_method: "installment",
+  approval_code: "BANK-REFERENCE", payment_slip_url: "orders-attachments/preview/slip.jpg",
   do_number: null, invoice_no: null, invoiced_at: null, delivered_at: null,
   dispatched_at: null, warehouse_id: null, delivery_partner_id: null,
 };
@@ -87,7 +88,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
   if (url.includes(`/payments`)) {
-    if (STATE === "empty") return json({ payments: [] });
+    if (["empty", "saved", "evidence-zero"].includes(STATE)) return json({ payments: [] });
     if (STATE === "forbidden") return json({ error: "Operation or principal only" }, 403);
     return json({ payments: PAYMENTS });
   }
@@ -101,17 +102,20 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/correction-work")) return json({ work: [] });
   if (url.includes("/service-cases")) return json({ cases: [] });
   if (url.includes("/receiving-sessions") || url.includes("/route")) return json({ sessions: [] });
-  /* The document data the live PDF preview renders from. It needs the shape,
-     not the detail — the pane beside the form is not what this walk is for. */
+  // The PDF and form must use the same saved facts, including services and paid. The fixture
+  // must not hide a parity failure behind unrelated document totals.
   if (url.includes("/sales-order-data"))
     return json({
-      order_id: ID, order_code: "SO-1319", issue_date: "2026-08-21", currency: "MYR",
+      order_id: ID, so_number: "SO-1319", order_code: "SO-1319", issue_date: "2026-08-21", currency: "MYR",
       customer: { name: ORDER.customer_name, phone: ORDER.customer_phone,
         email: ORDER.customer_email, address: "12 Jalan SS2/24, Petaling Jaya" },
       dealer: { name: "Carres HQ", contact: null, salesperson_name: "Bernard",
         outlet_name: "PJ Showroom" },
-      partner: null, lines: [], addons: [], payments: [],
-      subtotal: 4030, total: 4030, paid: 2999.5, balance_due: 1030.5,
+      partner: null,
+      lines: LINES.map((l) => ({ ...l, description: l.label, line_total: l.qty * l.unit_price })),
+      addons: ADDONS.map((a) => ({ ...a, label: a.addon_key === "DELIVERY" ? "Delivery fee" : "Stair carry", line_total: a.qty * a.unit_price })),
+      payments: [],
+      subtotal: 4130, total: 4130, paid: ORDER.paid, balance_due: 4130 - ORDER.paid,
       delivery_date: "2026-09-24",
     });
   if (url.includes("/api/operation/workspace-duties")) return json({ duties: [] });
@@ -121,12 +125,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ salespersons: [{ id: "s1", name: "Bernard" }] });
   if (url.includes("/api/catalog"))
     return json({ skus: [], models: [], addons: [
-      { key: "DELIVERY", name: "Delivery fee", price: 250 },
-      { key: "STAIR_CARRY", name: "Stair carry", price: 100 },
+      { key: "DELIVERY", name: "Delivery fee", price: 250, active: true },
+      { key: "STAIR_CARRY", name: "Stair carry", price: 100, active: true },
+      { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true, serviceSku: "SVC-DISPOSE-MATTRESS", sizeOptions: ["King", "Queen", "Super Single", "Single"] },
     ], entryConfig: { formFields: null } });
   if (url.includes("order-entry-config")) return json({ entryConfig: { formFields: null } });
   if (url.match(/\/api\/operation\/orders\/[0-9a-f-]+$/))
-    return json({ order: ORDER, lines: LINES, addons: ADDONS, total: 4030,
+    return json({ order: ORDER, lines: LINES, addons: ADDONS, total: 4130,
       warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
   return realFetch(input as RequestInfo, init);
 };

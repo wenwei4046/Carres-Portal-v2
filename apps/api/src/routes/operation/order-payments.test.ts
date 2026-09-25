@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -19,17 +12,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 interface TableCfg {
@@ -96,17 +81,8 @@ function makeSb(
   return { from, rpc: rpcFn, calls };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -119,6 +95,33 @@ const PAY_ID = "00000000-0000-0000-0000-0000000002bb";
 // GET /api/operation/orders/:id/payments
 // =====================================================================
 describe("GET /:id/payments", () => {
+  it.each([
+    ["sale-time uploaded slip", "order_create", "deposit", null, " dealer/order/slip.png ", "dealer/order/slip.png"],
+    ["existing receipt takes precedence", "order_create", "deposit", "existing.png", "original.png", "existing.png"],
+    ["later collection cannot inherit deposit proof", "manual", "payment", null, "original.png", null],
+    ["non-deposit cannot inherit deposit proof", "order_create", "payment", null, "original.png", null],
+    ["missing proof stays absent", "order_create", "deposit", null, undefined, null],
+    ["blank proof stays absent", "order_create", "deposit", null, "  ", null],
+    ["malformed proof stays absent", "order_create", "deposit", null, 123, null],
+  ])("resolves %s", async (_label, source, kind, receipt, slip, expected) => {
+    const sb = makeSb({ order_payments: { list: { data: [{
+      id: PAY_ID, order_id: ORDER_ID, amount: 915, kind,
+      receipt_url: receipt, source_channel: source,
+      source_metadata: { payment_slip_url: slip },
+    }], error: null } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { payments: Array<Record<string, unknown>> };
+    expect(body.payments[0].receipt_url).toBe(expected);
+    expect(body.payments[0].amount).toBe(915);
+    expect(body.payments[0]).not.toHaveProperty("source_metadata");
+    expect(sb.calls.updates).toEqual([]);
+  });
+
   it("401 without Authorization", async () => {
     const res = await app.fetch(
       new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`),

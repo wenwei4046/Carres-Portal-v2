@@ -8,7 +8,7 @@ import {
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import MonthCalendar from "@/components/kit/MonthCalendar";
 import { SectionCard } from "@/components/SectionPanel";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 
 /**
@@ -104,7 +104,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
   const visible = filter === "all" ? entries : entries.filter((e) => e.kind === filter);
   const safeDate = ISO_DATE.test(selectedDateIso)
     ? selectedDateIso
-    : new Date().toISOString().slice(0, 10);
+    : appTodayIso();
   const monday = weekMondayOf(safeDate);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => isoAddDays(monday, i)), [monday]);
   const byDay = useMemo(() => {
@@ -203,7 +203,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
         </div>
         <div className="space-y-1">
           {listing.map((e) => entryButton(e, true))}
-          {listing.length === 0 && <p className="text-label font-normal text-base-400">
+          {listing.length === 0 && <p className="text-meta text-kit-slate-11">
             No dated work for this filter. Pick a month date to go back to the Calendar.
           </p>}
         </div>
@@ -228,7 +228,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
             const list = byDay.get(iso) ?? [];
             return <div key={iso}
               className={`rounded-card border border-base-200 p-2 ${off ? "bg-base-50" : "bg-white"}`}>
-              <div className={`text-label ${off ? "text-base-400" : "text-base-600"} ${
+              <div className={`text-label ${off ? "text-kit-slate-11" : "text-kit-slate-12"} ${
                 iso === safeDate ? "font-semibold text-kit-blue-11" : ""}`}>
                 {WEEKDAY_WORD[dow === 0 ? 6 : dow - 1]}, {Number(iso.slice(8, 10))}
                 {iso === safeDate && <span className="ml-1">· selected</span>}
@@ -236,7 +236,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
               </div>
               <div className="mt-1 space-y-1">
                 {list.map((e) => entryButton(e, false))}
-                {list.length === 0 && <p className="text-label font-normal text-base-400">No dated work.</p>}
+                {list.length === 0 && <p className="text-meta text-kit-slate-11">No dated work.</p>}
               </div>
             </div>;
           })}

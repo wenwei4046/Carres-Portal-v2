@@ -19,18 +19,11 @@
   border-radius: 6px;
 }
 
-/* ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (Jess, 2026-09-10) — the
-   same approved light slate blue-grey as the SO Batch Purchase / Manual
-   Purchase / Purchase Orders table header (`PurchasingRegister.module.css`),
-   so one colour means "section header" everywhere in Operations. */
-[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child {
-  background-color: #b9c9d8;
-  color: #26384a;
-}
-
-[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child > h2 {
-  color: #26384a;
-}
+/* ⭐ THE 2026-09-10 SECTION BAND IS RETIRED HERE — superseded by the CARD
+   ORDER AND NAMES ruling (Jess, 2026-09-21) and "remain blue" (2026-09-22).
+   The card is white, the title is `kit-blue-11`, and the only chrome is the
+   1px rule the component draws. Purchase Orders keeps the band; it is a
+   different module and this work did not reopen it. */
 
 [data-so-theme="trial"] .so-detail-style :is(label, .text-base-400, .text-base-500, .text-base-600, .text-kit-slate-11),
 [data-so-theme="trial"] .so-detail-style [data-block] > div:first-child :is(span, p) {
@@ -89,16 +82,10 @@
   @apply text-kit-blue-11;
 }
 
-/* ⭐ DENSITY PASS (Jess, 2026-09-10) — a stricter, more scannable ERP read.
-   SO-scoped only: `.po-detail-style` shares the header markup but keeps its
-   own geometry, and the shared `Input`/`Select`/`DatePicker` kit components
-   (§0.1: "no className, no style") stay untouched everywhere else in the
-   portal — this page recolours and resizes them from the outside, the same
-   way it already recolours them above. */
-.so-detail-style [data-block] > div:first-child {
-  padding: 0.5rem 1rem;
-}
-
-.so-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]) {
-  height: 1.75rem;
-}
+/* ⭐ CONTROLS KEEP THE KIT'S 32px (SO page kit-sizes card, 2026-09-23). The
+   2026-09-10 density pass resized inputs to 28px from here, but the read-only
+   box's own `min-h-8` beat it, so one page drew 28px answers beside 32px
+   answers. The kit's `h-8` is "the height every form row aligns to"
+   (`field-recipe.ts`); this page no longer resizes a kit control from the
+   outside. The header's own padding went with the band: the component's
+   `pb-2` over the 1px rule is the whole treatment. */

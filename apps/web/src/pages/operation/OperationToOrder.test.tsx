@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,23 @@ vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigate };
 });
+
+/* Page-journey tests model the viewer readiness boundary; PdfPreview.test.tsx
+   exercises actual page painting, failure and cancellation separately. */
+const previewState = vi.hoisted(() => ({ ready: true }));
+vi.mock("@/components/kit/PdfPreview", () => ({
+  default: ({ src, title, onReady, "data-testid": testId }: {
+    src: string; title: string; onReady: (ready: boolean) => void; "data-testid": string;
+  }) => {
+    useEffect(() => { onReady(previewState.ready); }, [src]);
+    return <section aria-label={title} data-testid={testId} data-src={src} />;
+  },
+}));
+async function clickIssue() {
+  await waitFor(() => expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+}
+
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -81,6 +99,10 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean; `false` — nothing of
+       this build sits on an open purchase order — is the ordinary case, and it
+       is what makes the row offerable. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -135,12 +157,14 @@ function renderPage(initialEntry = "/operation?tab=purchase") {
 }
 
 beforeEach(() => {
+  previewState.ready = true;
   navigate.mockClear();
   apiFetch.mockReset();
   localStorage.clear();
+  let nextUrl = 0;
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
-    value: vi.fn(() => "blob:so-batch-test"),
+    value: vi.fn(() => `blob:so-batch-${++nextUrl}`),
   });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
 });
@@ -158,7 +182,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
     apiFetch.mockResolvedValue(payload());
     renderPage("/operation/to-order?so=1204");
     await screen.findByTestId("so-batch-page");
-    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands?so=1204");
+    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
   it("opens straight onto the header, the order-timing rail and the Register", async () => {
@@ -168,10 +192,12 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(screen.getByTestId("purchasing-tabs")).toHaveTextContent("SO Batch Purchase");
     const rail = screen.getByTestId("so-batch-rail");
     expect(rail).toBeInTheDocument();
-    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).not.toBeNull();
+    // ⛔ `TO ORDER / All not ordered` is retired (owner correction 2026-09-11):
+    // it named the page's own default, not a fact about a Sales Order.
+    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).toBeNull();
     // The five timing rows; `SETUP TO FIX` hides while its count is zero.
     expect(rail.querySelectorAll("[data-testid^='so-batch-state-']")).toHaveLength(5);
-    expect(rail.textContent).not.toContain("SETUP TO FIX");
+    expect(rail.textContent?.toLowerCase()).not.toContain("setup to fix");
     expect(await screen.findByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
@@ -199,7 +225,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
 
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 1 PO",
+      "1 Sales Order · 1 item · 2 units · Issue 1 PO",
     );
 
     apiFetch.mockClear();
@@ -226,10 +252,10 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
           })
         : Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] }),
     );
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · Version 1 has not reached Hooka",
+      "PO-2041 · PO V1 · Sending not confirmed",
     );
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real
@@ -272,6 +298,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     // document. (`Status` was retired as a presentation on 2026-09-11: the
     // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
+    fireEvent.click(await screen.findByText("No purchase needed"));
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
     );
@@ -300,9 +327,9 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     await screen.findByTestId("so-batch-issue-workspace");
-    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
-    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("Version 3");
+    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO V3");
 
     apiFetch.mockClear();
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
@@ -332,6 +359,27 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       expect.stringContaining("issue-batch"),
       expect.anything(),
     );
+  });
+
+  it("R8 — Back to buying returns to the SAME Register: search, open group and ticks kept", async () => {
+    apiFetch.mockResolvedValue(payload());
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    const search = screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "SO-" } });
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    await screen.findByTestId("so-batch-issue-workspace");
+    /* The Register is hidden, never unmounted. */
+    expect(screen.getByTestId("so-batch-page")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(screen.getByTestId("so-batch-issue-back"));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-issue-workspace")).not.toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-page")).not.toHaveAttribute("aria-hidden");
+    /* The tick survived, so the selection toolbar is still in place … */
+    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
+    /* … and clearing it hands back the toolbar with the query still typed. */
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect((screen.getByTestId("search-box").querySelector("input") as HTMLInputElement).value).toBe("SO-");
   });
 });
 

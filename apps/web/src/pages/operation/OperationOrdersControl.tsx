@@ -20,7 +20,7 @@ import {
 import { workspaceDutyActor } from "./workspace-duty-owner";
 import { useActiveOrder } from "@/lib/active-order";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
@@ -71,6 +71,7 @@ import {
   orderActionButton,
   orderActionChecklist,
   orderActionLine,
+  orderActionLines,
   orderActionQueue,
   orderActionsInDisplayOrder,
   displayOrderAction,
@@ -447,8 +448,7 @@ function daysToDue(o: operationOrderListRow): number | null {
   if (o.delivery_date_tbd || !o.delivery_date) return null;
   const d = new Date(`${o.delivery_date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(`${appTodayIso()}T00:00:00`);
   return Math.round((d.getTime() - today.getTime()) / 86_400_000);
 }
 
@@ -457,10 +457,9 @@ function daysToDue(o: operationOrderListRow): number | null {
 //  customer-deadline DEADLINE band; the supplier stock-window nuance stays in
 //  the NEXT verb's red/amber tone, not a separate filter.)
 
-/** Today as a local ISO date (YYYY-MM-DD) — for lexical ISO date compares. */
+/** Today as YYYY-MM-DD in the business timezone — for lexical ISO date compares. */
 export function todayIso(): string {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  return appTodayIso();
 }
 /** Shift an ISO date by n days (n may be negative), returned as ISO. */
 function addDaysIso(iso: string, n: number): string {
@@ -2020,13 +2019,13 @@ const ORDER_COL_DEFS: OrderColDef[] = [
  *
  * 1.75 / 3.5 — `delivery` pays TWICE what `customer` pays   ← SHIPPED
  *     customer 123 → 105px · delivery 150 → 114px
- *     every human customer name fits; `No logistics picked` ellipsises.
+ *     every human customer name fits; `Logistics not assigned` ellipsises.
  *     Actions, Deadline, Status, Order, Stock and PIC keep C14's width
  *     to the digit.
  * ```
  *
  * **`delivery` pays the larger share because it carries the least, and this
- * module already ruled why.** Its longest string is `No logistics picked`, and
+ * module already ruled why.** Its longest string is `Logistics not assigned`, and
  * §3's frozen rule is that *"the `Delivery` cell never repeats the sentence
  * `Actions` already carries"* — the row states what to DO about missing
  * logistics one column to the right, in the Actions pill, every time. C14's
@@ -2628,6 +2627,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
         .map((a) => ({
         key: a.key,
         line: orderActionLine(a.key, actionParties),
+        // The second structured line of a Delivery sentence (owner ruling
+        // 2026-09-13); null for an action spoken on one line.
+        result: orderActionLines(a.key, actionParties).result,
         tone: a.tone,
         locked: a.locked,
         steps: orderActionChecklist(a.key, actionSignals).map((st) => ({
@@ -3317,7 +3319,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Multi-select facets: one chip per picked value (✕ removes just that one).
   for (const c of logisticFilter)
     activeChips.push({
-      label: c === NO_CARRIER ? "No logistics picked" : `Logistics: ${c}`,
+      label: c === NO_CARRIER ? "Logistics not assigned" : `Logistics: ${c}`,
       onClear: () => setLogisticFilter((p) => toggleInSet(p, c)),
     });
   for (const rg of regionFilter)
@@ -4032,7 +4034,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       and "Unassigned" is not one of the allowed ones. */}
                   {unassignedCount > 0 && (
                     <KanbanRow
-                      label="No logistics picked"
+                      label="Logistics not assigned"
                       count={unassignedCount}
                       active={logisticFilter.has(NO_CARRIER)}
                       chip={picQueueChip}
@@ -5552,8 +5554,8 @@ function DeliveryCell({ logi }: { logi: LogisticState }) {
          rule is that the Actions cell one column right already says what to DO
          about it. An ellipsis here costs a reader nothing they cannot read on
          the same row. */
-      <span className="t4-caption truncate block" title="No logistics picked">
-        No logistics picked
+      <span className="t4-caption truncate block" title="Logistics not assigned">
+        Logistics not assigned
       </span>
     );
   return (
@@ -5679,7 +5681,8 @@ function NextActionCell({
   // delivered order that still owes, or on one whose delivery is held for the
   // balance, it is the only action left. C5: the figure comes from the shared
   // money rule, so the pill, the 🔒 and the Owing facet can never disagree.
-  const line = orderActionLine(na.key, parties);
+  const actionLines = orderActionLines(na.key, parties);
+  const line = actionLines.act;
   // C3 — everything else that is open, folded into ONE `+N`. A cell may have
   // exactly one way of saying "there is more". The count is `open.length − 1`
   // by construction, so the drawer opened by this row shows exactly `1 + N`
@@ -5687,21 +5690,30 @@ function NextActionCell({
   const more = visibleOpen.slice(1);
   return (
     <div className="flex items-center gap-1.5 max-w-full">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onNextAction(na.label);
-        }}
-        className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 hover:brightness-95`}
-        data-next-action={na.label}
-        title={`${line} — click to act`}
-      >
-        {na.locked && (
-          <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
-        )}
-        <span className="truncate min-w-0">{line}</span>
-      </button>
+      <span className="flex min-w-0 flex-col items-start">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNextAction(na.label);
+          }}
+          className={`pill ${NEXT_PILL_CLASS[na.tone]} inline-flex items-center gap-1 min-w-0 max-w-full hover:brightness-95`}
+          data-next-action={na.label}
+          title={actionLines.result ? `${line} · ${actionLines.result}` : line}
+        >
+          {na.locked && (
+            <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
+          )}
+          <span className="truncate min-w-0">{line}</span>
+        </button>
+        {/* ⭐ The REQUIRED RESULT — line two of a Delivery Work sentence
+            (owner ruling 2026-09-13), never joined to the act with `—`. */}
+        {actionLines.result ? (
+          <span className="block max-w-full truncate text-meta text-base-500" data-testid="next-action-result">
+            {actionLines.result}
+          </span>
+        ) : null}
+      </span>
       {more.length > 0 && (
         <button
           type="button"
@@ -5713,7 +5725,7 @@ function NextActionCell({
           className="shrink-0 tabular-nums text-meta font-semibold text-base-500 hover:text-base-900"
           title={`Also open: ${more
             .map((a) => orderActionLine(a.key, parties))
-            .join(" · ")} — click to see them all`}
+            .join(" · ")}`}
         >
           +{more.length}
         </button>

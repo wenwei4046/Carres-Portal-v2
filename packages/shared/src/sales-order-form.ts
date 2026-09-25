@@ -31,6 +31,23 @@ export const CUSTOMER_RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as 
 /** Gender choices the POS offers (0200 demographics). */
 export const CUSTOMER_GENDER_OPTIONS = ["Female", "Male"] as const;
 
+/**
+ * ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (Delivery Blueprint, owner ruling
+ * 2026-09-13; 【DELIVERY】 CARD 18). Delivery address, state, building type,
+ * floor, lift and the requested delivery date are required facts of a valid
+ * NEW order — refused at the POS schema, the wizard and the office create door
+ * with these exact words (docs/COPY-STANDARD.md, the Sales Order entry-gate
+ * words). Monitor's `Order details incomplete` line is left to legacy rows.
+ */
+export const DELIVERY_FACT_REFUSALS = {
+  address: "Delivery address — ask the customer for the address before you save the order",
+  state: "Delivery address — pick the State",
+  buildingType: "Building type — pick the building the goods go to",
+  floor: "Floor — enter the floor the goods go to",
+  lift: "Lift — say whether the building has a lift",
+  date: "Delivery date is required. Ask the customer for the date before you save the order.",
+} as const;
+
 /** Building type of the delivery address (rides `entry_data.fields.building_type`). */
 export const BUILDING_TYPE_OPTIONS = [
   "Landed",

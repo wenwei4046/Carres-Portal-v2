@@ -18,6 +18,9 @@ export type PurchaseOrderRegisterFilter =
   | "pdf_not_sent"
   | "supplier_date_missing"
   | "supplier_date_passed"
+  /** The supplier's evidenced date for the CURRENT version differs from the
+   *  original PO Delivery Date (Purchasing MASTER §9.3 rail, Jess 2026-09-17). */
+  | "supplier_date_changed"
   | "supplier_update_required"
   | "partly_received"
   | "completed"
@@ -55,22 +58,46 @@ export interface PurchaseOrderRegisterInput {
   status: "open" | "received" | "cancelled";
   version?: number | null;
   supplierDate?: string | null;
+  /** The immutable original PO Delivery Date (`official_delivery_date`);
+   *  null when the original is genuinely unknown. */
+  originalDate?: string | null;
   expectedReadyDate?: string | null;
-  lines: readonly { qty: number; receivedQty: number }[];
+  /** `null` = the line quantities could not be read. An unknown read is never
+   *  zero and never Completed (Purchasing MASTER §5.8 / §9.3). */
+  lines: readonly { qty: number | null; receivedQty: number | null }[] | null;
   sends: readonly PurchaseOrderRegisterSend[];
+}
+
+/** The four listing groups, classified Cancelled → Completed → Waiting for
+ *  goods from supplier → Confirm PO sent to supplier so each PO belongs to
+ *  exactly one (MASTER §5.8). The keys are internal state names; the visible
+ *  headings are `Confirm PO sent to supplier` (`not_marked_as_sent`) and
+ *  `Waiting for goods from supplier` (`issued`). */
+export type PurchaseOrderRegisterGroup = "not_marked_as_sent" | "issued" | "completed" | "cancelled";
+
+export interface PurchaseOrderExpectedDelivery {
+  /** The supplier's evidenced current-version date, else the original PO
+   *  Delivery Date, else null (`Not recorded` — never invented). */
+  date: string | null;
+  supplier: "not_confirmed" | "confirmed" | "changed";
+  /** The original date the supplier moved away from, when `changed`. */
+  changedFrom: string | null;
 }
 
 export interface PurchaseOrderRegisterFacts {
   version: number;
+  /** Known only when every line quantity was read. */
+  quantitiesKnown: boolean;
   quantities: { ordered: number; received: number; open: number };
   currentSend: PurchaseOrderRegisterSend | null;
   latestConfirmedSend: PurchaseOrderRegisterSend | null;
-  /** The latest PO version with confirmed-send evidence — `PO V{n}`, or `Not
-   *  sent` when no version has ever been confirmed sent. A PO that received
-   *  goods without a send record stays honestly `Not sent`; missing evidence
-   *  is never fabricated. */
+  /** The latest PO version with a sent mark — `PO V{n}`, or `Sending not
+   *  confirmed` when no version was ever marked. A PO that received goods without a
+   *  mark stays honestly unmarked; missing evidence is never fabricated. */
   sentToSupplier: string;
-  documentState: "Not sent to supplier" | "Issued" | "Completed" | "Cancelled";
+  documentState: "Sending not confirmed" | "Waiting for goods from supplier" | "Completed" | "Cancelled";
+  group: PurchaseOrderRegisterGroup;
+  expected: PurchaseOrderExpectedDelivery;
   operationStatus: PurchaseOrderOperationStatus | null;
   filters: PurchaseOrderRegisterFilter[];
 }
@@ -84,12 +111,22 @@ export function purchaseOrderRegisterFacts(
   todayIso: string,
 ): PurchaseOrderRegisterFacts {
   const version = Math.max(1, Number(input.version ?? 1));
-  const ordered = input.lines.reduce((sum, line) => sum + Math.max(0, Number(line.qty) || 0), 0);
-  const received = input.lines.reduce(
+  const lines = input.lines ?? [];
+  const quantitiesKnown =
+    input.lines != null &&
+    lines.every(
+      (line) =>
+        line.qty != null && Number.isFinite(Number(line.qty)) &&
+        line.receivedQty != null && Number.isFinite(Number(line.receivedQty)),
+    );
+  const ordered = lines.reduce((sum, line) => sum + Math.max(0, Number(line.qty) || 0), 0);
+  const received = lines.reduce(
     (sum, line) => sum + Math.max(0, Math.min(Number(line.qty) || 0, Number(line.receivedQty) || 0)),
     0,
   );
   const open = Math.max(0, ordered - received);
+  /* Goods are known to be pending only when the read succeeded. */
+  const pending = quantitiesKnown && open > 0;
   const confirmed = input.sends
     .filter((send) => send.kind === "confirmed_sent" && confirmedVersion(send) > 0)
     .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
@@ -97,27 +134,34 @@ export function purchaseOrderRegisterFacts(
   const latestConfirmedSend = confirmed[0] ?? null;
   const supplierVersion = latestConfirmedSend ? confirmedVersion(latestConfirmedSend) : null;
   const cancelled = input.status === "cancelled";
-  const completed = !cancelled && (input.status === "received" || (ordered > 0 && open === 0));
+  /* A failed quantity read can never make a PO Completed; only the
+     authoritative `received` status still can. */
+  const completed =
+    !cancelled && (input.status === "received" || (quantitiesKnown && ordered > 0 && open === 0));
   const filters: PurchaseOrderRegisterFilter[] = [];
 
   if (!cancelled && !completed && !currentSend) filters.push("pdf_not_sent");
   if (!cancelled && !completed && version > 1 && supplierVersion !== version) {
     filters.push("supplier_update_required");
   }
-  if (!cancelled && !completed && currentSend && open > 0 && !input.supplierDate) {
+  /* SUPPLIER REPLY facets: only a current version marked as sent with goods
+     pending (MASTER §9.3). */
+  const replyOpen = !cancelled && !completed && !!currentSend && pending;
+  if (replyOpen && !input.supplierDate) {
     filters.push("supplier_date_missing");
   }
   if (
-    !cancelled &&
-    !completed &&
-    currentSend &&
-    open > 0 &&
+    replyOpen &&
     !!input.supplierDate &&
-    input.supplierDate < todayIso
+    !!input.originalDate &&
+    input.supplierDate !== input.originalDate
   ) {
+    filters.push("supplier_date_changed");
+  }
+  if (replyOpen && !!input.supplierDate && input.supplierDate < todayIso) {
     filters.push("supplier_date_passed");
   }
-  if (!cancelled && !completed && received > 0 && open > 0) filters.push("partly_received");
+  if (!cancelled && !completed && quantitiesKnown && received > 0 && open > 0) filters.push("partly_received");
   if (completed) filters.push("completed");
   if (cancelled) filters.push("cancelled");
 
@@ -133,19 +177,37 @@ export function purchaseOrderRegisterFacts(
             ? "Issued"
             : null;
 
+  const group: PurchaseOrderRegisterGroup = cancelled
+    ? "cancelled"
+    : completed
+      ? "completed"
+      : currentSend
+        ? "issued"
+        : "not_marked_as_sent";
+  const supplierDate = input.supplierDate ?? null;
+  const originalDate = input.originalDate ?? null;
+  const expected: PurchaseOrderExpectedDelivery = supplierDate
+    ? originalDate && supplierDate !== originalDate
+      ? { date: supplierDate, supplier: "changed", changedFrom: originalDate }
+      : { date: supplierDate, supplier: "confirmed", changedFrom: null }
+    : { date: originalDate, supplier: "not_confirmed", changedFrom: null };
+
   return {
     version,
+    quantitiesKnown,
     quantities: { ordered, received, open },
     currentSend,
     latestConfirmedSend,
-    sentToSupplier: supplierVersion == null ? "Not sent" : `PO V${supplierVersion}`,
+    sentToSupplier: supplierVersion == null ? "Sending not confirmed" : `PO V${supplierVersion}`,
     documentState: cancelled
       ? "Cancelled"
       : completed
         ? "Completed"
         : currentSend
-          ? "Issued"
-          : "Not sent to supplier",
+          ? "Waiting for goods from supplier"
+          : "Sending not confirmed",
+    group,
+    expected,
     operationStatus,
     filters,
   };

@@ -10,8 +10,8 @@
  * as readable refusals), and the approve hook that lets the SYSTEM attempt
  * the issue on the admin client, fail-soft.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -24,30 +24,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });
@@ -124,106 +107,43 @@ describe("GET /:orderId — any internal reader", () => {
   });
 });
 
-describe("POST /:orderId — raise the request", () => {
-  it("calls the ONE door with the trimmed reason and returns 201", async () => {
+/**
+ * ⛔ THE WRITE DOORS ARE SHUT (owner ruling 2026-09-12; migration 0486).
+ * Money in full before delivery is absolute: nothing raises or decides an
+ * unpaid-delivery approval any more. The route answers 410 Gone and never
+ * reaches the database — the negative control that would fail if the door
+ * were quietly reopened.
+ */
+describe("POST /:orderId and /:id/decide — RETIRED, 410 Gone, no RPC", () => {
+  it.each(["operation", "principal", "salesperson"])("raising a request is gone for %s", async (role) => {
     const { rpc } = mockSb();
-    const res = await call(`/${ORDER_ID}`, "operation", {
+    const res = await call(`/${ORDER_ID}`, role, {
       method: "POST",
-      body: { reason: "  Outstation — partner schedules the customer  " },
+      body: { reason: "Outstation — partner schedules the customer" },
     });
-    expect(res.status).toBe(201);
-    expect(rpc).toHaveBeenCalledWith("delivery_payment_approval_request", {
-      p_order_id: ORDER_ID,
-      p_reason: "Outstation — partner schedules the customer",
-    });
-  });
-
-  it("refuses an empty reason at the schema — before any role check", async () => {
-    const { rpc } = mockSb();
-    const res = await call(`/${ORDER_ID}`, "operation", {
-      method: "POST",
-      body: { reason: "   " },
-    });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(410);
+    const body = await res.json() as { code: string; path: string; message: string };
+    expect(body.code).toBe("no_unpaid_delivery_approval");
+    expect(body.path).toBe("/finance/monitor");
+    expect(body.message).toContain("Money must be in full before delivery");
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("surfaces the database's own refusal readably (a second pending ask)", async () => {
-    mockSb({
-      rpcErr: {
-        code: "P0001",
-        message: "a payment approval request is already waiting for the approver",
-      },
-    });
-    const res = await call(`/${ORDER_ID}`, "operation", {
-      method: "POST",
-      body: { reason: "Ask again" },
-    });
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(JSON.stringify(await res.json())).toContain("already waiting");
-  });
-});
-
-describe("POST /:id/decide — the approver's word", () => {
-  it("passes decision + reason to the ONE door", async () => {
-    const { rpc } = mockSb({ rpcRow: { ...APPROVED_ROW, status: "refused" } });
-    const res = await call(`/${REQ_ID}/decide`, "principal", {
-      method: "POST",
-      body: { decision: "refused", reason: "Collect in full first" },
-    });
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("delivery_payment_approval_decide", {
-      p_id: REQ_ID,
-      p_decision: "refused",
-      p_reason: "Collect in full first",
-    });
-  });
-
-  it("refuses a decision without its reason — black and white, never verbal", async () => {
-    const { rpc } = mockSb();
-    const res = await call(`/${REQ_ID}/decide`, "principal", {
-      method: "POST",
-      body: { decision: "approved", reason: "" },
-    });
-    expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("surfaces the database's approver refusal — the route invents no second guard", async () => {
-    mockSb({
-      rpcErr: {
-        code: "42501",
-        message: "forbidden: only the configured approver decides a delivery payment approval",
-      },
-    });
-    const res = await call(`/${REQ_ID}/decide`, "operation", {
-      method: "POST",
-      body: { decision: "approved", reason: "yes" },
-    });
-    expect(res.status).toBe(403);
-  });
-
-  it("⭐ an APPROVAL lets the SYSTEM attempt the issue on the admin client, fail-soft", async () => {
-    mockSb({ rpcRow: APPROVED_ROW });
-    // The admin attempt blows up entirely — the decide response must not care.
-    vi.mocked(adminClient).mockImplementation(() => {
-      throw new Error("admin unavailable");
-    });
+  it("deciding is gone even for the principal, and the system attempts no DO issue", async () => {
+    const { rpc } = mockSb({ rpcRow: APPROVED_ROW });
     const res = await call(`/${REQ_ID}/decide`, "principal", {
       method: "POST",
       body: { decision: "approved", reason: "COD before unloading" },
     });
-    expect(res.status).toBe(200);
-    expect(vi.mocked(adminClient)).toHaveBeenCalled();
+    expect(res.status).toBe(410);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(vi.mocked(adminClient)).not.toHaveBeenCalled();
   });
 
-  it("a REFUSAL attempts nothing — no gate opened, no mint to try", async () => {
-    mockSb({ rpcRow: { ...APPROVED_ROW, status: "refused" } });
-    const res = await call(`/${REQ_ID}/decide`, "principal", {
-      method: "POST",
-      body: { decision: "refused", reason: "Collect first" },
-    });
+  it("history stays readable — an approval granted before the door closed is still served", async () => {
+    mockSb({ listRows: [APPROVED_ROW] });
+    const res = await call(`/${ORDER_ID}`, "operation");
     expect(res.status).toBe(200);
-    expect(vi.mocked(adminClient)).not.toHaveBeenCalled();
+    expect(((await res.json()) as Array<{ status: string }>)[0]?.status).toBe("approved");
   });
 });

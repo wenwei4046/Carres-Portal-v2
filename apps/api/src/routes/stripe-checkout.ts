@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { createStripeCheckoutInputSchema } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { parseJsonBody, fail } from "../lib/route-helpers";
 import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -251,8 +251,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   if (insErr) {
     // Money safety: a link we can't track must not stay payable.
     await stripe.checkout.sessions.expire(session.id).catch(() => {});
-    const m = mapPgError(insErr);
-    return c.json(m.body, m.status);
+    return fail(c, insErr);
   }
 
   return c.json({ session: shape(row as SessionRow) }, 201);
@@ -278,10 +277,7 @@ stripeCheckoutRouter.get("/:id/stripe/checkout", async (c) => {
     .eq("order_id", idCheck.data)
     .order("created_at", { ascending: false })
     .limit(5);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ sessions: ((data ?? []) as SessionRow[]).map(shape) });
 });
 
@@ -308,10 +304,7 @@ stripeCheckoutRouter.get("/:id/stripe/checkout/:sid", async (c) => {
     .eq("session_id", sidCheck.data)
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!row) throw new HTTPException(404, { message: "Checkout session not found" });
 
   let current = row as SessionRow;

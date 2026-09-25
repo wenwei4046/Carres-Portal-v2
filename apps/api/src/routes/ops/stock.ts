@@ -6,15 +6,10 @@ import {
   opsStockReleaseInputSchema,
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
-  opsStockHoldUnitInputSchema,
-  opsStockResolveUnitHoldInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
-  opsStockSetSiteInputSchema,
-  opsStockSetHolderInputSchema,
-  opsStockSetOwnershipInputSchema,
   opsStockImportInputSchema,
   opsReorderPointInputSchema,
   opsReserveLevelInputSchema,
@@ -43,12 +38,15 @@ import {
   canonicalUnitIdFrom,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { stockMovementEvidence } from "../../lib/stock-movement-evidence";
 import { stockRegisterContext } from "../../lib/stock-register-context";
-import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
+import { attemptDeliveryOrderIssue, todayIsoMYT } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
 import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
 
 /**
  * Per-unit stock register (migration 0137) — Carres Klang scope.
@@ -356,7 +354,18 @@ opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c)
     };
   });
 
-  return c.json({ unit, events });
+  const context = await stockRegisterContext(sb, [unit]);
+  return c.json({ unit: context[0], events });
+});
+
+opsStockRouter.get("/register/:unitCode/movements", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const code = c.req.param("unitCode").replace(/([\\%_])/g, "\\$1");
+  const { data: unit, error } = await sb.from("stock_unit_register_v")
+    .select("id,identity_scope").ilike("unit_code", code).maybeSingle();
+  if (error) throw mapErr(error);
+  if (!unit || unit.identity_scope === "quantity") throw new HTTPException(404, { message: "No Unit with that ID" });
+  return c.json({ evidence: await stockMovementEvidence(sb, unit.id) });
 });
 
 // =====================================================================
@@ -461,7 +470,7 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
     taken_at: string;
   }[];
 
-  const names = await nameMap(sb, [...new Set(raw.map((r) => r.taken_by))]);
+  const names = await resolveActorNames(sb, [...new Set(raw.map((r) => r.taken_by))]);
   const entries: PoolUsageEntry[] = raw.map((r) => ({
     id: r.id,
     sku: r.sku,
@@ -519,7 +528,7 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
  */
 opsStockRouter.get("/health", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
 
   // The plans decide how far back the sales window must reach: a month can only
   // be scored if its own sales were fetched. Read them first for that reason.
@@ -739,7 +748,7 @@ opsStockRouter.put("/reserve-level", requireOperationOrPrincipal, async (c) => {
  *
  * FAIL-SOFT and FIRE-AND-CHECK: an issuance hiccup must never undo or refuse
  * the reservation the operator just made — the facts persist, and the next
- * door (or the manual backstop) issues it. Only a `SO-{n}` ref can name an
+ * door (or Request Delivery Order) issues it. Only a `SO-{n}` ref can name an
  * order; every other ref (loans, partners) has no delivery-order gate.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -835,36 +844,6 @@ opsStockRouter.post("/release", requireOperationOrPrincipal, async (c) => {
   return c.json({ itemId: data });
 });
 
-// CARD 2 (0341) — the inspection ENTRY door. A wrong / surplus / released /
-// customer-rejected unit goes free|reserved → on_hold with a reason and NO
-// supplier claim (claims are still born only at receiving). A reserved unit's
-// ref moves into ref_history; the SO keeps owing through Card 1's truth.
-opsStockRouter.post("/hold", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockHoldUnitInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_hold_unit", {
-    p_item_id: parsed.itemId,
-    p_reason: parsed.reason,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json(data);
-});
-
-// CARD 2 (0341) — the inspection EXIT door. A claimless hold ends
-// back_to_stock (Available) or written_off; `returned` needs the claim door.
-opsStockRouter.post("/hold-resolve", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockResolveUnitHoldInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_resolve_unit_hold", {
-    p_item_id: parsed.itemId,
-    p_outcome: parsed.outcome,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json(data);
-});
-
 opsStockRouter.post("/reassign", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockReassignInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -957,81 +936,6 @@ opsStockRouter.post("/refurbish-complete", requireOperationOrPrincipal, async (c
   });
   if (error) throw mapErr(error);
   return c.json({ itemId: data as string });
-});
-
-// =====================================================================
-// 0366 · THE UNIT FACTS — one door each
-//
-// WHERE and WHO HAS IT are separate facts and move separately: a Unit can sit
-// in the Klang warehouse while NETS Delivery is responsible for it, and it can
-// change hands without changing Site (Stock MASTER §3). Ownership is
-// Purchasing's answer to why Carres holds the goods. Every one of them leaves
-// an append-only event behind it.
-// =====================================================================
-
-opsStockRouter.post("/:itemId/site", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const parsed = await parseBody(c, opsStockSetSiteInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_set_site", {
-    p_item_id: itemId,
-    p_warehouse_id: parsed.warehouseId,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-opsStockRouter.post("/:itemId/holder", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const parsed = await parseBody(c, opsStockSetHolderInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_set_holder", {
-    p_item_id: itemId,
-    p_party_code: parsed.partyCode,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-opsStockRouter.post("/:itemId/ownership", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const parsed = await parseBody(c, opsStockSetOwnershipInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_set_ownership", {
-    p_item_id: itemId,
-    p_ownership: parsed.ownership,
-    p_supplier: parsed.supplier ?? null,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-// A person physically confirmed this Unit. Never inferred from an edit — an
-// operator opening a screen is not an operator looking at a sofa.
-opsStockRouter.post("/:itemId/verify", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_verify_unit", {
-    p_item_id: itemId,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-// GET /parties — WHO HAS IT, as configured. NETS is a row here, never a Site
-// and never a hard-coded name in this file.
-opsStockRouter.get("/parties", requireOperationOrPrincipal, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("stock_operating_parties")
-    .select("id, code, name, kind, active")
-    .eq("active", true)
-    .order("name", { ascending: true });
-  if (error) throw mapErr(error);
-  return c.json({ parties: data ?? [] });
 });
 
 // 0366 — "+ Add stock" IS GONE. A Unit is BORN when a PO or Consignment
@@ -1234,11 +1138,6 @@ function thisMonthMyt(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
 }
 
-/** Today in the same calendar. K5 dates everything from here. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
-
 /** A malformed `?period=` reads as "this month" rather than 500-ing: the
  *  screen's default question is always the current month anyway. */
 function monthParam(raw: string | undefined): string {
@@ -1256,38 +1155,6 @@ function nextMonth(period: string): string {
   return m === 12
     ? `${y + 1}-01`
     : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
-}
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + parsed.error.issues[0]?.message,
-    });
-  }
-  return parsed.data;
 }
 
 function mapErr(error: { code?: string; message?: string }): HTTPException {

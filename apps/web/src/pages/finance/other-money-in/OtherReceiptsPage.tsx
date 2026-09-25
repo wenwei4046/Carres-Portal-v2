@@ -33,11 +33,14 @@ import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
 import Textarea from "@/components/kit/Textarea";
 import ListPageShell from "@/components/ListPageShell";
+import { takesIn } from "@carres/shared/money-accounts";
+import { useMoneyAccounts } from "../settings/api";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
+import { otherReceiptDoc } from "@/lib/pdf/other-money-in-docs";
 import {
   useCancelReceipt,
   useMoneyInAccounts,
@@ -62,6 +65,8 @@ import {
   type LineErrors,
   type TypedLine,
 } from "./parts";
+import { DepartmentFilter, DepartmentName, useDepartmentParam } from "../department";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_PARTY = "none";
@@ -123,7 +128,8 @@ export default function OtherReceiptsPage() {
 /* ── the Register ──────────────────────────────────────────────────────────── */
 
 function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
-  const query = useOtherReceipts();
+  const [dept, setDept] = useDepartmentParam();
+  const query = useOtherReceipts(dept);
   const columns = useMemo<DataGridColumn<OtherReceiptRow>[]>(
     () => [
       {
@@ -220,9 +226,12 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         isLoading={!query.isSuccess}
         searchPlaceholder="Search receipts…"
         toolbarStart={
-          <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
-            New receipt
-          </Button>
+          <span className="flex items-center gap-4">
+            <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
+              New receipt
+            </Button>
+            <DepartmentFilter value={dept} onChange={setDept} />
+          </span>
         }
         emptyMessage="No other receipt yet. Press New receipt to record a loan in, other income, or money against an invoice."
         expandTitle="Inspect receipt"
@@ -273,6 +282,7 @@ function ReceiptForm({
   const parties = useOtherDebtorParties();
   const invoices = useOtherDebtorInvoices();
   const accounts = useMoneyInAccounts();
+  const moneyAccounts = useMoneyAccounts();
   const record = useRecordReceipt();
   /* One key per opening of this form — never regenerated on a re-render or a
      refused press, so a second press can only find the first receipt. */
@@ -314,8 +324,10 @@ function ReceiptForm({
   }, [invoices.data, prefillInvoiceId]);
 
   const moneyOptions = useMemo(
-    () => (accounts.data ?? []).filter((a) => a.for_money).map((a) => ({ value: a.code, label: accountLabel(a) })),
-    [accounts.data],
+    // 0512: Received into reads the one money-account list — cash, banks and
+    // holding accounts (GHL, AhaPay, Online).
+    () => (moneyAccounts.data ?? []).filter(takesIn).map((a) => ({ value: a.code, label: accountLabel(a) })),
+    [moneyAccounts.data],
   );
   const lineAccounts = useMemo(() => (accounts.data ?? []).filter((a) => a.for_receipt_line), [accounts.data]);
   const partyOptions = useMemo(
@@ -402,13 +414,14 @@ function ReceiptForm({
     });
   };
 
-  if (parties.isError || accounts.isError || invoices.isError) {
+  if (parties.isError || accounts.isError || moneyAccounts.isError || invoices.isError) {
     return (
       <LoadFailed
         what="The parties, invoices and accounts for this form"
         onRetry={() => {
           void parties.refetch();
           void accounts.refetch();
+          void moneyAccounts.refetch();
           void invoices.refetch();
         }}
       />
@@ -455,7 +468,7 @@ function ReceiptForm({
               value={moneyAccount}
               onValueChange={setMoneyAccount}
               options={moneyOptions}
-              placeholder={accounts.isLoading ? "Loading accounts…" : "Choose the bank or cash account"}
+              placeholder={moneyAccounts.isLoading ? "Loading accounts…" : "Choose the bank or cash account"}
               error={fieldErrors.account}
             />
             <DatePicker
@@ -513,17 +526,17 @@ function ReceiptForm({
         </Facts>
 
         {fieldErrors.empty && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {fieldErrors.empty}
-          </p>
+          </FieldError>
         )}
         <p className="text-strong" data-testid="receipt-total">
           Total received {money(total)}
         </p>
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11" data-testid="receipt-refusal">
+          <FieldError testId="receipt-refusal">
             {refusal}
-          </p>
+          </FieldError>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
@@ -581,6 +594,18 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
   const [refusal, setRefusal] = useState<string | null>(null);
   const r = detail.receipt;
   const mayCancel = me.data?.mayCancel === true && r.status === "posted";
+  const [printing, setPrinting] = useState(false);
+  const downloadPdf = async () => {
+    setPrinting(true);
+    try {
+      const { renderReceiptPdf } = await import("@/lib/pdf/render");
+      window.open(URL.createObjectURL(await renderReceiptPdf(otherReceiptDoc(detail))), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The receipt could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-auto p-4" data-testid="other-receipt-object">
@@ -592,6 +617,9 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
           <span className="text-strong">{r.receipt_no}</span>
           <StatusPill tone={r.status === "posted" ? "success" : "neutral"}>{otherReceiptStatusWord(r.status)}</StatusPill>
           <span className="flex-1" />
+          <Button variant="neutral" loading={printing} onClick={downloadPdf}>
+            Download PDF
+          </Button>
           {mayCancel && (
             <Button
               variant="neutral"
@@ -632,6 +660,7 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
                 {accountLabel({ code: l.account_code, name: l.account_name })}
                 {" — "}
                 {l.description ?? "No description"}
+                {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
               </span>
               <span>{money(l.amount)}</span>
             </p>

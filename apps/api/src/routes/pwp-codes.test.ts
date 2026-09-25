@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -10,7 +10,6 @@ vi.mock("../lib/supabase", () => ({
 
 import { userClient } from "../lib/supabase";
 
-const KID = "test-kid-pwpcodes";
 // Valid-hex uuids — the reserve response round-trips through pwpCodeSchema, whose
 // ruleId/ownerStaffId are z.string().uuid(), so these must be real uuids.
 const STAFF_ID = "0000000a-0000-0000-0000-000000005741";
@@ -25,19 +24,11 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role = "salesperson") {
-  return new SignJWT({
+  return signTestJwt(STAFF_ID, {
     email: "sales@carres.com",
     app_metadata: { role, dealer_id: "00000000-0000-0000-0000-000000000d01" },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject(STAFF_ID)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 /* ─── stateful pwp_codes mock ─────────────────────────────────────────────────
@@ -220,17 +211,8 @@ const skuJoinRow = (sku: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -387,30 +369,6 @@ describe("GET /api/pwp-codes/mine", () => {
     const reap = sb._rpcCalls.find((c: { name: string }) => c.name === "pwp_reap_orphans");
     // Self-scoped RPC (review BLOCKER fix): the route no longer passes p_owner —
     // the RPC forces the owner to auth.uid() + clamps the grace.
-    expect(reap?.args).toEqual({ p_grace_minutes: 15 });
-  });
-});
-
-describe("POST /api/pwp-codes/reap", () => {
-  it("calls pwp_reap_orphans owner-scoped + returns the count", async () => {
-    const sb = mockSb();
-    sb.rpc = async (name: string, args: unknown) => {
-      sb._rpcCalls.push({ name, args });
-      return { data: 3, error: null };
-    };
-    vi.mocked(userClient).mockReturnValue(sb);
-    const res = await app.fetch(
-      new Request("http://t/api/pwp-codes/reap", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${await makeJwt()}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { reaped: number };
-    expect(body.reaped).toBe(3);
-    const reap = sb._rpcCalls.find((c: { name: string }) => c.name === "pwp_reap_orphans");
-    // Self-scoped RPC (review BLOCKER fix): no p_owner — owner forced to auth.uid().
     expect(reap?.args).toEqual({ p_grace_minutes: 15 });
   });
 });

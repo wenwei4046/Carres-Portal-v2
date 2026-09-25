@@ -30,7 +30,7 @@ function unitLabel(unit: { unitCode: string | null; lineSku: string }): string {
 }
 
 const LOCATION_OPTIONS: Array<{
-  value: DeliveryAttemptRecordInput["whereGoods"];
+  value: NonNullable<DeliveryAttemptRecordInput["whereGoods"]>;
   label: string;
 }> = [
   { value: "returned_to_warehouse", label: "Returned to Warehouse" },
@@ -38,13 +38,79 @@ const LOCATION_OPTIONS: Array<{
   { value: "with_customer", label: "With Customer" },
 ];
 
+/** 0491 — the governed words for a Unit that did not reach the customer. The
+ *  immediate inspection hold is retired: a Unit coming back rides the Inbound
+ *  arrival the result plans, and the Warehouse's receipt is what checks it. */
+const RETURN_ACTION_WORDS: Array<{ value: "back_to_pool" | "inspection_hold"; label: string }> = [
+  { value: "inspection_hold", label: "Return to Warehouse for checking" },
+  { value: "back_to_pool", label: "Release the reservation" },
+];
+
+/**
+ * 0491 — an INTERMEDIATE Journey leg records its arrival at the named
+ * warehouse: no Unit moves, the customer leg still owes its own result.
+ */
+function LegArrivalForm({
+  orderId,
+  leg,
+  destination,
+  onClose,
+}: {
+  orderId: string;
+  leg: number;
+  destination: string | null;
+  onClose: () => void;
+}) {
+  const record = useRecordDeliveryAttempt(orderId);
+  const [note, setNote] = useState("");
+  return (
+    <Modal title={`Arrived${destination ? ` at ${destination}` : ""}`} onClose={onClose}>
+      <div className="grid gap-3">
+        <p className="text-meta text-base-600">
+          This records that the goods reached the named warehouse. The customer has not received them — the next leg carries its own result.
+        </p>
+        <label className="grid gap-1 text-meta font-medium text-base-700">
+          Note
+          <textarea
+            aria-label="Note"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={2}
+            className="rounded-md border border-base-300 bg-white px-2 py-1 text-body font-normal"
+          />
+        </label>
+      </div>
+      <ModalActions
+        onCancel={onClose}
+        onPrimary={() =>
+          record.mutate(
+            { result: "delivered", leg, note: note.trim() || null, deliveredItemIds: [], returned: [] },
+            {
+              onSuccess: () => {
+                toast.success("Arrival recorded");
+                onClose();
+              },
+              onError: (error) => toast.error(error.message),
+            },
+          )
+        }
+        primary="Record arrival"
+        primaryDisabled={record.isPending}
+        primaryPending={record.isPending}
+      />
+    </Modal>
+  );
+}
+
 function DeliveryAttemptForm({
   orderId,
   result,
+  leg = 0,
   onClose,
 }: {
   orderId: string;
   result: IncompleteResult;
+  leg?: number;
   onClose: () => void;
 }) {
   const allocationQ = useOrderAllocation(orderId, true);
@@ -89,6 +155,7 @@ function DeliveryAttemptForm({
         reasonKey: reasonKey as DeliveryAttemptRecordInput["reasonKey"],
         whereGoods: whereGoods as DeliveryAttemptRecordInput["whereGoods"],
         note: note.trim(),
+        leg,
         deliveredItemIds: result === "partial" ? [...delivered] : [],
         returned:
           whereGoods === "returned_to_warehouse"
@@ -210,8 +277,9 @@ function DeliveryAttemptForm({
                   className="h-9 rounded-md border border-base-300 bg-white px-2 text-body"
                 >
                   <option value="">Select action</option>
-                  <option value="back_to_pool">Return to Available</option>
-                  <option value="inspection_hold">Hold for Inspection</option>
+                  {RETURN_ACTION_WORDS.map((w) => (
+                    <option key={w.value} value={w.value}>{w.label}</option>
+                  ))}
                 </select>
               </label>
             ))}
@@ -248,13 +316,23 @@ function DeliveryAttemptForm({
 export default function DeliveryResultAction({
   order,
   lines,
+  leg = 0,
+  lastLeg = 0,
+  legDestination = null,
 }: {
   order: DeliveryResultOrder;
   lines: Array<{ sku: string; qty: number }>;
+  /** 0491 — the Delivery scope this result belongs to (0 = the whole order). */
+  leg?: number;
+  /** The Journey's last leg; a leg before it records an ARRIVAL, not a delivery. */
+  lastLeg?: number;
+  /** The intermediate leg's named destination (`JB transit`), for the words. */
+  legDestination?: string | null;
 }) {
   const [chooserOpen, setChooserOpen] = useState(false);
   const [deliveredOpen, setDeliveredOpen] = useState(false);
   const [incompleteResult, setIncompleteResult] = useState<IncompleteResult | null>(null);
+  const intermediateLeg = leg > 0 && leg < lastLeg;
 
   return (
     <>
@@ -276,8 +354,9 @@ export default function DeliveryResultAction({
                 setChooserOpen(false);
                 setDeliveredOpen(true);
               }}
+              data-testid="do-result-delivered"
             >
-              Delivered
+              {intermediateLeg ? "Arrived" : "Delivered"}
             </button>
             <button
               type="button"
@@ -302,7 +381,14 @@ export default function DeliveryResultAction({
           </div>
         </Modal>
       ) : null}
-      {deliveredOpen ? (
+      {deliveredOpen && intermediateLeg ? (
+        <LegArrivalForm
+          orderId={order.id}
+          leg={leg}
+          destination={legDestination}
+          onClose={() => setDeliveredOpen(false)}
+        />
+      ) : deliveredOpen ? (
         <DOAttachModal
           order={order}
           warehouse={null}
@@ -314,6 +400,7 @@ export default function DeliveryResultAction({
         <DeliveryAttemptForm
           orderId={order.id}
           result={incompleteResult}
+          leg={leg}
           onClose={() => setIncompleteResult(null)}
         />
       ) : null}

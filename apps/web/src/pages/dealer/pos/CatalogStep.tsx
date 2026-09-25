@@ -1,5 +1,5 @@
 import { Search, Sofa } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
@@ -130,6 +130,9 @@ export default function CatalogStep({
   // configurator prefilled; on save the line is REPLACED in place.
   const [editingLine, setEditingLine] = useState<DraftLine | null>(null);
   const [pulse, setPulse] = useState(false);
+  const pulseTimer = useRef<number | undefined>(undefined);
+  // A pulse still pending when the page unmounts must not fire afterwards.
+  useEffect(() => () => window.clearTimeout(pulseTimer.current), []);
 
   const lockedCats = useMemo(
     () => lockedCategoriesFor(draft.lines, index.skuToCategory),
@@ -421,8 +424,13 @@ export default function CatalogStep({
     // The one-shot FAB pulse (class applied by FloatingCartButton when
     // pulse=true; cleared after 220ms) is the ONLY add feedback — no toast,
     // per Loo 2026-07-14: no notification pop-ups on cart mutations.
+    pulseCart();
+  }
+
+  function pulseCart() {
+    window.clearTimeout(pulseTimer.current);
     setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
+    pulseTimer.current = window.setTimeout(() => setPulse(false), 220);
   }
 
   /** 0239 — add a bundle: explode it into one line per component (Σ-exact
@@ -456,8 +464,7 @@ export default function CatalogStep({
       };
     });
     onChange({ ...draft, lines: [...draft.lines, ...newLines] });
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
+    pulseCart();
   }
 
   /** 0241 — a bundle card tap routes: anything with a choice or spec axes
@@ -485,8 +492,7 @@ export default function CatalogStep({
     const newLines: DraftLine[] = assembled.map((l) => ({ ...l, localId: newLocalId() }));
     onChange({ ...draft, lines: [...draft.lines, ...newLines] });
     setConfiguringBundle(null);
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
+    pulseCart();
   }
 
   /** Cart-line EDIT save — swap the edited line IN PLACE (same localId, so the
@@ -873,9 +879,6 @@ export default function CatalogStep({
             fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
             fabricTierConfig={catalog.fabricTierConfig}
             modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-            sofaCompartments={catalog.sofaCompartments}
-            modelSofaCompartments={catalog.modelSofaCompartments}
-            sofaCombos={catalog.sofaCombos}
             specialAddons={catalog.specialAddons}
             onAdd={addLine}
             onClose={closeConfigure}

@@ -115,15 +115,20 @@ describe("the empty query", () => {
     /* `operation:stock` is the Inventory Register — the 2026-09-01 Blueprint's
      * word for the Warehouse master list (CARD-2026-09-01-warehouse-01-sidebar);
      * same key, same route, the sidebar's own word. */
+    /* `operation:orders` is `Outright Sales` since the 2026-09-23 navigation
+     * ruling — same key, same route, same recent entry, the sidebar's own
+     * word. ⌘K composes from `visibleItems`, so the rail and the jump surface
+     * can never drift into two words for one destination. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
-      "Sales OrdersOperations",
+      "Outright SalesOperations",
       "InventoryOperations",
-      "PaymentsOperations",
-      // `Monitor` since the four-page map made it the Delivery module's
-      // flagship child (CARD-2026-09-04-delivery-01) — same key, same route,
-      // the sidebar's own word.
-      "MonitorOperations",
+      // `operation:payments` is the Payments module's `Monitor` since the
+      // 2026-09-12 ruling — same key, same recent, the sidebar's own word.
+      // Three modules now own a `Monitor` (Delivery · Warehouse · Payments),
+      // so a shared label carries its module word.
+      "Payments · MonitorOperations",
+      "Delivery · MonitorOperations",
     ]);
     expect(labels.filter((l) => l === "SuppliersOperations")).toHaveLength(1);
     expect(screen.getByText("Recent")).toBeInTheDocument();
@@ -138,21 +143,28 @@ describe("the empty query", () => {
 
 describe("what typing searches", () => {
   it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
-    // The PAGES are the destinations, never the module row. `Purchase Returns`
-    // is `Coming soon` and a door the rail refuses to open may not be offered
-    // here — grouping the rail changed no destination and added no door,
-    // because a drawer is presentation and Jump To lists pages.
+    // The PAGES are the destinations, never the module row. A door the rail
+    // refuses to open may not be offered here — grouping the rail changed no
+    // destination and added no door, because a drawer is presentation and Jump
+    // To lists pages.
     //
-    // CARD-2026-08-22-purchasing-01: the final rail lists eleven pages, five of
-    // them live. `Purchase Demands` and `Report` LEFT the rail, so Jump To may
-    // not offer them either — a demand is a hidden record, not a destination.
+    // CARD-2026-08-22-purchasing-01: the final rail lists eleven pages, SIX of
+    // them live since §9.6's Purchase Returns shipped on 2026-09-19 — which is
+    // why it is offered here and `Repair Orders`, still `Coming soon`, is not.
+    // `Purchase Demands` and `Report` LEFT the rail, so Jump To may not offer
+    // them either — a demand is a hidden record, not a destination.
     //
     // Starts-with ranks first — `Purchase Orders` — then contains, in NAV
     // order, which is the BUY drawer's own order: `SO Batch Purchase` then
     // `Manual Purchase`.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
+    ).toEqual([
+      "Purchase Orders",
+      "Purchase Returns",
+      "SO Batch Purchase",
+      "Manual Purchase Request",
+    ]);
   });
 
   it("every retired Purchasing row is unreachable from Jump To", () => {
@@ -209,10 +221,10 @@ describe("the keyboard", () => {
     });
     renderJump();
     const input = openSurface();
-    /* `payments` matches exactly one destination, so the document is the row
-     * after it and one ↓ is what reaches it. (`delivery` stopped being unique
-     * when the Delivery Orders register joined the sidebar.) */
-    fireEvent.change(input, { target: { value: "payments" } });
+    /* `payment records` matches exactly one destination, so the document is
+     * the row after it and one ↓ is what reaches it. (`payments` stopped being
+     * unique when the module gained its two destinations, 2026-09-12.) */
+    fireEvent.change(input, { target: { value: "payment records" } });
     await screen.findByTestId("jump-to-document"); // the debounced lookup lands
     const before = screen.getAllByRole("option");
     expect(before[0]).toHaveAttribute("data-active", "true");
@@ -269,9 +281,9 @@ describe("the keyboard", () => {
 describe("navigate-only", () => {
   it("selecting a destination only opens it — and remembers it as recent", () => {
     renderJump();
-    fireEvent.change(openSurface(), { target: { value: "Payments" } });
+    fireEvent.change(openSurface(), { target: { value: "Payments · Monitor" } });
     fireEvent.click(screen.getByTestId("jump-to-destination"));
-    expect(screen.getByTestId("here")).toHaveTextContent("/finance/invoices");
+    expect(screen.getByTestId("here")).toHaveTextContent("/finance/monitor");
     expect(JSON.parse(localStorage.getItem("carres-jump-recent") ?? "[]")).toEqual([
       "operation:payments",
     ]);

@@ -8,20 +8,24 @@ import {
   type PaymentVoucherDocument,
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
+  type SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
+import type { DepartmentType } from "@carres/shared";
+import { DepartmentFilter, DepartmentName, DepartmentPicker, useDepartmentParam } from "../department";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useApAccounts,
   useApBillOutstanding,
   useApSuppliers,
   usePaymentVoucher,
+  useSupplierBills,
   usePaymentVouchers,
   useSaveVoucher,
   useVoucherAct,
@@ -35,11 +39,15 @@ import {
   creditorKindWord,
   money,
   num,
+  priceCheckWord,
   refusal,
-  todayIso,
   word,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { VoucherAdvanceCard } from "./VoucherAdvance";
+import { paymentVoucherPrint } from "./voucher-print";
+import { paysOut } from "@carres/shared/money-accounts";
+import { useMoneyAccounts } from "../settings/api";
 
 /**
  * Finance → Payment Vouchers (migration 0477). The ONE door money leaves
@@ -53,6 +61,10 @@ import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, Rea
  * direct line's account · Cr the account the money left from, dated the
  * voucher date. Cancelling an approved voucher reverses that entry on the same
  * date. Who may do each step is the database's answer (`can`), never this page's.
+ *
+ * Advance (0484–0485): a supplier voucher may also carry money paid before
+ * the bill. Approving posts it Dr the payables account like a bill payment;
+ * it is applied to a bill later, or sent back, from the voucher's Advance card.
  */
 export default function PaymentVouchers() {
   return (
@@ -69,11 +81,12 @@ export default function PaymentVouchers() {
 
 function VoucherRegister() {
   const navigate = useNavigate();
-  const query = usePaymentVouchers();
+  const [dept, setDept] = useDepartmentParam();
+  const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [
     { key: "voucher", label: "Voucher No", width: 170,
-      accessor: (r) => <Link to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
+      accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.voucher_no ?? "", exportValue: (r) => r.voucher_no ?? "Draft, no number yet" },
     { key: "date", label: "Voucher Date", width: 130, accessor: (r) => fmtDate(r.voucher_date),
       dateValue: (r) => r.voucher_date, filterType: "date", exportValue: (r) => fmtDate(r.voucher_date) },
@@ -90,6 +103,8 @@ function VoucherRegister() {
       filterValue: (r) => word(PAY_METHOD_WORD, r.pay_method), filterType: "enum" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(VOUCHER_STATUS_WORD, r.status),
       filterValue: (r) => word(VOUCHER_STATUS_WORD, r.status), filterType: "enum" },
+    { key: "advance", label: "Advance", width: 190, accessor: (r) => advanceCell(r),
+      exportValue: (r) => num(r.advance_amount) ?? "" },
     { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => money(r.amount),
       numberValue: (r) => num(r.amount), filterType: "number", exportValue: (r) => num(r.amount) ?? "" },
     { key: "prepared", label: "Prepared By", width: 150, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
@@ -121,6 +136,7 @@ function VoucherRegister() {
             searchPlaceholder="Search payment vouchers…"
             toolbarStart={
               <span className="flex items-center gap-4">
+                <DepartmentFilter value={dept} onChange={setDept} />
                 <button
                   type="button"
                   data-testid="new-voucher"
@@ -153,6 +169,13 @@ function VoucherRegister() {
   );
 }
 
+/** "No advance", or the advance and — once approved — what is left of it. */
+function advanceCell(r: PaymentVoucherRegisterRow): string {
+  const amount = num(r.advance_amount) ?? 0;
+  if (amount <= 0) return "No advance";
+  return r.advance_open === null ? money(amount) : `${money(amount)} · ${money(r.advance_open)} left`;
+}
+
 // ── detail ──────────────────────────────────────────────────────────────────
 
 const STEP: Record<"prepare" | "check" | "approve", { label: string; done: string; ask: string }> = {
@@ -180,6 +203,7 @@ function VoucherDetail() {
   const act = useVoucherAct();
   const [asking, setAsking] = useState<"prepare" | "check" | "approve" | null>(null);
   const [reasonFor, setReasonFor] = useState<"reject" | "cancel" | null>(null);
+  const [printing, setPrinting] = useState(false);
   const doc = query.data;
 
   if (query.isError) {
@@ -205,6 +229,19 @@ function VoucherDetail() {
     });
   const next: "prepare" | "check" | "approve" | null =
     doc.can.prepare ? "prepare" : doc.can.check ? "check" : doc.can.approve ? "approve" : null;
+  const printable = paymentVoucherPrint(doc);
+  const print = async () => {
+    if (!printable) return;
+    setPrinting(true);
+    try {
+      const { renderPaymentVoucherPdf } = await import("@/lib/pdf/render");
+      window.open(URL.createObjectURL(await renderPaymentVoucherPdf(printable)), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The voucher could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
   const approveAsk = `Approve paying ${money(v.amount)} to ${v.payee_name} from ${v.pay_from_account_code} ${v.pay_from_name ?? ""}? `
     + `It is entered in the ledger on ${fmtDate(v.voucher_date)}.`;
 
@@ -219,6 +256,7 @@ function VoucherDetail() {
         status={<span data-testid="voucher-status">{word(VOUCHER_STATUS_WORD, v.status)}</span>}
         right={
           <span className="flex items-center gap-2">
+            {printable && <Button loading={printing} onClick={() => void print()}>Print</Button>}
             {doc.can.edit && (
               <Button icon="edit" onClick={() => navigate(`/finance/payment-vouchers/${id}/edit`)}>Edit</Button>
             )}
@@ -251,6 +289,7 @@ function VoucherDetail() {
             <FactRow label="Method">{word(PAY_METHOD_WORD, v.pay_method)}</FactRow>
             <FactRow label="Reference">{v.pay_reference ?? "No reference"}</FactRow>
             <FactRow label="Amount"><span data-testid="voucher-amount">{money(v.amount)}</span></FactRow>
+            {(num(v.advance_amount) ?? 0) > 0 && <FactRow label="Advance">{money(v.advance_amount)}</FactRow>}
             {v.narration && <FactRow label="Note">{v.narration}</FactRow>}
             <FactRow label="Prepared">{stepWho(v.prepared_at, v.prepared_by_name, "Not prepared yet")}</FactRow>
             <FactRow label="Checked">{stepWho(v.checked_at, v.checked_by_name, "Not checked yet")}</FactRow>
@@ -266,6 +305,7 @@ function VoucherDetail() {
             )}
           </Facts>
           <VoucherBillsCard doc={doc} />
+          <VoucherAdvanceCard doc={doc} />
           <VoucherLinesCard doc={doc} />
           <FilesCard kind="vouchers" id={id} files={doc.files} canAdd={doc.can.add_file} />
           <HistoryCard events={doc.events} />
@@ -294,6 +334,9 @@ function VoucherDetail() {
         description={reasonFor === "cancel"
           ? v.status === "approved"
             ? `The ledger entry is reversed on ${fmtDate(v.voucher_date)}, and the bills it paid are unpaid again.`
+              + ((num(v.advance_amount) ?? 0) > 0
+                ? " An advance applied to a bill or sent back must be taken off or cancelled first."
+                : "")
             : "The voucher is kept, marked cancelled. Its bills are free to pay on another voucher."
           : "The person who prepared it can change it and prepare it again."}
         action={reasonFor === "cancel" ? "Cancel voucher" : "Return to draft"}
@@ -332,7 +375,7 @@ function VoucherBillsCard({ doc }: { doc: PaymentVoucherDocument }) {
               <tbody>
                 {doc.allocations.map((a) => (
                   <tr key={a.bill_id} className="border-t border-base-100">
-                    <td className="py-1 pr-3"><Link to={`/finance/bills/${a.bill_id}`}>{a.bill_no ?? "Draft bill"}</Link></td>
+                    <td className="py-1 pr-3"><Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${a.bill_id}`}>{a.bill_no ?? "Draft bill"}</Link></td>
                     <td className="py-1 pr-3">{a.supplier_invoice_no}</td>
                     <td className="py-1 pr-3">{fmtDate(a.bill_date)}</td>
                     <td className="py-1 pr-3">{a.due_date ? fmtDate(a.due_date) : "No due date"}</td>
@@ -356,6 +399,7 @@ function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
         : doc.lines.map((l) => (
           <p key={l.line_no}>
             {l.account_code} {l.account_name ?? ""} · {l.description ?? "No description"} · {money(l.amount)}
+            {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
           </p>
         ))}
     </Facts>
@@ -367,23 +411,26 @@ function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
 type Purpose = PaymentVoucherDraftInput["purpose"];
 type Method = PaymentVoucherDraftInput["payMethod"];
 type BillPick = { on: boolean; amount: string };
-type DirectLine = { key: string; accountCode: string; description: string; amount: string };
+type DirectLine = { key: string; accountCode: string; description: string; amount: string; departmentType: DepartmentType | null; departmentId: string | null };
 
 let seq = 0;
-const newLine = (): DirectLine => { seq += 1; return { key: `d${seq}`, accountCode: "", description: "", amount: "" }; };
+const newLine = (): DirectLine => { seq += 1; return { key: `d${seq}`, accountCode: "", description: "", amount: "", departmentType: null, departmentId: null }; };
 
-/** The voucher total is never typed: it is what the ticked bills and the
- *  direct lines add up to, and the database recomputes it the same way. */
+/** The voucher total is never typed: it is what the ticked bills, the
+ *  advance and the direct lines add up to, and the database recomputes it the
+ *  same way. An advance counts only on a supplier voucher. */
 export function voucherTotal(
   purpose: Purpose,
   picks: Record<string, BillPick>,
   lines: Array<{ amount: string }>,
+  advance = "",
 ): number {
   const billPart = purpose === "SUPPLIER_BILLS"
     ? Object.values(picks).filter((p) => p.on).reduce((s, p) => s + (num(p.amount) ?? 0), 0)
     : 0;
+  const advancePart = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
   const linePart = lines.reduce((s, l) => s + (num(l.amount) ?? 0), 0);
-  return cents(billPart + linePart);
+  return cents(billPart + advancePart + linePart);
 }
 
 function VoucherForm() {
@@ -393,12 +440,13 @@ function VoucherForm() {
   const existing = usePaymentVoucher(id);
   const suppliers = useApSuppliers();
   const accounts = useApAccounts();
+  const moneyAccounts = useMoneyAccounts();
   const save = useSaveVoucher();
 
   const [purpose, setPurpose] = useState<Purpose>("SUPPLIER_BILLS");
   const [supplierId, setSupplierId] = useState(params.get("supplier") ?? "");
   const [payee, setPayee] = useState("");
-  const [voucherDate, setVoucherDate] = useState(todayIso());
+  const [voucherDate, setVoucherDate] = useState(appTodayIso());
   const [payFrom, setPayFrom] = useState("");
   const [method, setMethod] = useState<Method>("BANK_TRANSFER");
   const [reference, setReference] = useState("");
@@ -408,6 +456,7 @@ function VoucherForm() {
     return bill ? { [bill]: { on: true, amount: "" } } : {};
   });
   const [lines, setLines] = useState<DirectLine[]>([]);
+  const [advance, setAdvance] = useState("");
   const [loaded, setLoaded] = useState(!id);
 
   // Editing a draft: the form starts from the voucher as saved.
@@ -424,7 +473,9 @@ function VoucherForm() {
     setReference(d.voucher.pay_reference ?? "");
     setNarration(d.voucher.narration ?? "");
     setPicks(Object.fromEntries(d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }])));
-    setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount) })));
+    setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
+      departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
+    setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
     setLoaded(true);
   }, [id, loaded, existing.data]);
 
@@ -461,10 +512,15 @@ function VoucherForm() {
   }, [bills.data, mine]);
 
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
-  const payFromChoices = (accounts.data ?? []).filter((a) => a.for_pay_from);
+  // 0512: Paid from reads the one money-account list — cash and banks only.
+  const payFromChoices = (moneyAccounts.data ?? []).filter(paysOut);
   const lineChoices = (accounts.data ?? []).filter((a) => a.for_voucher_line);
-  const total = voucherTotal(purpose, picks, lines);
+  const total = voucherTotal(purpose, picks, lines, advance);
+  const advanceN = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
   const pickedCount = Object.values(picks).filter((p) => p.on).length;
+  // The bill's own price check (the Bills register's Price Check), so Finance
+  // sees it where it decides to pay. A flag, never a block (0477).
+  const billChecks = Object.fromEntries((useSupplierBills().data ?? []).map((b) => [b.id, b]));
 
   const submit = () => {
     const input: PaymentVoucherDraftInput = {
@@ -478,12 +534,15 @@ function VoucherForm() {
       narration: narration.trim() || null,
       lines: lines.map((l) => ({
         accountCode: l.accountCode,
-        description: l.description.trim() || null,
+        description: l.description.trim(),
         amount: Number(l.amount),
+        departmentType: l.departmentType,
+        departmentId: l.departmentId,
       })),
       allocations: purpose === "SUPPLIER_BILLS"
         ? Object.entries(picks).filter(([, p]) => p.on).map(([billId, p]) => ({ billId, amount: Number(p.amount) }))
         : [],
+      advanceAmount: advanceN,
     };
     save.mutate({ id, input }, {
       onSuccess: (out) => {
@@ -499,15 +558,18 @@ function VoucherForm() {
   if (id && existing.data && !existing.data.can.edit) {
     return (
       <div className="p-6 text-body">
-        Only a draft voucher can be changed. <Link to={`/finance/payment-vouchers/${id}`}>Back to the voucher</Link>
+        Only a draft voucher can be changed. <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${id}`}>Back to the voucher</Link>
       </div>
     );
   }
 
-  const linesOk = lines.every((l) => l.accountCode !== "" && (num(l.amount) ?? 0) > 0);
+  const linesOk = lines.every((l) => l.accountCode !== "" && l.description.trim() !== ""
+    && (num(l.amount) ?? 0) > 0 && l.departmentType !== null);
   const picksOk = Object.values(picks).filter((p) => p.on).every((p) => (num(p.amount) ?? 0) > 0);
-  const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && total > 0
-    && (purpose === "SUPPLIER_BILLS" ? supplierId !== "" && pickedCount > 0 : lines.length > 0)
+  const advanceOk = advance.trim() === "" || (num(advance) ?? -1) >= 0;
+  const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && advanceOk
+    && total > 0
+    && (purpose === "SUPPLIER_BILLS" ? supplierId !== "" && (pickedCount > 0 || advanceN > 0) : lines.length > 0)
     && (supplierId !== "" || payee.trim() !== "");
 
   return (
@@ -528,7 +590,7 @@ function VoucherForm() {
       <div className="flex-1 overflow-auto p-4" data-testid="voucher-form">
         <div className="flex max-w-[1100px] flex-col gap-4">
           <Facts title="Who is paid, and from where">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
                 Purpose
                 <select aria-label="Purpose" className={`${fieldCls} mt-1`} value={purpose}
@@ -538,7 +600,7 @@ function VoucherForm() {
                 </select>
                 <span className="text-meta text-base-500">
                   {purpose === "SUPPLIER_BILLS"
-                    ? "Pays confirmed bills. Extra lines (a bank charge) can be added below."
+                    ? "Pays confirmed bills, or an advance before the bill. Extra lines (a bank charge) can be added below."
                     : "An expense, a loan or money out that has no bill. Add a line for each account."}
                 </span>
               </label>
@@ -601,7 +663,20 @@ function VoucherForm() {
                     ? <p>Loading bills…</p>
                     : billRows.length === 0
                       ? <p>This supplier has no confirmed bill left to pay.</p>
-                      : <BillPicks rows={billRows} picks={picks} onChange={setPicks} />}
+                      : <BillPicks rows={billRows} picks={picks} onChange={setPicks} billChecks={billChecks} />}
+            </Facts>
+          )}
+          {purpose === "SUPPLIER_BILLS" && supplierId !== "" && (
+            <Facts title="Advance">
+              <label className="block">
+                Advance
+                <input aria-label="Advance" className={`${fieldCls} mt-1 w-40`} inputMode="decimal" value={advance}
+                  placeholder="0.00" onChange={(e) => setAdvance(e.target.value)} />
+                <span className="block text-meta text-base-500">
+                  Money paid before the bill. It is applied to a bill later, or the supplier sends it back.
+                </span>
+                {!advanceOk && <span className="block text-meta text-kit-red-11">An advance cannot be less than RM 0.00</span>}
+              </label>
             </Facts>
           )}
           <Facts title={purpose === "SUPPLIER_BILLS" ? "Other lines" : "Lines"}>
@@ -623,10 +698,11 @@ function VoucherForm() {
   );
 }
 
-function BillPicks({ rows, picks, onChange }: {
+function BillPicks({ rows, picks, onChange, billChecks }: {
   rows: Array<ApBillOutstandingRow & { available: number }>;
   picks: Record<string, BillPick>;
   onChange: (next: Record<string, BillPick>) => void;
+  billChecks: Record<string, SupplierBillRegisterRow>;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -640,6 +716,7 @@ function BillPicks({ rows, picks, onChange }: {
             <th className="py-1 pr-2">Due date</th>
             <th className="py-1 pr-2 text-right">Total</th>
             <th className="py-1 pr-2 text-right">Left to pay</th>
+            <th className="py-1 pr-2">Price Check</th>
             <th className="py-1">Pay now</th>
           </tr>
         </thead>
@@ -662,6 +739,7 @@ function BillPicks({ rows, picks, onChange }: {
                 <td className="py-1 pr-2">{b.due_date ? fmtDate(b.due_date) : "No due date"}</td>
                 <td className="py-1 pr-2 text-right">{money(b.total_amount)}</td>
                 <td className="py-1 pr-2 text-right">{money(b.available)}</td>
+                <td className="py-1 pr-2" data-testid={`price-check-${b.bill_id}`}>{billChecks[b.bill_id] ? priceCheckWord(billChecks[b.bill_id]!) : "—"}</td>
                 <td className="py-1">
                   <input aria-label={`Amount for ${b.bill_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}
@@ -695,6 +773,9 @@ function DirectLineRow({ line, n, accounts, onChange, onRemove }: {
         maxLength={300} placeholder="What it is for" onChange={(e) => onChange({ description: e.target.value })} />
       <input aria-label={`Line ${n} amount`} className={`${fieldCls} w-32`} inputMode="decimal" value={line.amount}
         placeholder="0.00" onChange={(e) => onChange({ amount: e.target.value })} />
+      <DepartmentPicker label={`Line ${n} department`} className={`${fieldCls} w-48`}
+        type={line.departmentType} id={line.departmentId}
+        income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />
       <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
     </div>
   );

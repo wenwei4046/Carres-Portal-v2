@@ -1,3 +1,274 @@
+## `do-number-collision` — ✅ FIXED 2026-09-24, PR #1550 (0575). Kept for its evidence only
+
+**THE FIX.** The number is now DRAWN from the Delivery Order's own pool
+(`delivery_document_numbers`, migration 0575): `DO`+YYMM+4 digits for Outright, `SDO`+YYMM+5 for
+Subscription (`orders.source_system = 'rental'`), random, unique across every order, kept forever so
+a voided document's number is never handed out again, fixed width, and the materialiser now REFUSES
+a number another order owns (`delivery_order_number_taken`) instead of silently skipping it. The
+legacy dispatch backstop draws from the same pool instead of inventing `DO-<SO>`.
+
+**MEASURED BOTH WAYS on a real Postgres running the whole migration chain**, because the nine-case
+integration suite is `describe.skipIf(!URL || !LOCAL)` and had therefore NEVER actually run:
+
+| Chain | The headline case |
+|---|---|
+| stopped at 0574 (before the fix) | `{ ok: true, value: 'DO-230926-4242' }` — **the second order was allowed to wear the first order's number** |
+| with 0575 applied | refused; 9 of 9 cases pass |
+
+**The width table below is still true and still matters** — but only for the shared
+`formal_document_codes` pool, which the DO number deliberately does NOT use. 0575 gave DO its own
+pool with a per-series width, so the three-places problem was side-stepped rather than solved: it
+returns the day any OTHER five-digit prefix joins the shared pool.
+
+**Status of the original P0 record, kept below unchanged for the evidence it carries.**
+
+---
+
+## ~~`do-number-collision`~~ — the original record, opened 2026-09-23, recorded 2026-09-24
+
+**Two Sales Orders can carry the SAME Delivery Order number, and one of them ends up with no
+document row at all.** Measured on `origin/main`, not quoted:
+
+1. `packages/shared/src/doc-number.ts:39` — `docTail` is an **FNV-1a hash of the ORDER ID modulo
+   10^digits**, 4 digits by default. It is a derivation, not an allocation: nothing checks whether
+   those digits are already taken by another order on the same day.
+2. `supabase/migrations/0356_a_delivery_order_is_a_document_with_its_own_register.sql:120` —
+   `ops_delivery_orders_materialise` reads
+   `if exists (select 1 from ops_delivery_orders where do_number = new.do_number) then return new;`
+   and **returns silently**. The mint path has already written `orders.do_number`, so the second
+   order keeps the number on its own row while the DO register never gains a document for it.
+
+**The arithmetic, so the risk is not argued from feel.** 4 digits is 10,000 slots a day, and this is
+the birthday problem, not "1 in 10,000":
+
+```
+ 20 DOs in one day →  1.9%      118 DOs in one day → 49.9%
+ 50 DOs in one day → 11.5%      250 DOs in one day → 95.6%
+100 DOs in one day → 39.0%      400 DOs in one day → 100.0%
+```
+
+Jess's own scale benchmark is Coway at 5–8k orders a month — **250–400 a day, where a same-day
+collision is effectively certain.** It is already a coin flip by about 118.
+
+**The approved target it must land on** (owner rulings 2026-09-23, Orders MASTER § order numbers by
+business, PR #1545 → `7df9b7597`): `DO2609-48271` — issue YYMM + **5 random digits**, drawn
+independently of the SO, unique across all orders, never reused, never auto-widening; a rebooked
+trip takes a NEW number (no `-B`). Subscription's twin is `SDO`. ⛔ **Widening the tail is not the
+fix on its own** — 5 digits still collides at ~1.9% by 50 a day while the number stays a hash of the
+order id. The number has to be ALLOCATED, not derived.
+
+### ⭐ WHAT MOVED UNDERNEATH IT ON 2026-09-24 — read this before writing the allocator
+
+Purchasing shipped `PO260924-4827` (PR #1551 → `e9bc40a0a`, migration **0574**). Relayed by that
+session and **verified here against `origin/main`** before being written down, because the DO
+allocator is the next thing likely to touch this machinery:
+
+- **`formal_document_codes` is re-keyed `(code_date, prefix, code)`** — it was `(code_date, code)`.
+  Each prefix now owns an independent pool of 10,000 a day. **Every lookup, update and delete must
+  name its own `prefix`**: a `(date, code)` predicate can now match a different prefix's row. That
+  exact defect was found inside the PO helper before it shipped.
+- **`formal_document_code_text(prefix, date, code)` is the ONE place a printed shape is decided.**
+  Only `PO` is on the short form today; MPR, GRN, PRTN, RO, SB and the finance prefixes still mint
+  `PREFIX-YYYYMMDD-RRRR`. Putting DO/SDO on the short form is one line there — never a second
+  spelling somewhere else.
+- **`poDocumentNumberOf(number, version)` in `@carres/shared`** decides the version marker from the
+  NUMBER's own form (new form → `(2)`, any pre-cutover `PO-…` → ` V2`). Reuse it rather than writing
+  a second version rule.
+- **The migration tail is 0574**, so the next free number is 0575+ — **re-measure at push time**,
+  never from `ls` (red line 7), and never from a working tree sitting on an old branch.
+
+### ⛔ AND THE POOL IS FOUR DIGITS WIDE IN THREE PLACES — the 5-digit DO's real cost
+
+Raised by the Purchasing session and **measured here**; it is one place worse than reported, and the
+extra place is the dangerous one. `DO2609-48271` is a **5-digit** tail, and the shared pool is hard
+4 everywhere:
+
+| # | Where | Today |
+|---|---|---|
+| 1 | `0381…:43` the table | `code text not null check (code ~ '^\d{4}$')` |
+| 2 | `0574…:140` the SHARED allocator | `v_code := lpad((floor(random() * 10000))::int::text, 4, '0')` |
+| 3 | `0574…:88` `formal_document_code_text` | `when p_prefix in ('PO')` — DO is not on the list |
+
+**⚠️ #2 is the trap.** `allocate_formal_document_code` is ONE function serving every prefix. Widening
+its draw to five digits silently re-shapes `PO` and every other prefix too, and the table's own CHECK
+would then reject what it draws. The width has to become **per-prefix** — the same lesson 0574
+already learned when the pool key had to grow a `prefix` — not a bigger constant.
+
+Get any one of the three wrong and it fails differently: the CHECK alone → the allocator still draws
+4; the allocator alone → the CHECK rejects the insert and the 200-try loop raises
+`document_code_pool_exhausted`; the text function alone → a correct number printed in the wrong shape.
+
+**Today the DO lane does NOT touch that table** — measured: no migration that references
+`formal_document_codes` also references `do_number`. So nothing is broken by 0574 right now. It
+matters because the approved `DO2609-48271` is a POOL number, so the fix is very likely to move DO
+onto exactly this machinery under its own `DO` prefix.
+
+**Why it is recorded here and not fixed here.** The Sales Order page and Amendment scope closed on
+2026-09-23 and this is neither. It has an owner through its own spawned task with no live chat, and
+until now it existed only in that chip and in one session's notes. **A P0 that lives in one chip is
+a P0 nobody will find.**
+
+**Closes when** two Sales Orders proceeding on the same day are proved to receive two different DO
+numbers, both materialised in `ops_delivery_orders`, on the approved format.
+
+**Falsifier:** a read of `ops_delivery_orders` showing an allocation path already in place — then
+the defect was fixed elsewhere and this entry goes.
+
+---
+
+## `do-number-month-capacity` — 🟡 OWNER DECISION, opened 2026-09-24 (measured, not estimated)
+
+**The Outright DO pool holds 10,000 numbers a month, and Jess's own volume benchmark reaches it.**
+
+`DO` + YYMM + **four** digits is 10,000 numbers per calendar month; `SDO` + YYMM + **five** is
+100,000. The pools are separate (proved: a full DO month does not touch SDO). When a month is used
+up the draw REFUSES by name — `delivery_order_numbers_used_up` — and **no new Delivery Order can be
+issued until the next month**. It never widens itself, which is the approved behaviour.
+
+| Volume | DOs per month (≈26 working days) | Against 10,000 |
+|---|---|---|
+| 30/day (today's shape) | 780 | 8% — comfortable |
+| 250/day (Jess's Coway benchmark, low) | 6,500 | 65% — works, but the redraw loop is already re-trying |
+| 400/day (Jess's benchmark, high) | 10,400 | **EXHAUSTED before month end** |
+
+Two costs, not one. The hard stop is obvious. The quieter one is the redraw: the allocator picks at
+random and retries a clash up to 500 times, so at 90% full it needs ~10 draws per number and at 99%
+full ~100 — still correct, and still inside the loop, but every issue gets slower as the month fills.
+
+**RECOMMENDATION (mine, not a ruling): give `DO` five digits, exactly like `SDO`.** One migration,
+one symmetric rule, 100,000 a month, and it costs one character on the supplier's paper
+(`DO2609-04827`). The alternative — `YYMMDD` instead of `YYMM` — gives 10,000 a DAY but changes the
+approved format more visibly and makes the number longer in a different place.
+
+**Why it is not fixed here.** The width is part of the format Jess approved on 2026-09-23
+(`DO2609-4827`, four digits, stated explicitly). Changing an approved document number silently is
+exactly what a numbering rule exists to prevent. It is one migration the day she says which way.
+
+**Closes when** the owner either widens the Outright series or accepts the monthly ceiling with the
+refusal as its guard.
+
+**Falsifier:** a measured Outright volume that stays well under ~8,000 DOs a month at go-live, in
+which case four digits is simply enough and this entry goes.
+
+---
+
+## `so-amendment-integration-tests-skip-in-ci` — EVIDENCE THAT PASSES LOCALLY AND IS NEVER RUN BY CI, opened 2026-09-23
+
+**A SECOND INSTANCE, 2026-09-24.** `apps/api/src/test/delivery-order-number-0575.integration.test.ts`
+shipped with nine cases guarding a P0 and had **never executed** — same `describe.skipIf`, same
+green-looking report. It was run by hand against a kept replay (before AND after 0575) to close
+`do-number-collision`. Two instances make this a pattern, not an accident: a suite whose gate is an
+environment variable reports as passing in the one place anybody looks.
+
+**🟡 The Sales Order amendment lane's strongest evidence does not run on any pull request.**
+`apps/api/src/test/amendment-lane-0564.integration.test.ts` (15 cases) and every sibling under
+`apps/api/src/test/*.integration.test.ts` open with
+`describe.skipIf(!URL || !LOCAL)` on `CARRES_TEST_DATABASE_URL`. CI sets no such variable, so the
+whole file is reported **SKIPPED**.
+
+**Why that is worse than having no test.** A summary line reads `172 passed | 8 skipped` and a
+reader takes the file as covered. It was: until 2026-09-23 these cases had **never been executed
+anywhere** — not locally, not in CI — and nobody knew, because skipping is silent. Run for real
+against a throwaway cluster that morning, all of them passed; but that is a fact about one laptop on
+one day, and the next change to `sales_order_decide_amendment`, `sales_order_submit_amendment` or
+`sales_order_save_revision` can break every one of them and merge green.
+
+**What runs them today, in full:**
+
+```
+LC_ALL=C node scripts/dry-run-migrations.mjs --baseline scripts/migration-replay-baseline.json --keep
+CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> \
+  npx vitest run src/test          # from apps/api
+```
+
+The replay harness runs `initdb -U postgres`, so the role is **`postgres`**, never `$(whoami)`.
+
+**The fix is a CI decision, not a test change.** Give the `verify` workflow a Postgres service,
+replay the migration chain into it once, export `CARRES_TEST_DATABASE_URL`, and the existing
+`skipIf` turns itself off with no test edited. The guard must stay — it is what keeps these files
+from ever pointing at production — so the work is supplying a local database in CI, not removing the
+gate. Budget it against the replay: 570 files, ~14s on a laptop.
+
+**Known before starting:** the chain is not clean on `main`. Six migrations fail replay; five are on
+`scripts/migration-replay-baseline.json` and one, `0561_the_voucher_line_guard_survives_a_rebuild.sql`,
+is **not** — a syntax error, unrelated to Sales Orders and with its own owner. And three Finance
+integration suites (`finance-approver-role`, `advances-to-suppliers-1230`, `money-moves`) are red on
+`main` against the same database, also with their owner. **Turning this gate on turns those reds on
+too**, so either they land first or the first run is scoped to the suites that pass.
+
+**Why it was reported and not fixed:** the Sales Order scope that surfaced it was closed as evidence
+with no application change, and rewiring the shared CI workflow from inside it would widen a closed
+card into everyone else's build. **Closes when a pull request runs
+`apps/api/src/test/amendment-lane-0564.integration.test.ts` and its result is PASSED, not SKIPPED.**
+
+**Falsifier:** a CI run that reports those cases as executed today — then the gap was already closed
+and this entry goes.
+
+---
+
+## `stock-register-pglite-timeout` — AN INTERMITTENT TEST WITH A KNOWN ONE-LINE FIX, opened 2026-09-14
+
+**🟡 `apps/api/src/routes/ops/stock-register.test.ts:181` flakes**, and the mechanism is known, so
+the only thing it costs now is whoever meets it next believing it is their change.
+
+`GET /register — the one current listing > executes both real route projections against the
+committed SQL and catches the missing migration` builds a **PGlite** WASM Postgres INSIDE the `it`
+body (`const db = await stockRegisterDatabase();`, line 182). `apps/api/vitest.config.ts` sets no
+`testTimeout`, so vitest's default 5000ms applies and WASM instantiation plus all the DDL is paid
+against it. Its only sibling PGlite test, `src/test/ready-stock-reservation.test.ts:78`, does the
+identical work in a `beforeEach` **hook** and gets the 10000ms hook budget. Same cost, half the
+budget — which is why one flakes and the other never has.
+
+**It is NOT embedded-postgres and it is NOT a contention or test-ordering bug.** Both labels were
+tried and both are wrong. `@electric-sql/pglite` is WASM: no libpq, no `psql`, no external binary,
+so this repo's earlier embedded-postgres history does not apply. And it is **intermittent, not
+suite-deterministic** — measured on one commit (`66eea424`): a quiescent full suite RED, a
+concurrent full suite RED, a third full suite GREEN, isolation GREEN (14/14, ~2.4s), GitHub CI
+GREEN, and the production deploy's own full re-run GREEN. Anyone hunting a test-isolation defect
+is hunting something that does not exist.
+
+**The fix:** give that `it` an explicit timeout, or move the database build into a hook as the
+sibling already does. Prefer the hook, so the two PGlite tests share one shape.
+
+**Why it was reported and not fixed:** it is a Stock Register test with no relationship to the
+Warehouse Schedule card that surfaced it, and widening a card to chase an unrelated red is how a
+card stops shipping. **Closes when the timeout or the hook lands.**
+
+**Falsifier:** a full `apps/api` suite that goes red on this file after the build moves into a
+hook — that would mean the budget was never the cause.
+
+## `collection-owner-unassigned-copy` — THE WORDS FOR AN UNOWNED ORDER, opened 2026-09-14
+
+**🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
+meets an order with no responsible person still prints `Nobody holds Delivery Duty.` with
+`Set the holder in Workspace → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
+and `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
+`apps/web/src/pages/finance/PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and
+`apps/web/src/pages/operation/OperationWork.tsx`).
+
+After 0504 the Delivery Duty holder has nothing to do with this answer. The responsible person is
+the individual the Sales Order was dealt to, so an unresolved owner means **no individual is in the
+Operation assignment pool** — and Staff & Duties cannot fix it. The sentence sends the operator to
+the wrong door, and the owner explicitly forbade asking for a Delivery Duty holder as a workaround.
+
+**The fix, ready to apply on her word:** `Nobody is assigned to this order.` with the door
+`Assign it in Sales Orders → Team`.
+
+**Why it was reported and not shipped:** an approved on-screen word changes only when the owner
+says so (CLAUDE.md §10, and one of the four reasons to interrupt her). Nothing operational depends
+on it today — the state is unreachable while the pool holds an individual, and production's pool
+holds two (Shasha CR005 · Yu Jun CR004). **Closes when she rules on the words.**
+
+**Falsifier:** an authenticated load that renders `monitor-owner-unassigned` or
+`collection-owner-none` on a real order. That would mean the pool has emptied and the wrong door is
+in front of an operator.
+
+**Supersedes `delivery-duty-initial-holder` (opened 2026-09-13, closed 2026-09-14 without being
+done).** That carry-forward asked the owner to name an initial `delivery_duty` holder so automatic
+ownership could resolve. She rejected the premise on 2026-09-13: responsibility is not a duty
+holder, it is the person the order was dealt to. 0504 removed the Delivery-Duty source, so the
+holder is no longer owed and automatic ownership no longer waits on anybody.
+
 ## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 
 **Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.
@@ -76,26 +347,69 @@ each owner should take the one-line change with a test.
   `Carres Klang` is warehouse-linked and reads its address through that column, so the **PO PDF's
   `Deliver To` prints the site name with no address line** until an authorised user records the
   real one in `Settings → Warehouse → Warehouse Details`. A blank line is honest; an operator
-  description printed as a delivery address is not. **Falsifier / next step:** the real Klang
-  address is typed into Warehouse Details, and one PO PDF is re-rendered to prove `Deliver To`.
-- `0454-issue-action-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-09. NOT THIS
-  LANE'S.** `supabase/migrations/0454_an_issue_action_has_one_identity_and_one_result.sql` landed
-  on `main` in PR #1189 and is **absent from `supabase_migrations.schema_migrations`** (measured
-  twice, 2026-09-09 17:35 and 18:35 MYT). It is either unapplied or SQL-editor-applied without a
-  tracker row — the second is the recurring `0318`/`0319`, `0348`/`0349` pattern. Found because
-  it collided with this card's `0454`, which was renumbered to `0456`/`0457` and whose two
-  tracker rows were renamed to match. **Falsifier / next step:** the Issue Tracker lane applies it
-  through the governed path, or confirms its objects are live and inserts the tracker row.
-- `0461-to-0469-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-10. NOT THIS
-  LANE'S.** Nine migrations are on `main` and **absent from `supabase_migrations.schema_migrations`**
-  (measured 2026-09-10 while applying the SO Batch Ready Stock work): `0461`–`0468`, the Finance
-  ledger set, plus `0469_a_reversal_and_its_contra_are_both_counted`. The tracker's numeric tail
-  is `0458` while the repository's is `0472`. This is the same shape as the `0454` scar above and
-  is nine times larger. Found because the Ready Stock lane had to establish which of its own
-  dependencies were live: `0442`/`0443`/`0444`/`0453` ARE applied, which is what `0471` stands on,
-  so nothing here was blocked and **nothing here was touched.** **Falsifier / next step:** the
-  Finance lane applies them through the governed path, or confirms their objects are live and
-  inserts the tracker rows. Until then any reader of the tracker tail will under-count by nine.
+  description printed as a delivery address is not.
+  **🔴 MEASURED ON PRODUCTION 2026-09-24 — THE RECORDED CONSEQUENCE ABOVE IS TOO MILD, AND HAS BEEN
+  SINCE THE DAY THIS WAS WRITTEN.** The `Deliver To` line does not print blank: **the document does
+  not compose at all.** `purchasing_po_document` raises `destination_address_missing` when the
+  resolved address is empty, and it has done so since **`0402`** — which is EARLIER than `0456`, so
+  the moment 0456 cleared the column those POs stopped producing paper. Probed read-only, all 63
+  live POs:
+
+  ```
+  total POs   63
+  can print   14   destination `Ohana` — the only one NOT warehouse-backed, so it carries its own address
+  CANNOT      49   destination_address_missing @ Carres Klang   ← 78%, one cause, one field
+  ```
+
+  So this is not a cosmetic blank on a document — **49 purchase orders cannot be put on paper at
+  all**, and the page says so honestly ("No address on file for this PO's destination"). `AL Sungai
+  Buloh` and `HOUZS Balakong` are also empty and block 0 POs *today* only because nothing has used
+  them yet.
+  ⚠️ **Do not try to fix this on the destination.** `purchasing_destinations` carries
+  `check (warehouse_id is null or address is null)` (`0307:39`) — a warehouse-backed destination is
+  FORBIDDEN from holding its own address, by design, so that one address has one owner. The field to
+  fill is `warehouses.address`, through `Warehouse → Settings → Full address`
+  (`PUT /api/operation/warehouse-settings/details` → `rpc warehouse_set_site_details`, gated on
+  `warehouse_can_manage_settings`).
+  **It is an unfinished handoff, not a defect.** 0456 correctly removed an operator name that was
+  sitting in an address field and said in its own header that an authorised user would record the
+  real address in Warehouse Settings. Every line of code involved is behaving as designed; the human
+  step was never taken. **The real address is Jess's to type — nobody should invent one from a
+  fixture onto a supplier-facing document.**
+  **Falsifier / next step:** the real Klang address is typed into Warehouse Details, and one PO PDF
+  is re-rendered to prove `Deliver To` — at which point the count above should go 49 → 0.
+- ~~`merged-migrations-absent-from-the-tracker`~~ — **CLOSED 2026-09-17.**
+  - **`0454`:** now tracked (`20260913032213`).
+  - **`0516`, `0517`:** were NOT applied. Both were probed in rollback, then applied from the exact
+    files (`20260917085808`, `20260917085832`); `md5(statements[1])` equals each file. While
+    `0517` was missing, `POST /delivery-orders/:id/proof-review` called a 6-argument door that
+    production did not have.
+  - **The other 36** (`0461`–`0469`, `0475`–`0479`, `0481`, `0482`, `0484`, `0485`, `0500`,
+    `0502`, `0503`, `0506`–`0508`, `0510`–`0515`, `0518`–`0521`, `0523`, `0524`) were proven live
+    object by object and given tracker rows through the §5 backfill standard in
+    `docs/ENGINEERING.md`. No file was re-run.
+  - **Cause:** the untracked files carry CRLF in `prosrc`, so they were applied from a Windows
+    working copy, outside `apply_migration`.
+- `null-role-gates-left-untouched-by-the-0500-and-0503-guards` — **OPEN, 2026-09-17, NOT THIS
+  LANE'S.** `0500` and `0503` rewrite a function's role gate only when its live body matches the
+  hash the rewrite was derived from. Measured on production:
+  - **Rewritten:** `0500` rewrote 54 functions, `0503` rewrote 9, and none is still on its source
+    hash.
+  - **Skipped:** 35 functions had drifted and were skipped by design.
+  - **Still NULL-blind:** a text scan shows about 24 of the skipped ones still gate with
+    `app_role() not in (...)` / `<>` and no null test, e.g. `sales_order_withdraw_attribution`,
+    `delivery_settings_gate`, `correction_work_close`, `finance_dashboard_summary`,
+    `finance_monthly_pl`, `hr_set_reports_to`, `ops_stock_reassign`, `ops_stock_release`,
+    `partner_accept_pickup`, `lp_reject_order`. A signed-in account with no active role may still
+    pass those gates.
+  - **Falsifier / next step:** for each one, read the live `prosrc`, write the null-safe gate
+    against THAT body in a new migration, and prove a no-role caller is refused.
+- `delivery-proof-review-production-walk-owed` — **OWED, 2026-09-17.** `0517` is live and was proven
+  in a rolled-back probe as a principal: `P0002` for an unknown DO, `22023` for a missing retry
+  key, and the old 4-argument door gone. The authenticated browser walk was not done: the
+  in-app browser held no signed-in session. **Next step:** open `DO-130926-3223`, the one DO with
+  proof and no review, record Proof Accepted, and confirm one `delivery_proof_reviews` row with
+  `source_version` and `idempotency_key` set.
 - `kit-blue-9-is-used-as-a-css-variable-and-never-defined` — **OPEN, 2026-09-11, NOT THIS LANE'S,
   found in passing while fixing the same mistake inside `ReadyStockPanel.tsx`.** The kit palette is
   a TAILWIND colour scale (`tailwind.config.ts` → `theme.extend.colors.kit`), not a set of CSS
@@ -365,7 +679,7 @@ each owner should take the one-line change with a test.
 **LOW**:
 - ~~`an-old-revision-opens-with-typable-fields`~~ — **CLOSED as a carry-forward 2026-08-27, the same day it was opened: it became `docs/cards/CARD-2026-08-27-sales-order-old-revision-fields-lock.md`.** A carry-forward is a risk nobody has scoped; a QUEUED Card is scoped work awaiting owner review. Keeping both would give one finding two homes and two states, which is exactly the duplication Law 3 exists to stop. The Card carries the measurement, the firm fix and the falsifier; this line survives only so a reader who knew the old key can find the new one.
 - `receiving-progress-rail-word-outlives-the-goods-receipts-rename` — **found 2026-08-20 during the CARD-2026-08-20-purchasing-sidebar-groups owner walk, recorded rather than fixed because that Card may not touch a page body.** The rail and the Destination Header now say `Goods Receipts` (`portal-nav.ts`, `PurchasingTabs.tsx` `PAGE_WORD`), but the page body still prints `Receiving Progress` as a facet heading in its own left rail — measured live at `/operation?tab=receiving`, text node under `NAV[receiving-rail]`. **`Receiving Summary` and `Start Receiving` are NOT part of this defect**: they are approved workspace/action words in `docs/COPY-STANDARD.md` and stay. Only the facet heading is the stray: a queue rail labelled with the OLD destination word tells the operator they are somewhere other than where the header says they are. Scope when someone next opens the Receiving page body: rename that one heading to the governed word and check no sibling facet inherited it. Bounded and cosmetic — no route, key, API or business rule is involved, and nothing is mis-filed because of it.
-- `hold-entry-only-from-incoming` — Receiving R4 (2026-07-27, 0299): the guard trigger allows `incoming → on_hold` and no other entry, so a unit already in the FREE pool that is later discovered damaged cannot be quarantined — it goes through `needs_repair` + condition (the Defective view) instead. Deliberate: two quarantine concepts on one table would give the warehouse two ways to say one thing, and worse, the refurbish path (`/refurbish-complete`, a direct PostgREST update gated only on `needs_repair`) would hand a "held" unit straight back to the pool with no claim ever answered. Consequence to remember: **a supplier claim can only ever be raised at receiving**, which is exactly R2's law, but it also means a latent factory fault found a week later has no supplier-claim route at all — that is a service-case (S-line) shape today. If Jess ever wants a post-receipt supplier claim, the entry rule and the refurbish door must be settled in the SAME change.
+- `hold-entry-only-from-incoming` — Receiving R4 (2026-07-27, 0299): the guard trigger allows `incoming → on_hold` and no other entry, so a unit already in the FREE pool that is later discovered damaged cannot be quarantined — it goes through `needs_repair` + condition (the Defective view) instead. Deliberate: two quarantine concepts on one table would give the warehouse two ways to say one thing, and worse, the refurbish path (`/refurbish-complete`, a direct PostgREST update gated only on `needs_repair`) would hand a "held" unit straight back to the pool with no claim ever answered. Consequence to remember: **a supplier claim can only ever be raised at receiving**, which is exactly R2's law, but it also means a latent factory fault found a week later has no supplier-claim route in code today. The 2026-09-14 owner ruling approves a post-receipt Purchasing stock claim opened from the Stock Unit with no Service Case parent (`docs/purchasing/MASTER.md` §9.5, APPROVED / NOT BUILT); the build that adds that door must settle this entry rule and the refurbish door in the SAME change.
 - `pool-usage-release-does-not-reverse` — Ready Stock K4 (2026-07-27, 0292): releasing a reserved unit back to free does NOT remove or negate its `ops_stock_pool_usage` row, so a month's split can exceed what net-left the warehouse. Deliberate, and the table's own comment says so: the ledger answers "what did we draw on ready stock FOR", and a release does not unmake the decision that was made. Bounded — `ops_stock_release` has never been called on prod (0 reserved rows at ship time). If the split ever needs to be a net figure, add a `released_at` stamp written by `ops_stock_release` and let `summarisePoolUsage` take a mode, rather than deleting rows: a deleted draw is a decision nobody can audit.
 - `pool-usage-bulk-record-is-all-or-nothing` — Ready Stock K4 (2026-07-27): the register flips a WHOLE record, so reserving the 555-unit pillow row for an order that needs one pillow takes all 555 out of free stock, and the ledger honestly records 555. That is a pre-existing property of the per-unit engine (0218 bulk rows), not something K4 introduced, and the card is explicitly told not to rebuild reservation. Consequence: a bulk draw dominates the month's split. Firm fix belongs to the stock engine — split a bulk record on partial reserve (decrement `qty`, mint a reserved sibling) — and every consumer of `ops_stock_items.qty` must be re-read when it happens.
 - `stock-movements-qty-hardcoded-1` — noticed while reading `ops_stock_takeout` for K4 (2026-07-27): the `stock_movements` row it writes is `qty 1` regardless of the record's real `qty`, so taking out the 555-unit pillow record logs one unit out. Pre-dates K4 (0137 wrote it before the 0218 bulk column existed) and K4 deliberately did not change it — the movements ledger feeds `ops_rollup_stock_balances`, which is itself `count(*)`-based (K1's note), so fixing one half alone would make the two disagree differently. Fix both together, or neither.
@@ -612,35 +926,74 @@ primitive fixes it in the same move.
 
 ---
 
-## `purchasing-approver-duty-has-no-holder` — OWNER ACTION OWED, opened 2026-09-11
+## `purchasing-approver-single-person` — OPEN BY OWNER RULING, opened 2026-09-18
 
-**🟡 The Purchasing Approver duty now REACHES the door, and nobody holds it.** Migration
-`0474` moves `purchasing_decide_request` onto `purchasing_approver_gate`, which resolves
-`purchasing_approver` through `workspace_resolve_duty` — the Shared Duty Resolver Staff &
-Duties actually writes. It closes a gap measured on production the same day: the key was
-offered in Staff & Duties and named by the Work Engine as `manual_purchase.approve`'s owner
-duty, but the door gated on `org_position_duties` (`ops_manager`), a DIFFERENT system — so
-`Approve purchase` had no owner in Work, and an assignment made on the Staff & Duties screen
-could never have reached the decision.
+**🟡 Jess is the only Purchasing Approver and has no eligible cover.** 0533 (owner rulings
+2026-09-18) bootstrapped her as the first holder and restricted holder and cover to active
+Principal **people**. Today she is the only one, so while she is away every Manual Purchase
+approval **waits** — by ruling 6 it is never downgraded to Operation. This replaces the closed
+`purchasing-approver-duty-has-no-holder` item: the duty now has a holder and the `ops_manager`
+fallback is gone.
 
-**Nothing changed on the day it landed, and that is deliberate.** The gate's third rung lets the
-`ops_manager` holder (Jess, the one active holder) keep deciding **while `purchasing_approver`
-has no active holder**, so behaviour is identical until the duty is assigned. This file exists
-so the assignment is not forgotten.
+**Closes when** a second Principal person exists (People/HR creates the account; the person
+marker is set there) and holds a dated cover in `Workspace → Staff & Duties`.
+**Falsifier:** `select public.workspace_duty_staff(array['principal'])` run as a duty manager
+returns more than one person.
 
-**What is owed, and by whom:** Jess (or whoever holds `account_creator`/HR) assigns
-**Purchasing Approver** to a position in `Workspace → Staff & Duties`. No migration, no deploy
-and no code change is involved — it is configuration, and CLAUDE.md §6 is explicit that
-configuration is what must survive go-live.
+## `operation-shared-login-email-fallback` — NON-APPROVAL, opened 2026-09-18
 
-**What happens the moment it is assigned:** the assigned holder becomes the approver in the SQL
-door, in `canApprove` (which draws the controls and the approver-only money) and in the Work
-row's owner — all three read the same three rungs in the same order. The `ops_manager` fallback
-disappears by itself, in the gate and in the reader, with no further migration.
+**🟡 The shared `operation@carres.com` login is still a Sales Orders Team manager through an email
+list.** 0533 removed every email from approval routes and removed `jess@carres.com` from both
+legacy lists. `LEGACY_OPS_MANAGER_EMAILS = ["operation@carres.com"]` survives only inside
+`checkDuty` for `ops_manager` (PIC reassign, pool settings, Purchasing Settings render, stock-plan
+consolidate) — none is an approval. Removing it silently would take a daily surface away from
+whoever uses the shared login, which is a business change nobody ruled.
 
-**Falsifier / how to close this:**
-```sql
-select public.workspace_resolve_duty('purchasing_approver');
-```
-`source = 'assignment'` with a non-null `actor_user_id` = closed. `not_assigned` = the
-`ops_manager` fallback is still carrying the approval.
+**Fix:** either give the shared login a governed flag for those surfaces (like
+`operations_superuser`) or retire the surfaces from it by owner ruling; then delete the list and
+`LEGACY_EMAILS_BY_DUTY`. **Falsifier:** `git grep LEGACY_OPS_MANAGER_EMAILS` returns nothing.
+
+## `operation-cannot-read-principal-rows` — CHECK IN THE SIGNED-IN WALK, opened 2026-09-18
+
+**🟡 `app_users_operation_peers_read` lets an Operation reader see only `operation` rows.** Jess
+became `principal` in 0533, so any Operation screen that names her through a plain `app_users`
+read (not `actor_display_names`) prints no name for her. The Manual Purchase approver name was
+moved onto `actor_display_names` in the same PR; other surfaces that read `app_users` directly
+(e.g. a users map used for `approved_by` history) were not all re-read. No RLS was changed.
+**Fix when seen:** read the name through `actor_display_names`. **Falsifier:** an Operation
+signed-in walk of a Manual Purchase Jess approved shows her name in History.
+
+- `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.
+
+## `authenticated-production-walk-owed` — BUILT AND DEPLOYED, NEVER WALKED SIGNED IN, opened 2026-09-19
+
+**🔴 Several shipped builds carry `PRODUCTION-VERIFIED — NOT YET`, and the reason is the same one
+every time: no build environment can sign in to production.** A converged SHA is proof that the
+bundle shipped. It is not proof of what the page draws, and this file is where that debt is
+counted so it stops being re-discovered by whoever ships next.
+
+**Verified, both independently, on 2026-09-18:** no signed-in browser session artefact exists
+anywhere in the container, and the agent proxy answers `connect_rejected` for both production
+hosts. So the walk is not "not done yet" — it **cannot** be done from here. It needs a signed-in
+human, or a production-reachable environment with a real session.
+
+**What is owed, and by which MASTER:**
+
+- `docs/purchasing/MASTER.md` §9.1 — the SO Batch approved listing and stock-selection UI
+  (BUILT 2026-09-18): the twelve parent columns in the owner's order against real rows · the goods
+  table's seven columns · a real Ready Stock cell's two counts and its Unit table · save, change,
+  remove-all and cancel against the governed doors · and the widths re-measured signed in, where
+  JetBrains Mono renders document numbers wider than the fixture font.
+- `docs/purchasing/MASTER.md` §9.3, §9.4 — the PO Register and the Receiving Register, each with
+  its own owed list already written there.
+- `docs/ui/MASTER.md` §6.7 — the destination header's 50px floor (BUILT 2026-09-18) and the
+  Warehouse Unit identity (BUILT 2026-09-19), at a real 390px device rather than an emulated
+  viewport, since a phone's own font metrics are what the wrap rule is measured against.
+- `docs/ui/MASTER.md` §1.x — the portal-wide listing readability slice (BUILT 2026-09-17).
+
+**Closes when** a signed-in walk of each surface above is recorded in its owning MASTER, which is
+also what turns that MASTER's `BUILT` into `PRODUCTION-VERIFIED`. Closing it in parts is correct;
+strike each line as its walk lands.
+
+**Falsifier:** a signed-in production walk finds any of these surfaces drawing what its MASTER
+already claims — then the claim was never owed, and the line goes.

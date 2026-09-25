@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -17,7 +10,6 @@ vi.mock("../lib/supabase", () => ({
 
 import { userClient } from "../lib/supabase";
 
-const KID = "test-kid-raw";
 const env = {
   SUPABASE_URL: "https://test.supabase.co",
   SUPABASE_ANON_KEY: "test-anon",
@@ -27,19 +19,11 @@ const env = {
 
 const DEALER_A = "00000000-0000-0000-0000-0000000000d1";
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId?: string) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000888", {
     email: "who@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000888")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 /** Full orders row the post-create refetch returns (same shape as GET /:id). */
@@ -126,17 +110,8 @@ function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
   return sb as any;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -156,9 +131,15 @@ async function post(jwt: string, body: unknown) {
   );
 }
 
+/** The smallest body the door accepts since 2026-09-13 (Delivery Card 18):
+ *  dealer, name, one line — and the required delivery facts. */
 const validBody = {
   dealerId: DEALER_A,
-  customer: { name: "Raw Customer" },
+  customer: { name: "Raw Customer", address: "12 Jalan A, KL", addressUnknown: false, addressState: "Kuala Lumpur" },
+  deliveryDate: "2026-08-01",
+  deliveryFloor: 1,
+  deliveryHasLift: false,
+  entryData: { fields: { building_type: "Condo" } },
   lines: [
     { sku: "CLOUD-QUEEN", qty: 1, unitPrice: 2890 },
     { sku: "CUSTOM DELIVERY SURCHARGE", qty: 1, unitPrice: 150.5 },
@@ -192,12 +173,13 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(call.name).toBe("create_raw_order");
     const p = call.payload;
     expect(p.dealer_id).toBe(DEALER_A);
-    // No POS gates: no signature, no terms, no payment method, date TBD.
+    // No POS gates: no signature, no terms, no payment method. The requested
+    // date is a required fact since 2026-09-13 — never TBD on a new order.
     expect(p.signature_url).toBeNull();
     expect(p.terms_accepted).toBe(false);
     expect(p.payment_method).toBeNull();
-    expect(p.delivery_date).toBeNull();
-    expect(p.delivery_date_tbd).toBe(true);
+    expect(p.delivery_date).toBe("2026-08-01");
+    expect(p.delivery_date_tbd).toBe(false);
     // Lines persist EXACTLY as entered — custom text sku + operator price, attrs null.
     expect(p.lines).toEqual([
       { sku: "CLOUD-QUEEN", qty: 1, attrs: null, unit_price: 2890 },
@@ -224,7 +206,27 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.delivery_date_tbd).toBe(false);
   });
 
-  it("minimal body still maps to the historical nulls (backward-compatible wire shape)", async () => {
+  it("refuses a body without the required delivery facts — one wording, every door (Card 18)", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ customer: { name: "Raw Customer", addressUnknown: true } }, "Delivery address — ask the customer for the address before you save the order"],
+      [{ customer: { name: "Raw Customer", address: "12 Jalan A, KL", addressUnknown: false } }, "Delivery address — pick the State"],
+      [{ entryData: { fields: { referral: "Fair 2026" } } }, "Building type — pick the building the goods go to"],
+      [{ deliveryFloor: undefined }, "Floor — enter the floor the goods go to"],
+      [{ deliveryHasLift: undefined }, "Lift — say whether the building has a lift"],
+      [{ deliveryDate: null }, "Delivery date is required. Ask the customer for the date before you save the order."],
+    ];
+    for (const [over, word] of cases) {
+      const res = await post(await makeJwt("principal"), { ...validBody, ...over });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message?: string; error?: string };
+      expect(JSON.stringify(body)).toContain(word);
+    }
+    expect(sb._rpcCalls.length).toBe(0);
+  });
+
+  it("minimal body still maps the untouched fields to the historical nulls (backward-compatible wire shape)", async () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(await makeJwt("principal"), validBody);
@@ -239,8 +241,8 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.delivery_has_lift).toBe(false);
     expect(p.installment_months).toBeNull();
     expect(p.addons).toEqual([]);
-    // entry_data key must be ABSENT (jsonb 'null' would trip the RPC guard).
-    expect("entry_data" in p).toBe(false);
+    // entry_data carries the building type now (never jsonb 'null').
+    expect(p.entry_data).toEqual({ fields: { building_type: "Condo" } });
   });
 
   it("POS-parity extras pass through: customer block, delivery extras, payment, addons, entry_data", async () => {
@@ -279,7 +281,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
       signaturePath: "orders-attachments/d1/w1/signature.png",
       paymentSlipPath: "orders-attachments/d1/w1/payment-slip.jpg",
       termsAccepted: true,
-      entryData: { payment: { bank: "Maybank" }, fields: { referral: "Fair 2026" } },
+      entryData: { payment: { bank: "Maybank" }, fields: { referral: "Fair 2026", building_type: "Condo" } },
     });
     expect(res.status).toBe(201);
     const p = sb._rpcCalls[0].payload;
@@ -307,7 +309,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.signature_url).toBe("orders-attachments/d1/w1/signature.png");
     expect(p.payment_slip_url).toBe("orders-attachments/d1/w1/payment-slip.jpg");
     expect(p.terms_accepted).toBe(true);
-    expect(p.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { referral: "Fair 2026" } });
+    expect(p.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { referral: "Fair 2026", building_type: "Condo" } });
     expect(p.addons).toEqual([
       { addon_key: "dispose-mattress", qty: 1, unit_price: 50, attrs: { size: "Queen" } },
     ]);
@@ -347,12 +349,12 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     ]);
   });
 
-  it("client delivery addons are dropped (server-exclusive keys) and proceed date needs a delivery date", async () => {
+  it("client delivery addons are dropped (server-exclusive keys) and the proceed date rides with the delivery date", async () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(await makeJwt("principal"), {
       ...validBody,
-      proceedDate: "2026-07-20", // no deliveryDate → must not persist
+      proceedDate: "2026-07-20",
       paymentMethod: "cash",
       installmentMonths: 6, // non-installment method → months must not persist
       addons: [
@@ -362,7 +364,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     });
     expect(res.status).toBe(201);
     const p = sb._rpcCalls[0].payload;
-    expect(p.proceed_date).toBeNull();
+    expect(p.proceed_date).toBe("2026-07-20");
     expect(p.installment_months).toBeNull();
     expect(p.addons).toEqual([
       { addon_key: "dispose-bedframe", qty: 1, unit_price: 80, attrs: { size: "King" } },

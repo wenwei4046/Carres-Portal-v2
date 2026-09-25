@@ -194,7 +194,7 @@ describe("every number derives from the Unit authority (Card §6)", () => {
     // 4 current Units; 1 bindable exact Unit; 555 bulk pieces that no Sales
     // Order can name, because 0366 forbids a qty > 1 record being reserved.
     expect(
-      await screen.findByText("4 Units · 1 you can promise · 555 pieces you cannot"),
+      await screen.findByText("4 records · 1 you can promise · 555 pieces you cannot"),
     ).toBeInTheDocument();
   });
 
@@ -272,10 +272,13 @@ describe("Stock exposes no second door onto the register (Card §2, Stock MASTER
 describe("Inventory saved views", () => {
   it("keeps the footer honest when a table column narrows the visible stock", async () => {
     await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Stock use$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
     fireEvent.click(screen.getByRole("button", { name: "Filter Stock use" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /^Available$/ }));
     expect(screen.queryByText("id-ccc333333")).not.toBeInTheDocument();
-    expect(screen.getByText("2 of 4 Units · 1 you can promise · 555 pieces you cannot")).toBeInTheDocument();
+    expect(screen.getByText("2 of 4 records · 1 you can promise · 555 pieces you cannot")).toBeInTheDocument();
   });
   it("Service Case uses purchase purpose, independently of product category", async () => {
     apiFetchMock.mockResolvedValue({ units: [
@@ -328,8 +331,30 @@ describe("Inventory saved views", () => {
       ? { units: [unit({ id: "source", unitCode: "id-source", productName: "Dream · King", poDate: "2026-08-01", soDate: "2026-08-02", expectedArrival: "2026-09-09" })], total: 1 } : {}));
     renderRegister();
     expect(await screen.findByText("Dream · King")).toBeInTheDocument();
-    for (const label of ["Stock use", "Site", "Condition", "SO No", "SO date", "PO No", "PO date", "Expected arrival", "Last verified"]) {
+    for (const label of ["Unit ID", "Product", "Site / stock use", "Orders / dates"]) {
       expect(screen.getByRole("columnheader", { name: new RegExp(label) })).toBeInTheDocument();
     }
   });
+});
+
+
+it("returns from a Unit without losing the register, search, rail or scroll", async () => {
+  await renderLoaded();
+  fireEvent.click(screen.getByTestId("rail-ready"));
+  fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+  const search = screen.getByPlaceholderText("Unit ID, product, PO, SO or supplier…");
+  fireEvent.change(search, { target: { value: "aaa111111" } });
+  await waitFor(() => expect(screen.queryByText("id-ccc333333")).toBeNull());
+  const grid = screen.getByTestId("grid-scroll");
+  grid.scrollTop = 180;
+  const link = screen.getByRole("link", { name: "id-aaa111111" });
+  expect(link.getAttribute("href")).toContain("view=ready");
+  fireEvent.click(link);
+  expect(grid).not.toBeVisible();
+  fireEvent.click(await screen.findByRole("button", { name: "← Inventory" }));
+  expect(screen.getByTestId("grid-scroll")).toBe(grid);
+  expect(grid).toBeVisible();
+  expect(grid.scrollTop).toBe(180);
+  expect(search).toHaveValue("aaa111111");
+  expect(screen.getByTestId("rail-ready")).toHaveAttribute("aria-pressed", "true");
 });

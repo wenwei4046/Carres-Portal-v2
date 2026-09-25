@@ -62,6 +62,15 @@ describe("CaseDeadline", () => {
     expect(screen.getByText("4 working days left")).toBeInTheDocument();
   });
 
+  it("counts the deadline from the Malaysian date, not the browser's", () => {
+    // Fri 17 Jul 01:00 in Kuala Lumpur — still Thu 16 Jul in UTC.
+    vi.stubEnv("TZ", "UTC");
+    vi.setSystemTime(new Date("2026-07-16T17:00:00Z"));
+    draw();
+    expect(screen.getByText("4 working days left")).toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
+
   it("asks for the call by name once the window is open", () => {
     draw();
     expect(

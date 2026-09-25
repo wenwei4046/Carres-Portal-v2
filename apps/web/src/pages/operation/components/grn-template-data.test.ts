@@ -159,6 +159,24 @@ describe("grnTemplateDataOf — the saved document", () => {
     expect(d.cancelled).toBeNull();
   });
 
+  it("binds Units by exact source line, preserving unbound and unreceived-line evidence", () => {
+    const input = detail();
+    input.receipt.unit_results[0].po_line_id = "lr1";
+    input.receipt.unit_results[1].po_line_id = "lr2";
+    // The same SKU on two lines must never join their Units.
+    input.receipt.lines[1].sku = "MS01";
+    input.receipt.unit_results.push({
+      stock_item_id: "si3", unit_code: "U-0003", outcome: "not_received",
+      issue_kind: null, note: null, po_line_id: null,
+    });
+    const data = grnTemplateDataOf(input);
+    expect(data.lines[0].unit_results).toEqual([{ unit_code: "U-0001", outcome_label: "Received" }]);
+    expect(data.unit_results).toEqual([
+      { unit_code: "U-0002", outcome_label: "Received with issue · damaged" },
+      { unit_code: "U-0003", outcome_label: "Not received" },
+    ]);
+  });
+
   it("a cancelled GRN is marked on the paper — number preserved", () => {
     const d = grnTemplateDataOf(
       detail({

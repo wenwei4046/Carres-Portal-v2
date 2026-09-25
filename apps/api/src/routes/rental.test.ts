@@ -1,14 +1,6 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import { Hono } from "hono";
-import { phoneKeyMy } from "@carres/shared";
 import { authMiddleware, _setJwksForTesting } from "../middleware/auth";
 import rentalRouter from "./rental";
 import type { AppEnv } from "../types";
@@ -24,7 +16,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -51,32 +42,15 @@ function buildApp() {
 }
 const app = buildApp();
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null = null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "test@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -322,19 +296,6 @@ const UNIT_ROW = {
   created_at: "2026-07-01T00:00:00Z",
   updated_at: "2026-07-02T00:00:00Z",
   updated_by: null,
-};
-
-const CUSTOMER_ROW = {
-  id: CUSTOMER_ID,
-  name: "Tan Mei Ling",
-  phone: "012-345 6789",
-  phone_key: phoneKeyMy("012-345 6789"),
-  email: null,
-  address: null,
-  notes: null,
-  created_at: "2026-07-01T00:00:00Z",
-  updated_at: "2026-07-01T00:00:00Z",
-  created_by: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -670,110 +631,6 @@ describe("GET /api/rental/units", () => {
     expect(body.units).toHaveLength(1);
     expect(body.units[0]).toMatchObject({ unitCode: "RU-1001", status: "in_rental", sku: "CLOUD-K" });
     expect(recordedFilters.rental_stock_units).toContainEqual({ method: "limit", args: [500] });
-  });
-});
-
-describe("GET /api/rental/customers", () => {
-  it("200 — q applies a name/phone ilike OR filter (wildcards escaped)", async () => {
-    const recordedFilters: Record<string, FilterCall[]> = {};
-    vi.mocked(userClient).mockReturnValue(
-      buildSb({ tables: { customers: [CUSTOMER_ROW] }, recordedFilters }),
-    );
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/rental/customers?q=mei%25", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { customers: Array<{ name: string; phone: string }> };
-    expect(body.customers).toHaveLength(1);
-    expect(body.customers[0]).toMatchObject({ name: "Tan Mei Ling", phone: "012-345 6789" });
-    // ONE .or() with both ilike arms; the literal % in the query is escaped.
-    expect(recordedFilters.customers).toContainEqual({
-      method: "or",
-      args: ["name.ilike.%mei\\%%,phone.ilike.%mei\\%%"],
-    });
-    expect(recordedFilters.customers).toContainEqual({ method: "limit", args: [50] });
-  });
-
-  it("200 — no q returns the newest 50 unfiltered (no .or)", async () => {
-    const recordedFilters: Record<string, FilterCall[]> = {};
-    vi.mocked(userClient).mockReturnValue(
-      buildSb({ tables: { customers: [CUSTOMER_ROW] }, recordedFilters }),
-    );
-    const jwt = await makeJwt("principal");
-    const res = await app.fetch(
-      new Request("http://t/api/rental/customers", { headers: { Authorization: `Bearer ${jwt}` } }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(recordedFilters.customers?.some((f) => f.method === "or")).toBe(false);
-  });
-});
-
-describe("POST /api/rental/customers", () => {
-  it("201 — computes phone_key server-side with the canonical MY-aware helper", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildSb({ recorded, writeReturn: CUSTOMER_ROW }));
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/rental/customers", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Tan Mei Ling", phone: "+60 12-345 6789" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const ins = recorded.find((r) => r.op === "insert");
-    expect(ins?.table).toBe("customers");
-    // The key comes from phoneKeyMy (pwp_phone_key JS twin) — never a local
-    // re-normalization; +60 and 0-prefixed forms canonicalize identically.
-    expect(ins?.payload).toMatchObject({
-      name: "Tan Mei Ling",
-      phone: "+60 12-345 6789",
-      phone_key: phoneKeyMy("+60 12-345 6789"),
-    });
-    expect((ins?.payload as { phone_key: string }).phone_key).toBe(phoneKeyMy("012-345 6789"));
-    const body = (await res.json()) as { customer: { name: string; phone: string } };
-    expect(body.customer).toMatchObject({ name: "Tan Mei Ling" });
-  });
-
-  it("409 customer_exists — duplicate phone_key via 23505", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      buildSb({
-        writeError: {
-          code: "23505",
-          message: 'duplicate key value violates unique constraint "customers_phone_key_key"',
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal");
-    const res = await app.fetch(
-      new Request("http://t/api/rental/customers", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Tan Mei Ling", phone: "012-345 6789" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe("customer_exists");
-  });
-
-  it("422 — invalid input (phone too short)", async () => {
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/rental/customers", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Tan Mei Ling", phone: "12" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
   });
 });
 

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   caseFollowUpPlan,
   caseNeedsManager,
@@ -77,7 +77,7 @@ export default function OperationServiceCases() {
   // S4 — the deadline is counted in WORKING days, so the holiday calendar is
   // injected once for the whole table rather than rebuilt per row.
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
-  const todayIso = new Date().toLocaleDateString("en-CA");
+  const todayIso = appTodayIso();
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

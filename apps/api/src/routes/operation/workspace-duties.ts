@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import {
+  WORKSPACE_DUTIES,
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -27,21 +29,37 @@ import type { AppEnv } from "../../types";
  */
 const workspaceDutiesRouter = new Hono<AppEnv>();
 
-/** The duties this surface manages today. A new duty joins by adding a row
- *  here AND its consumer module — never by a module keeping its own list. */
-const DUTIES = [
-  { key: "po_duty", label: "PO Duty" },
-  { key: "grn_duty", label: "GRN Duty" },
-  { key: "payment_duty", label: "Payment Duty" },
-  { key: "storage_waiver_approver", label: "Storage Waiver Approver" },
-  { key: "purchasing_approver", label: "Purchasing Approver" },
-  { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
-  { key: "payment_approver", label: "Payment Approver" },
-  { key: "stock_adjustment_approver", label: "Stock Adjustment Approver" },
-  { key: "service_case_approver", label: "Service Case Approver" },
-  { key: "issue_triage_duty", label: "Issue Triage Duty" },
-  { key: "issue_review_approver", label: "Issue Review Approver" },
-] as const;
+/** The duties this surface manages today — the shared catalogue, so the web
+ *  prints the same duty word (`workspaceDutyLabelOf`). */
+const DUTIES = WORKSPACE_DUTIES;
+
+/** The refusals the two write doors raise, by their SQL `detail`. The page
+ *  prints the governed §4.4.1 sentence for each code; the database's own
+ *  English never leaves this router (it names duty keys and ISO dates). */
+const REFUSAL_CODES = new Set([
+  "no_duty_holder",
+  "cover_overlap",
+  "cover_is_holder",
+  "invalid_cover",
+  "invalid_holder",
+  "self_assignment_refused",
+  "invalid_dates",
+  "invalid_duty_key",
+]);
+
+/** A write door's error as `{ code }` with its own status: a known refusal
+ *  keeps its detail code, the manager gate (0500) is `not_duty_manager`, and
+ *  anything else is `unknown`. */
+function refusal(error: { code?: string; message?: string; details?: string }) {
+  const { status } = mapPgError(error);
+  const detail = error.details ?? "";
+  const code = REFUSAL_CODES.has(detail)
+    ? detail
+    : error.code === "42501" && detail === "duty assignments are set by the manager"
+      ? "not_duty_manager"
+      : "unknown";
+  return { status, body: { error: code, code, message: code } };
+}
 
 workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -110,14 +128,29 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
       ].filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
-  const names = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", ids);
-    for (const u of users ?? []) names.set(u.id as string, u.name as string);
+  /* The cover a Scheduled state describes is the one the resolver will act
+     through on the next cover's first day — asked, never guessed from rows. */
+  const scheduledCoverIds: Record<string, string | null> = {};
+  for (const d of DUTIES) {
+    const today = (resolutions[d.key] as Record<string, unknown> | null)?.on_date;
+    const next = (covers.data ?? [])
+      .filter((v) => v.duty_key === d.key && typeof today === "string" && v.starts_on > today)
+      .sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)))[0];
+    scheduledCoverIds[d.key] = null;
+    if (!next) continue;
+    const { data, error } = await sb.rpc("workspace_resolve_duty", {
+      p_duty_key: d.key,
+      p_on: next.starts_on,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    const coverId = (data as Record<string, unknown> | null)?.cover_id;
+    scheduledCoverIds[d.key] = typeof coverId === "string" ? coverId : null;
   }
+
+  const names = await resolveActorNames(sb, ids);
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (names.get(v) ?? null) : null;
 
@@ -128,6 +161,7 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
       return {
         key: d.key,
         label: d.label,
+        scheduled_cover_id: scheduledCoverIds[d.key] ?? null,
         resolution: {
           ...r,
           normal_user_name: name(r?.normal_user_id),
@@ -165,10 +199,18 @@ workspaceDutiesRouter.post("/assign", requireOperation, async (c) => {
     p_note: parsed.data.note ?? null,
   });
   if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    const r = refusal(error);
+    return c.json(r.body, r.status);
   }
-  return c.json(data ?? {}, 201);
+  const row = (data ?? {}) as Record<string, unknown>;
+  const names = await resolveActorNames(
+    sb,
+    [row.holder_id].filter((v): v is string => typeof v === "string"),
+  );
+  return c.json(
+    { ...row, holder_name: typeof row.holder_id === "string" ? (names.get(row.holder_id) ?? null) : null },
+    201,
+  );
 });
 
 workspaceDutiesRouter.post("/cover", requireOperation, async (c) => {
@@ -183,10 +225,25 @@ workspaceDutiesRouter.post("/cover", requireOperation, async (c) => {
     p_reason: parsed.data.reason ?? null,
   });
   if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    const r = refusal(error);
+    return c.json(r.body, r.status);
   }
-  return c.json(data ?? {}, 201);
+  /* The success sentence names the normal owner the DOOR wrote for the cover's
+     own dates — not today's holder, which the page happens to have open. */
+  const row = (data ?? {}) as Record<string, unknown>;
+  const ids = [row.normal_user_id, row.acting_user_id].filter(
+    (v): v is string => typeof v === "string",
+  );
+  const names = await resolveActorNames(sb, ids);
+  const nameOf = (v: unknown) => (typeof v === "string" ? (names.get(v) ?? null) : null);
+  return c.json(
+    {
+      ...row,
+      normal_user_name: nameOf(row.normal_user_id),
+      acting_user_name: nameOf(row.acting_user_id),
+    },
+    201,
+  );
 });
 
 export default workspaceDutiesRouter;

@@ -157,6 +157,15 @@ describe("FinanceRentalApprover", () => {
     expect(mutate.mock.calls[0][0]).toMatchObject({ id: "ag-1", approve: true });
   });
 
+  it("sends the credit check and its reference with the decision (0538)", () => {
+    approvalsState = { data: { approvals: [ROW] }, isLoading: false, error: null };
+    render(<FinanceRentalApprover />);
+    fireEvent.change(screen.getByTestId("approver-credit-check"), { target: { value: " CTOS " } });
+    fireEvent.change(screen.getByTestId("approver-credit-reference"), { target: { value: "R-77" } });
+    fireEvent.click(screen.getByTestId("approver-approve"));
+    expect(mutate.mock.calls[0][0]).toMatchObject({ creditCheck: "CTOS", creditReference: "R-77" });
+  });
+
   it("reject asks for a reason first and refuses to file a blank one", () => {
     approvalsState = { data: { approvals: [ROW] }, isLoading: false, error: null };
     render(<FinanceRentalApprover />);

@@ -27,12 +27,6 @@ export function isRental(o: operationOrderListRow): boolean {
   return o.source_system === "rental";
 }
 
-/** Delivered — the only completion fact the ORDER itself carries. It is NOT
- *  "settled": `docs/orders/MASTER.md` §2.4 — *"Delivered is not paid."* */
-export function isDelivered(o: operationOrderListRow): boolean {
-  return o.status === "delivered" || o.operation_stage === "delivered";
-}
-
 /**
  * What ONE line is called, in words.
  *

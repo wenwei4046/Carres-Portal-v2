@@ -24,6 +24,7 @@ import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { toIso } from "@/components/kit/DatePicker";
 import { displayCustomerName } from "@/lib/customer-name";
 
 /**
@@ -69,11 +70,6 @@ const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
  *  one ruled span word. This is the only place the three chips are worded. */
 function rangeChipLabel(key: DeliveryRangeKey, fromIso: string): string {
   return key === "week" ? "This week" : fmtDate(fromIso);
-}
-
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** One booked delivery, as the calendar shows it. */
@@ -176,7 +172,7 @@ export default function CalendarPanel() {
   };
 
   const today = new Date();
-  const todayKey = ymd(today);
+  const todayKey = toIso(today);
   const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
   // T10: exactly ONE of these is active. A range chip clears the picked day; a
   // grid click clears the range. Default = Today, so the panel opens on the
@@ -199,7 +195,7 @@ export default function CalendarPanel() {
     const out: ({ day: number; key: string } | null)[] = [];
     for (let i = 0; i < startPad; i++) out.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
-      out.push({ day: d, key: ymd(new Date(view.y, view.m, d)) });
+      out.push({ day: d, key: toIso(new Date(view.y, view.m, d)) });
     }
     while (out.length % 7 !== 0) out.push(null);
     return out;
@@ -406,7 +402,7 @@ export default function CalendarPanel() {
 function DeliveryRow({ d }: { d: DayDelivery }) {
   const confirmed = d.kind === "confirmed";
   const loc = locationForAddress(d.address);
-  const carrier = d.partnerName?.trim() || "No logistics picked";
+  const carrier = d.partnerName?.trim() || "Logistics not assigned";
   return (
     <div
       className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors"

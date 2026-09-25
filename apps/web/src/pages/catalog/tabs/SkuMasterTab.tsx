@@ -3,11 +3,11 @@ import { toast } from "sonner";
 import type {
   CatalogResponse,
   ProductCategory,
-  ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
 import { activeSofaSizes, categoryHasSizeAxis, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
@@ -17,6 +17,8 @@ import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
+import { fmtRm } from "../format";
+import { useSkuFilter, type FlatRow } from "./use-sku-filter";
 
 /**
  * SKU Master — flat product table for the Master Admin. Columns: Product code ·
@@ -80,22 +82,6 @@ const GRID_COLS =
 const GRID_COLS_NO_SIZE =
   "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px 100px 80px";
 
-type CatFilter = ProductCategory | "all";
-
-interface FlatRow {
-  sku: ProductSkuDto;
-  model: ProductModelDto | undefined;
-  category: ProductCategory | undefined;
-  productName: string;
-}
-
-function fmtPrice(n: number): string {
-  return `RM ${n.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) {
   // Phase 2 (0175): only the principal ("Master Admin") may set/change SKU
   // price + cost. Non-principal internal users see those cells read-only — the
@@ -103,13 +89,18 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   // gated. Every other catalog edit (pos_active, description, name, delete,
   // + New SKU as UNPRICED) stays available.
   const isPrincipal = useAuth((s) => s.role) === "principal";
-  const [category, setCategory] = useState<CatFilter>("all");
-  const [modelFilter, setModelFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
-  /* 2026-08-24 - filter by WHO supplies it. "all" | "none" (no supplier on
-   * the SKU) | a suppliers.id. Names come from the roster and are matched by
-   * the FK, never by text - the same identity rule the Suppliers tab lives by. */
-  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const {
+    category,
+    pickCategory,
+    modelFilter,
+    setModelFilter,
+    search,
+    setSearch,
+    supplierFilter,
+    setSupplierFilter,
+    categoryModels,
+    filtered,
+  } = useSkuFilter(catalog);
   /* The SKU whose supplier door is open. One modal for the whole grid, not one
      per row - a mounted-per-row modal would fetch offers for every visible SKU. */
   const [offersFor, setOffersFor] = useState<ProductSkuDto | null>(null);
@@ -122,34 +113,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [editAll, setEditAll] = useState(false);
 
   const del = useDeleteCatalogSku();
-
-  const modelById = useMemo(() => {
-    const m = new Map<string, ProductModelDto>();
-    for (const model of catalog.models) m.set(model.id, model);
-    return m;
-  }, [catalog.models]);
-
-  const allRows = useMemo<FlatRow[]>(() => {
-    return catalog.skus.map((sku) => {
-      const model = modelById.get(sku.modelId);
-      return {
-        sku,
-        model,
-        category: model?.category,
-        productName: model?.name ?? "—",
-      };
-    });
-  }, [catalog.skus, modelById]);
-
-  // Models for the model pill row — scoped to the active category so the row
-  // isn't a flat 1000-model list; hidden entirely while category is "all".
-  const categoryModels = useMemo(
-    () =>
-      catalog.models
-        .filter((m) => category === "all" || m.category === category)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [catalog.models, category],
-  );
 
   // 0204 (Loo 2026-07-06) — the sofa-size axis (Special Add-ons → SOFA →
   // Sizes pool, the SAME `activeSofaSizes` the builder's Customize canvas
@@ -184,37 +147,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     : sizelessMode
       ? GRID_COLS_NO_SIZE
       : GRID_COLS;
-
-  // Switching category invalidates a model pick from the previous category —
-  // reset synchronously in the same handler so there's no stale-filter frame.
-  function pickCategory(next: CatFilter) {
-    setCategory(next);
-    setModelFilter("all");
-  }
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allRows
-      .filter((r) => (category === "all" ? true : r.category === category))
-      .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
-      .filter((r) =>
-        supplierFilter === "all"
-          ? true
-          : supplierFilter === "none"
-            ? r.sku.supplierId == null
-            : r.sku.supplierId === supplierFilter,
-      )
-      .filter((r) => {
-        if (!q) return true;
-        return (
-          r.sku.sku.toLowerCase().includes(q) ||
-          (r.sku.description ?? "").toLowerCase().includes(q) ||
-          r.productName.toLowerCase().includes(q) ||
-          r.sku.variant.toLowerCase().includes(q)
-        );
-      })
-      .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, modelFilter, search, supplierFilter]);
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
@@ -278,7 +210,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     }
     const csv = buildSkuExportCsv(filtered.map((r) => ({ sku: r.sku, model: r.model })));
     const tag = category === "all" ? "" : `${category}-`;
-    downloadCsv(`carres-skus-${tag}${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`carres-skus-${tag}${appTodayIso()}.csv`, csv);
     toast.success(`Exported ${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`);
   }
 
@@ -784,7 +716,7 @@ const SkuRowView = memo(function SkuRowView({
             ) : sku.price === 0 ? (
               <span className="text-meta text-base-400 italic">price not set</span>
             ) : (
-              <span className="t-num text-meta text-base-800">{fmtPrice(sku.price)}</span>
+              <span className="t-num text-meta text-base-800">{fmtRm(sku.price)}</span>
             )}
           </div>
         )}
@@ -899,7 +831,7 @@ const SkuRowView = memo(function SkuRowView({
         ) : sku.price === 0 ? (
           <span className="text-meta text-base-400 italic">price not set</span>
         ) : (
-          <span className="t-num text-meta text-base-800">{fmtPrice(sku.price)}</span>
+          <span className="t-num text-meta text-base-800">{fmtRm(sku.price)}</span>
         )}
       </div>
 
@@ -928,7 +860,7 @@ const SkuRowView = memo(function SkuRowView({
             —
           </span>
         ) : (
-          <span className="t-num text-meta text-base-800">{fmtPrice(sku.pwpPrice)}</span>
+          <span className="t-num text-meta text-base-800">{fmtRm(sku.pwpPrice)}</span>
         )}
       </div>
 
@@ -941,7 +873,7 @@ const SkuRowView = memo(function SkuRowView({
             className={`t-num text-meta ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
             title={marginLabel}
           >
-            {fmtPrice(margin.amount)}
+            {fmtRm(margin.amount)}
             <span className="text-base-400 text-label ml-0.5">
               {(margin.pct * 100).toFixed(1)}%
             </span>
@@ -1039,13 +971,13 @@ function CompartmentSizeCells({
                 className={`${INPUT_CLS} text-right t-num text-meta`}
               />
             ) : typeof explicit === "number" ? (
-              <span className="t-num text-meta text-base-800">{fmtPrice(explicit)}</span>
+              <span className="t-num text-meta text-base-800">{fmtRm(explicit)}</span>
             ) : sku.price > 0 ? (
               <span
                 className="text-meta text-base-400"
-                title={`Inherits the base price ${fmtPrice(sku.price)} — set a price for ${s} to override`}
+                title={`Inherits the base price ${fmtRm(sku.price)} — set a price for ${s} to override`}
               >
-                ({fmtPrice(sku.price)})
+                ({fmtRm(sku.price)})
               </span>
             ) : (
               <span className="text-meta text-base-400 italic">—</span>

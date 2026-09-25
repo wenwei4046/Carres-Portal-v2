@@ -63,6 +63,8 @@ export function moneyReceivedLine(rows: readonly PaymentRegisterRow[]): string {
 export function customerBalanceRows(rows: readonly InvoiceRegisterRow[]): Array<{
   orderId: string; so: number | null; customer: string; doorId: string;
   outstanding: number; storageOwing: number; overpaid: number;
+  /** When the order's sales invoice was issued; null while it is a draft, voided or missing. */
+  issuedAt: string | null;
 }> {
   const byOrder = new Map<string, InvoiceRegisterRow[]>();
   for (const r of rows) {
@@ -83,6 +85,7 @@ export function customerBalanceRows(rows: readonly InvoiceRegisterRow[]): Array<
       outstanding: money.outstanding,
       storageOwing: money.storageOwing,
       overpaid: money.overpaid,
+      issuedAt: mine.find((r) => r.kind === "sales" && r.status === "issued")?.issued_at ?? null,
     });
   }
   return out.sort((a, b) => b.outstanding - a.outstanding);
@@ -243,7 +246,7 @@ export default function FinancePaymentReport() {
             </span>
             <span className="text-body font-semibold tabular-nums shrink-0">{rm(Number(p.amount))}</span>
           </Row>)}
-          {received.length === 0 && <p className="text-label font-normal text-base-400">No money received this month.</p>}
+          {received.length === 0 && <p className="text-meta text-kit-slate-11">No money received this month.</p>}
         </div>
       </div></SectionCard>
 
@@ -259,7 +262,7 @@ export default function FinancePaymentReport() {
             </span>
             <span className="text-body font-semibold tabular-nums shrink-0">{rm(b.outstanding)} still needed</span>
           </Row>)}
-          {owing.length === 0 && <p className="text-label font-normal text-base-400">No customer owes money.</p>}
+          {owing.length === 0 && <p className="text-meta text-kit-slate-11">No customer owes money.</p>}
         </div>
       </div></SectionCard>
 
@@ -278,7 +281,7 @@ export default function FinancePaymentReport() {
             </span>
             <span className="text-body font-semibold tabular-nums shrink-0">{rm(Number(r.amount) + Number(r.tax_amount))}</span>
           </Row>)}
-          {storageInvoices.length === 0 && <p className="text-label font-normal text-base-400">No storage has been charged.</p>}
+          {storageInvoices.length === 0 && <p className="text-meta text-kit-slate-11">No storage has been charged.</p>}
         </div>
       </div></SectionCard>
 
@@ -293,7 +296,7 @@ export default function FinancePaymentReport() {
             <span className="block text-label font-normal">
               Free until {c.approved_free_until} · {c.approval_reason ?? "Reason not available"} · approved by {c.approved_by_user?.name ?? "Name not available"}</span>
           </div>)}
-          {waivers.length === 0 && <p className="text-label font-normal text-base-400">
+          {waivers.length === 0 && <p className="text-meta text-kit-slate-11">
             No free storage has been approved.</p>}
         </div>
       </div></SectionCard>
@@ -311,7 +314,7 @@ export default function FinancePaymentReport() {
             </span>
             <span className="text-body font-semibold tabular-nums shrink-0">{rm(Number(p.amount))}</span>
           </Row>)}
-          {corrections.length === 0 && <p className="text-label font-normal text-base-400">No payment was corrected this month.</p>}
+          {corrections.length === 0 && <p className="text-meta text-kit-slate-11">No payment was corrected this month.</p>}
         </div>
       </div></SectionCard>
 
@@ -323,7 +326,7 @@ export default function FinancePaymentReport() {
             <span className="block text-body font-semibold min-w-0">{b.so !== null ? `SO-${b.so}` : "SO not available"} · {b.customer}</span>
             <span className="text-body font-semibold tabular-nums shrink-0">{rm(b.overpaid)} needs review</span>
           </Row>)}
-          {needsReview.length === 0 && <p className="text-label font-normal text-base-400">No money needs review.</p>}
+          {needsReview.length === 0 && <p className="text-meta text-kit-slate-11">No money needs review.</p>}
         </div>
       </div></SectionCard>
 

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { purchasingSuppliersOnly, supplierCreateInput, supplierSlug } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -39,10 +39,7 @@ operationSuppliersRouter.get("/", async (c) => {
        dead end this list exists to prevent. */
     .select("id, name, slug, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url")
     .order("name", { ascending: true });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   /* 0477 — Finance's other creditors (a landlord, an advertiser) share this
      table. This list feeds the PO, catalog-slot and loan-return pickers, so
      none of them may offer one. */
@@ -95,10 +92,7 @@ operationSuppliersRouter.post("/", async (c) => {
     .select("id, name")
     .eq("slug", slug)
     .maybeSingle();
-  if (clashErr) {
-    const m = mapPgError(clashErr);
-    return c.json(m.body, m.status);
-  }
+  if (clashErr) return fail(c, clashErr);
   if (clash) {
     return c.json(
       {
@@ -118,10 +112,7 @@ operationSuppliersRouter.post("/", async (c) => {
     p_production_days: parsed.data.productionDays,
     p_off_days: parsed.data.offDays,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "insert returned no row" },

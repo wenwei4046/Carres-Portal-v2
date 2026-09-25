@@ -5,7 +5,7 @@ import {
   partnerSaveArrangementInput,
   type PartnerDeliveryCard,
 } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { adminClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -157,10 +157,7 @@ partnerDeliveriesRouter.get("/", async (c) => {
         .neq("status", "cancelled"),
     ]);
   const firstErr = arrErr ?? ordErr;
-  if (firstErr) {
-    const m = mapPgError(firstErr);
-    return c.json(m.body, m.status);
-  }
+  if (firstErr) return fail(c, firstErr);
 
   const arrRows = (arrangements ?? []) as ArrangementRow[];
   const orderRows = (orders ?? []) as OrderRow[];
@@ -283,12 +280,25 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
       logistics_note: parsed.data.note ?? null,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id ?? null,
+      updated_via: "partner_portal",
     },
     { onConflict: "order_id,leg" },
   );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+  if (error) return fail(c, error);
+
+  /* 0581 — the partner's own save is a dated fact with its door named, so a
+     scheduled date supersedes an older partner answer on every reader. */
+  if (parsed.data.confirmedDate) {
+    const { error: evErr } = await sb.from("ops_delivery_arrangement_events").insert({
+      order_id: orderId,
+      leg,
+      event: "arrangement_saved",
+      source: "partner_portal",
+      from_partner_id: me.partnerId,
+      note: [parsed.data.confirmedDate, parsed.data.confirmedTime].filter(Boolean).join(" · "),
+      recorded_by: c.var.auth.id ?? null,
+    });
+    if (evErr) return fail(c, evErr);
   }
 
   const { error: histErr } = await sb.from("order_history").insert({
@@ -298,10 +308,7 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
     }`,
     by_role: "partner",
   });
-  if (histErr) {
-    const m = mapPgError(histErr);
-    return c.json(m.body, m.status);
-  }
+  if (histErr) return fail(c, histErr);
 
   return c.json({ saved: true });
 });
@@ -344,11 +351,9 @@ partnerDeliveriesRouter.post("/:orderId/cannot-deliver", async (c) => {
     reason_key: parsed.data.reason,
     note: parsed.data.note ?? null,
     recorded_by: c.var.auth.id ?? null,
+    source: "partner_portal",
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,
@@ -357,10 +362,7 @@ partnerDeliveriesRouter.post("/:orderId/cannot-deliver", async (c) => {
     }`,
     by_role: "partner",
   });
-  if (histErr) {
-    const m = mapPgError(histErr);
-    return c.json(m.body, m.status);
-  }
+  if (histErr) return fail(c, histErr);
 
   return c.json({ reported: true });
 });

@@ -24,7 +24,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { CARRES_COMPANY } from "./letterhead";
+import { CARRES_COMPANY, formatMoney, moneyDigits, niceDate } from "./letterhead";
 import type { InvoiceTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -38,31 +38,6 @@ const mm = (v: number) => v * 2.83465;
 const MARGIN = mm(12);
 const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
-
-/** `2026-08-09` → `Sun, 9 Aug 26` (family body-date form). */
-function niceDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
-  if (!m) return String(iso);
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-    new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
-  ];
-  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][mo - 1];
-  return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
-}
-
-function moneyDigits(value: number): string {
-  return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function formatMoney(value: number, currency: string): string {
-  const unit = currency === "MYR" ? "RM" : currency;
-  return `${unit} ${value.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 const styles = StyleSheet.create({
   page: {
@@ -103,7 +78,9 @@ const styles = StyleSheet.create({
   th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(27) },
-  colQty: { width: mm(10), textAlign: "right" },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5). Money stays right-aligned.
+  colQty: { width: mm(10), textAlign: "center" },
   colPrice: { width: mm(25), textAlign: "right" },
   colDisc: { width: mm(24), textAlign: "right" },
   colAmount: { width: mm(25), textAlign: "right" },
@@ -121,7 +98,7 @@ const styles = StyleSheet.create({
   cellCode: { fontSize: 7.5, width: mm(27), paddingRight: mm(2), lineHeight: 1 },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
-  cellQty: { fontSize: 7, width: mm(10), textAlign: "right", lineHeight: 1 },
+  cellQty: { fontSize: 7, width: mm(10), textAlign: "center", lineHeight: 1 },
   cellMoney: { fontSize: 7, textAlign: "right", lineHeight: 1 },
   cellAmount: { fontSize: 7, fontWeight: 700, textAlign: "right", lineHeight: 1 },
 
@@ -185,7 +162,8 @@ function bandedLines(lines: InvLine[]): Array<{ band: string | null; rows: Array
 }
 
 export function InvoiceTemplate(data: InvoiceTemplateData) {
-  const { doc_title, invoice_no, issue_date, order_code, customer, lines, subtotal, tax_amount, total, currency } = data;
+  const { doc_title, invoice_no, issue_date, order_code, customer, lines, subtotal, tax_amount, total, currency,
+    received_before } = data;
   const guarantees = data.guarantees ?? [];
 
   const title = doc_title ?? "TAX INVOICE";
@@ -320,7 +298,7 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
                   <View style={styles.desc}>
                     <Text style={styles.descMain}>{line.description}</Text>
                   </View>
-                  <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                  <Text style={styles.cellQty}>
                     {line.qty}
                   </Text>
                   <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
@@ -398,6 +376,18 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
                 <Text style={styles.grandLabel}>{isTaxInvoice ? "TOTAL" : "TOTAL DUE"}</Text>
                 <Text style={styles.grandValue}>{money(total)}</Text>
               </View>
+              {/* Deposit then final invoice (KL Gateway 2026-09-18): the full
+                  total, the money received before this invoice, what is left. */}
+              {received_before ? (<>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>Received before this invoice</Text>
+                  <Text style={styles.totalsValue}>{money(received_before)}</Text>
+                </View>
+                <View style={styles.grandBox}>
+                  <Text style={styles.grandLabel}>BALANCE DUE</Text>
+                  <Text style={styles.grandValue}>{money(Math.max(0, total - received_before))}</Text>
+                </View>
+              </>) : null}
             </View>
           </View>
 

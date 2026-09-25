@@ -41,10 +41,9 @@
 // ruling), full-bleed as SO-4 shipped it. The engine owns the toolbar, search,
 // filters, chooser and footer; ListPageShell would wrap a second chrome
 // around the one the engine already draws.
-import { useCallback, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   DataGrid,
@@ -52,6 +51,9 @@ import {
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import Money from "@/components/Money";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Popover from "@/components/kit/Popover";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
@@ -63,26 +65,40 @@ import {
 } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
-import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
-import styles from "./SalesOrdersRegister.module.css";
+import ConnectedSections, { CONNECT_AT_TABLE_HEADER } from "./components/ConnectedSections";
+import GoodsMiniTable, { UnitEvidence, goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
-import {
-  deliveryDateToBeConfirmedGuidance,
-  missingDeliveryDateGuidance,
-} from "./sales-order-guidance";
 import {
   buildRegisterRow,
   defaultOnFor,
   moneyText,
   MUTED_ABSENCES,
+  NO_DO_YET,
+  NO_PO_YET,
+  NOT_IN_CATALOG,
   REGISTER_FIELDS,
   type RegisterField,
   type RegisterRow,
 } from "./sales-order-columns";
 
 /**
- * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
+ * The two long headers print on the shared two-line header (UI MASTER §6.8),
+ * split exactly as SO Batch Purchase splits the same words. The label stays
+ * the column's accessible, filter and export name.
+ */
+const HEADER_LINES: Partial<Record<string, readonly [string, string]>> = {
+  customer_delivery: ["Customer Requested", "Delivery Date"],
+  delivery_location: ["Customer Delivery", "Location"],
+};
+
+/** The free-text defaults that may be longer than their registry width. */
+const ONE_LINE_TEXT = new Set(["sales_location", "salesperson", "delivery_location", "items"]);
+
+/**
+ * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai),
+ * and it stays READABLE — Listing Standard 2026-09-16: `slate-11`, never the
+ * disabled `slate-9` grey (3.3:1 on white, below the 4.5:1 text floor).
  *
  * `Not recorded` / `Not given` keep their words — a blank may never carry two
  * meanings — and lose their weight. A `PO No` column of eight absences and two
@@ -93,7 +109,7 @@ import {
 function absenceAware(text: string) {
   if (!MUTED_ABSENCES.has(text)) return text;
   return (
-    <span className="text-kit-slate-9" data-absence="true">
+    <span className="text-kit-slate-11" data-absence="true">
       {text}
     </span>
   );
@@ -128,7 +144,9 @@ function toGridColumn(
   const base: DataGridColumn<RegisterRow> = {
     key: f.key,
     label: f.label,
-    width: Math.round(parseFloat(f.width)),
+    headerLines: HEADER_LINES[f.key],
+    /* The shared registry number, carried by the catalog (UI MASTER §6.8). */
+    width: f.width,
     align: f.align,
     sortable: true,
     defaultHidden: !defaultOnFor(f, role),
@@ -168,7 +186,7 @@ function toGridColumn(
       accessor: (r) => (
         <button
           type="button"
-          className="font-medium text-blue-700 underline-offset-2 hover:underline"
+          className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
           onClick={(event) => {
             event.stopPropagation();
             navigate(`/operation/orders/so/${r.id}`);
@@ -184,14 +202,20 @@ function toGridColumn(
       ...base,
       accessor: (r) =>
         r.poNumbers.length === 0 ? (
-          absenceAware(f.text(r))
+          absenceAware(NO_PO_YET)
+        ) : r.poNumbers.length === 1 ? (
+          <button type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={(event) => {
+            event.stopPropagation();
+            navigate(`/operation/procurement?po=${encodeURIComponent(r.poNumbers[0]!)}`);
+          }}>{r.poNumbers[0]}</button>
         ) : (
-          <span className="inline-flex gap-1.5">
+          <Popover label="Purchase Orders" trigger={<Button variant="ghost" size="sm">{r.poNumbers.length} Purchase Orders</Button>}>
+          <div className="flex flex-col gap-2">
             {r.poNumbers.map((po) => (
               <button
                 key={po}
                 type="button"
-                className="font-medium text-blue-700 underline-offset-2 hover:underline"
+                className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                 onClick={(event) => {
                   event.stopPropagation();
                   navigate(`/operation/procurement?po=${encodeURIComponent(po)}`);
@@ -200,7 +224,8 @@ function toGridColumn(
                 {po}
               </button>
             ))}
-          </span>
+          </div>
+          </Popover>
         ),
     };
   }
@@ -212,14 +237,14 @@ function toGridColumn(
          object; many open Delivery's register filtered to this SO. */
       accessor: (r) => {
         if (r.deliveryOrders.length === 0) {
-          return <span className="text-kit-slate-9">No delivery order yet</span>;
+          return absenceAware(NO_DO_YET);
         }
         if (r.deliveryOrders.length === 1) {
           const deliveryOrder = r.deliveryOrders[0]!;
           return (
             <button
               type="button"
-              className="font-medium text-blue-700 underline-offset-2 hover:underline"
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
               onClick={(event) => {
                 event.stopPropagation();
                 navigate(
@@ -234,7 +259,7 @@ function toGridColumn(
         return (
           <button
             type="button"
-            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
               navigate(`/operation/delivery-orders?order=${encodeURIComponent(r.id)}`);
@@ -249,14 +274,9 @@ function toGridColumn(
   if (f.key === "customer") {
     return {
       ...base,
-      accessor: (r) => (
-        <span
-          className="block truncate"
-          title={r.phone ? `${r.customer} · ${r.phone}` : r.customer}
-        >
-          {r.customer}
-        </span>
-      ),
+      /* A cut name opens whole by click or keyboard (engine `overflowText`,
+         Listing Standard 2026-09-16) — a hover title is not a way to read. */
+      overflowText: (r) => r.customer,
       /* The digits ride the search so `0162389…` finds the row however the
          phone was punctuated. */
       searchValue: (r) => `${r.customer} ${r.phone} ${r.phoneDigits}`,
@@ -264,64 +284,14 @@ function toGridColumn(
       exportValue: (r) => (r.phone ? `${r.customer} · ${r.phone}` : r.customer),
     };
   }
-  if (f.key === "customer_delivery") {
-    return {
-      ...base,
-      accessor: (r) => {
-        if (r.customerDelivery) return f.text(r);
-        /* THE 8 vs THE 3 — owner ruling 2026-08-15, docs/orders/MASTER.md.
-           `delivery_date_tbd` already records that the customer WAS asked and
-           answered *not yet*; the screen was discarding it and printing the
-           same warning on all eleven. A customer who has answered is not work
-           to do, so this reads as a plain fact: one line, no action clause and
-           no amber — amber is reserved for the three nobody has asked. */
-        if (r.o.delivery_date_tbd) {
-          const tbd = deliveryDateToBeConfirmedGuidance({
-            customer: r.customer,
-            salesperson: r.o.salespersons?.name,
-            phone: r.phone,
-          });
-          return (
-            <span className="block min-w-0 truncate text-base-600" title={tbd.detail}>
-              {tbd.fact}
-            </span>
-          );
-        }
-        const guidance = missingDeliveryDateGuidance({
-          so: r.so,
-          customer: r.customer,
-          salesperson: r.o.salespersons?.name,
-          phone: r.phone,
-        });
-        /* ⭐ THE FACT ALONE — owner ruling 2026-08-18, and it OVERWRITES the
-           two-line action guidance that used to render here: a register lists
-           documents; actions live in My Work / Team Work / the Order Route.
-           The amber problem line stays because it is a FACT about the row
-           (nobody has asked this customer), and the full who/phone/ask detail
-           still rides the hover and the workspace panel — what leaves the
-           cell is the instruction clause. */
-        return (
-          <span className="block min-w-0" title={guidance.detail}>
-            <span data-attention="warning" className="block truncate font-semibold text-kit-amber-11">
-              {guidance.problem}
-            </span>
-          </span>
-        );
-      },
-    };
-  }
   if (f.key === "phone") {
     return { ...base, searchValue: (r) => `${r.phone} ${r.phoneDigits}` };
   }
-  if (f.key === "items") {
-    return {
-      ...base,
-      accessor: (r) => (
-        <span className="block truncate" title={r.items}>
-          {r.items}
-        </span>
-      ),
-    };
+  if (ONE_LINE_TEXT.has(f.key)) {
+    /* ⭐ ONE LINE, 40px — owner ruling 2026-09-21. A value longer than its
+       registry width ends in `…` and opens whole through the engine's
+       `overflowText`; the row never grows and the column stays resizable. */
+    return { ...base, overflowText: (r) => f.text(r) };
   }
   if (f.key === "total" || f.key === "paid" || f.key === "balance") {
     const state = (r: RegisterRow) => r[f.key as "total" | "paid" | "balance"];
@@ -346,6 +316,51 @@ function toGridColumn(
  * passes no `selection`, so the ☑ column does not exist here (owner ruling
  * 2026-08-15: a register selects nothing).
  */
+/** One SKU spelling for a catalog lookup — trimmed, case-folded. */
+function skuKey(sku: string): string {
+  return sku.trim().toUpperCase();
+}
+
+/**
+ * SKU → the product's NAME and its recorded variant, from the one catalog
+ * read (`useCatalog`). The expansion's `Item` and the Register's `Items`
+ * both read it, so a product is named once and never by its code when the
+ * catalog knows it (orders MASTER, 2026-09-21: `Cody` / `Super King`).
+ */
+function useCatalogNames(): Map<string, { name: string; variant: string }> {
+  const catalogQ = useCatalog();
+  return useMemo(() => {
+    const modelName = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
+    const out = new Map<string, { name: string; variant: string }>();
+    for (const sku of catalogQ.data?.skus ?? []) {
+      const name = modelName.get(sku.modelId);
+      if (name) out.set(skuKey(sku.sku), { name, variant: sku.variant });
+    }
+    return out;
+  }, [catalogQ.data]);
+}
+
+/**
+ * Whether the Register's own canvas is under 768px — the width below which
+ * UI MASTER §6.7 rule 2 pins identity alone. Measured on the page's work
+ * surface, not the window, because the shell's nav and rail take their share.
+ */
+function useNarrowCanvas(): [React.RefObject<HTMLDivElement>, boolean] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    /* The work surface's 8px padding each side is not grid canvas. */
+    const measure = () => setNarrow(el.clientWidth > 0 && el.clientWidth - 16 < 768);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, narrow];
+}
+
 function ExpandedLines({ row }: { row: RegisterRow }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
@@ -363,12 +378,13 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     () => new Map((catalogQ.data?.addons ?? []).map((a) => [a.key, a.name])),
     [catalogQ.data],
   );
+  const catalogNames = useCatalogNames();
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
-    const facts = lineConfigBits(attrs);
+    const facts = lineConfigBits(attrs).map((fact) => fact === "gap KIV" ? "Mattress gap: Confirm later" : fact);
     // The register is an operational identification surface, not a raw attrs
     // inspector. Keep only governed, human-readable product facts here; sofa
     // builder coordinates/keys and pricing metadata remain with their owners.
@@ -390,26 +406,46 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     return facts;
   };
   const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  const unavailable = expansion.isError ? "Could not load goods details" : expansion.isLoading ? "Loading…" : null;
   /* The goods lines, then the services — the same order the document prints. */
   const miniLines: GoodsMiniLine[] = [
     ...lines.map((line, index): GoodsMiniLine => {
       const fact = factsByLine.get(line.id ?? "");
-      const detail = configOf(line);
+      /* ⭐ `Item` IS THE PRODUCT, NOT ITS CODE (owner ruling 2026-09-21): the
+         catalog name on line one, the variant and the line's own recorded
+         configuration on line two — `Cody` / `Super King`. SKU has its own
+         column. A code the catalog does not know prints as itself. */
+      const product = catalogNames.get(skuKey(line.sku));
+      const variant = product?.variant ?? "";
+      const detail = [
+        ...(variant ? [variant] : []),
+        ...configOf(line).filter((f) => f !== variant && !f.endsWith(`: ${variant}`)),
+      ];
       return {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `expanded-good-${line.sku}`,
-        category: goodsCategoryOf(line),
-        unitIds: fact?.unitIds ?? [],
+        /* The shared ladder says `Other goods` for a line with no catalog row;
+           this page prints the dictionary's `Not in catalog`, muted (owner
+           ruling 2026-09-22). Other pages keep their own word. */
+        ...(goodsCategoryOf(line) === "Other goods"
+          ? { category: NOT_IN_CATALOG, categoryNode: absenceAware(NOT_IN_CATALOG) }
+          : { category: goodsCategoryOf(line) }),
+        unitIds: fact?.verifiedUnitIds ?? fact?.unitIds ?? [],
+        unitNode: unavailable ? <span role={expansion.isError ? "alert" : "status"}>{unavailable}</span> : (
+          <UnitEvidence singleLineCodes ids={fact?.verifiedUnitIds ?? fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
+        ),
         unitAbsence: "Not allocated",
         /* A single destination prints its name alone; only a SPLIT earns the
            quantity, because `×1` on a one-route line is noise. */
         deliverTo: (fact?.deliverTo ?? []).map((d) =>
-          (fact?.deliverTo.length ?? 0) > 1 ? `${d.name} ×${d.qty}` : d.name,
+          (fact?.deliverTo.length ?? 0) > 1 || d.qty !== line.qty ? `${d.name} ×${d.qty}` : d.name,
         ),
-        deliverToAbsence: expansion.isLoading ? "Loading…" : "Not recorded",
+        deliverToNode: unavailable ? <span>{unavailable}</span> : undefined,
+        /* Before any PO line there is no supplier destination yet. */
+        deliverToAbsence: NO_PO_YET,
         sku: line.sku,
         qty: line.qty,
-        item: lineName(line),
+        item: product?.name ?? lineName(line),
         ...(detail.length ? { itemDetail: detail.join(" · ") } : {}),
         selectable: true,
       };
@@ -431,9 +467,23 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       selectable: false,
     })),
   ];
+  /* ⭐ THE PURCHASING REFERENCE GEOMETRY (UI MASTER §6.8–§6.9, owner ruling
+     2026-09-21): the shared `ConnectedSections` draws the 1px line from under
+     the SO row's caret to the goods table's bordered frame. One section, so
+     the line ends at it and structurally cannot run into the next order. */
   return (
     <div data-testid="row-expansion">
-      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} />
+      {expansion.isError && <Button variant="ghost" size="sm" onClick={() => void expansion.refetch()}>Retry</Button>}
+      <ConnectedSections
+        testId={`so-sections-${row.o.id}`}
+        sections={[
+          {
+            key: "goods",
+            connectAt: CONNECT_AT_TABLE_HEADER,
+            node: <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} salesOrderLayout />,
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -488,6 +538,8 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
 
 export default function SalesOrdersRegister() {
   const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
+  const seededSearch = urlParams.get("search") ?? "";
   const role = useAuth((s) => s.role);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
@@ -501,9 +553,15 @@ export default function SalesOrdersRegister() {
      naming which Sales Order the dialog is about. */
   const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
-  const { data, isLoading, isError, error, refetch } = useOperationOrders(
-    serverSearch ? { search: serverSearch } : {},
+  /* ⭐ POPULATION — owner ruling 2026-09-21: only orders Sales has handed to
+     Operation. A `Placed` order is not on this Register, so the server is
+     asked for the `proceeded` stage and counts its total the same way. */
+  const { data, isLoading, isError, refetch } = useOperationOrders(
+    serverSearch ? { stage: "proceeded", search: serverSearch } : { stage: "proceeded" },
   );
+  /* The product NAME behind a SKU — the same catalog read the expansion makes
+     (React Query dedupes it), so `Items` prints `Cody + 1 more`, not a code. */
+  const catalogNames = useCatalogNames();
   /* ▸ D4 · EACH ORDER CARRIES ITS OWN DELIVERY ORDERS NOW.
    *
    * This used to fetch the whole delivery REGISTER and group it by order id.
@@ -522,17 +580,24 @@ export default function SalesOrdersRegister() {
     () =>
       (data?.orders ?? [])
         .filter((o) => !isRental(o))
-        .map((o) => buildRegisterRow(o, o.ops_delivery_orders ?? [])),
-    [data],
+        .map((o) =>
+          buildRegisterRow(o, o.ops_delivery_orders ?? [], (sku) => catalogNames.get(skuKey(sku))?.name),
+        ),
+    [data, catalogNames],
   );
 
   /* The scope is the register's population; the engine's search and ▽s narrow
      WITHIN it. Newest first — the engine applies its own sort on top when a
      header is clicked. */
   const rows = useMemo(
-    () => [...all].sort((a, b) => b.ordered.localeCompare(a.ordered)),
+    () => [...all].sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     [all],
   );
+  /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
+     read (rentals excluded, search not applied), carried on every list answer,
+     so a search answered before any unsearched load still has it and a created
+     or cancelled order moves it on the next read. Unknown → `null` → no `of`. */
+  const population = typeof data?.salesOrderTotal === "number" ? data.salesOrderTotal : null;
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
      for Finance/Principal); the chooser opens every column either way.
@@ -547,8 +612,15 @@ export default function SalesOrdersRegister() {
      2026-08-18) retires the duplicate `Promised` column and brings every
      saved layout back to the ruled eight — a browser that had hidden
      `DO No` or opened `Promised` would otherwise replay that layout
-     forever on the one machine that matters. */
-  const storageKey = `carres.salesOrders.register.v4.${role ?? "anon"}`;
+     forever on the one machine that matters. v5 (Jess 2026-09-17) puts
+     `SO Date` before `SO No`; a v4 order saved identity-first is retired.
+     v6 (Jess 2026-09-21) is the eleven-column composition led by Proceed
+     Date · SO Doc Date · SO No, so no saved v5 order can resurrect the old one. */
+  const storageKey = `carres.salesOrders.register.v6.${role ?? "anon"}`;
+  /* Below a 768px canvas the three locked columns and the control gutter need
+     ~400px, so SO No started off-screen at 390 and pinned only after a scroll.
+     There SO No leads alone — on first paint — and the two dates follow it. */
+  const [canvasRef, narrowCanvas] = useNarrowCanvas();
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -603,12 +675,17 @@ export default function SalesOrdersRegister() {
   );
 
   const expandable = useMemo(
-    () => ({ flush: true, renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
+    () => ({
+      /* The Purchasing reference (UI MASTER §6.8–§6.9): the expansion sits flush
+         under its row and draws its own 1px connector to the goods frame. */
+      flush: true,
+      renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} />,
+    }),
     [],
   );
 
   return (
-    <div className={`${styles.page} flex h-full min-h-0 flex-col`}>
+    <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
 
       {cancelTarget && (
@@ -627,28 +704,29 @@ export default function SalesOrdersRegister() {
       )}
 
       {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
-      <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
-        {isError ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
-            <p className="text-body text-base-700">The register could not be loaded</p>
-            {(error as Error | undefined)?.message ? (
-              <p className="text-meta text-base-500">
-                {(error as Error).message}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-              onClick={() => {
-                void refetch();
-              }}
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
+      <div ref={canvasRef} className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
           <DataGrid<RegisterRow>
             appearance="reference"
+            palette="slate"
+            searchPresentation="responsive"
+            labelledToolbar
+            /* ONE kit error INSIDE the work surface: the toolbar — and New
+               Sales Order with it — stays, because creating an order does not
+               depend on the list loading. No raw transport message. */
+            errorState={
+              isError ? (
+                <div role="alert">
+                  <EmptyState
+                    title="Sales orders could not be loaded"
+                    action={
+                      <Button variant="neutral" onClick={() => void refetch()}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                </div>
+              ) : undefined
+            }
             rows={rows}
             columns={columns}
             storageKey={storageKey}
@@ -660,15 +738,32 @@ export default function SalesOrdersRegister() {
                never a breakpoint problem. A placeholder that fits is the fix;
                the search itself still matches SO number, customer, phone and
                item, and the ▽ per-column filters say so column by column. */
+            /* ⭐ A DOOR MAY ARRIVE WITH ITS QUESTION ALREADY ASKED (owner
+               ruling, Jess 2026-09-21): the Sales Order page's
+               `Existing customer · {n} orders ›` opens this register searched
+               by that phone. `?search=` seeds the engine's own search — no new
+               page, no new writer, no second list. */
+            initialSearch={seededSearch}
             searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
-            emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
+            emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
+            noMatchMessage="No sales orders match these filters"
             groupBanner={false}
-            /* Optional columns may widen the sheet (MASTER §0.1), so the row's
-               identity pins: ☐ · ▸ · SO No stay against the left edge while
-               the rest scrolls under them. An engine capability, never a
-               page-local hack (`docs/ui/MASTER.md` §4). */
-            stickyIdentity
+            /* ⭐ The one-line listing row is 40px, adopted on this page only
+               (ui MASTER §6.0 rule 5, owner ruling 2026-09-21). Text stays
+               13/18 with 8px padding; the engine default (38px) is untouched. */
+            rowHeight={40}
+            /* ⭐ Proceed Date · SO Doc Date · SO No lead and cannot be hidden
+               or moved (owner ruling 2026-09-21). At a canvas ≥768px the
+               engine pins SO Doc Date · SO No and Proceed Date scrolls under
+               them; below it SO No leads and pins alone, visible on first paint. */
+            leadingColumns={
+              narrowCanvas
+                ? /* All three stay locked (cannot be hidden or moved); SO No
+                     leads, and the engine pins it alone below 768px. */
+                  { before: ["so", "proceeded"], date: "ordered", identity: "so" }
+                : { before: ["proceeded"], date: "ordered", identity: "so" }
+            }
             chooserGroupOrder={[
               "Document",
               "Customer",
@@ -698,24 +793,28 @@ export default function SalesOrdersRegister() {
               },
             ]}
             toolbarStart={
-              <button
-                type="button"
+              /* The kit primary control (32px, kit `add` glyph at the governed
+                 stroke) — never a raw page-local capsule. */
+              <Button
+                variant="primary"
+                size="md"
+                icon="add"
                 data-testid="new-sales-order"
                 onClick={() => navigate("/operation/orders/so/new")}
-                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
               >
-                <Plus size={14} strokeWidth={2.25} /> New Sales Order
-              </button>
+                New Sales Order
+              </Button>
             }
             statusSummary={(filtered, selectedRows) => (
               <RegisterResultSummary
                 filtered={filtered}
                 selected={selectedRows}
-                total={rows.length}
+                loaded={rows.length}
+                searching={serverSearch !== ""}
+                total={population}
               />
             )}
           />
-        )}
       </div>
     </div>
   );
@@ -737,8 +836,9 @@ export default function SalesOrdersRegister() {
  *   footer that under-counts is worse than one that abbreviates: it is a
  *   number the operator trusts and cannot reproduce.
  *
- * Anything not positively recognised is `Other goods` — governed, honest, and
- * still counted.
+ * Anything not positively recognised is `Other goods` in the shared ladder —
+ * and this footer never prints it (owner ruling 2026-09-22): an unclassified
+ * line is a catalogue data error, reported for correction.
  */
 const FOOTER_WORDS = GOODS_CATEGORY_WORDS;
 
@@ -769,50 +869,119 @@ const footerWord = goodsCategoryWordOf;
 function RegisterResultSummary({
   filtered,
   selected,
+  loaded,
+  searching,
   total,
 }: {
   filtered: RegisterRow[];
   selected: RegisterRow[];
-  total: number;
+  /** Every row the page holds before the engine's search and header filters. */
+  loaded: number;
+  /** A server search is narrowing the rows. */
+  searching: boolean;
+  /** The server's authoritative total; `null` when unknown. */
+  total: number | null;
 }) {
+  const navigate = useNavigate();
   const scope = selected.length > 0 ? selected : filtered;
   const counts = new Map<string, number>();
+  /* The lines behind `Not in catalog {n}` — what the click lists. */
+  const uncatalogued: { id: string; so: number; sku: string; name: string; qty: number }[] = [];
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
-      counts.set(footerWord(line), (counts.get(footerWord(line)) ?? 0) + Number(line.qty || 0));
+      const word = footerWord(line);
+      counts.set(word, (counts.get(word) ?? 0) + Number(line.qty || 0));
+      if (word === "Other goods") {
+        uncatalogued.push({ id: row.id, so: row.so, sku: line.sku, name: lineName(line), qty: Number(line.qty || 0) });
+      }
     }
     for (const addon of row.o.order_addons ?? []) {
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
     }
   }
-  const orderWord = scope.length === 1 ? "order" : "orders";
+  /* Listing Standard 2026-09-16: the footer names the document —
+     `{n} of {m} sales orders`, singular `1 sales order`. */
+  const salesOrders = (n: number) => (n === 1 ? "sales order" : "sales orders");
+  /* An unknown total prints the count alone — never a guessed `of`. */
+  /* ⭐ `of` ONLY WHEN THE LIST IS NARROWED (card 12, 2026-09-21): a search, a
+     header filter, or the server's row cap. Unfiltered it is the plain count. */
+  const narrowed = searching || filtered.length < loaded || (total != null && loaded < total);
   const countWord = selected.length > 0
-    ? `${selected.length} selected ${orderWord}`
-    : filtered.length === total
-      ? `${filtered.length} ${orderWord}`
-      : `${filtered.length} of ${total} orders`;
-  /* ⛔ `Other goods` IS COUNTED AND NOT PRINTED — YH, 2026-08-27.
-     This OVERWRITES `COPY-STANDARD.md`'s "never dropped from the count", which
-     ruled the word must always appear.
-
-     What the word actually reports is a CATALOG GAP: a line nothing recognises,
-     because its SKU has no catalog row (or its category has no word here — a
-     `guarantee` item is catalogued correctly and still lands in this bucket,
-     since the footer's vocabulary has five of the catalog's six categories).
-     Neither is a fact about the customer's goods, which is what the rest of
-     this tally is, and neither is actionable from a register footer.
-
-     🟡 THE HONEST COST, stated rather than hidden: the printed numbers no
-     longer add up to the order's item count. The bucket is still computed —
-     `footerWord` is untouched and the count is still available to anything
-     that asks — so this is a display decision, reversible by deleting one
-     line, and it destroys no data. */
+    ? `${selected.length} selected ${salesOrders(selected.length)}`
+    : total == null || !narrowed
+      ? `${filtered.length} ${salesOrders(filtered.length)}`
+      : `${filtered.length} of ${total} ${salesOrders(total)}`;
+  /* ⭐ OWNER RULING 2026-09-22 (COPY-STANDARD, SO category footer): `Qty:`
+     names GOODS categories only. Services never enter it — they print apart
+     as `Services {n}`. And there is no `Other goods`: a line the ladder
+     cannot name is a catalogue data error, reported for correction, never
+     printed to staff as a kind of goods. */
   const parts = FOOTER_WORDS.filter(
-    (label) => label !== "Other goods" && (counts.get(label) ?? 0) > 0,
+    (label) => label !== "Service" && label !== "Other goods" && (counts.get(label) ?? 0) > 0,
   ).map((label) => `${label} ${counts.get(label)}`);
+  const services = counts.get("Service") ?? 0;
+  /* ⭐ NEVER A SILENT UNDER-COUNT (owner ruling 2026-09-22, Jess): a goods
+     line the ladder cannot name stays out of `Qty:` but is counted apart
+     under the dictionary's `Not in catalog {n}` — {n} is the PHYSICAL
+     QUANTITY, never an order or line count — and only when there is one.
+     Clicking it lists SO No · original SKU · product name · qty. No typo is
+     inferred and nothing is written to the catalogue. */
+  const notInCatalog = counts.get("Other goods") ?? 0;
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */
-  const line = [countWord, ...parts].join(" · ");
-  return <span className="block truncate" title={line}>{line}</span>;
+  const head = [
+    countWord,
+    ...(parts.length ? [`Qty: ${parts.join(" · ")}`] : []),
+    ...(services > 0 ? [`Services ${services}`] : []),
+  ].join(" · ");
+  const exception = `${NOT_IN_CATALOG} ${notInCatalog}`;
+  const line = notInCatalog > 0 ? `${head} · ${exception}` : head;
+  if (notInCatalog === 0) return <span className="block truncate" title={line}>{line}</span>;
+  return (
+    <span className="flex min-w-0 items-center" title={line}>
+      <span className="min-w-0 truncate">{head} ·&nbsp;</span>
+      <Popover
+        label={NOT_IN_CATALOG}
+        trigger={
+          <button
+            type="button"
+            data-testid="footer-not-in-catalog"
+            className="flex-none text-kit-blue-11 underline-offset-2 hover:underline"
+          >
+            {exception}
+          </button>
+        }
+      >
+        <table className="text-body" data-testid="not-in-catalog-list">
+          <thead>
+            <tr className="text-left text-label font-semibold text-kit-slate-11">
+              <th className="px-2 py-1">SO No</th>
+              <th className="px-2 py-1">SKU</th>
+              <th className="px-2 py-1">Item</th>
+              <th className="px-2 py-1 text-right">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {uncatalogued.map((u, i) => (
+              <tr key={`${u.id}-${u.sku}-${i}`}>
+                <td className="px-2 py-1">
+                  <button
+                    type="button"
+                    className="text-kit-blue-11 underline-offset-2 hover:underline"
+                    onClick={() => navigate(`/operation/orders/so/${u.id}`)}
+                  >
+                    SO-{u.so}
+                  </button>
+                </td>
+                <td className="whitespace-nowrap px-2 py-1">{u.sku}</td>
+                <td className="px-2 py-1">{u.name}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{u.qty}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Popover>
+    </span>
+  );
 }

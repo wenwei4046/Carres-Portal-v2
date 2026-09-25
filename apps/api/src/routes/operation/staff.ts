@@ -4,12 +4,12 @@ import { z } from "zod";
 import {
   updateOpsStaffSettingInput,
   isOpsGenericAccount,
-  distributeOrders,
-  countsAsInToday,
+  planOpsAssignment,
+  workspaceDutyRolesOf,
   type OpsStaffMember,
 } from "@carres/shared";
 import { dutyHolders, hasDuty, myDuties, requireDuty } from "../../lib/duties";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -19,14 +19,17 @@ import type { AppEnv } from "../../types";
  *   GET /api/operation/staff          — active operation accounts + pool state
  *   PUT /api/operation/staff/:userId  — upsert pool membership / availability
  *
- * The pool is OPT-IN: only accounts with an ops_staff_settings row receive
- * auto-assignments (keeps generic accounts like logistics@ out by default).
- * available=false = temporarily away (MC / leave) — new orders skip them;
- * their existing orders move only via an explicit human redistribute (the
- * client computes the plan with the shared `distributeOrders` and writes it
- * through the normal per-order control PUT — audit-stamped per order).
- * Visibility is never gated by any of this. userClient/RLS is the boundary
- * (ops_staff_settings = operation+principal ALL, mirrors ops_tasks).
+ * The pool is OPT-IN: only accounts with an ops_staff_settings row are dealt
+ * orders, and since 0504 only INDIVIDUALS may be in it — an account with a
+ * People record (`staff_code`). A shared login or a robot account records
+ * evidence and never carries a customer.
+ * available=false = temporarily away (MC / planned leave) — new orders skip
+ * them; their existing orders NEVER move, because responsibility is stable:
+ * the away day is covered by today's acting person
+ * (`delivery_responsible_operation`, 0504), and a permanent change is the
+ * formal handover. Visibility is never gated by any of this. userClient/RLS is
+ * the boundary (ops_staff_settings = operation+principal ALL, mirrors
+ * ops_tasks).
  */
 const staffRouter = new Hono<AppEnv>();
 
@@ -41,27 +44,47 @@ function requireOperationOrPrincipal(
 }
 
 // GET / — every ACTIVE operation account, joined with its pool settings.
+// GET /?duty=<key> — the Staff & Duties pickers for that duty. A duty whose
+// catalogue entry names other roles (Finance Approver: finance) gets those
+// accounts from workspace_duty_staff (0514), which only a duty manager may
+// call; every other duty gets the operation list below, unchanged.
 staffRouter.get("/", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
 
+  const dutyKey = c.req.query("duty") ?? "";
+  const roles = workspaceDutyRolesOf(dutyKey);
+  if (roles.join() !== "operation") {
+    const { data, error } = await sb.rpc("workspace_duty_staff", {
+      p_roles: roles,
+    });
+    if (error) return fail(c, error);
+    const staff: OpsStaffMember[] = (
+      (data ?? []) as { id: string; name: string | null; email: string | null }[]
+    ).map((u) => ({
+      user_id: u.id,
+      email: u.email ?? "",
+      name: u.name ?? null,
+      pooled: false,
+      available: false,
+      note: null,
+      last_seen_at: null,
+      duties: [],
+    }));
+    return c.json({ staff, myDuties: [] });
+  }
+
   const [users, settings] = await Promise.all([
     sb
       .from("app_users")
-      .select("id, email, name, status, last_seen_at")
+      .select("id, email, name, status, staff_code, is_person, last_seen_at")
       .eq("role", "operation")
       .order("email"),
     sb.from("ops_staff_settings").select("user_id, available, note"),
   ]);
-  if (users.error) {
-    const m = mapPgError(users.error);
-    return c.json(m.body, m.status);
-  }
-  if (settings.error) {
-    const m = mapPgError(settings.error);
-    return c.json(m.body, m.status);
-  }
+  if (users.error) return fail(c, users.error);
+  if (settings.error) return fail(c, settings.error);
 
   const byId = new Map(
     (settings.data ?? []).map((s) => [s.user_id as string, s]),
@@ -75,6 +98,11 @@ staffRouter.get("/", async (c) => {
   const staff: OpsStaffMember[] = (users.data ?? [])
     // Disabled accounts drop out of the pool automatically (resign = disable).
     .filter((u) => (u.status ?? "active") === "active")
+    // A duty picker offers PEOPLE only — the governed `is_person` marker
+    // (0533, owner ruling 2026-09-18), never `staff_code`: the shared owner
+    // login carries CR001. A shared login or a test robot records evidence
+    // and never holds a duty; the SQL doors refuse it either way.
+    .filter((u) => !dutyKey || (u as { is_person?: boolean }).is_person === true)
     .map((u) => {
       const s = byId.get(u.id as string);
       return {
@@ -111,6 +139,16 @@ async function autoEnroll(
   // Generic (non-person) accounts never auto-join — a login on logistics@
   // must not start swallowing orders (round-4 intent made explicit).
   if (isOpsGenericAccount(auth.email)) return;
+  // 0504 — AND the real test of a person is the People record, not the email
+  // spelling: only an account with a `staff_code` carries responsibility for a
+  // customer. The email heuristic above let `operation-test@x.com` into the
+  // pool, where it collected 100 orders nobody was answerable for.
+  const { data: me } = await sb
+    .from("app_users")
+    .select("staff_code")
+    .eq("id", auth.id)
+    .maybeSingle();
+  if (!me || me.staff_code == null) return;
   const { data: existing } = await sb
     .from("ops_staff_settings")
     .select("user_id")
@@ -130,24 +168,33 @@ staffRouter.post("/heartbeat", async (c) => {
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
   const { error } = await sb.rpc("touch_last_seen");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   await autoEnroll(c, sb);
   return c.json({ ok: true });
 });
 
 // POST /auto-assign — SERVER-SIDE sweep (Jess go-live feedback 2026-07-18):
 // any operation session may trigger it (the assignment PLAN is computed here,
-// so staff can't game it — the manager-only gate stays on MANUAL PUTs). The
-// staff member opening the portal is what makes them "in today", so the sweep
-// runs right after their own heartbeat: goods land the moment they show up,
-// no manager session needed.
+// so staff can't game it — the manager-only gate stays on MANUAL PUTs).
 //
-// Stamps the caller first (heartbeat), then distributes every OPEN unassigned
-// order across the pool members seen today (least-loaded, deterministic).
-// assigned_by stays NULL = system.
+// 0504 — THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13). A Sales
+// Order is dealt to ONE individual when it enters Operations and stays with
+// that person: they carry the customer follow-up, the balance and the storage
+// collection. The sweep therefore deals only orders that have NO responsible
+// person yet; it never re-spreads an order that already has one.
+//
+// What changed, and why: the sweep used to re-split every SYSTEM-assigned open
+// order across whoever was IN today, on every run. That made `assigned_staff`
+// an actor of the day rather than a stable owner — the exact opposite of the
+// owner's rule — and absence was expressed as a reassignment. Absence is now
+// COVER: `delivery_responsible_operation` (0504) names today's acting person
+// when the responsible one is away, and the order never moves.
+//
+// Who may be dealt an order: an ACTIVE INDIVIDUAL (a People record with a
+// `staff_code`) who is in the pool and not on planned leave. Presence is NOT a
+// condition — responsibility is durable and today's absence is covered, not
+// redistributed. A shared login or a robot account may record evidence and
+// never owns.
 staffRouter.post("/auto-assign", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -159,40 +206,32 @@ staffRouter.post("/auto-assign", async (c) => {
   await sb.rpc("touch_last_seen");
   await autoEnroll(c, sb);
 
-  // 2) Pool members not marked away, with the CUTOFF rule (Jess round-3 —
-  //    fully automatic MC handling, zero clicks):
-  //      · before 10:00 MYT: everyone keeps their share (late ≠ absent);
-  //      · from 10:00: no heartbeat today = treated absent TODAY → their
-  //        system-assigned orders flow to whoever is in, automatically;
-  //        they log in later → their share flows straight back.
-  //    The away toggle remains an OPTIONAL override for planned leave.
+  // 2) Who may be dealt an order (0504): pool members who are ACTIVE
+  //    INDIVIDUALS and not on planned leave. `available=false` is the
+  //    person-level leave flag — new orders skip them, exactly as before.
+  //    Today's heartbeat no longer decides ownership; it decides who ACTS
+  //    (the cover rule inside `delivery_responsible_operation`).
   const [users, settings] = await Promise.all([
     sb
       .from("app_users")
-      .select("id, status, last_seen_at")
+      .select("id, status, last_seen_at, staff_code")
       .eq("role", "operation"),
     sb.from("ops_staff_settings").select("user_id, available"),
   ]);
-  if (users.error) {
-    const m = mapPgError(users.error);
-    return c.json(m.body, m.status);
-  }
-  if (settings.error) {
-    const m = mapPgError(settings.error);
-    return c.json(m.body, m.status);
-  }
+  if (users.error) return fail(c, users.error);
+  if (settings.error) return fail(c, settings.error);
   const userById = new Map((users.data ?? []).map((u) => [u.id as string, u]));
+  /** An account that may CARRY a customer: active, and a People record with a
+   *  staff_code. A shared login or a robot account never owns (0504). */
+  const mayOwn = (id: string | null | undefined): boolean => {
+    if (!id) return false;
+    const u = userById.get(id);
+    return !!u && (u.status ?? "active") === "active" && u.staff_code != null;
+  };
   const availIds = (settings.data ?? [])
     .filter((s) => s.available !== false)
     .map((s) => s.user_id as string)
-    .filter((id) => {
-      const u = userById.get(id);
-      return (
-        !!u &&
-        (u.status ?? "active") === "active" &&
-        countsAsInToday(u.last_seen_at as string | null)
-      );
-    });
+    .filter(mayOwn);
   if (availIds.length === 0) return c.json({ assigned: 0, reason: "no_staff" });
 
   // 3) OPEN orders (mirrors the list's controlTabOf: delivered stage/status =
@@ -203,10 +242,7 @@ staffRouter.post("/auto-assign", async (c) => {
       "id, status, operation_stage, ops_order_control(assigned_staff, assigned_by)",
     )
     .neq("status", "cancelled");
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   type Ovl = { assigned_staff?: string | null; assigned_by?: string | null };
   const ovlOf = (o: { ops_order_control?: Ovl[] | Ovl | null }): Ovl | null => {
     const raw = o.ops_order_control;
@@ -216,34 +252,19 @@ staffRouter.post("/auto-assign", async (c) => {
     (o) => o.operation_stage !== "delivered" && o.status !== "delivered",
   );
 
-  // 4) REBALANCE, not just fill (Jess 2026-07-18: staff don't log in at the
-  //    same time — first-in must not keep the whole backlog). SYSTEM-assigned
-  //    orders (assigned_by NULL) are pool property: every sweep re-splits
-  //    them + the unassigned evenly across whoever is IN today. An order a
-  //    HUMAN assigned (assigned_by set — Jess's manual call) never moves.
-  //    Deterministic (sorted ids + tie-broken loads): same members → same
-  //    outcome → zero writes on a quiet re-run.
-  const rebalancable = open.filter((o) => {
-    const ovl = ovlOf(o);
-    return !ovl?.assigned_staff || ovl.assigned_by == null;
-  });
-  if (rebalancable.length === 0) return c.json({ assigned: 0, reason: "none_open" });
-  // Base loads = the orders each present member keeps regardless (human-assigned).
-  const loads = availIds.map((userId) => ({
-    userId,
-    openCount: open.filter((o) => {
-      const ovl = ovlOf(o);
-      return ovl?.assigned_staff === userId && ovl.assigned_by != null;
-    }).length,
+  // 4) DEAL WHAT NOBODY CARRIES (0504) — the arithmetic is the shared
+  //    `planOpsAssignment`, so the rule has exactly one implementation.
+  const candidates = open.map((o) => ({
+    orderId: o.id as string,
+    assignedStaff: ovlOf(o)?.assigned_staff ?? null,
+    assignedBy: ovlOf(o)?.assigned_by ?? null,
   }));
-  const plan = distributeOrders(
-    rebalancable.map((o) => o.id as string).sort(),
-    loads,
-  );
+  const plan = planOpsAssignment(candidates, availIds, mayOwn);
+  if (plan.length === 0) return c.json({ assigned: 0, reason: "none_open" });
 
   // 5) Write only the CHANGES; assigned_by NULL = system auto-assign.
   const currentOwner = new Map(
-    rebalancable.map((o) => [o.id as string, ovlOf(o)?.assigned_staff ?? null]),
+    candidates.map((o) => [o.orderId, o.assignedStaff]),
   );
   const changes = plan.filter((p) => currentOwner.get(p.orderId) !== p.userId);
   const nowIso = new Date().toISOString();
@@ -303,10 +324,7 @@ staffRouter.put("/:userId", async (c) => {
       .from("ops_staff_settings")
       .delete()
       .eq("user_id", idCheck.data);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     return c.json({ ok: true, pooled: false });
   }
 
@@ -320,10 +338,7 @@ staffRouter.put("/:userId", async (c) => {
     },
     { onConflict: "user_id" },
   );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, pooled: true });
 });
 

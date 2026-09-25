@@ -13,6 +13,9 @@ import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { SectionCard } from "@/components/SectionPanel";
 import { rm } from "@/lib/format-currency";
+import { FieldError } from "@/components/kit/FieldFrame";
+import type { DepartmentType } from "@carres/shared";
+import { decodeDepartment, encodeDepartment, useDepartments } from "../department";
 
 export function accountLabel(a: Pick<MoneyInAccountOption, "code" | "name">): string {
   return `${a.code} · ${a.name}`;
@@ -25,15 +28,19 @@ export interface TypedLine {
   account_code: string;
   description: string;
   amount: string;
+  /** 0540: "TYPE" or "TYPE:id", see ../department. */
+  department: string;
 }
 
 let lineSeq = 0;
 export function blankLine(): TypedLine {
   lineSeq += 1;
-  return { key: `line-${lineSeq}`, account_code: "", description: "", amount: "" };
+  return { key: `line-${lineSeq}`, account_code: "", description: "", amount: "", department: "" };
 }
 
-export type LineErrors = Record<string, { account?: string; amount?: string }>;
+export type LineErrors = Record<string, { account?: string; amount?: string; department?: string }>;
+
+type ReadLine = { account_code: string; description: string | null; amount: number; department_type: DepartmentType; department_id: string | null };
 
 /**
  * Turn typed lines into what the API takes. A row left completely blank is
@@ -41,26 +48,31 @@ export type LineErrors = Record<string, { account?: string; amount?: string }>;
  * field that is missing, never guessed.
  */
 export function readLines(lines: TypedLine[]): {
-  lines: Array<{ account_code: string; description: string | null; amount: number }>;
+  lines: ReadLine[];
   errors: LineErrors;
 } {
-  const out: Array<{ account_code: string; description: string | null; amount: number }> = [];
+  const out: ReadLine[] = [];
   const errors: LineErrors = {};
   for (const l of lines) {
     const blank = !l.account_code && !l.description.trim() && !l.amount.trim();
     if (blank) continue;
     const amount = parseTypedAmount(l.amount);
-    const e: { account?: string; amount?: string } = {};
+    const e: LineErrors[string] = {};
+    const dept = decodeDepartment(l.department);
     if (!l.account_code) e.account = "Choose an account.";
+    if (!dept.departmentType) e.department = "Choose the department.";
     if (amount === null) e.amount = "Type the amount.";
     else if (Number.isNaN(amount)) e.amount = "Type the amount in numbers, like 1500.00.";
     else if (amount <= 0) e.amount = "The amount must be more than RM 0.00.";
     else if (Math.abs(Math.round(amount * 100) - amount * 100) > 1e-6) e.amount = "An amount has at most two decimals.";
-    if (e.account || e.amount) {
+    if (e.account || e.amount || e.department) {
       errors[l.key] = e;
       continue;
     }
-    out.push({ account_code: l.account_code, description: l.description.trim() || null, amount: amount as number });
+    out.push({
+      account_code: l.account_code, description: l.description.trim() || null, amount: amount as number,
+      department_type: dept.departmentType!, department_id: dept.departmentId ?? null,
+    });
   }
   return { lines: out, errors };
 }
@@ -91,12 +103,16 @@ export function LinesEditor({
   accountPlaceholder?: string;
 }) {
   const options = accounts.map((a) => ({ value: a.code, label: accountLabel(a) }));
+  const departments = useDepartments().data ?? [];
+  const deptOptions = (income: boolean) => departments
+    .filter((d) => !(income && d.department_type === "OFFICE"))
+    .map((d) => ({ value: encodeDepartment(d.department_type, d.department_id), label: d.name }));
   const set = (key: string, patch: Partial<TypedLine>) =>
     onChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   return (
     <div className="flex flex-col gap-3" data-testid={`${idPrefix}-lines`}>
       {lines.map((l, i) => (
-        <div key={l.key} className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_auto] md:items-end">
+        <div key={l.key} className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto] md:items-end">
           <Select
             id={`${idPrefix}-account-${i}`}
             label="Account"
@@ -120,6 +136,15 @@ export function LinesEditor({
             value={l.amount}
             onChange={(e) => set(l.key, { amount: e.target.value })}
             error={errors[l.key]?.amount}
+          />
+          <Select
+            id={`${idPrefix}-department-${i}`}
+            label="Department"
+            value={l.department || undefined}
+            onValueChange={(v) => set(l.key, { department: v })}
+            options={deptOptions(accounts.find((a) => a.code === l.account_code)?.kind === "INCOME")}
+            placeholder="Choose the department"
+            error={errors[l.key]?.department}
           />
           <Button
             variant="ghost"
@@ -213,9 +238,9 @@ export function CancelWithReason({
           }}
         />
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {refusal}
-          </p>
+          </FieldError>
         )}
       </div>
     </Modal>

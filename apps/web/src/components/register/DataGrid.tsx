@@ -45,23 +45,42 @@ import {
   Fragment,
   memo,
   useCallback,
+  useId,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X, Check, ArrowDown, ArrowUp } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { appTodayIso } from "@/lib/fmt-date";
+import Button from "@/components/kit/Button";
+import Popover from "@/components/kit/Popover";
+import Tooltip from "@/components/kit/Tooltip";
+import { EXPANSION_JOIN_Y, ExpansionJoinContext } from "./expansion-connector";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
+
+import { ViewportExpansion } from "./ViewportExpansion";
 
 const ICON = { size: 14, strokeWidth: 1.75 } as const;
 
 export type DataGridColumn<T> = {
   key: string;
   label: string;
+  /** Deliberate two-line presentation; label remains the accessible/export/filter name. */
+  headerLines?: readonly [string, string];
+  /**
+   * ⭐ A CUT VALUE OPENS WHOLE (Listing Standard, owner approved 2026-09-16).
+   * Opt-in per column: the engine prints this string on one line and, ONLY
+   * when the cell actually cuts it, turns it into a kit `Popover` trigger that
+   * opens the full value by click or keyboard. A `title` hover alone is not a
+   * way to read a value. When set, it replaces `accessor` for the cell.
+   */
+  overflowText?: (row: T) => string;
   accessor: (row: T) => ReactNode;
   /** default width in px */
   width?: number;
@@ -91,6 +110,18 @@ export type DataGridColumn<T> = {
       value the operator sees in the cell. Falls back to groupValue, then the
       cell text — never to searchValue. */
   filterValue?: (row: T) => string;
+  /**
+   * ⭐ A DOOR IS NOT A FACT (walk finding, 2026-09-11).
+   *
+   * Every data column gets a funnel, which is right for a column that STATES
+   * something. A column that carries an ACTION states nothing, so its funnel
+   * opened on a single `(blank)` option — a control whose only possible
+   * effect was to hide the row the operator had come to act on. Setting this
+   * false removes the funnel and nothing else.
+   *
+   * Default (absent) is filterable, so no existing column changes.
+   */
+  filterable?: boolean;
   /** Per-column filter UX (Commander 2026-06-18 — one unified filter spec):
       - 'date'      → quick presets (Today/This week/This month/…) + a custom
                       from→to range. `dateValue` returns the row's RAW ISO date.
@@ -137,6 +168,27 @@ export type DataGridColumn<T> = {
   wrap?: boolean;
 };
 
+/** What a personal saved layout holds — and ONLY this (ui MASTER §6.7 rule 4):
+ *  column order, widths, visibility and sort. Never search, filters or group
+ *  open/closed state. */
+export type DataGridSavedLayout = {
+  order: string[];
+  hidden: string[];
+  widths: Record<string, number>;
+  sort: { key: string; dir: "asc" | "desc" } | null;
+};
+
+export type DataGridPersonalLayouts = {
+  /** The signed-in person's own layouts for this listing. */
+  layouts: readonly { id: string; name: string; layout: DataGridSavedLayout; isDefault: boolean }[];
+  /** Most layouts one person may keep for this listing. */
+  limit: number;
+  /** Save under a name; an existing name is replaced. Rejects with the
+   *  sentence to show when the save is refused. */
+  onSave: (name: string, layout: DataGridSavedLayout) => Promise<void>;
+  onSetDefault: (id: string) => Promise<void>;
+};
+
 /** A single entry in a row's right-click context menu. `divider: true`
     renders a horizontal rule (the other fields are then ignored). */
 export type DataGridContextMenuItem = {
@@ -159,8 +211,43 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Governed groups reuse the same group rows without creating a fake data column. */
+  fixedGroups?: {
+    /** `emptyLabel` — an always-open group with no rows says so beside its
+        zero (Manual Purchase round 2: `Nothing waiting for approval`). */
+    groups: readonly { key: string; label: string; initiallyCollapsed?: boolean; alwaysOpen?: boolean; emptyLabel?: string }[];
+    groupOf: (row: T) => string;
+    revealMatches?: boolean;
+  };
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
+  /**
+   * ROW DRAG (0557, Chart of accounts). Absent on every other grid, and when
+   * it is absent nothing here changes: no row is draggable and no key is
+   * intercepted. The grid owns the gesture only — WHICH rows may swap and what
+   * a swap means are the page's, because only the page knows the tree.
+   *
+   * KEYBOARD IS NOT OPTIONAL. Alt + ArrowUp / ArrowDown moves the focused row
+   * to the nearest row above/below that `canDrop` accepts, so a drag-only
+   * control never locks out a keyboard operator. Alt is what keeps ↑/↓ as
+   * plain row navigation.
+   */
+  rowDrag?: {
+    /** True when `dragged` may take `target`'s place. A move the server would
+        refuse must answer false here, so the screen never offers it. */
+    canDrop: (dragged: T, target: T) => boolean;
+    /** Alt + ArrowUp / ArrowDown's own test, when a keyboard step must stay
+        narrower than a drop (0570: the chart's Alt + arrow stays among
+        siblings while a drop may land on another heading). Absent = `canDrop`. */
+    canStep?: (dragged: T, target: T) => boolean;
+    /** Put `dragged` where `target` is. The page persists it. */
+    onMove: (dragged: T, target: T) => void;
+    /** Alt + ArrowUp / ArrowDown's own move, when a keyboard step means
+        something narrower than a drop on the same row (0570: a drop on a
+        heading puts the account under it; a step beside it only reorders).
+        Absent = `onMove`. */
+    onStep?: (dragged: T, target: T) => void;
+  };
   searchPlaceholder?: string;
   /** Human filename stem for the "Export Excel" button, e.g. "Purchase Orders".
       Falls back to a cleaned storageKey when omitted. A YYYY-MM-DD date is
@@ -194,6 +281,29 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Opt-in TICKED-ROW selection model (SO Batch first, owner ruling R5
+      2026-09-16): blue-3 ticked rows including pinned cells instead of the
+      single clicked-row highlight. The slate surfaces it first carried are
+      every grid's default since UI MASTER §6.7 (Jess 2026-09-17). */
+  palette?: "slate";
+  /**
+   * ⭐ THE MAIN HEADER'S FILL — owner ruling 2026-09-18, UI §6.8. OPT-IN.
+   *
+   * `paleBlue` gives the PARENT listing's header band blue-2, so the child
+   * tables inside an expansion — which keep neutral slate — read as children
+   * rather than as a second listing. It is the SO Batch reference's own
+   * treatment and explicitly not a new global blue-header ruling: omitted,
+   * every Register draws the slate-3 band it draws today.
+   */
+  headerTone?: "paleBlue";
+  /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
+      readable box when the toolbar has room, an icon that opens when narrow,
+      and an active query plus its clear control always visible. */
+  searchPresentation?: "icon" | "responsive";
+  /** Keep frequent controls labelled while the container has room. */
+  labelledToolbar?: boolean;
+  /** Let a page's date/context controls wrap without clipping; retains icon controls. */
+  wrapToolbar?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -261,10 +371,73 @@ export type DataGridProps<T> = {
    * intervening columns slide beneath it. `true` keeps the original
    * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean | { columnKey: string };
+  stickyIdentity?: boolean | { columnKey: string | readonly string[] };
+  /**
+   * ⭐ DATE FIRST, THEN IDENTITY (ui MASTER §6.7 rule 2, Jess 2026-09-17).
+   * OPTIONAL, default OFF.
+   *
+   * The listing begins with its own record date, then its document number or
+   * business identity. With this set the engine — not the page, not a saved
+   * layout — guarantees it:
+   *   · the two columns always lead, in that order, whatever order a browser
+   *     saved and wherever a header is dragged;
+   *   · neither can be hidden (Columns chooser, header menu, saved `hidden`);
+   *   · a canvas ≥768px pins both; a narrower canvas pins the identity alone,
+   *     so a phone keeps WHICH record without spending half its width on dates.
+   * When set it replaces `stickyIdentity`. Omitted = every register unchanged.
+   *
+   * ⭐ `before` — A COLUMN THE OWNER PUT AHEAD OF THE PAIR (Jess 2026-09-18).
+   * OPTIONAL, default empty.
+   *
+   * §6.7 rule 2 fixes the ORDER of the date and the identity; it does not make
+   * them the first two columns of every page. SO Batch Purchase's approved
+   * order opens with `Status`, and a general ordering heuristic may not
+   * rearrange an exact owner-approved page order (§6.7 rule 2 · Purchasing
+   * §9.1). So a page may name columns that LEAD the pair. They are protected
+   * exactly as the pair is — never hidden, never dragged away — and the PINNING
+   * rule is untouched: only the date and the identity pin, and a leading column
+   * scrolls under the pinned block like any other fact.
+   */
+  leadingColumns?: { date: string; identity: string; before?: readonly string[] };
+  /**
+   * ⭐ PERSONAL SAVED LAYOUTS — ui MASTER §6.7 rule 4 (Jess 2026-09-17).
+   * OPTIONAL, default OFF; Purchase Orders is the only pilot.
+   *
+   * The Columns menu gains `Save layout as…` · `Load layout` ·
+   * `Set as my default` · `Reset columns` · `Best fit` · `Expand all` ·
+   * `Collapse all`. The page owns storage (per signed-in user, server-side);
+   * the engine owns what a layout contains. The person's default is applied
+   * once when their layouts first arrive. Omitted = the menu is unchanged.
+   */
+  personalLayouts?: DataGridPersonalLayouts;
+  /**
+   * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
+   * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
+   * every cell carries one primary fact and one supporting line. Omitted =
+   * the Register baseline (38px), byte-identical for every other caller. A
+   * page passes the governed number; the engine never invents a third.
+   * 40 = the one-line listing row, adopted PAGE BY PAGE (ui MASTER §6.0 rule
+   * 5, owner ruling 2026-09-21); the 38px default is not changed by it.
+   */
+  rowHeight?: 38 | 40 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
+  /** Optional truthful no-match state with a complete reset action. */
+  noMatchMessage?: string;
+  /**
+   * A failed read, drawn INSIDE the work surface (Listing Standard 2026-09-16).
+   * The toolbar stays — a page's create action does not depend on the list
+   * loading. Omitted = unchanged (the page decides what a failure looks like).
+   */
+  errorState?: ReactNode;
+  /**
+   * ⭐ MESSAGE KIND ② — THE WARNING BAND (ui MASTER §6.7). A real business
+   * blocker, drawn between the toolbar and the table, costing zero height
+   * while absent. Manual Purchase round 2 (2026-09-17) is its first caller:
+   * an `Issue PO` refusal. Omitted = no band, byte-identical for every caller.
+   */
+  warning?: ReactNode;
   isLoading?: boolean;
   /**
    * Right-click row menu. Receives the row and returns the items to show.
@@ -286,6 +459,10 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
     flush?: boolean;
+    /** Align a child to this visible data column after saved reordering; first data column if hidden. */
+    alignToColumn?: string;
+    /** Keep the child within the visible width, retaining the data-column indent. */
+    fitExpansionToViewport?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
@@ -305,6 +482,8 @@ export type DataGridProps<T> = {
      * operator's own; changing this after mount changes nothing.
      */
     defaultExpandedKeys?: readonly string[];
+    /** Open and reveal a deep-linked row once it is present, including after async loading. */
+    revealExpandedKey?: string;
   };
   /**
    * First-class multi-select (Commander 2026-06-19). Prepends a synthetic
@@ -328,6 +507,8 @@ export type DataGridProps<T> = {
      * every row is selectable, exactly as before.
      */
     isSelectable?: (row: never) => boolean;
+    /** Existing row facts explaining a refused tick; omitted callers stay unchanged. */
+    unselectableReason?: (row: never) => string | null;
     /**
      * ⭐ CARD 02-B (2026-08-27): a row whose checkbox stands for a SET of
      * child records renders indeterminate when only part of that set is
@@ -347,6 +528,22 @@ export type DataGridProps<T> = {
    * append in first-appearance order; omitted entirely = first-appearance.
    */
   chooserGroupOrder?: readonly string[];
+  /**
+   * ⭐ THE PAGE'S OWN LIVE CONDITIONS (owner ruling 2026-09-11).
+   *
+   * A register is narrowed from TWO places - the page's filter rail and this
+   * grid's per-column funnels - and neither used to say what the other had
+   * done, so an operator reading four rows could not see why there were four.
+   * A page hands its conditions in here and they appear in ONE strip with the
+   * column filters, each removable on its own, under one `Clear filters`.
+   *
+   * Absent = no strip at all: no existing register gains a band it did not ask
+   * for (every optional power stays optional).
+   */
+  activeConditions?: Array<{ key: string; label: string; onClear: () => void }>;
+  /** Called by `Clear filters` after the grid clears its own column filters,
+   *  so one click really does clear everything the strip listed. */
+  onClearConditions?: () => void;
   /**
    * Compact mode for grids embedded inside another grid's expansion row
    * (the SO drill-down). Suppresses the search box and the bottom
@@ -463,7 +660,9 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  fixedGroups,
   rowKey,
+  rowDrag,
   searchPlaceholder = "Search…",
   exportName,
   onRowDoubleClick,
@@ -475,6 +674,11 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  palette,
+  headerTone,
+  searchPresentation = "icon",
+  labelledToolbar = false,
+  wrapToolbar = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -488,15 +692,24 @@ function DataGridInner<T>({
   focusSearchNonce,
   collapseAllNonce,
   stickyIdentity = false,
+  leadingColumns,
+  personalLayouts,
+  rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
+  noMatchMessage,
+  errorState,
+  warning,
   isLoading = false,
   contextMenu,
   expandable,
   selectable,
   chooserGroupOrder,
+  activeConditions,
+  onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
+  const selectionReasonId = useId();
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
      expanded row ids; rendering inserts a colSpan sub-<tr> directly under
      each expanded parent. Stored as a Set so the chevron column accessor
@@ -532,14 +745,24 @@ function DataGridInner<T>({
   );
 
   const [search, setSearch] = useState(initialSearch);
+  /** Listing Standard 2026-09-16: below a 768px canvas a row checkbox gets a
+   *  40×40 hit area (its column widens to 40 so the target is not shared). */
+  const [narrowCanvas, setNarrowCanvas] = useState(false);
+  /** The ONE row that holds the grid's Tab stop (roving tabindex). */
+  const [activeRowKey, setActiveRowKey] = useState<string | null>(null);
+  /** A keyboard-opened row menu may be followed by the browser's own
+   *  `contextmenu` event for the same key press; that one is ignored. */
+  const keyboardMenuAt = useRef(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(fixedGroups?.groups.filter((g) => g.initiallyCollapsed).map((g) => g.key)));
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
   /** Right-click row menu — anchor point + the menu items resolved at open time. */
   const [rowCtx, setRowCtx] = useState<{
     x: number;
     y: number;
     items: DataGridContextMenuItem[];
+    /** Opened from the keyboard: focus returns here when it closes. */
+    returnFocus?: HTMLElement | null;
   } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [groupZoneActive, setGroupZoneActive] = useState(false);
@@ -587,6 +810,7 @@ function DataGridInner<T>({
      dropdown has its own scrollable value list (maxHeight 320 / overflow auto). */
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchIconRef = useRef<HTMLButtonElement>(null);
 
   // Refocus search when parent bumps focusSearchNonce ("Find" button).
   useEffect(() => {
@@ -617,7 +841,10 @@ function DataGridInner<T>({
     if (!rowCtx) return;
     const close = () => setRowCtx(null);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        close();
+        rowCtx.returnFocus?.focus({ preventScroll: true });
+      }
     };
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
@@ -789,11 +1016,32 @@ function DataGridInner<T>({
      clears hidden + order + widths (preserving groupBy + sort so search
      state survives). toggleColumn flips a column's presence in `hidden`. */
   const resetColumns = useCallback(() => {
-    setLayout((l) => ({ ...l, hidden: [], order: [], widths: {} }));
+    /* With personal layouts, `Reset columns` returns to the COMPANY layout,
+       which includes its default order of rows (no header sort). */
+    setLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, ...(personalLayouts ? { sort: null } : {}) }));
     setColumnsMenuOpen(false);
-  }, [setLayout]);
+  }, [setLayout, personalLayouts]);
+  /**
+   * The columns a `leadingColumns` listing may never lose or reorder: the
+   * owner's own leading columns, then the record date, then the identity. A key
+   * named twice is kept once, in this order.
+   */
+  const leadingBefore = leadingColumns?.before;
+  const leadingKeys = useMemo(
+    () =>
+      leadingColumns
+        ? [...new Set([...(leadingBefore ?? []), leadingColumns.date, leadingColumns.identity])]
+        : [],
+    [leadingBefore, leadingColumns?.date, leadingColumns?.identity],
+  );
+  /** Of those, only the date and identity PIN — §6.7 rule 2 is about the pair. */
+  const pinnedLeadingKeys = useMemo(
+    () => (leadingColumns ? [leadingColumns.date, leadingColumns.identity] : []),
+    [leadingColumns?.date, leadingColumns?.identity],
+  );
   const toggleColumn = useCallback(
     (colKey: string) => {
+      if (leadingKeys.includes(colKey)) return;
       setLayout((l) => {
         /* If we're still on the pristine-defaults overlay (no explicit
          choices yet) materialize the current set of hidden keys before
@@ -809,7 +1057,7 @@ function DataGridInner<T>({
         return { ...l, hidden };
       });
     },
-    [columns, setLayout],
+    [columns, setLayout, leadingKeys],
   );
 
   // ── Resolve visible/ordered columns ───────────────────────────────
@@ -826,19 +1074,27 @@ function DataGridInner<T>({
      memo so the Columns popover can read the same set without recomputing. */
   const effectiveHidden = useMemo(() => {
     const pristineLayout = layout.order.length === 0 && layout.hidden.length === 0;
-    return pristineLayout
+    const hidden = pristineLayout
       ? new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key))
       : new Set(layout.hidden);
-  }, [columns, layout.order, layout.hidden]);
+    // A saved `hidden` from before the ruling cannot take the date or identity away.
+    for (const k of leadingKeys) hidden.delete(k);
+    return hidden;
+  }, [columns, layout.order, layout.hidden, leadingKeys]);
 
   const visibleColumns = useMemo(() => {
     const byKey = new Map(columns.map((c) => [c.key, c]));
-    const order = layout.order.length
+    const savedOrder = layout.order.length
       ? [
           ...layout.order.filter((k) => byKey.has(k)),
           ...columns.filter((c) => !layout.order.includes(c.key)).map((c) => c.key),
         ]
       : columns.map((c) => c.key);
+    /* Date, then identity, lead whatever a browser saved or a drag produced. */
+    const leading = leadingKeys.filter((k) => byKey.has(k));
+    const order = leading.length
+      ? [...leading, ...savedOrder.filter((k) => !leading.includes(k))]
+      : savedOrder;
     const base = order
       .filter((k) => !effectiveHidden.has(k))
       .map((k) => byKey.get(k)!)
@@ -849,8 +1105,8 @@ function DataGridInner<T>({
       synthetic.push({
         key: "__select__",
         label: "",
-        width: 30,
-        minWidth: 30,
+        width: narrowCanvas ? 40 : 30,
+        minWidth: narrowCanvas ? 40 : 30,
         sortable: false,
         groupable: false,
         accessor: () => null,
@@ -875,7 +1131,7 @@ function DataGridInner<T>({
       });
     }
     return synthetic.length ? [...synthetic, ...base] : base;
-  }, [columns, layout.order, effectiveHidden, expandable, selectable]);
+  }, [columns, layout.order, effectiveHidden, expandable, selectable, narrowCanvas, leadingKeys]);
 
   /**
    * ⭐ STICKY IDENTITY — which columns pin, and how far from the left edge.
@@ -889,10 +1145,27 @@ function DataGridInner<T>({
    */
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
-    if (!stickyIdentity) return m;
-    const identityKey =
-      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
+    /* Date-first listings: both lead and pin on a canvas ≥768px; below it the
+       identity pins alone and the date scrolls under it like any other fact. */
+    const pinRule: DataGridProps<T>["stickyIdentity"] = leadingColumns
+      ? { columnKey: narrowCanvas ? [leadingColumns.identity] : pinnedLeadingKeys }
+      : stickyIdentity;
+    if (!pinRule) return m;
+    /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
+       2026-09-12). A sheet 1818px wide scrolled to its `Actions` column showed
+       `Call NETS — confirm delivery date` with no customer attached to it, so
+       a page may now name the identity AND the column that says whose row it
+       is. The set stays a CONTIGUOUS RUN: pinning two columns with a third
+       between them would leave a gap the rows slide through, so the run stops
+       at the first column that is not named. */
+    const named =
+      typeof pinRule === "object"
+        ? Array.isArray(pinRule.columnKey)
+          ? pinRule.columnKey
+          : [pinRule.columnKey as string]
+        : null;
     let left = 0;
+    let pinned = 0;
     for (const col of visibleColumns) {
       if (col.key.startsWith("__")) {
         // The control gutter always pins, at cumulative offsets.
@@ -900,17 +1173,29 @@ function DataGridInner<T>({
         left += Number(layout.widths[col.key] ?? col.width ?? 140);
         continue;
       }
-      if (identityKey == null || col.key === identityKey) {
-        // The identity: the first data column, or the NAMED one — pinned
-        // directly after the gutter, so a scrolled sheet slides the columns
-        // before it underneath. If the named column is hidden, only the
-        // gutter pins: a wrong identity is worse than none.
+      if (named == null) {
+        // No name: the identity is the first data column, pinned directly
+        // after the gutter, so a scrolled sheet slides the rest underneath.
         m.set(col.key, left);
         break;
       }
+      if (named.includes(col.key)) {
+        m.set(col.key, left);
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        pinned += 1;
+        // Every named column found: the block is complete.
+        if (pinned === named.length) break;
+        continue;
+      }
+      // Not named. BEFORE the run starts this is an ordinary column the
+      // identity sits after — scan past it, exactly as the single-name form
+      // always did, and let it scroll under the block. ONCE the run has
+      // started, a gap would let rows slide through it, so the run ends here
+      // and whatever is already pinned stays correct.
+      if (pinned > 0) break;
     }
     return m;
-  }, [stickyIdentity, visibleColumns, layout.widths]);
+  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, narrowCanvas, visibleColumns, layout.widths]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
@@ -947,9 +1232,19 @@ function DataGridInner<T>({
    * a page-local hack — `docs/ui/MASTER.md` §4.)
    */
   const expansionGutter = useMemo(
-    () => visibleColumns.filter((c) => c.key.startsWith("__")).map((c) => c.key),
-    [visibleColumns],
+    () => {
+      const index = expandable?.alignToColumn
+        ? visibleColumns.findIndex((c) => c.key === expandable.alignToColumn)
+        : -1;
+      return (index >= 0 ? visibleColumns.slice(0, index) : visibleColumns.filter((c) => c.key.startsWith("__"))).map((c) => c.key);
+    },
+    [visibleColumns, expandable?.alignToColumn],
   );
+  /* §6.9 — the caret-anchored connector is drawn only for a FLUSH expansion
+     (the Purchasing geometry), where the stated join height is where the first
+     child begins. Every other expansion renders exactly as before. */
+  const expansionJoinable =
+    Boolean(expandable?.flush) && !expandable?.fitExpansionToViewport && expansionGutter.includes("__expand__");
 
   /* The Columns pill counts DATA columns only — the synthetic __select__ /
      __expand__ columns are chrome, not catalog (2990 subtracted only the
@@ -1129,10 +1424,21 @@ function DataGridInner<T>({
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
   type Render =
-    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean }
+    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean; alwaysOpen?: boolean; emptyLabel?: string }
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
+    if (fixedGroups) {
+      return fixedGroups.groups.flatMap((group): Render[] => {
+        const members = sortedRows.filter((row) => fixedGroups.groupOf(row) === group.key);
+        /* The always-open group keeps its heading at 0 while the Register has
+           records, so "nothing to buy" is stated rather than implied. */
+        if (members.length === 0 && !(group.alwaysOpen && sortedRows.length > 0)) return [];
+        const collapsed = !group.alwaysOpen && collapsedGroups.has(group.key);
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen, emptyLabel: group.emptyLabel },
+          ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
+      });
+    }
     if (layout.groupBy.length === 0) return sortedRows.map((row) => ({ kind: "row" as const, row }));
 
     const out: Render[] = [];
@@ -1186,7 +1492,85 @@ function DataGridInner<T>({
     };
     walk(root, 0, "");
     return out;
-  }, [sortedRows, layout.groupBy, columns, collapsedGroups]);
+  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups]);
+
+  /**
+   * ⭐ GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18. This supersedes the
+   * single global header above all groups.
+   *
+   * A governed grouped listing reads: `heading → column header → records`, per
+   * group. A collapsed group is its heading and its count and nothing else — a
+   * column header over no records names columns nobody is reading. The header
+   * belongs to the group it describes, so it stops at that group's boundary
+   * rather than sitting over the next group's rows.
+   *
+   * It is the ENGINE's behaviour, not a page's: every register that hands the
+   * grid governed `fixedGroups` gets it, and none of them gains or loses a
+   * group, a default expansion or a business rule by it. The embedded
+   * drill-down grid keeps its plain static header — it has no scroll container
+   * of its own for anything to stick to.
+   */
+  const groupLocalHeaders = fixedGroups != null && !embedded;
+
+  /** Every group table is exactly as wide as the columns, so the groups line
+   *  up with each other and with the horizontal scrollbar under them. */
+  const groupedTableWidth = useMemo(
+    () => visibleColumns.reduce((sum, col) => sum + Number(layout.widths[col.key] ?? col.width ?? 140), 0),
+    [visibleColumns, layout.widths],
+  );
+
+  /** One section per governed group: its heading, then the rows under it. */
+  const groupSections = useMemo(() => {
+    if (!groupLocalHeaders) return [];
+    type Section = { group: Extract<Render, { kind: "group" }>; rows: Render[]; index: number };
+    const out: Section[] = [];
+    renderList.forEach((item, index) => {
+      if (item.kind === "group") out.push({ group: item, rows: [], index });
+      else if (out.length > 0) out[out.length - 1]!.rows.push(item);
+    });
+    return out;
+  }, [groupLocalHeaders, renderList]);
+
+  /* The no-match state carries its own complete `Clear filters`; the condition
+     strip above it then keeps its removable chips but not a second, identical
+     button (one act, one control on screen). */
+  const noMatchShowing =
+    !isLoading && errorState == null && renderList.length === 0 && noMatchMessage != null &&
+    (rows.length > 0 || emptyMessage === noMatchMessage);
+
+  /* Every data row's position in the FULL render list (group banners are not
+     rows). Keyboard movement counts in this list, never in the DOM, because a
+     virtual list only has a window of rows in the document. */
+  const rowPositions = useMemo(
+    () => renderList.flatMap((item, i) => (item.kind === "row" ? [i] : [])),
+    [renderList],
+  );
+  /** A row the keyboard moved to that may not be rendered yet (virtual list). */
+  const pendingRowFocus = useRef<string | null>(null);
+  /* The row a drag is carrying. A ref, not state: dragover fires per pixel and
+     re-rendering the whole grid on each one is how a drag starts stuttering. */
+  const draggingRow = useRef<T | null>(null);
+
+  /* ⭐ A MATCH IS NEVER HIDDEN IN A COLLAPSED GROUP (owner ruling R1). While a
+     search, column filter or page filter narrows the Register, every governed
+     group opens once; the operator may still close one. Clearing the
+     narrowing puts back the open/closed state the operator had before it. */
+  const fixedGroupReveal = fixedGroups != null &&
+    (fixedGroups.revealMatches === true || debouncedSearch.trim() !== "" || filteredRows.length !== rows.length);
+  const collapsedBeforeReveal = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!fixedGroups) return;
+    if (fixedGroupReveal) {
+      setCollapsedGroups((prev) => {
+        collapsedBeforeReveal.current = prev;
+        return new Set();
+      });
+    } else if (collapsedBeforeReveal.current) {
+      setCollapsedGroups(collapsedBeforeReveal.current);
+      collapsedBeforeReveal.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixedGroupReveal]);
 
   // ── Column DnD (reorder) ──────────────────────────────────────────
   const onDragStartHeader = (e: DragEvent<HTMLTableCellElement>, key: string) => {
@@ -1385,7 +1769,7 @@ function DataGridInner<T>({
       // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
       // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
       // repeated exports are self-dating and don't silently overwrite.
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = appTodayIso();
       XLSX.writeFile(wb, `${stem} ${stamp}.xlsx`);
     },
     [deriveTable],
@@ -1430,6 +1814,106 @@ function DataGridInner<T>({
       return n;
     });
 
+  // ── Personal saved layouts (opt-in; ui MASTER §6.7 rule 4) ─────────
+  const [layoutPanel, setLayoutPanel] = useState<null | "save" | "load" | "default">(null);
+  const [layoutName, setLayoutName] = useState("");
+  const [layoutProblem, setLayoutProblem] = useState<string | null>(null);
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  /** The current arrangement, in exactly the governed shape — nothing more. */
+  const currentSavedLayout = (): DataGridSavedLayout => {
+    const byKey = new Set(columns.map((c) => c.key));
+    const saved = layout.order.length
+      ? [...layout.order.filter((k) => byKey.has(k)), ...columns.filter((c) => !layout.order.includes(c.key)).map((c) => c.key)]
+      : columns.map((c) => c.key);
+    const order = [...leadingKeys.filter((k) => byKey.has(k)), ...saved.filter((k) => !leadingKeys.includes(k))];
+    return {
+      order,
+      hidden: columns.filter((c) => effectiveHidden.has(c.key)).map((c) => c.key),
+      widths: { ...layout.widths },
+      sort: layout.sort,
+    };
+  };
+  const applySavedLayout = useCallback(
+    (saved: DataGridSavedLayout) =>
+      setLayout((l) => ({
+        ...l,
+        order: [...saved.order],
+        /* A saved layout can never hide the listing's date or identity. */
+        hidden: saved.hidden.filter((k) => !leadingKeys.includes(k)),
+        widths: { ...saved.widths },
+        sort: saved.sort,
+      })),
+    [setLayout, leadingKeys],
+  );
+  /* The person's default arrives with their layouts: apply it once. */
+  const defaultApplied = useRef(false);
+  useEffect(() => {
+    if (defaultApplied.current || !personalLayouts || personalLayouts.layouts.length === 0) return;
+    defaultApplied.current = true;
+    const mine = personalLayouts.layouts.find((l) => l.isDefault);
+    if (mine) applySavedLayout(mine.layout);
+  }, [personalLayouts, applySavedLayout]);
+
+  const saveLayoutAs = async () => {
+    if (!personalLayouts) return;
+    const name = layoutName.trim();
+    if (!name || layoutBusy) return;
+    setLayoutBusy(true);
+    setLayoutProblem(null);
+    try {
+      await personalLayouts.onSave(name, currentSavedLayout());
+      setLayoutName("");
+      setLayoutPanel(null);
+    } catch (e) {
+      setLayoutProblem((e as Error).message || "The layout could not be saved");
+    } finally {
+      setLayoutBusy(false);
+    }
+  };
+  const setMyDefault = async (id: string) => {
+    if (!personalLayouts || layoutBusy) return;
+    setLayoutBusy(true);
+    setLayoutProblem(null);
+    try {
+      await personalLayouts.onSetDefault(id);
+      setLayoutPanel(null);
+    } catch (e) {
+      setLayoutProblem((e as Error).message || "The default could not be saved");
+    } finally {
+      setLayoutBusy(false);
+    }
+  };
+  /** Best fit: every visible column takes its widest cell text, and never
+   *  less than its complete header plus the sort and filter controls. */
+  const bestFit = () => {
+    const { rows: cells } = deriveTable(sortedRows);
+    const data = visibleColumns.filter((c) => !c.key.startsWith("__"));
+    setLayout((l) => {
+      const widths = { ...l.widths };
+      data.forEach((col, i) => {
+        const header = col.headerLines
+          ? Math.max(col.headerLines[0].length, col.headerLines[1].length)
+          : col.label.length;
+        let longest = 0;
+        for (const row of cells) longest = Math.max(longest, (row[i] ?? "").length);
+        const fit = Math.round(Math.max(header * 6.5 + 46, longest * 7 + 17, col.minWidth ?? 40));
+        widths[col.key] = Math.min(420, fit);
+      });
+      return { ...l, widths };
+    });
+  };
+  const expandAll = () => {
+    if (expandable) setExpandedRows(new Set(sortedRows.map(expansionId)));
+    setCollapsedGroups(new Set());
+  };
+  /** Collapse all never closes a group that must stay open. */
+  const collapseAll = () => {
+    setExpandedRows(new Set());
+    if (fixedGroups) {
+      setCollapsedGroups(new Set(fixedGroups.groups.filter((g) => !g.alwaysOpen).map((g) => g.key)));
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────
   const totalCols = visibleColumns.length;
   const groupedCount = layout.groupBy.length;
@@ -1440,27 +1924,307 @@ function DataGridInner<T>({
      cases the normal full map renders, byte-identical to before. So at today's
      list sizes this is a no-op; it only kicks in past VIRTUAL_THRESHOLD rows. */
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [emptyViewportWidth, setEmptyViewportWidth] = useState<number>();
+  useEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      setEmptyViewportWidth(viewport.clientWidth);
+      /* The CANVAS decides, not the device: a register squeezed below 768px
+         inside a wide window is a touch-sized target problem all the same. */
+      setNarrowCanvas(viewport.clientWidth > 0 && viewport.clientWidth < 768);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+  const revealedKey = useRef<string | null>(null);
+  const revealKey = expandable?.revealExpandedKey;
+  useEffect(() => {
+    if (!revealKey) {
+      revealedKey.current = null;
+      return;
+    }
+    setExpandedRows(previous => previous.has(revealKey) ? previous : new Set([...previous, revealKey]));
+  }, [revealKey]);
+  useEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport || !revealKey || revealedKey.current === revealKey || !expandedRows.has(revealKey)) return;
+    const target = Array.from(viewport.querySelectorAll<HTMLTableRowElement>("tr[data-grid-expansion-key]"))
+      .find(row => row.dataset.gridExpansionKey === revealKey);
+    if (!target) return;
+    const headerHeight = viewport.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    viewport.scrollTop = Math.max(0, viewport.scrollTop + target.getBoundingClientRect().top
+      - viewport.getBoundingClientRect().top - headerHeight);
+    target.querySelector<HTMLButtonElement>("button[aria-expanded]")?.focus({ preventScroll: true });
+    revealedKey.current = revealKey;
+  }, [revealKey, expandedRows, renderList]);
   const VIRTUAL_THRESHOLD = 25;
   const canVirtualize =
-    !isLoading && !embedded && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
+    !isLoading && !embedded && !fixedGroups && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
   const rowVirtualizer = useVirtualizer({
+    enabled: canVirtualize,
     count: canVirtualize ? renderList.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 30,
     overscan: 14,
   });
   const virtualItems = canVirtualize ? rowVirtualizer.getVirtualItems() : [];
+
+  /* The row holding the Tab stop: the last row the operator focused while it
+     is RENDERED, else the first rendered row — a virtual grid scrolled away
+     from its active row still keeps exactly one Tab stop. */
+  const rovingRowKey = (() => {
+    const indices = canVirtualize ? virtualItems.map((vi) => vi.index) : rowPositions;
+    let first: string | null = null;
+    for (const i of indices) {
+      const item = renderList[i];
+      if (!item || item.kind !== "row") continue;
+      const k = rowKey(item.row);
+      if (k === activeRowKey) return k;
+      first ??= k;
+    }
+    return first;
+  })();
+
+  /* Put a focused row fully inside the viewport, below the sticky header.
+     The virtualizer places rows by an ESTIMATED height, so its own scroll can
+     leave the target just outside the view (measured 2026-09-17: 38px reference
+     rows against a 30px estimate — PageDown focused a row below the fold). */
+  const revealRow = (row: HTMLElement) => {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const view = viewport.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    const header = viewport.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    const top = view.top + header;
+    if (r.top < top) viewport.scrollTop -= top - r.top;
+    else if (r.bottom > view.top + viewport.clientHeight) viewport.scrollTop += r.bottom - (view.top + viewport.clientHeight);
+  };
+
+  /* Finish a keyboard move once its target row is in the document. */
+  useEffect(() => {
+    const key = pendingRowFocus.current;
+    const viewport = scrollRef.current;
+    if (!key || !viewport) return;
+    const target = Array.from(viewport.querySelectorAll<HTMLTableRowElement>("tr[data-row-nav]"))
+      .find((tr) => tr.dataset.rowKey === key);
+    if (!target) return;
+    pendingRowFocus.current = null;
+    target.focus({ preventScroll: true });
+    revealRow(target);
+  });
+
+  const moveRowFocus = (fromIndex: number, keyName: string, rowEl: HTMLElement): boolean => {
+    const at = rowPositions.indexOf(fromIndex);
+    if (at < 0 || rowPositions.length === 0) return false;
+    const rowHeight = rowEl.getBoundingClientRect().height || 38;
+    const viewportHeight = scrollRef.current?.clientHeight ?? 0;
+    const page = viewportHeight > 0 ? Math.max(1, Math.floor(viewportHeight / rowHeight) - 1) : 10;
+    const last = rowPositions.length - 1;
+    const to =
+      keyName === "ArrowDown" ? at + 1
+        : keyName === "ArrowUp" ? at - 1
+          : keyName === "Home" ? 0
+            : keyName === "End" ? last
+              : keyName === "PageDown" ? Math.min(last, at + page)
+                : Math.max(0, at - page);
+    if (to < 0 || to > last || to === at) return keyName !== "ArrowDown" && keyName !== "ArrowUp";
+    const targetIndex = rowPositions[to]!;
+    const targetItem = renderList[targetIndex];
+    if (!targetItem || targetItem.kind !== "row") return false;
+    const targetKey = rowKey(targetItem.row);
+    pendingRowFocus.current = targetKey;
+    setActiveRowKey(targetKey);
+    if (canVirtualize) rowVirtualizer.scrollToIndex(targetIndex, { align: "auto" });
+    /* Already rendered (the usual case): focus now, and the browser scrolls it
+       into view. Otherwise the effect above focuses it after the window moves. */
+    const rendered = Array.from(scrollRef.current?.querySelectorAll<HTMLTableRowElement>("tr[data-row-nav]") ?? [])
+      .find((tr) => tr.dataset.rowKey === targetKey);
+    if (rendered) {
+      pendingRowFocus.current = null;
+      rendered.focus({ preventScroll: true });
+      revealRow(rendered);
+    }
+    return true;
+  };
   const padTop = virtualItems.length ? virtualItems[0]!.start : 0;
   const padBottom = virtualItems.length
     ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end
     : 0;
 
+  /**
+   * ⭐ ONE HEADER DEFINITION, DRAWN WHERE ITS RECORDS ARE (Jess, 2026-09-18).
+   *
+   * A grouped listing has no single header above every group. `inGroup` is the
+   * SAME cells, rendered inside a group's own `<tbody>` between that group's
+   * heading and its records, where they pin to the top of the viewport until
+   * the group ends. Nothing about a column changes with the flag: one
+   * `visibleColumns`, one `layout.widths`, one `layout.sort`, one resize
+   * handle — so every group is the same table, not four tables that agree.
+   */
+  const headerCells = (inGroup: boolean) =>
+      visibleColumns.map((col) => {
+        const w = layout.widths[col.key] ?? col.width ?? 140;
+        const style: CSSProperties = {
+          width: w,
+          minWidth: col.minWidth ?? 40,
+          ...pinStyle(col.key),
+        };
+        const isSorted = layout.sort?.key === col.key;
+        const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
+        if (col.key === "__select__" && selectable) {
+          /* Select-all means "every row that CAN be selected". A header
+             box that stays indeterminate forever because three rows can
+             never be ticked is a control that lies about its own state. */
+          const keys = sortedRows
+            .filter((r) => selectable.isSelectable?.(r as never) ?? true)
+            .map(rowKey);
+          const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
+          const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
+          return (
+            <th key={col.key} scope="col" className={`${styles.th}${inGroup ? ` ${styles.thInGroup}` : ""}${pinClass(col.key)}`} style={style}>
+              <span className={styles.thInner}>
+                <input
+                  type="checkbox"
+                  aria-label="Select all rows"
+                  checked={allSel}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSel;
+                  }}
+                  onChange={() => selectable.onToggleAll(keys, allSel)}
+                />
+              </span>
+            </th>
+          );
+        }
+        return (
+          <th
+            key={col.key}
+            scope="col"
+            className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${
+              dropTarget === col.key ? styles.thDragOver : ""
+            }${pinClass(col.key)}`}
+            style={style}
+            draggable={!leadingKeys.includes(col.key)}
+            onDragStart={(e) => onDragStartHeader(e, col.key)}
+            onDragOver={(e) => onDragOverHeader(e, col.key)}
+            onDragLeave={() => setDropTarget(null)}
+            onDrop={(e) => onDropHeader(e, col.key)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtx({ x: e.clientX, y: e.clientY, colKey: col.key });
+            }}
+            title={col.label}
+          >
+            <span className={styles.thInner}>
+              {col.sortable !== false ? (
+                <button
+                  type="button"
+                  className={styles.sortBtn}
+                  aria-label={col.headerLines ? col.label : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSort(col.key);
+                  }}
+                >
+                  {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
+                  {/* ⭐ THE SORT IS AN ICON, NOT A LETTER (Card 12 review, 2026-09-21): a
+                      12px Lucide arrow in the header ink, beside the same 11px
+                      Filter icon. The direction is also spoken, never only drawn. */}
+                  {arrow && (
+                    <span className={styles.sortArrow} data-testid={`sort-${arrow === "A" ? "asc" : "desc"}`}>
+                      {arrow === "A" ? (
+                        <ArrowUp size={12} strokeWidth={2} aria-hidden />
+                      ) : (
+                        <ArrowDown size={12} strokeWidth={2} aria-hidden />
+                      )}
+                      <span className="sr-only">{arrow === "A" ? "sorted ascending" : "sorted descending"}</span>
+                    </span>
+                  )}
+                </button>
+              ) : (
+                col.label
+              )}
+              {col.key !== "__expand__" && col.key !== "__select__" && col.filterable !== false && (
+                <button
+                  type="button"
+                  title="Filter this column"
+                  aria-label={`Filter ${col.label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterMenu({ colKey: col.key, x: e.clientX, y: e.clientY });
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: 0,
+                    padding: "0 2px",
+                    marginLeft: 2,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color:
+                      (filters[col.key]?.length ?? 0) > 0 ||
+                      dateFilters[col.key] ||
+                      numberFilters[col.key] ||
+                      dateRangeFilters[col.key]
+                        ? "var(--c-orange)"
+                        : "var(--fg-soft)",
+                  }}
+                >
+                  <Filter size={11} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </span>
+            <div className={styles.resizeHandle} onMouseDown={(e) => onResizeStart(e, col.key, w)} />
+          </th>
+        );
+      });
+
   /* One grid row (group banner OR data row + optional expansion). Extracted so
      the normal path and the virtualized window render through the same code. */
   const renderGridRow = (item: Render, idx: number) => {
+    if (item.kind === "group" && fixedGroups) {
+      /* Governed groups: the always-open group is a HEADING, never a control;
+         a collapsible group is a real button announcing its state. Both stay
+         pinned to the visible left edge while the sheet scrolls sideways. */
+      return (
+        <tr key={`g-${item.path}`} className={`${styles.groupRow} ${styles.fixedGroupRow}`} data-testid={`grid-group-${item.path}`}>
+          <td className={styles.groupRowCell} colSpan={totalCols || 1}>
+            {item.alwaysOpen ? (
+              <span role="heading" aria-level={3} tabIndex={0} className={styles.fixedGroupLabel}>
+                {item.label}
+                <span className={styles.groupCount}>{item.count}</span>
+                {item.count === 0 && item.emptyLabel ? (
+                  <span className={styles.groupCount} data-testid={`grid-group-empty-${item.path}`}>
+                    {item.emptyLabel}
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.fixedGroupLabel} ${styles.fixedGroupToggle}`}
+                aria-expanded={!item.collapsed}
+                data-testid={`grid-group-toggle-${item.path}`}
+                onClick={() => toggleGroup(item.path)}
+              >
+                <ChevronRight size={14} strokeWidth={2} aria-hidden className={item.collapsed ? undefined : styles.fixedGroupChevronOpen} />
+                {item.label}
+                <span className={styles.groupCount}>{item.count}</span>
+              </button>
+            )}
+          </td>
+        </tr>
+      );
+    }
     if (item.kind === "group") {
       return (
-        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => toggleGroup(item.path)}>
+        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => { if (!item.alwaysOpen) toggleGroup(item.path); }}
+          tabIndex={item.alwaysOpen ? undefined : 0}
+          aria-expanded={!item.collapsed}
+          onKeyDown={(event) => { if (!item.alwaysOpen && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); toggleGroup(item.path); } }}>
           <td
             className={styles.groupRowCell}
             colSpan={totalCols || 1}
@@ -1480,8 +2244,39 @@ function DataGridInner<T>({
     return (
       <Fragment key={`f-${key}-${idx}`}>
         <tr
+          draggable={rowDrag ? true : undefined}
+          onDragStart={rowDrag ? ((e) => {
+            draggingRow.current = row;
+            e.dataTransfer.effectAllowed = "move";
+            /* Firefox starts no drag at all without payload. The key is the
+               payload; the row itself is held in the ref. */
+            e.dataTransfer.setData("text/plain", key);
+          }) : undefined}
+          onDragEnd={rowDrag ? (() => { draggingRow.current = null; }) : undefined}
+          onDragOver={rowDrag ? ((e) => {
+            const from = draggingRow.current;
+            /* preventDefault is what ALLOWS the drop. Not calling it on a row
+               that may not take the move is how the screen refuses to offer a
+               move the server would refuse. */
+            if (!from || from === row || !rowDrag.canDrop(from, row)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+          }) : undefined}
+          onDrop={rowDrag ? ((e) => {
+            const from = draggingRow.current;
+            draggingRow.current = null;
+            if (!from || from === row || !rowDrag.canDrop(from, row)) return;
+            e.preventDefault();
+            pendingRowFocus.current = rowKey(from);
+            rowDrag.onMove(from, row);
+          }) : undefined}
+          data-grid-expansion-key={expandKey ?? undefined}
           data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
-          className={`${styles.tr} ${selectedKey === key ? styles.trSelected : ""}`}
+          className={`${styles.tr} ${
+            palette === "slate"
+              ? selectable && (selectable.selectedKeys.has(key) || (selectable.isIndeterminate?.(row as never) ?? false)) ? styles.trTicked : ""
+              : selectedKey === key ? styles.trSelected : ""
+          }`}
           style={{
             ...rowStyle?.(row),
             ...(selectable || onRowClick || expandKey != null ? { cursor: "pointer" } : {}),
@@ -1501,29 +2296,104 @@ function DataGridInner<T>({
           onDoubleClick={() => onRowDoubleClick?.(row)}
           onContextMenu={(e) => {
             if (!contextMenu) return;
+            if (performance.now() - keyboardMenuAt.current < 500) {
+              e.preventDefault();
+              return;
+            }
             const items = contextMenu(row);
             if (!items || items.length === 0) return;
             e.preventDefault();
             setSelectedKey(key);
             setRowCtx({ x: e.clientX, y: e.clientY, items });
           }}
+          /* ⭐ ONE TAB STOP, ARROWS BETWEEN ROWS (Listing Standard 2026-09-16).
+             The grid is one stop in the page's Tab order; ↑/↓ move row to row,
+             Enter opens what a double-click opens, Space ticks, → / ← open and
+             close the expansion, and Shift+F10 or the Menu key opens the same
+             row menu a right-click does — from the row or from any control
+             inside it. Controls inside a row keep their own keys. */
+          data-row-nav=""
+          data-row-key={key}
+          tabIndex={key === rovingRowKey ? 0 : -1}
+          onFocus={(e) => {
+            if (e.target === e.currentTarget) setActiveRowKey(key);
+          }}
+          onKeyDown={(e) => {
+            const tr = e.currentTarget;
+            if (contextMenu && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) {
+              const items = contextMenu(row);
+              if (!items || items.length === 0) return;
+              e.preventDefault();
+              e.stopPropagation();
+              keyboardMenuAt.current = performance.now();
+              const origin = (e.target as HTMLElement).getBoundingClientRect();
+              setSelectedKey(key);
+              setRowCtx({
+                x: Math.round(origin.left + 8),
+                y: Math.round(origin.bottom),
+                items,
+                returnFocus: e.target as HTMLElement,
+              });
+              return;
+            }
+            if (e.target !== tr) return;
+            if (rowDrag && e.altKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+              /* The keyboard half of the drag: the nearest row in that
+                 direction that will TAKE the move. Nearest, not adjacent — a
+                 row's next sibling can sit several rows away with another
+                 heading's children printed in between. */
+              const order = renderList.filter((it) => it.kind === "row");
+              const at = order.findIndex((it) => it.kind === "row" && rowKey(it.row) === key);
+              const step = e.key === "ArrowDown" ? 1 : -1;
+              const accepts = rowDrag.canStep ?? rowDrag.canDrop;
+              for (let i = at + step; i >= 0 && i < order.length; i += step) {
+                const cand = order[i];
+                if (!cand || cand.kind !== "row" || !accepts(row, cand.row)) continue;
+                e.preventDefault();
+                pendingRowFocus.current = key;
+                setActiveRowKey(key);
+                (rowDrag.onStep ?? rowDrag.onMove)(row, cand.row);
+                return;
+              }
+              return;
+            }
+            if (["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"].includes(e.key)) {
+              /* ↑/↓ one row · Home/End first/last · PageUp/PageDown one screen —
+                 counted in the FULL list, so a virtual window never ends the walk. */
+              if (moveRowFocus(idx, e.key, tr)) e.preventDefault();
+            } else if (e.key === "Enter") {
+              if (onRowDoubleClick) onRowDoubleClick(row);
+              else onRowClick?.(row);
+            } else if (e.key === " " && selectable && (selectable.isSelectable?.(row as never) ?? true)) {
+              e.preventDefault();
+              selectable.onToggle(key);
+            } else if (expandable && expandKey != null && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+              if ((e.key === "ArrowRight") !== isExpanded) {
+                e.preventDefault();
+                toggleExpand(expandKey);
+              }
+            }
+          }}
         >
           {visibleColumns.map((col) => {
             const w = layout.widths[col.key] ?? col.width ?? 140;
             if (col.key === "__select__" && selectable) {
-              return (
-                <td
-                  key={col.key}
-                  className={`${styles.td}${pinClass(col.key)}`}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
-                  onClick={(e) => e.stopPropagation()}
+              const canSelect = selectable.isSelectable?.(row as never) ?? true;
+              const refusal = canSelect ? null : (selectable.unselectableReason?.(row as never) ?? null);
+              const refusalId = refusal ? `${selectionReasonId}-${encodeURIComponent(key)}` : undefined;
+              const checkLabel = (
+                  <label
+                  className={`${narrowCanvas ? styles.checkHitNarrow : styles.checkHit}${refusal ? ` ${styles.checkRefused}` : ""}`}
+                  tabIndex={refusal ? 0 : undefined}
+                  aria-label={refusal ?? undefined}
                 >
                   <input
                     type="checkbox"
                     aria-label="Select row"
+                    aria-describedby={refusalId}
                     data-testid={selectable.testId?.(row as never)}
                     checked={selectable.selectedKeys.has(key)}
-                    disabled={!(selectable.isSelectable?.(row as never) ?? true)}
+                    disabled={!canSelect}
                     /* A parent-of-children checkbox's third state — set via the
                        ref exactly as the header checkbox sets its own. */
                     ref={(el) => {
@@ -1531,6 +2401,24 @@ function DataGridInner<T>({
                     }}
                     onChange={() => selectable.onToggle(key)}
                   />
+                  {refusal ? <span id={refusalId} className="sr-only">{refusal}</span> : null}
+                  </label>
+              );
+              return (
+                <td
+                  key={col.key}
+                  className={`${styles.td}${pinClass(col.key)}`}
+                  style={{
+                    width: w,
+                    maxWidth: w,
+                    padding: narrowCanvas ? 0 : "4px 6px",
+                    textAlign: "center",
+                    ...(narrowCanvas ? { overflow: "visible" } : {}),
+                    ...pinStyle(col.key),
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {refusal ? <Tooltip content={refusal} side="right">{checkLabel}</Tooltip> : checkLabel}
                 </td>
               );
             }
@@ -1538,9 +2426,14 @@ function DataGridInner<T>({
               return (
                 <td
                   key={col.key}
-                  className={`${styles.td}${pinClass(col.key)}`}
+                  className={`${styles.td}${pinClass(col.key)}${isExpanded && expansionJoinable ? ` ${styles.expansionCaretCell}` : ""}`}
                   style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
                 >
+                  {/* §6.9 — the drop from beneath the caret, shown only when
+                      this row's expansion holds a connected section stack. */}
+                  {isExpanded && expansionJoinable ? (
+                    <span aria-hidden="true" className={styles.expansionDrop} data-testid="expansion-connector-drop" />
+                  ) : null}
                   <button
                     type="button"
                     aria-label={isExpanded ? "Collapse row" : "Expand row"}
@@ -1595,7 +2488,9 @@ function DataGridInner<T>({
                system stops mixing blanks and dashes. 0 / false / JSX elements
                are preserved (a real 0 must show as 0); synthetic columns
                (__expand__ / __select__) render nothing, not a dash. */
-            const content = col.accessor(row);
+            const content = col.overflowText
+              ? <OverflowText text={col.overflowText(row)} label={col.label} />
+              : col.accessor(row);
             const isEmpty = content == null || content === "";
             const wrapClass = col.wrap ? ` ${styles.tdWrap}` : "";
             /* ⭐ TRIGGER COLUMN — the arrow and the content are ONE expansion
@@ -1670,16 +2565,32 @@ function DataGridInner<T>({
           })}
         </tr>
         {isExpanded && expandable && (
-          <tr className={styles.tr} style={{ background: "var(--c-cream)" }}>
+          <tr
+            className={`${styles.tr} ${styles.trExpansion}`}
+            style={{
+              background: "var(--grid-expansion, var(--c-cream))",
+              ...(expansionJoinable ? { ["--expansion-join-y" as string]: `${EXPANSION_JOIN_Y}px` } : {}),
+            }}
+          >
             {/* The gutter, kept EMPTY beside the child rows — the indent IS
-                the parent-child link (owner ruling 2026-08-15). */}
-            {expansionGutter.map((key) => (
-              <td
-                key={key}
-                data-testid={`grid-expansion-gutter-${key}`}
-                style={{ padding: 0, borderTop: "1px solid var(--line)" }}
-              />
-            ))}
+                the parent-child link (owner ruling 2026-08-15). Under the caret
+                it carries the §6.9 elbow; any gutter cell after it carries the
+                line across; both show only beside a connected section stack,
+                and pin with the caret so the line holds under a sideways scroll. */}
+            {expansionGutter.map((key, gi) => {
+              const caretAt = expansionGutter.indexOf("__expand__");
+              const piece = !expansionJoinable || caretAt < 0 || gi < caretAt ? null : gi === caretAt ? styles.expansionElbow : styles.expansionRun;
+              return (
+                <td
+                  key={key}
+                  data-testid={`grid-expansion-gutter-${key}`}
+                  className={piece ? styles.expansionGutter : undefined}
+                  style={{ padding: 0, borderTop: "1px solid var(--line)", ...(piece ? pinStyle(key) : {}) }}
+                >
+                  {piece ? <span aria-hidden="true" className={piece} data-testid={`expansion-connector-${gi === caretAt ? "elbow" : "run"}`} /> : null}
+                </td>
+              );
+            })}
             <td
               colSpan={visibleColumns.length - expansionGutter.length}
               data-testid="grid-expansion-cell"
@@ -1690,7 +2601,17 @@ function DataGridInner<T>({
                  column's, the right edge is the parent table's. */
               style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
-              {expandable.renderExpansion(row)}
+              {/* The caret line joins only a FLUSH expansion (the §6.9 Purchasing
+                  geometry), where the stated join height is where the first
+                  child begins. A padded or viewport-fitted expansion keeps the
+                  section stack's own first elbow, exactly as before. */}
+              <ExpansionJoinContext.Provider value={expansionJoinable}>
+                {expandable.fitExpansionToViewport ? (
+                  <ViewportExpansion>
+                    {expandable.renderExpansion(row)}
+                  </ViewportExpansion>
+                ) : expandable.renderExpansion(row)}
+              </ExpansionJoinContext.Provider>
             </td>
           </tr>
         )}
@@ -1704,10 +2625,16 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        palette === "slate" ? styles.rootPaletteSlate : null,
+        headerTone === "paleBlue" ? styles.rootHeaderPaleBlue : null,
+        searchPresentation === "responsive" ? styles.rootSearchResponsive : null,
+        labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
         .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
+      style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
+      data-row-height={rowHeight}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
@@ -1717,8 +2644,71 @@ function DataGridInner<T>({
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
-        {!embedded && (
-          isReference && !searchOpen && !search ? (
+        {!embedded && searchPresentation === "responsive" ? (
+          /* R4 (owner ruling 2026-09-16): both forms are rendered and the
+             TOOLBAR's own width chooses (container query), so a narrow canvas
+             inside a wide window still gets the icon. An active query keeps
+             the box and its clear control on screen at every width. */
+          <>
+            <button
+              ref={searchIconRef}
+              type="button"
+              aria-label="Search"
+              title="Search"
+              data-testid="search-icon"
+              data-hidden={searchOpen || search !== "" ? "true" : undefined}
+              className={`${styles.toolbarIcon} ${styles.searchResponsiveIcon}`}
+              onClick={() => {
+                setSearchOpen(true);
+                requestAnimationFrame(() => searchRef.current?.focus());
+              }}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden />
+            </button>
+            <div
+              className={`${styles.searchWrap} ${styles.searchResponsiveBox}`}
+              data-testid="search-box"
+              data-active={searchOpen || search !== "" ? "true" : undefined}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden />
+              <input
+                ref={searchRef}
+                className={styles.searchInput}
+                type="search"
+                aria-label="Search"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setSearchOpen(false);
+                    requestAnimationFrame(() => {
+                      if (searchIconRef.current && getComputedStyle(searchIconRef.current).display !== "none") searchIconRef.current.focus();
+                    });
+                  }
+                }}
+                onBlur={() => { if (!search) setSearchOpen(false); }}
+              />
+              {search !== "" && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  data-testid="search-clear"
+                  className={styles.searchClear}
+                  onClick={() => {
+                    setSearch("");
+                    searchRef.current?.focus();
+                  }}
+                >
+                  <X size={14} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </div>
+          </>
+        ) : !embedded && (
+          isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
               aria-label="Search"
@@ -1736,6 +2726,7 @@ function DataGridInner<T>({
                 ref={searchRef}
                 className={styles.searchInput}
                 type="search"
+                aria-label="Search"
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -1788,7 +2779,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -1802,7 +2793,7 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && (
+            {(!isReference || labelledToolbar) && (
               <>
                 <span>Export</span>
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
@@ -1864,7 +2855,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Columns"
             title="Columns"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1878,14 +2869,14 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && <span>Columns</span>}
+            {(!isReference || labelledToolbar) && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>
               <div className={styles.columnsMenuBackdrop} onClick={() => setColumnsMenuOpen(false)} />
               <div
                 ref={columnsMenuRef}
-                className={styles.columnsMenu}
+                className={`${styles.columnsMenu}${personalLayouts ? ` ${styles.columnsMenuWithLayouts}` : ""}`}
                 style={
                   columnsMenuPos
                     ? { position: "fixed", top: columnsMenuPos.top, right: columnsMenuPos.right }
@@ -1895,16 +2886,81 @@ function DataGridInner<T>({
               >
                 <header className={styles.columnsMenuHeader}>
                   <span>Columns ({visibleDataColumnCount})</span>
+                  {!personalLayouts && (
                   <button
                     type="button"
                     className={styles.columnsMenuReset}
                     onClick={resetColumns}
-                    title="Reset to defaults"
+                    title="Reset columns"
                   >
                     <RotateCcw size={12} strokeWidth={1.75} aria-hidden />
-                    <span>Reset</span>
+                    <span>Reset columns</span>
                   </button>
+                  )}
                 </header>
+                {personalLayouts && (
+                  <div className={styles.layoutActions} data-testid="personal-layout-actions">
+                    <button type="button" className={styles.layoutAction} aria-expanded={layoutPanel === "save"}
+                      onClick={() => { setLayoutProblem(null); setLayoutPanel(layoutPanel === "save" ? null : "save"); }}>
+                      Save layout as…
+                    </button>
+                    {layoutPanel === "save" && (
+                      <form className={styles.layoutPanel} onSubmit={(e) => { e.preventDefault(); void saveLayoutAs(); }}>
+                        <label className={styles.layoutField}>
+                          <span>Layout name</span>
+                          <input
+                            autoFocus
+                            maxLength={60}
+                            value={layoutName}
+                            onChange={(e) => setLayoutName(e.target.value)}
+                          />
+                        </label>
+                        <Button variant="neutral" size="sm" type="submit" disabled={layoutName.trim() === "" || layoutBusy}>
+                          Save
+                        </Button>
+                      </form>
+                    )}
+                    <button type="button" className={styles.layoutAction} aria-expanded={layoutPanel === "load"}
+                      disabled={personalLayouts.layouts.length === 0}
+                      onClick={() => { setLayoutProblem(null); setLayoutPanel(layoutPanel === "load" ? null : "load"); }}>
+                      Load layout
+                    </button>
+                    {layoutPanel === "load" && (
+                      <div className={styles.layoutPanel} role="group" aria-label="Load layout">
+                        {personalLayouts.layouts.map((saved) => (
+                          <button key={saved.id} type="button" className={styles.layoutChoice}
+                            onClick={() => { applySavedLayout(saved.layout); setLayoutPanel(null); setColumnsMenuOpen(false); }}>
+                            {saved.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button type="button" className={styles.layoutAction} aria-expanded={layoutPanel === "default"}
+                      disabled={personalLayouts.layouts.length === 0}
+                      onClick={() => { setLayoutProblem(null); setLayoutPanel(layoutPanel === "default" ? null : "default"); }}>
+                      Set as my default
+                    </button>
+                    {layoutPanel === "default" && (
+                      <div className={styles.layoutPanel} role="group" aria-label="Set as my default">
+                        {personalLayouts.layouts.map((saved) => (
+                          <button key={saved.id} type="button" className={styles.layoutChoice}
+                            aria-pressed={saved.isDefault} disabled={layoutBusy}
+                            onClick={() => void setMyDefault(saved.id)}>
+                            <span>{saved.name}</span>
+                            {saved.isDefault ? <Check size={12} strokeWidth={2} aria-hidden /> : null}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {layoutProblem && (
+                      <p role="alert" className={styles.layoutProblem} data-testid="personal-layout-problem">{layoutProblem}</p>
+                    )}
+                    <button type="button" className={styles.layoutAction} onClick={resetColumns}>Reset columns</button>
+                    <button type="button" className={styles.layoutAction} onClick={bestFit}>Best fit</button>
+                    <button type="button" className={styles.layoutAction} onClick={expandAll}>Expand all</button>
+                    <button type="button" className={styles.layoutAction} onClick={collapseAll}>Collapse all</button>
+                  </div>
+                )}
                 <div className={styles.columnsMenuBody}>
                   {(() => {
                     /* STAGE 1 engine extension (Law 13) — the GROUPED chooser.
@@ -1916,6 +2972,8 @@ function DataGridInner<T>({
                         <input
                           type="checkbox"
                           checked={!effectiveHidden.has(c.key)}
+                          /* The listing's date and identity always show (§6.7 rule 2). */
+                          disabled={leadingKeys.includes(c.key)}
                           onChange={() => toggleColumn(c.key)}
                         />
                         <span>{c.label || c.key}</span>
@@ -2002,6 +3060,115 @@ function DataGridInner<T>({
         </div>
       )}
 
+      {warning != null && warning !== false && (
+        <div
+          className="flex min-h-10 flex-none items-center gap-2 border-b border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+          role="alert"
+          data-testid="grid-warning"
+        >
+          {warning}
+        </div>
+      )}
+
+      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
+          narrowing in ONE line, whoever applied it, each removable on its own
+          and all of them under one `Clear filters`. Renders nothing when
+          nothing is narrowed, and nothing at all for a grid whose page hands
+          in no conditions and carries no column filter. */}
+      {(() => {
+        const columnChips = [
+          ...Object.entries(filters)
+            .filter(([, v]) => v.length > 0)
+            .map(([key, values]) => ({
+              key: `col:${key}`,
+              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
+              onClear: () =>
+                setFilters((prev) => {
+                  const next = { ...prev };
+                  delete next[key];
+                  return next;
+                }),
+            })),
+          ...Object.keys(dateFilters).map((key) => ({
+            key: `date:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
+            onClear: () =>
+              setDateFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(dateRangeFilters).map((key) => ({
+            key: `range:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
+            onClear: () =>
+              setDateRangeFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(numberFilters).map((key) => ({
+            key: `num:${key}`,
+            label: columns.find((c) => c.key === key)?.label ?? key,
+            onClear: () =>
+              setNumberFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+        ];
+        /* Listing Standard 2026-09-16: with the governed Register search, an
+           active query IS a condition — listed here and cleared by the same
+           `Clear filters` (which also returns a server search to the whole
+           population through `onSearchChange`). */
+        const searchChips = searchPresentation === "responsive" && search.trim() !== ""
+          ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
+          : [];
+        const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
+        if (chips.length === 0) return null;
+        return (
+          <div className={styles.conditionBar} data-testid="active-conditions">
+            <span className={styles.conditionBarLabel}>Showing only:</span>
+            {chips.map((chip) => (
+              <span key={chip.key} className={styles.conditionChip}>
+                <span className={styles.conditionChipText} title={chip.label}>
+                  {chip.label}
+                </span>
+                <button
+                  type="button"
+                  className={styles.conditionChipRemove}
+                  aria-label={`Remove ${chip.label}`}
+                  title={`Remove ${chip.label}`}
+                  onClick={chip.onClear}
+                >
+                  <X size={12} strokeWidth={2} aria-hidden />
+                </button>
+              </span>
+            ))}
+            {!noMatchShowing && (
+            <button
+              type="button"
+              className={styles.conditionClear}
+              data-testid="clear-filters"
+              onClick={() => {
+                if (searchPresentation === "responsive") setSearch("");
+                setFilters({});
+                setDateFilters({});
+                setNumberFilters({});
+                setDateRangeFilters({});
+                onClearConditions?.();
+              }}
+            >
+              Clear filters
+            </button>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Group-by zone */}
       {groupBanner && (
         <div
@@ -2037,130 +3204,94 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={styles.table}>
-          <thead
-            className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
-            data-testid={isReference ? "grid-header" : undefined}
-          >
-            <tr>
-              {visibleColumns.map((col) => {
-                const w = layout.widths[col.key] ?? col.width ?? 140;
-                const style: CSSProperties = {
-                  width: w,
-                  minWidth: col.minWidth ?? 40,
-                  ...pinStyle(col.key),
-                };
-                const isSorted = layout.sort?.key === col.key;
-                const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
-                if (col.key === "__select__" && selectable) {
-                  /* Select-all means "every row that CAN be selected". A header
-                     box that stays indeterminate forever because three rows can
-                     never be ticked is a control that lies about its own state. */
-                  const keys = sortedRows
-                    .filter((r) => selectable.isSelectable?.(r as never) ?? true)
-                    .map(rowKey);
-                  const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
-                  const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
-                  return (
-                    <th key={col.key} className={`${styles.th}${pinClass(col.key)}`} style={style}>
-                      <span className={styles.thInner}>
-                        <input
-                          type="checkbox"
-                          aria-label="Select all rows"
-                          checked={allSel}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someSel;
-                          }}
-                          onChange={() => selectable.onToggleAll(keys, allSel)}
-                        />
-                      </span>
-                    </th>
-                  );
-                }
-                return (
-                  <th
-                    key={col.key}
-                    className={`${styles.th} ${col.align === "right" ? styles.thAlignRight : ""} ${
-                      dropTarget === col.key ? styles.thDragOver : ""
-                    }${pinClass(col.key)}`}
-                    style={style}
-                    draggable
-                    onDragStart={(e) => onDragStartHeader(e, col.key)}
-                    onDragOver={(e) => onDragOverHeader(e, col.key)}
-                    onDragLeave={() => setDropTarget(null)}
-                    onDrop={(e) => onDropHeader(e, col.key)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setCtx({ x: e.clientX, y: e.clientY, colKey: col.key });
-                    }}
-                    title={col.label}
-                  >
-                    <span className={styles.thInner}>
-                      {col.sortable !== false ? (
-                        <button
-                          type="button"
-                          className={styles.sortBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSort(col.key);
-                          }}
-                        >
-                          {col.label}
-                          {arrow && <span className={styles.sortArrow}>{arrow === "A" ? "^" : "v"}</span>}
-                        </button>
-                      ) : (
-                        col.label
-                      )}
-                      {col.key !== "__expand__" && col.key !== "__select__" && (
-                        <button
-                          type="button"
-                          title="Filter this column"
-                          aria-label={`Filter ${col.label}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterMenu({ colKey: col.key, x: e.clientX, y: e.clientY });
-                          }}
-                          style={{
-                            background: "transparent",
-                            border: 0,
-                            padding: "0 2px",
-                            marginLeft: 2,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            color:
-                              (filters[col.key]?.length ?? 0) > 0 ||
-                              dateFilters[col.key] ||
-                              numberFilters[col.key] ||
-                              dateRangeFilters[col.key]
-                                ? "var(--c-orange)"
-                                : "var(--fg-soft)",
-                          }}
-                        >
-                          <Filter size={11} strokeWidth={2} aria-hidden />
-                        </button>
-                      )}
-                    </span>
-                    <div className={styles.resizeHandle} onMouseDown={(e) => onResizeStart(e, col.key, w)} />
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+        {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
+            This SUPERSEDES the single global header.
+
+            A governed grouped listing is one table PER GROUP, in one scroll
+            container. That structure is not decoration: a sticky cell is held
+            by the table it is in, so each group's heading and column header
+            travel with the operator through that group's OWN records and stop
+            dead at its boundary, instead of standing over the next group's
+            rows. (A shared `<tbody>` per group does not do this — a table
+            cell's containing block is the table, and the header simply
+            escapes into the group below. Measured in Chromium, 2026-09-18.)
+
+            What the groups SHARE is the whole point, and it is shared by
+            construction rather than by agreement: one `visibleColumns`, one
+            `layout.widths` `<colgroup>`, one `layout.sort`, one resize handle,
+            `table-layout: fixed` so a long value in one group cannot widen a
+            column in that group alone. Four headers have nothing left to
+            disagree about. */}
+        {groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0
+          ? groupSections.map((section) => (
+              <table
+                key={`gs-${section.group.path}`}
+                className={`${styles.table} ${styles.tablePinnedBlock} ${styles.tableGrouped}`}
+                style={{ width: groupedTableWidth }}
+                data-testid={`grid-section-${section.group.path}`}
+              >
+                <colgroup>
+                  {visibleColumns.map((col) => (
+                    <col key={col.key} style={{ width: layout.widths[col.key] ?? col.width ?? 140 }} />
+                  ))}
+                </colgroup>
+                <thead className={styles.thead}>
+                  {renderGridRow(section.group, section.index)}
+                  {/* A collapsed group is its heading and its count. A column
+                      header over no records names columns nobody is reading —
+                      and an EMPTY open group is the same picture: measured on
+                      Manual Purchase 2026-09-22, `Need PO 0` drew fifteen
+                      column heads over nothing, so the operator read a table
+                      that had no rows in it. The heading and its count are the
+                      whole truth there. */}
+                  {!section.group.collapsed && section.rows.length > 0 && (
+                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true)}</tr>
+                  )}
+                </thead>
+                <tbody className={styles.tbody}>
+                  {section.rows.map((item, i) => renderGridRow(item, section.index + 1 + i))}
+                </tbody>
+              </table>
+            ))
+          : null}
+        <table
+          className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
+          hidden={groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0}
+        >
+          {/* A flat register keeps the one sticky header it has always had. */}
+          {!groupLocalHeaders && (
+            <thead
+              className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
+              data-testid={isReference ? "grid-header" : undefined}
+            >
+              <tr>{headerCells(false)}</tr>
+            </thead>
+          )}
           <tbody className={styles.tbody}>
             {isLoading && <SkeletonRows cols={totalCols || 1} rows={12} />}
-            {!isLoading && renderList.length === 0 && (
+            {!isLoading && errorState != null && (
               <tr>
-                <td className={styles.empty} colSpan={totalCols || 1}>
-                  {emptyMessage}
+                <td colSpan={totalCols || 1} style={{ padding: 0 }}>
+                  <div data-testid="grid-error" style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{errorState}</div>
+                </td>
+              </tr>
+            )}
+            {!isLoading && errorState == null && renderList.length === 0 && (
+              <tr>
+                <td colSpan={totalCols || 1} style={{ padding: 0 }}>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchShowing ? <>{noMatchMessage}<Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button></> : emptyMessage}</div>
                 </td>
               </tr>
             )}
             {/* Small / grouped / expandable lists: render every row (unchanged). */}
-            {!isLoading && !canVirtualize && renderList.map((item, idx) => renderGridRow(item, idx))}
+            {!isLoading && errorState == null && !canVirtualize && !groupLocalHeaders &&
+              renderList.map((item, idx) => renderGridRow(item, idx))}
+            {/* A grouped listing with nothing to show still needs its loading,
+                failure and empty states, and they belong in one table across
+                the whole width — not repeated once per group. */}
             {/* Large flat lists: windowed — only the visible slice is in the DOM,
                with spacer rows reserving the scroll height above and below. */}
-            {!isLoading && canVirtualize && (
+            {!isLoading && errorState == null && canVirtualize && (
               <>
                 {padTop > 0 && (
                   <tr aria-hidden="true">
@@ -2209,7 +3340,9 @@ function DataGridInner<T>({
         <div className={styles.statusLine} data-testid={isReference ? "grid-footer" : undefined}>
           {isLoading
             ? <span>Loading…</span>
-            : statusSummary
+            : errorState != null
+              ? null
+              : statusSummary
               ? statusSummary(sortedRows, selectedVisibleRows)
               : <span>{`${filteredRows.length} of ${rows.length} rows`}</span>}
         </div>
@@ -2223,24 +3356,30 @@ function DataGridInner<T>({
           const grouped = layout.groupBy.includes(ctx.colKey);
           return (
             <div className={styles.ctxMenu} style={{ top: ctx.y, left: ctx.x }} onClick={(e) => e.stopPropagation()}>
-              <button
-                className={styles.ctxItem}
-                onClick={() => {
-                  hideColumn(ctx.colKey);
-                  setCtx(null);
-                }}
-              >
-                Hide column
-              </button>
-              <button
-                className={styles.ctxItem}
-                onClick={() => {
-                  pinLeft(ctx.colKey);
-                  setCtx(null);
-                }}
-              >
-                Pin left
-              </button>
+              {/* The date and identity of a date-first listing can be neither
+                  hidden nor moved, so neither act is offered on them. */}
+              {!leadingKeys.includes(ctx.colKey) && (
+                <>
+                  <button
+                    className={styles.ctxItem}
+                    onClick={() => {
+                      hideColumn(ctx.colKey);
+                      setCtx(null);
+                    }}
+                  >
+                    Hide column
+                  </button>
+                  <button
+                    className={styles.ctxItem}
+                    onClick={() => {
+                      pinLeft(ctx.colKey);
+                      setCtx(null);
+                    }}
+                  >
+                    Pin left
+                  </button>
+                </>
+              )}
               <button
                 className={styles.ctxItem}
                 onClick={() => {
@@ -2527,15 +3666,40 @@ function DataGridInner<T>({
       {rowCtx && (
         <div
           className={styles.contextMenu}
+          role="menu"
+          aria-label="Row actions"
           style={{ top: rowCtx.y, left: rowCtx.x }}
           onClick={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
+          ref={(el) => {
+            /* The menu takes focus when it opens, so the keyboard lands on
+               its first act — never somewhere down the page. */
+            if (el && !el.contains(document.activeElement)) {
+              el.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus({ preventScroll: true });
+            }
+          }}
+          onKeyDown={(e) => {
+            const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
+            const at = items.indexOf(document.activeElement as HTMLButtonElement);
+            const go = (i: number) => items[(i + items.length) % items.length]?.focus({ preventScroll: true });
+            if (e.key === "ArrowDown") { e.preventDefault(); go(at + 1); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); go(at - 1); }
+            else if (e.key === "Home") { e.preventDefault(); go(0); }
+            else if (e.key === "End") { e.preventDefault(); go(items.length - 1); }
+            else if (e.key === "Tab") {
+              e.preventDefault();
+              setRowCtx(null);
+              rowCtx.returnFocus?.focus({ preventScroll: true });
+            }
+          }}
         >
           {rowCtx.items.map((it, i) => {
-            if (it.divider) return <div key={`d-${i}`} className={styles.contextMenuDivider} />;
+            if (it.divider) return <div key={`d-${i}`} role="separator" className={styles.contextMenuDivider} />;
             return (
               <button
                 key={`i-${i}-${it.label}`}
+                type="button"
+                role="menuitem"
                 className={`${styles.contextMenuItem} ${it.danger ? styles.contextMenuDanger : ""}`}
                 onClick={() => {
                   // Close before firing — handlers may navigate or open
@@ -2551,6 +3715,61 @@ function DataGridInner<T>({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One line of text that, only when the cell cuts it, shows the whole value
+ * (Listing Standard 2026-09-16). Measured on the element itself, so resizing a
+ * column turns the door on or off.
+ *
+ * ⭐ HOVER AND KEYBOARD FOCUS SHOW IT; CLICK AND ENTER OPEN IT (ui MASTER §6.0
+ * rule 5, Card 12 review 2026-09-21). One button carries both kit behaviours:
+ * the `Tooltip` answers hover and focus without taking focus out of the grid,
+ * and the `Popover` answers click, Enter and a touch screen's tap, where it
+ * can be read and selected at leisure.
+ */
+/* Exported (2026-09-22) so the SO goods table's configuration line reuses the
+   engine's ONE cut-value door instead of drawing a second (UI MASTER §6.8). */
+export function OverflowText({ text, label }: { text: string; label: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setCut(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, cut]);
+  const line = (
+    <span ref={ref} className={styles.overflowText}>
+      {text}
+    </span>
+  );
+  if (!cut) return line;
+  return (
+    <Popover
+      label={label}
+      trigger={
+        <Tooltip content={text}>
+          <button
+            type="button"
+            className={styles.overflowTrigger}
+            aria-label={`${label}: ${text}`}
+            data-testid="cell-overflow"
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            {line}
+          </button>
+        </Tooltip>
+      }
+    >
+      <p className="max-w-[320px] whitespace-normal break-words text-body text-kit-slate-12">{text}</p>
+    </Popover>
   );
 }
 

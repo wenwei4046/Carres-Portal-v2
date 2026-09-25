@@ -35,7 +35,7 @@
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { CARRES_COMPANY } from "./letterhead";
+import { CARRES_COMPANY, niceDate } from "./letterhead";
 import type { DoTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -49,19 +49,6 @@ const mm = (v: number) => v * 2.83465;
 const MARGIN = mm(12);
 const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
-
-/** `2026-08-24` → `Mon, 24 Aug 26` (SO-PDF-STANDARD body-date form). */
-function niceDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
-  if (!m) return String(iso);
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-    new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
-  ];
-  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][mo - 1];
-  return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
-}
 
 const styles = StyleSheet.create({
   page: {
@@ -104,7 +91,10 @@ const styles = StyleSheet.create({
   colCode: { width: mm(30) },
   colUnit: { width: mm(26) },
   colPo: { width: mm(22) },
-  colQty: { width: mm(18), textAlign: "right", paddingRight: mm(5) },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5). The 5mm right inset went with the
+  // right-alignment it existed to soften.
+  colQty: { width: mm(18), textAlign: "center" },
   bandRow: {
     flexDirection: "row",
     backgroundColor: BAND_BG,
@@ -122,7 +112,7 @@ const styles = StyleSheet.create({
   descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
   cellUnit: { fontSize: 7, color: GREY, width: mm(26), lineHeight: 1.3 },
   cellPo: { fontSize: 7, color: GREY, width: mm(22), lineHeight: 1.3 },
-  cellQty: { fontSize: 7, width: mm(18), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
+  cellQty: { fontSize: 7, width: mm(18), textAlign: "center", lineHeight: 1 },
 
   // ── sofa layout drawing (ported from po-template — direction contract) ──
   layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
@@ -393,7 +383,7 @@ export function DoTemplate(data: DoTemplateData) {
                     <Text style={styles.cellPo}>
                       {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
                     </Text>
-                    <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                    <Text style={styles.cellQty}>
                       {line.qty}
                     </Text>
                   </View>

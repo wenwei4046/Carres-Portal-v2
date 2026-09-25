@@ -10,7 +10,7 @@ import InvoiceSendReceipt from "./InvoiceSendReceipt";
 import type { PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useManualMethods } from "@/lib/payment-methods";
 import { toast } from "sonner";
@@ -19,10 +19,6 @@ import { toast } from "sonner";
  * Payment → Payment methods (0476, lib/payment-methods). `online` is
  * provider-recorded and never manually selectable — a link cannot be
  * pretended into a success. */
-
-function todayIso() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
 
 const inputCls =
   "mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body";
@@ -43,7 +39,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   const qc = useQueryClient();
   const [amount, setAmount] = useState(
     money.known && money.outstanding > 0 ? String(money.outstanding) : "");
-  const [paidOn, setPaidOn] = useState(todayIso());
+  const [paidOn, setPaidOn] = useState(appTodayIso());
   const [chosenMethod, setMethod] = useState<string>("bank");
   const [reference, setReference] = useState("");
   const [file, setFile] = useState<File | null>(null);
