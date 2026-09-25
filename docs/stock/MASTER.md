@@ -686,14 +686,17 @@ arrival as physical Stock.
 Inventory is the one current list. Its left rail filters the same Unit authority:
 
 ```
-STOCK                         OWNERSHIP                CONTROL
-All stock                     Carres Owned             Counts & Adjustments
-Reserved                      Supplier Consignment     History
-Ready Stock
-Showroom Display
-Service Case
-Needs checking
+STOCK                         CATEGORY                 OWNERSHIP                CONTROL
+All stock                     Mattress                 Carres Owned             History
+Reserved                      Bedframe                 Supplier Consignment
+Ready Stock                   Sofa
+Showroom Display              Pillow
+Service Case                  Mattress Protector
 Available · Cannot sell · Incoming   (Inventory Status rows, same group)
+
+(owner correction 2026-09-25, go-live: no `Coming soon` row anywhere on the rail — `Needs checking`
+and `Counts & Adjustments` appear only when built; `CATEGORY` lists the Catalog categories that
+have stock, from the one shared category reader, never a SKU-text parse.)
 ```
 
 The dated work strip remains above the Register. For the selected actual date it shows only the
