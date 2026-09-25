@@ -3840,6 +3840,7 @@ Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP dra
 | Ledger link | **Ledger entry** · **reversed by `JE-…`** | `gl_entries` | |
 | An unknown stored value | **Not known** | anything the word map lacks | never the raw value |
 | Buttons | **+ New Bill** · **Convert GRN to bill** · **Confirm bill** · **Cancel bill** · **+ New Payment Voucher** · **Prepare voucher** · **Check voucher** · **Approve payment** · **Return to draft** · **Cancel voucher** · **Add other creditor** · **Attach file** · **Use this GRN** | — | form buttons stay `Save` / `Cancel`; line lists stay `+ Add line` / `Remove` |
+| Bill form: the disabled Save NAMES its gap (the Receiving button law; first gap wins, top to bottom) — PROPOSAL, awaiting YH | **Save — pick the supplier** · **Save — type the supplier invoice No** · **Save — pick the bill date** · **Save — add a line** · **Save — type the amount on line `n`** · **Save — pick the department on line `n`** | — | a greyed `Save` that says nothing is the defect this row closes |
 
 **Three dictionary conflicts, reported rather than decided:**
 

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import SupplierBills, { lineAmount } from "./SupplierBills";
+import SupplierBills, { billSaveGap, lineAmount } from "./SupplierBills";
 import PaymentVouchers, { voucherTotal } from "./PaymentVouchers";
 import ApOutstanding from "./ApOutstanding";
 import { money, priceDiffWord, refusal, word, VOUCHER_STATUS_WORD } from "./payables-words";
@@ -309,6 +309,23 @@ describe("Bill form — Convert GRN to bill", () => {
     fireEvent.change(screen.getByLabelText("Bill date"), { target: { value: "2026-09-11" } });
     expect(screen.getByLabelText("Due date")).toHaveValue("2026-09-30");
     expect(screen.queryByTestId("due-from-terms")).toBeNull();
+  });
+
+  it("a disabled Save names the first thing still missing, top to bottom", async () => {
+    show("/finance/bills/new");
+    await screen.findByRole("option", { name: "Lumen Sofa Works" });
+    expect(screen.getByRole("button", { name: "Save — pick the supplier" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Supplier"), { target: { value: SUP } });
+    expect(screen.getByRole("button", { name: "Save — type the supplier invoice No" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "LSW-901" } });
+    expect(screen.getByRole("button", { name: "Save — add a line" })).toBeDisabled();
+
+    const base = { supplierId: SUP, invoiceNo: "X", billDate: "2026-09-10", lines: [] };
+    const line = { qty: "", unitPrice: "", amount: "10", departmentType: "OFFICE" as const };
+    expect(billSaveGap({ ...base, billDate: "" })).toBe("Save — pick the bill date");
+    expect(billSaveGap({ ...base, lines: [line, { ...line, amount: "" }] })).toBe("Save — type the amount on line 2");
+    expect(billSaveGap({ ...base, lines: [{ ...line, departmentType: null }] })).toBe("Save — pick the department on line 1");
+    expect(billSaveGap({ ...base, lines: [line] })).toBeNull();
   });
 
   it("leaves the due date empty when no terms are set (0530)", async () => {
