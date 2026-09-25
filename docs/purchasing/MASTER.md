@@ -664,6 +664,13 @@ Deliver To is a PO change (new version), not an answer. Goods that arrive early 
 no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
 Each batch derives its own day-before occurrence.
 
+**Answer evidence — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The answer form accepts
+photos, videos and PDF, several files per answer, through the shared Receiving uploader
+(`ArrivalEvidenceUploadField`) — never a second PO-only uploader; today's PO reply upload is
+JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot for a confirmation,
+date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
+Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
+
 One Office working day before the effective expected arrival,
 `purchasing.confirm_tomorrows_delivery` asks for either the **Supplier DO** or evidenced supplier
 confirmation that the named goods will be sent/delivered to the named Warehouse on that exact next
