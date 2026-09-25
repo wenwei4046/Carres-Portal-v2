@@ -14,7 +14,7 @@ import Button from "@/components/kit/Button";
 import DataTable, { type Column, type GroupRowCell } from "@/components/kit/DataTable";
 import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
-import type { StatementGroup, StatementLine, StatementSection } from "./report-queries";
+import type { StatementLine, StatementSection } from "./report-queries";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -67,55 +67,89 @@ export type StatementRow =
   | { id: string; section: string; kind: "unclosed"; amount: number }
   | { id: string; section: string; kind: "nothing" };
 
+/** A header as `headingWalk` reads it: where it sits in the chart, the header
+ *  it sits under, and the lines filed directly under it that are to print. */
+export interface WalkGroup<L extends { ordinal: number }> {
+  code: string;
+  parentCode: string | null;
+  ordinal: number;
+  lines: readonly L[];
+}
+
 /**
- * The rows the table prints. A header line comes first, then everything
- * under it in the chart's order: its own accounts and the headers under it
- * mixed together, as the Chart of accounts lists them. Each header keeps its
- * own subtotal, down to any depth (0579). An account at RM 0.00 is left out,
- * as the Trial Balance does, and so is a header with nothing but RM 0.00
- * under it. A section where every account is at RM 0.00 keeps its band and
- * gets one line saying so (`No income in this period.`). So even when every
- * section is at zero, the bands stay, and so does the bottom strip under them.
+ * One section's headers and lines in print order. A header line comes first,
+ * then everything under it in the chart's order: its own lines and the
+ * headers under it mixed together by `ordinal`, as the Chart of accounts
+ * lists them, down to any depth (0579). A header with no line anywhere under
+ * it is left out, so an empty header prints nothing. When one header holds
+ * the whole section and no header sits inside it, no header line prints
+ * (`headed` is false) and its lines print flush. The Balance Sheet, the Profit
+ * and Loss and the Trial Balance all print through this one walk.
+ */
+export function headingWalk<G extends WalkGroup<{ ordinal: number }>>(groups: readonly G[]): {
+  headed: boolean;
+  rows: ({ group: G; depth: number } | { line: G["lines"][number]; depth: number })[];
+} {
+  type L = G["lines"][number];
+  const codes = new Set(groups.map((g) => g.code));
+  const children = new Map<string | null, G[]>();
+  for (const g of groups) {
+    const parent = g.parentCode !== null && codes.has(g.parentCode) ? g.parentCode : null;
+    children.set(parent, [...(children.get(parent) ?? []), g]);
+  }
+  const shown = (g: G): boolean => g.lines.length > 0 || (children.get(g.code) ?? []).some(shown);
+  const roots = (children.get(null) ?? []).filter(shown);
+  // A header line only earns its place when there is more than one header,
+  // or when a header holds headers.
+  const headed = roots.length > 1 || groups.some((g) => g.parentCode !== null && codes.has(g.parentCode) && shown(g));
+  const rows: ({ group: G; depth: number } | { line: L; depth: number })[] = [];
+  const emit = (g: G, depth: number) => {
+    if (headed) rows.push({ group: g, depth });
+    // Lines and sub-headers in the chart's order. On a statement a
+    // sub-header's ordinal is its subtotal row, served right after everything
+    // under it, so it sorts against the lines beside it the way the chart does.
+    const under: ({ line: L } | { sub: G })[] = [
+      ...g.lines.map((line) => ({ line })),
+      ...(children.get(g.code) ?? []).filter(shown).map((sub) => ({ sub })),
+    ];
+    const at = (x: (typeof under)[number]) => ("sub" in x ? x.sub.ordinal : x.line.ordinal);
+    for (const x of under.sort((a, b) => at(a) - at(b))) {
+      if ("sub" in x) emit(x.sub, depth + 1);
+      else rows.push({ line: x.line, depth: headed ? depth + 1 : depth });
+    }
+  };
+  for (const g of roots) emit(g, 1);
+  return { headed, rows };
+}
+
+/**
+ * The rows the table prints, through `headingWalk`. Each header keeps its
+ * own subtotal. An account at RM 0.00 is left out, as the Trial Balance
+ * does, and so is a header with nothing but RM 0.00 under it. A section where
+ * every account is at RM 0.00 keeps its band and gets one line saying so
+ * (`No income in this period.`). So even when every section is at zero, the
+ * bands stay, and so does the bottom strip under them.
  */
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
   for (const s of sections) {
-    const codes = new Set(s.groups.map((g) => g.code));
-    const children = new Map<string | null, StatementGroup[]>();
-    for (const g of s.groups) {
-      const parent = g.parentCode !== null && codes.has(g.parentCode) ? g.parentCode : null;
-      children.set(parent, [...(children.get(parent) ?? []), g]);
-    }
-    const shown = (g: StatementGroup): boolean =>
-      g.lines.some((l) => !isZeroMoney(l.amount)) || (children.get(g.code) ?? []).some(shown);
-    const roots = (children.get(null) ?? []).filter(shown);
-    // A header line only earns its place when there is more than one header,
-    // or when a header holds headers.
-    const headed = roots.length > 1 || s.groups.some((g) => g.parentCode !== null && codes.has(g.parentCode) && shown(g));
     const before = out.length;
-    const emit = (g: StatementGroup, depth: number) => {
-      if (headed) {
-        out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal, depth });
+    const { headed, rows } = headingWalk(
+      s.groups.map((g) => ({ ...g, lines: g.lines.filter((l) => !isZeroMoney(l.amount)) })),
+    );
+    for (const r of rows) {
+      if ("group" in r) {
+        const g = r.group;
+        out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal, depth: r.depth });
+        continue;
       }
-      // Accounts and sub-headers in the database's row order. A sub-header's
-      // row is its subtotal, served right after everything under it, so it
-      // sorts against the accounts beside it the way the chart does.
-      const under: ({ line: StatementLine } | { sub: StatementGroup })[] = [
-        ...g.lines.filter((x) => !isZeroMoney(x.amount)).map((line) => ({ line })),
-        ...(children.get(g.code) ?? []).filter(shown).map((sub) => ({ sub })),
-      ];
-      const at = (x: (typeof under)[number]) => ("sub" in x ? x.sub.ordinal : x.line.ordinal);
-      for (const x of under.sort((a, b) => at(a) - at(b))) {
-        if ("sub" in x) { emit(x.sub, depth + 1); continue; }
-        const l = x.line;
-        out.push({
-          id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
-          amount: l.amount, nested: headed, depth: headed ? depth + 1 : depth,
-          reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
-        });
-      }
-    };
-    for (const g of roots) emit(g, 1);
+      const l = r.line;
+      out.push({
+        id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
+        amount: l.amount, nested: headed, depth: r.depth,
+        reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
+      });
+    }
     if (s.unclosedResult !== null && !isZeroMoney(s.unclosedResult)) {
       out.push({ id: `${s.kind}:unclosed`, section: s.kind, kind: "unclosed", amount: s.unclosedResult });
     }
@@ -126,7 +160,7 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
 
 /** Left padding by depth: a header at depth 1 sits flush, each level in one step. */
 const INDENT = ["", "", "pl-4", "pl-8", "pl-12"] as const;
-const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
+export const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
 
 export default function StatementTable({
   label,

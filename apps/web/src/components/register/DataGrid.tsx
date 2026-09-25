@@ -211,6 +211,13 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Told the column sort whenever it changes, and once on load with the
+      saved one; null when nothing is sorted. The Trial Balance prints its
+      headings only while nothing is sorted. Pass a stable function. */
+  onSortChange?: (sort: { key: string; dir: "asc" | "desc" } | null) => void;
+  /** Which rows a group heading's count counts. Absent = every row. The Trial
+      Balance counts its accounts, never its heading rows. */
+  countsInGroup?: (row: T) => boolean;
   /** Governed groups reuse the same group rows without creating a fake data column. */
   fixedGroups?: {
     /** `emptyLabel` — an always-open group with no rows says so beside its
@@ -660,6 +667,8 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  onSortChange,
+  countsInGroup,
   fixedGroups,
   rowKey,
   rowDrag,
@@ -1383,6 +1392,10 @@ function DataGridInner<T>({
     return [...filteredRows].sort((a, b) => cmp(a, b) * dir);
   }, [filteredRows, columns, layout.sort, colValue]);
 
+  useEffect(() => {
+    onSortChange?.(layout.sort);
+  }, [layout.sort, onSortChange]);
+
   // Selection callback when row changes.
   useEffect(() => {
     if (!onSelectionChange) return;
@@ -1428,6 +1441,7 @@ function DataGridInner<T>({
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
+    const countOf = (members: T[]) => (countsInGroup ? members.filter(countsInGroup).length : members.length);
     if (fixedGroups) {
       return fixedGroups.groups.flatMap((group): Render[] => {
         const members = sortedRows.filter((row) => fixedGroups.groupOf(row) === group.key);
@@ -1435,7 +1449,7 @@ function DataGridInner<T>({
            records, so "nothing to buy" is stated rather than implied. */
         if (members.length === 0 && !(group.alwaysOpen && sortedRows.length > 0)) return [];
         const collapsed = !group.alwaysOpen && collapsedGroups.has(group.key);
-        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen, emptyLabel: group.emptyLabel },
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: countOf(members), collapsed, alwaysOpen: group.alwaysOpen, emptyLabel: group.emptyLabel },
           ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
       });
     }
@@ -1474,7 +1488,7 @@ function DataGridInner<T>({
     const walk = (node: Node, level: number, parentPath: string) => {
       for (const child of node.children.values()) {
         const path = parentPath ? `${parentPath}${child.value}` : child.value;
-        const totalRows = collectRows(child).length;
+        const totalRows = countOf(collectRows(child));
         const collapsed = collapsedGroups.has(path);
         out.push({
           kind: "group",
@@ -1492,7 +1506,7 @@ function DataGridInner<T>({
     };
     walk(root, 0, "");
     return out;
-  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups]);
+  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups, countsInGroup]);
 
   /**
    * ⭐ GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18. This supersedes the
