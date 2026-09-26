@@ -3425,7 +3425,6 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | The cover filter (owner review 2026-09-25 item 16; shortened 2026-09-25 so the toolbar stays one row at 941px) | **Covering** | Covered (alone) · Covering for others |
 | The page filter (owner review 2026-09-25 item 17) | rail section **Page** · **All pages** | Module · All modules |
 | The Work rail (Payment Monitor grammar, Jess 2026-09-26) | header `‹ {Mon} – {Fri} ›` · a day card reads `{n} actions to do` or **`No work`** · `Public holiday · {name}` · `Today` ring · fixed rows `Missed {n}` · `No working date {n}` (`0` printed) · `Page` group `All pages` · `Owner` select `All owners` · `Hide filters` / `Show filters` | a hidden `0` · a blue badge alone as "today" · toolbar selects |
-| The header search (owner review 2026-09-25 item 12) | **Search** | Jump to… · a printed ⌘K |
 
 > **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
 > OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a
