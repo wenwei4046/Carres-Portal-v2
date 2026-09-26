@@ -2,28 +2,26 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyRailSelection,
-  ATTENTION_REASONS,
-  availabilityLabel,
   categoryKeyOf,
-  changedWithin,
-  CHANGED_SCOPES,
-  hasAttention,
+  displayUnitId,
+  INVENTORY_STATUS_RAIL,
+  inventoryStatusOf,
   isCurrentUnit,
+  isHeldUnit,
   isRailFiltered,
   NO_CATALOG_KEY,
   NO_CATALOG_LABEL,
   registerSummaryLine,
+  stillToArriveLine,
+  stockConditionOf,
   summariseRegister,
-  UNIT_AVAILABILITY,
+  UNIT_LIFECYCLE_OUTCOME_LABEL,
   UNIT_OWNERSHIP_LABEL,
-  type AttentionReason,
-  type ChangedScope,
+  unitIdOf,
+  type InventoryStatus,
   type StockRailSelection,
   type StockRegisterUnit,
-  type UnitAvailability,
-  displayUnitId,
-  unitIdOf,
-  READY_STOCK_CONDITION_WORDS,
+  type UnitLifecycleOutcome,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
@@ -33,24 +31,49 @@ import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspa
 import Button from "@/components/kit/Button";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 
-/** Inventory is the current Unit Register. Its 240px rail narrows the same
- * authority; source facts are read-only. Sales Order alone owns reservation. */
+/**
+ * INVENTORY — the one current Unit Register.
+ * Stock MASTER §7 (owner rulings 2026-09-25) · UI MASTER §6.0.
+ *
+ * ── THE DEFAULT LIST IS WHAT CARRES PHYSICALLY HOLDS ────────────────────────
+ * `All stock` opens on Available · Reserved · Cannot sell (and a Unit on the
+ * road, which keeps its word). `Incoming` — born with the PO, not received —
+ * is its own rail row, and the footer says how many are still to arrive.
+ * Measured on production 2026-09-25: `All stock 222` while 127 rows were
+ * Incoming and 95 stood in a Site; a new operator read 222 as goods on the
+ * floor.
+ *
+ * ── ONE ROW IS ONE UNIT, ONE CELL IS ONE FACT ───────────────────────────────
+ * Eleven single-line columns in the owner's own order; no row expansion, no
+ * composite cell. Every head is a dictionary word. `Who has it`, `Site`,
+ * `Where`, `Stock use`, `Not available`, `In transit` and `With NETS Delivery`
+ * are retired screen words: the road shows in `Ship Date · Pickup By ·
+ * Delivery Location`, and `Stock Location` is always the Carres or transit
+ * Site the Unit stands in or last stood in — never a company.
+ */
 const STOCK_VIEWS = [
-  ["all", "All stock"], ["reserved", "Reserved for Sales Orders"],
-  ["ready", "Ready Stock"], ["display", "Showroom Display"],
-  ["service", "Service Case"], ["checking", "Needs checking"],
+  ["all", "All stock"],
+  ["reserved", "Reserved"],
+  ["ready", "Ready Stock"],
+  ["display", "Showroom Display"],
+  ["service", "Service Case"],
 ] as const;
-type InventoryView = typeof STOCK_VIEWS[number][0] | "history";
+type InventoryView = (typeof STOCK_VIEWS)[number][0] | "history";
+
 function matchesView(u: StockRegisterUnit, view: InventoryView) {
   if (view === "history") return !isCurrentUnit(u);
-  if (!isCurrentUnit(u)) return false;
+  if (!isHeldUnit(u)) return false;
   switch (view) {
-    case "reserved": return u.availability === "reserved";
-    case "ready": return u.availability === "available" && u.qty === 1;
-    case "display": return u.condition === "exhibition" || u.purchasePurpose === "showroom_display";
-    case "service": return u.purchasePurpose === "service_case";
-    case "checking": return ATTENTION_REASONS.some((r) => hasAttention(u, r));
-    default: return true;
+    case "reserved":
+      return u.availability === "reserved";
+    case "ready":
+      return u.availability === "available" && u.identityScope !== "quantity" && u.qty === 1;
+    case "display":
+      return u.siteName === "PJ Showroom" || u.condition === "exhibition" || u.purchasePurpose === "showroom_display";
+    case "service":
+      return u.purchasePurpose === "service_case";
+    default:
+      return true;
   }
 }
 
@@ -64,16 +87,29 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 const CATEGORY_ORDER = ["mattress", "bedframe", "sofa", "accessory", "service", "guarantee"];
 
-/** Availability decides the dot's colour. The ARITHMETIC is 0366's; this only
- *  paints the answer it was handed. */
-const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
-  available: "bg-kit-green-11",
-  reserved: "bg-kit-blue-9",
-  incoming: "bg-kit-slate-9",
-  in_transit: "bg-kit-amber-11",
-  not_available: "bg-kit-red-9",
-  ended: "bg-kit-slate-5",
-};
+/** Owner ruling 2026-09-25: a fact that has not happened yet (no ship, no
+ *  pickup, nowhere to go) stays BLANK — it is not an absence word and not the
+ *  engine's dash, which is reserved for a counted row's Unit ID. */
+function Blank() {
+  return <span aria-hidden="true" />;
+}
+
+/** A Sales Order number is a door only when the Sales Order exists in this
+ *  portal; an opening-stock row carries the old order's reference as text. */
+function SoCell({ u }: { u: StockRegisterUnit }) {
+  const navigate = useNavigate();
+  if (!u.reservedRef) return <span className="text-kit-slate-11">No SO</span>;
+  if (!u.soldOrderId) return <span className="font-mono">{u.reservedRef}</span>;
+  return (
+    <button
+      type="button"
+      className="font-mono text-kit-blue-11 hover:underline"
+      onClick={() => navigate(`/operation/orders/${encodeURIComponent(u.soldOrderId!)}`)}
+    >
+      {u.reservedRef}
+    </button>
+  );
+}
 
 export default function WarehouseStockRegister() {
   const navigate = useNavigate();
@@ -88,33 +124,47 @@ export default function WarehouseStockRegister() {
   const { data, isLoading, isError, error, refetch } = useStockRegister();
   const [railOpen, setRailOpen] = useState(true);
   const requestedView = params.get("view");
-  const view: InventoryView = params.get("history") === "1" || requestedView === "history" ? "history"
-    : STOCK_VIEWS.some(([key]) => key === requestedView) ? requestedView as InventoryView : "all";
-  const holder = params.get("holder");
+  const view: InventoryView =
+    params.get("history") === "1" || requestedView === "history"
+      ? "history"
+      : STOCK_VIEWS.some(([key]) => key === requestedView)
+        ? (requestedView as InventoryView)
+        : "all";
+  const requestedStatus = params.get("status");
+  const status: InventoryStatus | null = INVENTORY_STATUS_RAIL.includes(requestedStatus as InventoryStatus)
+    ? (requestedStatus as InventoryStatus)
+    : null;
   const sourceReady = !!data && !isLoading && !isError;
+
   function setView(next: InventoryView) {
     const updated = new URLSearchParams(params);
     updated.set("tab", "stock-onhand");
     updated.delete("history");
-    if (next === "all") updated.delete("view"); else updated.set("view", next);
+    updated.delete("status");
+    if (next === "all") updated.delete("view");
+    else updated.set("view", next);
     setParams(updated, { replace: true });
   }
-  function setHolder(next: string) {
+  function setStatus(next: InventoryStatus) {
     const updated = new URLSearchParams(params);
-    if (holder === next) updated.delete("holder"); else updated.set("holder", next);
+    updated.set("tab", "stock-onhand");
+    updated.delete("view");
+    updated.delete("history");
+    if (status === next) updated.delete("status");
+    else updated.set("status", next);
     setParams(updated, { replace: true });
   }
 
   /** The rail lives in the URL so a narrowed view can be sent to a colleague
-   *  and comes back the same (Card §6 — deep-link behaviour). */
+   *  and comes back the same. */
   const sel: StockRailSelection = useMemo(
     () => ({
-      attention: (params.get("attention") as AttentionReason | null) ?? null,
-      availability: (params.get("availability") as UnitAvailability | null) ?? null,
+      attention: null,
+      availability: null,
       site: params.get("site"),
       ownership: params.get("ownership"),
       category: params.get("category"),
-      changed: (params.get("changed") as ChangedScope | null) ?? null,
+      changed: null,
       query: "",
       showEnded: view === "history",
     }),
@@ -126,12 +176,10 @@ export default function WarehouseStockRegister() {
   const now = useMemo(() => new Date(), []);
   const allUnits = useMemo(() => data?.units ?? [], [data]);
 
-  function setRail(key: keyof StockRailSelection, value: string | null) {
+  function setRail(key: "ownership" | "category" | "site", value: string | null) {
     const next = new URLSearchParams(params);
-    const urlKey = key === "showEnded" ? "history" : key;
-    // One selection applies WITHIN a section: picking the active chip clears it.
-    if (value === null || next.get(urlKey) === value) next.delete(urlKey);
-    else next.set(urlKey, value);
+    if (value === null || next.get(key) === value) next.delete(key);
+    else next.set(key, value);
     setParams(next, { replace: true });
   }
 
@@ -141,52 +189,39 @@ export default function WarehouseStockRegister() {
     setGridRevision((revision) => revision + 1);
   }
 
-  /** Facet counts describe the whole current Register before narrowing it. */
-  const currentUnits = useMemo(
-    () => allUnits.filter((u) => (sel.showEnded ? true : isCurrentUnit(u))),
-    [allUnits, sel.showEnded],
+  /** Facet counts describe the goods Carres holds before any narrowing. */
+  const heldUnits = useMemo(() => allUnits.filter(isHeldUnit), [allUnits]);
+  const incomingCount = useMemo(
+    () => allUnits.filter((u) => u.availability === "incoming").length,
+    [allUnits],
   );
 
   const counts = useMemo(() => {
-    const availability = new Map<string, number>();
-    const attention = new Map<string, number>();
-    const site = new Map<string, { name: string; n: number }>();
     const ownership = new Map<string, number>();
     const category = new Map<string, number>();
-    const changed = new Map<string, number>();
-
-    for (const u of currentUnits) {
-      availability.set(u.availability, (availability.get(u.availability) ?? 0) + 1);
-      for (const r of ATTENTION_REASONS) {
-        if (hasAttention(u, r)) attention.set(r, (attention.get(r) ?? 0) + 1);
-      }
-      if (u.warehouseId) {
-        const prev = site.get(u.warehouseId);
-        site.set(u.warehouseId, { name: u.siteName ?? "Unnamed site", n: (prev?.n ?? 0) + 1 });
-      }
+    const byStatus = new Map<InventoryStatus, number>();
+    for (const u of heldUnits) {
       ownership.set(u.ownership, (ownership.get(u.ownership) ?? 0) + 1);
       const ck = categoryKeyOf(u);
       category.set(ck, (category.get(ck) ?? 0) + 1);
-      for (const scope of CHANGED_SCOPES) {
-        if (changedWithin(u, scope, now)) changed.set(scope, (changed.get(scope) ?? 0) + 1);
-      }
+      const word = inventoryStatusOf(u);
+      if (word) byStatus.set(word, (byStatus.get(word) ?? 0) + 1);
     }
-    return { availability, attention, site, ownership, category, changed };
-  }, [currentUnits, now]);
+    byStatus.set("Incoming", incomingCount);
+    return { ownership, category, byStatus };
+  }, [heldUnits, incomingCount]);
 
-  const holderRows = useMemo(() => allUnits.filter((u) => !holder ||
-    (holder === "not-recorded" ? !u.holderPartyId : u.holderPartyId === holder)), [allUnits, holder]);
-  const rows = useMemo(() => applyRailSelection(
-    view === "all" ? holderRows : holderRows.filter((u) => matchesView(u, view)),
-    { ...sel, query: search }, now,
-  ), [holderRows, view, sel, search, now]);
-  const holders = useMemo(() => {
-    const result = new Map<string, string>();
-    for (const u of allUnits.filter(isCurrentUnit)) {
-      result.set(u.holderPartyId ?? "not-recorded", u.holderName ?? "Not recorded");
-    }
-    return [...result].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [allUnits]);
+  const scopedRows = useMemo(() => {
+    if (view === "history") return allUnits.filter((u) => !isCurrentUnit(u));
+    if (status === "Incoming") return allUnits.filter((u) => u.availability === "incoming");
+    const held = view === "all" ? heldUnits : heldUnits.filter((u) => matchesView(u, view));
+    return status ? held.filter((u) => inventoryStatusOf(u) === status) : held;
+  }, [allUnits, heldUnits, view, status]);
+
+  const rows = useMemo(
+    () => applyRailSelection(scopedRows, { ...sel, query: search }, now),
+    [scopedRows, sel, search, now],
+  );
 
   const categoryKeys = useMemo(() => {
     const present = [...counts.category.keys()].filter((k) => k !== NO_CATALOG_KEY);
@@ -196,105 +231,181 @@ export default function WarehouseStockRegister() {
     ];
   }, [counts.category]);
 
+  const dateColumn = (
+    key: "goodsReceivedDate" | "shipDate" | "soDate" | "poDate" | "expectedArrival" | "lastVerifiedAt" | "lastEventAt",
+    label: string,
+    options: { absent?: string; defaultHidden?: boolean; chooserGroup: string; width?: number; headerLines?: readonly [string, string] },
+  ): DataGridColumn<StockRegisterUnit> => ({
+    key,
+    label,
+    headerLines: options.headerLines,
+    width: options.width ?? 104,
+    sortable: true,
+    filterType: "date",
+    defaultHidden: options.defaultHidden,
+    chooserGroup: options.chooserGroup,
+    dateValue: (u) => u[key] ?? null,
+    exportValue: (u) => u[key] ?? "",
+    accessor: (u) =>
+      u[key] ? (
+        <span className="text-body text-base-900">{fmtDate(u[key]!)}</span>
+      ) : options.absent ? (
+        <span className="text-body text-kit-slate-11">{options.absent}</span>
+      ) : (
+        <Blank />
+      ),
+  });
+
   const columns: DataGridColumn<StockRegisterUnit>[] = useMemo(
     () => [
+      // A governed header sets the column's minimum width; the two-line
+      // presentation keeps the label and recovers the width a one-line
+      // `Goods Received Date` would spend (Receiving does the same).
+      dateColumn("goodsReceivedDate", "Goods Received Date", { absent: "Not received", chooserGroup: "Dates", width: 112, headerLines: ["Goods Received", "Date"] }),
+      dateColumn("shipDate", "Ship Date", { chooserGroup: "Dates" }),
+      {
+        key: "so",
+        label: "SO No",
+        width: 130,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (u) => u.reservedRef ?? "",
+        exportValue: (u) => u.reservedRef ?? "No SO",
+        accessor: (u) => <SoCell u={u} />,
+      },
+      {
+        key: "inventoryStatus",
+        label: "Inventory Status",
+        headerLines: ["Inventory", "Status"],
+        width: 108,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Unit",
+        filterValue: (u) => inventoryStatusOf(u) ?? UNIT_LIFECYCLE_OUTCOME_LABEL[u.lifecycleOutcome as UnitLifecycleOutcome] ?? u.lifecycleOutcome,
+        exportValue: (u) => inventoryStatusOf(u) ?? UNIT_LIFECYCLE_OUTCOME_LABEL[u.lifecycleOutcome as UnitLifecycleOutcome] ?? u.lifecycleOutcome,
+        accessor: (u) => {
+          const word = inventoryStatusOf(u);
+          return (
+            <span className="text-body text-base-900">
+              {word ?? UNIT_LIFECYCLE_OUTCOME_LABEL[u.lifecycleOutcome as UnitLifecycleOutcome] ?? u.lifecycleOutcome}
+            </span>
+          );
+        },
+      },
+      {
+        key: "stockCondition",
+        label: "Stock Condition",
+        headerLines: ["Stock", "Condition"],
+        // `Waiting inspection` is the longest governed word; it is never cut.
+        width: 140,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Unit",
+        filterValue: (u) => stockConditionOf(u),
+        exportValue: (u) => stockConditionOf(u),
+        accessor: (u) => <span className="text-body text-base-900">{stockConditionOf(u)}</span>,
+      },
+      {
+        key: "poNo",
+        label: "PO No / Ref No",
+        headerLines: ["PO No /", "Ref No"],
+        width: 130,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (u) => u.poNo ?? "",
+        exportValue: (u) => u.poNo ?? "Not recorded",
+        accessor: (u) =>
+          u.poNo ? (
+            <button
+              type="button"
+              className="font-mono text-kit-blue-11 hover:underline"
+              onClick={() => navigate(`/operation/procurement?po=${encodeURIComponent(u.poNo!)}`)}
+            >
+              {u.poNo}
+            </button>
+          ) : (
+            <span className="text-body text-kit-slate-11">Not recorded</span>
+          ),
+      },
       {
         key: "unitCode",
         label: "Unit ID",
-        width: 130,
-        wrap: true,
+        width: 118,
         sortable: true,
+        chooserGroup: "Unit",
         // Display, search and EXPORT all read the one resolver. Counted goods
         // have no identity, so the column prints `—` rather than the technical
         // key that keys their row (0453).
         searchValue: (u) => unitIdOf(u) ?? "",
         exportValue: (u) => displayUnitId(u),
-        chooserGroup: "Unit",
-        accessor: (u) => (
-          unitIdOf(u) ? <Link className="font-mono text-meta text-kit-blue-11 hover:underline" to={unitHref(unitIdOf(u)!)}>{displayUnitId(u)}</Link> : <span className="font-mono text-meta text-base-900">—</span>
-        ),
+        accessor: (u) =>
+          unitIdOf(u) ? (
+            <Link className="font-mono font-medium text-kit-blue-11 hover:underline" to={unitHref(unitIdOf(u)!)}>
+              {displayUnitId(u)}
+            </Link>
+          ) : (
+            <span className="font-mono text-base-900">—</span>
+          ),
       },
       {
-        key: "sku",
-        label: "Product",
-        width: 195,
-        wrap: true,
+        key: "item",
+        label: "Item",
+        width: 210,
         sortable: true,
+        chooserGroup: "Unit",
+        overflowText: (u) => `${u.productName ?? u.sku} · ${u.sku}${u.qty > 1 ? ` ×${u.qty}` : ""}`,
         searchValue: (u) => `${u.productName ?? ""} ${u.sku}`,
-        exportValue: (u) => [u.productName, u.sku, `Qty ${u.qty}`].filter(Boolean).join(" · "),
-        chooserGroup: "Unit",
+        exportValue: (u) => `${u.productName ?? u.sku} · ${u.sku}${u.qty > 1 ? ` ×${u.qty}` : ""}`,
         accessor: (u) => (
-          <div className="min-w-0 whitespace-normal break-words">
-            <div className="whitespace-normal break-words text-body text-base-900" title={u.productName ?? u.sku}>
-              {u.productName ?? u.sku}
-            </div>
-            <div className="whitespace-normal break-words text-meta text-base-500">{u.sku} · {u.category ?? "Not in catalog"}</div>
-            <div className="text-meta text-base-700">Qty {u.qty}</div>
-            {/* An inline second line is the ONE exception to a single-line row
-                (Constitution §2) — and it earns it: a bulk record is not one
-                Unit, and the operator must see that before promising it. */}
-            {u.qty > 1 ? (
-              <div className="text-meta text-kit-amber-11">
-                {u.qty} pieces in one record — cannot be promised individually
-              </div>
-            ) : null}
-          </div>
-        ),
-      },
-      {
-        key: "availability",
-        label: "Stock use",
-        defaultHidden: true,
-        width: 150,
-        sortable: true,
-        filterType: "enum",
-        filterValue: (u) => availabilityLabel(u.availability),
-        exportValue: (u) => availabilityLabel(u.availability),
-        chooserGroup: "Unit",
-        accessor: (u) => (
-          <span className="inline-flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${AVAILABILITY_DOT[u.availability]}`} />
-            <span className="text-meta text-base-800">{availabilityLabel(u.availability)}</span>
+          <span className="text-body text-base-900" title={`${u.productName ?? u.sku} · ${u.sku}`}>
+            {u.productName ?? u.sku}
+            <span className="text-base-600"> · {u.sku}</span>
+            {u.qty > 1 ? <span className="text-base-900"> ×{u.qty}</span> : null}
           </span>
         ),
       },
       {
-        key: "site",
-        label: "Site / stock use",
-        width: 160,
-        wrap: true,
+        key: "pickupBy",
+        label: "Pickup By",
+        width: 110,
         sortable: true,
         filterType: "enum",
-        filterValue: (u) => u.siteName ?? "Not recorded",
-        exportValue: (u) => u.siteName ?? "",
-        chooserGroup: "Place",
-        accessor: (u) => (
-          <div className="space-y-1 whitespace-normal break-words text-meta text-base-800">
-            <div>{u.siteName ?? "Site not recorded"}</div>
-            <div>Who has it · {u.holderName ?? "Not recorded"}</div>
-            <div>{availabilityLabel(u.availability)} · {READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition}</div>
-            {attentionSentence(u) && <div className="text-kit-amber-11">{attentionSentence(u)}</div>}
-          </div>
-        ),
+        chooserGroup: "Movement",
+        filterValue: (u) => u.pickupBy ?? "",
+        exportValue: (u) => u.pickupBy ?? "",
+        accessor: (u) => (u.pickupBy ? <span className="text-body text-base-900">{u.pickupBy}</span> : <Blank />),
       },
       {
-        key: "holder",
-        label: "Who has it",
-        defaultHidden: true,
-        width: 150,
+        key: "site",
+        label: "Stock Location",
+        headerLines: ["Stock", "Location"],
+        width: 130,
         sortable: true,
         filterType: "enum",
-        filterValue: (u) => u.holderName ?? "Not recorded",
-        exportValue: (u) => u.holderName ?? "",
-        chooserGroup: "Place",
+        chooserGroup: "Movement",
+        filterValue: (u) => u.siteName ?? "Not recorded",
+        exportValue: (u) => u.siteName ?? "Not recorded",
         accessor: (u) =>
-          u.holderName ? (
-            <span className="whitespace-normal break-words text-meta text-base-800">{u.holderName}</span>
+          u.siteName ? (
+            <span className="text-body text-base-900">{u.siteName}</span>
           ) : (
-            /* An absent holder stays absent instead of inventing an owner. */
-            <span className="text-meta text-kit-slate-11">Not recorded</span>
+            <span className="text-body text-kit-slate-11">Not recorded</span>
           ),
       },
+      {
+        key: "deliveryLocation",
+        label: "Delivery Location",
+        headerLines: ["Delivery", "Location"],
+        width: 200,
+        sortable: true,
+        chooserGroup: "Movement",
+        overflowText: (u) => u.deliveryLocation ?? "",
+        searchValue: (u) => u.deliveryLocation ?? "",
+        exportValue: (u) => u.deliveryLocation ?? "",
+        accessor: (u) =>
+          u.deliveryLocation ? <span className="text-body text-base-900">{u.deliveryLocation}</span> : <Blank />,
+      },
+      // ── One click away in Columns ──────────────────────────────────────
       {
         key: "ownership",
         label: "Ownership",
@@ -302,237 +413,231 @@ export default function WarehouseStockRegister() {
         sortable: true,
         defaultHidden: true,
         filterType: "enum",
+        chooserGroup: "Unit",
         filterValue: (u) => UNIT_OWNERSHIP_LABEL[u.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? u.ownership,
         exportValue: (u) => UNIT_OWNERSHIP_LABEL[u.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? u.ownership,
-        chooserGroup: "Unit",
         accessor: (u) => (
-          <span className="text-meta text-base-800">
+          <span className="text-body text-base-900">
             {UNIT_OWNERSHIP_LABEL[u.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? u.ownership}
           </span>
         ),
       },
       {
-        key: "condition",
-        label: "Condition",
-        defaultHidden: true,
-        width: 130,
+        key: "category",
+        label: "Category",
+        width: 120,
         sortable: true,
+        defaultHidden: true,
         filterType: "enum",
-        filterValue: (u) => READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
-        exportValue: (u) => READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
         chooserGroup: "Unit",
+        filterValue: (u) => CATEGORY_LABEL[u.category ?? ""] ?? (u.category ?? NO_CATALOG_LABEL),
+        exportValue: (u) => CATEGORY_LABEL[u.category ?? ""] ?? (u.category ?? NO_CATALOG_LABEL),
         accessor: (u) => (
-          <span className="text-meta text-base-800">{READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition}</span>
+          <span className="text-body text-base-900">{CATEGORY_LABEL[u.category ?? ""] ?? (u.category ?? NO_CATALOG_LABEL)}</span>
         ),
       },
-      {
-        key: "attention",
-        label: "Needs checking",
-        defaultHidden: true,
-        minWidth: 190,
-        chooserGroup: "Unit",
-        exportValue: (u) => attentionSentence(u) ?? "",
-        /* Card §2: ONE current attention item, and only when action is genuinely
-           open. It does not repeat the Unit ID or the product — those are the
-           row's own metadata, and saying them twice is what the card forbids. */
-        accessor: (u) => {
-          const line = attentionSentence(u);
-          return line ? (
-            <span className="whitespace-normal break-words text-meta text-kit-amber-11" title={line}>
-              {line}
-            </span>
-          ) : (
-            <span className="text-meta text-base-300">Not recorded</span>
-          );
-        },
-      },
-      {
-        key: "source",
-        label: "Orders / dates",
-        width: 230,
-        wrap: true,
-        sortable: true,
-        searchValue: (u) => u.poNo ?? "",
-        exportValue: (u) => u.poNo ?? "",
-        chooserGroup: "Source",
-        accessor: (u) => <div className="space-y-1 whitespace-normal break-words text-meta">
-          <div>{u.poNo ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/procurement?po=${encodeURIComponent(u.poNo!)}`)}>{u.poNo}</button> : "No purchase order"}</div>
-          <div>PO issued · {u.poDate ? fmtDate(u.poDate) : "Not recorded"}</div>
-          <div>{u.soldOrderId && u.reservedRef ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/orders/${encodeURIComponent(u.soldOrderId!)}`)}>{u.reservedRef}</button> : u.reservedRef ?? "No Sales Order"}</div>
-          <div>SO issued · {u.soDate ? fmtDate(u.soDate) : "Not recorded"}</div>
-          <div>Expected arrival · {u.expectedArrival ? fmtDate(u.expectedArrival) : "Not recorded"}</div>
-          <div>Last verified · {u.lastVerifiedAt ? fmtDate(u.lastVerifiedAt) : "Not recorded"}</div>
-        </div>,
-      },
-      {
-        key: "so", defaultHidden: true, label: "SO No", width: 150, sortable: true, chooserGroup: "Source",
-        searchValue: (u) => u.reservedRef ?? "", exportValue: (u) => u.reservedRef ?? "",
-        accessor: (u) => u.soldOrderId && u.reservedRef
-          ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/orders/${encodeURIComponent(u.soldOrderId!)}`)}>{u.reservedRef}</button>
-          : <span>{u.reservedRef ?? "Not recorded"}</span>,
-      },
-      ...([ ["soDate", "SO date"], ["poDate", "PO date"], ["expectedArrival", "Expected arrival"], ["lastVerifiedAt", "Last verified"] ] as const).map(([key, label]): DataGridColumn<StockRegisterUnit> => ({
-        key, label, defaultHidden: true, width: 150, sortable: true, filterType: "date", chooserGroup: "Dates",
-        dateValue: (u) => u[key] ?? null, exportValue: (u) => u[key] ?? "",
-        accessor: (u) => u[key] ? fmtDate(u[key]!) : "Not recorded",
-      })),
       {
         key: "supplier",
         label: "Supplier",
         width: 150,
         sortable: true,
         defaultHidden: true,
+        chooserGroup: "Documents",
         searchValue: (u) => u.supplier ?? "",
         exportValue: (u) => u.supplier ?? "",
-        chooserGroup: "Source",
-        accessor: (u) => (
-          <span className="whitespace-normal break-words text-meta text-base-700">{u.supplier ?? "Not recorded"}</span>
-        ),
-      },
-      {
-        key: "lastEventAt",
-        label: "Last moved",
-        width: 150,
-        sortable: true,
-        defaultHidden: true,
-        filterType: "date",
-        dateValue: (u) => u.lastEventAt,
-        exportValue: (u) => u.lastEventAt ?? "",
-        chooserGroup: "Dates",
         accessor: (u) =>
-          u.lastEventAt ? (
-            <span className="text-meta text-base-700">{fmtDate(u.lastEventAt)}</span>
+          u.supplier ? (
+            <span className="text-body text-base-900">{u.supplier}</span>
           ) : (
-            <span className="text-meta text-kit-slate-11">Not moved yet</span>
+            <span className="text-body text-kit-slate-11">Not recorded</span>
           ),
       },
+      dateColumn("soDate", "SO Date", { defaultHidden: true, chooserGroup: "Dates" }),
+      dateColumn("poDate", "PO Doc Date", { defaultHidden: true, chooserGroup: "Dates" }),
+      dateColumn("expectedArrival", "Expected arrival", { defaultHidden: true, chooserGroup: "Dates" }),
+      dateColumn("lastVerifiedAt", "Last verified", { defaultHidden: true, chooserGroup: "Dates" }),
+      dateColumn("lastEventAt", "Last moved", { defaultHidden: true, chooserGroup: "Dates", absent: "Not moved yet" }),
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [navigate, params],
   );
 
-  const filtered = isRailFiltered({ ...sel, query: search }) || !!holder || view !== "all";
+  const filtered = isRailFiltered({ ...sel, query: search }) || !!status || view !== "all";
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      {selectedUnit && <WarehouseUnitDetail unitCode={selectedUnit} onBack={() => {
-        const next = new URLSearchParams(params);
-        next.delete("unit");
-        setParams(next);
-      }} />}
+      {selectedUnit && (
+        <WarehouseUnitDetail
+          unitCode={selectedUnit}
+          onBack={() => {
+            const next = new URLSearchParams(params);
+            next.delete("unit");
+            setParams(next);
+          }}
+        />
+      )}
       {/* Keep the grid mounted: its search, column filters and viewport belong
           to this visit, including browser Back from the selected Unit. */}
       <div hidden={!!selectedUnit} className={selectedUnit ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
-      {!selectedUnit && <ModuleHeader
-        testId="stock-register-destination-header"
-        word="Inventory"
-        docTitle="Inventory · Warehouse — Carres"
-        right={<Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">Request Transfer</Link>}
-        destinationHeader
-      />}
-      <div className="flex min-h-0 flex-1" data-testid="stock-register">
-        {railOpen ? <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
-          <FilterRailGroup title="Stock" icon="order">
-            {STOCK_VIEWS.map(([key, label]) => <FilterRailRow key={key} testId={key === "all" ? "rail-all-stock" : `rail-${key}`}
-              label={label} active={view === key} resets={key === "all"} count={sourceReady ? allUnits.filter((u) => matchesView(u, key)).length : undefined}
-              onClick={() => key === "all" ? clearAll() : setView(key)} />)}
-          </FilterRailGroup>
-          {sourceReady ? <>
-            <FilterRailGroup title="Who has it" icon="people">{holders.map(([id, label]) => <FilterRailRow key={id} testId={`rail-holder-${id}`}
-              label={label} active={holder === id} count={allUnits.filter((u) => isCurrentUnit(u) && (u.holderPartyId ?? "not-recorded") === id).length}
-              onClick={() => setHolder(id)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Ownership" icon="customer">{[...counts.ownership].map(([id, count]) => <FilterRailRow key={id} testId={`rail-ownership-${id}`}
-              label={UNIT_OWNERSHIP_LABEL[id as keyof typeof UNIT_OWNERSHIP_LABEL] ?? id} count={count} active={sel.ownership === id}
-              onClick={() => setRail("ownership", id)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Site" icon="warehouse">{[...counts.site].map(([id, item]) => <FilterRailRow key={id} testId={`rail-site-${id}`}
-              label={item.name} count={item.n} active={sel.site === id} onClick={() => setRail("site", id)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Stock use" icon="ready">{UNIT_AVAILABILITY.filter((a) => a !== "ended").map((a) => <FilterRailRow key={a} testId={`rail-availability-${a}`}
-              label={availabilityLabel(a)} count={counts.availability.get(a) ?? 0} active={sel.availability === a} onClick={() => setRail("availability", a)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Category" icon="goods">{categoryKeys.map((key) => <FilterRailRow key={key} testId={`rail-category-${key}`}
-              label={CATEGORY_LABEL[key] ?? key} count={counts.category.get(key) ?? 0} active={sel.category === key} onClick={() => setRail("category", key)} />)}
-              {(counts.category.get(NO_CATALOG_KEY) ?? 0) > 0 ? <FilterRailRow testId="rail-no-catalog" label={NO_CATALOG_LABEL}
-                count={counts.category.get(NO_CATALOG_KEY)} active={sel.category === NO_CATALOG_KEY} onClick={() => setRail("category", NO_CATALOG_KEY)} /> : null}
-            </FilterRailGroup>
-          </> : null}
-          <FilterRailGroup title="History" icon="history"><FilterRailRow testId="rail-history" label="Delivered / history" active={view === "history"}
-            count={sourceReady ? allUnits.filter((u) => !isCurrentUnit(u)).length : undefined} onClick={() => setView("history")} /></FilterRailGroup>
-        </FilterRail> : null}
-
-        {/* ── THE REGISTER ───────────────────────────────────────────────── */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="register-column">
-          {!railOpen || filtered ? <div className="flex shrink-0 gap-2 pb-2">
-            {!railOpen ? <Button icon="filter" onClick={() => setRailOpen(true)}>Show filters</Button> : null}
-            {filtered ? <Button onClick={clearAll}>Clear filters</Button> : null}
-          </div> : null}
-          {isError ? (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
-              <p className="text-body text-base-700">Stock could not be loaded</p>
-              {(error as Error | undefined)?.message ? (
-                <p className="text-meta text-base-500">{(error as Error).message}</p>
+        {!selectedUnit && (
+          <ModuleHeader
+            testId="stock-register-destination-header"
+            word="Inventory"
+            docTitle="Inventory · Warehouse — Carres"
+            right={
+              <Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">
+                Request Transfer
+              </Link>
+            }
+            destinationHeader
+          />
+        )}
+        <div className="flex min-h-0 flex-1" data-testid="stock-register">
+          {railOpen ? (
+            <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
+              <FilterRailGroup title="Stock" icon="order">
+                {STOCK_VIEWS.map(([key, label]) => (
+                  <FilterRailRow
+                    key={key}
+                    testId={key === "all" ? "rail-all-stock" : `rail-${key}`}
+                    label={label}
+                    active={view === key && !status}
+                    resets={key === "all"}
+                    count={sourceReady ? (key === "all" ? heldUnits.length : heldUnits.filter((u) => matchesView(u, key)).length) : undefined}
+                    onClick={() => (key === "all" ? clearAll() : setView(key))}
+                  />
+                ))}
+                {INVENTORY_STATUS_RAIL.map((word) => (
+                  <FilterRailRow
+                    key={word}
+                    testId={`rail-status-${word.toLowerCase().replace(/\s+/g, "-")}`}
+                    label={word}
+                    active={status === word}
+                    count={sourceReady ? counts.byStatus.get(word) ?? 0 : undefined}
+                    onClick={() => setStatus(word)}
+                  />
+                ))}
+              </FilterRailGroup>
+              {sourceReady ? (
+                <>
+                  <FilterRailGroup title="Category" icon="goods">
+                    {categoryKeys.map((key) => (
+                      <FilterRailRow
+                        key={key}
+                        testId={`rail-category-${key}`}
+                        label={CATEGORY_LABEL[key] ?? key}
+                        count={counts.category.get(key) ?? 0}
+                        active={sel.category === key}
+                        onClick={() => setRail("category", key)}
+                      />
+                    ))}
+                    {(counts.category.get(NO_CATALOG_KEY) ?? 0) > 0 ? (
+                      <FilterRailRow
+                        testId="rail-no-catalog"
+                        label={NO_CATALOG_LABEL}
+                        count={counts.category.get(NO_CATALOG_KEY)}
+                        active={sel.category === NO_CATALOG_KEY}
+                        onClick={() => setRail("category", NO_CATALOG_KEY)}
+                      />
+                    ) : null}
+                  </FilterRailGroup>
+                  <FilterRailGroup title="Ownership" icon="customer">
+                    {[...counts.ownership].map(([id, count]) => (
+                      <FilterRailRow
+                        key={id}
+                        testId={`rail-ownership-${id}`}
+                        label={UNIT_OWNERSHIP_LABEL[id as keyof typeof UNIT_OWNERSHIP_LABEL] ?? id}
+                        count={count}
+                        active={sel.ownership === id}
+                        onClick={() => setRail("ownership", id)}
+                      />
+                    ))}
+                  </FilterRailGroup>
+                </>
               ) : null}
-              <button
-                type="button"
-                className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-                onClick={() => void refetch()}
-              >
-                Try again
-              </button>
-            </div>
-          ) : (
-            <DataGrid<StockRegisterUnit>
-              key={gridRevision}
-              appearance="reference"
-              rows={rows}
-              columns={columns}
-              storageKey="carres.warehouse.inventory.v3"
-              rowKey={(u) => u.id}
-              exportName="Inventory"
-              searchPlaceholder="Unit ID, product, PO, SO or supplier…"
-              isLoading={isLoading || !data}
-              onSearchChange={setSearch}
-              stickyIdentity
-              groupBanner={false}
-              chooserGroupOrder={["Unit", "Place", "Source", "Dates"]}
-              onRowDoubleClick={(u) => {
-                // A counted row has no Unit page to open — it is not a Unit.
-                const id = unitIdOf(u);
-                if (id) navigate(unitHref(id));
-              }}
-              emptyMessage={
-                allUnits.length === 0
-                  ? "No Units yet — a Unit is created when a purchase order or consignment order is confirmed, and Receiving checks it in against the ID the supplier put on the label."
-                  : "No Units match these filters."
-              }
-              statusSummary={(visibleRows) => {
-                /* UI MASTER §6.7: the 32px footer carries the summary. No KPI
-                   strip above the table — a Register is truth, not a dashboard. */
-                const line = registerSummaryLine(summariseRegister(visibleRows), currentUnits.length);
-                return (
-                  <span className="block truncate" title={line}>
-                    {line}
-                  </span>
-                );
-              }}
-            />
-          )}
+              <FilterRailGroup title="Control" icon="history">
+                <FilterRailRow
+                  testId="rail-history"
+                  label="History"
+                  active={view === "history"}
+                  count={sourceReady ? allUnits.filter((u) => !isCurrentUnit(u)).length : undefined}
+                  onClick={() => setView("history")}
+                />
+              </FilterRailGroup>
+            </FilterRail>
+          ) : null}
+
+          {/* ── THE REGISTER ───────────────────────────────────────────────── */}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="register-column">
+            {!railOpen || filtered ? (
+              <div className="flex shrink-0 gap-2 pb-2">
+                {!railOpen ? (
+                  <Button icon="filter" onClick={() => setRailOpen(true)}>
+                    Show filters
+                  </Button>
+                ) : null}
+                {filtered ? <Button onClick={clearAll}>Clear filters</Button> : null}
+              </div>
+            ) : null}
+            {isError ? (
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
+                <p className="text-body text-base-700">Stock could not be loaded</p>
+                {(error as Error | undefined)?.message ? (
+                  <p className="text-meta text-base-500">{(error as Error).message}</p>
+                ) : null}
+                <button
+                  type="button"
+                  className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+                  onClick={() => void refetch()}
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
+              <DataGrid<StockRegisterUnit>
+                key={gridRevision}
+                appearance="reference"
+                rows={rows}
+                columns={columns}
+                storageKey="carres.warehouse.inventory.v5"
+                rowKey={(u) => u.id}
+                exportName="Inventory"
+                searchPlaceholder="Unit ID, item, SO No, PO No or supplier…"
+                isLoading={isLoading || !data}
+                onSearchChange={setSearch}
+                /* ⭐ The owner's order puts Unit ID seventh; once the sheet scrolls
+                   the identity pins after the gutter and the facts slide under it. */
+                stickyIdentity={{ columnKey: "unitCode" }}
+                rowHeight={40}
+                groupBanner={false}
+                chooserGroupOrder={["Dates", "Documents", "Unit", "Movement"]}
+                onRowDoubleClick={(u) => {
+                  // A counted row has no Unit page to open — it is not a Unit.
+                  const id = unitIdOf(u);
+                  if (id) navigate(unitHref(id));
+                }}
+                emptyMessage={
+                  allUnits.length === 0
+                    ? "No stock in Carres control yet."
+                    : "No stock matches these filters."
+                }
+                statusSummary={(visibleRows) => {
+                  /* UI MASTER §6.0: the 32px footer carries the summary; the
+                     second fact is how many goods are still owed. */
+                  const line = registerSummaryLine(summariseRegister(visibleRows), scopedRows.length);
+                  const owed = view === "all" && !status ? stillToArriveLine(incomingCount) : null;
+                  const text = owed ? `${line} · ${owed}` : line;
+                  return (
+                    <span className="block truncate" title={text}>
+                      {text}
+                    </span>
+                  );
+                }}
+              />
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );
-}
-
-/**
- * ONE current attention item, in the operator's words.
- *
- * Card §2 forbids repeating the Unit ID, SO, customer or owner inside the
- * sentence — those already belong to the row. Card §5 forbids `Review`,
- * `Handle`, `Follow up`, `Priority`, `Next Action` and `Mark done`, so every
- * line here names the OBSERVED FACT instead of a vague verb.
- */
-function attentionSentence(u: StockRegisterUnit): string | null {
-  if (u.holdReason) return "Waiting inspection";
-  if (u.needsRepair) return "In repair";
-  if (u.condition === "damaged") return "Damaged";
-  if (!u.poNo) return "No purchase order";
-  return null;
 }

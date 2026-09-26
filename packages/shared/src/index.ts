@@ -1297,6 +1297,16 @@ export {
   type StockRegisterTotals,
   type StockRegisterUnit,
 } from "./stock-register";
+export {
+  INVENTORY_STATUS_RAIL,
+  STOCK_CONDITION_WORDS,
+  inventoryStatusOf,
+  isHeldUnit,
+  stillToArriveLine,
+  stockConditionOf,
+  type InventoryStatus,
+  type InventoryWordsInput,
+} from "./inventory-words";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {

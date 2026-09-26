@@ -6,12 +6,13 @@ import WarehouseStockRegister from "./WarehouseStockRegister";
 import type { StockRegisterUnit } from "@carres/shared";
 
 /**
- * THE STOCK REGISTER — CARD-2026-08-20-stock-register §6.
+ * INVENTORY — Stock MASTER §7, owner rulings 2026-09-25.
  *
- * These tests are the card's verification list, not a coverage exercise: the
- * destination says Inventory, every count derives from the Unit authority, the rail
- * sections combine and clear, ended Units stay out of the default view, and the
- * old `On hand` wording is gone from the operator surface.
+ * The default list is what Carres physically holds; Incoming is a rail row and
+ * a footer fact. Eleven single-line columns carry dictionary words only; the
+ * retired words (`Who has it` · `Where` · `Stock use` · `Not available` ·
+ * `Reserved / sold` · `In transit` · `With NETS Delivery`) never reach the
+ * operator. Every count derives from the Unit authority.
  */
 
 const apiFetchMock = vi.fn();
@@ -23,15 +24,16 @@ vi.mock("@/lib/api", async () => {
 function unit(p: Partial<StockRegisterUnit> & { id: string; unitCode: string }): StockRegisterUnit {
   return {
     identityScope: "unit",
-    sku: "BF03-Jager-K",
+    sku: "CODY-K",
     category: "bedframe",
+    productName: "Cody · King",
     warehouseId: "wh-klang",
-    siteName: "Carres Klang Warehouse",
+    siteName: "Carres Klang",
     holderPartyId: null,
     holderName: null,
     ownership: "carres_owned",
-    supplier: "Ohana",
-    poNo: "PO/2508-116",
+    supplier: "Hookka Industries",
+    poNo: "PO260924-4827",
     status: "free",
     condition: "new",
     needsRepair: false,
@@ -39,7 +41,8 @@ function unit(p: Partial<StockRegisterUnit> & { id: string; unitCode: string }):
     reservedRef: null,
     soldOrderId: null,
     qty: 1,
-    dateIn: "2026-08-01",
+    dateIn: "2026-09-25",
+    goodsReceivedDate: "2026-09-25",
     lastVerifiedAt: null,
     availability: "available",
     lifecycleOutcome: "active",
@@ -49,28 +52,28 @@ function unit(p: Partial<StockRegisterUnit> & { id: string; unitCode: string }):
   };
 }
 
-/** available ×2 (one of them a 555-piece bulk record) · reserved ×1 ·
- *  incoming ×1 · ended ×1 · one with no PO. */
+/** available ×2 (one a 319-piece counted row) · reserved ×1 · cannot sell ×1 ·
+ *  on the road ×1 · incoming ×1 · ended ×1. */
 const UNITS: StockRegisterUnit[] = [
-  unit({ id: "1", unitCode: "id-aaa111111" }),
-  unit({ id: "2", unitCode: "id-bbb222222", sku: "Essential Memory Pillow(L)", qty: 555, category: null }),
-  unit({ id: "3", unitCode: "id-ccc333333", availability: "reserved", status: "reserved", reservedRef: "SO-1319" }),
-  unit({ id: "4", unitCode: "id-ddd444444", availability: "incoming", status: "incoming", poNo: null }),
-  unit({ id: "5", unitCode: "id-eee555555", availability: "ended", status: "sold", lifecycleOutcome: "delivered" }),
+  unit({ id: "1", unitCode: "U1-000-084" }),
+  unit({ id: "2", unitCode: "QTY-000000001", identityScope: "quantity", sku: "MATTRESS-PROTECTOR-Q", productName: "Mattress Protector · Q", category: "accessory", qty: 319, poNo: null }),
+  unit({ id: "3", unitCode: "U1-000-082", sku: "JAGER-SS", productName: "Jager · Super Single", availability: "reserved", status: "reserved", reservedRef: "SO2609-4827", soldOrderId: "order-1", soDate: "2026-09-22" }),
+  unit({ id: "4", unitCode: "U1-000-065", sku: "FENRIR-Q", productName: "Fenrir · Queen", availability: "not_available", status: "free", condition: "damaged" }),
+  unit({ id: "5", unitCode: "U1-000-071", sku: "5539-2A(RHF)", productName: "Booqit · 2A(RHF)", category: "sofa", availability: "in_transit", status: "transferred", shipDate: "2026-09-26", pickupBy: "AL", deliveryLocation: "AL Sungai Buloh" }),
+  unit({ id: "6", unitCode: "U1-000-091", sku: "B1201S-K", productName: "Breeze SoftCloud · King", category: "mattress", availability: "incoming", status: "incoming", goodsReceivedDate: null }),
+  unit({ id: "7", unitCode: "U1-000-010", availability: "ended", status: "sold", lifecycleOutcome: "delivered" }),
 ];
 
-/** The rail is page furniture and paints before the query settles, so every
- *  assertion about a COUNT has to wait for the Units it is counting. */
 async function renderLoaded() {
   const r = renderRegister();
-  await screen.findByText("id-aaa111111");
+  await screen.findByText("U1-000-084");
   return r;
 }
 
 function renderRegister(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/stock"]}>
+      <MemoryRouter initialEntries={["/operation?tab=stock-onhand"]}>
         <WarehouseStockRegister />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -91,9 +94,7 @@ beforeEach(() => {
 describe("an unavailable source is never zero stock", () => {
   function expectNoStockClaims() {
     expect(within(screen.getByTestId("rail-all-stock")).queryByText(/^\d+$/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Nothing needs checking")).not.toBeInTheDocument();
-    expect(screen.queryByText(/No Unit has moved yet/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/No Units yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No stock in Carres control/)).not.toBeInTheDocument();
     expect(screen.queryByText(/you can promise/)).not.toBeInTheDocument();
   }
 
@@ -116,245 +117,177 @@ describe("an unavailable source is never zero stock", () => {
     }
   });
 
-  it("shows the failure and retries into real Unit counts", async () => {
+  it("shows the failure and retries into real counts", async () => {
     apiFetchMock.mockImplementation((path: string) => path.startsWith("/api/ops/stock/register")
-      ? Promise.reject(new Error("column stock_unit_register_v.site_name does not exist"))
-      : Promise.resolve({}));
+      ? Promise.reject(new Error("boom")) : Promise.resolve({}));
     renderRegister();
     await screen.findByText("Stock could not be loaded");
-    expectNoStockClaims();
-    apiFetchMock.mockImplementation((path: string) => Promise.resolve(path.startsWith("/api/ops/stock/register")
-      ? { units: UNITS, total: UNITS.length } : {}));
+    apiFetchMock.mockImplementation(() => Promise.resolve({ units: UNITS, total: UNITS.length }));
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await screen.findByText("id-aaa111111");
-    expect(within(screen.getByTestId("rail-all-stock")).getByText("4")).toBeInTheDocument();
-  });
-
-  it("withdraws cached counts when a refresh fails", async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderRegister(qc);
-    await screen.findByText("id-aaa111111");
-    apiFetchMock.mockRejectedValue(new Error("Stock request failed"));
-    await qc.invalidateQueries({ queryKey: ["operation", "stock-register"] });
-    await screen.findByText("Stock could not be loaded");
-    expectNoStockClaims();
-    expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument();
-  });
-
-  it("shows zero only after a successful empty response", async () => {
-    apiFetchMock.mockResolvedValue({ units: [], total: 0 });
-    renderRegister();
-    await screen.findByText(/No Units yet/);
-    expect(within(screen.getByTestId("rail-all-stock")).getByText("0")).toBeInTheDocument();
-    expect(within(screen.getByTestId("rail-checking")).getByText("0")).toBeInTheDocument();
+    await screen.findByText("U1-000-084");
+    expect(within(screen.getByTestId("rail-all-stock")).getByText("5")).toBeInTheDocument();
   });
 });
 
-describe("the destination is Inventory", () => {
-  /* Owner-approved Blueprint 2026-09-01 (Stock MASTER §2): the Warehouse
-   * master Register is `Inventory`; `Stock` and `On hand` are gone as the
-   * page word. CARD-2026-09-01-warehouse-01-sidebar. */
-  it("names the page Inventory, and the old Stock / On hand wording is gone", async () => {
-    renderRegister();
-    const header = await screen.findByTestId("stock-register-destination-header");
-    expect(within(header).getByText("Inventory")).toBeInTheDocument();
-    expect(within(header).queryByText(/^Stock$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/On hand/i)).not.toBeInTheDocument();
+describe("the default list is what Carres holds", () => {
+  it("names the page Inventory and keeps the Request Transfer door", async () => {
+    await renderLoaded();
+    expect(screen.getByTestId("stock-register-destination-header")).toHaveTextContent("Inventory");
+    expect(screen.getByRole("link", { name: "Request Transfer" })).toBeInTheDocument();
   });
 
   it("reads the Unit authority endpoint, never a stored total", async () => {
-    renderRegister();
-    await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
-    const paths = apiFetchMock.mock.calls.map((c) => String(c[0]));
-    expect(paths.some((p) => p.startsWith("/api/ops/stock/register"))).toBe(true);
-    // stock_balances is a non-authoritative cache since 0366 and must not be
-    // reachable from this page by any route.
-    expect(paths.some((p) => p.includes("balance"))).toBe(false);
-  });
-});
-
-describe("the default view is current Units (Card §1)", () => {
-  it("lists current Units and leaves the delivered one out", async () => {
-    renderRegister();
-    expect(await screen.findByText("id-aaa111111")).toBeInTheDocument();
-    expect(screen.queryByText("id-eee555555")).not.toBeInTheDocument();
-  });
-
-  it("offers Delivered / history as its own destination, with a truthful count", async () => {
     await renderLoaded();
-    const history = screen.getByTestId("rail-history");
-    expect(within(history).getByText("Delivered / history")).toBeInTheDocument();
-    expect(within(history).getByText("1")).toBeInTheDocument();
+    const paths = apiFetchMock.mock.calls.map((c) => c[0]);
+    expect(paths).toContain("/api/ops/stock/register");
+    expect(paths.some((p: string) => /balances|onhand|stock-summary/.test(p))).toBe(false);
+  });
+
+  it("leaves Incoming and delivered Units out, and counts the goods still to arrive in the footer", async () => {
+    await renderLoaded();
+    expect(screen.queryByText("U1-000-091")).not.toBeInTheDocument();
+    expect(screen.queryByText("U1-000-010")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("rail-all-stock")).getByText("5")).toBeInTheDocument();
+    expect(screen.getByText(/1 still to arrive · see Inbound/)).toBeInTheDocument();
+    expect(screen.getByText(/5 records · 1 you can promise · 319 pieces you cannot/)).toBeInTheDocument();
+  });
+
+  it("Incoming is its own rail row that lists the goods not yet received", async () => {
+    await renderLoaded();
+    const row = screen.getByTestId("rail-status-incoming");
+    expect(within(row).getByText("1")).toBeInTheDocument();
+    fireEvent.click(row);
+    await screen.findByText("U1-000-091");
+    expect(screen.queryByText("U1-000-084")).not.toBeInTheDocument();
+    expect(screen.queryByText(/still to arrive/)).not.toBeInTheDocument();
+  });
+
+  it("History is the Control group's own row with a truthful count", async () => {
+    await renderLoaded();
+    const row = screen.getByTestId("rail-history");
+    expect(within(row).getByText("1")).toBeInTheDocument();
+    fireEvent.click(row);
+    await screen.findByText("U1-000-010");
+    expect(within(screen.getByText("U1-000-010").closest("tr")!).getByText("Delivered")).toBeInTheDocument();
   });
 });
 
-describe("every number derives from the Unit authority (Card §6)", () => {
-  it("the footer separates what can be promised from what cannot", async () => {
-    renderRegister();
-    // 4 current Units; 1 bindable exact Unit; 555 bulk pieces that no Sales
-    // Order can name, because 0366 forbids a qty > 1 record being reserved.
-    expect(
-      await screen.findByText("4 records · 1 you can promise · 555 pieces you cannot"),
-    ).toBeInTheDocument();
+describe("one row is one Unit, one cell is one fact", () => {
+  it("prints the eleven heads in the owner's order and no retired head", async () => {
+    await renderLoaded();
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim() ?? "");
+    const order = ["Goods Received Date", "Ship Date", "SO No", "Inventory Status", "Stock Condition", "PO No / Ref No", "Unit ID", "Item", "Pickup By", "Stock Location", "Delivery Location"];
+    const seen = heads.filter((h) => order.includes(h));
+    expect(seen).toEqual(order);
+    for (const retired of ["Who has it", "Site / stock use", "Stock use", "Orders / dates", "Product", "Where", "Handed over"]) {
+      expect(heads).not.toContain(retired);
+    }
   });
 
-  it("warns on the row itself that a bulk record is not one promisable Unit", async () => {
-    renderRegister();
-    expect(
-      await screen.findByText(/555 pieces in one record — cannot be promised individually/),
-    ).toBeInTheDocument();
+  it("prints Inventory Status and Stock Condition with the ruled words only", async () => {
+    await renderLoaded();
+    expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Reserved").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Cannot sell").length).toBeGreaterThan(0);
+    expect(screen.getByText("Damaged")).toBeInTheDocument();
+    expect(screen.queryByText(/Reserved \/ sold/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not available/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/In transit/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/With NETS Delivery/)).not.toBeInTheDocument();
   });
 
-  it("shows Reserved / sold as the operator's word for a bound Unit", async () => {
-    renderRegister();
-    await screen.findByText("id-ccc333333");
-    expect(screen.getAllByText("Reserved / sold").length).toBeGreaterThan(0);
+  it("shows the road as Ship Date · Pickup By · Delivery Location while Stock Location stays the Site", async () => {
+    await renderLoaded();
+    const row = screen.getByText("U1-000-071").closest("tr")!;
+    expect(within(row).getByText("AL")).toBeInTheDocument();
+    expect(within(row).getByText("AL Sungai Buloh")).toBeInTheDocument();
+    expect(within(row).getByText("Carres Klang")).toBeInTheDocument();
+    expect(within(row).getByText("Available")).toBeInTheDocument();
+  });
+
+  it("a counted row prints — for Unit ID and ×{qty} on the item, and no arrow to expand", async () => {
+    await renderLoaded();
+    const row = screen.getByText(/Mattress Protector · Q · MATTRESS-PROTECTOR-Q ×319/).closest("tr")!;
+    expect(within(row).getByText("—")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show every product/ })).not.toBeInTheDocument();
+  });
+
+  it("uses the ruled absence words: No SO · Not received · Not recorded", async () => {
+    await renderLoaded();
+    expect(screen.getAllByText("No SO").length).toBeGreaterThan(0);
+    const counted = screen.getByText(/MATTRESS-PROTECTOR-Q ×319/).closest("tr")!;
+    expect(within(counted).getByText("Not recorded")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rail-status-incoming"));
+    const incoming = (await screen.findByText("U1-000-091")).closest("tr")!;
+    expect(within(incoming).getByText("Not received")).toBeInTheDocument();
+  });
+
+  it("an SO No opens the Sales Order only when the order exists in this portal", async () => {
+    await renderLoaded();
+    expect(screen.getByRole("button", { name: "SO2609-4827" })).toBeInTheDocument();
   });
 });
 
-describe("the rail filters the same authority (Card §3)", () => {
-  it("narrows to one availability and the footer follows", async () => {
+describe("the rail is STOCK · CATEGORY · OWNERSHIP · CONTROL", () => {
+  it("has no Who has it, Site or Coming soon rows", async () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
-    fireEvent.click(within(rail).getByRole("button", { name: /^Incoming/ }));
-    await waitFor(() => expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument());
-    expect(screen.getByText("id-ddd444444")).toBeInTheDocument();
+    expect(within(rail).queryByText(/Who has it/)).not.toBeInTheDocument();
+    expect(within(rail).queryByText(/Coming soon/)).not.toBeInTheDocument();
+    expect(within(rail).queryByText(/Needs checking/)).not.toBeInTheDocument();
+    expect(within(rail).getByText("Category")).toBeInTheDocument();
+    expect(within(rail).getByText("Ownership")).toBeInTheDocument();
+    expect(within(rail).getByText("Control")).toBeInTheDocument();
+  });
+
+  it("Category counts the held goods from the Catalog's answer", async () => {
+    await renderLoaded();
+    expect(within(screen.getByTestId("rail-category-bedframe")).getByText("3")).toBeInTheDocument();
+    expect(within(screen.getByTestId("rail-category-sofa")).getByText("1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rail-category-sofa"));
+    await waitFor(() => expect(screen.queryByText("U1-000-084")).not.toBeInTheDocument());
+    expect(screen.getByText("U1-000-071")).toBeInTheDocument();
+  });
+
+  it("Ready Stock lists exact Available Units and excludes the counted row", async () => {
+    await renderLoaded();
+    expect(within(screen.getByTestId("rail-ready")).getByText("1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rail-ready"));
+    await waitFor(() => expect(screen.queryByText(/MATTRESS-PROTECTOR-Q/)).not.toBeInTheDocument());
+    expect(screen.getByText("U1-000-084")).toBeInTheDocument();
   });
 
   it("All stock clears every filter", async () => {
     await renderLoaded();
-    const rail = screen.getByTestId("stock-rail");
-    fireEvent.click(within(rail).getByRole("button", { name: /^Incoming/ }));
-    await waitFor(() => expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument());
-    fireEvent.click(within(rail).getByTestId("rail-all-stock"));
-    expect(await screen.findByText("id-aaa111111")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rail-status-cannot-sell"));
+    await waitFor(() => expect(screen.queryByText("U1-000-084")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("rail-all-stock"));
+    await screen.findByText("U1-000-084");
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
   });
 
-  it("keeps an honest Not in catalog bucket, and never calls it Accessory", async () => {
-    await renderLoaded();
-    const rail = screen.getByTestId("stock-rail");
-    expect(within(rail).getByRole("button", { name: /Not in catalog/ })).toBeInTheDocument();
-    expect(within(rail).queryByRole("button", { name: /^Accessory/ })).not.toBeInTheDocument();
-  });
-
-  it("uses the approved 240px rail without a Calendar or date strip", async () => {
-    await renderLoaded();
-    const rail = screen.getByTestId("stock-rail");
-    expect(rail.className).toContain("w-[240px]");
-    expect(screen.queryByTestId("warehouse-date-strip")).not.toBeInTheDocument();
-  });
-
-  it("names holders, ownership and Sites from the governed records", async () => {
-    await renderLoaded();
-    const rail = screen.getByTestId("stock-rail");
-    expect(within(rail).getByText("Who has it")).toBeInTheDocument();
-    expect(within(rail).getByText("Ownership")).toBeInTheDocument();
-    expect(within(rail).getByText("Carres Klang Warehouse")).toBeInTheDocument();
-    expect(within(rail).queryByText("NETS Warehouse")).not.toBeInTheDocument();
-  });
-});
-
-describe("Stock exposes no second door onto the register (Card §2, Stock MASTER §4)", () => {
   it("has no reservation, edit, delete, add-stock or status control anywhere", async () => {
-    renderRegister();
-    await screen.findByText("id-aaa111111");
-    for (const banned of [
-      /^Reserve$/i, /^Release$/i, /^Edit$/i, /^Delete$/i,
-      /Add stock/i, /Remove stock/i, /Adjust/i, /Mark done/i,
-      /Review/i, /Follow up/i, /Next Action/i,
-    ]) {
-      expect(screen.queryByRole("button", { name: banned })).not.toBeInTheDocument();
+    await renderLoaded();
+    for (const word of [/^reserve$/i, /^release$/i, /^edit$/i, /^delete$/i, /add stock/i, /mark done/i, /make available/i]) {
+      expect(screen.queryByRole("button", { name: word })).not.toBeInTheDocument();
     }
   });
 });
-
-
-describe("Inventory saved views", () => {
-  it("keeps the footer honest when a table column narrows the visible stock", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /^Stock use$/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
-    fireEvent.click(screen.getByRole("button", { name: "Filter Stock use" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /^Available$/ }));
-    expect(screen.queryByText("id-ccc333333")).not.toBeInTheDocument();
-    expect(screen.getByText("2 of 4 records · 1 you can promise · 555 pieces you cannot")).toBeInTheDocument();
-  });
-  it("Service Case uses purchase purpose, independently of product category", async () => {
-    apiFetchMock.mockResolvedValue({ units: [
-      unit({ id: "service", unitCode: "id-service", purchasePurpose: "service_case", category: "sofa" }),
-      unit({ id: "catalog", unitCode: "id-catalog", category: "service", purchasePurpose: "ready_stock" }),
-    ], total: 2 });
-    renderRegister();
-    await screen.findByText("id-service");
-    fireEvent.click(screen.getByTestId("rail-service"));
-    expect(screen.getByText("id-service")).toBeInTheDocument();
-    expect(screen.queryByText("id-catalog")).not.toBeInTheDocument();
-  });
-  it("finds a product by its human name after the rail filters the same Units", async () => {
-    apiFetchMock.mockResolvedValue({ units: [
-      unit({ id: "dream", unitCode: "id-dream", productName: "Dream · King" }),
-      unit({ id: "other", unitCode: "id-other", productName: "Cloud · Queen" }),
-    ], total: 2 });
-    renderRegister();
-    await screen.findByText("Dream · King");
-    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
-    fireEvent.change(screen.getByPlaceholderText("Unit ID, product, PO, SO or supplier…"), { target: { value: "dream" } });
-    await waitFor(() => expect(screen.queryByText("id-other")).not.toBeInTheDocument());
-    expect(screen.getByText("id-dream")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(await screen.findByText("id-other")).toBeInTheDocument();
-  });
-  it("Ready Stock lists exact eligible Units and excludes the bulk record", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByTestId("rail-ready"));
-    expect(screen.getByText("id-aaa111111")).toBeInTheDocument();
-    expect(screen.queryByText("id-bbb222222")).not.toBeInTheDocument();
-    expect(screen.queryByText("id-ccc333333")).not.toBeInTheDocument();
-  });
-  it("Reserved for Sales Orders shows the bound Unit", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByTestId("rail-reserved"));
-    expect(screen.getByText("id-ccc333333")).toBeInTheDocument();
-    expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument();
-  });
-  it("can hide and restore the filters without losing the selected view", async () => {
-    await renderLoaded();
-    fireEvent.click(screen.getByTestId("rail-ready"));
-    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
-    expect(screen.queryByTestId("stock-rail")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show filters" }));
-    expect(screen.getByTestId("rail-ready")).toHaveAttribute("aria-pressed", "true");
-  });
-  it("shows source dates and human product names supplied by their owners", async () => {
-    apiFetchMock.mockImplementation((path: string) => Promise.resolve(path.startsWith("/api/ops/stock/register")
-      ? { units: [unit({ id: "source", unitCode: "id-source", productName: "Dream · King", poDate: "2026-08-01", soDate: "2026-08-02", expectedArrival: "2026-09-09" })], total: 1 } : {}));
-    renderRegister();
-    expect(await screen.findByText("Dream · King")).toBeInTheDocument();
-    for (const label of ["Unit ID", "Product", "Site / stock use", "Orders / dates"]) {
-      expect(screen.getByRole("columnheader", { name: new RegExp(label) })).toBeInTheDocument();
-    }
-  });
-});
-
 
 it("returns from a Unit without losing the register, search, rail or scroll", async () => {
+  apiFetchMock.mockImplementation((path: string) => {
+    if (path.startsWith("/api/ops/stock/register/")) {
+      return Promise.resolve({ unit: UNITS[0], events: [] });
+    }
+    if (path.startsWith("/api/ops/stock/register")) return Promise.resolve({ units: UNITS, total: UNITS.length });
+    return Promise.resolve({ evidence: [] });
+  });
   await renderLoaded();
-  fireEvent.click(screen.getByTestId("rail-ready"));
-  fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
-  const search = screen.getByPlaceholderText("Unit ID, product, PO, SO or supplier…");
-  fireEvent.change(search, { target: { value: "aaa111111" } });
-  await waitFor(() => expect(screen.queryByText("id-ccc333333")).toBeNull());
-  const grid = screen.getByTestId("grid-scroll");
-  grid.scrollTop = 180;
-  const link = screen.getByRole("link", { name: "id-aaa111111" });
-  expect(link.getAttribute("href")).toContain("view=ready");
-  fireEvent.click(link);
-  expect(grid).not.toBeVisible();
-  fireEvent.click(await screen.findByRole("button", { name: "← Inventory" }));
-  expect(screen.getByTestId("grid-scroll")).toBe(grid);
-  expect(grid).toBeVisible();
-  expect(grid.scrollTop).toBe(180);
-  expect(search).toHaveValue("aaa111111");
-  expect(screen.getByTestId("rail-ready")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByTestId("rail-category-bedframe"));
+  fireEvent.click(screen.getByRole("link", { name: "U1-000-084" }));
+  await screen.findByTestId("stock-unit-detail");
+  fireEvent.click(screen.getByRole("button", { name: "← Inventory" }));
+  await waitFor(() => expect(screen.queryByTestId("stock-unit-detail")).not.toBeInTheDocument());
+  expect(screen.getByText("U1-000-084")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
 });

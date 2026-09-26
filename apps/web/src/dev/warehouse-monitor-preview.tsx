@@ -277,7 +277,25 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       { id: "d2", unitId: STOCK_UNIT.id, direction: "out", siteId: null, siteName: null, at: "2026-09-06T10:00:00Z", reference: "DO-1", href: "/operation?tab=warehouse-outbound&do=DO-1", actorId: "actor" },
     ] });
     if (url.includes("/register/")) return json({ unit: STOCK_UNIT, events: [] });
-    return json({ units: [STOCK_UNIT, { ...STOCK_UNIT, id: "bulk", unitCode: "technical-key", identityScope: "quantity", qty: 10, productName: "Interchangeable fittings", sku: "FITTING-1", category: "accessory" }], total: 2 });
+    /* Owner rulings 2026-09-25: one row per Unit with the eleven single-fact
+       columns — held goods, a reserved Unit, one on the road, one that cannot
+       be sold, one at the showroom, a counted row and one still to arrive. */
+    const base = { ...STOCK_UNIT, siteName: "Carres Klang", goodsReceivedDate: "2026-09-25", poNo: "PO260924-4827", poDate: "2026-09-24", supplier: "Nice Future" };
+    const units = [
+      { ...base, id: "u84", unitCode: "U1-000-084", productName: "Cody · King", sku: "CODY-K", category: "bedframe" },
+      { ...base, id: "u83", unitCode: "U1-000-083", productName: "Cody · King", sku: "CODY-K", category: "bedframe" },
+      { ...base, id: "u82", unitCode: "U1-000-082", productName: "Jager · Super Single", sku: "JAGER-SS", category: "bedframe", availability: "in_transit", status: "transferred", reservedRef: "SO2609-4827", soldOrderId: "order-1", soDate: "2026-09-22", shipDate: "2026-09-26", pickupBy: "NETS", deliveryLocation: "12 Jalan SS2/24, Petaling Jaya" },
+      { ...base, id: "u65", unitCode: "U1-000-065", productName: "Fenrir · Queen", sku: "FENRIR-Q", category: "bedframe", availability: "not_available", status: "free", condition: "damaged" },
+      { ...base, id: "u71", unitCode: "U1-000-071", productName: "Booqit · 2A(RHF)", sku: "5539-2A(RHF)", category: "sofa", goodsReceivedDate: "2026-08-25", poNo: "PO-2032", availability: "in_transit", status: "transferred", shipDate: "2026-09-26", pickupBy: "AL", deliveryLocation: "AL Sungai Buloh", supplier: "Hookka Industries" },
+      { ...base, id: "u60", unitCode: "U1-000-060", productName: "Lyyar · 1A(LHF)", sku: "LYYAR-1A(LHF)", category: "sofa", siteName: "PJ Showroom", condition: "exhibition", availability: "reserved", status: "reserved", reservedRef: "SO-1362", soldOrderId: "order-2", soDate: "2026-08-24", goodsReceivedDate: "2026-08-24" },
+      { ...base, id: "u58", unitCode: "U1-000-058", productName: "Breeze FirmCare · King", sku: "B1201F-K", category: "mattress", condition: "old", goodsReceivedDate: "2026-08-24", poNo: "PO/2604-042" },
+      { ...base, id: "bulk", unitCode: "QTY-000000001", identityScope: "quantity", qty: 319, productName: "Mattress Protector · Q", sku: "MATTRESS-PROTECTOR-Q", category: "accessory", poNo: null, goodsReceivedDate: "2026-08-24" },
+      { ...base, id: "u51", unitCode: "U1-000-051", productName: "Booqit · CNR", sku: "5539-CNR", category: "sofa", availability: "not_available", status: "on_hold", holdReason: "inspection", goodsReceivedDate: "2026-08-20", poNo: "PO-2044" },
+      { ...base, id: "u46", unitCode: "U1-000-046", productName: "B1201S · King", sku: "B1201S-K", category: "mattress", siteName: "HOUZS Balakong", goodsReceivedDate: "2026-08-19", poNo: "PO-2037", availability: "in_transit", status: "transferred", shipDate: "2026-09-25", pickupBy: "HOUZS", deliveryLocation: "7 Jalan Bukit Belimbing, Seri Kembangan" },
+      { ...base, id: "u91", unitCode: "U1-000-091", productName: "H1401S · Queen", sku: "H1401S-Q", category: "mattress", availability: "incoming", status: "incoming", goodsReceivedDate: null, poNo: "PO260903-4354" },
+      { ...base, id: "u10", unitCode: "U1-000-010", productName: "Cody · Queen", sku: "CODY-Q", category: "bedframe", availability: "ended", status: "sold", lifecycleOutcome: "delivered", goodsReceivedDate: "2026-08-01" },
+    ];
+    return json({ units, total: units.length });
   }
   if (url.includes("/warehouse-settings")) return json({ details: { status: "active" }, workingHours: [], specialDates: [], holidayPolicy: null });
   if (url.includes("/warehouse-schedule")) return json({ events: EVENTS, skuCategories: [{ sku: "MAT-KING-1", category: "mattress" }, { sku: "BED-2", category: "bedframe" }, { sku: "SOFA-1", category: "sofa" }] });

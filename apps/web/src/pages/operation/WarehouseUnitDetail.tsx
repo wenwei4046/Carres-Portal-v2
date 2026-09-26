@@ -1,12 +1,11 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
-  availabilityLabel,
+  inventoryStatusOf,
+  stockConditionOf,
   stockSiteVisits,
   UNIT_LIFECYCLE_OUTCOME_LABEL,
   UNIT_OWNERSHIP_LABEL,
-  type UnitAvailability,
   type UnitLifecycleOutcome,
-  READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
@@ -36,15 +35,6 @@ import ModuleHeader from "./components/ModuleHeader";
  * Wiring them half-way would put five buttons on screen whose refusals nobody
  * had designed. They are recorded as the next Warehouse scope.
  */
-
-const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
-  available: "bg-kit-green-11",
-  reserved: "bg-kit-blue-9",
-  incoming: "bg-kit-slate-9",
-  in_transit: "bg-kit-amber-11",
-  not_available: "bg-kit-red-9",
-  ended: "bg-kit-slate-5",
-};
 
 /** The lineage's own words. Every one names a PHYSICAL change, because that is
  *  all `stock_unit_events` records (0366). */
@@ -107,36 +97,36 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
           </div>
         ) : unit ? (
           <div className="space-y-4">
-            {/* ── CURRENT FACTS ──────────────────────────────────────────── */}
+            {/* ── STOCK DETAILS — owner words 2026-09-25 ─────────────────── */}
             <section className="rounded-md border border-base-200 bg-white">
               <header className="border-b border-base-100 px-4 py-2.5">
-                <h2 className="text-label font-semibold text-base-900">Where it is now</h2>
+                <h2 className="text-label font-semibold text-base-900">Stock Details</h2>
               </header>
               <dl className="grid grid-cols-2 gap-x-8 gap-y-3 px-4 py-4 md:grid-cols-3">
-                <Fact label="Availability">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full ${AVAILABILITY_DOT[unit.availability]}`} />
-                    {availabilityLabel(unit.availability)}
-                  </span>
+                <Fact label="Inventory Status">
+                  {inventoryStatusOf(unit) ??
+                    UNIT_LIFECYCLE_OUTCOME_LABEL[unit.lifecycleOutcome as UnitLifecycleOutcome] ??
+                    unit.lifecycleOutcome}
                 </Fact>
-                <Fact label="Where">{unit.siteName ?? "—"}</Fact>
-                <Fact label="Who has it">
-                  {unit.holderName ?? <Absent>Not recorded</Absent>}
-                </Fact>
+                <Fact label="Stock Condition">{stockConditionOf(unit)}</Fact>
+                <Fact label="Stock Location">{unit.siteName ?? <Absent>Not recorded</Absent>}</Fact>
                 <Fact label="Ownership">
                   {UNIT_OWNERSHIP_LABEL[unit.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? unit.ownership}
                 </Fact>
-                <Fact label="Condition">
-                  {READY_STOCK_CONDITION_WORDS[unit.condition] ?? unit.condition}
-                  {unit.needsRepair ? " · in repair" : ""}
+                <Fact label="Goods Received Date">
+                  {unit.goodsReceivedDate ? fmtDate(unit.goodsReceivedDate) : <Absent>Not received</Absent>}
                 </Fact>
-                <Fact label="Last verified">
-                  {unit.lastVerifiedAt ? (
-                    fmtDate(unit.lastVerifiedAt, { time: true })
-                  ) : (
-                    <Absent>Never verified</Absent>
-                  )}
+                <Fact label="Item">
+                  {unit.productName ?? unit.sku}
+                  <div className="text-meta text-base-500">{unit.sku}{unit.category ? ` · ${unit.category}` : ""}</div>
                 </Fact>
+                {unit.shipDate ? (
+                  <>
+                    <Fact label="Ship Date">{fmtDate(unit.shipDate)}</Fact>
+                    <Fact label="Pickup By">{unit.pickupBy ?? <Absent>Not recorded</Absent>}</Fact>
+                    <Fact label="Delivery Location">{unit.deliveryLocation ?? <Absent>Not recorded</Absent>}</Fact>
+                  </>
+                ) : null}
                 {unit.qty > 1 ? (
                   <Fact label="Pieces in this record" span>
                     <span className="text-kit-amber-11">
@@ -145,41 +135,32 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
                     </span>
                   </Fact>
                 ) : null}
-                {unit.lifecycleOutcome !== "active" ? (
-                  <Fact label="How its life ended" span>
-                    {UNIT_LIFECYCLE_OUTCOME_LABEL[unit.lifecycleOutcome as UnitLifecycleOutcome] ??
-                      unit.lifecycleOutcome}
-                  </Fact>
-                ) : null}
               </dl>
             </section>
 
-            {/* ── WHERE IT CAME FROM, AND WHO IT IS FOR ──────────────────── */}
+            {/* ── DOCUMENTS ──────────────────────────────────────────────── */}
             <section className="rounded-md border border-base-200 bg-white">
               <header className="border-b border-base-100 px-4 py-2.5">
-                <h2 className="text-label font-semibold text-base-900">Connected records</h2>
+                <h2 className="text-label font-semibold text-base-900">Documents</h2>
               </header>
               <dl className="grid grid-cols-2 gap-x-8 gap-y-3 px-4 py-4 md:grid-cols-3">
-                <Fact label="Product">{unit.productName ?? unit.sku}<div className="text-meta text-base-500">{unit.sku}</div></Fact>
-                <Fact label="Category">
-                  {unit.category ?? <Absent>Not in catalog</Absent>}
-                </Fact>
-                <Fact label="Supplier">{unit.supplier ?? <Absent>—</Absent>}</Fact>
-                <Fact label="Source order">
+                <Fact label="PO No / Ref No">
                   {unit.poNo ? (
                     <Link className="font-mono text-kit-blue-11 hover:underline" to={`/operation/procurement?po=${encodeURIComponent(unit.poNo)}`}>{unit.poNo}</Link>
                   ) : (
-                    <Absent>No purchase order</Absent>
+                    <Absent>Not recorded</Absent>
                   )}
                 </Fact>
-                <Fact label="PO issued">{unit.poDate ? fmtDate(unit.poDate) : <Absent>Not recorded</Absent>}</Fact>
-                <Fact label="Promised to">
+                <Fact label="PO Doc Date">{unit.poDate ? fmtDate(unit.poDate) : <Absent>Not recorded</Absent>}</Fact>
+                <Fact label="Supplier">{unit.supplier ?? <Absent>Not recorded</Absent>}</Fact>
+                <Fact label="SO No">
                   {unit.reservedRef ? (
                     unit.soldOrderId ? <Link className="font-mono text-kit-blue-11 hover:underline" to={`/operation/orders/${encodeURIComponent(unit.soldOrderId)}`}>{unit.reservedRef}</Link> : <span className="font-mono">{unit.reservedRef}</span>
                   ) : (
-                    <Absent>Not promised</Absent>
+                    <Absent>No SO</Absent>
                   )}
                 </Fact>
+                <Fact label="SO Date">{unit.soDate ? fmtDate(unit.soDate) : <Absent>No SO</Absent>}</Fact>
               </dl>
             </section>
 
@@ -207,7 +188,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
               </>}
             </section>
 
-            {/* ── IN & OUT ───────────────────────────────────────────────── */}
+            {/* ── HISTORY ────────────────────────────────────────────────── */}
             <section className="rounded-md border border-base-200 bg-white">
               <header className="border-b border-base-100 px-4 py-2.5">
                 <h2 className="text-label font-semibold text-base-900">History</h2>
