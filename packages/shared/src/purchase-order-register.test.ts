@@ -170,10 +170,17 @@ describe("shared supplier reply Work", () => {
   const person = { userId: "po-duty", name: "Jess" };
   const owner = { dutyKey: "po_duty", onDate: "2026-09-08", normalOwner: person,
     actingPerson: person, activeCover: null, buddy: null, state: "primary" as const, assignmentId: "assignment" };
-  it("starts on the Malaysia send day and resending does not reset its clock", () => {
+  it("a sent PO the supplier has not answered is NOT work — it waits for goods (owner ruling 2026-09-24)", () => {
     const items = purchaseOrderReplyWorkItems({ ...base, sends: [sent, { ...sent, sentAt: "2026-09-07T01:00:00Z" }] }, owner, "2026-09-08", new Set());
+    expect(items).toEqual([]);
+    const facts = purchaseOrderRegisterFacts({ ...base, sends: [sent] }, "2026-09-08");
+    expect(facts.filters).toContain("supplier_date_missing");
+    expect(purchaseOrderWork({ ...base, sends: [sent] }, facts)).toBeNull();
+  });
+  it("a passed supplier date is work on that date, owned by the current PO Duty", () => {
+    const items = purchaseOrderReplyWorkItems({ ...base, sends: [sent], supplierDate: "2026-09-04" }, owner, "2026-09-08", new Set());
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ dueIso: "2026-09-04", workingDaysLate: 2, ownerUserId: "po-duty", ruleKey: "purchasing.supplier_reply", action: "Ask Hooka to confirm the PO delivery date" });
+    expect(items[0]).toMatchObject({ dueIso: "2026-09-04", workingDaysLate: 2, ownerUserId: "po-duty", ruleKey: "purchasing.supplier_date_passed", tone: "warning", action: "Ask Hooka when the goods will arrive" });
   });
   it("does not chase an unsent revision, completed goods, or a current future reply", () => {
     for (const patch of [{ version: 2 }, { lines: [{ qty: 3, receivedQty: 3 }] }, { supplierDate: "2026-09-10" }]) {
@@ -182,9 +189,10 @@ describe("shared supplier reply Work", () => {
   });
   it("routes to active cover while retaining the normal owner for Team Work", () => {
     const cover = { userId: "cover", name: "Cover" };
-    const [item] = purchaseOrderReplyWorkItems({ ...base, sends: [sent] }, { ...owner, activeCover: cover, actingPerson: cover, state: "covered" }, "2026-09-08", new Set());
+    const passed = { ...base, sends: [sent], supplierDate: "2026-09-04" };
+    const [item] = purchaseOrderReplyWorkItems(passed, { ...owner, activeCover: cover, actingPerson: cover, state: "covered" }, "2026-09-08", new Set());
     expect(item).toMatchObject({ ownerUserId: "cover", normalOwner: person, activeCover: cover, ownerDutyKey: "po_duty", ownerState: "covered" });
-    expect(purchaseOrderReplyWorkItems({ ...base, sends: [sent] }, null, "2026-09-08", new Set())[0]).toMatchObject({ ownerUserId: null, normalOwner: null, ownerState: "not_assigned" });
+    expect(purchaseOrderReplyWorkItems(passed, null, "2026-09-08", new Set())[0]).toMatchObject({ ownerUserId: null, normalOwner: null, ownerState: "not_assigned" });
   });
   it("rolls an office holiday forward without changing the supplier date", () => {
     const input = { ...base, sends: [sent], supplierDate: "2026-09-05" };
