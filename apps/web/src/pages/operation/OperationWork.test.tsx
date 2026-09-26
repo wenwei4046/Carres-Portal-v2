@@ -215,7 +215,8 @@ describe("Operation Work — one server feed", () => {
     expect(within(toolbar).queryByTestId("work-filters-toggle")).toBeNull();
     expect(within(toolbar).getByTestId("work-view-mine").className).toContain("h-[34px]");
     expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-[340px]");
-    expect(within(toolbar).getByRole("button", { name: "Covering" }).className).toContain("h-9");
+    /* No `Covering` button (Jess, 2026-09-26): cover shows on the row. */
+    expect(within(toolbar).queryByRole("button", { name: "Covering" })).toBeNull();
     const rail = screen.getByTestId("work-rail");
     expect(within(rail).getByRole("button", { name: "Hide filters" })).toBeInTheDocument();
     expect(screen.getByTestId("work-rail-week")).toBeInTheDocument();

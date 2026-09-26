@@ -2,7 +2,7 @@ import type { OperationWorkModule } from "@carres/shared";
 import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { isWorkingDay } from "@carres/shared/working-days";
 import { addDaysIso, weekStartIso } from "@/lib/excel-date-filter";
-import { fmtDate, fmtMonth } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
 import type { WorkLayout } from "./WorkSplitShell";
 
@@ -12,12 +12,11 @@ export interface WorkFilters {
   search: string;
   when: WorkWhen;
   module: OperationWorkModule | "all";
-  covered: boolean;
 }
 
 export interface WorkSection {
   key: "broken" | "overdue" | "today" | "later" | "no_date";
-  label: "Broken commitments" | "Missed" | "Today" | "Later" | "No working date";
+  label: "Broken commitments" | "Missed" | "Today" | "Later" | "No date";
   items: WorkRow[];
 }
 
@@ -34,7 +33,7 @@ const SECTION_LABEL: Record<WorkSection["key"], WorkSection["label"]> = {
   overdue: "Missed",
   today: "Today",
   later: "Later",
-  no_date: "No working date",
+  no_date: "No date",
 };
 
 function searchText(item: WorkRow): string {
@@ -55,7 +54,6 @@ export function filterWork(items: readonly WorkRow[], filters: WorkFilters): Wor
   const query = filters.search.trim().toLocaleLowerCase();
   return items.filter((item) => {
     if (filters.module !== "all" && item.module !== filters.module) return false;
-    if (filters.covered && item.ownerState !== "covered") return false;
     if (filters.when === "broken" && !item.broken) return false;
     if (filters.when !== "all" && filters.when !== "broken" && item.timingBucket !== filters.when) return false;
     return !query || searchText(item).includes(query);
@@ -148,6 +146,12 @@ export function parseWorkWeek(value: string | null): string | null {
   return value && ISO_DATE.test(value) ? weekStartIso(value) : null;
 }
 
+/** The rail header's one line: `Week of 28 Sep` — the Monday, no weekday, no
+ *  dash (Jess, 2026-09-26: the two-date label wrapped to three lines). */
+export function workWeekWord(dateInWeek: string): string {
+  return `Week of ${fmtDateShort(weekStartIso(dateInWeek))}`;
+}
+
 export interface WorkRailDay {
   iso: string;
   /** `Wed, 16 Sep` — the one `fmtDate` spelling. */
@@ -201,34 +205,6 @@ export function workRailDates(items: readonly WorkRow[], today: string, week: st
     }),
     noDate: items.filter((item) => item.timingBucket === "no_date").length,
   };
-}
-
-/** The Date options in order: Missed first, the work week, No working date
- *  last — every option prints its count, `0` included, and today says
- *  `Today`. The rail's day cards and its fixed rows read this one list. */
-export function workDateOptions(dates: WorkRailDates): { value: string; label: string }[] {
-  const n = (count: number) => ` · ${count}`;
-  return [
-    { value: "missed", label: `Missed${n(dates.missed)}` },
-    ...dates.days.map((d) => ({
-      value: d.iso,
-      label: `${d.label}${d.today ? " · Today" : ""}${d.holiday ? ` · ${d.holiday}` : ""}${n(d.count)}`,
-    })),
-    { value: "no_date", label: `No working date${n(dates.noDate)}` },
-  ];
-}
-
-/** The Page select's options: `All pages` first, then every admitted page
- *  with its count over the chosen Date's rows. */
-export function workPageOptions(
-  modules: readonly { key: OperationWorkModule; label: string }[],
-  counts: Record<OperationWorkModule, number>,
-  total: number,
-): { value: string; label: string }[] {
-  return [
-    { value: "all", label: `All pages · ${total}` },
-    ...modules.map((m) => ({ value: m.key, label: `${m.label} · ${counts[m.key]}` })),
-  ];
 }
 
 /** Module counts over the rows of the chosen Date — before the module choice,
@@ -301,12 +277,41 @@ export function myMissedAndToday(
 }
 
 /**
- * WHICH MIDDLE TAB A ROW BELONGS TO (Workspace §5.10). `Waiting` only when the
- * owning module RECORDED that we are waiting on the party (the feed's
+ * A ROW'S STATUS — the rail's `Status` rows (Jess, 2026-09-26: the three
+ * middle tabs moved into the rail). `waiting` only when the owning module
+ * RECORDED that we are waiting on the party (the feed's
  * `communication.replyState`, from Delivery's contact record) — silence is
- * never waiting. A missed row is always `To do`: Waiting never hides a
- * deadline. `Completed` needs source-owned closure receipts (§5.2.1).
+ * never waiting. A missed row is always `todo`: Waiting never hides a
+ * deadline. `done` needs source-owned closure receipts (§5.2.1) and is not
+ * in the open feed yet, so no open row ever reports it.
  */
-export function workListTabOf(row: WorkRow): "todo" | "waiting" {
+export type WorkStatus = "todo" | "waiting" | "done";
+
+export const WORK_STATUS_ORDER: readonly WorkStatus[] = ["todo", "waiting", "done"];
+
+export const WORK_STATUS_WORD: Record<WorkStatus, string> = {
+  todo: "To do",
+  waiting: "Waiting for answer",
+  done: "Done today",
+};
+
+export function workStatusOf(row: WorkRow): WorkStatus {
   return row.source.communication?.replyState === "waiting" && row.timingBucket !== "overdue" ? "waiting" : "todo";
+}
+
+/** The chosen statuses from the URL's `status` (`todo,waiting`); more than
+ *  one may be on. Absent or empty = `To do` alone, the opening list. */
+export function parseWorkStatus(value: string | null): WorkStatus[] {
+  const chosen = (value ?? "").split(",").filter((k): k is WorkStatus => (WORK_STATUS_ORDER as readonly string[]).includes(k));
+  return chosen.length > 0 ? WORK_STATUS_ORDER.filter((k) => chosen.includes(k)) : ["todo"];
+}
+
+/** The URL value after toggling one status; `null` when the result is the
+ *  default (`To do` alone) so the URL stays clean. The last status on cannot
+ *  be turned off — an empty list would show nothing and explain nothing. */
+export function toggleWorkStatus(current: readonly WorkStatus[], status: WorkStatus): string | null {
+  const next = current.includes(status)
+    ? current.length === 1 ? [...current] : current.filter((k) => k !== status)
+    : WORK_STATUS_ORDER.filter((k) => current.includes(k) || k === status);
+  return next.length === 1 && next[0] === "todo" ? null : next.join(",");
 }

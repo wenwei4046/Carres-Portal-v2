@@ -189,41 +189,6 @@ export default function WorkCard({
   );
 }
 
-export type WorkListTab = "todo" | "waiting" | "completed";
-
-const TAB_WORD: Record<WorkListTab, string> = { todo: "To do", waiting: "Waiting", completed: "Completed" };
-
-/** The 36px segmented control over the card list. A tab changes the list;
- *  it never expands a card. A count the feed does not carry is not printed. */
-export function WorkListTabs({
-  value,
-  counts,
-  onChange,
-}: {
-  value: WorkListTab;
-  counts: Partial<Record<WorkListTab, number>>;
-  onChange: (tab: WorkListTab) => void;
-}) {
-  return (
-    <div role="tablist" aria-label="Work list" className="grid h-9 shrink-0 grid-cols-3 gap-0.5 rounded-[7px] bg-work-tabs p-[3px]">
-      {(Object.keys(TAB_WORD) as WorkListTab[]).map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          role="tab"
-          aria-selected={value === tab}
-          data-testid={`work-tab-${tab}`}
-          onClick={() => onChange(tab)}
-          className={`rounded-[5px] text-[13px] font-semibold leading-[18px] transition-colors duration-[120ms] motion-reduce:transition-none ${FOCUS} focus-visible:outline-offset-1 ${value === tab ? "bg-white text-work-ink" : "text-work-muted hover:text-work-ink"}`}
-        >
-          {TAB_WORD[tab]}
-          {counts[tab] !== undefined ? <span className="ml-1 font-medium tabular-nums text-work-muted">{counts[tab]}</span> : null}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** Three 104px neutral placeholders; no shimmer under reduced motion. */
 export function WorkCardSkeleton() {
   return (
