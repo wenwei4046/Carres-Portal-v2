@@ -39,7 +39,6 @@ import {
   manualPurchaseLeadDayFacts,
   manualPurchaseLineRemainingOf,
   manualPurchaseObjectHeading,
-  manualPurchaseOrderByLine,
   manualPurchaseOrderByOf,
   manualPurchasePoSummary,
   manualPurchaseRailFacts,
@@ -72,6 +71,17 @@ import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
+import ConfigureDrawer from "@/pages/dealer/pos/ConfigureDrawer";
+import { buildCatalogIndex } from "@/pages/dealer/pos/catalog-index";
+import { useCatalog } from "@/lib/queries";
+import { lineConfigBits } from "@/pages/dealer/new-order/special-addons-picker";
+
+/** The line's configuration in the PO paper's own words (`lineConfigBits`,
+ *  the one reader the PO PDF and the dealer picker share): colour · gap ·
+ *  fabric · options · leg height · special add-ons. */
+const configWords = (attrs: Record<string, unknown> | null | undefined): string =>
+  lineConfigBits(attrs ?? null).join(" · ");
+import Textarea from "@/components/kit/Textarea";
 import Loading from "@/components/kit/Loading";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
@@ -123,7 +133,7 @@ import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 import type { IssuedPo } from "./components/PoIssueEvidence";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { Block } from "./SalesOrderWorkspace";
+import { Block, Fact as SharedFact } from "./SalesOrderWorkspace";
 import {
   RecordRanks,
   groupHistoryChronology,
@@ -490,8 +500,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       issueWalls: live.map((l) => ({
         demandId: l.id,
         requestNo: r.req_no,
-        purchaseRequirement: r.purchase_requirement ?? null,
-        note: l.remark ?? null,
+        configuration: configWords(l.attrs) || null,
         supplierId: l.supplier_id,
         supplierName: l.supplier_id ? (supplierName.get(l.supplier_id) ?? null) : null,
         supplierAddress: l.supplier_id ? (supplierAddress.get(l.supplier_id) ?? null) : null,
@@ -2207,7 +2216,9 @@ interface LineDraft {
   sku: string | null;
   needle: string;
   qty: string;
-  note: string;
+  /** 0591 — the line's configuration, chosen through the Sales portal's
+   *  own `Configure` (colour · fabric · size · options). No free text. */
+  attrs: Record<string, unknown> | null;
   state: LineState;
   error: string | null;
 }
@@ -2218,12 +2229,12 @@ const blankLine = (): LineDraft => ({
   sku: null,
   needle: "",
   qty: "1",
-  note: "",
+  attrs: null,
   state: "idle",
   error: null,
 });
 const isBlank = (l: LineDraft) =>
-  l.sku == null && l.needle === "" && l.note === "" && (l.qty === "1" || l.qty === "");
+  l.sku == null && l.needle === "" && l.attrs == null && (l.qty === "1" || l.qty === "");
 
 /** The picker's five columns — ported unchanged from the retired dialog
  *  (P15's list; the SKU leads because four `Booqit`s differ only by code). */
@@ -2261,7 +2272,7 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
   },
 ];
 
-const LINE_GRID = "minmax(0,1fr) 53px minmax(0,1fr) auto";
+const LINE_GRID = "minmax(0,1fr) 53px auto";
 /** The picker window. Bounded because `/demand/pick-items` returns every
  *  supplied SKU (to-order.ts) — the ceiling is a render budget, not a rule.
  *  The list scrolls inside a `max-h-64` box, so a needle that matches many
@@ -2335,14 +2346,6 @@ function CreateRequestWorkspace({
   const [dateTouched, setDateTouched] = useState(false);
   /** Only `Other Purchase` asks — and must answer — `What is this for?`. */
   const [why, setWhy] = useState("");
-  /**
-   * ⭐ `Purchase requirement` — OPTIONAL, ON EVERY PURPOSE (owner 2026-09-22).
-   * What the goods must satisfy, in the requester's words. It is NOT the
-   * `Other Purchase` reason: that one is required and answers *why buy at
-   * all*, and one field cannot carry two questions without one of them
-   * becoming a guess about which was answered.
-   */
-  const [requirement, setRequirement] = useState("");
   /** The per-purpose structured For fact (Card 04 §4). */
   const [serviceCaseId, setServiceCaseId] = useState<string | undefined>(undefined);
   const [staffUserId, setStaffUserId] = useState<string | undefined>(undefined);
@@ -2379,7 +2382,6 @@ function CreateRequestWorkspace({
     setWhy(r.purpose === "other_purchase" ? (r.why ?? "") : "");
     /* R4 — a returned request reopens with the requirement it was sent with;
        a request that recorded none opens empty and stays optional. */
-    setRequirement(r.purchase_requirement ?? "");
     setServiceCaseId(r.for_service_case_id ?? undefined);
     setStaffUserId(r.for_staff_user_id ?? undefined);
     setSubsidiaryName(r.for_subsidiary_name ?? "");
@@ -2391,7 +2393,7 @@ function CreateRequestWorkspace({
             demandId: l.id,
             sku: l.sku,
             qty: String(l.qty),
-            note: l.remark ?? "",
+            attrs: l.attrs ?? null,
           }))
         : [blankLine()],
     );
@@ -2420,6 +2422,21 @@ function CreateRequestWorkspace({
      picked line resolves Catalog Supplier × Category with complete
      Settings, proposes Delivery Date from the slowest line. The browser
      performs no working-day arithmetic and never guesses a date. */
+  /* The Sales portal's configurator over the same Catalog (0182 option
+     pools, fabrics, tiers, special add-ons). Read once, admin view. */
+  const [configureId, setConfigureId] = useState<string | null>(null);
+  const catalogQ = useCatalog({ admin: true });
+  const catalogReady = !!catalogQ.data && Array.isArray(catalogQ.data.skus) && Array.isArray(catalogQ.data.models);
+  const catalogIndex = useMemo(
+    () => (catalogQ.data && catalogReady ? buildCatalogIndex(catalogQ.data, catalogQ.data.fabricTierConfig, catalogQ.data.modelFabricTierOverrides) : null),
+    [catalogQ.data, catalogReady],
+  );
+  const configuring = configureId ? lines.find((l) => l.id === configureId) ?? null : null;
+  const configureModel = (() => {
+    if (!configuring?.sku || !catalogQ.data || !catalogReady || !catalogIndex) return null;
+    const sku = catalogQ.data.skus.find((x) => x.sku === configuring.sku);
+    return sku ? (catalogQ.data.models.find((m) => m.id === sku.modelId) ?? null) : null;
+  })();
   const pickedSkus = useMemo(
     () => [...new Set(lines.map((l) => l.sku).filter((s): s is string => s != null))],
     [lines],
@@ -2648,7 +2665,6 @@ function CreateRequestWorkspace({
           destinationId: chosenDest,
           requiredBy: deliveryDate,
           why: purpose === "other_purchase" ? why.trim() : null,
-          purchaseRequirement: requirement.trim() || null,
           serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
           staffUserId: purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
           subsidiaryName: purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
@@ -2656,7 +2672,7 @@ function CreateRequestWorkspace({
             id: l.demandId ?? null,
             sku: l.sku,
             qty: Number(l.qty),
-            note: l.note.trim() || null,
+            attrs: l.attrs,
           })),
         });
         setSaving(false);
@@ -2678,10 +2694,6 @@ function CreateRequestWorkspace({
         destinationId: chosenDest,
         requiredBy: deliveryDate || null,
         why: purpose === "other_purchase" ? why.trim() : null,
-        /* Optional on every purpose, and sent as a real absence when it is
-           empty — a blank string would store "the requester answered nothing"
-           as if it were an answer. */
-        purchaseRequirement: requirement.trim() || null,
         serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
         staffUserId:
           purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
@@ -2694,7 +2706,7 @@ function CreateRequestWorkspace({
           sku: l.sku,
           qty: Number(l.qty),
           requiredBy: deliveryDate || null,
-          note: l.note.trim() || null,
+          attrs: l.attrs,
         })),
       });
       setRequestId(created.id);
@@ -2764,7 +2776,6 @@ function CreateRequestWorkspace({
             ? MW.canStockAnswerNo
             : null,
     },
-    { label: MW.purchaseRequirement, value: requirement.trim() || null },
     { label: MW.createRequestedBy, value: requesterName },
     {
       label: MW.proceedDate,
@@ -2789,7 +2800,7 @@ function CreateRequestWorkspace({
          and the PO grouping at Issue PO is what splits them. */
       supplier: picked.supplier ?? null,
       qty: Number(line.qty) || 0,
-      note: line.note.trim() || null,
+      configuration: configWords(line.attrs) || null,
     }));
 
   /* ⭐ D1 · SEND STAYS ON SCREEN (measured 2026-09-17: at 390px the header's
@@ -2823,6 +2834,24 @@ function CreateRequestWorkspace({
         className="mp-create-page flex min-h-0 flex-1 flex-col overflow-auto p-4"
         data-testid="manual-purchase-create"
       >
+        {configuring && configureModel && catalogQ.data && catalogIndex ? (
+          <ConfigureDrawer
+            model={configureModel}
+            meta={catalogIndex.meta.get(configureModel.id)}
+            skus={catalogIndex.skusByModel.get(configureModel.id) ?? []}
+            fabrics={catalogIndex.fabricsByModel.get(configureModel.id) ?? []}
+            fabricTierConfig={catalogQ.data.fabricTierConfig}
+            modelFabricTierOverrides={catalogQ.data.modelFabricTierOverrides}
+            specialAddons={catalogQ.data.specialAddons}
+            onAdd={(line) => {
+              /* The configurator answers with the exact variant SKU and its
+                 configuration; the row's own Qty stays the requester's. */
+              patch(configuring.id, { sku: line.sku, needle: "", attrs: line.attrs });
+              setConfigureId(null);
+            }}
+            onClose={() => setConfigureId(null)}
+          />
+        ) : null}
         <h2 className="mp-create-heading">
           {editing ? MW.editAndSendAgain : "New Manual Purchase Request"}
         </h2>
@@ -2834,13 +2863,23 @@ function CreateRequestWorkspace({
         <div className="mp-create-split" data-testid="object-two-panes">
           <div className="mp-create-form mp-create-style flex min-w-0 flex-col gap-6">
             <Block title={MW.secCreateRequestDetails}>
-              <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* ⭐ ONE TITLE, ONE BOX, THREE TO A ROW — owner ruling 2026-09-26
+                  ("yes" to the sketch), the Sales Order fact grammar. Row 1: the
+                  automatic facts, then Purpose. Row 2: the purpose's own second
+                  box (its title changes with the purpose; Ready Stock and
+                  Showroom Display have none, so `Can stock answer this?` moves
+                  left). Owner 2026-09-26: no free text — the former
+                  `Purchase requirement` is gone; a line is CONFIGURED. */}
+              <div className="mp-create-general grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <SharedFact idPrefix="mp-create-fact" framed label={MW.createRequestedBy} testId="mp-raised-by" value={requesterName} />
+        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
+            Malaysia-date preview before Send; the stored hand-off truth
+            after. Never an input, never a browser clock. */}
+        <SharedFact idPrefix="mp-create-fact" framed label={MW.proceedDate} testId="mp-proceed-date" value={plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null} />
         <div>
-          <label htmlFor="mp-purpose" className="text-meta text-kit-slate-11">
-            {MW.createPurpose}
-          </label>
           <Select
             id="mp-purpose"
+            label={MW.createPurpose}
             value={purpose}
             /* R4 — the purpose is the request's identity; editing keeps it. */
             disabled={editing}
@@ -2848,38 +2887,15 @@ function CreateRequestWorkspace({
             options={DEMAND_PURPOSES.map((p) => ({ value: p.value, label: p.label }))}
           />
         </div>
-        {/* ⭐ CAN STOCK ANSWER THIS? — beside `Need for`, because it is the
-            same breath: the operator says what the purchase is for, then
-            whether goods already on the shelf can answer it. It is the ONE
-            fact the whole Ready Stock allocation reads (0546), and 0549 is
-            the file that finally writes it.
-
-            No default option and no pre-selection: the ruling of 2026-09-18
-            forbids inferring the intent, and a pre-picked answer is that
-            inference with the operator's name on it. `Send` names the gap. */}
-        <div>
-          <label htmlFor="mp-stock-answer" className="text-meta text-kit-slate-11">
-            {MW.canStockAnswer}
-          </label>
-          <Select
-            id="mp-stock-answer"
-            value={stockAnswer ?? undefined}
-            onValueChange={(v) => setStockAnswer(v as ManualPurchaseIntent)}
-            options={[
-              { value: "concrete_need", label: MW.canStockAnswerYes },
-              { value: "additional_stock", label: MW.canStockAnswerNo },
-            ]}
-          />
-        </div>
         {/* ── THE STRUCTURED FOR (Card 04 §4) — each exceptional purpose
-            names its object; routine purposes ask nothing extra. ── */}
+            names its object in its own box; routine purposes ask nothing
+            extra. Only `Other Purchase` asks `What is this for?`, and it must
+            be answered before Send unlocks. ── */}
         {purpose === "service_case" ? (
           <div data-testid="mp-for-service-case">
-            <label htmlFor="mp-service-case" className="text-meta text-kit-slate-11">
-              {MW.serviceCase}
-            </label>
             <Select
               id="mp-service-case"
+              label={MW.serviceCase}
               value={serviceCaseId}
               onValueChange={setServiceCaseId}
               options={(casesQ.data?.items ?? []).map((sc) => ({
@@ -2891,11 +2907,9 @@ function CreateRequestWorkspace({
         ) : null}
         {purpose === "internal_staff_purchase" ? (
           <div data-testid="mp-for-staff">
-            <label htmlFor="mp-staff" className="text-meta text-kit-slate-11">
-              {MW.staffMember}
-            </label>
             <Select
               id="mp-staff"
+              label={MW.staffMember}
               value={staffUserId}
               onValueChange={setStaffUserId}
               options={namedStaff.map((s) => ({
@@ -2907,73 +2921,43 @@ function CreateRequestWorkspace({
         ) : null}
         {purpose === "subsidiary_purchase" ? (
           <div data-testid="mp-for-subsidiary">
-            <label htmlFor="mp-subsidiary" className="text-meta text-kit-slate-11">
-              {MW.subsidiary}
-            </label>
             <Input
               id="mp-subsidiary"
+              label={MW.subsidiary}
               value={subsidiaryName}
               onChange={(e) => setSubsidiaryName(e.target.value)}
             />
           </div>
         ) : null}
-        <div>
-          <span className="text-meta text-kit-slate-11">{MW.createRequestedBy}</span>
-          {/* A FACT, never a control — the server stamps `created_by` itself.
-              The NAME is resolved through the same Staff list the Register
-              reads; a shared or unnamed login prints the governed absence
-              rather than an email or `(you)`, which named nobody. */}
-          <p className="pt-1.5 text-body text-base-900" data-testid="mp-raised-by">
-            {requesterName}
-          </p>
-        </div>
-        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
-            Malaysia-date preview before Send; the stored hand-off truth
-            after. Never an input, never a browser clock. */}
-        <div>
-          <span className="text-meta text-kit-slate-11">{MW.proceedDate}</span>
-          <p className="pt-1.5 text-body text-base-900" data-testid="mp-proceed-date">
-            {plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null}
-          </p>
-        </div>
-              </div>
-      {/* Card 04 — ONLY `Other Purchase` asks the question, and it must be
-          answered before Send unlocks. Routine purposes do not ask a
-          duplicate `Why`. */}
       {purpose === "other_purchase" ? (
-        <div className="max-w-[720px]">
-          <label htmlFor="mp-why" className="text-meta text-kit-slate-11">
-            {MW.whatIsThisFor}
-          </label>
-          <textarea
+        <div data-testid="mp-for-other">
+          <Textarea
             id="mp-why"
+            label={MW.whatIsThisFor}
             data-testid="mp-why"
             value={why}
             onChange={(e) => setWhy(e.target.value)}
             rows={2}
-            className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
           />
         </div>
       ) : null}
-
-      {/* ⭐ `Purchase requirement` — OPTIONAL, ON EVERY PURPOSE (owner
-          2026-09-22). It stays inside Request Details: the requirement is part
-          of what is being asked for, not a third kind of need and not a
-          question at the bottom of the form. It never borrows `Other
-          Purchase`'s required reason field. */}
-      <div className="max-w-[720px]">
-        <label htmlFor="mp-requirement" className="text-meta text-kit-slate-11">
-          {MW.purchaseRequirement}
-        </label>
-        <textarea
-          id="mp-requirement"
-          data-testid="mp-requirement"
-          value={requirement}
-          onChange={(e) => setRequirement(e.target.value)}
-          rows={2}
-          className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
-        />
-      </div>
+        {/* ⭐ CAN STOCK ANSWER THIS? — the ONE fact the whole Ready Stock
+            allocation reads (0546; 0549 writes it). No default option and no
+            pre-selection: the ruling of 2026-09-18 forbids inferring the
+            intent. `Send` names the gap. */}
+        <div>
+          <Select
+            id="mp-stock-answer"
+            label={MW.canStockAnswer}
+            value={stockAnswer ?? undefined}
+            onValueChange={(v) => setStockAnswer(v as ManualPurchaseIntent)}
+            options={[
+              { value: "concrete_need", label: MW.canStockAnswerYes },
+              { value: "additional_stock", label: MW.canStockAnswerNo },
+            ]}
+          />
+        </div>
+              </div>
       {headerError ? (
         <p className="text-meta text-kit-red-11" data-testid="mp-header-error">
           {headerError}
@@ -3056,7 +3040,6 @@ function CreateRequestWorkspace({
         >
           <span className="mp-line-head text-label text-kit-slate-11">{W.itemLabel}</span>
           <span className="mp-line-head text-label text-kit-slate-11">{W.itemsColQty}</span>
-          <span className="mp-line-head text-label text-kit-slate-11">{MW.note}</span>
           <span className="mp-line-head" />
 
           {lines.map((line, i) => {
@@ -3084,6 +3067,26 @@ function CreateRequestWorkspace({
                     }}
                     placeholder={W.searchItem}
                   />
+                  {/* ⭐ CONFIGURED LIKE A SALES PORTAL LINE (owner, 2026-09-26):
+                      the chosen colour · fabric · size · options print here
+                      and travel MPR → PO → PO PDF; `Configure` opens the
+                      Sales portal's own drawer over the same Catalog. */}
+                  {picked && !done ? (
+                    <span className="mt-1 flex flex-wrap items-center gap-x-3 text-meta">
+                      {configWords(line.attrs) ? (
+                        <span className="text-kit-slate-11" data-testid={`mp-line-config-${i}`}>{configWords(line.attrs)}</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="text-kit-blue-11 hover:underline"
+                        aria-label={`Configure ${picked.label}`}
+                        data-testid={`mp-line-configure-${i}`}
+                        onClick={() => setConfigureId(line.id)}
+                      >
+                        Configure
+                      </button>
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mp-line-qty min-w-0">
                   <span className="mp-line-caption text-label text-kit-slate-11" aria-hidden>
@@ -3096,18 +3099,6 @@ function CreateRequestWorkspace({
                     value={line.qty}
                     disabled={done}
                     onChange={(e) => patch(line.id, { qty: e.target.value })}
-                  />
-                </div>
-                <div className="mp-line-note min-w-0">
-                  <span className="mp-line-caption text-label text-kit-slate-11" aria-hidden>
-                    {MW.note}
-                  </span>
-                  <Input
-                    id={`mp-note-${i}`}
-                    aria-label={MW.note}
-                    value={line.note}
-                    disabled={done}
-                    onChange={(e) => patch(line.id, { note: e.target.value })}
                   />
                 </div>
                 <div className="mp-line-action">
@@ -3247,7 +3238,7 @@ function AlreadyHave({
       className="ml-1 flex flex-col gap-0.5 border-l-2 border-base-100 pl-3 text-meta"
       data-testid={`mp-already-have-${index}`}
     >
-      <span className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+      <span className="text-label font-semibold text-kit-slate-11">
         {MW.alreadyHave}
       </span>
       <span className="text-base-700">
@@ -3436,6 +3427,8 @@ function ObjectTable({
 }
 
 /** One REQUEST fact — label over value, the object's reading grammar. */
+/** The shared Sales Order fact (owner, 2026-09-26) in this page's id family,
+ *  boxed like the Sales Order page ("got box … I want follow"). */
 function Fact({
   label,
   children,
@@ -3447,14 +3440,7 @@ function Fact({
   testId?: string;
   wide?: boolean;
 }) {
-  return (
-    <div className={wide ? "col-span-full" : undefined}>
-      <dt className="text-meta text-kit-slate-11">{label}</dt>
-      <dd className="text-body text-base-900" data-testid={testId}>
-        {children}
-      </dd>
-    </div>
-  );
+  return <SharedFact idPrefix="mp-fact" own={false} framed label={label} value={<span className="block min-w-0">{children}</span>} testId={testId} wide={wide} />;
 }
 
 /**
@@ -3774,7 +3760,11 @@ function ManualPurchaseObject({
     if (!openSection || q.isPending) return;
     const title = openSection === "approval" ? MW.secApproval : null;
     if (!title) return;
-    const section = document.querySelector(`[data-block="${title}"]`);
+    /* The Approval card exists only when there is a decision to make or read
+       (owner, 2026-09-26); for a waiting request the state is the Request
+       card's `Approval Status` fact, so the deep link lands there. */
+    const section = document.querySelector(`[data-block="${title}"]`)
+      ?? (title === MW.secApproval ? document.querySelector('[data-testid="mp-approval-fact"]') : null);
     section?.scrollIntoView({ block: "start" });
   }, [openSection, q.isPending]);
   const pick = useQuery({
@@ -4095,6 +4085,57 @@ function ManualPurchaseObject({
         0,
       );
 
+  /* R3 · `Withdraw request` — the requester's own door, only while nothing is
+     decided and no PO exists; it rides the Request card's own header (a
+     panel's actions live in its header). It asks once more before it acts. */
+  const withdrawDoor = (
+    <>
+      {/* R3 · `Withdraw request` — the requester's own door, only while
+          nothing is decided and no PO exists. It asks once more before
+          it acts, because a withdrawn request cannot come back. */}
+      {d.canWithdraw ? (
+        <div className="flex flex-col items-end gap-2" data-testid="mp-withdraw">
+          {withdrawError ? (
+            <TwoLines
+              testId="mp-withdraw-error"
+              wrong={withdrawError.wrong}
+              todo={withdrawError.todo}
+            />
+          ) : null}
+          <span className="flex flex-wrap items-center gap-2">
+            {confirmWithdraw ? (
+              <>
+                <Button
+                  variant="neutral"
+                  onClick={() => setConfirmWithdraw(false)}
+                  disabled={withdraw.isPending}
+                >
+                  {MW.cancel}
+                </Button>
+                <Button
+                  variant="primary"
+                  loading={withdraw.isPending}
+                  onClick={() => void withdrawRequest()}
+                  data-testid="mp-withdraw-confirm"
+                >
+                  {MW.withdraw}
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="neutral"
+                onClick={() => setConfirmWithdraw(true)}
+                data-testid="mp-withdraw-request"
+              >
+                {MW.withdraw}
+              </Button>
+            )}
+          </span>
+        </div>
+      ) : null}
+    </>
+  );
+
   const historyGroups = groupHistoryChronology(d.history ?? []);
 
   return (
@@ -4105,8 +4146,8 @@ function ManualPurchaseObject({
           {/* ① REQUEST — the six authoritative facts, in the Card 06 order:
               Proceed Date · Delivery Date · Need for · For · Deliver To ·
               Requested By. */}
-          <Block title={MW.secRequest}>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+          <Block title={MW.secRequest} headerSlot={withdrawDoor}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="mp-detail-facts">
               <Fact label={MW.colProceedDate} testId="mp-detail-proceed-date">
                 {fmtDate(request.created_at.slice(0, 10))}
               </Fact>
@@ -4118,18 +4159,23 @@ function ManualPurchaseObject({
                      given an invented Order By (Card 06 §6). */
                   <span className="text-base-600">{MW.notRecorded}</span>
                 )}
-                {/* The quiet derived timing fact — `Order by {date}`; when
-                    passed, the fact states `Order date passed` first. No
-                    Object Issue PO button arrives with it. */}
-                {orderBy != null ? (
-                  <span className="block text-label text-base-600" data-testid="mp-detail-order-by">
-                    {timing === "order_date_passed" ? (
-                      <span className="block text-kit-red-11">{MW.orderDatePassed}</span>
-                    ) : null}
-                    {manualPurchaseOrderByLine(fmtDate(orderBy))}
-                  </span>
-                ) : null}
               </Fact>
+              {/* ONE TITLE, ONE BOX (owner, 2026-09-26): the derived `Order By`
+                  date and the `Order timing` state are their own facts, never
+                  stacked under Delivery Date. No Object Issue PO button
+                  arrives with them. */}
+              {orderBy != null ? (
+                <Fact label={MW.colOrderBy} testId="mp-detail-order-by">
+                  {fmtDate(orderBy)}
+                </Fact>
+              ) : null}
+              {orderBy != null && timing ? (
+                <Fact label={MANUAL_PURCHASE_RAIL.timing.heading} testId="mp-detail-order-timing">
+                  <span className={timing === "order_date_passed" ? "text-kit-red-11" : undefined}>
+                    {MANUAL_PURCHASE_RAIL.timing.rows.find((row) => row.state === timing)?.word ?? ""}
+                  </span>
+                </Fact>
+              ) : null}
               <Fact label={MW.needFor}>{purposeLabelOf(request.purpose)}</Fact>
               <Fact label={MW.colFor} testId="mp-detail-for">
                 {forText}
@@ -4154,6 +4200,19 @@ function ManualPurchaseObject({
               {/* The real staff display name — never `operation`, an email, a
                   role or `(you)`. A shared-account record whose individual
                   cannot be recovered states the audit defect. */}
+              {/* International pattern (Odoo / NetSuite / SAP release): the
+                  approval STATE is a field on the record; the decision is an
+                  action. So the status lives here, and the Approval card
+                  below appears only when there is a decision to make or a
+                  decision record to read (owner, 2026-09-26). */}
+              <Fact label={MW.colApproval} testId="mp-approval-fact">
+                <span className="block">{approval.kind === "need_approval" ? MANUAL_PURCHASE_APPROVAL_WORDS.need_approval : approval.label}</span>
+                {approval.kind === "need_approval" && approverLine ? (
+                  <span className="block text-meta text-base-600" data-testid="mp-detail-approver">
+                    {approverLine}
+                  </span>
+                ) : null}
+              </Fact>
               <Fact label={MW.colRequestedBy} testId="mp-detail-requested-by">
                 {d.requested_by_name ?? (
                   <span className="text-base-600">{MW.staffIdentityNotRecorded}</span>
@@ -4167,20 +4226,7 @@ function ManualPurchaseObject({
                   {request.why}
                 </Fact>
               ) : null}
-              {/* ⭐ `Purchase requirement` (0562) — shown only when the
-                  requester actually wrote one. It is OPTIONAL, so an empty row
-                  would print a label over nothing and read as a fact somebody
-                  failed to record. */}
-              {request.purchase_requirement ? (
-                <Fact
-                  label={MW.purchaseRequirement}
-                  testId="mp-detail-purchase-requirement"
-                  wide
-                >
-                  {request.purchase_requirement}
-                </Fact>
-              ) : null}
-            </dl>
+            </div>
           </Block>
 
           {/* ② ITEMS REQUESTED — read-only; Catalog human words beside the
@@ -4194,8 +4240,7 @@ function ManualPurchaseObject({
                 { key: "item", label: MW.expItem, width: 220 },
                 { key: "supplier", label: MW.expSupplier, width: 180 },
                 { key: "qty", label: MW.expRequestedQty, width: 110 },
-                { key: "deliver", label: MW.expDeliverTo, width: 170 },
-                { key: "note", label: MW.colNote },
+                { key: "deliver", label: MW.expDeliverTo },
               ]}
             >
               {lines.map((l, i) => (
@@ -4207,6 +4252,11 @@ function ManualPurchaseObject({
                   <td className="px-2 py-2 font-mono">{l.sku}</td>
                   <td className="px-2 py-2">
                     {l.item_label ?? l.sku}
+                    {configWords(l.attrs) ? (
+                      <span className="block text-label text-kit-slate-11" data-testid={`mp-object-item-config-${i}`}>
+                        {configWords(l.attrs)}
+                      </span>
+                    ) : null}
                     {l.cancelled_at ? (
                       <span className="block text-label text-kit-slate-11">
                         {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
@@ -4261,7 +4311,6 @@ function ManualPurchaseObject({
                   <td className="px-2 py-2">
                     {destName.get(l.destination_id ?? request.destination_id) ?? ""}
                   </td>
-                  <td className="px-2 py-2">{l.remark}</td>
                 </tr>
               ))}
             </ObjectTable>
@@ -4303,21 +4352,11 @@ function ManualPurchaseObject({
             )}
           </Block>
 
-          {/* ④ APPROVAL — always present: the decision is part of the object.
-              Content follows the fact and the caller's real authority. */}
+          {/* ④ APPROVAL — only when there is a decision to make here or a
+              decision record to read; the state itself is a Request fact. */}
+          {showDecision || approval.kind !== "need_approval" ? (
           <Block title={MW.secApproval}>
-            {approval.kind === "need_approval" && !showDecision ? (
-              <div className="flex flex-col gap-0.5" data-testid="mp-approval-fact">
-                <span className="text-body font-medium text-base-900">
-                  {MANUAL_PURCHASE_APPROVAL_WORDS.need_approval}
-                </span>
-                {approverLine ? (
-                  <span className="text-meta text-base-600" data-testid="mp-detail-approver">
-                    {approverLine}
-                  </span>
-                ) : null}
-              </div>
-            ) : approval.kind === "need_approval" && showDecision ? (
+            {approval.kind === "need_approval" && showDecision ? (
               <div className="flex flex-col gap-3" data-testid="mp-decision">
                 <ObjectTable
                   testId="mp-approval-table"
@@ -4431,7 +4470,7 @@ function ManualPurchaseObject({
               /* Decided, returned or withdrawn — the fact, the real actor and
                  time, and what the fact carries: the approved quantities, the
                  refusal reason, or the reason it came back. */
-              <div className="flex flex-col gap-2" data-testid="mp-approval-fact">
+              <div className="flex flex-col gap-2" data-testid="mp-approval-record">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-body font-semibold text-base-900">
                     {approval.label}
@@ -4492,50 +4531,8 @@ function ManualPurchaseObject({
                 ) : null}
               </div>
             )}
-            {/* R3 · `Withdraw request` — the requester's own door, only while
-                nothing is decided and no PO exists. It asks once more before
-                it acts, because a withdrawn request cannot come back. */}
-            {d.canWithdraw ? (
-              <div className="mt-3 flex flex-col gap-2 border-t border-base-200 pt-3" data-testid="mp-withdraw">
-                {withdrawError ? (
-                  <TwoLines
-                    testId="mp-withdraw-error"
-                    wrong={withdrawError.wrong}
-                    todo={withdrawError.todo}
-                  />
-                ) : null}
-                <span className="flex flex-wrap items-center gap-2">
-                  {confirmWithdraw ? (
-                    <>
-                      <Button
-                        variant="neutral"
-                        onClick={() => setConfirmWithdraw(false)}
-                        disabled={withdraw.isPending}
-                      >
-                        {MW.cancel}
-                      </Button>
-                      <Button
-                        variant="primary"
-                        loading={withdraw.isPending}
-                        onClick={() => void withdrawRequest()}
-                        data-testid="mp-withdraw-confirm"
-                      >
-                        {MW.withdraw}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="neutral"
-                      onClick={() => setConfirmWithdraw(true)}
-                      data-testid="mp-withdraw-request"
-                    >
-                      {MW.withdraw}
-                    </Button>
-                  )}
-                </span>
-              </div>
-            ) : null}
           </Block>
+          ) : null}
 
           {/* ⑤ PURCHASE ORDERS — read-only exact lineage. No Issue PO, no PO
               Duty, no consolidation, no price, no Receive, no PDF: issuance

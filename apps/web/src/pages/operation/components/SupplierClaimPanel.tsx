@@ -7,18 +7,20 @@ import {
 } from "@carres/shared";
 import { fetchOperationSupplierClaimPhotos, useOperationSupplierClaimPhotos, type SupplierClaimListRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
-import { SectionCard } from "@/components/SectionPanel";
-import SectionHeader from "@/components/kit/SectionHeader";
+import { Block } from "../SalesOrderWorkspace";
 import Button from "@/components/kit/Button";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import { RecordRanks } from "../SalesOrderLedger";
 
 const absent = "Not recorded";
 
+/** One object card grammar for the whole portal (owner, 2026-09-26): the
+ *  Sales Order `Block` — blue sentence-case title over a rule — replaces the
+ *  retired cream band here too. */
 export function ClaimSection({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
-  return <SectionCard><SectionHeader title={title} action={action} />
-    <div className="px-4 pb-4 text-body text-base-800 space-y-2 break-words">{children}</div>
-  </SectionCard>;
+  return <Block title={title} headerSlot={action}>
+    <div className="text-body text-base-800 space-y-2 break-words">{children}</div>
+  </Block>;
 }
 
 export function ClaimSource({ claim }: { claim: SupplierClaimListRow }) {

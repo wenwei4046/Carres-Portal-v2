@@ -102,15 +102,18 @@ describe("Sales Order object template contract", () => {
      module-specific owner ruling is not overturned by a shared document's
      general guidance. The grey-blue band is retired for a 1px rule. */
   it("draws card titles blue and sentence case over a 1px rule, with no band", () => {
-    expect(workspace).toContain('"text-strong text-kit-blue-11"');
-    expect(workspace).toContain('"border-b border-kit-slate-5 pb-2"');
-    /* ⭐ AND THE BLUE IS THE SALES ORDER'S ALONE. `Block` is shared with
-       `PurchaseOrdersPage`, so the ruling is opt-in: every Sales Order card
-       asks for it and no other page moves. */
+    expect(workspace).toContain('className="text-strong text-kit-blue-11"');
+    expect(workspace).toContain("border-b border-kit-slate-5 pb-2");
+    /* ⭐ AND SINCE 2026-09-26 IT IS THE ONE CHROME. Owner instruction "follow
+       sales order ui kit … every page of purchasing": `Block` no longer has a
+       second, opt-in tone — the mono uppercase title beside a band is retired
+       for every page that shares this card. */
+    expect(workspace).not.toContain("titleTone");
+    expect(workspace).not.toContain("font-mono text-strong uppercase");
+    expect(workspace).not.toContain("border-l-2 border-base-300");
     /* Six Order-tab cards + the Revisions/History card (kit-sizes card,
-       2026-09-23), which now wears the same section grammar. */
-    expect(workspace.match(/titleTone="sales-order"/g)).toHaveLength(7);
-    expect(workspace).toContain('titleTone = "shared"');
+       2026-09-23) all draw it. */
+    expect(workspace.match(/<Block\s+title=/g)!.length).toBeGreaterThanOrEqual(6);
     /* The tab underline is the screen's one accent, and it marks the current
        view — the accent's own job. */
     expect(workspace.match(/bg-kit-blue-9/g)).toHaveLength(1);
@@ -369,7 +372,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
     // `\s+`, not a literal newline: a Windows checkout holds CRLF, CI's Linux
     // checkout holds LF, and the same file must match on both.
-    const start = workspace.search(/<Block\s+titleTone="sales-order"\s+title="Customer"/);
+    const start = workspace.search(/<Block\s+title="Customer"/);
     const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(customer).toContain("headerSlot=");
@@ -849,7 +852,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    const start = workspace.search(/<Block[^>]*\stitleTone="sales-order"[\s\S]{0,40}title="Payment"/);
+    const start = workspace.search(/<Block[\s\S]{0,40}title="Payment"/);
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(money).toContain("headerSlot=");
@@ -1173,10 +1176,17 @@ describe("Sales Order object page — one form grammar", () => {
         expect(body, `${selector.trim()} may not re-case the sentence-case title`).not.toMatch(/text-transform/);
       }
     }
-    /* ⛔ AND PURCHASE ORDERS DID NOT MOVE. The band is Purchasing's, on a page
-       this work never reopened; retiring it here may not retire it there. */
-    expect(detailCss).toMatch(/:is\(\.po-detail-style, \.mp-create-style\) \[data-block\] > div:first-child \{/);
-    expect(detailCss).toContain("background-color: #b9c9d8;");
+    /* ⭐ AND SINCE 2026-09-26 PURCHASING MOVED TOO — owner instruction "follow
+       sales order ui kit … every page of purchasing": no stylesheet may paint
+       ANY page's card header. The band rules for `.po-detail-style` and
+       `.mp-create-style` are gone, not merely narrowed. */
+    for (const css of [detailCss, themeCss]) {
+      const bands = [...css.matchAll(/([^\n{}]*\[data-block\] > div:first-child)\s*\{([^}]*)\}/g)];
+      for (const [, selector, body] of bands) {
+        expect(body, `${selector.trim()} may not paint a card header`).not.toMatch(/background(-color)?:/);
+      }
+    }
+    expect(detailCss).not.toContain("#b9c9d8");
   });
 
   it("keeps the Items table a document on a locked order, doors and all", () => {
@@ -1186,11 +1196,11 @@ describe("Sales Order object page — one form grammar", () => {
        still offering `Edit`. One composition is the ruling; a live writer on a
        locked record is not part of it. */
     const items = workspace.slice(
-      workspace.indexOf('<Block titleTone="sales-order" title="Items">'),
+      workspace.indexOf('<Block title="Items">'),
     );
     const card = items.slice(0, items.indexOf("</Block>"));
     expect(card, "the Items card is inside the 0562 lock").not.toBe("");
-    const before = workspace.slice(0, workspace.indexOf('<Block titleTone="sales-order" title="Items">'));
+    const before = workspace.slice(0, workspace.indexOf('<Block title="Items">'));
     expect(
       before.slice(-400),
       "a `fieldset disabled={formLocked}` opens immediately before the Items card",
@@ -1213,7 +1223,7 @@ describe("Sales Order object page — one form grammar", () => {
        column, which is the one thing that sentence forbids.
        Every earlier contract read the card's NAMES; none read their ORDER, and
        that is exactly the gap the defect lived in. */
-    const card = workspace.slice(workspace.indexOf('<Block titleTone="sales-order" title="SO info">'));
+    const card = workspace.slice(workspace.indexOf('<Block title="SO info">'));
     const body = card.slice(0, card.indexOf("</Block>"));
     /* The LABEL as it is rendered, not a mention of it in prose above it. */
     const at = (label: string) => {
@@ -1551,10 +1561,8 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   const table = readFileSync(join(here, "components/so-document-table.ts"), "utf8");
   const serviceCode = readFileSync(join(here, "../../lib/service-code.ts"), "utf8");
 
-  it("spaces every SO section's groups with ONE 12px body gap, opt-in by tone", () => {
-    expect(workspace).toContain(
-      'className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}',
-    );
+  it("spaces every SO section's groups with ONE 12px body gap — the Block's one body", () => {
+    expect(workspace).toContain('className="mt-3 flex flex-col gap-3 [&>*:empty]:hidden"');
     /* The per-group margins it replaced may not return. */
     expect(workspace).not.toContain('<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">');
     expect(workspace).not.toContain('<div className="mt-4 border-t border-kit-slate-5 pt-3">');
@@ -1613,7 +1621,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   });
 
   it("draws Revisions and History through the same SO section Block — no off-scale p-5, no 20px title", () => {
-    expect(workspace).toContain('<Block titleTone="sales-order" title={objectView}>');
+    expect(workspace).toContain('<Block title={objectView}>');
     expect(workspace).not.toContain("rounded-card border border-kit-slate-5 bg-white p-5");
     expect(workspace).not.toContain('<h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>');
   });

@@ -531,6 +531,26 @@ the first panel's control `View Sales Order` unfolds the governed Sales Order do
 (owner ruling 2026-09-25 — INSPECT stays INSPECT, no fourth surface), and the row's `SO No` is the
 door to change them. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
 
+### ONE CARD GRAMMAR FOR EVERY OBJECT, DETAIL AND REVIEW SURFACE — OWNER INSTRUCTION 2026-09-26, BUILT
+Jess, on the Review Purchase Orders pane: *"pls follow sales order ui kit … make sure every page of
+purchasing fix this problem yourself."* The Sales Order object card is therefore the portal's ONE
+section chrome for facts: a white card (`rounded-card`, `kit-slate-5` hairline, `px-4 py-3`), a
+**blue sentence-case `text-strong` title over a 1px `kit-slate-5` rule** (owner ruling 2026-09-21/22,
+`../orders/MASTER.md` § CARD ORDER AND NAMES), one 12px body gap, and inside it the Sales Order fact
+grammar — `text-label` label over a 13px value, three to a row on a full-width page, two in a
+half-width pane, one on a phone. **The shared `Block` (`SalesOrderWorkspace.tsx`) has exactly this
+chrome and no second tone:** the former "shared" tone — a mono UPPERCASE title beside a left band —
+is retired; the cream `SectionBand` stays the Orders LIST / drawer chrome only. **The box travels with the
+grammar (owner, same day, pointing at the SO page: "got box … I want follow"):** on Purchasing pages
+every fact prints in the Sales Order's bordered box, whether or not that page can change it; the SO
+page's own three plain exceptions (`../orders/MASTER.md`, field standard 2026-09-22) remain the SO
+page's. Drawn 2026-09-26 on: the Purchase Order object (`Purchase order` · `Goods lines` ·
+`Receiving` · `Claims and returns` · `Revisions` · `History` · `Order Route`), the `Supplier reply` and
+`Record supplier answer` in-card headings (label rank, sentence case), the Manual Purchase saved-request
+detail, the Review Purchase Orders work pane (`Purchase order` facts + `Goods lines`), the Supplier
+Claim panel and the seven Purchasing Settings sections. Table heads keep their uppercase `text-label`
+row; a document's own heading (GRN, PO paper) keeps its document face.
+
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
 Header       which record · what state · ‹ 4 of 69 ›

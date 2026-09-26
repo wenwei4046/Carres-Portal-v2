@@ -58,6 +58,8 @@ const ANSWER_WORD: Record<AnswerKind, string> = {
 const control = "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-meta";
 const cell = "px-2 py-0 align-middle";
 const head = "h-9 px-2 text-left text-label font-semibold text-kit-slate-11";
+/** The read table's heads may wrap (`Supplier Confirmed Delivery Date` at 112px). */
+const readHead = "px-2 py-1.5 text-left align-bottom text-label font-semibold leading-tight text-kit-slate-11";
 
 export function stillToDeliver(line: { qty: number; receivedQty: number }): number {
   return Math.max(0, Number(line.qty) - Number(line.receivedQty));
@@ -251,9 +253,9 @@ export default function SupplierReplySection({
   /* ── READ ────────────────────────────────────────────────────────────── */
   if (!editing) {
     return (
-      <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
+      <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">SUPPLIER REPLY</div>
+          <div className="text-label font-semibold text-kit-slate-11">Supplier reply</div>
           <div className="text-meta text-kit-slate-11">PO Delivery Date · {officialDeliveryDate ? fmtDate(officialDeliveryDate) : "Not recorded"}</div>
           <div className="flex-1" />
           {canRecord ? (
@@ -264,11 +266,16 @@ export default function SupplierReplySection({
           ) : null}
         </div>
         <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-meta" data-testid="po-supplier-reply-table">
+          {/* The READ table: the narrow columns are fixed and the Item column
+              takes the rest, wrapping its Unit IDs — but never below 180px
+              (measured 2026-09-26 at the owner's 1074px viewport: without a
+              floor the item name broke into one word per line). Below 560px
+              the card's own scroller takes over, like the Goods lines table. */}
+          <table className="w-full min-w-[560px] border-collapse text-meta" data-testid="po-supplier-reply-table">
             <thead className="bg-kit-slate-3">
               <tr>
-                <th className={head}>Item</th><th className={`${head} text-right`}>Qty</th><th className={`${head} text-right`}>To deliver</th>
-                <th className={head}>Supplier Confirmed Delivery Date</th><th className={head}>Last answer</th>
+                <th className={`${readHead} min-w-[180px]`}>Item</th><th className={`${readHead} w-12 text-right`}>Qty</th><th className={`${readHead} w-16 text-right`}>To deliver</th>
+                <th className={`${readHead} w-[112px]`}>Supplier Confirmed Delivery Date</th><th className={`${readHead} w-[128px]`}>Last answer</th>
               </tr>
             </thead>
             <tbody>
@@ -308,9 +315,9 @@ export default function SupplierReplySection({
   );
 
   return (
-    <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
+    <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">RECORD SUPPLIER ANSWER</div>
+        <div className="text-label font-semibold text-kit-slate-11">Record supplier answer</div>
         <label className="flex items-center gap-1.5 text-meta">
           <input type="checkbox" checked={doReceived} onChange={(e) => setDoReceived(e.target.checked)} data-testid="po-answer-do-received" />
           Supplier DO received

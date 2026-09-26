@@ -43,7 +43,7 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 /* The Sales Order's card: same heading face, same border, same padding. The
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
-import { Block } from "../SalesOrderWorkspace";
+import { Block, Fact } from "../SalesOrderWorkspace";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,
@@ -58,7 +58,6 @@ import {
   useRevisePo,
   useSaveRegisterLayout,
   useSetDefaultRegisterLayout,
-  useSetPoTermsDays,
   useWorkspaceDuties,
   type operationPoListRow,
   type SupplierRow,
@@ -1633,23 +1632,29 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
        `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
        the PANE rather than scroll inside it, and the document would be
        squeezed to nothing. */
-    <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="po-document-panes">
-      <div className="flex min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4 lg:w-1/2 lg:overflow-auto">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-visible" data-testid="po-document-panes">
+      {/* Below `lg` the two panes STACK and the page scrolls as one column, so
+          neither pane may shrink or clip (measured 2026-09-26 at 743px: the
+          document pane was drawn over the Terms field). Beside each other at
+          `lg`, each pane scrolls on its own so the paper holds its place. */}
+      <div className="flex min-w-0 shrink-0 flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:overflow-auto">
       <WorkCard row={row} owner={owner} />
       <Block title="Purchase order">
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="Supplier" value={row.supplierName} />
-          <Fact label="Supplier Deliver To" value={row.deliverTo} />
-          <Fact label="Source" value={sourceSummary(row.sources)} />
-          <Fact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
+        {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
+            boxed value, three to a row, 12px gaps — "got box … I want follow":
+            the owner chose the Sales Order LOOK for every Purchasing page,
+            so the box no longer signals "editable here" on these pages. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="po-object-facts">
+          <PoFact label="Supplier" value={row.supplierName} />
+          <PoFact label="Supplier Deliver To" value={row.deliverTo} />
+          <PoFact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
           {/* Show the actual evidenced date, even when it matches the PO. */}
-          <Fact label="Supplier Confirmed Delivery Date" value={row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"} />
+          <PoFact label="Supplier Confirmed Delivery Date" value={row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"} />
           {/* The CURRENT version and its sent mark, in the register's own words;
               earlier versions' marks stay in Revisions (MASTER §9.3). */}
-          <Fact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
-          <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
-        </dl>
-        <PoTermsBlock key={`${row.id}:terms:${row.po.terms_days ?? ""}`} poId={row.id} saved={row.po.terms_days ?? null} />
+          <PoFact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
+          <PoFact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
+        </div>
         <SupplierReplySection
           key={`${row.id}:${row.facts.version}`}
           poId={row.id}
@@ -1749,7 +1754,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           while the facts scroll beside it — the whole reason the two are side
           by side. */}
       <aside
-        className="min-h-0 min-w-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto"
+        className="min-w-0 shrink-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:border-l lg:border-t-0 lg:overflow-auto"
         aria-label="Purchase order document"
         data-testid="po-document-column"
       >
@@ -1758,7 +1763,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
             that can only fill with an error strip. */}
         {row.po.status === "cancelled" ? (
           <section className="border border-kit-slate-5 bg-white px-3 py-2" data-testid="po-cancelled-no-document">
-            <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">Official document</div>
+            <div className="text-label font-semibold text-kit-slate-11">Official document</div>
             <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
           </section>
         ) : (
@@ -1787,56 +1792,8 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
  * A supplier can confirm the original PO date or give a different date with a
  * reason. Both answers require evidence tied to the exact sent version.
  */
-/** 0530 — the PO's own payment terms. They win over the supplier's when a
- *  bill's due date is filled in. Empty = not set; nothing waits on it. */
-function PoTermsBlock({ poId, saved }: { poId: string; saved: number | null }) {
-  const [draft, setDraft] = useState(saved == null ? "" : String(saved));
-  const [problem, setProblem] = useState<string | null>(null);
-  const save = useSetPoTermsDays(poId);
-  const n = draft.trim() === "" ? null : Number(draft);
-  const valid = n === null || (Number.isInteger(n) && n >= 0 && n <= 365);
-  const dirty = valid && n !== saved;
-  return (
-    <div className="mt-4 flex items-end gap-2 border-t border-kit-slate-4 pt-3" data-testid="po-terms">
-      <div className="w-40">
-        <Input
-          id={`po-terms-days-${poId}`}
-          label="Terms (days)"
-          type="number"
-          min={0}
-          max={365}
-          step={1}
-          value={draft}
-          hint="Blank uses the supplier's terms"
-          error={valid ? undefined : "0 to 365"}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-      </div>
-      <button
-        type="button"
-        disabled={!dirty || save.isPending}
-        onClick={() => {
-          setProblem(null);
-          save.mutate(n, {
-            onError: (e: unknown) => {
-              const body = (e as { body?: { message?: string } }).body;
-              setProblem(body?.message ?? "The terms could not be saved");
-            },
-          });
-        }}
-        data-testid="po-terms-save"
-        className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
-      >
-        {save.isPending ? "Saving..." : "Save"}
-      </button>
-      {problem ? <div className="text-meta text-kit-red-11">{problem}</div> : null}
-    </div>
-  );
-}
-
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-label text-kit-slate-11">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;
+function PoFact({ label, value }: { label: string; value: string }) {
+  return <Fact idPrefix="po-fact" own={false} framed label={label} value={value === "Not recorded" ? <Absence /> : value} />;
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
@@ -1848,7 +1805,7 @@ function ConnectionRow({ primary, secondary }: { primary: string; secondary: str
 }
 
 function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
+  return <div className="mx-auto w-full max-w-[980px]"><Block title={title}><div className="divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></Block></div>;
 }
 
 function ReadProblem({ problem, action, onRetry }: { problem: string; action: string; onRetry?: () => void }) {
@@ -1870,18 +1827,18 @@ function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, r
   const problemCount = claims.length + returnRows.length;
   const problemLoading = claimsLoading || receivingLoading;
   const problemError = claimsError || receivingError;
-  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={sourceSummary(row.sources)} detail={row.sources.length === 0 ? "No governed source is recorded" : ""}>{row.sources.map((source) => { const href = sourceHref(source); return href ? <Link key={source.reference} to={href} className="block font-mono text-meta text-kit-blue-11 underline-offset-2 hover:underline">{source.reference}</Link> : <span key={source.reference} className="block font-mono text-meta text-kit-slate-11">{source.reference}</span>; })}</RouteNode><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
+  return <div className="mx-auto w-full max-w-[1100px]"><Block title="Order Route"><div className="grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={sourceSummary(row.sources)} detail={row.sources.length === 0 ? "No governed source is recorded" : ""}>{row.sources.map((source) => { const href = sourceHref(source); return href ? <Link key={source.reference} to={href} className="block font-mono text-meta text-kit-blue-11 underline-offset-2 hover:underline">{source.reference}</Link> : <span key={source.reference} className="block font-mono text-meta text-kit-slate-11">{source.reference}</span>; })}</RouteNode><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></Block></div>;
 }
 
 /** `children` — where a node's facts are individually REACHABLE rather than
  *  summarised: the Source node names every SO and MPR behind this PO, each
  *  one a door (MASTER §9.3, "individually reachable"). */
 function RouteNode({ title, main, detail, children }: { title: string; main: string; detail: string; children?: ReactNode }) {
-  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-11">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
+  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label text-kit-slate-11">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
 }
 
 function RouteProblem({ title, problem, action, onRetry }: { title: string; problem: string; action: string; onRetry: () => void }) {
-  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
+  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
 }
 
 function OfficialPreview({ poId }: { poId: string }) {
