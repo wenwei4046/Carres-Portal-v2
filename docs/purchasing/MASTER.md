@@ -2141,11 +2141,16 @@ composition merely because Sales Order uses its separate blue-title opt-in.
 
 The three sections, in the SAME reading order on the form and preview, are:
 
-1. **Request Details** — `Purpose`; its structured Service Case / Staff member /
-   Subsidiary / `What is this for?` field where applicable; optional
-   `Purchase requirement`; the existing explicit `Can stock answer this?` choice
-   (no inferred/default answer); automatic `Requested By` and `Proceed Date`.
-   The requirement stays here, never a separate section or a bottom-of-form question.
+1. **Request Details** — drawn in the Sales Order fact grammar, one title one box,
+   three to a row, in this reading order (owner ruling 2026-09-26 — "yes" to the
+   sketch): **row 1** automatic `Requested By` · automatic `Proceed Date` · `Purpose`;
+   **row 2** the purpose's own second box, whose title changes with the purpose —
+   `Service Case` (Service Case) · `Staff member` (Internal Staff Purchase) ·
+   `Subsidiary` (Subsidiary Purchase) · `What is this for?` (Other Purchase, required
+   before Send) — and NO second box for Ready Stock / Showroom Display, so `Can stock
+   answer this?` (explicit choice, no inferred/default answer) moves left; **row 3** the
+   optional `Purchase requirement` as one full-width box. The requirement stays here,
+   never a separate section or a bottom-of-form question.
    Proceed Date previews server time and records the actual successful hand-off;
    it is not a manually backdated document date. Requester is the real individual.
 2. **Delivery** — `Deliver To` from governed destinations, then `Delivery Date`.

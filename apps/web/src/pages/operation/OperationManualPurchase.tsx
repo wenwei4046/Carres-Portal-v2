@@ -71,6 +71,7 @@ import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
+import Textarea from "@/components/kit/Textarea";
 import Loading from "@/components/kit/Loading";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
@@ -2833,13 +2834,22 @@ function CreateRequestWorkspace({
         <div className="mp-create-split" data-testid="object-two-panes">
           <div className="mp-create-form mp-create-style flex min-w-0 flex-col gap-6">
             <Block title={MW.secCreateRequestDetails}>
-              <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* ⭐ ONE TITLE, ONE BOX, THREE TO A ROW — owner ruling 2026-09-26
+                  ("yes" to the sketch), the Sales Order fact grammar. Row 1: the
+                  automatic facts, then Purpose. Row 2: the purpose's own second
+                  box (its title changes with the purpose; Ready Stock and
+                  Showroom Display have none, so `Can stock answer this?` moves
+                  left). Row 3: the optional Purchase requirement, full width. */}
+              <div className="mp-create-general grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <SharedFact idPrefix="mp-create-fact" framed label={MW.createRequestedBy} testId="mp-raised-by" value={requesterName} />
+        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
+            Malaysia-date preview before Send; the stored hand-off truth
+            after. Never an input, never a browser clock. */}
+        <SharedFact idPrefix="mp-create-fact" framed label={MW.proceedDate} testId="mp-proceed-date" value={plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null} />
         <div>
-          <label htmlFor="mp-purpose" className="text-meta text-kit-slate-11">
-            {MW.createPurpose}
-          </label>
           <Select
             id="mp-purpose"
+            label={MW.createPurpose}
             value={purpose}
             /* R4 — the purpose is the request's identity; editing keeps it. */
             disabled={editing}
@@ -2847,38 +2857,15 @@ function CreateRequestWorkspace({
             options={DEMAND_PURPOSES.map((p) => ({ value: p.value, label: p.label }))}
           />
         </div>
-        {/* ⭐ CAN STOCK ANSWER THIS? — beside `Need for`, because it is the
-            same breath: the operator says what the purchase is for, then
-            whether goods already on the shelf can answer it. It is the ONE
-            fact the whole Ready Stock allocation reads (0546), and 0549 is
-            the file that finally writes it.
-
-            No default option and no pre-selection: the ruling of 2026-09-18
-            forbids inferring the intent, and a pre-picked answer is that
-            inference with the operator's name on it. `Send` names the gap. */}
-        <div>
-          <label htmlFor="mp-stock-answer" className="text-meta text-kit-slate-11">
-            {MW.canStockAnswer}
-          </label>
-          <Select
-            id="mp-stock-answer"
-            value={stockAnswer ?? undefined}
-            onValueChange={(v) => setStockAnswer(v as ManualPurchaseIntent)}
-            options={[
-              { value: "concrete_need", label: MW.canStockAnswerYes },
-              { value: "additional_stock", label: MW.canStockAnswerNo },
-            ]}
-          />
-        </div>
         {/* ── THE STRUCTURED FOR (Card 04 §4) — each exceptional purpose
-            names its object; routine purposes ask nothing extra. ── */}
+            names its object in its own box; routine purposes ask nothing
+            extra. Only `Other Purchase` asks `What is this for?`, and it must
+            be answered before Send unlocks. ── */}
         {purpose === "service_case" ? (
           <div data-testid="mp-for-service-case">
-            <label htmlFor="mp-service-case" className="text-meta text-kit-slate-11">
-              {MW.serviceCase}
-            </label>
             <Select
               id="mp-service-case"
+              label={MW.serviceCase}
               value={serviceCaseId}
               onValueChange={setServiceCaseId}
               options={(casesQ.data?.items ?? []).map((sc) => ({
@@ -2890,11 +2877,9 @@ function CreateRequestWorkspace({
         ) : null}
         {purpose === "internal_staff_purchase" ? (
           <div data-testid="mp-for-staff">
-            <label htmlFor="mp-staff" className="text-meta text-kit-slate-11">
-              {MW.staffMember}
-            </label>
             <Select
               id="mp-staff"
+              label={MW.staffMember}
               value={staffUserId}
               onValueChange={setStaffUserId}
               options={namedStaff.map((s) => ({
@@ -2906,73 +2891,57 @@ function CreateRequestWorkspace({
         ) : null}
         {purpose === "subsidiary_purchase" ? (
           <div data-testid="mp-for-subsidiary">
-            <label htmlFor="mp-subsidiary" className="text-meta text-kit-slate-11">
-              {MW.subsidiary}
-            </label>
             <Input
               id="mp-subsidiary"
+              label={MW.subsidiary}
               value={subsidiaryName}
               onChange={(e) => setSubsidiaryName(e.target.value)}
             />
           </div>
         ) : null}
-        <div>
-          <span className="text-meta text-kit-slate-11">{MW.createRequestedBy}</span>
-          {/* A FACT, never a control — the server stamps `created_by` itself.
-              The NAME is resolved through the same Staff list the Register
-              reads; a shared or unnamed login prints the governed absence
-              rather than an email or `(you)`, which named nobody. */}
-          <p className="pt-1.5 text-body text-base-900" data-testid="mp-raised-by">
-            {requesterName}
-          </p>
-        </div>
-        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
-            Malaysia-date preview before Send; the stored hand-off truth
-            after. Never an input, never a browser clock. */}
-        <div>
-          <span className="text-meta text-kit-slate-11">{MW.proceedDate}</span>
-          <p className="pt-1.5 text-body text-base-900" data-testid="mp-proceed-date">
-            {plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null}
-          </p>
-        </div>
-              </div>
-      {/* Card 04 — ONLY `Other Purchase` asks the question, and it must be
-          answered before Send unlocks. Routine purposes do not ask a
-          duplicate `Why`. */}
       {purpose === "other_purchase" ? (
-        <div className="max-w-[720px]">
-          <label htmlFor="mp-why" className="text-meta text-kit-slate-11">
-            {MW.whatIsThisFor}
-          </label>
-          <textarea
+        <div data-testid="mp-for-other">
+          <Textarea
             id="mp-why"
+            label={MW.whatIsThisFor}
             data-testid="mp-why"
             value={why}
             onChange={(e) => setWhy(e.target.value)}
             rows={2}
-            className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
           />
         </div>
       ) : null}
-
-      {/* ⭐ `Purchase requirement` — OPTIONAL, ON EVERY PURPOSE (owner
-          2026-09-22). It stays inside Request Details: the requirement is part
-          of what is being asked for, not a third kind of need and not a
-          question at the bottom of the form. It never borrows `Other
-          Purchase`'s required reason field. */}
-      <div className="max-w-[720px]">
-        <label htmlFor="mp-requirement" className="text-meta text-kit-slate-11">
-          {MW.purchaseRequirement}
-        </label>
-        <textarea
+        {/* ⭐ CAN STOCK ANSWER THIS? — the ONE fact the whole Ready Stock
+            allocation reads (0546; 0549 writes it). No default option and no
+            pre-selection: the ruling of 2026-09-18 forbids inferring the
+            intent. `Send` names the gap. */}
+        <div>
+          <Select
+            id="mp-stock-answer"
+            label={MW.canStockAnswer}
+            value={stockAnswer ?? undefined}
+            onValueChange={(v) => setStockAnswer(v as ManualPurchaseIntent)}
+            options={[
+              { value: "concrete_need", label: MW.canStockAnswerYes },
+              { value: "additional_stock", label: MW.canStockAnswerNo },
+            ]}
+          />
+        </div>
+        {/* ⭐ `Purchase requirement` — OPTIONAL, ON EVERY PURPOSE (owner
+            2026-09-22), one full-width box inside Request Details: the
+            requirement is part of what is being asked for, never a question at
+            the bottom of the form and never `Other Purchase`'s reason field. */}
+      <div className="col-span-full">
+        <Textarea
           id="mp-requirement"
+          label={MW.purchaseRequirement}
           data-testid="mp-requirement"
           value={requirement}
           onChange={(e) => setRequirement(e.target.value)}
           rows={2}
-          className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
         />
       </div>
+              </div>
       {headerError ? (
         <p className="text-meta text-kit-red-11" data-testid="mp-header-error">
           {headerError}
