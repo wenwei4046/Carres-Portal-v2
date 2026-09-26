@@ -1145,7 +1145,16 @@ Collapsed height is exactly **72px**. It prints `Customer · {name}` and one sou
 after the arrangement; or the highest-material exception `Customer requested another date ·
 {date}` · `Customer refused delivery` · `Phone number is wrong` ·
 `Delivery delayed · customer notice required`. Phone, email, owner and history do not appear
-collapsed. Normal partner contact has no Carres button.
+collapsed.
+
+**THE CUSTOMER DOOR IS ALWAYS THERE — owner ruling, Jess 2026-09-26 ("customer still need
+communication, never know — example: inform the customer no stock once we place the PO").**
+The routine date agreement stays the Logistics company's job and generates no Carres task; but the
+Customer card, like Logistics and Supplier, always carries its communication side — WhatsApp
+(`Open WhatsApp` · `Copy message`), email where recorded, `Record as sent` and the history — so
+Operation can tell the customer anything the moment it is known (a supplier delay after the PO,
+no stock, a changed plan) without waiting for a governed exception to open a button. Opening a
+channel or copying text is never sent evidence; the message template is the owning module's.
 
 Expanded order:
 
