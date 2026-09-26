@@ -634,7 +634,8 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   `No working date {n}`; then the `Page` group (`All pages` + each page with its count) and, in
   Team Work, the `Owner` select. Hidden, it leaves the 44px `Show filters` strip; the choice is
   remembered per browser; on one stage it floats over the list. The three-panel page is rail ·
-  list · detail. The 72px header, framed toolbar, compact strip and toolbar selects are retired.
+  list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
+  right column and never spans above the rail (Jess, 2026-09-26).** The 72px header, framed toolbar, compact strip and toolbar selects are retired.
   The card list itself keeps its approved 104px cards until the owner rules on the §6.0 table.
 - **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
   sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
