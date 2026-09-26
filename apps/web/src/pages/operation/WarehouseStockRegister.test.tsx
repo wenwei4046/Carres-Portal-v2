@@ -212,6 +212,25 @@ describe("one row is one Unit, one cell is one fact", () => {
     expect(screen.queryByRole("button", { name: /Show every product/ })).not.toBeInTheDocument();
   });
 
+  it("stands the newest Goods Received Date first at rest, whatever order the source sent", async () => {
+    // Production 2026-09-26: the source answers in Unit ID order, so the owner's
+    // fresh 25 Sep goods sat behind 300 older rows. The date leads, newest first.
+    apiFetchMock.mockImplementation(() =>
+      Promise.resolve({
+        units: [
+          unit({ id: "old", unitCode: "U1-000-001", goodsReceivedDate: "2026-06-08" }),
+          unit({ id: "new", unitCode: "U1-000-300", goodsReceivedDate: "2026-09-25" }),
+          unit({ id: "mid", unitCode: "U1-000-200", goodsReceivedDate: "2026-08-20" }),
+        ],
+        total: 3,
+      }),
+    );
+    renderRegister();
+    await screen.findByText("U1-000-300");
+    const codes = screen.getAllByText(/^U1-000-\d{3}$/).map((el) => el.textContent);
+    expect(codes).toEqual(["U1-000-300", "U1-000-200", "U1-000-001"]);
+  });
+
   it("uses the ruled absence words: No SO · Not received · Not recorded", async () => {
     await renderLoaded();
     expect(screen.getAllByText("No SO").length).toBeGreaterThan(0);

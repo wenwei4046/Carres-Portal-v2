@@ -218,8 +218,15 @@ export default function WarehouseStockRegister() {
     return status ? held.filter((u) => inventoryStatusOf(u) === status) : held;
   }, [allUnits, heldUnits, view, status]);
 
+  /* At rest the newest goods stand first (ui MASTER §6.7: the listing begins
+     with its own record date, newest on top); a Unit with no date sits after
+     every dated one, and Unit ID keeps ties stable. A header sort overrides. */
   const rows = useMemo(
-    () => applyRailSelection(scopedRows, { ...sel, query: search }, now),
+    () => [...applyRailSelection(scopedRows, { ...sel, query: search }, now)].sort(
+      (a, b) =>
+        (b.goodsReceivedDate ?? "").localeCompare(a.goodsReceivedDate ?? "") ||
+        a.unitCode.localeCompare(b.unitCode),
+    ),
     [scopedRows, sel, search, now],
   );
 
