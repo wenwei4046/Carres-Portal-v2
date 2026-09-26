@@ -1063,7 +1063,32 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · Complete Work right panel — owner-approved target 2026-09-25 / NOT BUILT
+### 5.10 · The Work right panel — OWNER RULING B, Jess 2026-09-26 night · BUILT
+
+**WORK IS AN INBOX. The right panel is the ACTION card and nothing else.** Asked "how does Work
+help me work?", the owner chose, from three operating models, **B · do it here**: the left list
+is the day's work; the right panel is *doing this one thing* — COPY's sections `ACTION` (the
+sentence, the party, `due {date}`, red when missed) · `CURRENT FACT` · `FINISH WHEN` ·
+`WHAT HAPPENS NEXT` (only when the source supplies one) · `COMMUNICATION` (the owning module's
+prepared message, `Open WhatsApp group` / `Open WhatsApp` as the panel's ONE blue, `Copy message`,
+and the module door that records the answer) · the `Open {object}` door. Buttons live only here.
+When no module message is admitted, `Open {object}` is the act.
+
+**Retired from Work by this ruling:** the Order Route, the Sales Order card, the Logistics,
+Customer and Supplier cards and the mission header (option C, "see the whole order, then decide",
+was rejected: "I don't know what I should do now"; option A, a bare list, was rejected for making
+every act a page change). The whole-order view lives on the Sales Order page behind the door and
+is not drawn a second time in Work. The party-card components and their laws below remain the
+owning pages' material (Delivery §5.5 Logistics; Sales Order Route) — Work does not render them.
+`Owner, timing and source` stays as the last, closed disclosure.
+
+**Admitted messages so far:** Delivery work — Delivery's own logistics message (customer
+reference, address, building, goods by catalogue name, customer date, the external link) to the
+partner's WhatsApp group, door `Open in Delivery`. **Next:** Purchasing (the supplier group, PO
+reference) and Payment (the customer) bring their own when their MASTERs admit them — never a
+Workspace draft.
+
+#### The former whole-order composition (owner-approved 2026-09-25) — kept for the owning pages, NOT drawn in Work
 
 This section is the canonical continuation of §5.9. It freezes the complete selected-mission
 composition so a later chat reads it from the repository rather than reconstructing it from chat.

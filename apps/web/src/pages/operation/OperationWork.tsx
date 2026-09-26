@@ -23,7 +23,7 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { orderActionLines, workspaceDutyLabelOf, type OperationWorkItem, type OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
@@ -53,7 +53,7 @@ import {
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkParties, { type MissionReport, type Party } from "./work/WorkParties";
+import WorkParties from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
@@ -121,16 +121,6 @@ export default function OperationWork() {
   );
   const railVisible = layout === "one" ? railOpen && phoneRailOverride : railOpen;
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
-  /* §5.10: which party card is open (one at a time) and what the mission
-     reports — the summary opens a card and carries the one blue act while
-     every card is collapsed. Reset whenever another work item is chosen. */
-  const [openParty, setOpenParty] = useState<Party | null>(null);
-  const [mission, setMission] = useState<MissionReport>({ shown: false, act: null, openCardHasAct: false });
-  const reportMission = useCallback((report: MissionReport) => {
-    setMission((before) =>
-      before.shown === report.shown && before.act?.party === report.act?.party && before.act?.label === report.act?.label && before.openCardHasAct === report.openCardHasAct ? before : report,
-    );
-  }, []);
   /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -352,12 +342,6 @@ export default function OperationWork() {
   );
 
   const selectedId = params.get("selected");
-  const selectedKey = (visible.find((item) => item.id === selectedId) ?? visible[0] ?? null)?.id ?? null;
-  /* A new item starts with every card collapsed. The mission (keyed per item)
-     reports itself on mount — child effects run first, so it is not reset here. */
-  useEffect(() => {
-    setOpenParty(null);
-  }, [selectedKey]);
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   const visibleIds = new Set(visible.map((item) => item.id));
   // The date rail and its badge already say when; the list is one ordered run.
@@ -705,20 +689,9 @@ export default function OperationWork() {
               {selected.source.object.kind === "po_window" ? (
                 <PoWindowMission item={selected.source} onOpen={() => navigate(selected.destination)} />
               ) : (
-                <>
-                  {/* Route first (Jess, 2026-09-26): an order's mission opens
-                      on its Route and Sales Order card; the summary block is
-                      drawn only for work that names no order. */}
-                  {!mission.shown ? (
-                    <WorkActionPanel
-                      item={selected.source}
-                      hasParties={false}
-                      primaryAct={null}
-                      onOpen={() => navigate(selected.destination)}
-                    />
-                  ) : null}
-                  <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} onOpenRecord={() => navigate(selected.destination)} />
-                </>
+                /* Work is an inbox (ruling B, Jess 2026-09-26): the ACTION card
+                   is the panel; the whole order lives behind its door. */
+                <WorkParties key={selected.id} item={selected.source} onOpenRecord={() => navigate(selected.destination)} />
               )}
               <WorkOwnerSource item={selected.source} />
             </>

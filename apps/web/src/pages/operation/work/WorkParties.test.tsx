@@ -1,19 +1,21 @@
 /**
- * THE RIGHT PANEL'S CROSS-CARD LAWS (Workspace §5.10): the 72px shell, one
- * card open at a time, ONE blue action, and an unreadable order that says so.
+ * THE RIGHT PANEL (Workspace §5.10, owner ruling B 2026-09-26): the ACTION
+ * card for every work item — with the owning module's message when it has
+ * one — and the party-card shell the owning pages keep.
  */
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { OperationWorkItem } from "@carres/shared";
-import { ApiError } from "@/lib/api";
 import { PartyCardShell, ToneLine } from "./PartyCardShell";
-import { primaryPartyOf } from "./WorkParties";
 
 const scopeState = { failed: true };
 const ordersState: { error: unknown } = { error: null };
 vi.mock("@/lib/queries", () => ({
   useOperationOrders: () => ({ error: ordersState.error, isLoading: false, refetch: vi.fn() }),
+  useLogisticsCardFacts: () => ({ data: null, isError: false }),
+  useDeliveryPartners: () => ({ data: { partners: [] } }),
+  useCatalog: () => ({ data: undefined }),
 }));
 vi.mock("../delivery-scope-card", () => ({
   useOrderIdFromRef: () => null,
@@ -70,48 +72,32 @@ describe("Escape belongs to the control that owns it (#1608 review)", () => {
   });
 });
 
-describe("ONE blue action across the panel", () => {
-  it("missed beats today beats the selected work's party beats future", () => {
-    expect(primaryPartyOf({ logistics: "today", customer: "missed", supplier: "ahead" }, "logistics")).toBe("customer");
-    expect(primaryPartyOf({ logistics: "ahead", customer: "today", supplier: null }, "logistics")).toBe("customer");
-    expect(primaryPartyOf({ logistics: "ahead", customer: "ahead", supplier: "ahead" }, "supplier")).toBe("supplier");
-    expect(primaryPartyOf({ logistics: null, customer: null, supplier: null }, "logistics")).toBeNull();
-  });
-});
+describe("the ACTION card is the panel", () => {
+  const item = {
+    object: { kind: "sales_order", id: "order-1", label: "SO-1362" }, module: "delivery", ruleKey: "confirm_delivery_date",
+    problem: "The delivery is not scheduled", action: "Call AL Logistics", recipient: "AL Logistics",
+    requiredResult: "Scheduled delivery recorded", completionStatement: "Scheduled delivery recorded",
+    timing: { actionOn: "2026-09-22", placement: "missed" }, interaction: { mode: "open_module" },
+  } as unknown as OperationWorkItem;
 
-describe("an order the panel cannot read", () => {
-  it("says so — never a guessed Logistics not assigned", async () => {
+  it("draws the ACTION card even when the order cannot be loaded — the act never waits for the record", async () => {
     const WorkParties = (await import("./WorkParties")).default;
-    const item = { object: { kind: "sales_order", id: "order-1", label: "SO-1362" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
-    expect(screen.getByTestId("work-mission-unavailable")).toHaveTextContent("Order details unavailable");
-    expect(screen.getByText("The work item still exists, but its Sales Order could not be loaded.")).toBeInTheDocument();
+    render(<MemoryRouter><WorkParties item={item} /></MemoryRouter>);
+    expect(screen.getByTestId("work-detail-title")).toHaveTextContent("Call AL Logistics");
+    expect(screen.getByTestId("work-detail-action")).toHaveTextContent("due Tue, 22 Sep");
+    expect(screen.getByTestId("work-detail-fact")).toHaveTextContent("The delivery is not scheduled");
+    expect(screen.getByRole("button", { name: "Open SO-1362" })).toBeInTheDocument();
+    /* No whole-order view in Work (ruling B): no Route, no party cards. */
     expect(screen.queryByText("Logistics not assigned")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-route")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("logistics-card")).not.toBeInTheDocument();
   });
 
-  it("an order simply outside the Operation list draws nothing (not a failure)", async () => {
-    scopeState.failed = false;
+  it("a work item that names no Sales Order gets the same card with no message", async () => {
     const WorkParties = (await import("./WorkParties")).default;
-    const item = { object: { kind: "sales_order", id: "order-9", label: "SO-9" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    const { container } = render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
-    expect(container).toBeEmptyDOMElement();
-    scopeState.failed = true;
-  });
-
-  it("a refused read prints the owner's permission words and leaks nothing", async () => {
-    ordersState.error = new ApiError(403, "forbidden", null);
-    const WorkParties = (await import("./WorkParties")).default;
-    const item = { object: { kind: "sales_order", id: "order-1", label: "SO-1362" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
-    expect(screen.getByTestId("work-mission-denied")).toHaveTextContent("You cannot view this record");
-    expect(screen.getByText("Ask an authorised operation user for access.")).toBeInTheDocument();
-    ordersState.error = null;
-  });
-
-  it("a work item that names no Sales Order draws no mission at all", async () => {
-    const WorkParties = (await import("./WorkParties")).default;
-    const item = { object: { kind: "manual_purchase", id: "mp-1", label: "MP-12" }, interaction: { mode: "open_module" } } as unknown as OperationWorkItem;
-    const { container } = render(<MemoryRouter><WorkParties item={item} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
-    expect(container).toBeEmptyDOMElement();
+    const mp = { ...item, object: { kind: "manual_purchase", id: "mp-1", label: "MP-12" }, module: "purchasing", action: "Approve purchase", recipient: null } as unknown as OperationWorkItem;
+    render(<MemoryRouter><WorkParties item={mp} /></MemoryRouter>);
+    expect(screen.getByTestId("work-detail-title")).toHaveTextContent("Approve purchase");
+    expect(screen.queryByTestId("work-detail-communication")).not.toBeInTheDocument();
   });
 });

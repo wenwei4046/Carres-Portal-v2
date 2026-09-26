@@ -16,7 +16,11 @@ const refetch = vi.fn();
 /* The party cards read Delivery through their own queries; their behaviour is
    held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
-vi.mock("./work/WorkParties", () => ({ default: () => null }));
+vi.mock("./work/WorkParties", async () => {
+  /* The page tests stand the ACTION card in for the mission (no order reads). */
+  const { default: WorkActionPanel } = await import("./work/WorkActionPanel");
+  return { default: ({ item, onOpenRecord }: { item: import("@carres/shared").OperationWorkItem; onOpenRecord?: () => void }) => <WorkActionPanel item={item} onOpen={onOpenRecord ?? (() => {})} /> };
+});
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
