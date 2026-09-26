@@ -40,6 +40,35 @@ control types, special schedules and business behavior; no page-local appearance
 
 ---
 
+# §0.0 · SALES ORDER BLUEPRINT 2026-09-26 — PLAN MISSION COMPLETE · READY SCOPES
+
+**Eight segments were reviewed and approved by Jess on 2026-09-25/26 and are persisted in this
+MASTER, COPY-STANDARD and UI MASTER as APPROVED TARGET / NOT BUILT.** The Order Route Blueprint of
+2026-09-24 is folded in and its file deleted (Law 5). Every scope below is a dependency-ordered,
+unnumbered BUILD handoff boundary: it has approved business truth, approved UI/word truth, one owner
+and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY lane authors Cards.
+
+| Scope (dependency order) | Approved truth | Acceptance boundary |
+|---|---|---|
+| **A · Order Route reads its owners** | §0.2 THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS · THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK · THE PAYMENT NODE … TWO LINES · `⚠ unreadable` · `PROPOSED CHANGE` banner · lanes per scope | SO-1362 (two legs, delivered) draws two DELIVERY lanes, two issued DOs, `Delivered to customer`, `Paid`; SO-1319 draws `PO Delivery Date`, `0 of 1 received`, `Hold delivery` / `RM 1,249.00 unpaid · by {date}`; a thrown Purchasing read yellows one line only; a `submitted` amendment shows the banner; route facts load only with `?route=1`; the four orphaned components deleted |
+| **B · Identity and History** | §0.1 WHO ACTED IS DECIDED ONCE … · HISTORY TRANSLATES AT THE READ BOUNDARY · BELOW 768px THE HEADER IS TWO ROWS | `principal@carres.com` events print `Staff identity not recorded · Principal`; `awaiting logistics triage` never prints; `Not recorded → No`; at 375px `SO-1365` and `Print` never overlap |
+| **C · SO page locked state** | §0.1 THE LOCKED STATE (five rules) | View and Rev 1 render zero row writers, `RM 1,399.00` text, `RM 0.00` discount, no `*`, no TBD checkbox in Edit |
+| **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `Edit · View · Print · ─ Cancel SO`; one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
+| **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
+| **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
+
+**Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
+(Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
+node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
+optional column and `Scan Order` (their own cards) · the new SO/SUB number formats and the
+protected-ownership lane fold (owner decisions already recorded in their own sections).
+
+**Standard Build takeover:** *`Sales Orders — CONTINUOUS BUILD. Read docs/orders/MASTER.md §0.0 and
+its READY scopes A–F; execute each approved scope as a full production vertical slice
+autonomously, in dependency order. Do not ask the owner for engineering execution choices.`*
+
+---
+
 # §0 · THE CHARTER — FROZEN 2026-08-08 (Loo). Phase 1 of the Golden Template.
 
 > **Sales Order is the truth/register home of the customer order: find any order and understand
@@ -338,6 +367,32 @@ No deposit · Online order
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
+**WHO ACTED IS DECIDED ONCE, ON THE SERVER, AND A SHARED LOGIN IS NOT A PERSON — OWNER RULING
+2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on production 2026-09-25: SO-1365
+printed `principal · Principal · Wed, 23 Sep 09:33` and `Recorded by principal`; SO-1319 printed
+`Operations · Operation`. `actorKindOf` (`apps/api/src/routes/operation/orders.ts:144-153`) calls
+any id that resolves to a name `human`, and `principal@carres.com`, `operation@carres.com` and
+`operation-test@x.com` carry a name with `app_users.is_person = false`. The rule: an id resolving
+to an active `is_person = true` account is `human` and prints the real name; an id resolving to
+`is_person = false` (a shared role login, a robot, a test account) is `missing` and prints
+`Staff identity not recorded` with the role word kept (`Staff identity not recorded · Principal ·
+Wed, 23 Sep 09:33`); `System` only from `metadata.actor = "system"`. History (`:1059`) and
+Revisions (`:1228`) read the one function, so both views change together. The cure remains one
+account per person (`CARD-2026-08-27-individual-staff-identity.md`); this keeps the screen honest
+until then.
+
+**HISTORY TRANSLATES AT THE READ BOUNDARY AND NEVER LEAKS A STORED PHRASE — OWNER RULING
+2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured: line 3 printed `awaiting logistics
+triage` (the V1 pipeline phrase migrations 0024/0396 store in `order_history.text`), a boolean
+correction printed `Address not given yet: — → No`, and a legacy recovery note printed a whole
+chat paragraph. The rule: `historyValueWords` carries the complete stored-phrase table — a
+`proceed` event keeps `Order proceeded` on line 1 and omits line 3 (the phrase is a pipeline word,
+not a result); a stored phrase the table does not know prints `Activity`, never itself. A missing
+before-value prints `No {field word, lowercased}` (COPY), and a boolean's missing before-value
+prints `Not recorded → No` / `Not recorded → Yes`. A line-3 note longer than one line ends in `…`
+and opens whole on hover, focus and click through the engine's `OverflowText` — the Register's
+rule, not a second one. The stored event is never rewritten.
+
 ## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
 
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
@@ -350,7 +405,7 @@ orders are not silently added. The earlier proposal to default the order list to
 is superseded by the approved list filters below; no default unfinished-only population is introduced.
 
 **Time and filters.** The monthly view defaults to the current calendar month plus the next five
-months. Offer three months, six months and a chosen starting month. Always retain separate
+months. Offer a chosen starting month and any number of months from one to six (owner re-ruling 2026-09-26: never only three or six — the international demand-planning shape is a start period plus a period count). Always retain separate
 buckets for outstanding demand earlier than the selected first month, later than its final month,
 and a visible data-quality exception count for demand without a definite requested delivery date;
 do not present missing required dates as an ordinary monthly demand category. Assign months using the customer's
@@ -427,6 +482,64 @@ subsequently approved handling matrix in Rental §5.6 distinguishes eligible sto
 held at Diglant, production under an existing PO, verified shortage and unknown evidence. Resolve
 unknowns before buying; a timing shortfall is not an automatic quantity purchase; evaluate each SO
 line separately. The operating target is approved, not built; expected supply remains non-Ready Stock.
+
+**UI, KIT AND SOURCES — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** The
+operating model above is unchanged; this fixes how it is drawn and where every number comes from.
+
+- **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (`+ New Sales Order` ·
+  Search · Export · Columns). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
+  top region with the view selector `Order list` · `Monthly demand`; the scrolling region shows only
+  the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
+  months) and Export produces the matrix.
+- **Order list groups:** `Dealer / Sales Location` (multi-select with search) · `Delivery State /
+  City` (two selects) · `Date` (field select `Proceed Date` · `SO Doc Date` · `Customer Requested
+  Delivery Date` + range select `All dates` · `Today` · `This week` · `This month` · `Custom`) ·
+  `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
+  (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
+  cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
+  select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
+  `Dealer / Sales Location` · `Delivery State / City` · `Product category` (multi-select, no
+  search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
+  pressing it again.
+- **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
+  title", "not like other pages?").** Every group is single-choice like every other Portal rail
+  (icon + 13px/600 title, 36px rows, chosen value in blue at the right, press again to unchoose);
+  `Dealer / Sales Location` keeps a search box because dealers are many; there is NO multi-select
+  and NO `FilterRailMultiSelect` — the 2026-09-22 multi-selection line is withdrawn and no kit
+  component is admitted. Several dealers together = `All dealers`.
+- **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
+  "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
+  **Corrected again the same day (Jess: "4 KPI is what? repeated?"): two blocks, not three.**
+  ① `This month · {Mon YYYY}` — THREE numbers for the current month (or the month the operator
+  chose): `Total Qty` · `Delivered` · `Not delivered`. They never repeat the table's `Total` row —
+  they are one month, the table is every month. No unit line; `Qty` is in the word. ② One table,
+  ONE ROW PER MONTH (`Before {Mon YYYY}` · each month · `After {Mon YYYY}` · `No delivery date` ·
+  `Total`), columns `Month` · `Mattress` · `Bedframe` · `Sofa` · `Accessory` · `Total Qty` ·
+  `Delivered` · `Not delivered` · `To buy`. **No bar chart, no legend** (withdrawn — one more thing
+  to read); `Reserved` and `Pending Delivery Qty` leave this view and stay SO Batch Purchase's,
+  reached by the door. No product/size expansion, no second table under it. A month is a door: it opens `Order list` with `Customer Requested Delivery
+  Date` narrowed to that month. Under the table the one door `Open SO Batch Purchase →`. A cell is
+  the physical pieces still owed to the customer in that month and category: the current effective
+  Revision's `order_lines.qty` less pieces actually delivered (Stock's `delivered` Units bound by
+  `reserved_order_line_id`); gifts under their real category; services never; a pending amendment
+  never. Month = `orders.delivery_date`; `No date` = legacy `delivery_date_tbd` rows only, with
+  `{n} pieces have no delivery date` beside the header. Zero prints `0`; a cell whose source read
+  failed prints `Unavailable`. Lines with no catalog row count under `Not in catalog` (never
+  dropped, never a kind of goods).
+- **The four numbers read their owners and derive nothing:** `Not delivered` = current-Revision
+  `order_lines.qty` less Stock's `delivered` Units bound by `reserved_order_line_id`; `Reserved` =
+  `ops_stock_items` reserved to these lines; `Pending Delivery Qty` = the PO word, `po_line_sources`
+  on non-cancelled POs less received (Rental §5.6's evidenced Diglant supply counted once); `To buy`
+  = `soBatchOrderLineOutstandingQty`, SO Batch's one arithmetic. Nothing is bought or reserved here.
+- **States:** skeleton = rail groups + a 10-column, 3-row matrix + the strip; filtered empty `No
+  Sales Orders in these months` (the `No delivery date` row still shows); whole failure `Monthly
+  demand could not be loaded` + `Try again`; a single failed source prints `Unavailable` in its
+  numbers only; permission follows the Register's scope.
+- **Responsive:** 1440 / 1180 rail beside the three blocks (the month table is ~900px and never
+  scrolls sideways; the bars share one row); below 896px
+  (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the four numbers become two rows of two and the bars wrap under them; at 390 `Period` moves under the toolbar and every target is
+  40px; the page never scrolls sideways.
+- Words registered in COPY-STANDARD § Monthly demand words with this ruling.
 
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
@@ -518,6 +631,36 @@ Search, filters, sorting, Columns and Export remain. Selection scopes output onl
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
 a door to its owner: SO → SO, PO → PO, DO → DO.
 
+**REGISTER CLOSE-OUT — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on
+production 2026-09-25 (`6ed021fac`):
+
+1. **The context menu reads `Edit · View · Print · ─ Cancel SO` — and NOTHING of Delivery's.**
+   OWNER RULING 2026-09-26 (Jess: *"sales order request delivery order?"* — no): `Request Delivery
+   Order` is Delivery's door (the Monitor row, the DO page; server door `POST
+   /:id/delivery-order/request`, `order-control.ts:767`) and a Sales Order surface offering it is a
+   second entrance to another module's act (Law C) and a work control on a truth register (§0
+   CHARTER). This overwrites the Loo 2026-08-11 fourth row and its 2026-08-16/19 re-wording in §11.
+   Shipped: `View · Edit · Print PDF · ─ Cancel SO` (`SalesOrdersRegister.tsx:652-675`); the order
+   becomes `Edit · View · Print` and the word is `Print` (the Export menu already says it). The only
+   Delivery door a Sales Order carries is Order Route's `Open Delivery →`.
+2. **An empty cell is empty.** The engine prints `—` for a blank value (`DataGrid.tsx:2580, :2592`),
+   the banned absent-value glyph (SO-1312 / SO-1313 `Proceed Date`, SO-1312 `Customer Delivery
+   Location`). A document that does not exist yet already has its word (`No PO yet` · `No DO yet`);
+   every other blank prints nothing — §6.0 rule 3, an empty required fact is a system error, not a
+   value. One DataGrid change, every listing alike (UI MASTER §6.0 owns the line).
+3. **Fixtures without `proceeded_at` are data, not code.** The two `AutoCount Archive` rows
+   (SO-1312, SO-1313) are test data; nothing is backfilled (CLAUDE §6) and the column stays empty.
+4. **One population, one predicate.** The list takes `status ≠ place` (`orders.ts:334`) while the
+   total counts `place · proceed_order · delivered` (`:376`) and rentals leave in the browser
+   (`SalesOrdersRegister.tsx:582`). Both server reads use `status NOT IN (place, cancelled)` with
+   rentals excluded there; the Charter's `All` = every non-cancelled handed-over order, defined once.
+5. **`Old Orders` stays mounted** until its four boxes move (SALES-ORDER-CUTOVER); Service's
+   `CaseOrderLink` still opens it (`CaseOrderLink.tsx:56`) — Service's own round redirects it to
+   `/operation/orders/so/{id}`. Not built here; recorded as the cross-module consequence.
+
+Approved and still not built, outside this round: the optional `Guarantee` column (§11) and the
+`…` overflow with `Scan Order` (the Intake card).
+
 ### Listing Standard — owner approved 2026-09-16
 
 The shared ERP Listing Standard applies to this Register without changing what it is (a record
@@ -601,6 +744,11 @@ it never stretches to the sheet, and its frame hugs it (owner review 2026-09-22 
 configuration wraps) = 986px. Nothing is bold: SKU and the item name are plain 13px, the configuration
 is the 11px slate-11 second fact (UI §6.0 rule 5). **One two-line geometry (owner review 2026-09-22, BUILT [PR #1518](https://github.com/wenwei4046/Carres-Portal-v2/pull/1518)):** line 1 the product name, line 2 the configuration on ONE line — a long one ends in `…` and opens whole on hover, keyboard focus and click through the engine's own `OverflowText` (now exported, not copied); a line with no configuration keeps the same empty 14px second line. Rendered at 1440 (fixture): every goods row 51px. Every cell has 8px left and right padding; no empty spacing columns.
 Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
+**Row heights confirmed by the owner 2026-09-26 ("we got width, not tall"): the Register row stays 40px
+and every goods row of the expansion stays 51px** (the two-line Item geometry); UI MASTER §6.8 now
+carries 51 as the one shared two-line number. **A Service row prints `Not applicable` under
+`Unit ID` and `Deliver To`** (the 2026-08-15 ruling in §0.2, never built — `GoodsMiniTable.tsx:382`
+prints `—`, the glyph the owner banned portal-wide on 2026-09-26).
 The child follows the Purchasing reference (UI MASTER §6.8–§6.9, owner ruling 2026-09-21): it hangs
 flush under its row inside the shared `ConnectedSections` stack, whose 1px line runs to the goods
 table's own four-sided bordered frame and ends there. Sales Orders never selects child items.
@@ -821,6 +969,35 @@ Type order: card title 15px/600 blue (largest) → value 13px dark → label 11p
 `text-label`, which `FieldFrame` already rendered; the earlier "12px" wording contradicted the kit and is
 overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section spaces its field groups with ONE
 12px body gap (`Block`, SO tone); controls keep the kit's 32px — the page no longer resizes them.
+
+**THE LOCKED STATE — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** The right-hand
+real PDF pane and the 50/50 split are untouched by every rule below (Jess, 2026-09-26: *"remain my
+current"* — the permanent split was already NOT retired). View and a
+historical version (`oldrev`) are ONE locked presentation; Edit and Create are the only states
+that draw controls. Measured on production 2026-09-25 (`6ed021fac`, SO-1365 / SO-1319 Rev 1):
+
+1. **A locked goods line prints text.** `Qty` and `Unit (RM)` render as `<Input type="number">` in
+   every state and are merely disabled in View (`SalesOrderWorkspace.tsx:2817-2830`), so the
+   mattress printed `1399` in a box beside a service printing `RM 50.00`. Locked: `{qty}` and
+   `fmtMoney(unit_price)` as plain cells, the same rendering the service rows already use. One
+   table, one money spelling.
+2. **`Disc (RM)` prints `RM 0.00`, never a dash.** The cell is a literal `—` (`:2832`). `Amount =
+   Qty × Unit` proves the line carries no discount, so zero is the fact; the dash was the banned
+   absent-value glyph. A real discount prints only when the API carries `lines[].discount`
+   (SO-PDF-STANDARD §10), page and paper from one rule.
+3. **Edit offers no `Delivery date to be confirmed`.** The checkbox at `:3103-3107` lets an
+   amendment return an order to no date, which THE SALES PORTAL ENTRY GATE closed on 2026-08-15
+   (`delivery_date_tbd` describes only orders taken before that day). A date changes only into
+   another date. A legacy TBD order keeps its amber `No delivery date` in View; its Edit requires a
+   date before it can commit. The dictionary word survives for History translation only.
+4. **`oldrev` carries the same lock as View.** `formLocked` excluded it (`:1496`) and the version
+   relied on `fieldset disabled` (`:2951`), so a read-only version rendered disabled `Configure` /
+   `Remove`, number inputs, `Select` / `Pick a date` placeholders for absent values and the
+   `Fill in the building type first…` hint. Locked means: no row writers, no `Add item` / `Add
+   service`, absent values through `Fact` as `Not recorded`, hints only in Edit / Create. The
+   fieldset stays as the backstop.
+5. **The required star belongs to Edit and Create only.** `required` reaches every state
+   (`:3291-3323`, `:3480`), so View labels read `Full name *`. A locked field is not a question.
 
 **ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
 items stay (existing Class A rule). The one journey is:
@@ -1144,8 +1321,8 @@ creates both actions for their own quantities.
 
 Each leg has its own Logistics Partner, linked DO scope, dates, handover, **Who has it** fact and
 proof. Leg 1 completion means accepted at the named JB warehouse; it never means the Singapore
-customer received the goods. Both leg DOs appear in Related Documents and in the relevant Route
-nodes. Delivery remains the writer; Sales provides doors only.
+customer received the goods. Both leg DOs appear as their own lanes' `DELIVERY ORDER` nodes on Order
+Route (`Related Documents` is retired). Delivery remains the writer; Sales provides doors only.
 
 Delivery owns confirmed operational arrangement facts. Sales Orders keeps the promised Customer
 Delivery date. If the customer request changes the commercial promise, it uses the governed Sales
@@ -1189,7 +1366,7 @@ Open Delivery Order →
 ```
 
 The authoritative Delivery Orders Register and DO object live under Delivery. The SO Register,
-Related Documents and Order Route only link to the documents. For Singapore, each linked leg keeps
+Order Route only links to the documents (`Related Documents` is retired). For Singapore, each linked leg keeps
 its own DO/document scope; split or rebooked documents remain separate history rather than
 overwriting one number.
 
@@ -1228,6 +1405,22 @@ A failed cross-module read is an error, never an empty truth: `Delivery facts co
 · Try again`. Loading uses the governed skeleton. Slow or missing data never becomes `No delivery`
 or `No Finance hold`. Long text truncates only where the governed Register permits it; the full
 fact remains available through the owning object/accessible name.
+
+**A READ FAILURE HAS THREE FACES, AND A PERMISSION REFUSAL NEVER OFFERS `Try again` — OWNER RULING
+2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on production 2026-09-25: the object page
+prints the raw transport `error.message` under `This sales order could not be opened`
+(`SalesOrderWorkspace.tsx:4133`); a 403 on the Register, the object, Revisions, History and the
+Route wears the same "could not be opened / loaded" sentence with a retry that can never succeed;
+`SalesOrderAbsence` draws its own `<button>` instead of the kit's (`:1188-1202`). One shared
+translator (`readFailureWords`, `packages/shared`) answers every read failure on the three
+surfaces: **403** → `You cannot view this record` / `Ask an authorised operation user for access.`
+with `Back to Sales Orders` and NO retry (the Register's own title: `You cannot view sales orders`,
+its footer printing no count); **404 / an invalid parameter** → `Sales Order not found.` +
+`Back to Sales Orders`; **anything else** → the surface's existing `… could not be opened / loaded`
++ `Try again`. A transport message never reaches the screen. The absence and failure blocks are the
+kit `EmptyState` + kit `Button`, centred, at most 480px wide, full width with 16px gutters at 390.
+Loading reserves the final geometry (two panes on the object, the 320px canvas skeleton on the
+Route, DataGrid's own skeleton on the Register). Empty, failed and refused never share a sentence.
 
 Keyboard and screen-reader order follows the visual route order. Every document door names its
 document, every owner chip exposes the person's full name, state is never colour-only, and pan/zoom
@@ -1320,7 +1513,7 @@ that it stopped being a stack and became **one connected map**.
 SO
 ├── Goods            forks per goods line and per source quantity
 ├── Delivery         Journey / LOGISTICS → DELIVERY DATE
-├── Money            collection remains its own route
+├── Payment          collection remains its own route (band and node word `PAYMENT`, owner 2026-09-26)
 └── Loan             rendered ONLY when a loan is out
 
 Governed leg facts + any formal Finance hold → DELIVERY ORDER (system) → DELIVER → DELIVERY PHOTO
@@ -1344,7 +1537,7 @@ map too wide for the floor opens **centred on the Sales Order** and the operator
 the explicit whole-map fit and may go smaller because the operator asked for it.
 
 **THREE ROUTES READ AS THREE GROUPS — owner ruling 2026-08-17.** One uppercase **group band** —
-`GOODS` · `DELIVERY` · `MONEY` · `LOAN` (conditional) — sits above each route's columns; columns
+`GOODS` · `DELIVERY` · `PAYMENT` · `LOAN` (conditional) — `PAYMENT` since 2026-09-26 (Jess: *"remove money, but payment"*; the page's word since 2026-09-21) — sits above each route's columns; columns
 inside a group sit 32px apart and **groups sit 72px apart**. The band is where a route says its
 name: edges carry no route captions. Colour still belongs to STATE alone (blue CURRENT · green
 done · amber exception); routes are told apart by band and spacing, never by hue.
@@ -1362,6 +1555,7 @@ door** back to the object already open.
 | `○` waiting | primary-school English — `No Purchase Order yet` · `Not received yet` — **never `PO: —`** |
 | `⚠` blocked | the reason in words, and the owning door |
 | `○` future (dashed) | a step the work has not reached — dashed box AND dashed connector |
+| `⚠` unreadable | **the read failed** (owner ruling 2026-09-26 · APPROVED TARGET / NOT BUILT): two plain lines — what could not be read and what that does NOT mean — then `Try again →`. Amber like `blocked`, because it is an exception, just not a business one. **Never a `✓`, never `CURRENT`, never a business sentence:** a failed read is not a position, and `No Purchase Order yet` printed from a thrown read is a false claim in the register the operator trusts most. One branch failing never blanks the map; the other groups draw from their own reads. Not `unknown` — that word already means an unknown MONEY VALUE in the resolver |
 
 **A `✓` costs real completion evidence.** Nothing is ticked because the next thing started.
 **State is never colour-only:** complete carries the tick, CURRENT carries its chip and word, future
@@ -1391,9 +1585,91 @@ invents one.
 - **Completed segments solid; a path the work has not walked is dashed.**
 - The one edge fact left is the loan's `collect back`, a small grey label ON its line; route names
   live on the group bands and product names on the plates, never on a connector.
-- `DELIVERY ORDER` is the single convergence gate; `DELIVER` and `DELIVERY PHOTO` hang below it in a
-  straight line. **The last node has no trailing line.**
+- **One delivery scope is ONE LANE — owner ruling 2026-09-26.** A scope is one `(leg, trip)` of
+  `ops_delivery_orders` (a leg of a Journey, or one trip of a split delivery); an ordinary order has
+  one scope, no plate, and exactly today's single chain. Two or more scopes each take a lane under
+  the `DELIVERY` band with the same grey caption plate grammar GOODS uses — `Leg 1 · Carres Klang →
+  JB transit warehouse` · `Trip 2 · Mattress, 1 item` · `Trip 3 · not booked yet` — and each lane
+  carries its own `LOGISTICS → DELIVERY DATE → DELIVERY ORDER → DELIVER → DELIVERY PHOTO`. The
+  `DELIVERY ORDER` gate is therefore per lane; goods STOCK tails join the gate of the trip that
+  carries them (`trip_groups`), and on a Journey every tail joins leg 1's gate while leg 2's gate
+  carries the extra requirement `Leg 1 arrived at {stop}`. `DELIVER` and `DELIVERY PHOTO` hang
+  below their own gate in a straight line; a transfer leg draws no `DELIVERY PHOTO` (the customer leg
+  owes the proof). **The last node of a lane has no trailing line.** `CURRENT` stays ONE for the
+  whole DELIVERY group — the earliest unfinished lane — never one per lane.
 - No node is ever an orphan, and no two nodes overlap — both are asserted, not assumed.
+
+### THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT
+
+**Measured on production 2026-09-25 (`6ed021fac`, SO-1362):** `orders.status = delivered`, two
+`ops_delivery_arrangements` rows (leg 1 NETS · Tue, 15 Sep · 10 AM to 1 PM; leg 2 AL · Thu, 17 Sep ·
+2 PM to 5 PM), two `ops_delivery_orders`, two `delivered` attempts — and the map printed `LOGISTICS ·
+Logistics not assigned`, `DELIVERY DATE · Not scheduled yet`, `DELIVERY ORDER · NOT READY FOR DELIVERY
+· 3 of 5`, with `DELIVER · Delivered: Sun, 13 Sep` beneath it. The cause is the input, not the
+drawing: `booking-brief` reads `ops_order_control.booking_stage / confirmed_date` (the V1 two-stage
+booking) and `orders.ops_assigned_logistic`, and the workspace hands the resolver one
+`orders.do_number` (`SalesOrderWorkspace.tsx:2422-2436`). Delivery's records have lived elsewhere
+since 2026-08-24 (Delivery MASTER §8.8). SO-1358 (NETS · Wed, 30 Sep on its arrangement) shows the
+same blindness. This ruling overwrites every source the DELIVERY group read before it.
+
+| Node | Reads (Delivery's own record, per scope) | Completion fact | Door |
+|---|---|---|---|
+| lane plate | `ops_delivery_orders.leg / trip / trip_groups`; before any DO, the arrangement's `leg` | — (a plate is not a station) | — |
+| `LOGISTICS` | `ops_delivery_arrangements.partner_id` → `delivery_partners.name` | a partner recorded on the scope | `Open Delivery →` (the Monitor row) |
+| `DELIVERY DATE` | `ops_delivery_arrangements.confirmed_date` (+ `confirmed_time`, printed only when recorded) | `confirmed_date` recorded — the time is optional (Delivery §5) | `Open Delivery →` |
+| `DELIVERY ORDER` | the 0362 gate predicate per scope; issued = an `ops_delivery_orders` row with `voided_at IS NULL` | the row exists | `Open {DO No} →` |
+| `DELIVER` | `delivery_attempts` + `delivery_handover_events` + `delivery_stops` **through Delivery's ONE label function** (`deliveryWorkStatusOf`, Delivery §8.4 — owner ruling 2026-09-25: one function prints the words) | customer leg: attempt `delivered`; transfer leg: attempt `delivered` = arrived at the named stop, never customer receipt | `Open Delivery →` |
+| `DELIVERY PHOTO` | `ops_order_control.delivery_photos` filtered by this scope's `doNumber` (`driverSubmissionOf`, the one reader) | a photo on this DO | `Open Delivery →` |
+
+- **`DELIVER` prints Delivery's words, not its own.** Line 1 is the §8.4 rung for the scope —
+  `Scheduled` · `Waiting for {partner} pickup` · `Collected by {partner}` · `On the way to customer` ·
+  `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Overdue` — and line 2 its
+  labelled date, ETA or the one reason. The Route's own `Not delivered yet` survives only for a
+  scope with no Delivery Order yet (a dashed future node). A second label function on this surface
+  is a Law D defect (the register/card split measured 2026-09-25 is the precedent).
+- **`DELIVERY DATE` never reads the Sales Order.** `Requested delivery: {date}` on its second line
+  is the customer's promise printed for contrast; `Scheduled delivery: {date}` is Delivery's fact.
+  Neither is stated as the other (THE CROSS-MODULE DATE CONTRACT).
+- **Owner chips stay honest:** Delivery's owner rule is not yet admitted to the shared resolver,
+  so these nodes still draw no initials (MEASURED BOUNDARY 2026-09-07 stands).
+- **Route facts load only when the Route is open.** Measured: `useSalesOrderRouteFacts` fires on
+  every opened order (`SalesOrderWorkspace.tsx:1293`), eleven requests the Order tab never reads.
+  The build gates it on `?route=1`.
+- The read/write boundary is unchanged: **Sales Order gains no writer.** Every door opens Delivery.
+
+### THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT
+
+**Measured 2026-09-26 (`sales-order-route.ts`, production `6ed021fac`).** SUPPLIER reads
+`purchase_orders.expected_ready_date` (`:2405`), NULL on every live PO, so every supplier prints
+`Ready date not confirmed` — PO-2033 included, whose immutable `official_delivery_date` is Wed, 19
+Aug. RECEIVING drops its count the moment a posted receipt exists (`:646-656`: a record prints the
+GRN number and date whether 3 or 5 arrived) and sums `purchase_order_lines.received_qty` itself
+instead of asking `receivingSummaryOf`. STOCK offers `Create the Units` — nobody creates Units by
+hand; they are minted at PO issue (0426) and become available at posting. `purchaseSlices` pairs a
+PO with a line by SKU similarity (`:602-620`) where Purchasing §5.7 rules `po_line_sources` is the
+only lineage. The plate says `{m} to buy from factory` for goods already on an issued PO.
+
+| Node | Reads (the owner's record, per line lineage) | Prints | Completion fact | Action (owner) |
+|---|---|---|---|---|
+| plate | `order_lines.qty` (current Revision) · Σ `po_line_sources.qty` | `Qty {n}` · `Qty {n} · {m} on order` · `Qty {n} · {m} to buy` | — | — |
+| `PURCHASING` | `purchase_orders` through `po_line_sources(order_line_id → po_line_id)` — never SKU matching, never `purchase_orders.so` | `{PO No}` · `Issued: {date}` · `Open {PO No} →`; uncovered qty: `⚠ No Purchase Order yet` | a non-cancelled PO line covers the qty | `Issue PO` (PO Duty, resolver chip) |
+| `SUPPLIER` | `official_delivery_date` (immutable) · the newest per-line answer through `effectiveArrivalOf` · `tomorrowDeliveryCallOf` | `PO Delivery Date: {d}` · `Expected arrival: {d} · Delayed · {governed reason}` (or ` · Earlier`) · legacy with no date: `Ready date not confirmed` | the answer is `confirmed` or a Supplier DO is recorded | `Confirm ready date` (PO Duty) ONLY while the day-before check is open — never a standing action (Purchasing §5.8: no immediate reply is owed) |
+| `RECEIVING` | `receivingSummaryOf` over this line's share of the PO lines · the latest posted `warehouse_receipts` row | `{received} of {order} received` · `Latest: {GRN No} · Received: {date}` · `{k} damaged or wrong` (only when k > 0; the claim itself is on `LINKED PROBLEMS`) · complete: `{GRN No} · Received: {date}` | `pendingDeliveryQty = 0` | `Check in` (GRN Duty, resolver chip) |
+| `STOCK` | `ops_stock_items` by `reserved_order_line_id` (0471); eligible Ready Stock by `stock_match_key` | `{n} of {m} Units ready` · line 2 `Waiting for purchase` (no PO covers it) / `Waiting for receiving` (issued, not received) / the Unit IDs when whole | bound Units ≥ committed qty | **`Choose Ready Unit`** (SO PIC) only when eligible Ready Stock exists for the SKU — door `Open Ready Stock →`; otherwise NO action line: the wait belongs to Purchasing or Receiving |
+
+- **The goods gate's partial scope is the lane's `trip_groups`** (THE DELIVERY GROUP ruling), no
+  longer `ops_order_control.booking_groups`.
+- **A failed Purchasing or Stock read yellows this line's chain only** (`⚠ unreadable`); the
+  other lines and groups draw.
+- **Retired from the Route:** `Create the Units` · `Estimated ready: {date}` · `{m} to buy from
+  factory`. Registered in COPY-STANDARD with this ruling.
+- **REAL GAP, recorded and not built here — the direct-to-customer line.** §11's two-path law says a
+  purchased line either enters a Carres receiving location or never touches a Carres floor, and a
+  direct line must not manufacture a Warehouse node or GRN. No record carries that route today:
+  `purchasing_destinations` holds name · warehouse · address and no kind, and the "Operation
+  explicitly confirms fulfilment" fact has no table. Without the fact the map neither draws nor
+  guesses it; the chain stays `PURCHASING → SUPPLIER → RECEIVING → STOCK` for every PO until
+  Purchasing records the route and its completion.
 
 ### The DELIVERY ORDER gate — derived, read-only, and NO release button
 
@@ -1422,8 +1698,38 @@ engine may never disagree):
 
 ```
 outstanding = 0   → ✓ Paid
-owing             → ✗ collect first — the delivery cannot be arranged while money is owed
+owing             → ✗ Hold delivery · RM {amount} unpaid        (owner ruling 2026-09-25, one word on every surface)
 ```
+
+**THE PAYMENT NODE AND THE GATE LINE SPEAK IN TWO LINES — OWNER RULING 2026-09-26 (Jess) · APPROVED
+TARGET / NOT BUILT.** The node and its band are titled `PAYMENT`, never `MONEY` (owner, same day). The
+`SALES ORDER` node prints `SO Doc Date: {date}` and every route date context prints `Customer
+requested: {date}` — the dictionary's Route words, not the retired `SO Date` / `Requested Delivery Date`. Measured on production 2026-09-25: the node printed `RM 764.00 still to
+collect` and the gate `RM 764.00 still outstanding — collect, or request a payment approval`
+(`sales-order-route.ts:829/1028/1044`) — an invitation to a door closed on 2026-09-01, in words
+retired on 2026-09-25. The node now reads:
+
+```
+owing              Hold delivery
+                   RM 764.00 unpaid · by Thu, 22 Oct          ← paymentDeadlineOf (Payment MASTER):
+                   Collect  · Open Payments →                     2 working days before Scheduled delivery
+                                                                  (else the Requested date), 3 outstation
+paid               Paid
+                   Open Payments →
+OPEN Finance hold  Hold delivery
+                   Finance hold · {reason}
+                   Open Payments →
+no price           No price yet — money does not hold this delivery
+```
+
+The gate's money line is `Hold delivery · RM {amount} unpaid` unmet and `Paid` met; the OPEN
+Finance exception stays its own second line. **Deleted from the screen:** `still to collect` ·
+`still outstanding — collect, or request a payment approval` · `Money in full` · `COD approved —
+collect before unloading` · `Payment approval waiting for decision`. A pre-closure approval is
+still honoured by the 0362 predicate — a met line then reads `Paid` on the terms recorded, and the
+DO prints its COD instruction (Delivery §3) — but no surface invites a new one. The deadline is
+one arithmetic with the Work right panel and the Logistics card (`paymentDeadlineOf`,
+`packages/shared`); a passed deadline is `Missed` in Work and stays `by {date}` on the map.
 
 **RE-RULED 2026-09-01 — the exception is CLOSED.** The owner made money-in-full absolute: the
 Delivery Payment Approval door was removed from the screen (PR #1031) and nothing can request
@@ -1437,7 +1743,7 @@ fully-paid order, and an approval does not clear it. The full ruling, the approv
 definition and the COD terms live once in **§8 · Money on an order**.
 
 **An order whose value nobody has entered does not hold anything** (§8 — unknown warns, never
-blocks): the gate reads `No price yet — unknown never holds`.
+blocks): the gate reads `No price yet — money does not hold this delivery` (the dictionary's one spelling).
 
 **A met goods requirement on PARTIAL goods** is allowed ONLY when an explicit partial-delivery scope
 exists **and is displayed** — `Goods ready for this delivery (1 Unit in, 2 Units still open)`. The
@@ -1463,6 +1769,25 @@ An open Service Case or Supplier Claim renders as a conditional strip beside the
 stage every Sales Order passes through and Service is not one. A CLOSED exception does not render.
 The status word is the owning module's own translation — no internal enum reaches this screen.
 
+### `PROPOSED CHANGE` — a waiting amendment is announced above the map · OWNER RULING 2026-09-25 (Jess) · APPROVED TARGET / NOT BUILT
+
+Measured 2026-09-24 (the Order Route Blueprint of 2026-09-24, folded into this MASTER on 2026-09-26): the string `amend` appears zero times in
+`packages/shared/src/sales-order-route.ts`, so while an amendment waits for a decision the map keeps
+drawing the original lanes as if nothing were in flight. Jess ruled on 2026-09-25 that the operator
+must see it on Order Route.
+
+- **One banner, above the canvas, never inside it.** The map keeps meaning *what is true now*; an
+  amendment is precisely not yet true. It is the same `warning` band kind every Register uses
+  (`role="alert"`, amber, zero height while absent) — no new kit component.
+- **Three sentences, no more:** the fact with who and when, the door, and the sentence that stops
+  the wrong reading — *the map below shows the order as it stands today, not the change.*
+- **It links, it never duplicates** (Law C): the Before/After lives on the `Order` tab; the banner
+  opens it. No proposed lane is drawn in a ghost style on the canvas — two truths on one surface
+  is the defect the 2026-08-16 ruling removed.
+- **Reads:** `sales_order_amendment_live` (the same read the Order tab makes) — status `submitted`
+  or `stale`, submitted by, submitted at. A `rejected` or `applied` request renders nothing.
+- Exact words live in `docs/COPY-STANDARD.md` § The Order Route words (registered with this ruling).
+
 ### The scenario matrix — what renders, and what deliberately does not
 
 | Scenario | What the map draws |
@@ -1471,11 +1796,18 @@ The status word is the owning module's own translation — no internal enum reac
 | On order | `PURCHASING → SUPPLIER → RECEIVING`, plus the line's STOCK fork |
 | No PO yet | the chain still draws, `PURCHASING ⚠ No Purchase Order yet` and the rest dashed |
 | Split quantity | one fork per Purchase Order, each in its own column |
-| Partial receiving | `1 of 2 received`, and RECEIVING holds the goods CURRENT |
+| Partial receiving | `3 of 5 received` · `Latest: {GRN No} · Received: {date}` — the count rides the factual line and stays after a receipt is posted; RECEIVING holds the goods CURRENT until `pendingDeliveryQty = 0` |
+| Received with damage | RECEIVING adds `{k} damaged or wrong`; the Supplier Claim is a `LINKED PROBLEMS` strip, never a node |
+| Short, and Ready Stock exists | STOCK is CURRENT with `Choose Ready Unit`; otherwise STOCK waits with `Waiting for purchase` / `Waiting for receiving` and no action |
+| Two lines of one SKU | two lanes; each PO joins the lane its `po_line_sources` row names |
 | Service lines | no goods fork; a linked case appears on the strip only |
 | Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |
 | Amended line | the map always reflects the CURRENT effective Revision |
 | Delivered | DELIVER complete with its date; DELIVERY PHOTO becomes the open step |
+| Singapore / any Journey | one DELIVERY lane per leg with its plate; every goods tail joins leg 1's gate; leg 2's gate adds `Leg 1 arrived at {stop}`; the transfer leg draws no DELIVERY PHOTO |
+| Split delivery (`trip > 0`) | one lane per trip naming its goods; each goods tail joins its own trip's gate; `Trip {n} · not booked yet` for a trip with no DO |
+| A change waiting for approval | the `PROPOSED CHANGE` banner above the canvas; the map draws the CURRENT effective Revision only |
+| A read failed | that group's nodes carry the `⚠ unreadable` mark; the other groups draw; nothing is ticked and nothing is CURRENT in the failed group |
 
 **A PO WHOSE GOODS ARRIVED IS STILL ITS LINE'S ROUTE.** The fork is keyed on the PO's ORDERED
 quantity, not its still-open quantity — keyed on the latter, the whole fork vanished the moment
@@ -1502,11 +1834,10 @@ primitives the Team board and the PO duty chips already use. The reading model i
 org-chart / parcel-tracking / GitHub-checks **patterns only**; every colour, font, spacing and
 component is the Carres UI Kit. **Sales Order gains no writer.**
 
-**KNOWN BOUNDARY, reported not hidden.** The card's DELIVER node lists `In transit` among its
-states. Delivery owns that fact (`Handed Over` → `Received by Logistics`,
-`docs/delivery/MASTER.md` §4) and the route does not read those statuses today, so DELIVER renders
-`Not delivered yet` / `Scheduled: {date}` / `Delivered: {date}` and no `In transit` is invented.
-Wiring Delivery's handover status is approved-target, not built.
+**DELIVER's words are Delivery's** — see THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS above
+(owner ruling 2026-09-26). The earlier boundary note that the route "does not read those statuses
+today" is retired with that ruling; until built, the shipped node still prints its own
+`Not delivered yet` / `Delivered: {date}` and reads the V1 booking fields.
 
 ## Owner UI acceptance corrections — 2026-08-14
 
@@ -1910,6 +2241,15 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   Gmail, Google and SAP print no word on it). It stays last because it is the drawer that grows; its accessible
   name and tooltip are `More actions`, and it keeps `Cancel SO`. **No amount in the header (owner ruling
   2026-09-21)** — the order total is stated once, as the Items table's `TOTAL PAYABLE` and in `Payment`.
+  **BELOW 768px THE HEADER IS TWO ROWS — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT
+  BUILT.** Measured at 375px on production 2026-09-25: `SO-1365` and `Print ▾` overprinted each
+  other (`SalesOrderTabs.tsx:41-77` is one 44px row whose back link, SO number, actions and
+  global icons are all `shrink-0`; only the customer name may truncate). Under the phone shell's
+  breakpoint (#1646) the header becomes row 1 `← Sales Orders` + the global icons, row 2 the
+  identity (`SO-{n}` never shrinks, the customer name ends in `…` with its full name in the
+  accessible label) + `Print ▾` · `Edit` · `⋮`, then the four views. Below 480px `Print` is its
+  icon with the accessible name `Print`; `Edit` keeps its word (the page's one blue); `⋮` stays
+  last and 40px. The Delivery Order object shares this header and takes the rule with it.
   Tabs stay `Order | Revisions | History | Order Route`. Rejected from 2990: an
   overall status pill (a Sales Order has no overall status), `Relationship Map` (Order Route is that view)
   and a standalone `Cancel SO` button.
@@ -6090,10 +6430,12 @@ Edit
 View
 Print
 ────────
-Request Delivery Order
-────────
 Cancel SO
 ```
+
+**⛔ THE FOURTH ROW IS GONE — OWNER RULING 2026-09-26 (Jess).** `Request Delivery Order` left this
+menu: it is Delivery's door and never a Sales Order control (§0.1 REGISTER CLOSE-OUT). The
+paragraph below records how the row was worded while it existed.
 
 **The fourth row is re-worded by the system-issuance rulings** (Jess 2026-08-16 / 2026-08-19,
 overwriting the Loo 2026-08-11 `Issue Delivery Order` line): the SYSTEM issues the DO when the
