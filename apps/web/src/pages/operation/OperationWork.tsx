@@ -717,7 +717,7 @@ export default function OperationWork() {
                       onOpen={() => navigate(selected.destination)}
                     />
                   ) : null}
-                  <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
+                  <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} onOpenRecord={() => navigate(selected.destination)} />
                 </>
               )}
               <WorkOwnerSource item={selected.source} />

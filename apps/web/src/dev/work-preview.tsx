@@ -188,6 +188,8 @@ if (firstDelivery) {
   firstDelivery.problem = "The delivery is not scheduled";
   firstDelivery.action = "Call AL Logistics";
   firstDelivery.recipient = "AL Logistics";
+  firstDelivery.requiredResult = "Scheduled delivery recorded";
+  firstDelivery.completionStatement = "Scheduled delivery recorded";
 }
 const AL = "00000000-0000-4000-8000-00000000d001";
 const withPartner = lc !== "none";

@@ -46,7 +46,8 @@ import { useDeliveryLinkActs, useDeliveryPartners, useLogisticsCardFacts } from 
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "../components/DeliveryBrief";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { chaseMessageFor } from "../delivery-chase";
-import { lineName, moneyOfOrder } from "../sales-order-facts";
+import { moneyOfOrder } from "../sales-order-facts";
+import { useGoodsName } from "./goods-name";
 import { WorkSection } from "./WorkCard";
 import { escapeBelongsToControl } from "./PartyCardShell";
 
@@ -206,6 +207,34 @@ export function useLogisticsModel(orderId: string, leg = 0) {
   return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model };
 }
 
+/** THE PREPARED LOGISTICS MESSAGE for the ACTION card (§5.10): the same
+ *  words the card copies, the partner's WhatsApp group, and the Delivery door
+ *  that records the answer. Null until the order and its partner are known. */
+export function useLogisticsMessage(orderId: string, leg = 0) {
+  const { card, facts, partnerName, o, linkUrl } = useLogisticsModel(orderId, leg);
+  const partnersQ = useDeliveryPartners();
+  const nameOf = useGoodsName();
+  if (!card || !o || !partnerName) return null;
+  const partnerId = facts?.partner?.id ?? card.logisticsPartnerId;
+  const partnerRow = (partnersQ.data?.partners ?? []).find((p) => p.id === partnerId);
+  const message = chaseMessageFor({
+    reference: (o.source_ref ?? []).filter(Boolean).join(" · ") || null,
+    customer: displayCustomerName(o.customer_name) || null,
+    address: (o.customer_address ?? "").trim() || null,
+    building: (o.building_type ?? "").trim() || null,
+    goods: (o.order_lines ?? []).map((l) => nameOf(l.sku)),
+    requestedDate: card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : null,
+    linkUrl,
+  });
+  return {
+    party: partnerName,
+    channel: "WhatsApp group",
+    message,
+    href: partnerRow?.whatsapp_group_url ?? null,
+    recordDoor: { label: PARTY_COPY.openInDelivery, to: `/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}` },
+  };
+}
+
 export default function LogisticsCard({
   orderId,
   leg = 0,
@@ -238,6 +267,7 @@ export default function LogisticsCard({
   const partnersQ = useDeliveryPartners();
   const acts = useDeliveryLinkActs(orderId, leg);
   const { scope, factsQ, card, facts, partnerName, o, linkUrl, model } = useLogisticsModel(orderId, leg);
+  const nameOf = useGoodsName();
 
   if (scope.loading && !card) {
     return <WorkSection className="p-4 text-body text-kit-slate-11" data-testid="logistics-card">{PARTY_COPY.loading}</WorkSection>;
@@ -262,7 +292,7 @@ export default function LogisticsCard({
     customer: displayCustomerName(o.customer_name) || null,
     address: (o.customer_address ?? "").trim() || null,
     building: (o.building_type ?? "").trim() || null,
-    goods: (o.order_lines ?? []).map((l) => lineName({ sku: l.sku })),
+    goods: (o.order_lines ?? []).map((l) => nameOf(l.sku)),
     requestedDate: card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : null,
     linkUrl,
   });

@@ -24,6 +24,7 @@ vi.mock("@/lib/queries", () => ({
   useLogisticsCardFacts: () => ({ data: factsState.data, isError: false }),
   useDeliveryPartners: () => ({ data: { partners: [{ id: "p-al", name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/x" }] } }),
   useDeliveryLinkActs: () => ({ create, revoke }),
+  useCatalog: () => ({ data: undefined }),
 }));
 vi.mock("../components/DeliveryBrief", () => ({
   DeliveryDatesEdit: () => <div data-testid="stub-dates-edit" />,

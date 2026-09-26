@@ -15,15 +15,13 @@
  * READ-ONLY (ERP-ARCHITECTURE Law B): every line is the order's own record,
  * spelled by the shared facts; nothing here is a form.
  */
-import { useMemo } from "react";
 import { displayCustomerName } from "@/lib/customer-name";
 import { fmtDate } from "@/lib/fmt-date";
-import { useCatalog } from "@/lib/queries";
 import { moneyOfOrder } from "../sales-order-facts";
 import { useLogisticsModel } from "./LogisticsCard";
 import { useMissionRoute } from "./WorkOrderRoute";
-import { SectionTitle } from "./PartyCardShell";
-import { WorkSection } from "./WorkCard";
+import { useGoodsName } from "./goods-name";
+import { PartyCardShell } from "./PartyCardShell";
 
 const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -36,22 +34,10 @@ function Fact({ label, children, testId }: { label: string; children: React.Reac
   );
 }
 
-export default function SalesOrderCard({ orderId }: { orderId: string }) {
+export default function SalesOrderCard({ orderId, open, onToggle }: { orderId: string; open: boolean; onToggle: (open: boolean) => void }) {
   const lm = useLogisticsModel(orderId);
   const { route } = useMissionRoute(orderId);
-  const catalogQ = useCatalog();
-  /* The goods by their catalogue names (`Carres Cloud · King`), never the
-     bare SKU — the operator reads names (PoDetailModal's own spelling). */
-  const nameOf = useMemo(() => {
-    const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
-    const skus = new Map((catalogQ.data?.skus ?? []).map((s) => [s.sku, s]));
-    return (sku: string) => {
-      const found = skus.get(sku);
-      if (!found) return sku;
-      const model = models.get(found.modelId);
-      return model ? `${model} · ${found.variant}` : found.variant;
-    };
-  }, [catalogQ.data]);
+  const nameOf = useGoodsName();
   const o = lm.o;
   const card = lm.card;
   if (!o || !card) return null;
@@ -64,26 +50,33 @@ export default function SalesOrderCard({ orderId }: { orderId: string }) {
      then `· by 26 Sep` — the governed collection deadline the Route's payment
      line reads (the Logistics card does not repeat the money below). */
   const deadline = route?.paymentLine?.deadlineText ?? null;
+  const owed = money.known && money.outstanding > 0;
   const balance = !money.known
     ? "Value not recorded"
-    : money.outstanding > 0
+    : owed
       ? `RM ${RM.format(money.outstanding)} · not paid${deadline ? ` · by ${deadline}` : ""}`
       : "RM 0.00 · paid";
   const customerDate = card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : "No delivery date";
+  /* Collapsed (Jess, 2026-09-26: every card hides and expands): the customer,
+     the customer date and the Balance on one line. */
+  const status = (
+    <span className="min-w-0 truncate text-[12px] leading-4 text-kit-slate-11" data-testid="work-so-status">
+      {name}{phone ? ` · ${phone}` : ""} · {customerDate} · <span className={owed ? "font-semibold text-danger" : "text-kit-slate-12"}>{balance}</span>
+    </span>
+  );
   return (
-    <WorkSection className="shrink-0 px-3 py-2 min-[768px]:px-4" data-testid="work-sales-order" aria-label="Sales Order">
-      <SectionTitle>Sales Order</SectionTitle>
+    <PartyCardShell testId="work-sales-order" party="Sales Order" heading="Sales Order" status={status} open={open} onToggle={onToggle}>
       {/* Two columns from 768px so the panel's width carries the facts in
           three lines, not six (Jess, 2026-09-26: "width so empty"). */}
-      <dl className="mt-1.5 grid grid-cols-[92px_minmax(0,1fr)] gap-x-2 gap-y-1 min-[768px]:grid-cols-[92px_minmax(0,1fr)_92px_minmax(0,1fr)]">
+      <dl className="grid grid-cols-[92px_minmax(0,1fr)] gap-x-2 gap-y-1 min-[768px]:grid-cols-[92px_minmax(0,1fr)_92px_minmax(0,1fr)]">
         <Fact label="Customer" testId="work-so-customer">{name}{phone ? ` · ${phone}` : ""}</Fact>
         <Fact label="Customer date" testId="work-so-date">{customerDate}</Fact>
         <Fact label="Deliver to" testId="work-so-address">{address ?? "Address not recorded"}</Fact>
         <Fact label="Balance" testId="work-so-balance">
-          <span className={money.known && money.outstanding > 0 ? "font-semibold text-danger" : ""}>{balance}</span>
+          <span className={owed ? "font-semibold text-danger" : ""}>{balance}</span>
         </Fact>
         <Fact label="Goods" testId="work-so-goods">{goods.length ? goods.join(" · ") : "No goods lines"}</Fact>
       </dl>
-    </WorkSection>
+    </PartyCardShell>
   );
 }

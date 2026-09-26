@@ -25,7 +25,8 @@ import { ApiError } from "@/lib/api";
 import { useOperationOrders } from "@/lib/queries";
 import { useDeliveryScopeCard, useOrderIdFromRef } from "../delivery-scope-card";
 import CustomerCard, { useCustomerCard } from "./CustomerCard";
-import LogisticsCard, { useLogisticsModel } from "./LogisticsCard";
+import LogisticsCard, { useLogisticsModel, useLogisticsMessage } from "./LogisticsCard";
+import WorkActionPanel from "./WorkActionPanel";
 import SupplierCard, { supplierActRowOf, useSupplierCard } from "./SupplierCard";
 import WorkOrderRoute, { useMissionRoute } from "./WorkOrderRoute";
 import { Link } from "react-router-dom";
@@ -46,19 +47,21 @@ export const PARTIES_COPY = {
   openSupplierCard: "Open Supplier card",
 } as const;
 
-export type Party = "logistics" | "customer" | "supplier";
+export type Party = "order" | "logistics" | "customer" | "supplier";
+/** The parties that can carry an act (the Sales Order card is facts only). */
+export type ActParty = Exclude<Party, "order">;
 
 /** What the page learns from the mission: whether party cards are showing
  *  (the summary then leaves the result to them) and the one act to offer. */
 export interface MissionReport {
   shown: boolean;
-  act: { party: Party; label: string } | null;
+  act: { party: ActParty; label: string } | null;
   /** The open card has an act of its own — it then holds the blue. */
   openCardHasAct: boolean;
 }
 
 /** Which party card the selected work itself belongs to. */
-function partyOfWork(item: OperationWorkItem): Party | null {
+function partyOfWork(item: OperationWorkItem): ActParty | null {
   if (item.module === "purchasing" || item.module === "receiving") return "supplier";
   if (item.ruleKey === "ask_delivery_date") return "customer";
   if (item.module === "delivery") return "logistics";
@@ -69,10 +72,10 @@ type Timing = "ahead" | "today" | "missed" | "no_date" | null;
 const RANK: Record<string, number> = { missed: 0, today: 1, ahead: 3, no_date: 4 };
 
 /** The ONE blue action: missed → today → the selected work's party → future. */
-export function primaryPartyOf(candidates: Record<Party, Timing>, selected: Party | null): Party | null {
-  let best: Party | null = null;
+export function primaryPartyOf(candidates: Record<ActParty, Timing>, selected: ActParty | null): ActParty | null {
+  let best: ActParty | null = null;
   let bestRank = Number.POSITIVE_INFINITY;
-  for (const party of ["logistics", "customer", "supplier"] as Party[]) {
+  for (const party of ["logistics", "customer", "supplier"] as ActParty[]) {
     const timing = candidates[party];
     if (!timing) continue;
     let rank = RANK[timing] ?? 5;
@@ -90,11 +93,14 @@ export default function WorkParties({
   openParty,
   onOpenParty,
   onReport,
+  onOpenRecord = () => {},
 }: {
   item: OperationWorkItem;
   openParty: Party | null;
   onOpenParty: (party: Party | null) => void;
   onReport?: (report: MissionReport) => void;
+  /** The `Open {object}` door of the ACTION card. */
+  onOpenRecord?: () => void;
 }) {
   const ref = orderRefOf(item);
   const orderId = useOrderIdFromRef(ref ?? {});
@@ -139,7 +145,7 @@ export default function WorkParties({
       </WorkSection>
     );
   }
-  return <Mission key={orderId as string} orderId={orderId as string} item={item} openParty={openParty} onOpenParty={onOpenParty} onReport={onReport} />;
+  return <Mission key={orderId as string} orderId={orderId as string} item={item} openParty={openParty} onOpenParty={onOpenParty} onReport={onReport} onOpenRecord={onOpenRecord} />;
 }
 
 /** THE RIGHT PANEL'S HEADER (Jess, 2026-09-26): the order number as the
@@ -171,14 +177,20 @@ function Mission({
   openParty,
   onOpenParty,
   onReport,
+  onOpenRecord,
 }: {
   orderId: string;
   item: OperationWorkItem;
   openParty: Party | null;
   onOpenParty: (party: Party | null) => void;
   onReport?: (report: MissionReport) => void;
+  onOpenRecord: () => void;
 }) {
   const lm = useLogisticsModel(orderId);
+  /* The owning module's prepared message for the ACTION card: Delivery's
+     logistics message for delivery work; other rules bring their own later. */
+  const logisticsMessage = useLogisticsMessage(orderId);
+  const communication = item.module === "delivery" && item.ruleKey !== "check_delivery_proof" ? logisticsMessage : null;
   const customer = useCustomerCard(orderId);
   const supplier = useSupplierCard(orderId);
   const embedded = item.interaction.mode === "embedded";
@@ -207,9 +219,6 @@ function Mission({
     : openParty === "customer" ? Boolean(customerAct)
     : openParty === "supplier" ? actRow !== null || (supplier.model?.needPoCount ?? 0) > 0
     : false;
-  /* One visible blue: the open card's act when it has one; with every card
-     collapsed the summary's button carries it (reported below). */
-  const visiblePrimary = embedded || !openParty ? null : openHasAct ? openParty : null;
 
   const act = useMemo<MissionReport["act"]>(() => {
     if (!primary) return null;
@@ -236,17 +245,24 @@ function Mission({
 
   return (
     <div className="flex flex-col gap-2" data-testid="work-parties">
-      {/* Route FIRST, then the order's own facts, then the parties (Jess,
-          2026-09-26). The Route's title line is the order, never the words
-          "Order Route". */}
+      {/* DO, then LOOK (Jess, 2026-09-26 evening): the ACTION card first —
+          buttons live only there — then the order's header, its Route, and
+          the information cards, every one collapsed until clicked. */}
+      <WorkActionPanel
+        item={item}
+        hasParties
+        communication={communication}
+        primaryAct={!communication && act && !embedded ? { label: act.label, onClick: () => onOpenParty(act.party) } : null}
+        onOpen={onOpenRecord}
+      />
       <MissionHeader orderId={orderId} label={item.object.label} module={WORK_MODULE_WORD[item.module]} />
       <WorkOrderRoute orderId={orderId} title={null} onOpenParty={(party) => onOpenParty(party)} />
-      <SalesOrderCard orderId={orderId} />
+      <SalesOrderCard orderId={orderId} open={openParty === "order"} onToggle={toggle("order")} />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
-        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={visiblePrimary === "logistics"} moneyOnBalance />
+        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={false} moneyOnBalance />
       </div>
-      <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={visiblePrimary === "customer"} />
-      <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={visiblePrimary === "supplier"} />
+      <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={false} />
+      <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={false} />
     </div>
   );
 }
