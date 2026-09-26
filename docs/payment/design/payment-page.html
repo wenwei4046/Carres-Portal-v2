@@ -16,59 +16,56 @@
   .side svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .main{display:flex;flex-direction:column;min-width:0;overflow-x:auto}
   header.dest{height:50px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px}
-  header.dest .back{color:var(--blue-11);text-decoration:none;font-size:13px}
-  header.dest h1{font-size:20px;line-height:28px;font-weight:600;margin:0;display:flex;gap:10px;align-items:baseline}
-  header.dest h1 .so{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
-  header.dest h1 .cust{font-weight:400;font-size:15px;color:var(--ink-2)}
-  header.dest .status{font-size:13px;font-weight:600}header.dest .status.o{color:var(--amber-11)}
-  header.dest .doors{margin-left:auto;display:flex;gap:6px}
+  header.dest .back{color:var(--ink-2);text-decoration:none;font-size:15px;display:flex;align-items:center;gap:8px}
+  header.dest .sep{width:1px;height:24px;background:var(--border)}
+  header.dest h1{font-size:15px;line-height:22px;font-weight:600;margin:0;display:flex;gap:8px;align-items:baseline}
+  header.dest h1 .cust{font-weight:400;color:var(--ink-2)}
+  header.dest .doors{margin-left:auto;display:flex;gap:8px;align-items:center}
   .btn{height:32px;padding:0 12px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
-  .btn.sm{height:28px;font-size:12px;padding:0 10px}
+  .btn.ghost{border:0;background:none;color:var(--ink-2);padding:0 6px}
   .bar{display:flex;align-items:center;gap:12px;margin:16px 16px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-control);background:#fff;font-size:13px;line-height:18px}
   .bar.o{border-color:#f5d78e;background:#fff7c2}.bar.r{border-color:#f4a9a8;background:#feebec}.bar.g{border-color:#a8dcb5;background:#e6f6eb}
   .bar .fact b{font-weight:600}.bar .bbtns{margin-left:auto;display:flex;gap:6px}
   .stage{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;min-width:1024px;align-items:start}
-  .work{display:flex;flex-direction:column;gap:12px;min-width:0}
-  /* Sales Order page block grammar: rounded-card, blue text-strong title with a hairline, 3-column label-over-field grid, kit readonly-field boxes */
+  .work{display:flex;flex-direction:column;gap:24px;min-width:0}
   .blk{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:12px 16px;min-width:0}
-  .blk table.t td{white-space:normal}.blk table.t td.num,.blk table.t td:first-child{white-space:nowrap}
-  .blk h2{margin:0;padding-bottom:8px;border-bottom:1px solid var(--border);font-size:15px;line-height:22px;font-weight:600;color:var(--blue-11)}
+  .bh{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);padding-bottom:8px}
+  .bh h2{margin:0;font-size:15px;line-height:22px;font-weight:600;color:var(--blue-11)}
+  .bh .door{font-size:13px;color:var(--blue-11)}
   .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
   .f{display:flex;flex-direction:column;gap:4px;min-width:0}
   .f label{font-size:11px;line-height:14px;font-weight:500;color:var(--ink-2)}
-  .f .v{min-height:32px;display:flex;align-items:center;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-control);background:#fff;font-size:13px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .f .v.o{color:var(--amber-11);font-weight:600}.f .v.m{color:var(--ink-2)}
-  .bh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border)}.bh h2{border-bottom:0}
-  .bdoors{font-size:12px;line-height:16px;color:var(--ink-2)}
-  .blk .fact{margin:8px 0 0;font-size:13px;line-height:18px}.blk .foot{margin:8px 0 0;font-size:12px;line-height:16px;color:var(--ink-2)}
-  .f .pv{min-height:32px;display:flex;align-items:center;padding:4px 0;font-size:13px;line-height:18px}.f .pv.m{color:var(--ink-2)}
-  .blk table.t{margin-top:12px;border:1px solid var(--border);border-radius:var(--r-control);overflow:hidden;border-collapse:separate;border-spacing:0}
-    table.t{border-collapse:collapse;width:100%}.t th{height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--divider);border-right:1px solid var(--border)}
-  .t td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
-  .t th:last-child,.t td:last-child{border-right:0}.t tr:last-child td{border-bottom:0}.t .num{text-align:right}.t .m{color:var(--ink-2)}
-  .t tr.sum td{font-weight:600;border-top:1px solid var(--divider)}.t tr.due td{font-weight:600}
+  .f .v{min-height:32px;display:flex;align-items:center;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-control);background:#fff;font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .f .v.m{color:var(--ink-2)}
+  table.t{border-collapse:separate;border-spacing:0;width:100%;margin-top:12px;border:1px solid var(--border);border-radius:var(--r-control);overflow:hidden}
+  .t th{height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--divider);border-right:1px solid var(--border)}
+  .t td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+  .t th:last-child,.t td:last-child{border-right:0}.t tr:last-child td{border-bottom:0}.t .num{text-align:right;white-space:nowrap}.t .m{color:var(--ink-2)}
+  .totals{display:grid;grid-template-columns:1fr auto;gap:4px 24px;margin:12px 0 0 auto;width:320px}
+  .totals span:nth-child(odd){color:var(--ink-2)}.totals .num{text-align:right}
+  .totals .big{font-weight:600;font-size:15px;line-height:22px;color:var(--ink);border-top:1px solid var(--divider);padding-top:6px}
   .so{color:var(--blue-11);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
   .link{color:var(--blue-11);text-decoration:underline;text-underline-offset:2px;background:none;border:0;font:inherit;padding:0;cursor:pointer}
-  .btns{display:flex;flex-wrap:wrap;gap:6px}
-  /* Right — the paper */
   .paper{position:sticky;top:16px}
   .paper .tabs{display:flex;gap:2px;background:var(--surface-alt);border-radius:7px;padding:3px;margin-bottom:8px;width:max-content}
   .paper .tabs span{padding:4px 10px;border-radius:5px;font-size:12px;font-weight:600;color:var(--ink-2)}.paper .tabs span.on{background:#fff;color:var(--ink)}
-  .sheet{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:32px 36px;min-height:640px;font-size:12px;line-height:18px;color:var(--ink)}
-  .sheet .brand{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
-  .sheet .brand b{font-size:20px;letter-spacing:.06em;color:#e8412c}
-  .sheet .brand .dt{text-align:right;color:var(--ink-2)}.sheet .brand .dt b{font-size:14px;color:var(--ink);letter-spacing:0}
-  .sheet h3{font-size:16px;margin:0 0 12px;font-weight:600}
-  .sheet .kv{display:grid;grid-template-columns:120px 1fr;gap:2px 12px;margin-bottom:20px}.sheet .kv span:nth-child(odd){color:var(--ink-2)}
-  .sheet table{border-collapse:collapse;width:100%;margin-bottom:16px}.sheet th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--ink);padding:6px 0}
-  .sheet td{padding:6px 0;border-bottom:1px solid var(--surface-alt)}.sheet .num{text-align:right}
-  .sheet .totals{margin-left:auto;width:280px;display:grid;grid-template-columns:1fr auto;gap:4px 16px}
-  .sheet .totals .big{font-size:14px;font-weight:600;border-top:1px solid var(--ink);padding-top:6px}
-  .sheet .foot{margin-top:28px;color:var(--ink-2);font-size:11px}
+  .sheet{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:28px 32px;min-height:760px;font-size:10.5px;line-height:15px;color:#111}
+  .sheet .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+  .sheet .logo{color:#e8412c;font-weight:600;font-size:18px;letter-spacing:.04em}
+  .sheet .title{text-align:right}.sheet .title b{font-size:15px;letter-spacing:.06em;display:block}
+  .sheet h4{font-size:9px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 4px;background:#111;color:#fff;display:inline-block;padding:2px 6px}
+  .sheet .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .sheet .kv{display:grid;grid-template-columns:70px 1fr;gap:2px 8px}.sheet .kv span:nth-child(odd){color:#666}
+  .sheet table{border-collapse:collapse;width:100%;margin-bottom:12px}.sheet th{text-align:left;font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:#111;color:#fff;padding:4px 6px}
+  .sheet td{padding:4px 6px;border-bottom:1px solid #e5e5e5;vertical-align:top}.sheet .num{text-align:right}.sheet .sec td{background:#f3f3f3;font-weight:600;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+  .sheet .tot{margin-left:auto;width:260px;display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin-bottom:14px}.sheet .tot .big{font-weight:600;border-top:1px solid #111;padding-top:4px}
+  .sheet .sig{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:16px}.sheet .sig div{border:1px dashed #bbb;height:56px;padding:4px 6px;color:#777}
+  .sheet .terms{margin-top:14px;color:#444}.sheet .terms b{display:block;margin-bottom:2px}.sheet .terms ol{margin:0;padding-left:14px}
+  .sheet .foot{margin-top:14px;color:#777;font-size:9px}
   @media (max-width:1024px){.stage{grid-template-columns:1fr;min-width:0}.paper{position:static}}
 </style>
-<div class="note">Design mock · the Payment page (opened from the Monitor's SO No) · left = the work, right = the paper the customer receives · fixture data</div>
+<div class="note">Design mock · the Payment page (opened from the Monitor's SO No) · left = the work, in the Sales Order page's kit · right = the paper the customer receives · fixture data</div>
 <div class="shell">
   <aside class="side" aria-label="Portal rail">
     <div class="logo">CARRES</div>
@@ -80,54 +77,74 @@
   </aside>
   <div class="main">
     <header class="dest">
-      <a class="back" href="monitor-status-rail.html">← Monitor</a>
-      <h1><span class="so">SO-1405</span><span class="cust">SITI AMINAH</span></h1>
-      <div class="doors"><button class="btn">Print ▾</button><button class="btn" aria-label="More actions" title="Record payment · Create payment link · Statement">⋮</button></div>
+      <a class="back" href="monitor-status-rail.html">← Monitor</a><span class="sep"></span>
+      <h1><span>SO-1405</span><span class="cust">· SITI AMINAH</span></h1>
+      <div class="doors"><button class="btn ghost">Print ▾</button><button class="btn ghost" aria-label="More actions" title="Record payment · Create payment link · Statement">⋮</button></div>
     </header>
-    <div class="bar o" role="status"><span class="fact"><b>Customer promised to pay today</b> · RM 2,500.00 unpaid · Payment due Tue, 22 Sep</span><span class="bbtns"><button class="btn sm">Record the result</button><button class="btn sm p">Ask customer to pay</button></span></div>
+    <div class="bar o" role="status"><span class="fact"><b>Customer promised to pay today</b> · RM 2,500.00 unpaid · Payment due Tue, 22 Sep</span><span class="bbtns"><button class="btn">Record the result</button><button class="btn p">Ask customer to pay</button></span></div>
     <div class="stage">
       <div class="work">
-        <section class="blk"><h2>Money</h2>
+        <section class="blk"><div class="bh"><h2>Payment</h2></div>
+          <div class="grid3">
+            <div class="f"><label>Payment due</label><div class="v">Tue, 22 Sep</div></div>
+            <div class="f"><label>Collection owner</label><div class="v">Shasha</div></div>
+            <div class="f"><label>Today's cover</label><div class="v m">No cover today</div></div>
+          </div>
           <table class="t">
-            <thead><tr><th>Item</th><th class="num">Amount</th></tr></thead>
-            <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
-            <tr><td>Storage</td><td class="num">RM 400.00</td></tr>
-            <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
-            <tr><td>Paid to date</td><td class="num">RM 900.00</td></tr>
-            <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
+            <thead><tr><th>Date</th><th>Payment received</th><th>Approval code</th><th>Collected by</th><th class="num">Amount (RM)</th></tr></thead>
+            <tr><td>Mon, 7 Sep</td><td>Bank transfer · Deposit</td><td class="m">—</td><td>POS · Khoo Aik Yean</td><td class="num">900.00</td></tr>
           </table>
-          <p class="foot">Payment due Tue, 22 Sep · Collection owner Shasha · No cover today</p>
+          <div class="totals"><span>Goods</span><span class="num">RM 3,000.00</span><span>Storage</span><span class="num">RM 400.00</span><span>Total payable</span><span class="num">RM 3,400.00</span><span>Paid to date</span><span class="num">RM 900.00</span><span class="big">Balance due</span><span class="big num">RM 2,500.00</span></div>
         </section>
-        <section class="blk"><div class="bh"><h2>Storage</h2><span class="bdoors"><a class="link" href="#">Request more free days</a> · <a class="link" href="#">Check stored goods</a></span></div>
-          <p class="fact">Sofa · Day 29 · RM 400.00 so far</p>
-          <p class="fact">Free until Tue, 1 Sep</p>
-          <p class="fact">Charge RM 200.00 every 14 calendar days</p>
+        <section class="blk"><div class="bh"><h2>Customer</h2><span class="door">Existing customer · 1 order ›</span></div>
+          <div class="grid3">
+            <div class="f"><label>Full name</label><div class="v">SITI AMINAH</div></div>
+            <div class="f"><label>Phone</label><div class="v">0133332211</div></div>
+            <div class="f"><label>Email</label><div class="v">siti.aminah@gmail.com</div></div>
+            <div class="f"><label>Reference</label><div class="v m">No reference</div></div>
+            <div class="f"><label>Customer Requested Delivery Date</label><div class="v">Thu, 24 Sep</div></div>
+            <div class="f"><label>Scheduled delivery</label><div class="v">Thu, 24 Sep · NETS</div></div>
+          </div>
         </section>
-        <section class="blk"><h2>History</h2>
+        <section class="blk"><div class="bh"><h2>Storage</h2><span class="door"><a class="link" href="#">Request more free days</a> · <a class="link" href="#">Check stored goods</a></span></div>
+          <div class="grid3">
+            <div class="f"><label>Storage</label><div class="v">Sofa · Day 29 · RM 400.00 so far</div></div>
+            <div class="f"><label>Free until</label><div class="v">Tue, 1 Sep</div></div>
+            <div class="f"><label>Charge</label><div class="v">RM 200.00 every 14 calendar days</div></div>
+          </div>
+        </section>
+        <section class="blk"><div class="bh"><h2>History</h2></div>
           <table class="t">
             <thead><tr><th>Date</th><th>Event</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
             <tr><td>Tue, 15 Sep</td><td>Customer will pay on a date · promised Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
             <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">WhatsApp screenshot</a></td></tr>
-            <tr><td>Mon, 7 Sep</td><td>Payment recorded</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span> · <a class="link" href="#">Print</a> · <a class="link" href="#">Send receipt</a></td></tr>
-            <tr><td>Mon, 7 Sep</td><td>Proceed</td><td class="num m">—</td><td>Sales</td><td><span class="so">SO-1405</span> · <a class="link" href="#">Print</a></td></tr>
+            <tr><td>Mon, 7 Sep</td><td>Payment recorded</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span> · <a class="link" href="#">Print</a></td></tr>
+            <tr><td>Mon, 7 Sep</td><td>Proceed</td><td class="num m">—</td><td>Sales</td><td><span class="so">SO-1405</span></td></tr>
           </table>
         </section>
-        <section class="blk"><h2>Customer</h2><div class="grid3">
-          <div class="f"><label>Full name</label><div class="pv">SITI AMINAH</div></div>
-          <div class="f"><label>Phone</label><div class="pv">0133332211</div></div>
-          <div class="f"><label>Reference</label><div class="pv m">No reference</div></div>
-        </div></section>
       </div>
       <aside class="paper" aria-label="The paper the customer receives">
         <div class="tabs"><span class="on">Sales Order</span><span>Message</span><span>Receipt</span><span>Invoice</span></div>
         <div class="sheet">
-          <div class="brand"><b>CARRES</b><div class="dt"><b>SALES ORDER</b><br>SO-1405 · Mon, 7 Sep 2026</div></div>
-          <div class="kv"><span>Customer</span><span>SITI AMINAH · 0133332211</span><span>Delivery address</span><span>12, Jalan Damai 3, 41200 Klang, Selangor</span><span>Customer Requested Delivery Date</span><span>Thu, 24 Sep 2026</span></div>
-          <table><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr>
-            <tr><td>Booqit 3-seater sofa · Sand · Seat height 24</td><td class="num">1</td><td class="num">3,000.00</td></tr>
-            <tr><td>Storage · Sofa · Day 29</td><td class="num">—</td><td class="num">400.00</td></tr></table>
-          <div class="totals"><span>Total payable</span><span class="num">RM 3,400.00</span><span>Paid to date</span><span class="num">RM 900.00</span><span class="big">BALANCE DUE</span><span class="big num">RM 2,500.00</span></div>
-          
+          <div class="top"><div class="logo">CARRES</div><div class="title"><b>SALES ORDER</b>Doc No: SO-1405</div></div>
+          <div class="two">
+            <div><h4>Bill To</h4><div class="kv"><span>Name</span><span>SITI AMINAH</span><span>Address</span><span>12, Jalan Damai 3, 41200 Klang, Selangor</span><span>Tel</span><span>0133332211</span><span>Email</span><span>siti.aminah@gmail.com</span><span>Emergency</span><span>Not recorded</span></div></div>
+            <div><h4>Sales Order Info</h4><div class="kv"><span>SO No</span><span>SO-1405</span><span>SO Doc Date</span><span>Mon, 7 Sep 2026</span><span>Proceed Date</span><span>Mon, 7 Sep 2026</span><span>Sales Location</span><span>Carres Maluri Cheras</span><span>Salesperson</span><span>Khoo Aik Yean</span></div></div>
+          </div>
+          <div class="two"><div><h4>Deliver To</h4><div class="kv"><span>Address</span><span>Same as billing address</span><span>Date</span><span>Thu, 24 Sep 2026</span></div></div></div>
+          <table><thead><tr><th>#</th><th>Item Code</th><th>Description</th><th class="num">Qty</th><th class="num">Unit (RM)</th><th class="num">Disc (RM)</th><th class="num">Amount (RM)</th></tr></thead>
+            <tr class="sec"><td colspan="7">Goods</td></tr>
+            <tr><td>1</td><td>SOFA-BQ-3S</td><td>Booqit 3-seater sofa · Sand · Seat height 24</td><td class="num">1</td><td class="num">3,000.00</td><td class="num">0.00</td><td class="num">3,000.00</td></tr>
+            <tr class="sec"><td colspan="7">Services</td></tr>
+            <tr><td>2</td><td>SVC-STORAGE</td><td>Storage · Sofa · Day 29</td><td class="num">1</td><td class="num">400.00</td><td class="num">0.00</td><td class="num">400.00</td></tr>
+          </table>
+          <div class="tot"><span>Total payable</span><span class="num">RM 3,400.00</span><span>Paid to date</span><span class="num">RM 900.00</span><span class="big">BALANCE DUE</span><span class="big num">RM 2,500.00</span></div>
+          <h4>Payments Received</h4>
+          <table><thead><tr><th>Date</th><th>Payment Received</th><th>Approval Code</th><th>Collected By</th><th class="num">Amount (RM)</th></tr></thead>
+            <tr><td>7 Sep 2026</td><td>Bank transfer · Deposit</td><td>—</td><td>Khoo Aik Yean</td><td class="num">900.00</td></tr></table>
+          <div class="sig"><div>Customer Signature</div><div>Authorised by Carres</div></div>
+          <div class="terms"><b>Terms &amp; Conditions</b><ol><li>Balance due must be paid in full before delivery.</li><li>Storage charges apply when the customer delays delivery after the goods are ready.</li><li>Delivery date is subject to confirmation by the logistics company.</li></ol></div>
+          <div class="foot">SO-1405 · Issued Mon, 7 Sep 2026 · Page 1 of 1</div>
         </div>
       </aside>
     </div>
