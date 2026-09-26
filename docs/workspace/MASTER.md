@@ -1063,7 +1063,38 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · The Work right panel — OWNER RULING B, Jess 2026-09-26 night · BUILT
+### 5.10 · THE ORDER IS THE CORE — OWNER RULING, Jess 2026-09-26 night · APPROVED / NOT BUILT
+
+**"Order 就是那整个东西的核心。"** After three days of right-panel pictures the owner put the
+reference images side by side — Jobdrive's deal, AML's transaction, Plain's thread, the mail
+clients — and named what they share: **the centre is the one record, never the one act.** Work is
+therefore ORDER-CENTRED:
+
+- **One row = one order** (a Sales Order; for supplier work, a PO). An order appears ONCE in the
+  list, however many open acts it carries. The row says: the number, the customer, where the
+  Route stands, and what must be done today.
+- **The right panel = that order, whole:** its number and state with ONE big button (today's next
+  act) on top → the **Order Route**, one line, every point dated → **today's acts**, one line each,
+  each with its own prepared message and button (`Call AL Logistics` · `Ask customer to pay`) →
+  then the order's facts — Customer · Balance · Supplier · Logistics · what happened (history) —
+  collapsed, opened on click.
+- **An act lives inside its order** (Jobdrive's "Next drip · Follow up proposal · Scheduled for
+  tomorrow" sits inside the deal; AML's investigation sits inside the transaction). Work never
+  scatters one order's acts into separate rows.
+- The left rail stays the month calendar: pick the day, then see that day's orders.
+
+**Retired by this ruling:** the per-act row (SO-1362 appearing once for Delivery and again for
+Payment); the ACTION-card-only panel (ruling B, same night — superseded within the hour once the
+owner saw it: "I want my Order Route"); the 2026-09-25 composition's summary-less panel. The
+components built for them (Route, Sales Order card, party cards, ACTION card) are the parts this
+composition reuses; nothing is drawn twice.
+
+**Build order (owner to say "build"):** 1 · the middle list grouped by order, one row per order with
+its today's acts · 2 · the order panel: header + big button, dated Route, the acts list with their
+messages · 3 · the collapsed fact cards and history. Each step is shown on the real page, walked by
+the owner with two questions per row — *do I know what to do? · did I have to open another page?*
+
+#### The former per-act right panel (rulings 2026-09-25 / B 2026-09-26) — superseded, kept for the parts
 
 **WORK IS AN INBOX. The right panel is the ACTION card and nothing else.** Asked "how does Work
 help me work?", the owner chose, from three operating models, **B · do it here**: the left list
