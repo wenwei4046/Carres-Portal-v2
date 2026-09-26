@@ -789,6 +789,36 @@ Subscription  1 service visit             ›  Rental (no date/record door yet �
    `{n} {company} contact deadline(s)` shows the day the company must reach the customer, so staff can see
    whether it did; it is not a Carres call list.
 
+### CUSTOMERS — find the caller, see all their orders and records (owner-confirmed 2026-09-26, flow step 3)
+
+```text
+Customers                                   [×]
+Customers you can see · Updated 10:42
+[ Name, phone or order number             ]
+Mei Tan · 012-345 6789                    ›
+Petaling Jaya · SO2609-4827 · 24 Sep
+‹ Back to results
+Mei Tan · 012-345 6789 · Matched by phone
+[ Orders ] [ History ]
+Orders   SO2609-4827 · Scheduled delivery Fri, 2 Oct   › Sales Order page
+         SUB2609-48271 · Active                        › Subscription
+History  Delivery scheduled · Fri, 2 Oct · NETS · recorded by Aina · 25 Sep 10:06  › source History
+```
+
+1. **Read only.** Changing details, recording a contact result or taking money is done on the source
+   record through its own module action; the Customers door has no edit, note or completion control.
+2. **Search, then choose.** Name, phone or saved order number (SO/SUB, including historical forms).
+   Exact phone or number matches rank first, then name matches; nothing opens by itself.
+3. **Say how a match was found.** `Matched by phone` where the canonical phone links records; a name-only
+   hit is a `Possible match`, kept separate and never merged into one person, balance or entitlement.
+4. **Permissions decide what exists.** Results, counts and suggestions never reveal a customer or order
+   the signed-in person may not see.
+5. **Different job from Work's Customer card** (Workspace §5.10): that card shows one mission's current
+   customer-facing exception; this door starts from the customer and lists all their orders and
+   recorded history. Both read the same source records and neither keeps a second copy.
+6. **Who did it is stated truthfully.** Delivery contact by the Logistics company reads as the company's
+   act recorded on its behalf (owner correction 2026-09-25), never as a Carres call.
+
 ### WHAT IS ON SCREEN TODAY — measured source, 2026-09-24
 
 `OperationRightRail.tsx` still mounts Calendar, My Work (`TasksPanel`) and Activity. Customer search

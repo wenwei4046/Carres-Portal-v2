@@ -1136,6 +1136,10 @@ WhatsApp never completes anything. Facts remain owned by Sales Orders (customer/
 delay planning and phone), Delivery (partner contact result, scheduled/delivered and arrangement
 decision), and their source communication evidence.
 
+**Relation to the right rail's Customers door (owner-confirmed 2026-09-26, UI MASTER §5):** this card is
+one mission's customer-facing exception; the rail door starts from the customer and lists all their orders
+and recorded history. Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
+
 #### Supplier card
 
 One mission has one Supplier card even when it has several suppliers. Collapsed height is exactly
