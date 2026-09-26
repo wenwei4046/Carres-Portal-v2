@@ -2780,7 +2780,8 @@ automatically become a Sales Order state. These words are approved target copy, 
 words above. Falsifier: the owner approves or rejects them.
 | A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
-| Unknown promised date | **Delivery date to be confirmed** |
+| Unknown promised date — History translation of a legacy `delivery_date_tbd` event only (owner ruling 2026-09-26: the Edit checkbox is retired; a date changes only into another date) | **Delivery date to be confirmed** |
+| A locked goods line's discount cell (owner ruling 2026-09-26) | **`RM 0.00`** — never `—` |
 | Empty immutable-version view | **No revisions recorded** |
 | Empty event-ledger view | **No history recorded** |
 | Those two views while the read is IN FLIGHT | **`Opening the revisions`** · **`Opening the history`** |

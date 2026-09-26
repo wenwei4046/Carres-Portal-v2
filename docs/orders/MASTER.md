@@ -822,6 +822,33 @@ Type order: card title 15px/600 blue (largest) → value 13px dark → label 11p
 overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section spaces its field groups with ONE
 12px body gap (`Block`, SO tone); controls keep the kit's 32px — the page no longer resizes them.
 
+**THE LOCKED STATE — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** View and a
+historical version (`oldrev`) are ONE locked presentation; Edit and Create are the only states
+that draw controls. Measured on production 2026-09-25 (`6ed021fac`, SO-1365 / SO-1319 Rev 1):
+
+1. **A locked goods line prints text.** `Qty` and `Unit (RM)` render as `<Input type="number">` in
+   every state and are merely disabled in View (`SalesOrderWorkspace.tsx:2817-2830`), so the
+   mattress printed `1399` in a box beside a service printing `RM 50.00`. Locked: `{qty}` and
+   `fmtMoney(unit_price)` as plain cells, the same rendering the service rows already use. One
+   table, one money spelling.
+2. **`Disc (RM)` prints `RM 0.00`, never a dash.** The cell is a literal `—` (`:2832`). `Amount =
+   Qty × Unit` proves the line carries no discount, so zero is the fact; the dash was the banned
+   absent-value glyph. A real discount prints only when the API carries `lines[].discount`
+   (SO-PDF-STANDARD §10), page and paper from one rule.
+3. **Edit offers no `Delivery date to be confirmed`.** The checkbox at `:3103-3107` lets an
+   amendment return an order to no date, which THE SALES PORTAL ENTRY GATE closed on 2026-08-15
+   (`delivery_date_tbd` describes only orders taken before that day). A date changes only into
+   another date. A legacy TBD order keeps its amber `No delivery date` in View; its Edit requires a
+   date before it can commit. The dictionary word survives for History translation only.
+4. **`oldrev` carries the same lock as View.** `formLocked` excluded it (`:1496`) and the version
+   relied on `fieldset disabled` (`:2951`), so a read-only version rendered disabled `Configure` /
+   `Remove`, number inputs, `Select` / `Pick a date` placeholders for absent values and the
+   `Fill in the building type first…` hint. Locked means: no row writers, no `Add item` / `Add
+   service`, absent values through `Fact` as `Not recorded`, hints only in Edit / Create. The
+   fieldset stays as the backstop.
+5. **The required star belongs to Edit and Create only.** `required` reaches every state
+   (`:3291-3323`, `:3480`), so View labels read `Full name *`. A locked field is not a question.
+
 **ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
 items stay (existing Class A rule). The one journey is:
 `Edit → change fields / Add / Remove (restorable before commit) → Save or Submit amendment request
