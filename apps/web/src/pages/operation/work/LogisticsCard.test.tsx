@@ -145,14 +145,14 @@ describe("collapsed — at most five facts", () => {
     expect(screen.getByTestId("logistics-card-toggle").textContent).not.toMatch(/RM /);
   });
 
-  it("collapsed it is two rows like Customer and Supplier — the heading row, then ONE status line", () => {
+  it("collapsed it is one row like Customer and Supplier — heading · status · trailing", () => {
     scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
     factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
     draw();
+    /* One row in three segments (Jess, 2026-09-27): the heading column, the
+       status column, then the trailing date/button outside the toggle. */
     const toggle = screen.getByTestId("logistics-card-toggle");
-    const rows = Array.from(toggle.firstElementChild!.children);
-    expect(rows).toHaveLength(2);
-    expect(rows[1]!.getAttribute("data-testid")).toBe("logistics-card-status");
+    expect(toggle.children[1]!.getAttribute("data-testid")).toBe("logistics-card-status");
     expect(screen.getByTestId("logistics-card-status").textContent).toBe("Scheduled delivery · 27 Oct · Hold delivery · RM 1,000.00 unpaid");
   });
 });
@@ -244,7 +244,7 @@ describe("density below 768px — owner ruling 2026-09-25 (classes only; behavio
     expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[13px]");
     expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-[18px]");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
-    expect(screen.getByTestId("logistics-card-status").className).toContain("text-[12px]");
+    expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-[12px]");
     expect(act.className).toContain("text-[13px]");
     expect(act.className).toContain("leading-[18px]");
     expect(act.className).toContain("font-semibold");

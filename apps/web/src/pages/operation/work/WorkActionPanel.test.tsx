@@ -59,13 +59,13 @@ describe("WorkActionPanel", () => {
   it("is one compact summary: 16/22 problem, 13/18 action, the door beside it, no audit inside", () => {
     render(<WorkActionPanel item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
     const header = screen.getByTestId("work-detail-header");
-    expect(header.className).toContain("p-3");
+    expect(header.className).toContain("px-3");
     expect(header.className).toContain("rounded-work");
     expect(header.className).not.toMatch(/min-h-/);
     const title = screen.getByTestId("work-detail-title");
     expect(title).toHaveTextContent("Review the delivery proof");
-    expect(title.className).toContain("text-[16px]");
-    expect(title.className).toContain("leading-[22px]");
+    expect(title.className).toContain("text-[15px]");
+    expect(title.className).toContain("leading-5");
     expect(title.className).toContain("font-semibold");
     expect(screen.getByTestId("work-detail-action")).toHaveTextContent("due Thu, 17 Sep");
     expect(screen.getByTestId("work-detail-fact")).toHaveTextContent("Delivery proof needs review");
@@ -88,14 +88,17 @@ describe("WorkActionPanel", () => {
         <WorkActionPanel
           hasParties
           primaryAct={{ label: "Contact logistics today", onClick: () => {} }}
-          communication={{ party: "AL Logistics", channel: "WhatsApp group", message: "TCF0541 · LIM KUAN YANG", href: "https://chat.whatsapp.com/x", recordDoor: { label: "Open in Delivery", to: "/operation?tab=delivery" } }}
+          communication={{ party: "AL Logistics", channel: "WhatsApp group", templates: [{ key: "details", label: "Delivery details", message: "TCF0541 · LIM KUAN YANG" }], href: "https://chat.whatsapp.com/x", recordDoor: { label: "Open in Delivery", to: "/operation?tab=delivery" } }}
           item={{ ...base, action: "Call AL Logistics", recipient: "AL Logistics", interaction: { mode: "open_module" } } as OperationWorkItem}
           onOpen={() => {}}
         />
       </MemoryRouter>,
     );
+    /* Short by default (Jess): the template is named, the message is folded. */
+    expect(screen.queryByTestId("work-detail-message")).not.toBeInTheDocument();
+    expect(screen.getByText("Delivery details")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("work-detail-toggle-message"));
     expect(screen.getByTestId("work-detail-message")).toHaveTextContent("TCF0541 · LIM KUAN YANG");
-    expect(screen.getByText("To AL Logistics · WhatsApp group")).toBeInTheDocument();
     const chat = screen.getByTestId("work-detail-open-chat");
     expect(chat).toHaveTextContent("Open WhatsApp group");
     expect(chat.className).toContain("bg-kit-blue-9");

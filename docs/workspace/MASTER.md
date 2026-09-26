@@ -1082,6 +1082,16 @@ therefore ORDER-CENTRED:
   tomorrow" sits inside the deal; AML's investigation sits inside the transaction). Work never
   scatters one order's acts into separate rows.
 - The left rail stays the month calendar: pick the day, then see that day's orders.
+- **Every card tallies a Route step (Jess, 2026-09-27: "every card is tally every order route step").**
+  Below the Route the cards come in Route order — `Proceed · Sales Order` · `PO · Supplier` ·
+  `GRN · Warehouse` · `Contact · Logistics` · `Delivery · Customer` — each ONE row in three segments
+  (the step · its status line · that step's date and status word from the Route, plus the one
+  button when the order's act lands there), collapsed; expand = the detail, card in card, two
+  sides (facts left, message and history right). Not every section is read every time. The
+  order's acts land on their step: a delivery act on Contact · Logistics (the WhatsApp door with
+  its template picker; the message folded until `Show message`), every other act on the Sales
+  Order row (its door). The first act's button is the panel's ONE blue. "Long" is the failure:
+  the panel uses its width, never its height.
 
 **Retired by this ruling:** the per-act row (SO-1362 appearing once for Delivery and again for
 Payment); the ACTION-card-only panel (ruling B, same night — superseded within the hour once the

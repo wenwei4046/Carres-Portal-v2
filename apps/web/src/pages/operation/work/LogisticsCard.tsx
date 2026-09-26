@@ -21,7 +21,7 @@
  * (`LogisticsDetailsEdit`, `DeliveryDatesEdit`) or a Delivery door (link). The
  * one arithmetic is `logisticsCardModel` in @carres/shared.
  */
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -46,10 +46,13 @@ import { useDeliveryLinkActs, useDeliveryPartners, useLogisticsCardFacts } from 
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "../components/DeliveryBrief";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { chaseMessageFor } from "../delivery-chase";
+import { buildLogisticChase, buildLogisticReminder } from "@/lib/wa-templates";
 import { moneyOfOrder } from "../sales-order-facts";
 import { useGoodsName } from "./goods-name";
 import { WorkSection } from "./WorkCard";
-import { escapeBelongsToControl } from "./PartyCardShell";
+import { PartyCardShell } from "./PartyCardShell";
+import Select from "@/components/kit/Select";
+import { ACTION_COPY, type WorkCommunication } from "./WorkActionPanel";
 
 const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -207,9 +210,11 @@ export function useLogisticsModel(orderId: string, leg = 0) {
   return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model };
 }
 
-/** THE PREPARED LOGISTICS MESSAGE for the ACTION card (§5.10): the same
- *  words the card copies, the partner's WhatsApp group, and the Delivery door
- *  that records the answer. Null until the order and its partner are known. */
+/** THE PREPARED LOGISTICS MESSAGES for the act card (§5.10): Delivery's
+ *  governed templates — the delivery details (the card's own message), the
+ *  reminder and the deadline follow-up — the partner's WhatsApp group, and
+ *  the Delivery door that records the answer. Null until the order and its
+ *  partner are known. */
 export function useLogisticsMessage(orderId: string, leg = 0) {
   const { card, facts, partnerName, o, linkUrl } = useLogisticsModel(orderId, leg);
   const partnersQ = useDeliveryPartners();
@@ -217,19 +222,35 @@ export function useLogisticsMessage(orderId: string, leg = 0) {
   if (!card || !o || !partnerName) return null;
   const partnerId = facts?.partner?.id ?? card.logisticsPartnerId;
   const partnerRow = (partnersQ.data?.partners ?? []).find((p) => p.id === partnerId);
-  const message = chaseMessageFor({
-    reference: (o.source_ref ?? []).filter(Boolean).join(" · ") || null,
-    customer: displayCustomerName(o.customer_name) || null,
+  const reference = (o.source_ref ?? []).filter(Boolean).join(" · ") || null;
+  const customer = displayCustomerName(o.customer_name) || null;
+  const requested = card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : null;
+  const details = chaseMessageFor({
+    reference,
+    customer,
     address: (o.customer_address ?? "").trim() || null,
     building: (o.building_type ?? "").trim() || null,
     goods: (o.order_lines ?? []).map((l) => nameOf(l.sku)),
-    requestedDate: card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : null,
+    requestedDate: requested,
     linkUrl,
   });
+  const chase = {
+    logistic: partnerName,
+    ref: reference,
+    customer,
+    region: (o.customer_address_city ?? "").trim() || null,
+    lines: (o.order_lines ?? []).map((l) => ({ sku: nameOf(l.sku), qty: l.qty })),
+    deadline: requested ?? "TBD",
+    overdue: Boolean(card.scope.customerDeliveryIso && card.scope.customerDeliveryIso < appTodayIso()),
+  };
   return {
     party: partnerName,
     channel: "WhatsApp group",
-    message,
+    templates: [
+      { key: "details", label: "Delivery details", message: details },
+      { key: "reminder", label: "Reminder", message: buildLogisticReminder(chase) },
+      { key: "deadline", label: "Deadline follow-up", message: buildLogisticChase(chase) },
+    ],
     href: partnerRow?.whatsapp_group_url ?? null,
     recordDoor: { label: PARTY_COPY.openInDelivery, to: `/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}` },
   };
@@ -242,6 +263,9 @@ export default function LogisticsCard({
   onToggle,
   primary = true,
   moneyOnBalance = false,
+  heading: headingProp,
+  trailing,
+  communication = null,
 }: {
   orderId: string;
   leg?: number;
@@ -253,10 +277,16 @@ export default function LogisticsCard({
   /** The Sales Order card above already prints the Balance (Jess, 2026-09-26:
    *  the money was said twice) — the collapsed card then drops its money line. */
   moneyOnBalance?: boolean;
+  /** The Route step this card is (`Contact · Logistics`). */
+  heading?: string;
+  /** The row's third segment: date · status word · the one button. */
+  trailing?: ReactNode;
+  /** Delivery's governed message templates (`useLogisticsMessage`). */
+  communication?: WorkCommunication | null;
 }) {
-  const bodyId = useId();
-  const toggleRef = useRef<HTMLButtonElement>(null);
   const [openLocal, setOpenLocal] = useState(false);
+  const [templateKey, setTemplateKey] = useState<string | undefined>(undefined);
+  const [showMessage, setShowMessage] = useState(false);
   const open = openProp ?? openLocal;
   const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
     const value = typeof next === "function" ? next(open) : next;
@@ -363,70 +393,43 @@ export default function LogisticsCard({
   const exception = moneyOnBalance && model.exceptionKind === "money" ? null : model.exception;
   const timingTone = action?.timing === "missed" ? "text-kit-red-11" : action?.timing === "today" ? "text-kit-slate-12" : "text-kit-slate-11";
 
-  return (
-    <WorkSection
-      className="shrink-0"
-      data-testid="logistics-card"
-      aria-label={LOGISTICS_COPY.heading}
-      onKeyDown={(event) => {
-        /* §5.10: Escape collapses the open card and returns focus to its heading. */
-        if (event.key === "Escape" && open && editing === null && !escapeBelongsToControl(event)) {
-          event.stopPropagation();
-          setOpen(false);
-          toggleRef.current?.focus();
-        }
-      }}
-    >
-      {/* ── COLLAPSED: the same two rows as Customer and Supplier (Jess,
-          2026-09-26 — the three cards read alike): the heading row with its
-          check count, then ONE status line — the act in bold, its result and
-          due date, the scheduled day, the one exception — separated by `·`.
-          It wraps, never truncates, and never grows a third row of its own. */}
-      <button
-        type="button"
-        ref={toggleRef}
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-[56px] w-full items-center gap-2 rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:px-4"
-        data-testid="logistics-card-toggle"
-      >
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2">
-          <span className="flex min-w-0 items-baseline justify-between gap-x-3">
-            <span className={`min-w-0 truncate text-[13px] font-semibold leading-[18px] ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
-              {heading}
-            </span>
-            <span className="shrink-0 text-[12px] font-normal leading-4 tabular-nums text-kit-slate-11" data-testid="logistics-card-progress">{LOGISTICS_COPY.checks(model.doneCount)}</span>
-          </span>
-          <span className="min-w-0 text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-status">
-            {action ? (
-              <span data-testid="logistics-card-action">
-                <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">{action.act}</span>
-                <span className={`text-[12px] leading-4 ${timingTone}`}>{` · ${[action.result, dueText(action)].filter(Boolean).join(" · ")}`}</span>
-              </span>
-            ) : null}
-            {scheduledLine ? (
-              <span className="text-kit-slate-12" data-testid="logistics-card-scheduled">
-                {action ? " · " : ""}{LOGISTICS_COPY.scheduled} · {scheduledLine}
-              </span>
-            ) : null}
-            {exception ? (
-              <>
-                {action || scheduledLine ? " · " : null}
-                <span className="inline-flex items-center gap-1 text-kit-amber-11" data-testid="logistics-card-exception">
-                  <Icon name="late" size={14} />
-                  <span>{exception}</span>
-                </span>
-              </>
-            ) : null}
-          </span>
+  const template = communication ? communication.templates.find((t) => t.key === templateKey) ?? communication.templates[0] ?? null : null;
+  const status = (
+    <span className="flex min-w-0 flex-col text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-status-lines">
+      {action ? (
+        <span className="min-w-0" data-testid="logistics-card-action">
+          <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">{action.act}</span>
+          <span className={`text-[12px] leading-4 ${timingTone}`}>{` · ${[action.result, dueText(action)].filter(Boolean).join(" · ")}`}</span>
         </span>
-        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11" data-testid="logistics-card-chevron"><Icon name={open ? "collapse" : "expand"} size={16} /></span>
-      </button>
-
-      {/* ── EXPANDED: eight sections in the owner's order ─────────────────── */}
-      {open ? (
-        <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[768px]:gap-4 min-[768px]:px-4 min-[768px]:py-4" data-testid="logistics-card-body">
+      ) : null}
+      <span className="min-w-0 truncate">
+        {scheduledLine ? <span className="text-kit-slate-12" data-testid="logistics-card-scheduled">{LOGISTICS_COPY.scheduled} · {scheduledLine}</span> : null}
+        {scheduledLine && exception ? " · " : null}
+        {exception ? (
+          <span className="inline-flex items-center gap-1 text-kit-amber-11" data-testid="logistics-card-exception">
+            <Icon name="late" size={14} />
+            <span>{exception}</span>
+          </span>
+        ) : null}
+      </span>
+    </span>
+  );
+  return (
+    <PartyCardShell
+      testId="logistics-card"
+      party={LOGISTICS_COPY.heading}
+      heading={headingProp ?? heading}
+      headingTone={partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}
+      progress={LOGISTICS_COPY.checks(model.doneCount)}
+      status={status}
+      trailing={trailing}
+      open={open}
+      onToggle={(next) => setOpen(next)}
+    >
+      {/* ── EXPANDED: the facts on the left, the message and history on the
+          right — card in card, two sides (Jess, 2026-09-26/27) ── */}
+      <div className="grid grid-cols-1 gap-4 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[900px]:gap-x-8">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* 1 · Current action */}
           <section aria-label={PARTY_COPY.currentAction} className="flex flex-col gap-2">
             <SectionTitle>{PARTY_COPY.currentAction}</SectionTitle>
@@ -561,6 +564,8 @@ export default function LogisticsCard({
             </Link>
           </section>
 
+        </div>
+        <div className="flex min-w-0 flex-col gap-4 min-[900px]:border-l min-[900px]:border-work-line min-[900px]:pl-8">
           {/* 6 · External link */}
           <section aria-label={LINK_COPY.heading} className="flex flex-col gap-1.5" data-testid="logistics-card-link">
             <SectionTitle>{LINK_COPY.heading}</SectionTitle>
@@ -612,11 +617,24 @@ export default function LogisticsCard({
             <SectionTitle>{PARTY_COPY.communication}</SectionTitle>
             {partnerName ? (
               <>
-                <pre className="whitespace-pre-wrap break-all rounded-control border border-kit-slate-5 bg-kit-slate-2 p-2 font-sans text-body text-kit-slate-12" data-testid="logistics-card-message">
-                  {message}
-                </pre>
+                {communication && template ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="text-[12px] leading-4 text-kit-slate-11">{ACTION_COPY.template}</span>
+                    <div className="w-[200px]">
+                      <Select id={`logistics-template-${orderId}`} toolbar options={communication.templates.map((t) => ({ value: t.key, label: t.label }))} value={template.key} onValueChange={setTemplateKey} />
+                    </div>
+                    <button type="button" className="text-[12px] leading-4 text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" onClick={() => setShowMessage((v) => !v)} data-testid="logistics-card-toggle-message">
+                      {showMessage ? ACTION_COPY.hideMessage : ACTION_COPY.showMessage}
+                    </button>
+                  </div>
+                ) : null}
+                {!communication || showMessage ? (
+                  <pre className="whitespace-pre-wrap break-words rounded-control border border-kit-slate-5 bg-kit-slate-2 p-2 font-sans text-body text-kit-slate-12" data-testid="logistics-card-message">
+                    {template?.message ?? message}
+                  </pre>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="touch" icon="copy" onClick={() => void copy(message, PARTY_COPY.copied, true)}>
+                  <Button size="touch" icon="copy" onClick={() => void copy(template?.message ?? message, PARTY_COPY.copied, true)}>
                     {PARTY_COPY.copyMessage}
                   </Button>
                   {partnerRow?.whatsapp_group_url ? (
@@ -658,8 +676,8 @@ export default function LogisticsCard({
             )}
           </section>
         </div>
-      ) : null}
-    </WorkSection>
+      </div>
+    </PartyCardShell>
   );
 }
 

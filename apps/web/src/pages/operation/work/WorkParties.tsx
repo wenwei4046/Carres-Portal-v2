@@ -13,7 +13,10 @@
  * Route or cards. A FAILED order read says so; a refused one prints the owner's
  * permission words; an order outside the Operation list draws its acts only.
  */
-import type { OperationWorkItem } from "@carres/shared";
+import type { ReactNode } from "react";
+import type { OperationWorkItem, RoutePointKey } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
+import GrnCard from "./GrnCard";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { ApiError } from "@/lib/api";
@@ -40,7 +43,7 @@ export const PARTIES_COPY = {
   tryAgain: "Try again",
 } as const;
 
-export type Party = "order" | "logistics" | "customer" | "supplier";
+export type Party = "order" | "logistics" | "customer" | "supplier" | "grn";
 
 export default function WorkParties({
   items,
@@ -123,31 +126,66 @@ function Order({ orderId, items, openParty, onOpenParty, onOpenRecord }: {
 }) {
   const lm = useLogisticsModel(orderId);
   const logisticsMessage = useLogisticsMessage(orderId);
+  const { route } = useMissionRoute(orderId);
   const first = items[0]!;
   const toggle = (party: Party) => (open: boolean) => onOpenParty(open ? party : null);
   const reference = (lm.o?.source_ref ?? []).filter(Boolean).join(" · ") || null;
+  /* ⭐ EVERY CARD TALLIES A ROUTE STEP (Jess, 2026-09-27): the row's third
+     segment repeats that step's date and status word from the Route. */
+  const step = (key: RoutePointKey): ReactNode => {
+    const point = route?.points.find((p) => p.key === key);
+    if (!point) return null;
+    return <span className="whitespace-nowrap text-[12px] leading-4 text-kit-slate-11" data-testid={`work-step-${key}`}>{[point.dateText, point.status].filter(Boolean).join(" · ")}</span>;
+  };
+  /* The order's acts land on their step: delivery acts on Contact ·
+     Logistics (the message button), every other act on the Sales Order row
+     (its door). The FIRST act's button is the panel's ONE blue. */
+  const deliveryActs = items.filter((i) => i.module === "delivery" && i.ruleKey !== "check_delivery_proof");
+  const orderActs = items.filter((i) => !deliveryActs.includes(i));
+  const blueOn: "logistics" | "order" = deliveryActs.includes(first) ? "logistics" : "order";
+  const actLine = (i: OperationWorkItem) => ({
+    text: [i.action, i.recipient && !i.action.includes(i.recipient) ? i.recipient : null, i.timing.actionOn ? `due ${fmtDate(i.timing.actionOn)}` : null].filter(Boolean).join(" · "),
+    missed: i.timing.placement === "missed",
+  });
+  const chat = logisticsMessage?.href ? (
+    <a
+      href={logisticsMessage.href}
+      target="_blank"
+      rel="noreferrer"
+      className={`inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-[13px] font-semibold leading-[18px] ${blueOn === "logistics" && deliveryActs.length > 0 ? "bg-kit-blue-9 text-white hover:bg-kit-blue-10" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
+      data-testid="work-logistics-chat"
+    >
+      <Icon name="message" size={14} />
+      Open WhatsApp group
+    </a>
+  ) : null;
   return (
     <div className="flex flex-col gap-2" data-testid="work-parties">
       <OrderHeader orderId={orderId} label={first.object.label} module={WORK_MODULE_WORD[first.module]} />
       <WorkOrderRoute orderId={orderId} title={null} onOpenParty={(party) => onOpenParty(party)} />
-      <div className="flex flex-col gap-2" data-testid="work-acts">
-        {items.map((item, i) => (
-          <WorkActionPanel
-            key={item.id}
-            item={item}
-            hasParties
-            primary={i === 0}
-            communication={item.module === "delivery" && item.ruleKey !== "check_delivery_proof" ? logisticsMessage : null}
-            onOpen={onOpenRecord}
-          />
-        ))}
-      </div>
-      <SalesOrderCard orderId={orderId} open={openParty === "order"} onToggle={toggle("order")} />
+      <SalesOrderCard
+        orderId={orderId}
+        heading="Proceed · Sales Order"
+        act={orderActs[0] ? actLine(orderActs[0]) : null}
+        trailing={<>{step("proceed")}{orderActs[0] ? <Button size="touch" variant={blueOn === "order" ? "primary" : "neutral"} onClick={onOpenRecord} data-testid="work-order-act-door">Open {first.object.label}</Button> : null}</>}
+        open={openParty === "order"}
+        onToggle={toggle("order")}
+      />
+      <SupplierCard orderId={orderId} reference={reference} heading="PO · Supplier" trailing={step("po")} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={false} />
+      <GrnCard orderId={orderId} heading="GRN · Warehouse" trailing={step("grn")} open={openParty === "grn"} onToggle={toggle("grn")} />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
-        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={false} moneyOnBalance />
+        <LogisticsCard
+          orderId={orderId}
+          heading="Contact · Logistics"
+          trailing={<>{step("contact")}{chat}</>}
+          communication={logisticsMessage}
+          open={openParty === "logistics"}
+          onToggle={toggle("logistics")}
+          primary={false}
+          moneyOnBalance
+        />
       </div>
-      <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={false} />
-      <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={false} />
+      <CustomerCard orderId={orderId} heading="Delivery · Customer" trailing={step("delivery")} open={openParty === "customer"} onToggle={toggle("customer")} primary={false} />
     </div>
   );
 }

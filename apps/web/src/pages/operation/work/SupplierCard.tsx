@@ -67,8 +67,13 @@ export default function SupplierCard({
   open,
   onToggle,
   primary,
+  heading: headingProp,
+  trailing,
 }: {
   orderId: string;
+  /** The Route step this card is (Jess, 2026-09-27: every card tallies a Route step). */
+  heading?: string;
+  trailing?: React.ReactNode;
   /** The order's CR/TCF reference — a supplier message never carries the SO. */
   reference: string | null;
   open: boolean;
@@ -92,7 +97,8 @@ export default function SupplierCard({
       testId="party-supplier"
       anchorId={`party-supplier-${orderId}`}
       party={S.heading}
-      heading={model?.heading ?? S.heading}
+      heading={headingProp ?? model?.heading ?? S.heading}
+      trailing={trailing}
       status={
         failed ? (
           <ToneLine tone="attention">{S.unavailable}</ToneLine>

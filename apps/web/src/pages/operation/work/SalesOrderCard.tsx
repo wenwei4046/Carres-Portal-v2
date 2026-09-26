@@ -34,7 +34,14 @@ function Fact({ label, children, testId }: { label: string; children: React.Reac
   );
 }
 
-export default function SalesOrderCard({ orderId, open, onToggle }: { orderId: string; open: boolean; onToggle: (open: boolean) => void }) {
+export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sales Order", trailing, act }: {
+  orderId: string; open: boolean; onToggle: (open: boolean) => void;
+  /** The Route step this card is (`Proceed · Sales Order`). */
+  heading?: string;
+  trailing?: React.ReactNode;
+  /** The order's own open act (payment, a customer decision): the status line leads with it. */
+  act?: { text: string; missed: boolean } | null;
+}) {
   const lm = useLogisticsModel(orderId);
   const { route } = useMissionRoute(orderId);
   const nameOf = useGoodsName();
@@ -60,12 +67,15 @@ export default function SalesOrderCard({ orderId, open, onToggle }: { orderId: s
   /* Collapsed (Jess, 2026-09-26: every card hides and expands): the customer,
      the customer date and the Balance on one line. */
   const status = (
-    <span className="min-w-0 truncate text-[12px] leading-4 text-kit-slate-11" data-testid="work-so-status">
-      {name}{phone ? ` · ${phone}` : ""} · {customerDate} · <span className={owed ? "font-semibold text-danger" : "text-kit-slate-12"}>{balance}</span>
+    <span className="flex min-w-0 flex-col" data-testid="work-so-status">
+      {act ? <span className={`text-[13px] font-semibold leading-[18px] ${act.missed ? "text-danger" : "text-kit-slate-12"}`} data-testid="work-so-act">{act.text}</span> : null}
+      <span className="min-w-0 truncate text-[12px] leading-4 text-kit-slate-11">
+        {name}{phone ? ` · ${phone}` : ""} · {customerDate} · <span className={owed ? "font-semibold text-danger" : "text-kit-slate-12"}>{balance}</span>
+      </span>
     </span>
   );
   return (
-    <PartyCardShell testId="work-sales-order" party="Sales Order" heading="Sales Order" status={status} open={open} onToggle={onToggle}>
+    <PartyCardShell testId="work-sales-order" party="Sales Order" heading={heading} trailing={trailing} status={status} open={open} onToggle={onToggle}>
       {/* Two columns from 768px so the panel's width carries the facts in
           three lines, not six (Jess, 2026-09-26: "width so empty"). */}
       <dl className="grid grid-cols-[92px_minmax(0,1fr)] gap-x-2 gap-y-1 min-[768px]:grid-cols-[92px_minmax(0,1fr)_92px_minmax(0,1fr)]">

@@ -105,8 +105,12 @@ export default function CustomerCard({
   open,
   onToggle,
   primary,
+  heading: headingProp,
+  trailing,
 }: {
   orderId: string;
+  heading?: string;
+  trailing?: React.ReactNode;
   leg?: number;
   open: boolean;
   onToggle: (open: boolean) => void;
@@ -130,6 +134,7 @@ export default function CustomerCard({
         testId="party-customer"
         anchorId={`party-customer-${orderId}`}
         party={C.heading}
+        trailing={trailing}
         heading={C.heading}
         status={<ToneLine tone={failed ? "attention" : "future"}>{C.unavailable}</ToneLine>}
         open={open}
@@ -155,7 +160,8 @@ export default function CustomerCard({
       testId="party-customer"
       anchorId={`party-customer-${orderId}`}
       party={C.heading}
-      heading={`${C.heading} · ${name ?? "Name not recorded"}`}
+      heading={headingProp ?? `${C.heading} · ${name ?? "Name not recorded"}`}
+      trailing={trailing}
       status={<ToneLine tone={model.status.tone} testId="party-customer-line">{model.status.text}</ToneLine>}
       open={open}
       onToggle={onToggle}
