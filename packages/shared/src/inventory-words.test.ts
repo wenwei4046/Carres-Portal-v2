@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inventoryStatusOf, isHeldUnit, stillToArriveLine, stockConditionOf } from "./inventory-words";
+import { goodsReceivedAbsence, inventoryStatusOf, isHeldUnit, stillToArriveLine, stockConditionOf } from "./inventory-words";
 
 describe("Inventory Status — owner words 2026-09-25", () => {
   it("prints the three saleability words and never Not available", () => {
@@ -41,5 +41,13 @@ describe("the default list is what Carres holds", () => {
   it("prints the still-to-arrive line only when goods are owed", () => {
     expect(stillToArriveLine(127)).toBe("127 still to arrive · see Inbound");
     expect(stillToArriveLine(0)).toBeNull();
+  });
+});
+
+describe("goodsReceivedAbsence", () => {
+  it("says Not received only for an Incoming Unit; held goods without a date read Not recorded", () => {
+    expect(goodsReceivedAbsence({ availability: "incoming" })).toBe("Not received");
+    expect(goodsReceivedAbsence({ availability: "available" })).toBe("Not recorded");
+    expect(goodsReceivedAbsence({ availability: "reserved" })).toBe("Not recorded");
   });
 });

@@ -764,7 +764,7 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 
 | Column | Meaning | Absence |
 |---|---|---|
-| `Goods Received Date` | the day it entered Carres control (posted receipt) | `Not received` |
+| `Goods Received Date` | the day it entered Carres control (posted receipt; a Unit booked in before Receiving existed keeps its recorded date in) | `Not received` for an `Incoming` Unit (no Receiving record); `Not recorded` for goods Carres holds whose date was never captured — measured 2026-09-26: 27 opening-stock rows |
 | `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
 | `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |

@@ -212,6 +212,25 @@ describe("one row is one Unit, one cell is one fact", () => {
     expect(screen.queryByRole("button", { name: /Show every product/ })).not.toBeInTheDocument();
   });
 
+  it("stands the newest Goods Received Date first at rest, whatever order the source sent", async () => {
+    // Production 2026-09-26: the source answers in Unit ID order, so the owner's
+    // fresh 25 Sep goods sat behind 300 older rows. The date leads, newest first.
+    apiFetchMock.mockImplementation(() =>
+      Promise.resolve({
+        units: [
+          unit({ id: "old", unitCode: "U1-000-001", goodsReceivedDate: "2026-06-08" }),
+          unit({ id: "new", unitCode: "U1-000-300", goodsReceivedDate: "2026-09-25" }),
+          unit({ id: "mid", unitCode: "U1-000-200", goodsReceivedDate: "2026-08-20" }),
+        ],
+        total: 3,
+      }),
+    );
+    renderRegister();
+    await screen.findByText("U1-000-300");
+    const codes = screen.getAllByText(/^U1-000-\d{3}$/).map((el) => el.textContent);
+    expect(codes).toEqual(["U1-000-300", "U1-000-200", "U1-000-001"]);
+  });
+
   it("uses the ruled absence words: No SO · Not received · Not recorded", async () => {
     await renderLoaded();
     expect(screen.getAllByText("No SO").length).toBeGreaterThan(0);
@@ -220,6 +239,19 @@ describe("one row is one Unit, one cell is one fact", () => {
     fireEvent.click(screen.getByTestId("rail-status-incoming"));
     const incoming = (await screen.findByText("U1-000-091")).closest("tr")!;
     expect(within(incoming).getByText("Not received")).toBeInTheDocument();
+  });
+
+  it("opening stock Carres holds with no date captured reads Not recorded, never Not received", async () => {
+    // Production 2026-09-26: 27 held rows booked in without a date printed
+    // `Not received` while standing in Carres Klang. They WERE received; the
+    // fact was never captured (COPY: Inventory absence words).
+    apiFetchMock.mockImplementation(() =>
+      Promise.resolve({ units: [unit({ id: "u", unitCode: "U1-000-120", goodsReceivedDate: null, dateIn: null })], total: 1 }),
+    );
+    renderRegister();
+    const undated = (await screen.findByText("U1-000-120")).closest("tr")!;
+    expect(within(undated).getByText("Not recorded")).toBeInTheDocument();
+    expect(screen.queryByText("Not received")).not.toBeInTheDocument();
   });
 
   it("an SO No opens the Sales Order only when the order exists in this portal", async () => {
