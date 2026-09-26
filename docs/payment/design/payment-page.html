@@ -25,11 +25,17 @@
   .btn.sm{height:28px;font-size:12px;padding:0 10px}
   .stage{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;min-width:1024px;align-items:start}
   .work{display:flex;flex-direction:column;gap:12px;min-width:0}
-  .box{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden}
-  .box h2{margin:0;height:34px;display:flex;align-items:center;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--divider)}
-  .box .body{padding:10px 12px}
-  .fact{font-weight:600}.fact.o{color:var(--amber-11)}.meta{color:var(--ink-2);font-size:12px;line-height:16px;margin:2px 0 8px}
-  table.t{border-collapse:collapse;width:100%}.t th{height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--divider);border-right:1px solid var(--border)}
+  /* Sales Order page block grammar: rounded-card, blue text-strong title with a hairline, 3-column label-over-field grid, kit readonly-field boxes */
+  .blk{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);padding:12px 16px}
+  .blk h2{margin:0;padding-bottom:8px;border-bottom:1px solid var(--border);font-size:15px;line-height:22px;font-weight:600;color:var(--blue-11)}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+  .f{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .f label{font-size:11px;line-height:14px;font-weight:500;color:var(--ink-2)}
+  .f .v{min-height:32px;display:flex;align-items:center;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-control);background:#fff;font-size:13px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .f .v.o{color:var(--amber-11);font-weight:600}.f .v.m{color:var(--ink-2)}
+  .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .blk table.t{margin-top:12px;border:1px solid var(--border);border-radius:var(--r-control);overflow:hidden;border-collapse:separate;border-spacing:0}
+    table.t{border-collapse:collapse;width:100%}.t th{height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--divider);border-right:1px solid var(--border)}
   .t td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
   .t th:last-child,.t td:last-child{border-right:0}.t tr:last-child td{border-bottom:0}.t .num{text-align:right}.t .m{color:var(--ink-2)}
   .t tr.sum td{font-weight:600;border-top:1px solid var(--divider)}.t tr.due td{font-weight:600}
@@ -72,26 +78,35 @@
     </header>
     <div class="stage">
       <div class="work">
-        <section class="box"><h2>What to do</h2><div class="body">
-          <p class="fact o" style="margin:0">Customer promised to pay today</p>
-          <p class="meta">Ask customer to pay, then record the answer. Collection owner Shasha · No cover today.</p>
-          <button class="btn sm">Record the result</button>
-        </div></section>
-        <section class="box"><h2>Money</h2>
+        <section class="blk"><h2>What to do</h2><div class="grid3">
+          <div class="f"><label>Status</label><div class="v o">Customer promised to pay today</div></div>
+          <div class="f"><label>Payment due</label><div class="v">Tue, 22 Sep</div></div>
+          <div class="f"><label>Collection owner</label><div class="v">Shasha · No cover today</div></div>
+        </div><div class="acts"><button class="btn sm">Record the result</button></div></section>
+        <section class="blk"><h2>Money</h2>
           <table class="t">
+            <thead><tr><th>Item</th><th class="num">Amount</th></tr></thead>
             <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
             <tr><td>Storage · Sofa · 29 days</td><td class="num">RM 400.00</td></tr>
             <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
-            <tr><td>Paid</td><td class="num">RM 900.00</td></tr>
+            <tr><td>Paid to date</td><td class="num">RM 900.00</td></tr>
             <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
           </table>
         </section>
-        <section class="box"><h2>Storage</h2><div class="body">
-          <p style="margin:0 0 2px"><b>Sofa · Day 29</b></p>
-          <p class="meta">Started Wed, 19 Aug · free until Tue, 1 Sep · RM 200.00 every 14 days · next check Fri, 18 Sep</p>
-          <div class="btns"><button class="btn sm">Request more free days</button><button class="btn sm">Check the stored furniture</button></div>
+        <section class="blk"><h2>Storage</h2><div class="grid3">
+          <div class="f"><label>Group</label><div class="v">Sofa</div></div>
+          <div class="f"><label>Storage day</label><div class="v">Day 29</div></div>
+          <div class="f"><label>Started</label><div class="v">Wed, 19 Aug</div></div>
+          <div class="f"><label>Free until</label><div class="v">Tue, 1 Sep</div></div>
+          <div class="f"><label>Charge</label><div class="v">RM 200.00 every 14 days</div></div>
+          <div class="f"><label>Next check</label><div class="v">Fri, 18 Sep</div></div>
+        </div><div class="acts"><button class="btn sm">Request more free days</button><button class="btn sm">Check the stored furniture</button></div></section>
+        <section class="blk"><h2>Customer</h2><div class="grid3">
+          <div class="f"><label>Full name</label><div class="v">SITI AMINAH</div></div>
+          <div class="f"><label>Phone</label><div class="v">0133332211</div></div>
+          <div class="f"><label>Reference</label><div class="v m">No reference</div></div>
         </div></section>
-        <section class="box"><h2>History</h2>
+        <section class="blk"><h2>History</h2>
           <table class="t">
             <thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
             <tr><td>Tue, 15 Sep</td><td>Customer will pay on Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
