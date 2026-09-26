@@ -177,7 +177,7 @@ is dead code — check `apps/api`'s route assembly before building it.
 
 ---
 
-### 3.4 · 🔴 PARTLY DONE IS DRAWN AS DONE OR NOT DONE
+### 3.4 · 🔴 PARTLY DONE IS DRAWN AS DONE OR NOT DONE — ✅ APPROVED 2026-09-26 (Jess), law in `MASTER.md` § THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK
 
 **Current.** `cancelledLines` is modelled, so a removed line states its outcome and stops — good. But
 **3 of 5 received** and **2 of 3 delivered** have no representation: a node is `✓` or it is not.

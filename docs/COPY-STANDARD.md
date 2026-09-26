@@ -2674,12 +2674,21 @@ what has not happened yet, in the plainest words available:
 | A read failed — Delivery | **`Could not read Delivery for this order.`** / **`This does not mean nothing is arranged.`** + **`Try again →`** | `Logistics not assigned` printed from a thrown read |
 | A read failed — Payments | **`Could not read Payments for this order.`** / **`This does not mean the order is unpaid.`** + **`Try again →`** | a balance sentence from a thrown read |
 | A read failed — Purchasing | **`Could not read Purchasing for this line.`** / **`This does not mean there is no purchase order.`** + **`Try again →`** | `No Purchase Order yet` from a thrown read |
+| SUPPLIER node — the immutable original date (owner ruling 2026-09-26) | **`PO Delivery Date: {weekday, date}`** | `Estimated ready: {date}` (retired on the Route 2026-09-26) · ETA |
+| SUPPLIER node — the supplier's newest promise | **`Expected arrival: {weekday, date}`**, then ` · Delayed · {governed reason}` when later than the original, ` · Earlier` when earlier | Latest date · Revised ETA · New date |
+| RECEIVING node — partly received, a receipt posted | **`{n} of {m} received`** / **`Latest: {GRN No} · Received: {date}`** | printing the GRN alone as if complete |
+| RECEIVING node — damaged or wrong goods in the receipt | **`{k} damaged or wrong`** (only when k > 0) | Rejected · Claim (the claim is the strip's) |
+| RECEIVING node — complete | **`{GRN No} · Received: {date}`** | Done · Received (alone) |
+| STOCK node — why the Units are short | **`Waiting for purchase`** (no Purchase Order covers it) · **`Waiting for receiving`** (issued, not received) | Not allocated · No stock |
+| STOCK node action — eligible Ready Stock exists for the SKU | **`Choose Ready Unit`**, door **`Open Ready Stock →`** | `Create the Units` (retired 2026-09-26 — Units are minted at PO issue, nobody creates one) · Reserve · Allocate |
+| The goods lane's plate | **`Qty {n}`** · **`Qty {n} · {m} on order`** (covered by an issued PO) · **`Qty {n} · {m} to buy`** (no PO covers it) | `{m} to buy from factory` (retired 2026-09-26 — it said *buy* about goods already bought) |
 | A read failed — the change requests (the banner) | **`Could not read the change requests for this order.`** + **`Try again →`** | drawing no banner as if none were waiting |
 
 **BANNED on this surface, as everywhere:** `No data` · `No results` · `Not available`. Every empty
 state answers three things — what is missing, why, and who does what next.
 
-**RETIRED FROM THE ROUTE 2026-09-26 (owner ruling):** `still to collect` · `still outstanding —
+**RETIRED FROM THE ROUTE 2026-09-26 (owner ruling):** `Create the Units` · `Estimated ready: {date}` ·
+`{m} to buy from factory` · `still to collect` · `still outstanding —
 collect, or request a payment approval` · `still outstanding — approval waiting for decision` ·
 `Money in full` · `COD approved — collect before unloading` · `Payment approval waiting for decision`.
 The Delivery Payment Approval door closed on 2026-09-01; no surface invites one.
@@ -2727,7 +2736,7 @@ inside the object already open, so it has no circular `Open SO-{n} →` action.
 
 **THE EDGE WORDS.** A connector may carry a small grey label, and only these:
 **`goods`** · **`(same line)`** · **`delivery`** · **`money`** · **`loan`** ·
-**`{item} · Qty {n}`** · **`{n} to buy from factory`** · **`collect back`**.
+**`{item} · Qty {n}`** · **`{n} on order`** · **`{n} to buy`** · **`collect back`**.
 
 **`Logistics`, never `Carrier`** — already this dictionary's word for the delivery module,
 restated here because the Route names the party on the delivery side and a second spelling on a new

@@ -1444,6 +1444,40 @@ same blindness. This ruling overwrites every source the DELIVERY group read befo
   The build gates it on `?route=1`.
 - The read/write boundary is unchanged: **Sales Order gains no writer.** Every door opens Delivery.
 
+### THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT
+
+**Measured 2026-09-26 (`sales-order-route.ts`, production `6ed021fac`).** SUPPLIER reads
+`purchase_orders.expected_ready_date` (`:2405`), NULL on every live PO, so every supplier prints
+`Ready date not confirmed` — PO-2033 included, whose immutable `official_delivery_date` is Wed, 19
+Aug. RECEIVING drops its count the moment a posted receipt exists (`:646-656`: a record prints the
+GRN number and date whether 3 or 5 arrived) and sums `purchase_order_lines.received_qty` itself
+instead of asking `receivingSummaryOf`. STOCK offers `Create the Units` — nobody creates Units by
+hand; they are minted at PO issue (0426) and become available at posting. `purchaseSlices` pairs a
+PO with a line by SKU similarity (`:602-620`) where Purchasing §5.7 rules `po_line_sources` is the
+only lineage. The plate says `{m} to buy from factory` for goods already on an issued PO.
+
+| Node | Reads (the owner's record, per line lineage) | Prints | Completion fact | Action (owner) |
+|---|---|---|---|---|
+| plate | `order_lines.qty` (current Revision) · Σ `po_line_sources.qty` | `Qty {n}` · `Qty {n} · {m} on order` · `Qty {n} · {m} to buy` | — | — |
+| `PURCHASING` | `purchase_orders` through `po_line_sources(order_line_id → po_line_id)` — never SKU matching, never `purchase_orders.so` | `{PO No}` · `Issued: {date}` · `Open {PO No} →`; uncovered qty: `⚠ No Purchase Order yet` | a non-cancelled PO line covers the qty | `Issue PO` (PO Duty, resolver chip) |
+| `SUPPLIER` | `official_delivery_date` (immutable) · the newest per-line answer through `effectiveArrivalOf` · `tomorrowDeliveryCallOf` | `PO Delivery Date: {d}` · `Expected arrival: {d} · Delayed · {governed reason}` (or ` · Earlier`) · legacy with no date: `Ready date not confirmed` | the answer is `confirmed` or a Supplier DO is recorded | `Confirm ready date` (PO Duty) ONLY while the day-before check is open — never a standing action (Purchasing §5.8: no immediate reply is owed) |
+| `RECEIVING` | `receivingSummaryOf` over this line's share of the PO lines · the latest posted `warehouse_receipts` row | `{received} of {order} received` · `Latest: {GRN No} · Received: {date}` · `{k} damaged or wrong` (only when k > 0; the claim itself is on `LINKED PROBLEMS`) · complete: `{GRN No} · Received: {date}` | `pendingDeliveryQty = 0` | `Check in` (GRN Duty, resolver chip) |
+| `STOCK` | `ops_stock_items` by `reserved_order_line_id` (0471); eligible Ready Stock by `stock_match_key` | `{n} of {m} Units ready` · line 2 `Waiting for purchase` (no PO covers it) / `Waiting for receiving` (issued, not received) / the Unit IDs when whole | bound Units ≥ committed qty | **`Choose Ready Unit`** (SO PIC) only when eligible Ready Stock exists for the SKU — door `Open Ready Stock →`; otherwise NO action line: the wait belongs to Purchasing or Receiving |
+
+- **The goods gate's partial scope is the lane's `trip_groups`** (THE DELIVERY GROUP ruling), no
+  longer `ops_order_control.booking_groups`.
+- **A failed Purchasing or Stock read yellows this line's chain only** (`⚠ unreadable`); the
+  other lines and groups draw.
+- **Retired from the Route:** `Create the Units` · `Estimated ready: {date}` · `{m} to buy from
+  factory`. Registered in COPY-STANDARD with this ruling.
+- **REAL GAP, recorded and not built here — the direct-to-customer line.** §11's two-path law says a
+  purchased line either enters a Carres receiving location or never touches a Carres floor, and a
+  direct line must not manufacture a Warehouse node or GRN. No record carries that route today:
+  `purchasing_destinations` holds name · warehouse · address and no kind, and the "Operation
+  explicitly confirms fulfilment" fact has no table. Without the fact the map neither draws nor
+  guesses it; the chain stays `PURCHASING → SUPPLIER → RECEIVING → STOCK` for every PO until
+  Purchasing records the route and its completion.
+
 ### The DELIVERY ORDER gate — derived, read-only, and NO release button
 
 ```
@@ -1567,7 +1601,10 @@ must see it on Order Route.
 | On order | `PURCHASING → SUPPLIER → RECEIVING`, plus the line's STOCK fork |
 | No PO yet | the chain still draws, `PURCHASING ⚠ No Purchase Order yet` and the rest dashed |
 | Split quantity | one fork per Purchase Order, each in its own column |
-| Partial receiving | `1 of 2 received`, and RECEIVING holds the goods CURRENT |
+| Partial receiving | `3 of 5 received` · `Latest: {GRN No} · Received: {date}` — the count rides the factual line and stays after a receipt is posted; RECEIVING holds the goods CURRENT until `pendingDeliveryQty = 0` |
+| Received with damage | RECEIVING adds `{k} damaged or wrong`; the Supplier Claim is a `LINKED PROBLEMS` strip, never a node |
+| Short, and Ready Stock exists | STOCK is CURRENT with `Choose Ready Unit`; otherwise STOCK waits with `Waiting for purchase` / `Waiting for receiving` and no action |
+| Two lines of one SKU | two lanes; each PO joins the lane its `po_line_sources` row names |
 | Service lines | no goods fork; a linked case appears on the strip only |
 | Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |
 | Amended line | the map always reflects the CURRENT effective Revision |
