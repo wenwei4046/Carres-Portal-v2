@@ -24,7 +24,9 @@ export function buildIssueEnglish(raw: IssueIntake): string {
   const input = issueIntakeSchema.parse(raw); const link = input.linkedObjects[0]!.label;
   const where = input.foundByKind === "warehouse" ? "Warehouse checked" : `${input.foundByName} checked`;
   const proof = input.evidence.map((e) => `${e.count} ${e.kind === "photo" ? (e.count === 1 ? "photo" : "photos") : e.kind.replaceAll("_", " ")}`).join(" and ");
-  return `${input.affectedObject} ${problemText[input.observedProblem]} when ${where} ${link} on ${englishDate(input.observedOn)}. ${proof} were added by ${input.foundByName}. ${input.impact}.`;
+  // One photo WAS added; three photos WERE (production walk 2026-09-26).
+  const verb = input.evidence.reduce((n, e) => n + e.count, 0) === 1 ? "was" : "were";
+  return `${input.affectedObject} ${problemText[input.observedProblem]} when ${where} ${link} on ${englishDate(input.observedOn)}. ${proof} ${verb} added by ${input.foundByName}. ${input.impact}.`;
 }
 
 /** 0589 — a Unit problem reported from Warehouse routes its check to GRN Duty
