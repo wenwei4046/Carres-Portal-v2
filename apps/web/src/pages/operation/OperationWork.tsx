@@ -594,10 +594,10 @@ export default function OperationWork() {
           activePanel={activePanel}
           railBeside={railVisible}
           list={(
-            {/* The picker is ONE white card, like every card on the right (Jess,
-                2026-09-26: "why middle is not white?"). No search, no Clear
-                all: the rail's own rows reset themselves, the header's
-                Jump to… finds a record. */}
+            /* The picker is ONE white card, like every card on the right (Jess,
+               2026-09-26: "why middle is not white?"). No search, no Clear
+               all: the rail's own rows reset themselves, the header's
+               Jump to… finds a record. */
             <div className="flex min-h-0 flex-1 flex-col rounded-work border border-work-line bg-white px-3 pt-2" data-testid="work-list">
                     {/* The picker's own controls, over the picker (Jess, 2026-09-26:
                         "My Work, Team Work is under middle card"): the scope tabs on
