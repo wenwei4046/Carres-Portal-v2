@@ -2025,17 +2025,15 @@ and keeps stock/issue lifecycle verification separate.
   picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
   was in the shared destination header and is fixed there — see §6.7 below.
 
-**THE SHARED TWO-LINE LISTING ROW IS 54px — owner ruling 2026-09-18, APPROVED / NOT BUILT.** A
-listing whose cells carry two-line identity or two-line goods uses one shared 54px row with
-vertically centred checkbox, disclosure and quantity. It is the goods-row geometry, NOT a
-portal-wide replacement: the engine's 38px single-line row (`--grid-row-h`) stays correct for
-single-line registers, and existing per-page exceptions keep their own approved heights
-(SO Batch 40px, Payment Monitor 72px). Short content fits 54px; long content and accessibility
-needs may grow the row — **a required party, number, document or date is never ellipsised to
-protect the height.** No page-local row or header height. *Falsifier: the DOM measurement owed at
-build. 54px is the owner's reviewed number from the 2026-09-18 mockups; no shipped surface states
-it yet, so the build measures it in the rendered shell at 1440/1180/820/390 and reports back
-rather than hard-coding a number nobody checked.*
+**THE SHARED TWO-LINE LISTING ROW IS 51px — owner ruling 2026-09-26 (Jess: *"I like the current row
+height"*), overwriting the 2026-09-18 mockup number 54px.** A one-line listing row stays 40px (§6.0
+rule 5). A row whose Item cell carries two lines — product name 13px/18 over configuration 11px/14,
+the configuration on ONE line ending in `…` — is 8 + 18 + 2 + 14 + 8 = 50px plus its 1px rule:
+**51px, measured on the Sales Orders goods expansion at 1440 (PR #1518) and kept.** Every row of a
+two-line goods table is that height, a line with no configuration keeping the empty 14px second
+line, so rows never differ. It is the goods-row geometry, not a portal-wide replacement: single-line
+registers keep 40px, and the per-page exceptions keep their own approved heights (Payment Monitor
+72px). A required party, number, document or date is never ellipsised to protect the height.
 
 **ONE CELL MAY CARRY A DOCUMENT AND THE EXACT GOODS IT NAMES — NEVER TWO DOCUMENTS.** The stock
 picker's `PO No / Ref No` with the Unit ID on line two (§9.1) is the approved shape, and Supplier
@@ -2187,7 +2185,7 @@ behaviour, not Purchasing business fields or page-specific colours.
 | Dividers / connector | 1px |
 | Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
 | Single-line parent row | 38px minimum, existing density law |
-| Two-line goods / Unit rows | 54px minimum, shared across the same table; grow together if content requires |
+| Two-line goods / Unit rows | 51px, shared across the same table (owner 2026-09-26); grow together only if content requires |
 | Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
 | Standard control | 32px minimum; checkbox 16px, vertically centred |
 | Toolbar / footer | 45px / 32px minimum |

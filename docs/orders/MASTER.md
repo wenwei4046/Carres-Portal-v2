@@ -657,6 +657,11 @@ it never stretches to the sheet, and its frame hugs it (owner review 2026-09-22 
 configuration wraps) = 986px. Nothing is bold: SKU and the item name are plain 13px, the configuration
 is the 11px slate-11 second fact (UI §6.0 rule 5). **One two-line geometry (owner review 2026-09-22, BUILT [PR #1518](https://github.com/wenwei4046/Carres-Portal-v2/pull/1518)):** line 1 the product name, line 2 the configuration on ONE line — a long one ends in `…` and opens whole on hover, keyboard focus and click through the engine's own `OverflowText` (now exported, not copied); a line with no configuration keeps the same empty 14px second line. Rendered at 1440 (fixture): every goods row 51px. Every cell has 8px left and right padding; no empty spacing columns.
 Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
+**Row heights confirmed by the owner 2026-09-26 ("we got width, not tall"): the Register row stays 40px
+and every goods row of the expansion stays 51px** (the two-line Item geometry); UI MASTER §6.8 now
+carries 51 as the one shared two-line number. **A Service row prints `Not applicable` under
+`Unit ID` and `Deliver To`** (the 2026-08-15 ruling in §0.2, never built — `GoodsMiniTable.tsx:382`
+prints `—`, the glyph the owner banned portal-wide on 2026-09-26).
 The child follows the Purchasing reference (UI MASTER §6.8–§6.9, owner ruling 2026-09-21): it hangs
 flush under its row inside the shared `ConnectedSections` stack, whose 1px line runs to the goods
 table's own four-sided bordered frame and ends there. Sales Orders never selects child items.
