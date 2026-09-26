@@ -600,7 +600,22 @@ export default function OperationWork() {
           embeds the global utilities; the page prints no count up here. */}
       <ModuleHeader destinationHeader testId="work-destination-header" word="Work" docTitle="Work — Carres" />
       <ListPageShell register testId="operation-work">
-      <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      {/* The rail runs from the page header to the bottom (Jess, 2026-09-26:
+          the toolbar is the right column's, never a bar across the rail). */}
+      <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        {railVisible
+          ? (layout === "one"
+              ? <div className="absolute inset-y-0 left-0 z-20 flex shadow-lg">{rail}</div>
+              : rail)
+          : layout !== "one"
+            ? (
+              <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="work-rail-collapsed">
+                <ShowFiltersButton onShow={() => setRailOpen(true)} testId="work-show-filters-rail" />
+                <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
+              </aside>
+            )
+            : null}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="work-right-column">
         {/* The toolbar row of the §6.0 shell: white, one bottom rule, no box.
             My Work · Team Work · Search (340px) · Date · Page · Owner ·
             Covering. Below 600px the controls wrap. */}
@@ -681,19 +696,6 @@ export default function OperationWork() {
           )}
         </section>
 
-        <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {railVisible
-          ? (layout === "one"
-              ? <div className="absolute inset-y-0 left-0 z-20 flex shadow-lg">{rail}</div>
-              : rail)
-          : layout !== "one"
-            ? (
-              <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="work-rail-collapsed">
-                <ShowFiltersButton onShow={() => setRailOpen(true)} testId="work-show-filters-rail" />
-                <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
-              </aside>
-            )
-            : null}
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
