@@ -338,6 +338,32 @@ No deposit · Online order
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
+**WHO ACTED IS DECIDED ONCE, ON THE SERVER, AND A SHARED LOGIN IS NOT A PERSON — OWNER RULING
+2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on production 2026-09-25: SO-1365
+printed `principal · Principal · Wed, 23 Sep 09:33` and `Recorded by principal`; SO-1319 printed
+`Operations · Operation`. `actorKindOf` (`apps/api/src/routes/operation/orders.ts:144-153`) calls
+any id that resolves to a name `human`, and `principal@carres.com`, `operation@carres.com` and
+`operation-test@x.com` carry a name with `app_users.is_person = false`. The rule: an id resolving
+to an active `is_person = true` account is `human` and prints the real name; an id resolving to
+`is_person = false` (a shared role login, a robot, a test account) is `missing` and prints
+`Staff identity not recorded` with the role word kept (`Staff identity not recorded · Principal ·
+Wed, 23 Sep 09:33`); `System` only from `metadata.actor = "system"`. History (`:1059`) and
+Revisions (`:1228`) read the one function, so both views change together. The cure remains one
+account per person (`CARD-2026-08-27-individual-staff-identity.md`); this keeps the screen honest
+until then.
+
+**HISTORY TRANSLATES AT THE READ BOUNDARY AND NEVER LEAKS A STORED PHRASE — OWNER RULING
+2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured: line 3 printed `awaiting logistics
+triage` (the V1 pipeline phrase migrations 0024/0396 store in `order_history.text`), a boolean
+correction printed `Address not given yet: — → No`, and a legacy recovery note printed a whole
+chat paragraph. The rule: `historyValueWords` carries the complete stored-phrase table — a
+`proceed` event keeps `Order proceeded` on line 1 and omits line 3 (the phrase is a pipeline word,
+not a result); a stored phrase the table does not know prints `Activity`, never itself. A missing
+before-value prints `No {field word, lowercased}` (COPY), and a boolean's missing before-value
+prints `Not recorded → No` / `Not recorded → Yes`. A line-3 note longer than one line ends in `…`
+and opens whole on hover, focus and click through the engine's `OverflowText` — the Register's
+rule, not a second one. The stored event is never rewritten.
+
 ## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
 
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
@@ -2073,6 +2099,15 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   Gmail, Google and SAP print no word on it). It stays last because it is the drawer that grows; its accessible
   name and tooltip are `More actions`, and it keeps `Cancel SO`. **No amount in the header (owner ruling
   2026-09-21)** — the order total is stated once, as the Items table's `TOTAL PAYABLE` and in `Payment`.
+  **BELOW 768px THE HEADER IS TWO ROWS — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT
+  BUILT.** Measured at 375px on production 2026-09-25: `SO-1365` and `Print ▾` overprinted each
+  other (`SalesOrderTabs.tsx:41-77` is one 44px row whose back link, SO number, actions and
+  global icons are all `shrink-0`; only the customer name may truncate). Under the phone shell's
+  breakpoint (#1646) the header becomes row 1 `← Sales Orders` + the global icons, row 2 the
+  identity (`SO-{n}` never shrinks, the customer name ends in `…` with its full name in the
+  accessible label) + `Print ▾` · `Edit` · `⋮`, then the four views. Below 480px `Print` is its
+  icon with the accessible name `Print`; `Edit` keeps its word (the page's one blue); `⋮` stays
+  last and 40px. The Delivery Order object shares this header and takes the rule with it.
   Tabs stay `Order | Revisions | History | Order Route`. Rejected from 2990: an
   overall status pill (a Sales Order has no overall status), `Relationship Map` (Order Route is that view)
   and a standalone `Cancel SO` button.

@@ -3375,6 +3375,10 @@ row, no dash for tax and no "tax included / excluded" claim appears.
 
 ## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
 
+**A boolean's missing before-value prints `Not recorded → No` / `Not recorded → Yes` (owner ruling
+2026-09-26); a stored History phrase the translation table does not know prints `Activity`, and the
+V1 pipeline phrase `awaiting logistics triage` never reaches the screen.**
+
 **A `—` on either side of a change arrow is a dash pretending to be a value.** The reader
 cannot tell an empty field from a value that failed to load, and `— → —` says nothing at all.
 
