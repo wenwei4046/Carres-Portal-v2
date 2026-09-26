@@ -739,14 +739,19 @@ the same group and item grammar; zero matches is not the same as zero work.
   under ONE 32px owner line — `[SH] Shasha  49 actions to do · 88 missed`: 32px avatar with 12/16/600
   initials, 8px, owner name 15/20/600, count 12/16/400, missed 12/16/500; 8px to its first card,
   16px from its last card to the next owner.
-- **THE WORK LIST ROW — 52px, two lines, in a 300px column (Jess, 2026-09-26; replaces the
-  104px card).** The middle column is a PICKER: line 1 is the document number 13/18/600 with the
-  due date 12/16 on the right (`Thu, 1 Oct`; the date alone in red 600 when missed — no word; `No date`);
-  line 2 is the action sentence 13/18 slate-11 truncated. My Work marks a covered row `For {normal
-  owner}` in an amber tag beside the number; Team Work says it once on the owner's group line.
-  Rows sit edge to edge with a 1px rule; the chosen row is the pale-blue wash with the 2px left
-  line — the list's one blue. The number opens the record; the row shows it on the right. Over the
-  list ONE line names the chosen Date (`Thu, 1 Oct` · `Missed` · `No date`) — no count, no tabs.
+- **THE WORK CARD — four lines in a 300px column (Jess, 2026-09-26, "this format is correct";
+  replaces the 52px two-line row and the 104px card before it).** The middle column is an inbox
+  of cards, 12px padding, ~100px each: line 1 the document number 13/18/600 (opens the record)
+  with the due date 12/16 on the right (`Thu, 1 Oct`; the date alone in red 600 when missed — no
+  word; `No date`); line 2 the action sentence 13/18/500; line 3 the fact 12/16 slate-11; line 4
+  the chips 11/16 — the page word (`Delivery`) and the party (`AL Logistics`), plus `For {normal
+  owner}` in amber on a covered row in My Work (Team Work says it once on the owner's group line).
+  Every line is one line: a long sentence ends in `…` and shows whole on hover; the right panel
+  prints it in full. The column stays 300px (Jess: the width need not grow for the sentence).
+  Cards sit edge to edge with a 1px rule, no border, no radius; the chosen card is the pale-blue
+  wash with the 2px left line — the list's one blue. Over the list ONE line names the chosen Date
+  (`Thu, 1 Oct` · `Missed` · `No date`) — no count, no tabs. Reference: an inbox thread list
+  (title · sender · preview · tags · time), not a table (Jess rejected the §6.0 table for Work).
   Rows draw 50 at a time as the list end scrolls into view; a failed refresh keeps the last good
   list with one retry row. Team Work groups under ONE 32px owner line — `[SH] Shasha  49 actions to
   do · 88 missed`: 32px avatar with 12/16/600 initials, 8px, owner name 15/20/600, count 12/16/400,
