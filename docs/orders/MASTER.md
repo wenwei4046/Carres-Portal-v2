@@ -40,6 +40,35 @@ control types, special schedules and business behavior; no page-local appearance
 
 ---
 
+# §0.0 · SALES ORDER BLUEPRINT 2026-09-26 — PLAN MISSION COMPLETE · READY SCOPES
+
+**Eight segments were reviewed and approved by Jess on 2026-09-25/26 and are persisted in this
+MASTER, COPY-STANDARD and UI MASTER as APPROVED TARGET / NOT BUILT.** The Order Route Blueprint of
+2026-09-24 is folded in and its file deleted (Law 5). Every scope below is a dependency-ordered,
+unnumbered BUILD handoff boundary: it has approved business truth, approved UI/word truth, one owner
+and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY lane authors Cards.
+
+| Scope (dependency order) | Approved truth | Acceptance boundary |
+|---|---|---|
+| **A · Order Route reads its owners** | §0.2 THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS · THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK · THE MONEY NODE … TWO LINES · `⚠ unreadable` · `PROPOSED CHANGE` banner · lanes per scope | SO-1362 (two legs, delivered) draws two DELIVERY lanes, two issued DOs, `Delivered to customer`, `Paid`; SO-1319 draws `PO Delivery Date`, `0 of 1 received`, `Hold delivery` / `RM 1,249.00 unpaid · by {date}`; a thrown Purchasing read yellows one line only; a `submitted` amendment shows the banner; route facts load only with `?route=1`; the four orphaned components deleted |
+| **B · Identity and History** | §0.1 WHO ACTED IS DECIDED ONCE … · HISTORY TRANSLATES AT THE READ BOUNDARY · BELOW 768px THE HEADER IS TWO ROWS | `principal@carres.com` events print `Staff identity not recorded · Principal`; `awaiting logistics triage` never prints; `Not recorded → No`; at 375px `SO-1365` and `Print` never overlap |
+| **C · SO page locked state** | §0.1 THE LOCKED STATE (five rules) | View and Rev 1 render zero row writers, `RM 1,399.00` text, `RM 0.00` discount, no `*`, no TBD checkbox in Edit |
+| **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `Edit · View · Print · ─ Cancel SO`; one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
+| **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
+| **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
+
+**Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
+(Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
+node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
+optional column and `Scan Order` (their own cards) · the new SO/SUB number formats and the
+protected-ownership lane fold (owner decisions already recorded in their own sections).
+
+**Standard Build takeover:** *`Sales Orders — CONTINUOUS BUILD. Read docs/orders/MASTER.md §0.0 and
+its READY scopes A–F; execute each approved scope as a full production vertical slice
+autonomously, in dependency order. Do not ask the owner for engineering execution choices.`*
+
+---
+
 # §0 · THE CHARTER — FROZEN 2026-08-08 (Loo). Phase 1 of the Golden Template.
 
 > **Sales Order is the truth/register home of the customer order: find any order and understand
@@ -1373,6 +1402,22 @@ A failed cross-module read is an error, never an empty truth: `Delivery facts co
 or `No Finance hold`. Long text truncates only where the governed Register permits it; the full
 fact remains available through the owning object/accessible name.
 
+**A READ FAILURE HAS THREE FACES, AND A PERMISSION REFUSAL NEVER OFFERS `Try again` — OWNER RULING
+2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on production 2026-09-25: the object page
+prints the raw transport `error.message` under `This sales order could not be opened`
+(`SalesOrderWorkspace.tsx:4133`); a 403 on the Register, the object, Revisions, History and the
+Route wears the same "could not be opened / loaded" sentence with a retry that can never succeed;
+`SalesOrderAbsence` draws its own `<button>` instead of the kit's (`:1188-1202`). One shared
+translator (`readFailureWords`, `packages/shared`) answers every read failure on the three
+surfaces: **403** → `You cannot view this record` / `Ask an authorised operation user for access.`
+with `Back to Sales Orders` and NO retry (the Register's own title: `You cannot view sales orders`,
+its footer printing no count); **404 / an invalid parameter** → `Sales Order not found.` +
+`Back to Sales Orders`; **anything else** → the surface's existing `… could not be opened / loaded`
++ `Try again`. A transport message never reaches the screen. The absence and failure blocks are the
+kit `EmptyState` + kit `Button`, centred, at most 480px wide, full width with 16px gutters at 390.
+Loading reserves the final geometry (two panes on the object, the 320px canvas skeleton on the
+Route, DataGrid's own skeleton on the Register). Empty, failed and refused never share a sentence.
+
 Keyboard and screen-reader order follows the visual route order. Every document door names its
 document, every owner chip exposes the person's full name, state is never colour-only, and pan/zoom
 controls remain keyboard-operable.
@@ -1720,7 +1765,7 @@ The status word is the owning module's own translation — no internal enum reac
 
 ### `PROPOSED CHANGE` — a waiting amendment is announced above the map · OWNER RULING 2026-09-25 (Jess) · APPROVED TARGET / NOT BUILT
 
-Measured 2026-09-24 (`ORDER-ROUTE-BLUEPRINT.md` §3.1): the string `amend` appears zero times in
+Measured 2026-09-24 (the Order Route Blueprint of 2026-09-24, folded into this MASTER on 2026-09-26): the string `amend` appears zero times in
 `packages/shared/src/sales-order-route.ts`, so while an amendment waits for a decision the map keeps
 drawing the original lanes as if nothing were in flight. Jess ruled on 2026-09-25 that the operator
 must see it on Order Route.
