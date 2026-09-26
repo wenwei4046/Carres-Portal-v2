@@ -82,7 +82,7 @@ export default function WorkSplitShell({
         ? "grid-cols-[minmax(0,1fr)]"
         : "grid-cols-[300px_minmax(0,1fr)]";
   return (
-    <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 gap-4 ${columns}`}>
+    <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 ${columns}`}>
       {showRail ? (
         <aside aria-label="Work filters" className={`${COLUMN} gap-4 overflow-y-auto`}>
           {rail}
@@ -92,7 +92,9 @@ export default function WorkSplitShell({
         {list}
       </section>
       {hideDetail ? null : (
-        <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto`}>
+        /* The detail is the one canvas region: 16px around its cards. The rail
+           and the picker are flat white columns joined to it. */
+        <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto p-4`}>
           {detail}
         </section>
       )}

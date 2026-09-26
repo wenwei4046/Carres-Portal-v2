@@ -588,7 +588,7 @@ export default function OperationWork() {
               </aside>
             )
             : null}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="work-right-column">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="work-right-column">
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
@@ -598,7 +598,7 @@ export default function OperationWork() {
                2026-09-26: "why middle is not white?"). No search, no Clear
                all: the rail's own rows reset themselves, the header's
                Jump to… finds a record. */
-            <div className="flex min-h-0 flex-1 flex-col rounded-work border border-work-line bg-white px-3 pt-2" data-testid="work-list">
+            <div className="flex min-h-0 flex-1 flex-col border-r border-kit-slate-5 bg-white px-3 pt-2" data-testid="work-list">
                     {/* The picker's own controls, over the picker (Jess, 2026-09-26:
                         "My Work, Team Work is under middle card"): the scope tabs on
                         one line, the search on the next; never a bar across the
