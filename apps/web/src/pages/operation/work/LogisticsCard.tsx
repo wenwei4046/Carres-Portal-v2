@@ -326,7 +326,7 @@ export default function LogisticsCard({
   }
 
   const heading = partnerName ? `${LOGISTICS_COPY.heading} · ${partnerName}` : LOGISTICS_COPY.notAssigned;
-  const timingTone = action?.timing === "missed" ? "text-kit-red-11" : action?.timing === "today" ? "text-kit-blue-11" : "text-kit-slate-11";
+  const timingTone = action?.timing === "missed" ? "text-kit-red-11" : action?.timing === "today" ? "text-kit-slate-12" : "text-kit-slate-11";
 
   return (
     <WorkSection
@@ -349,12 +349,12 @@ export default function LogisticsCard({
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-[72px] w-full min-[768px]:min-h-0 items-center gap-2 rounded-work px-3 py-[9px] text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:items-start min-[768px]:gap-3 min-[768px]:px-4 min-[768px]:py-3"
+        className="flex min-h-[56px] w-full min-[768px]:min-h-0 items-center gap-2 rounded-work px-3 py-[9px] text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:items-start min-[768px]:gap-3 min-[768px]:px-4 min-[768px]:py-3"
         data-testid="logistics-card-toggle"
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span className={`text-[15px] font-semibold leading-5 ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
+            <span className={`text-[13px] font-semibold leading-[18px] ${partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}`} data-testid="logistics-card-heading">
               {heading}
             </span>
             <span className="text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-progress">{LOGISTICS_COPY.checks(model.doneCount)}</span>
@@ -397,7 +397,7 @@ export default function LogisticsCard({
                 {editing === null ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {doorFor(action.door)}
-                    <Link className="inline-flex min-h-6 items-center gap-1 text-label text-kit-blue-11 hover:underline" to={`/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}`}>
+                    <Link className="inline-flex min-h-6 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={`/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}`}>
                       {PARTY_COPY.openInDelivery}
                       <Icon name="open" size={14} />
                     </Link>
@@ -513,7 +513,7 @@ export default function LogisticsCard({
                 </div>
               ))
             )}
-            <Link className="inline-flex min-h-6 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to="/operation/procurement">
+            <Link className="inline-flex min-h-6 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to="/operation/procurement">
               {PARTY_COPY.openPurchasing}
               <Icon name="open" size={14} />
             </Link>
@@ -578,7 +578,7 @@ export default function LogisticsCard({
                     {PARTY_COPY.copyMessage}
                   </Button>
                   {partnerRow?.whatsapp_group_url ? (
-                    <a className="inline-flex min-h-6 items-center gap-1 text-label text-kit-blue-11 hover:underline" href={partnerRow.whatsapp_group_url} target="_blank" rel="noreferrer">
+                    <a className="inline-flex min-h-6 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" href={partnerRow.whatsapp_group_url} target="_blank" rel="noreferrer">
                       <Icon name="message" size={14} />
                       {PARTY_COPY.openGroup}
                     </a>

@@ -219,10 +219,10 @@ describe("density below 768px — owner ruling 2026-09-25 (classes only; behavio
   it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
     draw();
     const toggle = screen.getByTestId("logistics-card-toggle");
-    expect(toggle.className).toContain("min-h-[72px]");
+    expect(toggle.className).toContain("min-h-[56px]");
     expect(toggle.className).toContain("px-3");
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[15px]");
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-5");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[13px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-[18px]");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
     expect(act.className).toContain("text-[13px]");
     expect(act.className).toContain("leading-[18px]");

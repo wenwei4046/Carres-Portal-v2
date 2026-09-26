@@ -591,85 +591,85 @@ export default function OperationWork() {
             )
             : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="work-right-column">
-        {/* The toolbar row of the §6.0 shell: white, one bottom rule, no box.
-            My Work · Team Work · Search (340px). Below 600px the controls
-            wrap. `Covering` is gone (Jess, 2026-09-26): cover shows on the
-            row itself, never as a toolbar button. */}
-        <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-base-200 bg-white px-2 py-1.5" data-testid="work-toolbar">
-          {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
-          <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
-            {(
-              [
-                ["mine", "My Work"],
-                ["team", "Team Work"],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                data-testid={`work-view-${k}`}
-                aria-pressed={activeView === k}
-                onClick={() => {
-                  setParams((before) => {
-                    const next = new URLSearchParams(before);
-                    if (k === "mine") {
-                      next.delete("scope");
-                      next.delete("owner");
-                    } else next.set("scope", "team");
-                    return next;
-                  }, { replace: true });
-                }}
-                className={`h-[34px] px-3 text-control max-[599px]:flex-1 ${
-                  activeView === k
-                    ? "bg-kit-blue-9 font-semibold text-white"
-                    : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="w-[340px] shrink-0 max-[599px]:w-auto max-[599px]:basis-full">
-            <SearchInput
-              toolbar
-              id="work-search"
-              value={search}
-              onChange={(event) => updateParam("q", event.target.value)}
-              placeholder="Search work…"
-            />
-          </div>
-          {activeView === "team" && ownerFocus && (
-            <button
-              type="button"
-              data-testid="work-owner-clear"
-              onClick={() => updateParam("owner", null)}
-              className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
-            >
-              {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
-              · Clear
-            </button>
-          )}
-          {(search || when !== "all" || moduleFilter !== "all" || params.get("status") || day !== "focus") && (
-            <button
-              type="button"
-              onClick={() => setParams((before) => {
-                const next = new URLSearchParams(before);
-                for (const key of ["q", "when", "module", "status", "owner", "day", "week", "selected"]) next.delete(key);
-                return next;
-              }, { replace: true })}
-              className="h-9 px-2 text-control text-kit-blue-11"
-            >
-              Clear all
-            </button>
-          )}
-        </section>
-
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
           railBeside={railVisible}
           list={(
             <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
+                    {/* The picker's own controls, over the picker (Jess, 2026-09-26:
+                        "My Work, Team Work is under middle card"): the scope tabs on
+                        one line, the search on the next; never a bar across the
+                        detail. `Covering` is gone: cover shows on the row itself. */}
+              <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 pb-2" data-testid="work-toolbar">
+                {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
+                <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
+                  {(
+                    [
+                      ["mine", "My Work"],
+                      ["team", "Team Work"],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      data-testid={`work-view-${k}`}
+                      aria-pressed={activeView === k}
+                      onClick={() => {
+                        setParams((before) => {
+                          const next = new URLSearchParams(before);
+                          if (k === "mine") {
+                            next.delete("scope");
+                            next.delete("owner");
+                          } else next.set("scope", "team");
+                          return next;
+                        }, { replace: true });
+                      }}
+                      className={`h-[34px] px-3 text-control max-[599px]:flex-1 ${
+                        activeView === k
+                          ? "bg-kit-slate-3 font-semibold text-kit-slate-12"
+                          : "bg-white text-kit-slate-11 hover:bg-kit-slate-2"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {activeView === "team" && ownerFocus && (
+                  <button
+                    type="button"
+                    data-testid="work-owner-clear"
+                    onClick={() => updateParam("owner", null)}
+                    className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
+                  >
+                    {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
+                    · Clear
+                  </button>
+                )}
+                {(search || when !== "all" || moduleFilter !== "all" || params.get("status") || day !== "focus") && (
+                  <button
+                    type="button"
+                    onClick={() => setParams((before) => {
+                      const next = new URLSearchParams(before);
+                      for (const key of ["q", "when", "module", "status", "owner", "day", "week", "selected"]) next.delete(key);
+                      return next;
+                    }, { replace: true })}
+                    className="ml-auto h-9 px-2 text-control text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12"
+                  >
+                    Clear all
+                  </button>
+                )}
+                <div className="basis-full">
+                  <SearchInput
+                    toolbar
+                    id="work-search"
+                    value={search}
+                    onChange={(event) => updateParam("q", event.target.value)}
+                    placeholder="Search work…"
+                  />
+                </div>
+              </section>
+
               {/* One line: the chosen Date (Jess, 2026-09-26 — the calendar
                   reference's `Monday, August 31`). No count, no tabs. */}
               {listHeading && layout !== "one" ? (

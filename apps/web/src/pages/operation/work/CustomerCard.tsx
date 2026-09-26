@@ -240,7 +240,7 @@ export default function CustomerCard({
 
 function DoorLink({ to, children }: { to: string; children: string }) {
   return (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to={to}>
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={to}>
       {children}
       <Icon name="open" size={14} />
     </Link>

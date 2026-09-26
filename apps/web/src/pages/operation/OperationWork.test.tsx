@@ -212,11 +212,13 @@ describe("Operation Work — one server feed", () => {
     expect(screen.queryByTestId("workspace-header")).toBeNull();
     expect(screen.queryByTestId("work-header-count")).toBeNull();
     const toolbar = screen.getByTestId("work-toolbar");
-    expect(toolbar.className).toContain("border-b");
-    expect(toolbar.className).not.toMatch(/rounded-work|border-work-line/);
+    /* The picker's controls sit over the picker, unframed (Jess, 2026-09-26). */
+    expect(toolbar.className).not.toMatch(/rounded-work|border-work-line|border-b/);
     expect(within(toolbar).queryByTestId("work-filters-toggle")).toBeNull();
     expect(within(toolbar).getByTestId("work-view-mine").className).toContain("h-[34px]");
-    expect(screen.getByRole("searchbox").parentElement?.parentElement?.className).toContain("w-[340px]");
+    /* The scope tabs and the search sit over the picker column (Jess, 2026-09-26). */
+    expect(within(screen.getByTestId("work-list")).getByRole("searchbox")).toBeInTheDocument();
+    expect(within(screen.getByTestId("work-list")).getByTestId("work-toolbar")).toBeInTheDocument();
     /* No `Covering` button (Jess, 2026-09-26): cover shows on the row. */
     expect(within(toolbar).queryByRole("button", { name: "Covering" })).toBeNull();
     const rail = screen.getByTestId("work-rail");

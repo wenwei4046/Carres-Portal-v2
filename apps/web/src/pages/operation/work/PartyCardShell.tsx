@@ -19,7 +19,7 @@ import { WorkSection } from "./WorkCard";
 /** The five tones, as text colour + a glyph — done is a neutral dark tick. */
 export const TONE_TEXT: Record<PartyTone, string> = {
   done: "text-kit-slate-12",
-  current: "text-kit-blue-11",
+  current: "text-kit-slate-12",
   attention: "text-kit-amber-11",
   missed: "text-kit-red-11",
   future: "text-kit-slate-11",
@@ -100,12 +100,12 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => onToggle(!open)}
-        className="flex h-[70px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:px-4"
+        className="flex h-[56px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:px-4"
         data-testid={`${testId}-toggle`}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-baseline justify-between gap-x-3">
-            <span className={`min-w-0 truncate text-[15px] font-semibold leading-5 ${headingTone}`} data-testid={`${testId}-heading`}>
+            <span className={`min-w-0 truncate text-[13px] font-semibold leading-[18px] ${headingTone}`} data-testid={`${testId}-heading`}>
               {heading}
             </span>
             {progress ? (

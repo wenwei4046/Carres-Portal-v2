@@ -150,7 +150,8 @@ export default function WorkOrderRoute({
 
   const firstCurrent = route.points.find((p) => p.tone === "current")?.key ?? null;
   const exceptions: Array<{ text: string; tone: RouteTone }> = [];
-  if (route.paymentLine) exceptions.push(route.paymentLine);
+  /* The payment line lives on the Sales Order card's Balance (Jess,
+     2026-09-26: said once, never under the Route and again below it). */
   if (!lm.partnerName && !lm.o?.delivered_at) exceptions.push({ text: "Logistics not assigned", tone: "attention" });
   else if (lm.facts?.answer?.kind === "cannot_deliver" && lm.model?.exception) exceptions.push({ text: `Logistics · ${lm.model.exception}`, tone: "missed" });
 

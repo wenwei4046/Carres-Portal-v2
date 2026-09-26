@@ -28,12 +28,12 @@ describe("the party-card shell", () => {
       </PartyCardShell>,
     );
     const toggle = screen.getByTestId("party-x-toggle");
-    expect(toggle.className).toContain("h-[70px]"); // + the 1px edge = 72px
+    expect(toggle.className).toContain("h-[56px]"); // the compact card (Jess, 2026-09-26)
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     /* The name carries the party, its state and the act — not a bare verb. */
     expect(toggle).toHaveAccessibleName(/Customer · Lim Kuan Yang.*Contact due today.*Show Customer details/);
-    expect(screen.getByTestId("party-x-heading").className).toContain("text-[15px]");
-    expect(screen.getByTestId("party-x-heading").className).toContain("leading-5");
+    expect(screen.getByTestId("party-x-heading").className).toContain("text-[13px]");
+    expect(screen.getByTestId("party-x-heading").className).toContain("leading-[18px]");
     expect(screen.getByText("Contact due today").parentElement?.className).toContain("text-[12px]");
     expect(screen.queryByText("body")).not.toBeInTheDocument();
     expect(screen.getByTestId("party-x-chevron").className).toContain("h-10");

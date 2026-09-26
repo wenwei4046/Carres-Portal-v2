@@ -386,10 +386,11 @@ export function FilterRailRow({
            label simply adds its second 18px line — natural height, same font,
            never a tooltip. `items-start` keeps the count on the first line. */
         "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
-        /* ONE BLUE PER RAIL (Jess, 2026-09-26): only a real choice is washed
-           blue. The group's `All …` row is the unfiltered state — bold, no
-           wash, no left line — so five default rows never light up at once. */
-        active && !resets ? "bg-kit-blue-3 font-semibold" : active ? "font-semibold" : "hover:bg-kit-slate-3",
+        /* ONE BLUE PER PAGE (Jess, 2026-09-26): a rail choice is bold with the
+           2px left line, never a wash; the group's `All …` row is the
+           unfiltered state — bold, nothing else. The only washed row on a
+           page is the chosen work/record row. */
+        active ? "font-semibold" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
       {active && !resets && (
@@ -709,7 +710,7 @@ export function FilterRailWeekStrip({
             data-closed={closed ? "yes" : undefined}
             className={[
               "flex min-w-0 flex-col overflow-hidden rounded-control text-center tabular-nums",
-              chosen ? "bg-kit-blue-9 text-white" : "bg-white text-kit-slate-12 ring-1 ring-inset ring-kit-slate-4 hover:ring-kit-slate-6",
+              chosen ? "bg-kit-blue-9 text-white" : "bg-white text-kit-slate-12 hover:bg-kit-slate-2",
             ].join(" ")}
           >
             <span className={`block text-[10px] font-semibold leading-4 ${chosen ? "bg-kit-blue-9 text-white" : closed ? "bg-kit-slate-3 text-kit-slate-9" : "bg-kit-slate-3 text-kit-slate-11"}`}>
