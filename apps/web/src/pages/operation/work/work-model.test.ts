@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
-import { workDateOptions, workPageOptions, filterWork, parseWorkWeek, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workSections, workWeek } from "./work-model";
+import { filterWork, parseWorkStatus, parseWorkWeek, toggleWorkStatus, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workSections, workWeek, workWeekWord } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
@@ -52,7 +52,7 @@ describe("Work presentation model", () => {
       "Broken commitments",
       "Missed",
       "Later",
-      "No working date",
+      "No date",
     ]);
     expect(sections.flatMap((section) => section.items).filter((item) => item.id === "broken")).toHaveLength(1);
   });
@@ -60,16 +60,16 @@ describe("Work presentation model", () => {
   it("searches object, recipient, problem, action and required result", () => {
     const rows = [row()];
     for (const search of ["SO-1318", "Tan Qu Qu", "No delivery", "Ask customer", "Customer Delivery"])
-      expect(filterWork(rows, { search, when: "all", module: "all", covered: false })).toHaveLength(1);
+      expect(filterWork(rows, { search, when: "all", module: "all" })).toHaveLength(1);
   });
 
-  it("keeps Later and No date separate and filters cover structurally", () => {
+  it("keeps Later and No date separate", () => {
     const rows = [
       row({ id: "later", timingBucket: "later" }),
-      row({ id: "none", timingBucket: "no_date", dueIso: null, ownerState: "covered" }),
+      row({ id: "none", timingBucket: "no_date", dueIso: null }),
     ];
-    expect(filterWork(rows, { search: "", when: "later", module: "all", covered: false }).map((item) => item.id)).toEqual(["later"]);
-    expect(filterWork(rows, { search: "", when: "all", module: "all", covered: true }).map((item) => item.id)).toEqual(["none"]);
+    expect(filterWork(rows, { search: "", when: "later", module: "all" }).map((item) => item.id)).toEqual(["later"]);
+    expect(filterWork(rows, { search: "", when: "no_date", module: "all" }).map((item) => item.id)).toEqual(["none"]);
   });
 });
 
@@ -183,28 +183,19 @@ describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
   });
 });
 
-describe("the toolbar selects (UI MASTER §6.0 shell, owner ruling 2026-09-25)", () => {
-  it("Date: Missed first, every day with its count (0 too), Today in words, No working date last", () => {
-    const rail = workRailDates([
-      row({ id: "a", dueIso: "2026-09-16", timingBucket: "later" }),
-      row({ id: "b", dueIso: "2026-09-10", timingBucket: "overdue" }),
-      row({ id: "c", dueIso: null, timingBucket: "no_date" }),
-    ], "2026-09-15", "2026-09-17");
-    const options = workDateOptions(rail);
-    expect(options[0]).toEqual({ value: "missed", label: "Missed · 1" });
-    expect(options[1]).toEqual({ value: "2026-09-14", label: "Mon, 14 Sep · 0" });
-    expect(options[2]).toEqual({ value: "2026-09-15", label: "Tue, 15 Sep · Today · 0" });
-    expect(options[3]).toEqual({ value: "2026-09-16", label: "Wed, 16 Sep · Malaysia Day · 1" });
-    expect(options.at(-1)).toEqual({ value: "no_date", label: "No working date · 1" });
-    expect(options).toHaveLength(7);
+describe("the rail's own words (Jess, 2026-09-26)", () => {
+  it("the header is one line: Week of {day Mon}, no weekday, no dash", () => {
+    expect(workWeekWord("2026-09-28")).toBe("Week of 28 Sep");
+    expect(workWeekWord("2026-10-01")).toBe("Week of 28 Sep");
+    expect(workWeekWord("2026-12-28")).toBe("Week of 28 Dec");
   });
-  it("Page: All pages first with the list total, then every page with its count", () => {
-    const counts = { orders: 1, purchasing: 0, receiving: 0, delivery: 2, payment: 0, issue_tracker: 0 };
-    const options = workPageOptions([{ key: "orders", label: "Sales Orders" }, { key: "delivery", label: "Delivery" }], counts, 3);
-    expect(options).toEqual([
-      { value: "all", label: "All pages · 3" },
-      { value: "orders", label: "Sales Orders · 1" },
-      { value: "delivery", label: "Delivery · 2" },
-    ]);
+  it("Status: To do alone by default; more than one may be on; the last one on stays", () => {
+    expect(parseWorkStatus(null)).toEqual(["todo"]);
+    expect(parseWorkStatus("waiting,todo")).toEqual(["todo", "waiting"]);
+    expect(parseWorkStatus("nonsense")).toEqual(["todo"]);
+    expect(toggleWorkStatus(["todo"], "waiting")).toBe("todo,waiting");
+    expect(toggleWorkStatus(["todo", "waiting"], "todo")).toBe("waiting");
+    expect(toggleWorkStatus(["waiting"], "waiting")).toBe("waiting");
+    expect(toggleWorkStatus(["todo", "waiting"], "waiting")).toBeNull();
   });
 });
