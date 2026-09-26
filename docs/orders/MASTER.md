@@ -501,16 +501,22 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `Dealer / Sales Location` · `Delivery State / City` · `Product category` (multi-select, no
   search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
-- **Kit admission — `FilterRailMultiSelect`** (joins `workspace-rail.tsx`; the single-choice
-  `FilterRailSelect` and `FilterRailRow` are untouched): an optional 32px search box inside the
-  group; 36px rows = 16px `rounded-pill` checkbox + wrapping label + right-aligned count;
-  `role="checkbox"` / `aria-checked`; chosen rows sort first and stay visible; the group title's
-  right slot prints `{n} selected` in blue (the single-choice groups print the chosen value there);
-  Esc clears the search only.
-- **The matrix is the shared DataGrid** (`rowHeight={40}`, `Product` pinned left, §6.9 connected
-  expansion): columns `Product` · `Earlier` · one column per month of the window (`Oct 2026`) ·
-  `Later` · `No date` · `Total`; rows the catalog categories (`Mattress` · `Bedframe` · `Sofa` ·
-  `Accessory`), each expanding to model, then size/configuration; a `Total` footer row. A cell is
+- **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
+  title", "not like other pages?").** Every group is single-choice like every other Portal rail
+  (icon + 13px/600 title, 36px rows, chosen value in blue at the right, press again to unchoose);
+  `Dealer / Sales Location` keeps a search box because dealers are many; there is NO multi-select
+  and NO `FilterRailMultiSelect` — the 2026-09-22 multi-selection line is withdrawn and no kit
+  component is admitted. Several dealers together = `All dealers`.
+- **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
+  "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
+  ① Four summary numbers for the window: `Not delivered` · `Reserved` · `Pending Delivery Qty` ·
+  `To buy` (unit line `Qty`). ② One stacked bar per month — green `Reserved`, blue `Pending
+  Delivery Qty`, amber `To buy` — the total above each bar, the three legend words the same three
+  words. ③ One table, ONE ROW PER MONTH (`Before {Mon YYYY}` · each month · `After {Mon YYYY}` ·
+  `No delivery date` · `Total`), columns `Month` · `Mattress` · `Bedframe` · `Sofa` · `Accessory` ·
+  `Not delivered` · `Reserved` · `Pending Delivery Qty` · `To buy`. No product/size expansion, no
+  second table under it. A month is a door: it opens `Order list` with `Customer Requested Delivery
+  Date` narrowed to that month. Under the table the one door `Open SO Batch Purchase →`. A cell is
   the physical pieces still owed to the customer in that month and category: the current effective
   Revision's `order_lines.qty` less pieces actually delivered (Stock's `delivered` Units bound by
   `reserved_order_line_id`); gifts under their real category; services never; a pending amendment
@@ -518,24 +524,18 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `{n} pieces have no delivery date` beside the header. Zero prints `0`; a cell whose source read
   failed prints `Unavailable`. Lines with no catalog row count under `Not in catalog` (never
   dropped, never a kind of goods).
-- **Clicking a number selects the cell (blue-3) and expands that row** to the contributing orders
-  for that month — `SO No · Dealer · Customer Requested Delivery Date · Qty still owed · Coverage`
-  — under the same filters and permissions; `SO No` opens the order. No second timeline, no drawer.
-- **The coverage strip under the matrix reads the selected cell's month and category:** `Still
-  owed {n}` · `Reserved from stock {n}` (`ops_stock_items.reserved_order_line_id`) · `On purchase
-  orders {n}` (`po_line_sources`, non-cancelled — including Rental §5.6's evidenced Diglant supply,
-  counted once) · `Still to buy {n}` (`soBatchOrderLineOutstandingQty`, SO Batch's one arithmetic)
-  · `Supplier may be late {n}` (`effectiveArrivalOf` later than the requested date) · `Arrival not
-  known {n}` (no PO Delivery Date and no answer) · the door `Open SO Batch Purchase →`. Nothing is
-  bought or reserved here.
+- **The four numbers read their owners and derive nothing:** `Not delivered` = current-Revision
+  `order_lines.qty` less Stock's `delivered` Units bound by `reserved_order_line_id`; `Reserved` =
+  `ops_stock_items` reserved to these lines; `Pending Delivery Qty` = the PO word, `po_line_sources`
+  on non-cancelled POs less received (Rental §5.6's evidenced Diglant supply counted once); `To buy`
+  = `soBatchOrderLineOutstandingQty`, SO Batch's one arithmetic. Nothing is bought or reserved here.
 - **States:** skeleton = rail groups + a 10-column, 3-row matrix + the strip; filtered empty `No
-  confirmed demand in these months` (the `No date` column still shows); whole failure `Monthly
+  Sales Orders in these months` (the `No delivery date` row still shows); whole failure `Monthly
   demand could not be loaded` + `Try again`; a single failed source prints `Unavailable` in its
   numbers only; permission follows the Register's scope.
-- **Responsive:** 1440 / 1180 rail beside a 1048px matrix (`Product` 200 · months 96 × 8 · `Total`
-  80) that scrolls inside its own frame with `Product` pinned; below 896px
-  (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the strip's six
-  numbers become two rows of three; at 390 `Period` moves under the toolbar and every target is
+- **Responsive:** 1440 / 1180 rail beside the three blocks (the month table is ~900px and never
+  scrolls sideways; the bars share one row); below 896px
+  (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the four numbers become two rows of two and the bars wrap under them; at 390 `Period` moves under the toolbar and every target is
   40px; the page never scrolls sideways.
 - Words registered in COPY-STANDARD § Monthly demand words with this ruling.
 

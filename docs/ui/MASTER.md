@@ -1736,8 +1736,8 @@ Personal saved layouts remain a separate PO-only capability; this ruling does no
 - **Special rails:** Payment Monitor weekly plans and Warehouse schedule day lists use the same
   heading, divider and text treatment; preserve their content, date meaning and behavior.
   Sales Orders gains the owner-approved rail of 2026-09-22 / 2026-09-26 (Orders MASTER § Monthly
-  demand): the view selector in the fixed region, and `FilterRailMultiSelect` admitted to the kit for
-  Dealer and Product category — the single-choice groups elsewhere are unchanged.
+  demand): the view selector in the fixed region and six single-choice groups in the shared style C —
+  no new kit component (the multi-select admitted earlier on 2026-09-26 was withdrawn the same day).
 - **Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11;
   form/button helper 12px slate-11; input error/save failure 13px error color with text and icon;
   cannot-act reason 13px dark grey or warning color according to meaning. Never use slate-9 for

@@ -4367,14 +4367,12 @@ changes, already written into the list below (built in migration 0576 and the we
 |---|---|---|
 | The rail's view selector | **`Order list`** · **`Monthly demand`** | Register · Report · Forecast · Dashboard |
 | The period controls (owner ruling 2026-09-26: any count 1–6, never only 3 or 6) | **`Starting month`** select · **`Months`** select `1 · 2 · 3 · 4 · 5 · 6` (default 6), resolved window printed as **`Oct 2026 – Mar 2027`** | Range · From/To · Horizon · two fixed period buttons |
-| Matrix columns | **`Product`** · **`Earlier`** · **`{Mon YYYY}`** · **`Later`** · **`No date`** · **`Total`** | Overdue · Backlog · Beyond · TBD · Unknown |
-| Matrix rows | the catalog categories — `Mattress` · `Bedframe` · `Sofa` · `Accessory`; a line with no catalog row under **`Not in catalog`** | `Other goods` · Misc |
+| The month table (owner correction 2026-09-26: dictionary words only, one row per month) | rows **`Before {Mon YYYY}`** · **`{Mon YYYY}`** … · **`After {Mon YYYY}`** · **`No delivery date`** · **`Total`**; columns **`Month`** · the catalog categories `Mattress` · `Bedframe` · `Sofa` · `Accessory` · **`Not delivered`** · **`Reserved`** · **`Pending Delivery Qty`** · **`To buy`** | `Earlier` · `Later` · `No date` · `Product` (all retired 2026-09-26) · Overdue · Backlog · TBD |
 | A cell whose source could not be read | **`Unavailable`** | `0` · a blank · a dash |
-| The data-quality count beside the header | **`{n} pieces have no delivery date`** | TBD · Undated demand |
-| The coverage strip | **`Still owed`** · **`Reserved from stock`** · **`On purchase orders`** · **`Still to buy`** · **`Supplier may be late`** · **`Arrival not known`** | Demand · Allocated · Covered · Shortage · Risk · ETA unknown |
+| The four summary numbers and the bar legend (owner correction 2026-09-26: the same four dictionary words everywhere on this view) | **`Not delivered`** (the Order list's delivery word) · **`Reserved`** (Inventory Status) · **`Pending Delivery Qty`** (the Purchase Order's word) · **`To buy`** (SO Batch Purchase's group word); each number's unit line reads **`Qty`** | `Still owed` · `Reserved from stock` · `On purchase orders` · `Still to buy` · `Supplier may be late` · `Arrival not known` · `{n} pieces have no delivery date` (all retired 2026-09-26 — words the owner did not understand) · Demand · Allocated · Covered · Shortage |
 | Its door | **`Open SO Batch Purchase →`** | Buy now · Create PO |
-| A multi-select group's chosen count | **`{n} selected`** | `{n} filters` · Selected: n |
-| Filtered empty | **`No confirmed demand in these months`** | No data · No results |
+| The view's one-line heading | **`Not delivered · by Customer Requested Delivery Date · {Mon YYYY} – {Mon YYYY}`** and under the bars **`Click a month to open its Sales Orders.`** | a sentence of invented words |
+| Filtered empty | **`No Sales Orders in these months`** | `No confirmed demand in these months` (retired) · No data · No results |
 | Failed | **`Monthly demand could not be loaded`** + **`Try again`** | an API error string |
 | The Order list rail groups and rows | `Dealer / Sales Location` · `Delivery State / City` · `Date` (`Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date`; `All dates` · `Today` · `This week` · `This month` · `Custom`) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations` (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open cases` · `Closed cases only` · `No cases`) | Status · Stage · Progress |
 
