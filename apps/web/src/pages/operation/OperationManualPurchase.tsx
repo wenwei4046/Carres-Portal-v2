@@ -3450,7 +3450,7 @@ function Fact({
   testId?: string;
   wide?: boolean;
 }) {
-  return <SharedFact idPrefix="mp-fact" own={false} label={label} value={<span className="flex min-w-0 flex-col">{children}</span>} testId={testId} wide={wide} />;
+  return <SharedFact idPrefix="mp-fact" own={false} label={label} value={<span className="block min-w-0">{children}</span>} testId={testId} wide={wide} />;
 }
 
 /**

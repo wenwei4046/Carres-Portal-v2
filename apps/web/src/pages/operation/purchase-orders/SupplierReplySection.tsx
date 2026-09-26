@@ -58,6 +58,8 @@ const ANSWER_WORD: Record<AnswerKind, string> = {
 const control = "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-meta";
 const cell = "px-2 py-0 align-middle";
 const head = "h-9 px-2 text-left text-label font-semibold text-kit-slate-11";
+/** The read table's heads may wrap (`Supplier Confirmed Delivery Date` at 112px). */
+const readHead = "px-2 py-1.5 text-left align-bottom text-label font-semibold leading-tight text-kit-slate-11";
 
 export function stillToDeliver(line: { qty: number; receivedQty: number }): number {
   return Math.max(0, Number(line.qty) - Number(line.receivedQty));
@@ -264,11 +266,15 @@ export default function SupplierReplySection({
           ) : null}
         </div>
         <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-meta" data-testid="po-supplier-reply-table">
+          {/* The READ table fits the half-width object pane (owner's 1074px
+              viewport ⇒ ~480px): no minimum width, the narrow columns are
+              fixed and the Item column takes the rest, wrapping its Unit IDs.
+              Only the EDIT table below, with its controls, may scroll. */}
+          <table className="w-full border-collapse text-meta" data-testid="po-supplier-reply-table">
             <thead className="bg-kit-slate-3">
               <tr>
-                <th className={head}>Item</th><th className={`${head} text-right`}>Qty</th><th className={`${head} text-right`}>To deliver</th>
-                <th className={head}>Supplier Confirmed Delivery Date</th><th className={head}>Last answer</th>
+                <th className={readHead}>Item</th><th className={`${readHead} w-12 text-right`}>Qty</th><th className={`${readHead} w-16 text-right`}>To deliver</th>
+                <th className={`${readHead} w-[112px]`}>Supplier Confirmed Delivery Date</th><th className={`${readHead} w-[128px]`}>Last answer</th>
               </tr>
             </thead>
             <tbody>

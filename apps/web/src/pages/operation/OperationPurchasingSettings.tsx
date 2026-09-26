@@ -381,7 +381,7 @@ export default function OperationPurchasingSettings({
           >
 
           {destinationDraft && (
-            <div className="mb-3 rounded-[10px] border border-base-200 bg-white p-4">
+            <div className="mb-3 border-b border-kit-slate-5 bg-white pb-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-meta font-semibold text-base-700">
                   Name
@@ -468,7 +468,7 @@ export default function OperationPurchasingSettings({
             </div>
           )}
 
-          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+          <div className="overflow-hidden bg-white">
             {data.destinations.length === 0 ? (
               <div className="p-4 text-body text-base-600">No Deliver To has been added yet.</div>
             ) : (
@@ -515,7 +515,7 @@ export default function OperationPurchasingSettings({
 
         <div className="mb-8 max-w-[860px]" data-testid="supplier-collection-settings">
           <Block title="Supplier collection" subtitle={"Who collects from a supplier that does not deliver, and where those goods always go. Issue review reads this rule; it does not ask again."}>
-          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+          <div className="overflow-hidden bg-white">
             {(data.supplierCollections ?? []).length === 0 ? (
               <div className="p-4 text-body text-base-600">
                 No supplier needs Carres to arrange collection.
@@ -641,7 +641,7 @@ export default function OperationPurchasingSettings({
         {/* ── Production working days, per supplier × category ─────────────── */}
         <div className="mb-8 max-w-[860px]">
           <Block title="Production working days" subtitle={"How long each factory takes to make an item. Only the factories that have SKUs appear here."}>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+          <div className="bg-white">
             {rows.length === 0 && (
               <div className="py-4 text-body text-base-600">
                 No factory has SKUs yet. Add SKUs in Operation Catalog and the
@@ -740,7 +740,7 @@ export default function OperationPurchasingSettings({
             supplier nobody has set reads `Set a number`. */}
         <div className="mb-8 max-w-[860px]" data-testid="transit-days-settings">
           <Block title="Transit days" subtitle={"Working days between the factory finishing and the goods reaching Carres. Counted on the Carres work week, not the factory’s."}>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+          <div className="bg-white">
             {data.suppliers.length === 0 && (
               <div className="py-4 text-body text-base-600">
                 No factory has SKUs yet. Add SKUs in Operation Catalog and the
@@ -835,7 +835,7 @@ export default function OperationPurchasingSettings({
             set, and nothing waits on it. */}
         <div className="mb-8 max-w-[860px]" data-testid="terms-days-settings">
           <Block title="Payment terms" subtitle={"Days after the supplier’s bill date that the bill is due. A PO’s own terms come first."}>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+          <div className="bg-white">
             {data.suppliers.map((s) => {
               const saved = s.termsDays ?? null;
               const draft = termsDraft[s.id] ?? (saved == null ? "" : String(saved));
@@ -898,7 +898,7 @@ export default function OperationPurchasingSettings({
         {/* ── Supplier work week ───────────────────────────────────────────── */}
         <div className="mb-8 max-w-[860px]">
           <Block title="Supplier work week" subtitle={"The days each factory works. Pick the days it is open."}>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+          <div className="bg-white">
             {data.suppliers.map((s) => {
               const off = weekDraft[s.id] ?? s.offDays ?? [SUNDAY];
               const working = WEEKDAYS.map((w) => w.day).filter((d) => !off.includes(d));
@@ -974,7 +974,7 @@ export default function OperationPurchasingSettings({
         {/* ── The single numbers ───────────────────────────────────────────── */}
         <div className="mb-8 max-w-[860px]">
           <Block title="The other numbers">
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+          <div className="bg-white">
             <NumberRow
               label="Safety days"
               hint="Extra time allowed for delays."
