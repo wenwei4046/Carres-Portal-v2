@@ -502,6 +502,12 @@ lines — four regions and five hierarchy items — and stops. **Three surfaces 
 happens when the law is four lines long.**
 
 ### THE THREE SURFACES, AND THERE IS NO FOURTH
+
+> **Payment page — the split rule's customer case, owner approval 2026-09-26.** The Payment
+> Monitor's `SO No` opens a 50/50 working page (`payment/MASTER.md` §3): the right half is the paper
+> the CUSTOMER receives (Sales Order with `Balance due` → WhatsApp message → Receipt → Invoice),
+> redrawn as the left half is worked. The register row's `▸` is a read-only nested HISTORY table,
+> the Sales Orders grammar. This is the existing split rule, not a new surface.
 ```
 INSPECT   inside the list      row expand      ↑↓ moves · Esc closes · read to decide
 WORK      full screen          four regions    the job gets done here
