@@ -38,7 +38,8 @@ export async function stockRegisterDatabase() {
       status text, condition text, needs_repair boolean, hold_reason text,
       reserved_ref text, sold_order_id text, qty integer, date_in date,
       sold_at timestamptz, last_verified_at timestamptz,
-      identity_scope text not null default 'unit'
+      identity_scope text not null default 'unit',
+      reserved_order_line_id text, reserved_purchase_demand_id text
     );
     create table public.stock_unit_events (unit_id text, event text, event_at timestamptz, seq bigint, id text, from_value text, to_value text, note text);
     -- The physical facts the Inventory register reads (owner rulings 2026-09-25):
