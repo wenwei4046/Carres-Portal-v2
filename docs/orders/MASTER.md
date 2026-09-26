@@ -50,7 +50,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 
 | Scope (dependency order) | Approved truth | Acceptance boundary |
 |---|---|---|
-| **A · Order Route reads its owners** | §0.2 THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS · THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK · THE MONEY NODE … TWO LINES · `⚠ unreadable` · `PROPOSED CHANGE` banner · lanes per scope | SO-1362 (two legs, delivered) draws two DELIVERY lanes, two issued DOs, `Delivered to customer`, `Paid`; SO-1319 draws `PO Delivery Date`, `0 of 1 received`, `Hold delivery` / `RM 1,249.00 unpaid · by {date}`; a thrown Purchasing read yellows one line only; a `submitted` amendment shows the banner; route facts load only with `?route=1`; the four orphaned components deleted |
+| **A · Order Route reads its owners** | §0.2 THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS · THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK · THE PAYMENT NODE … TWO LINES · `⚠ unreadable` · `PROPOSED CHANGE` banner · lanes per scope | SO-1362 (two legs, delivered) draws two DELIVERY lanes, two issued DOs, `Delivered to customer`, `Paid`; SO-1319 draws `PO Delivery Date`, `0 of 1 received`, `Hold delivery` / `RM 1,249.00 unpaid · by {date}`; a thrown Purchasing read yellows one line only; a `submitted` amendment shows the banner; route facts load only with `?route=1`; the four orphaned components deleted |
 | **B · Identity and History** | §0.1 WHO ACTED IS DECIDED ONCE … · HISTORY TRANSLATES AT THE READ BOUNDARY · BELOW 768px THE HEADER IS TWO ROWS | `principal@carres.com` events print `Staff identity not recorded · Principal`; `awaiting logistics triage` never prints; `Not recorded → No`; at 375px `SO-1365` and `Print` never overlap |
 | **C · SO page locked state** | §0.1 THE LOCKED STATE (five rules) | View and Rev 1 render zero row writers, `RM 1,399.00` text, `RM 0.00` discount, no `*`, no TBD checkbox in Edit |
 | **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `Edit · View · Print · ─ Cancel SO`; one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
@@ -405,7 +405,7 @@ orders are not silently added. The earlier proposal to default the order list to
 is superseded by the approved list filters below; no default unfinished-only population is introduced.
 
 **Time and filters.** The monthly view defaults to the current calendar month plus the next five
-months. Offer three months, six months and a chosen starting month. Always retain separate
+months. Offer a chosen starting month and any number of months from one to six (owner re-ruling 2026-09-26: never only three or six — the international demand-planning shape is a start period plus a period count). Always retain separate
 buckets for outstanding demand earlier than the selected first month, later than its final month,
 and a visible data-quality exception count for demand without a definite requested delivery date;
 do not present missing required dates as an ordinary monthly demand category. Assign months using the customer's
@@ -497,7 +497,7 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
   (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
   cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
-  select · `6 months` / `3 months`, the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
+  select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
   `Dealer / Sales Location` · `Delivery State / City` · `Product category` (multi-select, no
   search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
@@ -968,7 +968,9 @@ Type order: card title 15px/600 blue (largest) → value 13px dark → label 11p
 overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section spaces its field groups with ONE
 12px body gap (`Block`, SO tone); controls keep the kit's 32px — the page no longer resizes them.
 
-**THE LOCKED STATE — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** View and a
+**THE LOCKED STATE — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** The right-hand
+real PDF pane and the 50/50 split are untouched by every rule below (Jess, 2026-09-26: *"remain my
+current"* — the permanent split was already NOT retired). View and a
 historical version (`oldrev`) are ONE locked presentation; Edit and Create are the only states
 that draw controls. Measured on production 2026-09-25 (`6ed021fac`, SO-1365 / SO-1319 Rev 1):
 
@@ -1509,7 +1511,7 @@ that it stopped being a stack and became **one connected map**.
 SO
 ├── Goods            forks per goods line and per source quantity
 ├── Delivery         Journey / LOGISTICS → DELIVERY DATE
-├── Money            collection remains its own route
+├── Payment          collection remains its own route (band and node word `PAYMENT`, owner 2026-09-26)
 └── Loan             rendered ONLY when a loan is out
 
 Governed leg facts + any formal Finance hold → DELIVERY ORDER (system) → DELIVER → DELIVERY PHOTO
@@ -1533,7 +1535,7 @@ map too wide for the floor opens **centred on the Sales Order** and the operator
 the explicit whole-map fit and may go smaller because the operator asked for it.
 
 **THREE ROUTES READ AS THREE GROUPS — owner ruling 2026-08-17.** One uppercase **group band** —
-`GOODS` · `DELIVERY` · `MONEY` · `LOAN` (conditional) — sits above each route's columns; columns
+`GOODS` · `DELIVERY` · `PAYMENT` · `LOAN` (conditional) — `PAYMENT` since 2026-09-26 (Jess: *"remove money, but payment"*; the page's word since 2026-09-21) — sits above each route's columns; columns
 inside a group sit 32px apart and **groups sit 72px apart**. The band is where a route says its
 name: edges carry no route captions. Colour still belongs to STATE alone (blue CURRENT · green
 done · amber exception); routes are told apart by band and spacing, never by hue.
@@ -1697,8 +1699,10 @@ outstanding = 0   → ✓ Paid
 owing             → ✗ Hold delivery · RM {amount} unpaid        (owner ruling 2026-09-25, one word on every surface)
 ```
 
-**THE MONEY NODE AND THE GATE LINE SPEAK IN TWO LINES — OWNER RULING 2026-09-26 (Jess) · APPROVED
-TARGET / NOT BUILT.** Measured on production 2026-09-25: the node printed `RM 764.00 still to
+**THE PAYMENT NODE AND THE GATE LINE SPEAK IN TWO LINES — OWNER RULING 2026-09-26 (Jess) · APPROVED
+TARGET / NOT BUILT.** The node and its band are titled `PAYMENT`, never `MONEY` (owner, same day). The
+`SALES ORDER` node prints `SO Doc Date: {date}` and every route date context prints `Customer
+requested: {date}` — the dictionary's Route words, not the retired `SO Date` / `Requested Delivery Date`. Measured on production 2026-09-25: the node printed `RM 764.00 still to
 collect` and the gate `RM 764.00 still outstanding — collect, or request a payment approval`
 (`sales-order-route.ts:829/1028/1044`) — an invitation to a door closed on 2026-09-01, in words
 retired on 2026-09-25. The node now reads:

@@ -2601,7 +2601,7 @@ to point at one of them and be wrong about the others.
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The whole surface | **`Order Route`** | Timeline · Journey · Progress · Flow chart · Diagram |
-| A node's heading | **`SALES ORDER`** · **`PURCHASING`** · **`SUPPLIER`** · **`RECEIVING`** · **`STOCK`** · **`LOGISTICS`** · **`DELIVERY DATE`** · **`MONEY`** · **`DELIVERY ORDER`** · **`DELIVER`** · **`DELIVERY PHOTO`** · **`LOAN`** | Step · Stage · Task · any renaming of these |
+| A node's heading | **`SALES ORDER`** · **`PURCHASING`** · **`SUPPLIER`** · **`RECEIVING`** · **`STOCK`** · **`LOGISTICS`** · **`DELIVERY DATE`** · **`PAYMENT`** (owner ruling 2026-09-26 — `MONEY` retired on the Route as it was on the page 2026-09-21) · **`DELIVERY ORDER`** · **`DELIVER`** · **`DELIVERY PHOTO`** · **`LOAN`** | Step · Stage · Task · `MONEY` · any renaming of these |
 | Where the work stands on a route | **`CURRENT`** | `YOU ARE HERE` (rejected) · Now · Active · Here |
 | The conditional exception strip beside the map | **`LINKED PROBLEMS`** | Issues · Exceptions · Service · Alerts — and never a node |
 | The convergence gate | **`DELIVERY ORDER`** | Release gate · Ready check · Can we deliver |
@@ -2663,10 +2663,10 @@ what has not happened yet, in the plainest words available:
 | A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
 | A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
 | A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · ({n})`** | Removed · Deleted · Void |
-| MONEY node, money owed (owner ruling 2026-09-26) | **`Hold delivery`** over **`RM {amount} unpaid · by {weekday, date}`** | `RM {amount} still to collect` (retired 2026-09-26) · Outstanding · Balance |
-| MONEY node, paid | **`Paid`** | `Paid in full` (retired 2026-09-26) · Settled · Cleared |
-| MONEY node, an OPEN Finance exception | **`Hold delivery`** over **`Finance hold · {reason}`** | Finance is holding this delivery |
-| MONEY node, no price | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced |
+| PAYMENT node, money owed (owner ruling 2026-09-26) | **`Hold delivery`** over **`RM {amount} unpaid · by {weekday, date}`** | `RM {amount} still to collect` (retired 2026-09-26) · Outstanding · Balance |
+| PAYMENT node, paid | **`Paid`** | `Paid in full` (retired 2026-09-26) · Settled · Cleared |
+| PAYMENT node, an OPEN Finance exception | **`Hold delivery`** over **`Finance hold · {reason}`** | Finance is holding this delivery |
+| PAYMENT node, no price | **`No price yet — money does not hold this delivery`** | RM 0 · Unpriced |
 | A DELIVERY lane's plate — a Journey leg | **`Leg {n} · {from} → {to}`** (`Leg 1 · Carres Klang → JB transit warehouse`) | Stage · Hop · Segment |
 | A DELIVERY lane's plate — a split trip | **`Trip {n} · {goods, e.g. Sofa, 2 items}`** · a trip with no Delivery Order yet **`Trip {n} · not booked yet`** | Batch · Part · Shipment |
 | Leg 2's extra gate requirement | **`Leg 1 arrived at {stop}`** met · **`Leg 1 not arrived yet`** unmet | Leg 1 complete · Transit done |
@@ -2724,7 +2724,7 @@ inside the object already open, so it has no circular `Open SO-{n} →` action.
 
 | Fact | Prints |
 |---|---|
-| The day the order was taken | **`SO Date: {date}`** |
+| The day the order was taken | **`SO Doc Date: {date}`** (owner ruling 2026-09-26 — the Route follows the 2026-09-21 word; `SO Date` retired) |
 | The day the customer asked for | **`Customer requested: {date}`** |
 | The day the delivery is due | **`Due: {date}`** |
 | The day the Purchase Order was issued | **`Issued: {date}`** |
@@ -4366,7 +4366,7 @@ changes, already written into the list below (built in migration 0576 and the we
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The rail's view selector | **`Order list`** · **`Monthly demand`** | Register · Report · Forecast · Dashboard |
-| The period controls | **`Starting month`** · **`6 months`** · **`3 months`**, resolved window printed as **`Oct 2026 – Mar 2027`** | Range · From/To · Horizon |
+| The period controls (owner ruling 2026-09-26: any count 1–6, never only 3 or 6) | **`Starting month`** select · **`Months`** select `1 · 2 · 3 · 4 · 5 · 6` (default 6), resolved window printed as **`Oct 2026 – Mar 2027`** | Range · From/To · Horizon · two fixed period buttons |
 | Matrix columns | **`Product`** · **`Earlier`** · **`{Mon YYYY}`** · **`Later`** · **`No date`** · **`Total`** | Overdue · Backlog · Beyond · TBD · Unknown |
 | Matrix rows | the catalog categories — `Mattress` · `Bedframe` · `Sofa` · `Accessory`; a line with no catalog row under **`Not in catalog`** | `Other goods` · Misc |
 | A cell whose source could not be read | **`Unavailable`** | `0` · a blank · a dash |
