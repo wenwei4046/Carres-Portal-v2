@@ -90,7 +90,8 @@ quantity`, 0218) whose technical register key is never shown, printed or scanned
 That key is `QTY-000000001` (0453) — deliberately not the shape of a Unit ID — and both register
 views expose `identity_scope` so no surface has to guess. **Every screen, PDF, export and scan
 resolves identity through the one shared resolver** (`unitIdOf()`), which answers `null` for
-counted goods; `null` prints `—`. A counted row cannot be reached by scanning, because nothing was
+counted goods; `null` prints nothing on a screen (owner ruling 2026-09-26: no dash stands in for a
+value; a PDF or export keeps COPY's governed absence). A counted row cannot be reached by scanning, because nothing was
 ever printed for it.
 Receiving verifies the identities Purchasing issued and never creates, replaces or renumbers one.
 
