@@ -714,7 +714,7 @@ screenshot refuses the record. Evidence is append-only with supplier, recorder a
 the immutable original PO Delivery Date and earlier answers are never overwritten. The existing
 arrival arithmetic recomputes only the affected open source-line scope and reports customer impact.
 
-**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · BUILT 2026-09-26 (migration 0587 `purchasing_record_supplier_answers`; `POST /pos/:id/tomorrow-delivery` takes the per-line body; production walk recorded below when done).** One
+**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · DEPLOYED 2026-09-26 (PR #1660 `b96f16ba1` + #1666 `51e9eb2a5`; migration 0587 `purchasing_record_supplier_answers` APPLIED 2026-09-26 — see the production record after this block; `POST /pos/:id/tomorrow-delivery` takes the per-line body; the authenticated owner walk is still owed).** One
 `Record supplier answer` form on the PO records the supplier's answer **per PO goods line**. Each
 line chooses `No change` (default) · `Confirmed` · `New date` (the server classifies `Earlier` —
 no reason — or `Delayed` — one governed reason required) · `Split delivery` (any number of
@@ -729,6 +729,37 @@ Date`. A supplier date answer creates no PO revision and no resend; changing qua
 Deliver To is a PO change (new version), not an answer. Goods that arrive early without notice need
 no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
 Each batch derives its own day-before occurrence.
+
+**PRODUCTION RECORD 2026-09-26 (Blueprint segments 1–2).** Migration
+`0587_a_supplier_answer_is_recorded_per_goods_line` was APPLIED through the governed
+`apply_migration` path after a rolled-back production probe (`probe_0587_rolled_back_do_not_track`:
+the whole file executed, the negative control refused an unsigned caller with `42501`, then
+`PROBE_ROLLBACK` undid everything — no tracker row, nothing persisted, re-read to prove it). The
+apply wrote tracker row `20260926084721`; `md5(statements[1])` = the committed file's md5
+`1f7ef2f3e8050b819a0482f358b517ad`, one statement. Reconciled live afterwards: all seven function
+bodies (`purchasing_supplier_reply_actor` · `purchasing_require_reply_evidence` ·
+`purchasing_po_expected_arrivals` · `purchasing_po_effective_arrival` ·
+`purchasing_project_line_etas` · `purchasing_record_supplier_answers` ·
+`purchasing_record_arrival_confirmation`) carry the same CR-normalised `md5(prosrc)` the replayed
+full-chain database produced from the same file; `po_supplier_promises.answer_group` and its partial
+index exist; `po_promise_scope` admits a line-level `tomorrow_delivery` row; `authenticated` holds
+EXECUTE on the answer door and on `purchasing_po_expected_arrivals`, and NOT on
+`purchasing_project_line_etas`; the six pre-existing PO-level `tomorrow_delivery` rows are untouched
+(0587 rewrites no row). The five canonical web/Worker surfaces reported `b96f16ba1` before the
+apply (bundle `index-CjmMoe4Q.js`, 7,131,619 bytes, read from the apex: `Record supplier answer` 2 ·
+`Split delivery` 1 · `Add another date` 1 · `Apply to selected` 2 · `Answered by supplier on` 2 ·
+`Confirm tomorrow's supplier delivery` 1); the Worker-side Work sentences (`Supplier date passed ·
+nothing received yet`, `Click WhatsApp, ask …`) are proven by the API suite, not by a bundle grep.
+That bundle read also found the ONE leftover — the PO object page's WorkCard still printed the
+retired `Supplier has not confirmed the PO date` for a sent-but-unanswered PO — fixed by #1666
+(`purchaseOrderWork` returns no card for `supplier_date_missing`; the shared reply-work builder emits
+only `purchasing.supplier_date_passed`). After #1666 all five surfaces reported `51e9eb2a5`
+(bundle `index-CKMdXM5f.js`, 7,131,503 bytes): `Supplier has not confirmed the PO date` 0 ·
+`Supplier delivery date passed` 3 · `Record supplier answer` 2; the one surviving `…to confirm the
+PO delivery date` is the `purchasing.supplier_reply` rule DEFINITION in `work-engine.ts` — kept so
+stored occurrence rows still resolve — and no projection emits it. **Owed:** the authenticated owner walk — PO page at
+1440/1180/820/743/390, one real per-line answer saved, the Register summary/expansion, the D-1 and
+receiving Work cards.
 
 **Answer evidence — OWNER-APPROVED (Jess, 2026-09-25) · BUILT 2026-09-26** (`SupplierAnswerEvidenceUploadField` over the ONE shared `EvidenceUploadField`, signing kind `answer` = JPG/PNG/MP4/MOV/WEBM/PDF, bucket `delivery-orders`, the PO's own prefix)**.** The answer form accepts
 photos, videos and PDF, several files per answer, through the shared Receiving uploader
