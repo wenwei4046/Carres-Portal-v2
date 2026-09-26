@@ -243,7 +243,7 @@ function Mission({
       <WorkOrderRoute orderId={orderId} title={null} onOpenParty={(party) => onOpenParty(party)} />
       <SalesOrderCard orderId={orderId} />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
-        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={visiblePrimary === "logistics"} />
+        <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={visiblePrimary === "logistics"} moneyOnBalance />
       </div>
       <CustomerCard orderId={orderId} open={openParty === "customer"} onToggle={toggle("customer")} primary={visiblePrimary === "customer"} />
       <SupplierCard orderId={orderId} reference={reference} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={visiblePrimary === "supplier"} />

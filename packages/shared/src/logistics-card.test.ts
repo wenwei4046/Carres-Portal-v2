@@ -126,8 +126,9 @@ describe("1 working day before checks exceptions only", () => {
       }),
     );
     expect(m.rows[2].state).toBe("open");
-    expect(m.rows[2].gaps.map((g) => g.fact)).toEqual(["RM 1,250.00 still to collect", "Driver and vehicle not recorded"]);
-    expect(m.exception).toBe("RM 1,250.00 still to collect");
+    expect(m.rows[2].gaps.map((g) => g.fact)).toEqual(["Hold delivery · RM 1,250.00 unpaid", "Driver and vehicle not recorded"]);
+    expect(m.exception).toBe("Hold delivery · RM 1,250.00 unpaid");
+    expect(m.exceptionKind).toBe("money");
     expect(m.currentAction?.act).toBe("Ask AL Logistics");
   });
 

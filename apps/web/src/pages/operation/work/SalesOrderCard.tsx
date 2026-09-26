@@ -60,13 +60,14 @@ export default function SalesOrderCard({ orderId }: { orderId: string }) {
   const address = (o.customer_address ?? "").trim() || null;
   const goods = (o.order_lines ?? []).map((l) => `${nameOf(l.sku)} ×${l.qty}`);
   const money = moneyOfOrder(o);
-  /* The Route's payment sentence, said here once: `RM 1,250.00 to collect by
-     26 Sep` (its deadline is the governed collection timing). */
-  const routePayment = route?.paymentLine?.text.replace(/^Payment · /, "") ?? null;
+  /* COPY's Balance line, said ONCE on the panel: `RM 1,250.00 · not paid`,
+     then `· by 26 Sep` — the governed collection deadline the Route's payment
+     line reads (the Logistics card does not repeat the money below). */
+  const deadline = route?.paymentLine?.deadlineText ?? null;
   const balance = !money.known
     ? "Value not recorded"
     : money.outstanding > 0
-      ? routePayment ?? `RM ${RM.format(money.outstanding)} · not paid`
+      ? `RM ${RM.format(money.outstanding)} · not paid${deadline ? ` · by ${deadline}` : ""}`
       : "RM 0.00 · paid";
   const customerDate = card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : "No delivery date";
   return (

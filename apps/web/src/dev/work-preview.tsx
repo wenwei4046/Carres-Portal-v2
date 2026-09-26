@@ -3,9 +3,10 @@
  *
  * The REAL Work page and stylesheet over a seeded v2 Work feed
  * (`/api/operation/work`), so the left rail can be walked and measured without
- * a login: Thu 17 Sep is today, Wed 16 Sep is Malaysia Day, and the opening
- * URL chooses Wed so today's blue badge and the chosen pale-blue row can be
- * seen apart. Every party, date and number here is invented.
+ * a login. Every row is dated from the machine's own today (working-day
+ * offsets), so the rail's ringed day, the picker's red dates and the right
+ * panel's `{n} days left` all count from ONE today. Every party, date and
+ * number here is invented; the sentences are the production rules' own.
  *
  * A separate vite entry (`work-preview.html`), not a route: `vite build` only
  * emits `index.html`'s graph, so this cannot reach production. The fetch stub
@@ -24,26 +25,44 @@ import PreviewFrame from "./preview-frame";
 import "@/index.css";
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
-const TODAY = "2026-09-17";
+/* The machine's own today, in Malaysia; `wd(n)` is n Office working days
+   away (Sunday and public holidays skipped), so a dated row never lands on
+   a day the rules would not put it on. */
+const TODAY = appTodayIso();
+const REAL_TODAY = TODAY;
+const wd = (n: number) => (n >= 0 ? addWorkingDays(TODAY, n, { holidays: myHolidaySet() }) : subWorkingDays(TODAY, -n));
+function subWorkingDays(from: string, n: number): string {
+  const holidays = myHolidaySet();
+  let cur = from;
+  let left = n;
+  while (left > 0) {
+    const d = new Date(`${cur}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 1);
+    cur = d.toISOString().slice(0, 10);
+    /* Office days only: a missed Payment or Sales Order row never sits on a Saturday. */
+    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6 && !holidays.has(cur)) left--;
+  }
+  return cur;
+}
 
 let seq = 0;
 type Words = { problem: string; action: string; recipient: string | null; ref?: string };
 const WORDS: Record<OperationWorkModule, Words[]> = {
   orders: [
-    { problem: "No delivery date", action: "Ask customer for a delivery date", recipient: "Tan Qu Qu" },
-    { problem: "Customer asked to change the sofa colour after the order was confirmed", action: "Confirm the new colour with the customer", recipient: "Lim Mei Ling" },
+    { problem: "No delivery date", action: "Call Tan Qu Qu", recipient: "Tan Qu Qu" },
+    { problem: "Supplier date misses the customer commitment", action: "Delay planning", recipient: "Lim Mei Ling" },
   ],
   purchasing: [
-    { problem: "Supplier has not confirmed the PO", action: "Chase the supplier for PO confirmation", recipient: "Dreamland Factory", ref: "PO2609-1042" },
-    { problem: "Production date not set", action: "Ask the factory for a production date", recipient: "Sleepwell Sdn Bhd", ref: "PO2609-1057" },
+    { problem: "Supplier delivery date passed", action: "Ask the supplier when the goods will arrive", recipient: "Dreamland Factory", ref: "PO2609-1042" },
+    { problem: "Confirm tomorrow's supplier delivery", action: "Confirm tomorrow's delivery", recipient: "Sleepwell Sdn Bhd", ref: "PO2609-1057" },
   ],
-  receiving: [{ problem: "Goods arrived without a GRN", action: "Record the goods received", recipient: "Warehouse Klang", ref: "PO2609-1031" }],
+  receiving: [{ problem: "Supplier date passed · nothing received yet", action: "Check in", recipient: "Warehouse Klang", ref: "PO2609-1031" }],
   delivery: [
-    { problem: "Not delivered", action: "Arrange a new delivery date", recipient: "NETS" },
-    { problem: "Delivery proof needs review", action: "Review the delivery proof", recipient: "AL Logistic", ref: "DO2609-20411" },
+    { problem: "Overdue delivery", action: "Call NETS", recipient: "NETS" },
+    { problem: "Delivery proof not reviewed", action: "Check delivery proof", recipient: "AL Logistics", ref: "DO2609-20411" },
   ],
-  payment: [{ problem: "Customer balance due", action: "Ask customer to pay", recipient: "Wong Kah Wai" }],
-  issue_tracker: [{ problem: "Issue waiting for a reply", action: "Reply to the issue", recipient: null }],
+  payment: [{ problem: "Payment due today", action: "Ask customer to pay", recipient: "Wong Kah Wai" }],
+  issue_tracker: [{ problem: "Issue waiting for a reply", action: "Record result", recipient: null }],
 };
 const used: Partial<Record<OperationWorkModule, number>> = {};
 
@@ -119,26 +138,26 @@ const FEED: OperationWorkResponse = {
     errorLabel: null,
   })),
   items: [
-    item("purchasing", "2026-09-10", 5),
-    item("delivery", "2026-09-11", 4),
-    item("payment", "2026-09-09", 6),
-    item("orders", "2026-09-15"),
-    item("receiving", "2026-09-15"),
-    item("purchasing", "2026-09-16"),
-    item("delivery", "2026-09-16"),
-    item("delivery", "2026-09-16"),
-    item("orders", "2026-09-16"),
-    item("payment", TODAY),
-    item("delivery", "2026-09-18"),
-    item("purchasing", "2026-09-18"),
+    item("purchasing", wd(-5), 5),
+    item("delivery", wd(-4), 4),
+    item("payment", wd(-6), 6),
+    item("orders", wd(0)),
+    item("receiving", wd(0)),
+    item("purchasing", wd(1)),
+    item("delivery", wd(1)),
+    item("delivery", wd(1)),
+    item("orders", wd(1)),
+    item("payment", wd(0)),
+    item("delivery", wd(2)),
+    item("purchasing", wd(2)),
     item("orders", null),
     item("payment", null),
   ],
 };
 
-// One covered job (Wed 16 Sep, Delivery · NETS): Shasha acts for Li Ching
-// today, so the card footer carries `Covered for Li Ching` beside its number.
-const coveredItem = FEED.items.find((i) => i.module === "delivery" && i.timing.actionOn === "2026-09-16" && i.recipient === "NETS");
+// One covered job (tomorrow, Delivery · NETS): Shasha acts for Li Ching
+// today, so the row carries `For Li Ching` beside its number.
+const coveredItem = FEED.items.find((i) => i.module === "delivery" && i.timing.actionOn === wd(1) && i.recipient === "NETS");
 if (coveredItem) {
   coveredItem.owner = {
     ...coveredItem.owner,
@@ -157,9 +176,8 @@ if (coveredItem) {
    default — AL Logistics, no link yet, the 3-day check due today and money
    owed on an outstation delivery. Every name, date and number is invented. */
 const ORDER = "00000000-0000-4000-8000-00000000c001";
-/* Dated from the machine's own today so the checks read true on any day the
-   preview is opened: the requested date is 3 working days out. */
-const REAL_TODAY = appTodayIso();
+/* The requested date is 3 working days out, so the checks read true on any
+   day the preview is opened. */
 const REQUESTED = addWorkingDays(REAL_TODAY, 3, { holidays: myHolidaySet() });
 const lc = new URLSearchParams(window.location.search).get("lc") ?? "due";
 const firstDelivery = FEED.items.find((i) => i.module === "delivery");
@@ -184,13 +202,25 @@ const ORDERS = {
       placed_at: "2026-09-01T02:00:00Z", proceeded_at: "2026-09-01T02:00:00Z",
       delivery_date: REQUESTED, delivery_date_tbd: false, source_system: null, source_ref: ["TCF0541"],
       ops_assigned_logistic: null,
-      order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1, unit_price: 2450 }, { id: "l-2", sku: "bedframe:B1201S-K", qty: 1, unit_price: 1800 }],
+      order_lines: [{ id: "l-1", sku: "M1401F-K", qty: 1, unit_price: 2450 }, { id: "l-2", sku: "B1201S-K", qty: 1, unit_price: 1800 }],
       order_addons: [], paid: 3000, delivery_partner_id: null, request_for_delivery_at: null, partner_accepted_at: null,
       partner_rejected_at: null, partner_rejected_reason: null, delivery_partners: null, do_number: null, dispatched_at: null,
       delivered_at: null, outlet_id: null, dealer_id: "d-1", dealers: { name: "Carres KL" }, order_supplier_threads: [],
       order_annotations: [], order_finance_exceptions: [], ops_delivery_orders: [],
     },
   ],
+};
+/* The catalogue the Sales Order card reads goods names from (`Carres Cloud · King`). */
+const CATALOG = {
+  models: [
+    { id: "00000000-0000-4000-8000-00000000e001", category: "mattress", modelKey: "M1401F", name: "Carres Cloud", blurb: null, colors: null, gaps: null, sofaMode: null },
+    { id: "00000000-0000-4000-8000-00000000e002", category: "bedframe", modelKey: "B1201S", name: "Oslo Bed Frame", blurb: null, colors: null, gaps: null, sofaMode: null },
+  ],
+  skus: [
+    { id: "00000000-0000-4000-8000-00000000e101", modelId: "00000000-0000-4000-8000-00000000e001", sku: "M1401F-K", variant: "King", variantKind: "size", price: 2450, cost: null },
+    { id: "00000000-0000-4000-8000-00000000e102", modelId: "00000000-0000-4000-8000-00000000e002", sku: "B1201S-K", variant: "King", variantKind: "size", price: 1800, cost: null },
+  ],
+  sofaFabrics: [], addons: [], floorConfig: {},
 };
 const ARRANGEMENTS = {
   arrangements: withPartner
@@ -235,10 +265,10 @@ const plusDays = (n: number) => addWorkingDays(REAL_TODAY, n, { holidays: myHoli
 const SUPPLIERS = sp === "none"
   ? []
   : sp === "received"
-    ? [{ poNo: "PO260910-4827", supplier: "Hookka Industries", issued: true, originalIso: plusDays(-2), effectiveIso: plusDays(-2), reply: null, supplierDo: { number: "DO-5531", atIso: `${plusDays(-3)}T02:00:00Z` }, deliverTo: "Carres Klang Warehouse", grnIso: plusDays(-2), orderedQty: 2, receivedQty: 2, lines: [{ sku: "mattress:M1401F-K", qty: 1 }] }]
+    ? [{ poNo: "PO260910-4827", supplier: "Hookka Industries", issued: true, originalIso: plusDays(-2), effectiveIso: plusDays(-2), reply: null, supplierDo: { number: "DO-5531", atIso: `${plusDays(-3)}T02:00:00Z` }, deliverTo: "Carres Klang Warehouse", grnIso: plusDays(-2), orderedQty: 2, receivedQty: 2, lines: [{ sku: "M1401F-K", qty: 1 }] }]
     : [
-        { poNo: "PO260910-4827", supplier: "Sleepwell", issued: true, originalIso: plusDays(1), effectiveIso: plusDays(6), reply: { answer: "delayed", reason: "Production Delay", evidence: "arrangement/wa-1.jpg", recordedAtIso: `${REAL_TODAY}T01:00:00Z` }, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "mattress:M1401F-K", qty: 1 }] },
-        { poNo: "PO260911-1188", supplier: "ABC Furniture", issued: true, originalIso: plusDays(2), effectiveIso: plusDays(2), reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "bedframe:B1201S-K", qty: 1 }] },
+        { poNo: "PO260910-4827", supplier: "Sleepwell", issued: true, originalIso: plusDays(1), effectiveIso: plusDays(6), reply: { answer: "delayed", reason: "Production Delay", evidence: "arrangement/wa-1.jpg", recordedAtIso: `${REAL_TODAY}T01:00:00Z` }, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "M1401F-K", qty: 1 }] },
+        { poNo: "PO260911-1188", supplier: "ABC Furniture", issued: true, originalIso: plusDays(2), effectiveIso: plusDays(2), reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "B1201S-K", qty: 1 }] },
         { poNo: "PO260912-2044", supplier: "XYZ Bedding", issued: false, originalIso: null, effectiveIso: null, reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 2, receivedQty: 0, lines: [{ sku: "pillow:P01", qty: 2 }] },
       ];
 let linkActive = lc === "link";
@@ -363,6 +393,7 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return new Response(JSON.stringify(FEED), { status: 200, headers: { "Content-Type": "application/json" } });
   }
   if (/\/api\/operation\/orders(\?|$)/.test(url)) return json(ORDERS);
+  if (/\/api\/catalog(\?|$)/.test(url)) return json(CATALOG);
   if (/\/api\/operation\/partners(\?|$)/.test(url)) return json({ partners: [{ id: AL, name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/example" }] });
   if (/\/api\/operation\/pos\/for-order\//.test(url)) return json({ purchaseOrders: SUPPLIERS });
   if (/\/loan-offers/.test(url)) return json({ offers: loanOn ? [{ id: "lo-1", seq: 1, order_id: ORDER, event: "offered", item_id: null, label: "Loan sofa", reason: null, recorded_by: ME, recorded_at: `${REAL_TODAY}T01:00:00Z`, unit_id: null }] : [] });

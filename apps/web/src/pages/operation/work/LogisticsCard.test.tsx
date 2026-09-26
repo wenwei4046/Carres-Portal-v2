@@ -80,10 +80,10 @@ function facts(over: Partial<LogisticsCardFacts> = {}): LogisticsCardFacts {
   };
 }
 
-function draw() {
+function draw(props: { moneyOnBalance?: boolean } = {}) {
   return render(
     <MemoryRouter>
-      <LogisticsCard orderId="order-1" />
+      <LogisticsCard orderId="order-1" {...props} />
     </MemoryRouter>,
   );
 }
@@ -133,7 +133,26 @@ describe("collapsed — at most five facts", () => {
     scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
     factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
     draw();
-    expect(screen.getByTestId("logistics-card-exception").textContent).toBe("RM 1,000.00 still to collect");
+    expect(screen.getByTestId("logistics-card-exception").textContent).toBe("Hold delivery · RM 1,000.00 unpaid");
+  });
+
+  it("on the Work right panel the Sales Order card's Balance says the money — the collapsed card does not repeat it", () => {
+    scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
+    factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
+    draw({ moneyOnBalance: true });
+    expect(screen.queryByTestId("logistics-card-exception")).toBeNull();
+    expect(screen.getByTestId("logistics-card-toggle").textContent).not.toMatch(/RM /);
+  });
+
+  it("collapsed it is two rows like Customer and Supplier — the heading row, then ONE status line", () => {
+    scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
+    factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
+    draw();
+    const toggle = screen.getByTestId("logistics-card-toggle");
+    const rows = Array.from(toggle.firstElementChild!.children);
+    expect(rows).toHaveLength(2);
+    expect(rows[1]!.getAttribute("data-testid")).toBe("logistics-card-status");
+    expect(screen.getByTestId("logistics-card-status").textContent).toBe("Scheduled delivery · 27 Oct · Hold delivery · RM 1,000.00 unpaid");
   });
 });
 
@@ -224,6 +243,7 @@ describe("density below 768px — owner ruling 2026-09-25 (classes only; behavio
     expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[13px]");
     expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-[18px]");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
+    expect(screen.getByTestId("logistics-card-status").className).toContain("text-[12px]");
     expect(act.className).toContain("text-[13px]");
     expect(act.className).toContain("leading-[18px]");
     expect(act.className).toContain("font-semibold");

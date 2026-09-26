@@ -48,8 +48,9 @@ export const MISSION_ROUTE_COPY = {
   scheduled: "Scheduled",
   requested: "Requested",
   noDate: "No date",
-  paymentOwed: (amount: string, date: string | null) => (date ? `Payment · ${amount} to collect by ${date}` : `Payment · ${amount} to collect`),
-  paymentHeld: "Payment · Finance is holding this delivery",
+  /* COPY 2026-09-25: `to collect` and `Finance is holding` are retired. */
+  paymentOwed: (amount: string, date: string | null) => (date ? `Payment · Hold delivery · ${amount} unpaid · by ${date}` : `Payment · Hold delivery · ${amount} unpaid`),
+  paymentHeld: "Payment · Hold delivery · Finance hold",
 } as const;
 
 export interface MissionRoutePoint {
@@ -82,7 +83,9 @@ export interface MissionRouteInput {
 export interface MissionRouteModel {
   points: MissionRoutePoint[];
   header: { text: string; tone: RouteTone } | null;
-  paymentLine: { text: string; tone: RouteTone } | null;
+  /** `deadlineText` is the spelled collection deadline, for a surface that
+   *  prints the money once in its own words (the Sales Order card's Balance). */
+  paymentLine: { text: string; tone: RouteTone; deadlineText: string | null } | null;
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -205,11 +208,13 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
 
   let paymentLine: MissionRouteModel["paymentLine"] = null;
   if (!input.deliveredIso) {
-    if (input.payment.financeHold) paymentLine = { text: C.paymentHeld, tone: "attention" };
+    if (input.payment.financeHold) paymentLine = { text: C.paymentHeld, tone: "attention", deadlineText: null };
     else if (input.payment.owedText) {
+      const deadlineText = d(input.payment.deadlineIso);
       paymentLine = {
-        text: C.paymentOwed(input.payment.owedText, d(input.payment.deadlineIso)),
+        text: C.paymentOwed(input.payment.owedText, deadlineText),
         tone: input.payment.affects ? "attention" : "future",
+        deadlineText,
       };
     }
   }

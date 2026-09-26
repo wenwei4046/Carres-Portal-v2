@@ -414,8 +414,8 @@ a complete accessible name and a visible keyboard focus ring. Top to bottom:
   the number of open actions dated that day and is **empty** when there are none — never
   `No work`, never `0`. A public holiday (and any non-working day) is the grey-text tile, its name
   only in the accessible name and tooltip (`Malaysia Day`) — never `Hol`, never `Public holiday ·`.
-  **Today** is the black number with a dot under it; the word `Today` is never on screen. The
-  **chosen** day is the solid-blue tile with white text — the page's ONE blue: a rail row choice is
+  **Today** is the ringed black number, and this week's row is the tinted row; the word `Today` is
+  never on screen. The **chosen** day is the solid-blue tile with white text — the page's ONE blue: a rail row choice is
   bold with its left line, never washed; the only washed row on the page is the chosen work. Today,
   closed and chosen are independent states. A day can be chosen whether or not it is closed and
   counts the work dated on it.
@@ -625,9 +625,10 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   hint (the `Search` rename was reverted by Jess 2026-09-26) · `Help` and `Settings` beside their
   icons · the right rail names each icon. **`Covering` is retired (Jess, 2026-09-26):** a covered row
   says so on the row itself; the toolbar carries no cover button.
-- **The Date rail** is the one-line week header and the week strip of tiles in §5.2 Panel 1 (Jess,
-  2026-09-26 — replaces the day cards, `Today` in words, `No work`, `Public holiday · {name}` and
-  the two-week column). `No date` (never `No working date`) is always listed.
+- **The Date rail** is the one-line month header and the Monday–Saturday month grid of §5.1
+  Panel 1 (Jess, 2026-09-26 — replaces the day cards, `Today` in words, `No work`,
+  `Public holiday · {name}`, the two-week column and the one-week strip). `No date` (never
+  `No working date`) is always listed.
 - **List tabs are retired** (Jess, 2026-09-26): `To do` · `Waiting for answer` · `Done today` are
   the rail's `Status` rows, more than one may be on.
 - **My Work / Team Work** active segment is kit blue. Search is 340px beside it at every width
@@ -1070,10 +1071,17 @@ multi-supplier Supplier card, compact Order Route and their shared communication
 1. **Order Route** — one compact horizontal mission-health line, first, always open; its title
    line is `{object} · {module}` (`SO-1362 · Delivery`), never the words "Order Route"; it is not
    a wizard or sequence.
-2. **Sales Order card** — the order's own facts, read-only: `Customer` (name · phone) · `Deliver to`
-   · `Goods` (`{name} ×{qty}` per line) · `Customer date` · `Balance` (`RM 0.00 · paid` / red
-   `RM {n} · not paid`), with the `Open {SO}` door on its title line.
-3. **Logistics card** — §5.9's deployed component and eight-section expansion, unchanged.
+2. **Sales Order card** — the order's own facts, read-only, in two columns: `Customer` (name ·
+   phone) · `Deliver to` · `Goods` (`{name} ×{qty}` per line, catalogue names) · `Customer date` ·
+   `Balance` (`RM 0.00 · paid` / red `RM {n} · not paid · by {date}` — the collection deadline the
+   Route's payment line reads). The record door is the header's `open` icon (Jess, 2026-09-26).
+   The Balance is the panel's ONE money line.
+3. **Logistics card** — §5.9's deployed eight-section expansion, unchanged. Collapsed it reads like
+   Customer and Supplier (Jess, 2026-09-26): the heading row with `Checks {n} of 3`, then ONE
+   status line — the act in bold · its result · `due {date}` · the scheduled day · the one exception,
+   `·`-separated, wrapping, never a third row. Its money exception (`Hold delivery · RM {n}
+   unpaid`) is not printed on the right panel because the Balance already says it; the expanded
+   `1 working day before` check keeps it.
 4. **Customer card** — mission-relevant dates, contact checkpoint and structured answer only.
 5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
 6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
