@@ -454,22 +454,16 @@ export function projectPurchaseOrderReplyWork(input: {
         dutyName: send.duty_name,
         actingName: send.acting_name,
       })),
-    }, input.poDuty, input.today, holidays)
-      /* ⛔ RETIRED 2026-09-24 (Purchasing MASTER §5.7, Workspace §6.1): a PO
-         the supplier has not answered since it was sent is NOT work — it is
-         `Waiting for goods from supplier`. Only the passed-date follow-up and
-         the exact-date day-before check remain supplier-contact Work. The
-         register's own facts are untouched; only Work stops admitting it. */
-      .filter((item) => item.ruleKey !== "purchasing.supplier_reply");
+    }, input.poDuty, input.today, holidays);
+    /* A PO the supplier has not answered since it was sent is NOT work
+       (owner ruling 2026-09-24, Purchasing MASTER §5.7 / §9.3) — the shared
+       builder emits only the passed-date follow-up; the day-before check is
+       `projectPurchaseOrderArrivalCheckWork`. */
     return items.map((item) => operationWorkItemFromProjection(item, {
       object: { kind: "purchase_order", id: po.id, label: po.id },
-      problem: item.ruleKey === "purchasing.supplier_date_passed"
-        ? "Supplier delivery date passed"
-        : "Supplier has not confirmed the PO date",
+      problem: "Supplier delivery date passed",
       recipient: supplierName,
-      requiredResult: item.ruleKey === "purchasing.supplier_date_passed"
-        ? "New evidenced supplier delivery date recorded"
-        : "Evidenced supplier delivery date recorded",
+      requiredResult: "New evidenced supplier delivery date recorded",
       destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
       today: input.today,
     }));

@@ -671,6 +671,11 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     sent(); queryData.pos[0]!.promises = [];
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.getByTestId("po-answer-date-line-1")).toHaveTextContent("Not confirmed");
+    /* A sent PO the supplier has not answered is NOT work (owner ruling
+       2026-09-24): the retired card sentence never prints; only a PASSED
+       date may still raise the object-page card. */
+    expect(document.body).not.toHaveTextContent("Supplier has not confirmed the PO date");
+    expect(document.body).not.toHaveTextContent("to confirm the PO delivery date");
     open();
     expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — answer a line or record the Supplier DO");
     kind("new_date");
