@@ -798,8 +798,11 @@ result `Received` makes a Unit `Available` automatically (SAP unrestricted stock
 receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
 the way back from `Cannot sell`.
 
-**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT 2026-09-26 (migration 0589;
-authenticated production walk owed).** The page is the Sales Order object page's grammar (owner
+**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT and PRODUCTION-WALKED 2026-09-26
+(migrations 0589 + 0590 APPLIED; walk: `U1-000-282` reported damaged → Issue `IS-2609-0005`, Unit
+`Cannot sell · Waiting inspection`, History shows the condition, status and protection changes, the
+GRN Duty card `Check the damage on U1-000-282 and record the result · by Mon, 28 Sep` stands in Work,
+and `Make available for sale` refuses with `1 reported problem is still open`).** The page is the Sales Order object page's grammar (owner
 ruling 2026-09-26, Law C: one header, never a lookalike): the header row reads
 `← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are blue-titled blocks, and an old
 reference the portal never held prints `{ref} · not in this portal` instead of `No SO`. The
