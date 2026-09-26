@@ -540,10 +540,11 @@ section chrome for facts: a white card (`rounded-card`, `kit-slate-5` hairline, 
 grammar — `text-label` label over a 13px value, three to a row on a full-width page, two in a
 half-width pane, one on a phone. **The shared `Block` (`SalesOrderWorkspace.tsx`) has exactly this
 chrome and no second tone:** the former "shared" tone — a mono UPPERCASE title beside a left band —
-is retired; the cream `SectionBand` stays the Orders LIST / drawer chrome only. **The SO field rule
-travels with the grammar:** a grey box means "changed with `Edit` here" and nothing else, so a fact
-another page owns (a supplier address, the immutable PO Delivery Date, a saved request's facts) prints
-PLAIN, never boxed. Drawn 2026-09-26 on: the Purchase Order object (`Purchase order` · `Goods lines` ·
+is retired; the cream `SectionBand` stays the Orders LIST / drawer chrome only. **The box travels with the
+grammar (owner, same day, pointing at the SO page: "got box … I want follow"):** on Purchasing pages
+every fact prints in the Sales Order's bordered box, whether or not that page can change it; the SO
+page's own three plain exceptions (`../orders/MASTER.md`, field standard 2026-09-22) remain the SO
+page's. Drawn 2026-09-26 on: the Purchase Order object (`Purchase order` · `Goods lines` ·
 `Receiving` · `Claims and returns` · `Revisions` · `History` · `Order Route`), the `Supplier reply` and
 `Record supplier answer` in-card headings (label rank, sentence case), the Manual Purchase saved-request
 detail, the Review Purchase Orders work pane (`Purchase order` facts + `Goods lines`), the Supplier

@@ -75,6 +75,6 @@
   background-color: #eaf4ff;
 }
 
-.po-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]) {
+.po-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"]) {
   height: 1.75rem;
 }

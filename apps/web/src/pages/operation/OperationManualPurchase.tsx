@@ -3436,9 +3436,8 @@ function ObjectTable({
 }
 
 /** One REQUEST fact — label over value, the object's reading grammar. */
-/** The shared Sales Order fact (owner, 2026-09-26) in this page's id family.
- *  A saved request's facts are not changed here — Deliver To has its own
- *  door inside the value — so they print PLAIN, never as a grey box. */
+/** The shared Sales Order fact (owner, 2026-09-26) in this page's id family,
+ *  boxed like the Sales Order page ("got box … I want follow"). */
 function Fact({
   label,
   children,
@@ -3450,7 +3449,7 @@ function Fact({
   testId?: string;
   wide?: boolean;
 }) {
-  return <SharedFact idPrefix="mp-fact" own={false} label={label} value={<span className="block min-w-0">{children}</span>} testId={testId} wide={wide} />;
+  return <SharedFact idPrefix="mp-fact" own={false} framed label={label} value={<span className="block min-w-0">{children}</span>} testId={testId} wide={wide} />;
 }
 
 /**

@@ -460,32 +460,31 @@ export default function SoBatchIssueWorkspace({
               {/* The Sales Order card grammar (owner, 2026-09-26: "follow
                   sales order ui kit"): one `Purchase order` card of facts —
                   label over value, two to a row inside this half-width pane —
-                  then the goods. Nothing here is edited on this surface
-                  (addresses live in Suppliers / Purchasing Settings), so
-                  every fact prints PLAIN; a grey box means "changed with
-                  Edit" and nothing else. */}
+                  then the goods. Boxed like the Sales Order page — the
+                  owner chose that LOOK for every Purchasing page ("got box …
+                  I want follow", 2026-09-26). */}
               <div className="mt-3">
               <Block title="Purchase order">
                 <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2" data-testid="so-batch-issue-facts">
-                  <Fact idPrefix="po-review-fact" own={false} label="Supplier" value={
+                  <Fact idPrefix="po-review-fact" own={false} framed label="Supplier" value={
                     <span className="flex flex-col">
                       <span>{current.supplierName ?? "Not recorded"}</span>
                       <span className="whitespace-pre-wrap break-words text-meta text-kit-slate-11">{current.supplierAddress || <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Address not recorded. Check Suppliers.</a>}</span>
                     </span>
                   } />
-                  <Fact idPrefix="po-review-fact" own={false} label="Supplier Deliver To" value={
+                  <Fact idPrefix="po-review-fact" own={false} framed label="Supplier Deliver To" value={
                     <span className="flex flex-col">
                       <span>{current.destinationName || destinationName(current.destinationId) || "Not recorded"}</span>
                       <span className="whitespace-pre-wrap break-words text-meta text-kit-slate-11">{current.destinationAddress || <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Address not recorded. Check Purchasing Settings.</a>}</span>
                     </span>
                   } />
-                  <Fact idPrefix="po-review-fact" own={false} label="Delivery Method" value={
+                  <Fact idPrefix="po-review-fact" own={false} framed label="Delivery Method" value={
                     draftData?.delivery_method === "we_collect" ? "We collect" : draftData?.delivery_method === "supplier_delivers" ? "Supplier delivers" : <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Not recorded. Check Suppliers.</a>
                   } />
-                  <Fact idPrefix="po-review-fact" own={false} label="PO Doc Date" hint="Provisional. The date is recorded when issued." value={
+                  <Fact idPrefix="po-review-fact" own={false} framed label="PO Doc Date" hint="Provisional. The date is recorded when issued." value={
                     current.poDate ? fmtDate(current.poDate) : "Not available. Go back and reload."
                   } />
-                  <Fact idPrefix="po-review-fact" own={false} testId="po-review-fact-po-delivery-date" label={current.poDeliveryWorkingDays != null ? `PO ${current.poDeliveryWorkingDays}-Day Delivery Date` : "PO Delivery Date"} value={
+                  <Fact idPrefix="po-review-fact" own={false} framed testId="po-review-fact-po-delivery-date" label={current.poDeliveryWorkingDays != null ? `PO ${current.poDeliveryWorkingDays}-Day Delivery Date` : "PO Delivery Date"} value={
                     current.poDeliveryDate ? fmtDate(current.poDeliveryDate) : <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Not available. Check production days in Purchasing Settings.</a>
                   } />
                 </div>

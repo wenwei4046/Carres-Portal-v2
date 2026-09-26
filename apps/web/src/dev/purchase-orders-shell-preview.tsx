@@ -98,6 +98,29 @@ window.fetch = async (input, init) => {
       messageTemplate: "Please build this purchase order.",
     });
   }
+  /* The official paper beside the facts: the same money-free payload the
+     server composes (`purchasing_po_document`), built from the fixture PO so
+     the object page draws a real PDF instead of an empty half. */
+  const print = /\/api\/operation\/pos\/([^/?]+)\/print-data/.exec(url);
+  if (print) {
+    const po = pos.find((p) => p.id === decodeURIComponent(print[1]!));
+    if (!po) return json({ code: "po_not_found", message: "Purchase Order not found." }, 404);
+    const supplier = SUPPLIERS.find((s) => s.id === po.supplier_id)!;
+    const dest = po.destination_id === "d2" ? { name: "AL Sungai Buloh", address: "Lot 2, Jalan Sungai Buloh, 47000 Sungai Buloh, Selangor." } : { name: "Carres Klang", address: "Lot 6515, Batu 5 1/2, Jalan Kapar, 42100 Klang, Selangor." };
+    return json({
+      po_number: po.id, po_id: po.id, version: po.version, issue_date: po.placed_at.slice(0, 10),
+      supplier: { name: supplier.name, address: "No. 8, Jalan Perusahaan 3, Kawasan Perindustrian, 43300 Seri Kembangan, Selangor.", contact: supplier.contact },
+      destination: dest, delivery_instructions: null, eta_date: po.official_delivery_date, delivery_working_days: 7,
+      delivery_method: po.supplier_id === "s3" ? "we_collect" : "supplier_delivers", terms: null, issued_by: "Yu Jun",
+      so_refs: po.sources.flatMap((src) => src.kind === "sales_order" ? [Number(src.reference.replace("SO-", ""))] : []),
+      lines: po.purchase_order_lines.map((l, n) => ({
+        sku: l.sku, description: [l.model_name, l.size].filter(Boolean).join(" · "), qty: l.qty, unit: "unit",
+        destination: dest, attrs: l.attrs, identity_mode: "exact_unit",
+        unit_codes: Array.from({ length: l.qty }, (_, u) => `U1-${String(n + 1).padStart(3, "0")}-${String(u + 1).padStart(3, "0")}`),
+        sources: [{ so: po.sources[0]?.kind === "sales_order" ? Number(po.sources[0].reference.replace("SO-", "")) : null, qty: l.qty }],
+      })),
+    });
+  }
   if (url.includes("/api/operation/suppliers")) return json({ suppliers: SUPPLIERS.map((s) => ({ ...s, kind: "own_logistics", cat_covered: [], lead_time: null })) });
   if (url.includes("/api/operation/warehouse")) return json({ warehouses: [{ id: "w1", name: "Carres Klang", address: "Klang" }] });
   if (url.includes("/api/operation/workspace-duties")) {

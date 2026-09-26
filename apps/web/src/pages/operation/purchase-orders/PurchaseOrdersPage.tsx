@@ -1641,11 +1641,10 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
       <div className="flex min-w-0 shrink-0 flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:overflow-auto">
       <WorkCard row={row} owner={owner} />
       <Block title="Purchase order">
-        {/* The Sales Order fact grammar (owner, 2026-09-26): label over value,
-            three to a row, 12px gaps. These facts are not this page's to
-            change (PO Delivery Date is immutable; the supplier's date is
-            recorded through `Record supplier answer` below), so they print
-            PLAIN — a grey box means "changed with Edit" and nothing else. */}
+        {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
+            boxed value, three to a row, 12px gaps — "got box … I want follow":
+            the owner chose the Sales Order LOOK for every Purchasing page,
+            so the box no longer signals "editable here" on these pages. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="po-object-facts">
           <PoFact label="Supplier" value={row.supplierName} />
           <PoFact label="Supplier Deliver To" value={row.deliverTo} />
@@ -1847,7 +1846,7 @@ function PoTermsBlock({ poId, saved }: { poId: string; saved: number | null }) {
 /** The shared Sales Order fact, in this page's id family; an unrecorded value
  *  keeps the page's one absence voice. */
 function PoFact({ label, value }: { label: string; value: string }) {
-  return <Fact idPrefix="po-fact" own={false} label={label} value={value === "Not recorded" ? <Absence /> : value} />;
+  return <Fact idPrefix="po-fact" own={false} framed label={label} value={value === "Not recorded" ? <Absence /> : value} />;
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
