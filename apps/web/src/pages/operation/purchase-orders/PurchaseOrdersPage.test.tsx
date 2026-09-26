@@ -612,18 +612,6 @@ describe("Purchase Orders Register", () => {
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
   });
 
-  it("saves the PO's payment terms, and blank clears them (0530)", () => {
-    renderPage("/operation/procurement?po=PO-20260828-4827");
-    const field = screen.getByLabelText("Terms (days)");
-    const save = screen.getByTestId("po-terms-save");
-    expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "-1" } });
-    expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "45" } });
-    fireEvent.click(save);
-    expect(termsMutate).toHaveBeenCalledWith(45, expect.anything());
-  });
-
   it("opens an object from the live register without changing the page's Hook order", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "PO-20260828-4827" }));

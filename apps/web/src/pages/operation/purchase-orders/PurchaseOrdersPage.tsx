@@ -58,7 +58,6 @@ import {
   useRevisePo,
   useSaveRegisterLayout,
   useSetDefaultRegisterLayout,
-  useSetPoTermsDays,
   useWorkspaceDuties,
   type operationPoListRow,
   type SupplierRow,
@@ -1648,7 +1647,6 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="po-object-facts">
           <PoFact label="Supplier" value={row.supplierName} />
           <PoFact label="Supplier Deliver To" value={row.deliverTo} />
-          <PoFact label="Source" value={sourceSummary(row.sources)} />
           <PoFact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
           {/* Show the actual evidenced date, even when it matches the PO. */}
           <PoFact label="Supplier Confirmed Delivery Date" value={row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"} />
@@ -1657,7 +1655,6 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <PoFact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
           <PoFact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </div>
-        <PoTermsBlock key={`${row.id}:terms:${row.po.terms_days ?? ""}`} poId={row.id} saved={row.po.terms_days ?? null} />
         <SupplierReplySection
           key={`${row.id}:${row.facts.version}`}
           poId={row.id}
@@ -1795,56 +1792,6 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
  * A supplier can confirm the original PO date or give a different date with a
  * reason. Both answers require evidence tied to the exact sent version.
  */
-/** 0530 — the PO's own payment terms. They win over the supplier's when a
- *  bill's due date is filled in. Empty = not set; nothing waits on it. */
-function PoTermsBlock({ poId, saved }: { poId: string; saved: number | null }) {
-  const [draft, setDraft] = useState(saved == null ? "" : String(saved));
-  const [problem, setProblem] = useState<string | null>(null);
-  const save = useSetPoTermsDays(poId);
-  const n = draft.trim() === "" ? null : Number(draft);
-  const valid = n === null || (Number.isInteger(n) && n >= 0 && n <= 365);
-  const dirty = valid && n !== saved;
-  return (
-    <div className="mt-4 flex items-end gap-2 border-t border-kit-slate-4 pt-3" data-testid="po-terms">
-      <div className="w-40">
-        <Input
-          id={`po-terms-days-${poId}`}
-          label="Terms (days)"
-          type="number"
-          min={0}
-          max={365}
-          step={1}
-          value={draft}
-          hint="Blank uses the supplier's terms"
-          error={valid ? undefined : "0 to 365"}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-      </div>
-      <button
-        type="button"
-        disabled={!dirty || save.isPending}
-        onClick={() => {
-          setProblem(null);
-          save.mutate(n, {
-            onError: (e: unknown) => {
-              const body = (e as { body?: { message?: string } }).body;
-              setProblem(body?.message ?? "The terms could not be saved");
-            },
-          });
-        }}
-        data-testid="po-terms-save"
-        className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
-      >
-        {save.isPending ? "Saving..." : "Save"}
-      </button>
-      {problem ? <div className="text-meta text-kit-red-11">{problem}</div> : null}
-    </div>
-  );
-}
-
-
-/** The shared Sales Order fact, in this page's id family; an unrecorded value
- *  keeps the page's one absence voice. */
 function PoFact({ label, value }: { label: string; value: string }) {
   return <Fact idPrefix="po-fact" own={false} framed label={label} value={value === "Not recorded" ? <Absence /> : value} />;
 }

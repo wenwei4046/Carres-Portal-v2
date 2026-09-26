@@ -39,7 +39,6 @@ import {
   manualPurchaseLeadDayFacts,
   manualPurchaseLineRemainingOf,
   manualPurchaseObjectHeading,
-  manualPurchaseOrderByLine,
   manualPurchaseOrderByOf,
   manualPurchasePoSummary,
   manualPurchaseRailFacts,
@@ -3769,7 +3768,11 @@ function ManualPurchaseObject({
     if (!openSection || q.isPending) return;
     const title = openSection === "approval" ? MW.secApproval : null;
     if (!title) return;
-    const section = document.querySelector(`[data-block="${title}"]`);
+    /* The Approval card exists only when there is a decision to make or read
+       (owner, 2026-09-26); for a waiting request the state is the Request
+       card's `Approval Status` fact, so the deep link lands there. */
+    const section = document.querySelector(`[data-block="${title}"]`)
+      ?? (title === MW.secApproval ? document.querySelector('[data-testid="mp-approval-fact"]') : null);
     section?.scrollIntoView({ block: "start" });
   }, [openSection, q.isPending]);
   const pick = useQuery({
@@ -4090,6 +4093,57 @@ function ManualPurchaseObject({
         0,
       );
 
+  /* R3 · `Withdraw request` — the requester's own door, only while nothing is
+     decided and no PO exists; it rides the Request card's own header (a
+     panel's actions live in its header). It asks once more before it acts. */
+  const withdrawDoor = (
+    <>
+      {/* R3 · `Withdraw request` — the requester's own door, only while
+          nothing is decided and no PO exists. It asks once more before
+          it acts, because a withdrawn request cannot come back. */}
+      {d.canWithdraw ? (
+        <div className="flex flex-col items-end gap-2" data-testid="mp-withdraw">
+          {withdrawError ? (
+            <TwoLines
+              testId="mp-withdraw-error"
+              wrong={withdrawError.wrong}
+              todo={withdrawError.todo}
+            />
+          ) : null}
+          <span className="flex flex-wrap items-center gap-2">
+            {confirmWithdraw ? (
+              <>
+                <Button
+                  variant="neutral"
+                  onClick={() => setConfirmWithdraw(false)}
+                  disabled={withdraw.isPending}
+                >
+                  {MW.cancel}
+                </Button>
+                <Button
+                  variant="primary"
+                  loading={withdraw.isPending}
+                  onClick={() => void withdrawRequest()}
+                  data-testid="mp-withdraw-confirm"
+                >
+                  {MW.withdraw}
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="neutral"
+                onClick={() => setConfirmWithdraw(true)}
+                data-testid="mp-withdraw-request"
+              >
+                {MW.withdraw}
+              </Button>
+            )}
+          </span>
+        </div>
+      ) : null}
+    </>
+  );
+
   const historyGroups = groupHistoryChronology(d.history ?? []);
 
   return (
@@ -4100,7 +4154,7 @@ function ManualPurchaseObject({
           {/* ① REQUEST — the six authoritative facts, in the Card 06 order:
               Proceed Date · Delivery Date · Need for · For · Deliver To ·
               Requested By. */}
-          <Block title={MW.secRequest}>
+          <Block title={MW.secRequest} headerSlot={withdrawDoor}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="mp-detail-facts">
               <Fact label={MW.colProceedDate} testId="mp-detail-proceed-date">
                 {fmtDate(request.created_at.slice(0, 10))}
@@ -4113,18 +4167,23 @@ function ManualPurchaseObject({
                      given an invented Order By (Card 06 §6). */
                   <span className="text-base-600">{MW.notRecorded}</span>
                 )}
-                {/* The quiet derived timing fact — `Order by {date}`; when
-                    passed, the fact states `Order date passed` first. No
-                    Object Issue PO button arrives with it. */}
-                {orderBy != null ? (
-                  <span className="block text-label text-base-600" data-testid="mp-detail-order-by">
-                    {timing === "order_date_passed" ? (
-                      <span className="block text-kit-red-11">{MW.orderDatePassed}</span>
-                    ) : null}
-                    {manualPurchaseOrderByLine(fmtDate(orderBy))}
-                  </span>
-                ) : null}
               </Fact>
+              {/* ONE TITLE, ONE BOX (owner, 2026-09-26): the derived `Order By`
+                  date and the `Order timing` state are their own facts, never
+                  stacked under Delivery Date. No Object Issue PO button
+                  arrives with them. */}
+              {orderBy != null ? (
+                <Fact label={MW.colOrderBy} testId="mp-detail-order-by">
+                  {fmtDate(orderBy)}
+                </Fact>
+              ) : null}
+              {orderBy != null && timing ? (
+                <Fact label={MANUAL_PURCHASE_RAIL.timing.heading} testId="mp-detail-order-timing">
+                  <span className={timing === "order_date_passed" ? "text-kit-red-11" : undefined}>
+                    {MANUAL_PURCHASE_RAIL.timing.rows.find((row) => row.state === timing)?.word ?? ""}
+                  </span>
+                </Fact>
+              ) : null}
               <Fact label={MW.needFor}>{purposeLabelOf(request.purpose)}</Fact>
               <Fact label={MW.colFor} testId="mp-detail-for">
                 {forText}
@@ -4149,6 +4208,19 @@ function ManualPurchaseObject({
               {/* The real staff display name — never `operation`, an email, a
                   role or `(you)`. A shared-account record whose individual
                   cannot be recovered states the audit defect. */}
+              {/* International pattern (Odoo / NetSuite / SAP release): the
+                  approval STATE is a field on the record; the decision is an
+                  action. So the status lives here, and the Approval card
+                  below appears only when there is a decision to make or a
+                  decision record to read (owner, 2026-09-26). */}
+              <Fact label={MW.colApproval} testId="mp-approval-fact">
+                <span className="block">{approval.kind === "need_approval" ? MANUAL_PURCHASE_APPROVAL_WORDS.need_approval : approval.label}</span>
+                {approval.kind === "need_approval" && approverLine ? (
+                  <span className="block text-meta text-base-600" data-testid="mp-detail-approver">
+                    {approverLine}
+                  </span>
+                ) : null}
+              </Fact>
               <Fact label={MW.colRequestedBy} testId="mp-detail-requested-by">
                 {d.requested_by_name ?? (
                   <span className="text-base-600">{MW.staffIdentityNotRecorded}</span>
@@ -4298,21 +4370,11 @@ function ManualPurchaseObject({
             )}
           </Block>
 
-          {/* ④ APPROVAL — always present: the decision is part of the object.
-              Content follows the fact and the caller's real authority. */}
+          {/* ④ APPROVAL — only when there is a decision to make here or a
+              decision record to read; the state itself is a Request fact. */}
+          {showDecision || approval.kind !== "need_approval" ? (
           <Block title={MW.secApproval}>
-            {approval.kind === "need_approval" && !showDecision ? (
-              <div className="flex flex-col gap-0.5" data-testid="mp-approval-fact">
-                <span className="text-body font-medium text-base-900">
-                  {MANUAL_PURCHASE_APPROVAL_WORDS.need_approval}
-                </span>
-                {approverLine ? (
-                  <span className="text-meta text-base-600" data-testid="mp-detail-approver">
-                    {approverLine}
-                  </span>
-                ) : null}
-              </div>
-            ) : approval.kind === "need_approval" && showDecision ? (
+            {approval.kind === "need_approval" && showDecision ? (
               <div className="flex flex-col gap-3" data-testid="mp-decision">
                 <ObjectTable
                   testId="mp-approval-table"
@@ -4426,7 +4488,7 @@ function ManualPurchaseObject({
               /* Decided, returned or withdrawn — the fact, the real actor and
                  time, and what the fact carries: the approved quantities, the
                  refusal reason, or the reason it came back. */
-              <div className="flex flex-col gap-2" data-testid="mp-approval-fact">
+              <div className="flex flex-col gap-2" data-testid="mp-approval-record">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-body font-semibold text-base-900">
                     {approval.label}
@@ -4487,50 +4549,8 @@ function ManualPurchaseObject({
                 ) : null}
               </div>
             )}
-            {/* R3 · `Withdraw request` — the requester's own door, only while
-                nothing is decided and no PO exists. It asks once more before
-                it acts, because a withdrawn request cannot come back. */}
-            {d.canWithdraw ? (
-              <div className="mt-3 flex flex-col gap-2 border-t border-base-200 pt-3" data-testid="mp-withdraw">
-                {withdrawError ? (
-                  <TwoLines
-                    testId="mp-withdraw-error"
-                    wrong={withdrawError.wrong}
-                    todo={withdrawError.todo}
-                  />
-                ) : null}
-                <span className="flex flex-wrap items-center gap-2">
-                  {confirmWithdraw ? (
-                    <>
-                      <Button
-                        variant="neutral"
-                        onClick={() => setConfirmWithdraw(false)}
-                        disabled={withdraw.isPending}
-                      >
-                        {MW.cancel}
-                      </Button>
-                      <Button
-                        variant="primary"
-                        loading={withdraw.isPending}
-                        onClick={() => void withdrawRequest()}
-                        data-testid="mp-withdraw-confirm"
-                      >
-                        {MW.withdraw}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="neutral"
-                      onClick={() => setConfirmWithdraw(true)}
-                      data-testid="mp-withdraw-request"
-                    >
-                      {MW.withdraw}
-                    </Button>
-                  )}
-                </span>
-              </div>
-            ) : null}
           </Block>
+          ) : null}
 
           {/* ⑤ PURCHASE ORDERS — read-only exact lineage. No Issue PO, no PO
               Duty, no consolidation, no price, no Receive, no PDF: issuance

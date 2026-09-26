@@ -3292,7 +3292,10 @@ describe("Card 05 · the object detail", () => {
     return await screen.findByTestId("mp-detail");
   }
 
-  it("renders the six sections, full width, in the Card's exact order", async () => {
+  it("renders the sections, full width, in the Card's exact order — Approval only when there is a decision to make or read", async () => {
+    /* Owner 2026-09-26: a waiting request shows its state as the Request
+       card's `Approval Status` fact; the Approval card appears for the
+       approver (the decision) and after a decision (the record). */
     const detail = await openObject();
     const blocks = [...detail.querySelectorAll("[data-block]")].map((b) =>
       b.getAttribute("data-block"),
@@ -3301,10 +3304,12 @@ describe("Card 05 · the object detail", () => {
       "Request",
       "Items Requested",
       "What We Already Have",
-      "Approval",
       "Purchase Orders",
       "History",
     ]);
+    const fact = within(detail).getByTestId("mp-approval-fact");
+    expect(fact.closest("[data-block]")?.getAttribute("data-block")).toBe("Request");
+    expect(fact).toHaveTextContent("Need approval");
     // ONE scroll — no tabs, no split preview, no centred narrow island.
     expect(within(detail).queryByRole("tablist")).toBeNull();
     expect(detail.querySelector(".max-w-\\[720px\\]")).toBeNull();
@@ -3615,10 +3620,9 @@ describe("Card 06 · the object's date facts", () => {
       fmtDate("2026-09-12"),
     );
     // The derived timing fact — quiet, and NOT past due at the server's date.
-    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(
-      `Order by ${fmtDate("2026-09-01")}`,
-    );
-    expect(screen.getByTestId("mp-detail-order-by").textContent).not.toContain(
+    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(fmtDate("2026-09-01"));
+    // One title, one box (owner 2026-09-26): the timing state is its own fact.
+    expect(screen.getByTestId("mp-detail-order-timing").textContent).not.toContain(
       "Order date passed",
     );
     // Retired words never return to this object.
@@ -3637,9 +3641,9 @@ describe("Card 06 · the object's date facts", () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
-    const timing = screen.getByTestId("mp-detail-order-by");
+    const timing = screen.getByTestId("mp-detail-order-timing");
     expect(timing).toHaveTextContent("Order date passed");
-    expect(timing).toHaveTextContent(`Order by ${fmtDate("2026-09-01")}`);
+    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(fmtDate("2026-09-01"));
     // Still no object-side Issue PO door arrives with the fact (Card 05/06).
     expect(screen.queryByTestId("mp-issue-selected")).toBeNull();
   });
@@ -3713,7 +3717,11 @@ describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by
        so no anchor vocabulary was invented for this. */
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
     const target = scrollIntoView.mock.instances[0] as Element;
-    expect(target.getAttribute("data-block")).toBe("Approval");
+    /* The approver lands on the Approval card; anyone else on the Request
+       card's `Approval Status` fact (owner, 2026-09-26). */
+    expect(
+      target.getAttribute("data-block") ?? target.getAttribute("data-testid"),
+    ).toMatch(/^(Approval|mp-approval-fact)$/);
   });
 });
 
