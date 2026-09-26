@@ -453,6 +453,16 @@ called a Receipt. Inspect is read-only (Receipt/customer/amount once · allocate
 amounts · Evidence `View` · paid date and time · actual recorder · `Open payment`) with no Record,
 Edit, Correct, Void or WhatsApp control.
 
+### Payment Records and Settings — reviewed 2026-09-26, three corrections, otherwise unchanged
+
+Payment Records (the per-receipt ledger) and `Settings → Payments` keep their 2026-09-12 rulings.
+The 2026-09-26 review changes three things: (1) the Payment Record object's `Actions` section
+offers `Send receipt and invoice` once the order is paid in full (before that, `Send receipt`);
+(2) `Hold delivery` / `Remove hold` (the Finance exception) leave the Payment Record's overflow
+and sit on the Payment PAGE's `⋮`, because the hold is about the order, not one receipt;
+(3) `Void and replace` on an Invoice resolves the Payment Approver duty the same way Payment
+Records already does, not principal-only.
+
 ### The Payment Record object
 
 Full-width, one scroll, no tabs. Header: `Receipt No · Customer` / `SO No` / `Payment recorded`
