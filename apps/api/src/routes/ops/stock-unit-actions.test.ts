@@ -7,7 +7,7 @@ import type { AppEnv } from "../../types";
 
 /**
  * Unit Detail `⋮` — Report a problem · Make available for sale · Count again
- * (Stock MASTER §6 · §7; migration 0588).
+ * (Stock MASTER §6 · §7; migration 0589).
  *
  * What these tests hold:
  *  1. Report a problem goes through ONE door, `stock_unit_report_problem`,

@@ -798,7 +798,7 @@ result `Received` makes a Unit `Available` automatically (SAP unrestricted stock
 receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
 the way back from `Cannot sell`.
 
-**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT 2026-09-26 (migration 0588;
+**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT 2026-09-26 (migration 0589;
 authenticated production walk owed).** The page is the Sales Order object page's grammar (owner
 ruling 2026-09-26, Law C: one header, never a lookalike): the header row reads
 `← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are blue-titled blocks, and an old

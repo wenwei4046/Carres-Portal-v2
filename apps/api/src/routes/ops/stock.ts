@@ -380,7 +380,7 @@ opsStockRouter.get("/register/:unitCode/movements", requireOperationOrPrincipal,
 // =====================================================================
 // Unit Detail `⋮` — Report a problem · Make available for sale · Count again
 // Stock MASTER §6 · §7 · §12.4 (owner rulings 2026-09-25, design approved
-// 2026-09-26). Migration 0588.
+// 2026-09-26). Migration 0589.
 // =====================================================================
 
 const UNIT_ACTION_SELECT =
@@ -461,7 +461,7 @@ opsStockRouter.get("/register/:unitCode/issues", requireOperationOrPrincipal, as
   return c.json({ issues: await openIssuesForUnit(sb, unit.id) });
 });
 
-// POST /register/:unitCode/report-problem — ONE door (0588): the Issue and the
+// POST /register/:unitCode/report-problem — ONE door (0589): the Issue and the
 // derived protective control commit together or not at all.
 opsStockRouter.post("/register/:unitCode/report-problem", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, unitProblemReportInputSchema);
@@ -507,7 +507,7 @@ opsStockRouter.post("/register/:unitCode/report-problem", requireOperationOrPrin
   }, result.replayed ? 200 : 201);
 });
 
-// POST /register/:unitCode/make-available — the way back from Cannot sell (0588).
+// POST /register/:unitCode/make-available — the way back from Cannot sell (0589).
 opsStockRouter.post("/register/:unitCode/make-available", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const unit = await unitForAction(sb, c.req.param("unitCode"));

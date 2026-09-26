@@ -76,7 +76,7 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
 });
 
 /** POST /evidence/upload-url — one signed slot in the private `issue-evidence`
- *  bucket (0588). The server names the object key; the browser uploads with
+ *  bucket (0589). The server names the object key; the browser uploads with
  *  the slot's token and records the path as the proof line. */
 router.post("/evidence/upload-url", requireOperationOrPrincipal, async (c) => {
   const raw = await c.req.json<{ mimeType?: string; scope?: { kind?: string; id?: string } }>().catch(() => ({} as { mimeType?: string; scope?: { kind?: string; id?: string } }));
