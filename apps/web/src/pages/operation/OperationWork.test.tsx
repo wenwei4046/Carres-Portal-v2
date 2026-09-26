@@ -217,7 +217,8 @@ describe("Operation Work — one server feed", () => {
     expect(within(toolbar).queryByTestId("work-filters-toggle")).toBeNull();
     expect(within(toolbar).getByTestId("work-view-mine").className).toContain("h-[34px]");
     /* The scope tabs and the search sit over the picker column (Jess, 2026-09-26). */
-    expect(within(screen.getByTestId("work-list")).getByRole("searchbox")).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).toBeNull(); // no search on Work (Jess, 2026-09-26)
+    expect(screen.getByTestId("work-list").className).toContain("bg-white");
     expect(within(screen.getByTestId("work-list")).getByTestId("work-toolbar")).toBeInTheDocument();
     /* No `Covering` button (Jess, 2026-09-26): cover shows on the row. */
     expect(within(toolbar).queryByRole("button", { name: "Covering" })).toBeNull();
@@ -263,7 +264,6 @@ describe("Operation Work — one server feed", () => {
     show("/operation?tab=work&q=Acme&module=payment&when=no_date");
     expect(screen.queryByTestId("work-row-SO-1318-ask_delivery_date")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-row-INV-2041-collect")).toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: "Search work…" })).toHaveValue("Acme");
   });
 
   it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {

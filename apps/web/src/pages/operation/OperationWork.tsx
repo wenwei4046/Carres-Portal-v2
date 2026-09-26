@@ -29,7 +29,6 @@ import { orderActionLines, workspaceDutyLabelOf, type OperationWorkItem, type Op
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
-import SearchInput from "@/components/kit/SearchInput";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
@@ -515,7 +514,7 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
+      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
@@ -595,7 +594,11 @@ export default function OperationWork() {
           activePanel={activePanel}
           railBeside={railVisible}
           list={(
-            <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
+            {/* The picker is ONE white card, like every card on the right (Jess,
+                2026-09-26: "why middle is not white?"). No search, no Clear
+                all: the rail's own rows reset themselves, the header's
+                Jump to… finds a record. */}
+            <div className="flex min-h-0 flex-1 flex-col rounded-work border border-work-line bg-white px-3 pt-2" data-testid="work-list">
                     {/* The picker's own controls, over the picker (Jess, 2026-09-26:
                         "My Work, Team Work is under middle card"): the scope tabs on
                         one line, the search on the next; never a bar across the
@@ -645,28 +648,6 @@ export default function OperationWork() {
                     · Clear
                   </button>
                 )}
-                {(search || when !== "all" || moduleFilter !== "all" || params.get("status") || day !== "focus") && (
-                  <button
-                    type="button"
-                    onClick={() => setParams((before) => {
-                      const next = new URLSearchParams(before);
-                      for (const key of ["q", "when", "module", "status", "owner", "day", "month", "selected"]) next.delete(key);
-                      return next;
-                    }, { replace: true })}
-                    className="ml-auto h-9 px-2 text-control text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12"
-                  >
-                    Clear all
-                  </button>
-                )}
-                <div className="basis-full">
-                  <SearchInput
-                    toolbar
-                    id="work-search"
-                    value={search}
-                    onChange={(event) => updateParam("q", event.target.value)}
-                    placeholder="Search work…"
-                  />
-                </div>
               </section>
 
               {/* One line: the chosen Date (Jess, 2026-09-26 — the calendar
