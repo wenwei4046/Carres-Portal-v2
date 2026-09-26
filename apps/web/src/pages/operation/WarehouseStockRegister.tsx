@@ -234,11 +234,12 @@ export default function WarehouseStockRegister() {
   const dateColumn = (
     key: "goodsReceivedDate" | "shipDate" | "soDate" | "poDate" | "expectedArrival" | "lastVerifiedAt" | "lastEventAt",
     label: string,
-    options: { absent?: string; defaultHidden?: boolean; chooserGroup: string; width?: number },
+    options: { absent?: string; defaultHidden?: boolean; chooserGroup: string; width?: number; headerLines?: readonly [string, string] },
   ): DataGridColumn<StockRegisterUnit> => ({
     key,
     label,
-    width: options.width ?? 128,
+    headerLines: options.headerLines,
+    width: options.width ?? 104,
     sortable: true,
     filterType: "date",
     defaultHidden: options.defaultHidden,
@@ -257,7 +258,10 @@ export default function WarehouseStockRegister() {
 
   const columns: DataGridColumn<StockRegisterUnit>[] = useMemo(
     () => [
-      dateColumn("goodsReceivedDate", "Goods Received Date", { absent: "Not received", chooserGroup: "Dates", width: 150 }),
+      // A governed header sets the column's minimum width; the two-line
+      // presentation keeps the label and recovers the width a one-line
+      // `Goods Received Date` would spend (Receiving does the same).
+      dateColumn("goodsReceivedDate", "Goods Received Date", { absent: "Not received", chooserGroup: "Dates", width: 112, headerLines: ["Goods Received", "Date"] }),
       dateColumn("shipDate", "Ship Date", { chooserGroup: "Dates" }),
       {
         key: "so",
@@ -272,7 +276,8 @@ export default function WarehouseStockRegister() {
       {
         key: "inventoryStatus",
         label: "Inventory Status",
-        width: 130,
+        headerLines: ["Inventory", "Status"],
+        width: 108,
         sortable: true,
         filterType: "enum",
         chooserGroup: "Unit",
@@ -290,6 +295,8 @@ export default function WarehouseStockRegister() {
       {
         key: "stockCondition",
         label: "Stock Condition",
+        headerLines: ["Stock", "Condition"],
+        // `Waiting inspection` is the longest governed word; it is never cut.
         width: 140,
         sortable: true,
         filterType: "enum",
@@ -301,7 +308,8 @@ export default function WarehouseStockRegister() {
       {
         key: "poNo",
         label: "PO No / Ref No",
-        width: 150,
+        headerLines: ["PO No /", "Ref No"],
+        width: 130,
         sortable: true,
         chooserGroup: "Documents",
         searchValue: (u) => u.poNo ?? "",
@@ -342,7 +350,7 @@ export default function WarehouseStockRegister() {
       {
         key: "item",
         label: "Item",
-        width: 230,
+        width: 210,
         sortable: true,
         chooserGroup: "Unit",
         overflowText: (u) => `${u.productName ?? u.sku} · ${u.sku}${u.qty > 1 ? ` ×${u.qty}` : ""}`,
@@ -370,7 +378,8 @@ export default function WarehouseStockRegister() {
       {
         key: "site",
         label: "Stock Location",
-        width: 140,
+        headerLines: ["Stock", "Location"],
+        width: 130,
         sortable: true,
         filterType: "enum",
         chooserGroup: "Movement",
@@ -386,7 +395,8 @@ export default function WarehouseStockRegister() {
       {
         key: "deliveryLocation",
         label: "Delivery Location",
-        width: 220,
+        headerLines: ["Delivery", "Location"],
+        width: 200,
         sortable: true,
         chooserGroup: "Movement",
         overflowText: (u) => u.deliveryLocation ?? "",
@@ -589,7 +599,7 @@ export default function WarehouseStockRegister() {
                 appearance="reference"
                 rows={rows}
                 columns={columns}
-                storageKey="carres.warehouse.inventory.v4"
+                storageKey="carres.warehouse.inventory.v5"
                 rowKey={(u) => u.id}
                 exportName="Inventory"
                 searchPlaceholder="Unit ID, item, SO No, PO No or supplier…"
