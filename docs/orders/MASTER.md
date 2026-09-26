@@ -509,13 +509,15 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   component is admitted. Several dealers together = `All dealers`.
 - **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
   "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
-  ① Four summary numbers for the window: `Not delivered` · `Reserved` · `Pending Delivery Qty` ·
-  `To buy` (unit line `Qty`). ② One stacked bar per month — green `Reserved`, blue `Pending
-  Delivery Qty`, amber `To buy` — the total above each bar, the three legend words the same three
-  words. ③ One table, ONE ROW PER MONTH (`Before {Mon YYYY}` · each month · `After {Mon YYYY}` ·
-  `No delivery date` · `Total`), columns `Month` · `Mattress` · `Bedframe` · `Sofa` · `Accessory` ·
-  `Not delivered` · `Reserved` · `Pending Delivery Qty` · `To buy`. No product/size expansion, no
-  second table under it. A month is a door: it opens `Order list` with `Customer Requested Delivery
+  **Corrected again the same day (Jess: "4 KPI is what? repeated?"): two blocks, not three.**
+  ① `This month · {Mon YYYY}` — THREE numbers for the current month (or the month the operator
+  chose): `Total Qty` · `Delivered` · `Not delivered`. They never repeat the table's `Total` row —
+  they are one month, the table is every month. No unit line; `Qty` is in the word. ② One table,
+  ONE ROW PER MONTH (`Before {Mon YYYY}` · each month · `After {Mon YYYY}` · `No delivery date` ·
+  `Total`), columns `Month` · `Mattress` · `Bedframe` · `Sofa` · `Accessory` · `Total Qty` ·
+  `Delivered` · `Not delivered` · `To buy`. **No bar chart, no legend** (withdrawn — one more thing
+  to read); `Reserved` and `Pending Delivery Qty` leave this view and stay SO Batch Purchase's,
+  reached by the door. No product/size expansion, no second table under it. A month is a door: it opens `Order list` with `Customer Requested Delivery
   Date` narrowed to that month. Under the table the one door `Open SO Batch Purchase →`. A cell is
   the physical pieces still owed to the customer in that month and category: the current effective
   Revision's `order_lines.qty` less pieces actually delivered (Stock's `delivered` Units bound by
