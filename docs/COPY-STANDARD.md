@@ -691,7 +691,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | Items panel Status | `Ready` · `Arriving {date}` · `Arriving after the requested date` · `No purchase order raised yet` · `Not received yet` |
 | Items panel Location | the place: `Carres Klang` · `With NETS Delivery` · `PJ Showroom`; never `Ready at Carres Klang Warehouse` |
 | Logistics Details pickup fact | `Handed over {date} {time} · {n} of {m} Units` · `Received by {partner} {time}` · `Pickup not recorded` |
-| An order nobody is assigned to | `Nobody assigned · system error` over `Report it to IT` (owner ruling 2026-09-26; `Nobody holds Delivery Duty.` and the Staff & Duties door are retired — an unowned order is a defect, not a Duty to fill) |
+| An order nobody is assigned to | `Nobody assigned to this order` over `Manager assigns in Sales Orders → Team` (owner ruling 2026-09-26; `Nobody holds Delivery Duty.` and the Staff & Duties door are retired — only a manager can add a person to the Operation pool or assign the order — not a Duty to fill) |
 
 **Do NOT use on Monitor:** `Paid in full` (that is the Sales Orders register's money word) ·
 `Payment pending` · `Needs attention` · `Attention` · `Alert` · `Checklist` · `Due` · `Next

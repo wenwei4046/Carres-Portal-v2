@@ -211,8 +211,8 @@ hook — that would mean the budget was never the cause.
 ## `collection-owner-unassigned-copy` — ✅ CLOSED 2026-09-26 by owner ruling
 
 Jess: *why no assign? meaning system error.* An order with no assigned person is a defect (every
-order is dealt to a person), so the surface says so and asks for a report, not for a Duty holder:
-**`Nobody assigned · system error`** over **`Report it to IT`**. Replaces `Nobody holds Delivery
+order is dealt to a person), so the surface names the manager's door, not a Duty holder:
+**`Nobody assigned to this order`** over **`Manager assigns in Sales Orders → Team`**. Replaces `Nobody holds Delivery
 Duty.` / `Set the holder in Workspace → Staff & Duties` in COPY-STANDARD, Delivery §13.1, Payment
 §3 and Workspace; the code constants (`NO_DELIVERY_DUTY_HOLDER`, `SET_HOLDER_DOOR` in
 `packages/shared/src/payment-collection-owner.ts`) change in the Delivery build's first scope.

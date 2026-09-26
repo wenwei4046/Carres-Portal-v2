@@ -135,7 +135,7 @@ order enters Operations, `ops_order_control.assigned_staff` names the one normal
 order, customer, delivery and ordinary collection work. The Work Engine routes today's action to
 that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
 Duty is no longer the routine owner. It remains only the explicit fallback when a Sales Order has
-no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody assigned · system error` (owner ruling 2026-09-26)
+no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody assigned to this order` (owner ruling 2026-09-26)
 and `Set the holder in Workspace → Staff & Duties`. Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
 

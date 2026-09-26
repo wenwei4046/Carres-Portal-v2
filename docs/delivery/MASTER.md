@@ -1729,7 +1729,7 @@ authorised evidence but never becomes the order owner; managers are never dealt 
 handover changes the Sales Order PIC and its append-only responsibility evidence together.
 
 Delivery Duty is no longer the routine owner. It is used only when the Sales Order has no PIC so
-the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody assigned · system error` over `Report it to IT` (owner ruling 2026-09-26: every order is dealt to a person, so an unowned order is a defect, never a Duty to fill — `Nobody holds Delivery Duty.` and its Staff & Duties door are retired). Once a PIC exists, every open
+the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody assigned to this order` over `Manager assigns in Sales Orders → Team` (owner ruling 2026-09-26: the system deals every order to a person and only a manager can add or assign one, so the line names the manager's door, never a Duty to fill — `Nobody holds Delivery Duty.` and its Staff & Duties door are retired). Once a PIC exists, every open
 and future routine Delivery action resolves to that PIC and cover. Governed delivery-charge
 exceptions continue to route to `delivery_charge_approver`. Corrections of saved facts,
 exceptional proof and refusal closure without an approved action definition enter no engine and
