@@ -23,6 +23,9 @@
   .btn{height:32px;padding:0 12px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
   .btn.sm{height:28px;font-size:12px;padding:0 10px}
+  .bar{display:flex;align-items:center;gap:12px;margin:16px 16px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-control);background:#fff;font-size:13px;line-height:18px}
+  .bar.o{border-color:#f5d78e;background:#fff7c2}.bar.r{border-color:#f4a9a8;background:#feebec}.bar.g{border-color:#a8dcb5;background:#e6f6eb}
+  .bar .fact b{font-weight:600}.bar .bbtns{margin-left:auto;display:flex;gap:6px}
   .stage{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;min-width:1024px;align-items:start}
   .work{display:flex;flex-direction:column;gap:12px;min-width:0}
   /* Sales Order page block grammar: rounded-card, blue text-strong title with a hairline, 3-column label-over-field grid, kit readonly-field boxes */
@@ -77,9 +80,9 @@
     <header class="dest">
       <a class="back" href="monitor-status-rail.html">← Monitor</a>
       <h1><span class="so">SO-1405</span><span class="cust">SITI AMINAH</span></h1>
-      <span class="status o">Customer promised to pay today</span>
-      <div class="doors"><button class="btn">Print ▾</button><button class="btn p">Ask customer to pay</button><button class="btn" aria-label="More actions" title="Record payment · Record the result · Create payment link · Statement">⋮</button></div>
+      <div class="doors"><button class="btn">Print ▾</button><button class="btn" aria-label="More actions" title="Record payment · Create payment link · Statement">⋮</button></div>
     </header>
+    <div class="bar o" role="status"><span class="fact"><b>Customer promised to pay today</b> · RM 2,500.00 unpaid · Payment due Tue, 22 Sep</span><span class="bbtns"><button class="btn sm">Record the result</button><button class="btn sm p">Ask customer to pay</button></span></div>
     <div class="stage">
       <div class="work">
         <section class="blk"><h2>Money</h2>

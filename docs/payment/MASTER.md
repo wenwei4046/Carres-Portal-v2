@@ -382,11 +382,17 @@ Document`. Nothing is done there. **Clicking `SO No` opens the Payment page**
 (`/finance/monitor/{orderId}`, back word `Monitor`, which restores the picked day, status, filters
 and scroll). The page follows the Sales Order page's kit exactly (owner instruction 2026-09-26):
 
-- **Header** (one row, the SO page's own slots): `← Monitor` · `SO-{n} · {customer}` · the status
-  word in the status slot (the Monitor's `Payment timing` fact, e.g. `Customer promised to pay
-  today`) · `Print ▾` · ONE blue action (`Ask customer to pay` when the clock admits asking, else
-  `Record payment`) · `⋮` holding `Record payment` · `Record the result` · `Create payment link` ·
-  `Statement`. There is no `What to do` block: the status and the one act ARE the header.
+- **Header** (one row, the SO page's own slots): `← Monitor` · `SO-{n} · {customer}` · `Print ▾` ·
+  `⋮` (`Record payment` · `Create payment link` · `Statement`). Identity only.
+- **Action bar (owner approval 2026-09-26)** — one row under the header, above every block, drawn
+  ONLY when the order needs a hand today: the `Payment timing` fact on the left (`{fact} ·
+  RM {x} unpaid · Payment due {day}`), the acts on the right, the ONE blue among them. Tone is one
+  status colour: red for `Payment should have been received`, amber for `Ask customer today` ·
+  `Payment due today` · `Customer promised to pay today` · `Storage Invoice not paid`, green for
+  `Paid in full` with `Send receipt and invoice`. `Ask customer to pay` (blue) · `Record the result`
+  are its acts; `Record payment` stays in `⋮` unless the fact is money received. A waiting order
+  (`Arrival not confirmed` · `No delivery date` · `Payment due later`) has NO bar — one grey line
+  under Money says why. The same sentence is the Monitor cell, this bar and the Work card.
 - **Left half, top to bottom, each a rounded-card block with the blue `text-strong` title and its
   hairline:** `Money` (the SO page's payment-table style: `Goods` · `Storage` · `Total payable` ·
   `Paid to date` · `Balance due`, then one grey line `Payment due {day} · Collection owner {name}`)
