@@ -798,9 +798,28 @@ result `Received` makes a Unit `Available` automatically (SAP unrestricted stock
 receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
 the way back from `Cannot sell`.
 
-**UNIT DETAIL — owner rulings 2026-09-25; the four sections and their words BUILT 2026-09-26, the
-`⋮` actions (`Report a problem` · `Make available for sale` · `Count again`) APPROVED TARGET / NOT
-BUILT.** Titled `{Unit ID} ·
+**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT 2026-09-26 (migration 0588;
+authenticated production walk owed).** The page is the Sales Order object page's grammar (owner
+ruling 2026-09-26, Law C: one header, never a lookalike): the header row reads
+`← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are blue-titled blocks, and an old
+reference the portal never held prints `{ref} · not in this portal` instead of `No SO`. The
+`⋮` holds exactly three acts. **`Report a problem`** asks three things — `What did you see?`
+(`Damaged` · `Not found` · `Wrong item` · `Missing component` · `Label / Unit ID problem` ·
+`Something else`), at least one `Photo` (or video) and `What happened, in one sentence` — prints the
+consequence before submit, and writes through the ONE Issue door (`stock_unit_report_problem` →
+`issue_record_issue`) with the derived control in the same transaction: a free Unit enters the
+inspection hold and reads `Cannot sell · Waiting inspection`; a reserved Unit keeps its Sales Order
+(linked on the Issue, `Sales Order {SO No} is at risk`); observed damage is written to
+`Stock Condition`. The first action routes to GRN Duty at the Site, due the next working day, in the
+governed grammar (`Check the damage on {Unit ID} and record the result` · `Look for {Unit ID} at
+{Site} and scan it again` · …), and appears in `Current work` and in Work. **`Make available for
+sale`** (only while `Cannot sell`) prints five checks — Stock Location recorded · no reported
+problem open · not in repair · not on the road · no Sales Order reservation — names the failing
+one, and on Confirm resolves the claimless hold and, for a `Damaged` Unit, records the clearance
+(`sale_cleared_at`) so the availability arithmetic reads `Available` while `Stock Condition` keeps
+saying `Damaged`; a later hold or repair clears it again. **`Count again`** (only while an open
+`Not found` report names the Unit) completes the current look through the Issue Tracker's one
+result door and opens the next dated look. Photos live in the private `issue-evidence` bucket. Titled `{Unit ID} ·
 {Item}`, `← Inventory` returns to the register with its filters and position. Four sections, one
 scroll, these words: **`Stock Details`** (Inventory Status · Stock Condition · Stock Location ·
 Ownership · Goods Received Date — the receipt date is the proof the Unit was seen; there is no

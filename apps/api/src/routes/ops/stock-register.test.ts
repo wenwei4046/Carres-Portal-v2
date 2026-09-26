@@ -223,6 +223,13 @@ describe("GET /register — the one current listing", () => {
       const correction = migration("0453_a_quantity_row_is_keyed_not_identified");
       await db.exec(statementOf(correction, "create or replace view public.stock_unit_availability_v", "FROM ops_stock_items i;"));
       await db.exec(statementOf(correction, "create or replace view public.stock_unit_register_v", "LIMIT 1) e ON true;"));
+      // 0588 · the clearance fact joins the arithmetic; the availability view
+      // calls the five-argument form. Real committed SQL, in order.
+      const clearance = migration("0588_a_unit_problem_is_reported_through_the_issue_door");
+      await db.exec(statementOf(clearance, "alter table public.ops_stock_items", "sale_cleared_at timestamptz;"));
+      await db.exec(statementOf(clearance, "create or replace function public.unit_availability(\n  p_status       text,\n  p_needs_repair boolean,\n  p_hold_reason  text,\n  p_condition    text,\n  p_sale_cleared boolean", "$$;"));
+      await db.exec(statementOf(clearance, "-- The four-argument form", "$$;"));
+      await db.exec(statementOf(clearance, "create or replace view public.stock_unit_availability_v", "FROM ops_stock_items i;"));
       await db.exec(verifyInventorySql);
       const response = await app.request("/api/ops/stock/register", { headers }, env);
       expect(response.status).toBe(200);

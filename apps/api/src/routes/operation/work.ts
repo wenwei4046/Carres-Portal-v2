@@ -1744,6 +1744,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     dutyResolutions: {
       ...(issueTriageDuty ? { issue_triage_duty: issueTriageDuty } : {}),
       ...(issueReviewApprover ? { issue_review_approver: issueReviewApprover } : {}),
+      // 0588 — a Unit problem's check is GRN Duty's (Stock MASTER §6).
+      ...(grnDuty ? { grn_duty: grnDuty } : {}),
     },
     today,
     observedAt,

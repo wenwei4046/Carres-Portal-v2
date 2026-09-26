@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { addIssueMoneyInputSchema, buildIssueEnglish, createIssueInputSchema, issueActionResultInputSchema } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { resolveActorNames } from "../../lib/actor-names";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 const router = new Hono<AppEnv>();
@@ -73,6 +73,22 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
   }
   const issue = data as { id: string; issue_no: string; official_english: string; replayed: boolean };
   return c.json({ id: issue.id, issueNo: issue.issue_no, officialEnglish: issue.official_english, replayed: issue.replayed === true }, issue.replayed ? 200 : 201);
+});
+
+/** POST /evidence/upload-url — one signed slot in the private `issue-evidence`
+ *  bucket (0588). The server names the object key; the browser uploads with
+ *  the slot's token and records the path as the proof line. */
+router.post("/evidence/upload-url", requireOperationOrPrincipal, async (c) => {
+  const raw = await c.req.json<{ mimeType?: string; scope?: { kind?: string; id?: string } }>().catch(() => ({} as { mimeType?: string; scope?: { kind?: string; id?: string } }));
+  const mime = raw.mimeType ?? "";
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : mime === "video/mp4" ? "mp4" : mime === "video/quicktime" ? "mov" : mime === "image/jpeg" ? "jpg" : null;
+  if (!ext) return c.json({ error: "invalid_param", code: "invalid_param", message: "Only JPEG, PNG, WebP, MP4 or MOV evidence is accepted" }, 422);
+  const kind = /^[a-z_]+$/.test(raw.scope?.kind ?? "") ? raw.scope!.kind! : "issue";
+  const id = /^[0-9a-f-]{36}$/i.test(raw.scope?.id ?? "") ? raw.scope!.id! : "unscoped";
+  const path = `${kind}/${id}/${crypto.randomUUID()}.${ext}`;
+  const { data, error } = await adminClient(c.env).storage.from("issue-evidence").createSignedUploadUrl(path);
+  if (error) return c.json({ error: "sign_upload_failed", code: "sign_upload_failed", message: error.message }, 500);
+  return c.json({ token: data.token, path: data.path });
 });
 
 router.get("/reports/:partyId", requireOperationOrPrincipal, async (c) => {

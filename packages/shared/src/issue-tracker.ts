@@ -27,7 +27,9 @@ export function buildIssueEnglish(raw: IssueIntake): string {
   return `${input.affectedObject} ${problemText[input.observedProblem]} when ${where} ${link} on ${englishDate(input.observedOn)}. ${proof} were added by ${input.foundByName}. ${input.impact}.`;
 }
 
-export const issueActionOwnerRules = ["issue_triage_duty", "issue_review_approver"] as const;
+/** 0588 — a Unit problem reported from Warehouse routes its check to GRN Duty
+ *  (Stock MASTER §6), so the Duty rule joins the two Issue Tracker rules. */
+export const issueActionOwnerRules = ["issue_triage_duty", "issue_review_approver", "grn_duty"] as const;
 export type IssueActionOwnerRule = (typeof issueActionOwnerRules)[number];
 
 const governedActionSchema = z.string().trim().min(4).refine(

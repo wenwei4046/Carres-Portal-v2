@@ -276,6 +276,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       { id: "r2", unitId: STOCK_UNIT.id, direction: "in", siteId: "wh-1", siteName: "Carres Klang Warehouse", at: "2026-09-05", reference: "GRN-2", href: "/operation?tab=receiving&session=r2", actorId: "actor" },
       { id: "d2", unitId: STOCK_UNIT.id, direction: "out", siteId: null, siteName: null, at: "2026-09-06T10:00:00Z", reference: "DO-1", href: "/operation?tab=warehouse-outbound&do=DO-1", actorId: "actor" },
     ] });
+    if (url.includes("/register/") && url.endsWith("/issues")) return json({ issues: [] });
+    if (url.includes("/register/") && url.endsWith("/movements")) return json({ evidence: [] });
     if (url.includes("/register/")) return json({ unit: STOCK_UNIT, events: [] });
     /* Owner rulings 2026-09-25: one row per Unit with the eleven single-fact
        columns — held goods, a reserved Unit, one on the road, one that cannot
