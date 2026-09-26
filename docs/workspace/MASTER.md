@@ -1091,9 +1091,16 @@ multi-supplier Supplier card, compact Order Route and their shared communication
 5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
 6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
 
-The selected-work summary block (problem · action · `Open {object}`) is retired for order missions
-(Jess, 2026-09-26: with the parties below it said everything twice); it is drawn only for work that
-names no Sales Order. No section is dragged or reordered; sections are always open on a desktop.
+**THE ACTION CARD IS BACK ON TOP — owner ruling, Jess 2026-09-26 evening ("I lost … I don't know why
+I see so many info for what"; she chose option C with hide/expand).** The right panel is two layers:
+**do**, then **look**. The first card is the selected work itself — COPY's own sections `ACTION`
+(the sentence, the party, `due {date}`, red when missed) · `CURRENT FACT` · `FINISH WHEN` ·
+`WHAT HAPPENS NEXT` (only when the source supplies one) · `COMMUNICATION` (the owning module's
+prepared message, `Open WhatsApp group` / `Open WhatsApp` as the panel's ONE blue, `Copy message`,
+and the door that records the answer). Buttons live only here. Below it every information card —
+Sales Order · Logistics · Customer · Supplier — is collapsed to one line and expands on click, one
+at a time, exactly as §5.9 built them; the Order Route stays open and each point explains itself on
+click. The 2026-09-26 afternoon retirement of the summary block is overturned by this ruling. No section is dragged or reordered; sections are always open on a desktop.
 The Route says which mission obligation needs attention; the party card says who must answer and
 exposes the owning action. Only one party card expands at a time, and it remains expanded after a
 save or refresh. On a screen below 768px `Back to work` restores the same list position and filters.
