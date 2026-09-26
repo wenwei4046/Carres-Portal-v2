@@ -609,7 +609,8 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   is empty while the team has work: `0 for you · {n} for the team`, and the empty list offers
   `See Team Work`.
 - **Words:** `Covering` (not `Covered`; `Covering for others` wrapped the 941px toolbar) · rail section `Page` / `All pages` (not
-  Module) · header `Search` with no printed shortcut · `Help` and `Settings` beside their icons ·
+  Module) · header `Jump to…` with its keyboard hint (the `Search` rename was reverted by Jess
+  2026-09-26) · `Help` and `Settings` beside their icons ·
   the right rail names each icon.
 - **The Date rail** prints every count, `0` included; `Today` in words beside today's date;
   `No working date` always listed; two work weeks with a divider before the second Monday; the
