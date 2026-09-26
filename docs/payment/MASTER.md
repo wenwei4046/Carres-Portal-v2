@@ -140,10 +140,10 @@ timing` (red past the deadline, amber for a promise/ask day) — every other cel
 Columns, in exactly this order:
 
 ```text
-SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing | Owner
+SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing | Collection owner
 ```
 
-- **Owner** (new, 2026-09-25) — the acting person as avatar + name from the shared Work item (cover
+- **Collection owner** (new, 2026-09-25; the dictionary forbids a bare `Owner`) — the acting person as avatar + name from the shared Work item (cover
   ring when covered; `Not assigned` link when nobody resolves); empty on a `Wait` row. The action
   word is not repeated here: it is the expansion's blue door and the Work card's line.
 
@@ -244,6 +244,34 @@ MASTER's examples used to carry the full weekday (`Monday, 21 Sep`) while the re
 spelled `Mon, 21 Sep` through `fmtDate`, so the Monitor said `Sunday, 4 Oct` and the workspace the
 row opens said `Sun, 4 Oct` for the same day. COPY-STANDARD is explicit that a second date spelling
 is itself the defect, and the date law outranks a module's examples.
+
+### States, responsive behaviour and history — segments 7–9, persisted 2026-09-26
+
+**History (segment 7).** One append-only table per Sales Order, the same rows on the Monitor
+expansion, the Payment page and the Work Customer card: `Date · Event · Amount · By · Document`.
+Events and their documents: `Proceed` (SO No) · `Payment recorded` (Receipt No · `Print` · `Send
+receipt`) · `Payment message sent` (`WhatsApp screenshot`) · `Customer will pay on a date · promised
+{day}` · `Customer did not answer` · `Customer needs help` · `Customer disputes the amount` ·
+`Customer paid` (the customer's word, not money) · `Receipt and invoice sent` · `Invoice issued`
+(Invoice No · `Print`) · storage events (`Storage started` · `Free storage approved until {day}` ·
+`Stored goods checked`) · `Collection handed over · {from} → {to}` · `Payment voided` · `Allocation
+corrected`. `By` is the actual actor, `POS` for the deposit, `System` for an automatic Invoice.
+Newest first; the Monitor expansion shows the latest 5 with `Show all` opening the page.
+
+**Responsive (segment 8).** Monitor: 1440/1180 rail open, sheet scrolls sideways, `SO No` +
+`Customer` pinned; 820/743 rail collapsed to the 44px strip with the picked day/status repeated
+above the sheet; 390 rail as a drawer, `SO No` alone pinned, no page-level sideways scroll. Payment
+page: ≥1024 two halves (work left, paper right, 16px gap); below 1024 the paper stacks under the
+work; the header keeps the SO number whole and lets the customer name truncate; 390 buttons 40px,
+the `⋮` holds every secondary act.
+
+**States (segment 9).** Loading: skeleton rows at 40px and `Reading the collection desk…`, never a
+zero. Empty: `No customer money is needed right now.` / `No follow-up planned on {day}.` /
+`No paid orders yet.` Error: `The collection desk could not be loaded.` + `Try again`, the last
+good list kept. Permission (Finance): the same statuses from Payment's own read, no owner avatars,
+`Stock facts are Operation's.`, `Owner facts are Operation's.`; the page's acts hidden, the paper
+readable. Missing data: `No delivery date` · `Not assigned` → `Assign it in Sales Orders → Team` ·
+`No reference` · `No phone recorded`. A failed posting keeps everything typed and writes nothing.
 
 ### Monitor versus shared Work
 
@@ -346,32 +374,42 @@ working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
-**Owner approval 2026-09-26 (segments 1, 4 and 6 of the Payment Blueprint review) · APPROVED / NOT
-BUILT — the Sales Orders / Purchase Orders pattern.** The register row's `▸` expansion is a LOOK,
+**Owner approval 2026-09-26 (segments 1, 4, 5 and 6 of the Payment Blueprint review) · APPROVED /
+NOT BUILT — the Sales Orders / Purchase Orders pattern.** The register row's `▸` expansion is a LOOK,
 not a workplace: one nested read-only table in the register's own grammar (11px grey header, 13px
-cells, tabular numbers), the order's HISTORY newest first — `Date · What · Amount · By · Document`
-(receipts, sent messages, recorded answers, the issued Invoice). Nothing is done there. **Clicking
-`SO No` opens the Payment page** (`/finance/monitor/{orderId}`, back word `Monitor`, which restores
-the picked day, status, filters and scroll) — a 50/50 working page under UI MASTER §4.1's split rule,
-because every Payment act produces something the customer receives:
+cells, tabular numbers), the order's HISTORY newest first — `Date · Event · Amount · By ·
+Document`. Nothing is done there. **Clicking `SO No` opens the Payment page**
+(`/finance/monitor/{orderId}`, back word `Monitor`, which restores the picked day, status, filters
+and scroll). The page follows the Sales Order page's kit exactly (owner instruction 2026-09-26):
 
-```text
-← Monitor   SO-1405 · SITI AMINAH · Balance due RM 2,500.00       [Record payment] [Ask customer to pay ← blue] [⋯]
-LEFT — the work                                     RIGHT — the paper the customer receives
-WHAT TO DO   fact · one line · one button           default: the Sales Order document (prints Balance due)
-MONEY        Goods · Storage · Total payable ·      Ask customer to pay → the WhatsApp message, live
-             Paid · Balance due                     Record payment     → the Receipt, live
-STORAGE      {Group} · Day {n} · free until ·       Balance due RM 0   → the Invoice
-             next check · the two storage doors
-HISTORY      the same nested table, complete
-```
-
-Left column words are the register's; no nested cards; below 1024px the paper stacks under the
-work. `⋯` holds `Statement` · `Print` · `Create payment link`. The Work Customer card's Payment
-section is the LEFT column only (the right panel cannot host two halves); its `Open SO-{n} in
-Payments` door opens this page. Design record `docs/payment/design/` (`monitor-status-rail.html`
-for the register, `payment-page.html` for the page). Delivery's DO row keeps its in-row work
-because its acts need no customer paper; Payment's acts do — that is the one reason the two differ.
+- **Header** (one row, the SO page's own slots): `← Monitor` · `SO-{n} · {customer}` · the status
+  word in the status slot (the Monitor's `Payment timing` fact, e.g. `Customer promised to pay
+  today`) · `Print ▾` · ONE blue action (`Ask customer to pay` when the clock admits asking, else
+  `Record payment`) · `⋮` holding `Record payment` · `Record the result` · `Create payment link` ·
+  `Statement`. There is no `What to do` block: the status and the one act ARE the header.
+- **Left half, top to bottom, each a rounded-card block with the blue `text-strong` title and its
+  hairline:** `Money` (the SO page's payment-table style: `Goods` · `Storage` · `Total payable` ·
+  `Paid to date` · `Balance due`, then one grey line `Payment due {day} · Collection owner {name}`)
+  → `Storage` (only when a case exists; the block header's right side carries its two doors
+  `Request more free days` · `Check stored goods`; the body is the dictionary's three sentences
+  `{Group} · Day {n} · RM {x} so far` / `Free until {day}` / `Charge RM {x} every {n} calendar
+  days`) → `History` (the same table as the expansion, complete; events are dictionary words:
+  `Payment recorded` · `Payment message sent` · `Customer will pay on a date · promised {day}` ·
+  `Receipt sent` · `Invoice issued` · `Proceed`) → `Customer` (`Full name` · `Phone` ·
+  `Reference`, plain facts).
+- **No boxes:** the SO kit draws a bordered field only where a value is editable on that page;
+  nothing on the Payment page is edited in place, so every value is a plain fact. **No buttons in a
+  block body:** acts live in the header and in a block's own header line.
+- **Right half:** the paper the customer receives, one sheet with four tabs — `Sales Order`
+  (default; prints `Customer Requested Delivery Date`, `Total payable`, `Paid to date`, `BALANCE
+  DUE`) → `Message` while `Ask customer to pay` is open → `Receipt` while `Record payment` is
+  open → `Invoice` once `Balance due` is RM 0. Below 1024px the paper stacks under the work.
+- `Ask customer to pay`, `Record the result` and `Record payment` replace the LEFT half with their
+  existing compositions; the right half is their live paper. A recorded act adds one History row
+  and returns the left half. After a successful posting the blue becomes `Send receipt and
+  invoice`.
+- The Work Customer card's Payment section = the header's act and the History table (no paper);
+  its `Open SO-{n} in Payments` door opens this page. Design records `docs/payment/design/`.
 
 The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
 opens the Payment page; `?invoice=` is retired with the Invoice-keyed row): Delivery's `Items,

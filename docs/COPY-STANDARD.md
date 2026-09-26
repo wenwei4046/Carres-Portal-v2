@@ -2413,12 +2413,26 @@ it now has two words, and each appears once per screen:
 
 `RM {amount} still to collect` stays Delivery's own warning word (Delivery Monitor, Logistics card).
 
+### The Payment page and the History table — owner instruction 2026-09-26
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The page header | `← Monitor` · `SO-{n} · {customer}` · the `Payment timing` status word · `Print` · one blue (`Ask customer to pay` / `Record payment`) · `⋮` (`Record payment` · `Record the result` · `Create payment link` · `Statement`) | a `What to do` block · two blues · buttons inside a block body |
+| The left blocks, in order | **`Money`** · **`Storage`** · **`History`** · **`Customer`** | Details · Summary · Info |
+| Money rows | **`Goods`** · **`Storage`** · **`Total payable`** · **`Paid to date`** · **`Balance due`**; footer line `Payment due {day} · Collection owner {name}` | Amount needed · Outstanding · Owing |
+| Storage block doors | **`Request more free days`** · **`Check stored goods`** | Create Storage Invoice · Check the stored furniture (as a door word) |
+| History columns | **`Date · Event · Amount · By · Document`** | What · Who · Action · Notes |
+| History events | **`Proceed`** · **`Payment recorded`** · **`Payment message sent`** · **`Customer will pay on a date · promised {day}`** · **`Customer did not answer`** · **`Customer needs help`** · **`Customer disputes the amount`** · **`Customer paid`** · **`Receipt and invoice sent`** · **`Invoice issued`** · **`Storage started`** · **`Free storage approved until {day}`** · **`Stored goods checked`** · **`Collection handed over · {from} → {to}`** · **`Payment voided`** · **`Allocation corrected`** | Deposit received · Order proceeded · Reminder · Note |
+| History document words | `{Receipt No}` · `Print` · `Send receipt` · `WhatsApp screenshot` · `{Invoice No}` · `{SO No}` | Send (alone) · Screenshot (alone) · View |
+| Customer block | **`Full name`** · **`Phone`** · **`Reference`** · `No reference` · `No phone recorded` | Name · Contact · Ref |
+| The paper's tabs | **`Sales Order`** · **`Message`** · **`Receipt`** · **`Invoice`** | Preview · Document · PDF |
+
 ### PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12)
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The module heading and its two destinations | **`Payments`** · **`Monitor`** · **`Payment Records`** | Finance Portal · Invoices · Receipts · Order Payments · Collections desk |
-| Monitor columns, in order (owner ruling 2026-09-16) | **`SO No · Customer · Balance due · Items & Stock · Storage · Requested Delivery Date · Scheduled delivery · Payment timing · Owner`** — on the Sales Orders Register's 40px row, one fact per cell on one line (owner direction 2026-09-25; the 72px two-line row is retired; `Balance due` replaces `Amount needed`; `Owner` = avatar + name) | Amount needed (RETIRED 2026-09-25) · Goods · Customer delivery (both RETIRED 2026-09-16) · Stock readiness · Stock arrival · Next step · Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
+| Monitor columns, in order (owner ruling 2026-09-16) | **`SO No · Customer · Balance due · Items & Stock · Storage · Requested Delivery Date · Scheduled delivery · Payment timing · Collection owner`** — on the Sales Orders Register's 40px row, one fact per cell on one line (owner direction 2026-09-25; the 72px two-line row is retired; `Balance due` replaces `Amount needed`; `Collection owner` = avatar + name, never a bare `Owner`) | Amount needed (RETIRED 2026-09-25) · Goods · Customer delivery (both RETIRED 2026-09-16) · Stock readiness · Stock arrival · Next step · Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
 | SO No and Customer cells | line 1 **`SO-{n}`** (opens the Sales Order) over the customer's reference(s) **`TCF0541 · CR1122`**, nothing when none; line 1 the customer name over the phone. A cut value opens whole by click or keyboard | `SO-1217 TCF0541` on one line · a hover-only full value |
 | Items & Stock cell (Delivery's words) | **`Ready`** · **`Not ready`** over **`2 of 2`** · **`1 of 2 · 1 short`** · **`Arriving after the requested date`**; **`Delivered`** for a delivered order still owing; Finance reader **`Stock facts are Operation's.`**; a failed stock read **`Stock facts could not be loaded.`** The cell opens Delivery's **`Items, Services & Stock`** panel (`Item` · `Qty` · `Source` · `Status` · `Location`) | Goods ready · Received (for Ready) · Stock readiness · In stock · ETA |
 | Storage cell | **`No storage charge`** · **`Free until {day}`** · **`{Group} · Day {n} · RM {x} so far`** · **`Free request waiting for approval · Estimated charge RM {x}`** · **`Free storage approved until {day}`** · **`Storage Invoice issued · RM {x} not paid`** — on the 72px row the same words break onto two lines after the state (`Sofa · Day 15` / `RM 200.00 so far` · `Free storage approved` / `until {day}`); Search and Export keep the one sentence | Storage fee · Accrued · Pending waiver |
