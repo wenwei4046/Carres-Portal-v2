@@ -237,7 +237,7 @@ vi.mock("@/lib/queries", () => ({
   useRegisterLayouts: () => ({ data: { layouts: [], limit: 10 }, isLoading: false, isError: false }),
   useSaveRegisterLayout: () => ({ mutateAsync: vi.fn() }),
   useSetDefaultRegisterLayout: () => ({ mutateAsync: vi.fn() }),
-  useRecordSupplierDate: () => ({ mutate: supplierDateMutate, isPending: false }),
+  useRecordSupplierAnswers: () => ({ mutate: supplierDateMutate, isPending: false }),
   useRevisePo: () => ({ mutate: reviseMutate, isPending: false }),
   useSetPoTermsDays: () => ({ mutate: termsMutate, isPending: false }),
 }));
@@ -341,7 +341,7 @@ describe("Purchase Orders Register", () => {
     const railEl = screen.getByTestId("po-filter-rail");
     const headings = ["Supplier reply", "Receiving", "Supplier", "Supplier Deliver To"];
     for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
-    for (const gone of ["All purchase orders", "PDF not sent", "Version changed", "DOCUMENT STATE", "Completed", "Cancelled", "Clear filters"]) {
+    for (const gone of ["All purchase orders", "PDF not sent", "Version changed", "DOCUMENT STATE", "Completed", "Cancelled", "Clear filters", "Supplier has not confirmed the PO date"]) {
       expect(railEl).not.toHaveTextContent(gone);
     }
     const rail = within(railEl);
@@ -350,7 +350,7 @@ describe("Purchase Orders Register", () => {
        only `Date changed` names none of them, and the group heading that was
        meant to qualify it scrolls away. */
     for (const label of [
-      "Supplier has not confirmed the PO date",
+      "Confirm tomorrow's supplier delivery",
       "Supplier Confirmed Delivery Date changed",
       "Supplier delivery date passed",
       "Partly received",
@@ -380,9 +380,9 @@ describe("Purchase Orders Register", () => {
 
   it("SUPPLIER REPLY counts only the current version marked as sent with goods pending", () => {
     renderPage();
-    // V2 is not marked: it is nobody's supplier chase yet.
+    // V2 is not marked: it is nobody's supplier chase yet — no day-before check either.
     const rail = within(screen.getByTestId("po-filter-rail"));
-    expect(within(rail.getByRole("button", { name: /Supplier has not confirmed the PO date/ })).getByText("0")).toBeInTheDocument();
+    expect(within(rail.getByRole("button", { name: /Confirm tomorrow's supplier delivery/ })).getByText("0")).toBeInTheDocument();
   });
 
   it("the row's label and its active-condition chip are one sentence, written once", () => {
@@ -535,11 +535,17 @@ describe("Purchase Orders Register", () => {
     delete po.grns;
   });
 
-  it("the goods expansion reads Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items, read-only", () => {
+  it("the goods expansion reads Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items · Supplier Confirmed Delivery Date, read-only", () => {
     renderPage();
     const goods = screen.getByTestId("po-goods-PO-20260828-4827");
     const heads = [...goods.querySelectorAll("th")].map((th) => th.textContent);
-    expect(heads).toEqual(["Category", "Supplier", "Supplier Deliver To", "PO No / Unit ID", "Qty", "Items"]);
+    /* The seventh column — owner-approved 2026-09-25 (Purchasing §9.3): the
+       line's NEWEST supplier answer, read-only; the only write door is
+       `Record supplier answer` on the PO. */
+    expect(heads).toEqual(["Category", "Supplier", "Supplier Deliver To", "PO No / Unit ID", "Qty", "Items", "Supplier Confirmed Delivery Date"]);
+    /* The fixture's evidenced PO-level answer (legacy `shipping`, about the
+       PO date) answers every line that has no answer of its own. */
+    expect(screen.getByTestId("po-goods-supplier-date-line-1")).toHaveTextContent("Thu, 10 Sep");
     /* A TRUTH table: nothing here can commit a unit or buy anything. */
     expect(goods.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(goods).not.toHaveTextContent("Ready Stock");
@@ -633,101 +639,137 @@ describe("Purchase Orders Register", () => {
   });
 });
 
-vi.mock("@/components/ClaimPhotoUploadField", () => ({
-  default: ({ onChange }: { onChange: (paths: string[]) => void }) =>
-    <button onClick={() => onChange(["PO-20260828-4827/reply.png"])}>Upload reply evidence</button>,
+vi.mock("@/components/SupplierAnswerEvidenceUploadField", () => ({
+  default: ({ onChange, ariaLabel }: { onChange: (entries: { path: string; kind: "photo" | "pdf" }[]) => void; ariaLabel: string }) =>
+    <button onClick={() => onChange([{ path: ariaLabel === "DO file" ? "PO-20260828-4827/do.pdf" : "PO-20260828-4827/reply.png", kind: ariaLabel === "DO file" ? "pdf" : "photo" }])}>Upload {ariaLabel}</button>,
 }));
 
-describe("the evidenced supplier reply door", () => {
+describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
   function sent() { queryData.pos[0]!.sends[0]!.po_version = 2; }
-  function evidence() {
+  function who() {
     fireEvent.change(screen.getByLabelText("Recipient"), { target: { value: "Factory group" } });
-    fireEvent.change(screen.getByLabelText("Reported by"), { target: { value: "Factory staff" } });
-    fireEvent.change(screen.getByLabelText("Reported at"), { target: { value: "2026-08-28T10:00" } });
-    fireEvent.click(screen.getByText("Upload reply evidence"));
+    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Factory staff" } });
+    fireEvent.change(screen.getByLabelText("Answered by supplier on"), { target: { value: "2026-08-28T10:00" } });
   }
-  it("never offers RECORDING before this version was sent — history stays readable", () => {
-    /* 0430 — the record form still needs the current version's confirmed
-       send; but a recorded reply may never disappear behind a revision, so
-       the block itself renders as read-only history. */
+  const open = () => fireEvent.click(screen.getByTestId("po-supplier-reply-record"));
+  const kind = (value: string) => fireEvent.change(screen.getByTestId("po-answer-kind-line-1"), { target: { value } });
+
+  it("reads as ONE table — Item · Qty · To deliver · Supplier Confirmed Delivery Date · Last answer — and never offers recording before this version was sent", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    expect(screen.queryByTestId("po-supplier-date-input")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("po-supplier-date-save")).not.toBeInTheDocument();
-    expect(screen.getByTestId("po-supplier-reply-history")).toBeInTheDocument();
+    const table = screen.getByTestId("po-supplier-reply-table");
+    expect([...table.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["Item", "Qty", "To deliver", "Supplier Confirmed Delivery Date", "Last answer"]);
+    /* 3 ordered, 1 received → 2 to deliver; the legacy PO-level answer names the PO date. */
+    expect(screen.getByTestId("po-answer-still-line-1")).toHaveTextContent("2");
+    expect(screen.getByTestId("po-answer-date-line-1")).toHaveTextContent("Thu, 10 Sep");
+    /* Every Unit ID in full under its item (owner 2026-09-26). */
+    expect(screen.getByTestId("po-answer-units-line-1")).toHaveTextContent("U1-000-001 · U1-000-002");
+    expect(screen.queryByTestId("po-supplier-reply-record")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-supplier-reply-foot")).toHaveTextContent("Supplier DO · Not recorded");
   });
-  it("asks WHY only for a later date, pre-selects nothing, and sends one date for the server to classify", () => {
-    /* 0430 — the browser used to submit `answer: "delayed"` with a
-       pre-selected "Production Delay" the operator never chose. Now a later
-       date blocks the save until a reason is CHOSEN, and the wire carries the
-       date alone — classification is the server's. */
+
+  it("a later date asks WHY in the row, pre-selects nothing, and the Save button names the gap; the wire carries the line, the date and the reason", () => {
     sent(); queryData.pos[0]!.promises = [];
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    /* The input is LABELLED with whose date it is, not a bare "Date". */
-    expect(screen.getByTestId("po-supplier-date-input").closest("label")).toHaveTextContent("Supplier Confirmed Delivery Date");
-    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
-    expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Later than the PO date");
-    evidence();
-    /* Evidence complete, reason NOT chosen — the save must stay closed. */
-    expect(screen.getByTestId("po-supplier-date-reason")).toHaveValue("");
-    expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
-    /* 0585 · the eight governed reasons (owner ruling 2026-09-24). */
-    fireEvent.change(screen.getByTestId("po-supplier-date-reason"), { target: { value: "Material unavailable" } });
-    fireEvent.click(screen.getByTestId("po-supplier-date-save"));
+    expect(screen.getByTestId("po-answer-date-line-1")).toHaveTextContent("Not confirmed");
+    open();
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — answer a line or record the Supplier DO");
+    kind("new_date");
+    fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-15" } });
+    expect(screen.getByTestId("po-answer-reason-line-1")).toHaveValue("");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — choose why the supplier moved the date");
+    fireEvent.change(screen.getByTestId("po-answer-reason-line-1"), { target: { value: "Material unavailable" } });
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — add a WhatsApp screenshot");
+    fireEvent.click(screen.getByText("Upload Evidence"));
+    who();
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent(/^Save$/);
+    fireEvent.click(screen.getByTestId("po-answer-save"));
     expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
-      poVersion: 2, supplierDate: "2026-09-15", reason: "Material unavailable",
-      channel: "whatsapp", recipient: "Factory group", evidence: "PO-20260828-4827/reply.png",
-      reportedBy: "Factory staff",
+      poVersion: 2, channel: "whatsapp", recipient: "Factory group", reportedBy: "Factory staff",
+      evidence: ["PO-20260828-4827/reply.png"],
+      lines: [{ poLineId: "line-1", answer: "new_date", date: "2026-09-15", reason: "Material unavailable" }],
     });
-    expect(supplierDateMutate.mock.calls[0]![0]).not.toHaveProperty("answer");
+    expect(supplierDateMutate.mock.calls[0]![0]).not.toHaveProperty("supplierDo");
   });
-  it("records an EARLIER date without any delay reason", () => {
-    /* An earlier date is not a delay: the reason question never appears and
-       nothing reason-shaped reaches the wire. */
+
+  it("an EARLIER date asks no reason; `Other` needs a note", () => {
     sent(); queryData.pos[0]!.promises = [];
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-05" } });
-    expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Earlier than the PO date");
-    expect(screen.queryByTestId("po-supplier-date-reason")).not.toBeInTheDocument();
-    evidence();
-    fireEvent.click(screen.getByTestId("po-supplier-date-save"));
-    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({ poVersion: 2, supplierDate: "2026-09-05" });
-    expect(supplierDateMutate.mock.calls[0]![0]).not.toHaveProperty("reason");
+    open(); kind("new_date");
+    fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-05" } });
+    expect(screen.queryByTestId("po-answer-reason-line-1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Upload Evidence")); who();
+    fireEvent.click(screen.getByTestId("po-answer-save"));
+    expect(supplierDateMutate.mock.calls[0]![0].lines[0]).toEqual({ poLineId: "line-1", answer: "new_date", date: "2026-09-05" });
+    fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-20" } });
+    fireEvent.change(screen.getByTestId("po-answer-reason-line-1"), { target: { value: "Other" } });
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — write why the supplier moved the date");
+    fireEvent.change(screen.getByTestId("po-answer-note-line-1"), { target: { value: "Fabric mill closed" } });
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent(/^Save$/);
   });
-  it("discards an unfinished reply when the official version changes", () => {
+
+  it("a split grows one sub-row per batch, must total what is still to deliver, and sends the batches", () => {
+    sent(); queryData.pos[0]!.promises = [];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    open(); kind("split");
+    /* The first batch starts as the whole remainder; the total is stated. */
+    expect(screen.getByTestId("po-answer-batch-qty-line-1-0")).toHaveValue(2);
+    expect(screen.getByTestId("po-answer-total-line-1")).toHaveTextContent("Total 2 of 2");
+    fireEvent.change(screen.getByTestId("po-answer-batch-qty-line-1-0"), { target: { value: "1" } });
+    expect(screen.getByTestId("po-answer-total-line-1")).toHaveTextContent("Total 1 of 2");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — the batches must total 2");
+    fireEvent.click(screen.getByTestId("po-answer-add-batch-line-1"));
+    expect(screen.getByTestId("po-answer-batch-qty-line-1-1")).toHaveValue(1);
+    fireEvent.change(screen.getByTestId("po-answer-batch-date-line-1-0"), { target: { value: "2026-09-10" } });
+    fireEvent.change(screen.getByTestId("po-answer-batch-date-line-1-1"), { target: { value: "2026-09-17" } });
+    fireEvent.change(screen.getByTestId("po-answer-batch-reason-line-1-1"), { target: { value: "Partial quantity ready" } });
+    fireEvent.click(screen.getByText("Upload Evidence")); who();
+    fireEvent.click(screen.getByTestId("po-answer-save"));
+    expect(supplierDateMutate.mock.calls[0]![0].lines[0]).toEqual({
+      poLineId: "line-1", answer: "split",
+      batches: [{ qty: 1, date: "2026-09-10" }, { qty: 1, date: "2026-09-17", reason: "Partial quantity ready" }],
+    });
+  });
+
+  it("`Supplier DO received` alone is an answer: number + file, every line No change", () => {
+    sent(); queryData.pos[0]!.promises = [];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    open();
+    fireEvent.click(screen.getByTestId("po-answer-do-received"));
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — record the Supplier DO number");
+    fireEvent.change(screen.getByTestId("po-answer-do-number"), { target: { value: "DO-2251" } });
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — upload the Supplier DO");
+    fireEvent.click(screen.getByText("Upload DO file")); who();
+    fireEvent.click(screen.getByTestId("po-answer-save"));
+    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
+      supplierDo: { number: "DO-2251", file: "PO-20260828-4827/do.pdf" },
+      evidence: [],
+      lines: [{ poLineId: "line-1", answer: "no_change" }],
+    });
+  });
+
+  it("ticked rows take one bulk answer; Cancel leaves nothing recorded", () => {
+    sent(); queryData.pos[0]!.promises = [];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    open();
+    fireEvent.click(screen.getByTestId("po-answer-select-line-1"));
+    expect(screen.getByTestId("po-answer-bulk")).toHaveTextContent("1 selected · Apply to selected");
+    fireEvent.change(screen.getByTestId("po-answer-bulk-kind"), { target: { value: "confirmed" } });
+    fireEvent.click(screen.getByTestId("po-answer-bulk-apply"));
+    expect(screen.getByTestId("po-answer-kind-line-1")).toHaveValue("confirmed");
+    fireEvent.click(screen.getByTestId("po-answer-cancel"));
+    expect(screen.queryByTestId("po-answer-table")).not.toBeInTheDocument();
+    expect(supplierDateMutate).not.toHaveBeenCalled();
+  });
+
+  it("discards an unfinished answer when the official version changes", () => {
     sent(); queryData.pos[0]!.promises = [];
     const view = renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
-    evidence();
+    open(); kind("new_date");
     queryData.pos[0]!.version = 3;
     queryData.pos[0]!.sends[0]!.po_version = 3;
     view.rerender(<MemoryRouter initialEntries={["/operation/procurement?po=PO-20260828-4827"]}><PurchaseOrdersPage /></MemoryRouter>);
-    expect(screen.getByTestId("po-supplier-date-input")).toHaveValue("");
-    expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
-  });
-  it("can confirm the original PO date without changing it", () => {
-    sent(); queryData.pos[0]!.promises = [];
-    renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-10" } });
-    expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Same as PO");
-    evidence(); fireEvent.click(screen.getByTestId("po-supplier-date-save"));
-    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({ supplierDate: "2026-09-10", poVersion: 2 });
-  });
-  it("shows a reply recorded without evidence instead of claiming a proven absence", () => {
-    /* 0430 — a pre-evidence reply linked to this version is a recorded fact.
-       It never qualifies as the governed Supplier Confirmed Delivery Date, but the block
-       must say what exists rather than 'the supplier has said nothing'. */
-    sent();
-    queryData.pos[0]!.promises = [{
-      kind: "tomorrow_delivery", answer: "shipping", about_date: "2026-09-10",
-      previous_date: null, new_date: null, reason: null, po_version: 2,
-      channel: null, recipient: null, evidence: null, reported_by: null,
-      reported_at: null, recorded_by: null, recorded_at: "2026-08-27T08:00:00Z",
-    } as never];
-    renderPage("/operation/procurement?po=PO-20260828-4827");
-    const block = screen.getByTestId("po-supplier-date");
-    expect(block).toHaveTextContent("Supplier reply recorded without evidence");
-    expect(screen.getByTestId("po-supplier-reply-history")).toHaveTextContent("PO V2");
-    expect(screen.getByTestId("po-supplier-reply-history")).toHaveTextContent("Confirms the PO date");
+    expect(screen.queryByTestId("po-answer-table")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-supplier-reply-record")).toBeInTheDocument();
   });
 });
 

@@ -8,6 +8,7 @@ import {
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import {
+  type RecordSupplierAnswersInput,
   type AbandonOrderInput,
   type AssignPartnerInput,
   type AssignPickupPartnerInput,
@@ -3436,9 +3437,28 @@ export interface operationPoListRow {
     acting_name?: string | null;
     po_revisions: { rev_no: number } | null;
   }[];
+  /** 0587 — the Supplier DO the supplier sent for this PO, recorded once
+   *  through `Record supplier answer`; Receiving reads the same fields. */
+  do_number?: string | null;
+  do_file_path?: string | null;
+  do_uploaded_at?: string | null;
+  /** 0585 · the day-before check's evidence, per version and expected date. */
+  arrival_confirmations?: {
+    po_version: number;
+    for_date: string;
+    destination_id: string;
+    kind: "supplier_do" | "supplier_confirmation";
+    supplier_do_no?: string | null;
+  }[];
   /** The supplier-date field's own history (0306 ledger, newest first) —
    *  it renders BESIDE the field, never in the Activity timeline. */
   promises?: {
+    id?: string | null;
+    /** 0587 — a line-level answer names its goods line and batch quantity;
+     *  the rows of one recorded answer share `answer_group`. */
+    po_line_id?: string | null;
+    about_qty?: number | null;
+    answer_group?: string | null;
     po_version?: number | null;
     channel?: string | null;
     recipient?: string | null;
@@ -5192,22 +5212,14 @@ export function usePurchasingSettings(
  * reply evidence, preserves the original PO date, and updates the exact
  * linked Sales lines' arrival planning in the same transaction.
  */
-export function useRecordSupplierDate(poId: string | null) {
+export function useRecordSupplierAnswers(poId: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      poVersion?: number;
-      channel?: "whatsapp" | "email" | "phone" | "in_person";
-      recipient?: string;
-      evidence?: string;
-      reportedBy?: string;
-      reportedAt?: string;
-      /* 0430 — ONE date; the server classifies the answer against the PO's
-         recorded original date. The browser never writes "delayed". */
-      supplierDate: string;
-      reason?: string;
-      remarks?: string;
-    }) =>
+    /* 0587 — the answer PER GOODS LINE: `no_change` · `confirmed` ·
+       `new_date` · `split` batches, an optional Supplier DO and the evidence
+       files. The server classifies every date against the PO's original date;
+       the browser never writes "delayed". */
+    mutationFn: (input: RecordSupplierAnswersInput) =>
       apiFetch<{ ok: true; result: unknown }>(
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/tomorrow-delivery`,
         { method: "POST", body: JSON.stringify(input) },
@@ -5223,6 +5235,7 @@ export function useRecordSupplierDate(poId: string | null) {
       // recorded delay leave a stale Orders board.
       await qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
     },
   });
 }

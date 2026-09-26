@@ -503,7 +503,18 @@ describe("operation Work response composition", () => {
         status: "open",
         supplier_id: "supplier-3",
         eta_date: "2026-09-06",
+        version: 1,
+        sends: [{ kind: "confirmed_sent", po_version: 1 }],
         purchase_order_lines: [{ qty: 5, received_qty: 2 }],
+      }, {
+        /* Never marked sent: the supplier never got it, so it cannot arrive (segment 2). */
+        id: "PO-5",
+        status: "open",
+        supplier_id: "supplier-3",
+        eta_date: "2026-09-06",
+        version: 1,
+        sends: [],
+        purchase_order_lines: [{ qty: 5, received_qty: 0 }],
       }, {
         id: "PO-4",
         status: "received",
@@ -692,7 +703,9 @@ describe("operation Work response composition", () => {
         id: "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11",
         module: "purchasing",
         object: { kind: "purchase_order", id: "PO-3001", label: "PO-3001" },
-        action: "Call Ohana — confirm tomorrow's delivery",
+        /* Owner wording 2026-09-25: no recorded channel → ask; the fact names the obligation. */
+        action: "Ask Ohana for the Supplier DO for PO-3001",
+        problem: "Confirm tomorrow's supplier delivery",
         recipient: "Ohana",
         owner: { dutyKey: "po_duty", normal: person, acting: person },
         destination: "/operation?tab=purchase-orders&po=PO-3001",
@@ -758,6 +771,36 @@ describe("operation Work response composition", () => {
       /* The confirmation for the OLD date proves nothing about the new one. */
       expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-14")).toHaveLength(1);
       expect(project({ ...base, arrival_confirmations: [confirmation({ for_date: "2026-09-15" })] }, "2026-09-14")).toHaveLength(0);
+    });
+
+    it("a split answer derives ONE occurrence per batch date, and the card clicks the supplier's recorded channel (0587)", () => {
+      const evidenced = {
+        kind: "tomorrow_delivery", po_version: 1, about_date: "2026-09-11", previous_date: null, channel: "whatsapp",
+        recipient: "Ohana group", evidence: "PO-3001/a.png", reported_by: "Ah Hock", reported_at: "2026-09-09T02:00:00Z",
+        recorded_by: "u-1", recorded_at: "2026-09-09T02:05:00Z", answer_group: "g1", po_line_id: "L1",
+      };
+      const base = {
+        official_delivery_date: "2026-09-11", destination_id: DEST,
+        sends: [{ kind: "confirmed_sent", channel: "whatsapp", sent_at: "2026-09-01T01:00:00Z", po_version: 1 }],
+        purchase_order_lines: [{ id: "L1", qty: 4, received_qty: 0 }],
+        promises: [
+          { ...evidenced, about_qty: 3, answer: "confirmed", reason: null, new_date: "2026-09-11" },
+          { ...evidenced, about_qty: 1, answer: "delayed", reason: "Partial quantity ready", new_date: "2026-09-15" },
+        ],
+      };
+      const first = project(base, "2026-09-10");
+      expect(first.map((i) => i.id)).toEqual(["purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11"]);
+      expect(first[0]?.action).toBe("Click WhatsApp, ask Ohana for the Supplier DO for PO-3001");
+      /* On Mon 14 Sep the unconfirmed first batch is still open (and late) beside the second batch's check. */
+      const second = project(base, "2026-09-14");
+      expect(second.map((i) => i.id)).toEqual([
+        "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11",
+        "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-15",
+      ]);
+      /* The first batch's confirmation closes the first occurrence only. */
+      expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-10")).toHaveLength(0);
+      expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-14").map((i) => i.id))
+        .toEqual(["purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-15"]);
     });
 
     it("stays open and turns late once the check day has passed", () => {

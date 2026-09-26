@@ -171,6 +171,12 @@ export interface EffectiveArrivalPromise {
   recorded_by?: string | null;
   recorded_at: string;
   new_date: string | null;
+  /** 0587 — a line-level answer and its batch. */
+  po_line_id?: string | null;
+  about_qty?: number | null;
+  answer_group?: string | null;
+  answer?: string | null;
+  reason?: string | null;
 }
 
 /**
@@ -183,11 +189,74 @@ export function effectivePoArrivalOf(po: {
   officialDeliveryDate: string | null;
   etaDate: string | null;
   promises: readonly EffectiveArrivalPromise[];
+  /** 0587 — with the open lines, the PO-level arrival is the LAST expected
+   *  arrival across them (the PO is not in until its last batch is). */
+  lines?: readonly ExpectedArrivalLine[];
 }): string | null {
+  if (po.lines && po.lines.length) {
+    const arrivals = poExpectedArrivalsOf({ ...po, lines: po.lines });
+    if (arrivals.length) return arrivals.map((a) => a.arrival).sort().at(-1) ?? null;
+  }
   const answer = po.promises
-    .filter((p) => p.kind === "tomorrow_delivery" && p.po_version === po.version
-      && p.channel?.trim() && p.recipient?.trim() && p.evidence?.trim() && p.reported_by?.trim()
-      && p.reported_at && p.recorded_by && p.new_date)
+    .filter((p) => evidencedAnswer(p, po.version) && !p.po_line_id)
     .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
   return (answer?.new_date ?? po.officialDeliveryDate ?? po.etaDate)?.slice(0, 10) ?? null;
+}
+
+const evidencedAnswer = (p: EffectiveArrivalPromise, version: number) =>
+  p.kind === "tomorrow_delivery" && p.po_version === version
+  && !!p.channel?.trim() && !!p.recipient?.trim() && !!p.evidence?.trim() && !!p.reported_by?.trim()
+  && !!p.reported_at && !!p.recorded_by && !!p.new_date;
+
+export interface ExpectedArrivalLine {
+  id: string;
+  qty: number;
+  receivedQty: number;
+}
+
+export interface ExpectedArrival {
+  poLineId: string;
+  qty: number;
+  arrival: string;
+  /** confirmed · earlier · delayed · reported — the server's classification; null = no answer yet. */
+  answer: string | null;
+  reason: string | null;
+}
+
+/**
+ * ⭐ ONE EXPECTED ARRIVAL PER LINE / SPLIT BATCH — mirrors
+ * `purchasing_po_expected_arrivals` (0587, Purchasing §5.7): for every open
+ * line, the batches of its NEWEST evidenced answer on the current version;
+ * else the PO-level newest evidenced answer; else the original PO Delivery
+ * Date; else the planning date. The day-before check derives ONE occurrence
+ * per distinct arrival from this list; the Register and the Supplier card
+ * read the same list (Law D).
+ */
+export function poExpectedArrivalsOf(po: {
+  version: number;
+  officialDeliveryDate: string | null;
+  etaDate: string | null;
+  promises: readonly EffectiveArrivalPromise[];
+  lines: readonly ExpectedArrivalLine[];
+}): ExpectedArrival[] {
+  const rows = po.promises.filter((p) => evidencedAnswer(p, po.version));
+  const poLevel = rows.filter((p) => !p.po_line_id).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
+  const out: ExpectedArrival[] = [];
+  for (const line of po.lines) {
+    const still = Number(line.qty) - Number(line.receivedQty);
+    if (!(still > 0)) continue;
+    const own = rows.filter((p) => p.po_line_id === line.id).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+    const newest = own[0];
+    if (newest) {
+      const group = own.filter((p) => newest.answer_group ? p.answer_group === newest.answer_group : p.recorded_at === newest.recorded_at);
+      for (const p of group) {
+        out.push({ poLineId: line.id, qty: p.about_qty ?? still, arrival: p.new_date!.slice(0, 10), answer: p.answer ?? null, reason: p.reason ?? null });
+      }
+      continue;
+    }
+    const fallback = (poLevel?.new_date ?? po.officialDeliveryDate ?? po.etaDate)?.slice(0, 10) ?? null;
+    if (!fallback) continue;
+    out.push({ poLineId: line.id, qty: still, arrival: fallback, answer: poLevel?.answer ?? null, reason: poLevel?.reason ?? null });
+  }
+  return out.sort((a, b) => a.poLineId.localeCompare(b.poLineId) || a.arrival.localeCompare(b.arrival));
 }

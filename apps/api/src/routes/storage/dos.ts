@@ -45,6 +45,11 @@ const ARRIVAL_MIMES = [
   "video/webm",
 ] as const;
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MiB
+// 0587 — a supplier ANSWER's evidence is a WhatsApp screenshot, a photo, a
+// short video or the supplier's PDF (Purchasing §5.7, owner 2026-09-25): the
+// one kind that takes all three families. Same bucket, same RLS, same per-PO
+// prefix the SQL evidence checks require.
+const ANSWER_MIMES = [...ALLOWED_MIMES, "video/mp4", "video/quicktime", "video/webm"] as const;
 
 // R2 (0288) — `kind: "claim"` names the file `<po_id>/<uuid>-claim-<do>.<ext>`
 // instead of the DO-number scheme. Same bucket, same RLS, same per-PO prefix:
@@ -57,10 +62,11 @@ const signUploadSchema = z
     do_number: z.string().min(3).max(50),
     mime_type: z.enum([...ALLOWED_MIMES, ...ARRIVAL_MIMES] as [string, ...string[]]),
     size_bytes: z.number().int().positive().max(MAX_SIZE),
-    kind: z.enum(["do", "claim", "arrival"]).default("do"),
+    kind: z.enum(["do", "claim", "arrival", "answer"]).default("do"),
   })
   .superRefine((v, ctx) => {
-    const pool: readonly string[] = v.kind === "arrival" ? ARRIVAL_MIMES : ALLOWED_MIMES;
+    const pool: readonly string[] =
+      v.kind === "arrival" ? ARRIVAL_MIMES : v.kind === "answer" ? ANSWER_MIMES : ALLOWED_MIMES;
     if (!pool.includes(v.mime_type)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -162,7 +168,9 @@ dosRouter.post("/sign-upload", async (c) => {
       ? `claim-${safeDo}`
       : kind === "arrival"
         ? `arrival-${safeDo}`
-        : safeDo;
+        : kind === "answer"
+          ? `answer-${safeDo}`
+          : safeDo;
   const path = `${po_id}/${crypto.randomUUID()}-${slug}.${ext}`;
 
   // F11 — USER JWT, never service_role. Storage RLS (migration 0042) gates
