@@ -878,7 +878,7 @@ joins an act to a party or to an explanation**, in the cell or in its tooltip.
 
 **The deadline is stated ONCE, and it is stated in Work.** `Call by {date}` is retired from every
 visible line: it printed the verb column 3 had just said, and it printed the same day twice on
-one row — once under the status and again under `Confirmed Delivery`. The words did not
+one row — once under the status and again under `Scheduled delivery`. The words did not
 disappear. `Contact deadline {date}`, and `Contact deadline {date} · overdue, the deadline does
 not move` once it has passed, are the cell's `title` and its accessible name, and they are what
 Search matches and what the Excel export prints. A row whose customer named no day owes no
@@ -899,7 +899,7 @@ a status fact. Governed functional icons remain: Search, Export, Columns, the ex
 Download, Hide and Show filters, the calendar arrows and the rest of the existing Carres utility
 set.
 
-**The three delivery checks live in their columns.** Customer confirmation in `Confirmed Delivery`
+**The three delivery checks live in their columns.** Customer confirmation in `Scheduled delivery`
 and `Logistics`; stock in `Items & Stock`; money in `Payment`. Monitor has no checklist, alert,
 due, next-action or priority column. Order Route shows the complete delivery checklist because it
 is the full order journey.
@@ -919,11 +919,11 @@ service moves no Unit and is never a shortage. `Arriving after the requested dat
 the two-line cell are shared with the Payment Monitor, which prints this cell for the whole Sales
 Order; and Delivery's confirmed day (DO → arrangement → confirmed booking, the customer leg) is the
 day Payment's collection clock and its Work item anchor on (`invoiceConfirmedDelivery`). A
-`Save confirmed delivery` therefore starts the collection clock; Delivery keeps sole write
+`Save scheduled delivery` therefore starts the collection clock; Delivery keeps sole write
 ownership of the date.
 
 **Chooser columns, off by default:** `State` · `Expected arrival` · `Accessories & services` ·
-`Confirmed Time` · `Building` · `Phone`. Sortable, filterable and exported. `Actions` and `Edit
+`Scheduled time` · `Building` · `Phone`. Sortable, filterable and exported. `Actions` and `Edit
 Delivery` are retired as columns; the row's acts live in the panels (§8.6).
 
 **Selection.** Every row has a checkbox; the header checkbox selects the visible filtered rows;
@@ -1420,7 +1420,7 @@ identity, search, governed per-column filters, Export, Columns and the fixed 32p
 **Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
 
 - **Default columns, in order:** `DO Date` · `DO No` · `SO No` · `Customer` · `Status` ·
-  `Requested Delivery Date` · `Confirmed Delivery` · `Confirmed Time` · `Logistics` · `Delivery
+  `Requested Delivery Date` · `Scheduled delivery` · `Scheduled time` · `Logistics` · `Delivery
   Location` · `Driver submission`. Off by default: `Goods` · `Created`. `Requested Delivery Date`
   opens no editor here; `SO No` opens the Sales Order and `DO No` the Delivery Order. `Assign
   logistics` never appears on this register.
@@ -1616,7 +1616,7 @@ number.
 ## 10 · Daily operator journey, Work and Quick Rail
 
 Operation starts in Monitor and works the rail in order: `Failed Delivery`, `Overdue delivery`,
-`Upload delivery proof`, `Logistics not assigned`, `Call customer`, then the calendar for the days
+`Upload delivery proof`, `Logistics not assigned`, `Get delivery date`, then the calendar for the days
 ahead. From assignment through confirmation, Warehouse preparation, handover, delivery day,
 result, proof and return, every row states one concrete next fact and one resolved owner.
 

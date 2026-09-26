@@ -1623,8 +1623,8 @@ module may rename another module's date.**
 | Canonical label | What it means | Owner |
 |---|---|---|
 | **`Requested Delivery Date`** | Customer requested this date. | **Sales Orders** |
-| **`Confirmed Delivery`** | Logistics and the customer agreed to this delivery day. | **Delivery** |
-| **`Confirmed Time`** | Logistics and the customer agreed to this time range. | **Delivery** |
+| **`Scheduled delivery`** | Logistics and the customer agreed to this delivery day (owner ruling 2026-09-24 renamed `Confirmed Delivery`). | **Delivery** |
+| **`Scheduled time`** | Logistics and the customer agreed to this time range — optional since 2026-09-24 (renamed `Confirmed Time`). | **Delivery** |
 | **`Delivered`** | The goods were actually delivered. | **Delivery result** |
 
 **Sales Orders owns `Requested Delivery Date`. Delivery may READ it and may NEVER silently
@@ -1647,17 +1647,17 @@ Requested Delivery Date − 14 Safety days                          = Goods Must
 Goods Must Arrive − Supplier × Category production working days   = Order By
 ```
 
-**Purchasing must NEVER wait for `Confirmed Delivery` before ordering.**
+**Purchasing must NEVER wait for `Scheduled delivery` before ordering.**
 
 ### The Delivery connection
 
 Delivery keeps the three apart and prints them apart:
 
 ```
-Requested Delivery Date  |  Confirmed Delivery  |  Confirmed Time
+Requested Delivery Date  |  Scheduled delivery  |  Scheduled time
 ```
 
-`Confirmed Delivery` and `Confirmed Time` are **NOT renamed by this ruling.**
+`Scheduled delivery` and `Scheduled time` are Delivery's words since the owner ruling of 2026-09-24 (this 2026-08-27 contract renamed nothing; Delivery later did).
 **No confirmed-logistics column is added to the Sales Orders Register by this ruling** — that
 placement requires separate owner review.
 
@@ -5314,8 +5314,8 @@ can see or close. It moves to them the day that portal covers appointments.
 # §7 · Delivery on an order
 
 > **The delivery WORKSPACE is [`../delivery/MASTER.md`](../delivery/MASTER.md) and it OWNS the
-> delivery ARRANGEMENT** (owner ruling 2026-08-24): the Logistics Partner, Confirmed Delivery,
-> Confirmed Time, expected arrival, logistics note, reply proof and driver/vehicle are Delivery's
+> delivery ARRANGEMENT** (owner ruling 2026-08-24): the Logistics company, Scheduled delivery,
+> Scheduled time, expected arrival, logistics note, reply proof and driver/vehicle are Delivery's
 > writes on `ops_delivery_arrangements` (0386). **This section defines the ORDER's own delivery
 > facts once** — the customer promise, the booking gate and the order-lifecycle Work triggers.
 > Sales Orders may never write an arrangement fact, and Delivery may never write a Sales fact.
@@ -5344,7 +5344,7 @@ Issue, Release or Approve button exists anywhere, and no worklist raises it as w
 number follows the 2026-09-23 ruling (`DO2609-4827` Outright / `SDO2609-48271` Subscription,
 random, unique across all orders — `docs/delivery/MASTER.md` §3.1); the stored number is reprinted,
 so a reprint always matches the signed original. A REBOOKED trip is a NEW document (card §6): an un-run document is voided
-`rescheduled` by the system; a failed one keeps its Delivery exception forever and simply stops
+`rescheduled` by the system; a failed one keeps its `Failed Delivery` / `Partially Delivered` and reason forever and simply stops
 being the active number; a delivered one is untouched history.
 
 **`Request Delivery Order` — the ONE governed manual door (owner ruling 2026-08-19, card §5).**
