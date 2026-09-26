@@ -102,6 +102,14 @@ interface SbOpts {
   sourceError?: { code: string; message: string };
 }
 
+/** The tables the register reads for Goods Received Date · Ship Date ·
+ *  Pickup By · Delivery Location (owner rulings 2026-09-25). */
+const PHYSICAL_FACT_TABLES = [
+  "receiving_unit_results", "warehouse_receipts",
+  "delivery_handover_event_units", "delivery_handover_events", "ops_delivery_orders",
+  "arrival_source_events", "arrival_sources", "stock_operating_parties", "warehouses",
+];
+
 function buildSb(opts: SbOpts = {}) {
   const tables: string[] = [];
   const orders: { col: string; asc: boolean }[] = [];
@@ -111,6 +119,7 @@ function buildSb(opts: SbOpts = {}) {
     const c: Record<string, unknown> = {};
     c.select = () => c;
     c.in = () => c;
+    c.overlaps = () => c;
     c.eq = (col: string, val: unknown) => {
       eqs.push({ col, val });
       return c;
@@ -137,6 +146,7 @@ function buildSb(opts: SbOpts = {}) {
       tables.push(table);
       if (table === "stock_unit_events") return chain(opts.events ?? []);
       if (["product_skus", "purchase_orders", "orders"].includes(table)) return chain([], null, opts.sourceError);
+      if (PHYSICAL_FACT_TABLES.includes(table)) return chain([]);
       return chain(opts.rows ?? [], opts.single);
     },
   };
@@ -160,20 +170,18 @@ describe("GET /register — the one current listing", () => {
       from(table: string) {
         tables.push(table);
         let projection = "*";
-        let filter: { column: string; value: unknown; op?: "ilike" } | undefined;
+        // Every filter the route applies becomes a real predicate against
+        // PGlite, so a column the committed SQL does not have fails here.
+        const where: { sql: (n: number) => string; value: unknown }[] = [];
         let order = "";
-        let values: unknown[] = [];
-        let inColumn = "";
         const execute = async (single = false) => {
           try {
             const columns = table === "product_skus"
               ? "sku, variant, (select json_build_object('name',name) from product_models where id=product_skus.model_id) as product_models"
               : projection;
             if (table === "product_skus") expect(projection).toBe("sku, variant, product_models(name)");
-            const where = filter
-              ? ` where ${filter.column} ${filter.op === "ilike" ? "ilike" : "="} $1`
-              : values.length ? ` where ${inColumn} = any($1)` : "";
-            const result = await db.query(`select ${columns} from public.${table}${where}${order}`, filter ? [filter.value] : values.length ? [values] : []);
+            const clause = where.length ? ` where ${where.map((w, i) => w.sql(i + 1)).join(" and ")}` : "";
+            const result = await db.query(`select ${columns} from public.${table}${clause}${order}`, where.map((w) => w.value));
             return { data: single ? result.rows[0] ?? null : result.rows, error: null };
           } catch (error) {
             return { data: null, error };
@@ -181,11 +189,16 @@ describe("GET /register — the one current listing", () => {
         };
         const chain = {
           select(columns: string) { projection = columns; return chain; },
-          in(column: string, list: unknown[]) { expect(["sku", "id"]).toContain(column); inColumn = column; values = list; return chain; },
-          eq(column: string, value: unknown) { filter = { column, value }; return chain; },
+          in(column: string, list: unknown[]) {
+            expect(["sku", "id", "stock_item_id", "outcome", "item_id"]).toContain(column);
+            where.push({ sql: (n) => `${column} = any($${n})`, value: list });
+            return chain;
+          },
+          overlaps(column: string, list: unknown[]) { where.push({ sql: (n) => `${column} && $${n}`, value: list }); return chain; },
+          eq(column: string, value: unknown) { where.push({ sql: (n) => `${column} = $${n}`, value }); return chain; },
           // 0453 — the Unit lookup matches case-insensitively, so the contract
           // test must execute the real `ilike` against real PostgreSQL.
-          ilike(column: string, value: unknown) { filter = { column, value, op: "ilike" }; return chain; },
+          ilike(column: string, value: unknown) { where.push({ sql: (n) => `${column} ilike $${n}`, value }); return chain; },
           order(column: string, options?: { ascending?: boolean }) { order = ` order by ${column} ${options?.ascending === false ? "desc" : "asc"}`; return chain; },
           limit() { return chain; },
           maybeSingle() { return execute(true); },
@@ -220,10 +233,25 @@ describe("GET /register — the one current listing", () => {
       expect(String(body.units[0].poDate)).toContain("2026-08-01");
       expect(String(body.units[0].soDate)).toContain("2026-08-02");
       expect(body.units[1]).toMatchObject({ siteName: null, holderName: null, lifecycleOutcome: "delivered" });
+      // Owner rulings 2026-09-25: a Unit booked in before Receiving existed keeps
+      // its recorded date in; nothing has left, so the road facts stay absent.
+      expect(String(body.units[0].goodsReceivedDate)).toContain("2026-07-30");
+      expect(body.units[0]).toMatchObject({ shipDate: null, pickupBy: null, deliveryLocation: null });
+      // unit-2: the POSTED receipt (not the draft) is Goods Received Date; the
+      // Warehouse `handed_over` event (not `ready_for_handover`, not the
+      // Logistics side) is Ship Date, with the DO's company and the order's address.
+      expect(String(body.units[1].goodsReceivedDate)).toContain("2026-08-20");
+      expect(String(body.units[1].shipDate)).toContain("2026-08-25");
+      expect(body.units[1]).toMatchObject({ pickupBy: "NETS", deliveryLocation: "12 Jalan Fixture, Klang" });
       const detail = await app.request("/api/ops/stock/register/id-contract2", { headers }, env);
       expect(detail.status).toBe(200);
       expect(await detail.json()).toMatchObject({ unit: { unitCode: "id-contract2", lifecycleOutcome: "delivered" } });
-      expect(new Set(tables)).toEqual(new Set(["stock_unit_register_v", "stock_unit_events", "product_skus", "purchase_orders", "orders"]));
+      // The view, the lineage, the three source tables and the physical-fact
+      // tables — a batched read with no ids is never sent, so the allowed set
+      // bounds the reads; the governed core is always present.
+      const allowed = new Set(["stock_unit_register_v", "stock_unit_events", "product_skus", "purchase_orders", "orders", ...PHYSICAL_FACT_TABLES]);
+      for (const table of new Set(tables)) expect(allowed).toContain(table);
+      for (const core of ["stock_unit_register_v", "stock_unit_events", "product_skus", "purchase_orders", "orders", "receiving_unit_results", "warehouse_receipts", "delivery_handover_events"]) expect(tables).toContain(core);
       const grants = await db.query("select grantee, privilege_type from information_schema.role_table_grants where table_name='stock_unit_register_v' and grantee in ('authenticated','anon')");
       expect(grants.rows).toEqual([{ grantee: "authenticated", privilege_type: "SELECT" }]);
     } finally {

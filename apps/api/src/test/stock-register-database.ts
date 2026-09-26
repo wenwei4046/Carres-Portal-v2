@@ -29,7 +29,7 @@ export async function stockRegisterDatabase() {
     create table public.product_models (id text primary key, category text, name text);
     create table public.product_skus (sku text, model_id text, variant text);
     create table public.purchase_orders (id text primary key, placed_at timestamptz, eta_date date, purpose text);
-    create table public.orders (id text primary key, placed_at timestamptz);
+    create table public.orders (id text primary key, placed_at timestamptz, customer_address text, customer_address_line1 text, customer_address_city text);
     create table public.warehouses (id text primary key, name text);
     create table public.stock_operating_parties (id text primary key, name text);
     create table public.ops_stock_items (
@@ -41,6 +41,18 @@ export async function stockRegisterDatabase() {
       identity_scope text not null default 'unit'
     );
     create table public.stock_unit_events (unit_id text, event text, event_at timestamptz, seq bigint, id text, from_value text, to_value text, note text);
+    -- The physical facts the Inventory register reads (owner rulings 2026-09-25):
+    -- the latest posted receipt is Goods Received Date; the latest Warehouse
+    -- handover or Transfer/Return collection is Ship Date · Pickup By ·
+    -- Delivery Location. Column names are the committed ones (0302/0314, 0363,
+    -- 0424, 0426, 0490); only the rows are fixtures.
+    create table public.warehouse_receipts (id text primary key, status text, goods_received_at date);
+    create table public.receiving_unit_results (receipt_id text, stock_item_id text, outcome text);
+    create table public.ops_delivery_orders (id text primary key, logistics_partner text, order_id text);
+    create table public.delivery_handover_events (id text primary key, delivery_order_id text, kind text, recorded_at timestamptz);
+    create table public.delivery_handover_event_units (event_id text, delivery_order_id text, item_id text, recorded_side text);
+    create table public.arrival_sources (id text primary key, party_id text, to_site_id text);
+    create table public.arrival_source_events (id text primary key, source_id text, kind text, occurred_at timestamptz, unit_ids text[]);
     insert into warehouses values ('site-1', 'Fixture site');
     insert into stock_operating_parties values ('party-1', 'Fixture holder');
     insert into ops_stock_items (id,unit_code,sku,warehouse_id,holder_party_id,ownership,status,condition,needs_repair,qty)
@@ -51,7 +63,14 @@ export async function stockRegisterDatabase() {
     insert into product_skus values ('fixture-sku','model-1','Three seater');
     insert into purchase_orders values ('PO-fixture','2026-08-01T00:00:00Z','2026-09-09','service_case');
     insert into orders values ('order-1','2026-08-02T00:00:00Z');
-    update ops_stock_items set po_no='PO-fixture', sold_order_id='order-1' where id='unit-1';
+    update ops_stock_items set po_no='PO-fixture', sold_order_id='order-1', date_in='2026-07-30' where id='unit-1';
+    -- unit-2 was received through Receiving, then handed to Logistics for order-1.
+    insert into warehouse_receipts values ('receipt-1','posted','2026-08-20'), ('receipt-draft','submitted','2026-08-28');
+    insert into receiving_unit_results values ('receipt-1','unit-2','received'), ('receipt-draft','unit-2','received');
+    update orders set customer_address='12 Jalan Fixture, Klang' where id='order-1';
+    insert into ops_delivery_orders values ('do-1','NETS','order-1');
+    insert into delivery_handover_events values ('ev-ready','do-1','ready_for_handover','2026-08-24T02:00:00Z'), ('ev-out','do-1','handed_over','2026-08-25T03:00:00Z');
+    insert into delivery_handover_event_units values ('ev-ready','do-1','unit-2','warehouse'), ('ev-out','do-1','unit-2','warehouse'), ('ev-out','do-1','unit-2','logistics');
   `);
   const authority = migration("0366_the_unit_register_is_the_one_inventory_authority");
   await db.exec(statement(authority, "create or replace function public.stock_sku_category", "$$;"));
