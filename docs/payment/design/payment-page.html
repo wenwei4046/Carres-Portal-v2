@@ -18,7 +18,7 @@
   header.dest h1{font-size:20px;line-height:28px;font-weight:600;margin:0;display:flex;gap:10px;align-items:baseline}
   header.dest h1 .so{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
   header.dest h1 .cust{font-weight:400;font-size:15px;color:var(--ink-2)}
-  header.dest .due{font-size:13px;color:var(--ink-2)}header.dest .due b{color:var(--ink)}
+  header.dest .status{font-size:13px;font-weight:600}header.dest .status.o{color:var(--amber-11)}
   header.dest .doors{margin-left:auto;display:flex;gap:6px}
   .btn{height:32px;padding:0 12px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-weight:500;color:var(--ink);cursor:pointer}
   .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
@@ -33,7 +33,10 @@
   .f label{font-size:11px;line-height:14px;font-weight:500;color:var(--ink-2)}
   .f .v{min-height:32px;display:flex;align-items:center;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-control);background:#fff;font-size:13px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .f .v.o{color:var(--amber-11);font-weight:600}.f .v.m{color:var(--ink-2)}
-  .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .bh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border)}.bh h2{border-bottom:0}
+  .bdoors{font-size:12px;line-height:16px;color:var(--ink-2)}
+  .blk .fact{margin:8px 0 0;font-size:13px;line-height:18px}.blk .foot{margin:8px 0 0;font-size:12px;line-height:16px;color:var(--ink-2)}
+  .f .pv{min-height:32px;display:flex;align-items:center;padding:4px 0;font-size:13px;line-height:18px}.f .pv.m{color:var(--ink-2)}
   .blk table.t{margin-top:12px;border:1px solid var(--border);border-radius:var(--r-control);overflow:hidden;border-collapse:separate;border-spacing:0}
     table.t{border-collapse:collapse;width:100%}.t th{height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--divider);border-right:1px solid var(--border)}
   .t td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
@@ -73,59 +76,52 @@
     <header class="dest">
       <a class="back" href="monitor-status-rail.html">← Monitor</a>
       <h1><span class="so">SO-1405</span><span class="cust">SITI AMINAH</span></h1>
-      <span class="due">Balance due <b>RM 2,500.00</b> · Payment due Tue, 22 Sep</span>
-      <div class="doors"><button class="btn">Record payment</button><button class="btn p">Ask customer to pay</button><button class="btn" aria-label="More actions" title="Statement · Print · Create payment link">⋯</button></div>
+      <span class="status o">Customer promised to pay today</span>
+      <div class="doors"><button class="btn">Print ▾</button><button class="btn p">Ask customer to pay</button><button class="btn" aria-label="More actions" title="Record payment · Record the result · Create payment link · Statement">⋮</button></div>
     </header>
     <div class="stage">
       <div class="work">
-        <section class="blk"><h2>What to do</h2><div class="grid3">
-          <div class="f" style="grid-column:span 2"><label>Status</label><div class="v o">Customer promised to pay today</div></div>
-          <div class="f"><label>Payment due</label><div class="v">Tue, 22 Sep</div></div>
-          <div class="f" style="grid-column:span 3"><label>Collection owner</label><div class="v">Shasha · No cover today</div></div>
-        </div><div class="acts"><button class="btn sm">Record the result</button></div></section>
         <section class="blk"><h2>Money</h2>
           <table class="t">
             <thead><tr><th>Item</th><th class="num">Amount</th></tr></thead>
             <tr><td>Goods</td><td class="num">RM 3,000.00</td></tr>
-            <tr><td>Storage · Sofa · 29 days</td><td class="num">RM 400.00</td></tr>
+            <tr><td>Storage</td><td class="num">RM 400.00</td></tr>
             <tr class="sum"><td>Total payable</td><td class="num">RM 3,400.00</td></tr>
             <tr><td>Paid to date</td><td class="num">RM 900.00</td></tr>
             <tr class="due"><td>Balance due</td><td class="num">RM 2,500.00</td></tr>
           </table>
+          <p class="foot">Payment due Tue, 22 Sep · Collection owner Shasha · No cover today</p>
         </section>
-        <section class="blk"><h2>Storage</h2><div class="grid3">
-          <div class="f"><label>Group</label><div class="v">Sofa</div></div>
-          <div class="f"><label>Storage day</label><div class="v">Day 29</div></div>
-          <div class="f"><label>Started</label><div class="v">Wed, 19 Aug</div></div>
-          <div class="f"><label>Free until</label><div class="v">Tue, 1 Sep</div></div>
-          <div class="f"><label>Charge</label><div class="v">RM 200.00 every 14 days</div></div>
-          <div class="f"><label>Next check</label><div class="v">Fri, 18 Sep</div></div>
-        </div><div class="acts"><button class="btn sm">Request more free days</button><button class="btn sm">Check the stored furniture</button></div></section>
-        <section class="blk"><h2>Customer</h2><div class="grid3">
-          <div class="f"><label>Full name</label><div class="v">SITI AMINAH</div></div>
-          <div class="f"><label>Phone</label><div class="v">0133332211</div></div>
-          <div class="f"><label>Reference</label><div class="v m">No reference</div></div>
-        </div></section>
+        <section class="blk"><div class="bh"><h2>Storage</h2><span class="bdoors"><a class="link" href="#">Request more free days</a> · <a class="link" href="#">Check stored goods</a></span></div>
+          <p class="fact">Sofa · Day 29 · RM 400.00 so far</p>
+          <p class="fact">Free until Tue, 1 Sep</p>
+          <p class="fact">Charge RM 200.00 every 14 calendar days</p>
+        </section>
         <section class="blk"><h2>History</h2>
           <table class="t">
-            <thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
-            <tr><td>Tue, 15 Sep</td><td>Customer will pay on Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
-            <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">Screenshot</a></td></tr>
-            <tr><td>Mon, 7 Sep</td><td>Deposit received</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span> · <a class="link" href="#">Print</a> · <a class="link" href="#">Send</a></td></tr>
-            <tr><td>Mon, 7 Sep</td><td>Order proceeded</td><td class="num m">—</td><td>Sales</td><td><span class="so">SO-1405</span> · <a class="link" href="#">Print</a></td></tr>
+            <thead><tr><th>Date</th><th>Event</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
+            <tr><td>Tue, 15 Sep</td><td>Customer will pay on a date · promised Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
+            <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">WhatsApp screenshot</a></td></tr>
+            <tr><td>Mon, 7 Sep</td><td>Payment recorded</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span> · <a class="link" href="#">Print</a> · <a class="link" href="#">Send receipt</a></td></tr>
+            <tr><td>Mon, 7 Sep</td><td>Proceed</td><td class="num m">—</td><td>Sales</td><td><span class="so">SO-1405</span> · <a class="link" href="#">Print</a></td></tr>
           </table>
         </section>
+        <section class="blk"><h2>Customer</h2><div class="grid3">
+          <div class="f"><label>Full name</label><div class="pv">SITI AMINAH</div></div>
+          <div class="f"><label>Phone</label><div class="pv">0133332211</div></div>
+          <div class="f"><label>Reference</label><div class="pv m">No reference</div></div>
+        </div></section>
       </div>
       <aside class="paper" aria-label="The paper the customer receives">
         <div class="tabs"><span class="on">Sales Order</span><span>Message</span><span>Receipt</span><span>Invoice</span></div>
         <div class="sheet">
           <div class="brand"><b>CARRES</b><div class="dt"><b>SALES ORDER</b><br>SO-1405 · Mon, 7 Sep 2026</div></div>
-          <div class="kv"><span>Customer</span><span>SITI AMINAH · 0133332211</span><span>Delivery address</span><span>12, Jalan Damai 3, 41200 Klang, Selangor</span><span>Requested delivery</span><span>Thu, 24 Sep 2026</span></div>
+          <div class="kv"><span>Customer</span><span>SITI AMINAH · 0133332211</span><span>Delivery address</span><span>12, Jalan Damai 3, 41200 Klang, Selangor</span><span>Customer Requested Delivery Date</span><span>Thu, 24 Sep 2026</span></div>
           <table><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr>
             <tr><td>Booqit 3-seater sofa · Sand · Seat height 24</td><td class="num">1</td><td class="num">3,000.00</td></tr>
-            <tr><td>Storage · 29 days from 19 Aug 2026</td><td class="num">—</td><td class="num">400.00</td></tr></table>
+            <tr><td>Storage · Sofa · Day 29</td><td class="num">—</td><td class="num">400.00</td></tr></table>
           <div class="totals"><span>Total payable</span><span class="num">RM 3,400.00</span><span>Paid to date</span><span class="num">RM 900.00</span><span class="big">BALANCE DUE</span><span class="big num">RM 2,500.00</span></div>
-          <p class="foot">Pay to Hong Leong Bank ····1234 (account number to be entered in Settings) · Please pay by Tue, 22 Sep 2026 · Important Notes: to be supplied by the owner.</p>
+          
         </div>
       </aside>
     </div>

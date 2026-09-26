@@ -121,18 +121,18 @@
           <div class="util"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search by SO, customer or phone…" aria-label="Search"></label><button><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 21h16"/></svg>Export</button><button><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Columns</button></div></div>
         <div class="sheet">
           <table class="grid">
-            <thead><tr><th class="ctl s1"></th><th class="s2" style="min-width:110px">SO No</th><th class="s3" style="min-width:220px">Customer</th><th class="num" style="min-width:120px">Balance due</th><th style="min-width:140px">Items &amp; Stock</th><th style="min-width:250px">Storage</th><th style="min-width:170px">Requested Delivery Date</th><th style="min-width:210px">Scheduled delivery</th><th style="min-width:250px">Payment timing</th><th style="min-width:250px">Owner</th></tr></thead>
+            <thead><tr><th class="ctl s1"></th><th class="s2" style="min-width:110px">SO No</th><th class="s3" style="min-width:220px">Customer</th><th class="num" style="min-width:120px">Balance due</th><th style="min-width:140px">Items &amp; Stock</th><th style="min-width:250px">Storage</th><th style="min-width:170px">Requested Delivery Date</th><th style="min-width:210px">Scheduled delivery</th><th style="min-width:250px">Payment timing</th><th style="min-width:250px">Collection owner</th></tr></thead>
             <tbody id="rows">
               <tr data-d="missed" data-k="missed"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1401</span></td><td class="s3">TAN SRI DATO' SERI MUHAMMAD</td><td class="num">RM 1,700.00</td><td>Ready · 1 of 1</td><td>No storage charge</td><td>Fri, 18 Sep</td><td>Scheduled · Fri, 18 Sep · 2 PM</td><td class="r">Payment should have been received</td><td><span class="av">SH</span>Shasha</td></tr>
               <tr data-d="2026-09-18" data-k="storage"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1404</span></td><td class="s3">WONG MEI LING</td><td class="num">RM 1,800.00</td><td>Ready · 1 of 1</td><td>Storage Invoice issued · RM 200.00 not paid</td><td>Wed, 23 Sep</td><td>Scheduled · Wed, 23 Sep</td><td>Storage Invoice not paid</td><td><span class="av">YJ</span>Yu Jun</td></tr>
               <tr data-d="2026-09-17" data-k="promised"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><a class="so" href="payment-page.html">SO-1405</a></td><td class="s3">SITI AMINAH</td><td class="num">RM 2,500.00</td><td>Ready · 1 of 1</td><td>Sofa · Day 29 · RM 400.00 so far</td><td>Thu, 24 Sep</td><td>Scheduled · Thu, 24 Sep</td><td class="o">Customer promised to pay today</td><td><span class="av">SH</span>Shasha</td></tr>
               <tr class="exp" data-d="2026-09-17" data-k="promised"><td colspan="10"><div class="expbox">
                 <table class="nest">
-                  <thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
+                  <thead><tr><th>Date</th><th>Event</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
                   <tbody>
-                    <tr><td>Tue, 15 Sep</td><td>Customer will pay on Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
-                    <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">Screenshot</a></td></tr>
-                    <tr><td>Mon, 7 Sep</td><td>Deposit received</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span></td></tr>
+                    <tr><td>Tue, 15 Sep</td><td>Customer will pay on a date · promised Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
+                    <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">WhatsApp screenshot</a></td></tr>
+                    <tr><td>Mon, 7 Sep</td><td>Payment recorded</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span></td></tr>
                   </tbody>
                 </table>
               </div></td></tr>
