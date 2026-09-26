@@ -82,7 +82,7 @@ describe("the ACTION card is the panel", () => {
 
   it("draws the ACTION card even when the order cannot be loaded — the act never waits for the record", async () => {
     const WorkParties = (await import("./WorkParties")).default;
-    render(<MemoryRouter><WorkParties item={item} /></MemoryRouter>);
+    render(<MemoryRouter><WorkParties items={[item]} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
     expect(screen.getByTestId("work-detail-title")).toHaveTextContent("Call AL Logistics");
     expect(screen.getByTestId("work-detail-action")).toHaveTextContent("due Tue, 22 Sep");
     expect(screen.getByTestId("work-detail-fact")).toHaveTextContent("The delivery is not scheduled");
@@ -96,7 +96,7 @@ describe("the ACTION card is the panel", () => {
   it("a work item that names no Sales Order gets the same card with no message", async () => {
     const WorkParties = (await import("./WorkParties")).default;
     const mp = { ...item, object: { kind: "manual_purchase", id: "mp-1", label: "MP-12" }, module: "purchasing", action: "Approve purchase", recipient: null } as unknown as OperationWorkItem;
-    render(<MemoryRouter><WorkParties item={mp} /></MemoryRouter>);
+    render(<MemoryRouter><WorkParties items={[mp]} openParty={null} onOpenParty={() => {}} /></MemoryRouter>);
     expect(screen.getByTestId("work-detail-title")).toHaveTextContent("Approve purchase");
     expect(screen.queryByTestId("work-detail-communication")).not.toBeInTheDocument();
   });

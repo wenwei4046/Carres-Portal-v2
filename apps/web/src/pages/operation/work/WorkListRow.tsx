@@ -1,25 +1,23 @@
 /**
- * ⭐ THE WORK CARD — Jess, 2026-09-26 ("this format is correct"; replaces the
- * 52px two-line row and the 104px card before it). An inbox card, four lines,
- * in a 300px column:
+ * ⭐ THE WORK ROW = ONE ORDER (Jess, 2026-09-26 night: "order 就是那整个东西的核心").
  *
  * ```
- *   SO-1362                          Tue, 22 Sep   ← document (bold, opens) · date (red when missed)
- *   Call AL Logistics                               ← the action
- *   The delivery is not scheduled                   ← the fact, grey
- *   [Delivery] [AL Logistics]                       ← chips: page · party (· For {owner})
+ *   SO-1362                          Tue, 22 Sep   ← the record (bold, opens it) · its earliest date, red when missed
+ *   Call AL Logistics · Ask customer to pay        ← today's acts on this order, in list order
+ *   The delivery is not scheduled                  ← the first act's fact, grey
+ *   [Delivery] [Payment]                           ← the pages the acts belong to (· For {owner})
  * ```
  *
- * Every line is ONE line: a long sentence ends in … and shows whole on hover
- * (the right panel prints it in full anyway). Cards sit edge to edge with a
- * 1px rule, no border, no radius; the chosen card is the pale-blue wash with
- * the 2px left line — the list's one blue. The number opens the record; the
- * card shows it on the right.
+ * One order appears once, however many acts it carries. Every line is one
+ * line: a long sentence ends in … and shows whole on hover (the panel prints
+ * everything). Rows sit edge to edge with a 1px rule; the chosen row is the
+ * pale-blue wash with the 2px left line — the list's one blue.
  */
 import type { KeyboardEvent } from "react";
 import { fmtDate } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
 import { WORK_MODULE_WORD } from "./module-word";
+import type { WorkRecord } from "./work-model";
 
 export function workDueWord(item: Pick<WorkRow, "timingBucket" | "dueIso">): { text: string; missed: boolean } {
   if (!item.dueIso) return { text: "No date", missed: false };
@@ -30,22 +28,26 @@ export function workDueWord(item: Pick<WorkRow, "timingBucket" | "dueIso">): { t
 }
 
 export default function WorkListRow({
-  item,
-  action,
+  record,
+  acts,
   cover,
   selected,
   onSelect,
   onOpenRecord,
 }: {
-  item: WorkRow;
-  action: string;
-  /** The normal owner's name when the signed-in person covers this row. */
+  record: WorkRecord;
+  /** The act sentences, one per open act, in list order. */
+  acts: string[];
+  /** The normal owner's name when the signed-in person covers this record. */
   cover: string | null;
   selected: boolean;
   onSelect: () => void;
   onOpenRecord: () => void;
 }) {
-  const due = workDueWord(item);
+  const due = workDueWord(record);
+  const first = record.items[0]!;
+  const pages = [...new Set(record.items.map((i) => WORK_MODULE_WORD[i.module]))];
+  const actLine = acts.join(" · ");
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -58,9 +60,9 @@ export default function WorkListRow({
       role="button"
       tabIndex={0}
       aria-pressed={selected}
-      aria-label={`${item.soRef} · ${action} · ${item.problem} · ${due.text}`}
+      aria-label={`${record.soRef} · ${actLine} · ${first.problem} · ${due.text}`}
       data-work-row
-      data-testid={`work-row-${item.soRef}-${item.ruleKey}`}
+      data-testid={`work-row-${record.soRef}`}
       onClick={onSelect}
       onKeyDown={onKey}
       className={[
@@ -68,24 +70,23 @@ export default function WorkListRow({
         selected ? "bg-kit-blue-3" : "bg-white hover:bg-kit-slate-2",
       ].join(" ")}
     >
-      {selected ? <span aria-hidden className="absolute left-0 top-0 bottom-0 w-0.5 bg-kit-blue-9" /> : null}
+      {selected ? <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" /> : null}
       <span className="flex min-w-0 items-baseline gap-2">
         <button
           type="button"
           className="shrink-0 text-[13px] font-semibold leading-[18px] text-kit-slate-12 underline-offset-2 hover:underline"
           onClick={(event) => { event.stopPropagation(); onOpenRecord(); }}
         >
-          {item.soRef}
+          {record.soRef}
         </button>
         <span className={`ml-auto shrink-0 text-[12px] leading-4 ${due.missed ? "font-semibold text-danger" : "text-kit-slate-11"}`} data-testid="work-row-due">
           {due.text}
         </span>
       </span>
-      <span className="truncate text-[13px] font-medium leading-[18px] text-kit-slate-12" title={action} data-testid="work-row-action">{action}</span>
-      <span className="truncate text-[12px] leading-4 text-kit-slate-11" title={item.problem} data-testid="work-row-fact">{item.problem}</span>
+      <span className="truncate text-[13px] font-medium leading-[18px] text-kit-slate-12" title={actLine} data-testid="work-row-action">{actLine}</span>
+      <span className="truncate text-[12px] leading-4 text-kit-slate-11" title={first.problem} data-testid="work-row-fact">{first.problem}</span>
       <span className="mt-1 flex min-w-0 items-center gap-1.5" data-testid="work-row-chips">
-        <span className={chip}>{WORK_MODULE_WORD[item.module]}</span>
-        {item.recipient ? <span className={chip} title={item.recipient}>{item.recipient}</span> : null}
+        {pages.map((page) => <span key={page} className={chip}>{page}</span>)}
         {cover ? (
           <span className="truncate rounded-[4px] bg-kit-amber-3 px-1.5 text-[11px] font-semibold leading-4 text-kit-amber-11" data-testid="work-row-cover">
             For {cover}

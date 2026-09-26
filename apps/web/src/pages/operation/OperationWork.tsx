@@ -47,13 +47,15 @@ import {
   workModuleCounts,
   workRailMonth,
   workSections,
+  groupByRecord,
+  type WorkRecord,
   workStatusOf,
   type WorkStatus,
   type WorkWhen,
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkParties from "./work/WorkParties";
+import WorkParties, { type Party } from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
@@ -121,6 +123,9 @@ export default function OperationWork() {
   );
   const railVisible = layout === "one" ? railOpen && phoneRailOverride : railOpen;
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
+  /* §5.10: which fact card of the order is open (one at a time); reset when
+     another order is chosen. */
+  const [openParty, setOpenParty] = useState<Party | null>(null);
   /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -342,10 +347,17 @@ export default function OperationWork() {
   );
 
   const selectedId = params.get("selected");
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  /* ⭐ ONE ROW PER ORDER (Jess, 2026-09-26 night): the list and the panel work
+     in records; `selected` is the record's first act (the URL keeps an act id
+     so a deep link to one act still lands on its order). */
+  const allRecords = groupByRecord(visible);
+  const selectedRecord = allRecords.find((r) => r.items.some((i) => i.id === selectedId)) ?? allRecords[0] ?? null;
+  const selected = selectedRecord?.items.find((i) => i.id === selectedId) ?? selectedRecord?.items[0] ?? null;
   const visibleIds = new Set(visible.map((item) => item.id));
   // The date rail and its badge already say when; the list is one ordered run.
   const myItems = workSections(visible).flatMap((section) => section.items);
+  const myRecords = groupByRecord(myItems);
+  useEffect(() => { setOpenParty(null); }, [selectedRecord?.key]);
   const displayTeamGroups = visibleTeamGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
@@ -365,7 +377,7 @@ export default function OperationWork() {
   const listKey = [...params.entries()].filter(([key]) => key !== "selected").map(([k, v]) => `${k}=${v}`).join("&");
   useEffect(() => setCardLimit(CARD_STEP), [listKey]);
   const moreRef = useRef<HTMLDivElement>(null);
-  const listTotal = activeView === "mine" ? myItems.length : displayTeamGroups.reduce((n, g) => n + g.items.length, 0);
+  const listTotal = activeView === "mine" ? myRecords.length : displayTeamGroups.reduce((n, g) => n + groupByRecord(g.items).length, 0);
   const hasMore = listTotal > cardLimit;
   useEffect(() => {
     const sentinel = moreRef.current;
@@ -391,15 +403,15 @@ export default function OperationWork() {
   /* The two-line picker row (Jess, 2026-09-26). A covered row names the
      normal owner in My Work (`For Li Ching`); Team Work groups by that owner
      already, so the row says nothing twice. */
-  const card = (i: WorkRow) => (
+  const card = (r: WorkRecord) => (
     <WorkListRow
-      key={`${i.orderId}:${i.ruleKey}`}
-      item={i}
-      action={`${deliveryLines(i)?.act ?? i.action}`}
-      cover={activeView === "mine" && i.ownerState === "covered" ? (i.normalOwner?.name ?? "normal owner") : null}
-      selected={layout !== "one" && selected?.id === i.id}
-      onSelect={() => openRow(i)}
-      onOpenRecord={() => navigate(i.destination)}
+      key={r.key}
+      record={r}
+      acts={r.items.map((i) => `${deliveryLines(i)?.act ?? i.action}`)}
+      cover={activeView === "mine" && r.items.some((i) => i.ownerState === "covered") ? (r.items.find((i) => i.ownerState === "covered")?.normalOwner?.name ?? "normal owner") : null}
+      selected={layout !== "one" && selectedRecord?.key === r.key}
+      onSelect={() => openRow(r.items[0]!)}
+      onOpenRecord={() => navigate(r.items[0]!.destination)}
     />
   );
   /** The one line over the list: the chosen Date, the rail's own words. */
@@ -498,7 +510,7 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
+      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myRecords.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
@@ -544,7 +556,7 @@ export default function OperationWork() {
               </Link>
             </p>
           )}
-          {g.items.map(card)}
+          {groupByRecord(g.items).map(card)}
         </section>
       ))}
     </div>
@@ -691,7 +703,7 @@ export default function OperationWork() {
               ) : (
                 /* Work is an inbox (ruling B, Jess 2026-09-26): the ACTION card
                    is the panel; the whole order lives behind its door. */
-                <WorkParties key={selected.id} item={selected.source} onOpenRecord={() => navigate(selected.destination)} />
+                <WorkParties key={selectedRecord?.key ?? selected.id} items={(selectedRecord?.items ?? [selected]).map((i) => i.source)} openParty={openParty} onOpenParty={setOpenParty} onOpenRecord={() => navigate(selected.destination)} />
               )}
               <WorkOwnerSource item={selected.source} />
             </>

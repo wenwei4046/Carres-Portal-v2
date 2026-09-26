@@ -23,7 +23,7 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 vi.mock("./work/WorkParties", async () => {
   /* The page tests stand the ACTION card in for the mission (no order reads). */
   const { default: WorkActionPanel } = await import("./work/WorkActionPanel");
-  return { default: ({ item, onOpenRecord }: { item: import("@carres/shared").OperationWorkItem; onOpenRecord?: () => void }) => <WorkActionPanel item={item} onOpen={onOpenRecord ?? (() => {})} /> };
+  return { default: ({ items, onOpenRecord }: { items: import("@carres/shared").OperationWorkItem[]; onOpenRecord?: () => void }) => <>{items.map((item) => <WorkActionPanel key={item.id} item={item} onOpen={onOpenRecord ?? (() => {})} />)}</> };
 });
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");

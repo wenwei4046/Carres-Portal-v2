@@ -380,3 +380,36 @@ export function toggleWorkStatus(current: readonly WorkStatus[], status: WorkSta
     : WORK_STATUS_ORDER.filter((k) => current.includes(k) || k === status);
   return next.length === 1 && next[0] === "todo" ? null : next.join(",");
 }
+
+/** ⭐ THE ORDER IS THE CORE (Jess, 2026-09-26 night): the list shows one row
+ *  per RECORD — a Sales Order, or a PO for supplier work — carrying every
+ *  open act on it. Order of records = order of their first act in the list;
+ *  the record's date is its earliest act; it is missed when any act is. */
+export interface WorkRecord {
+  key: string;
+  soRef: string;
+  module: WorkRow["module"];
+  items: WorkRow[];
+  dueIso: string | null;
+  missed: boolean;
+  timingBucket: WorkRow["timingBucket"];
+}
+
+export function groupByRecord(rows: readonly WorkRow[]): WorkRecord[] {
+  const byKey = new Map<string, WorkRecord>();
+  for (const row of rows) {
+    const key = `${row.orderId}`;
+    const record = byKey.get(key);
+    if (record) {
+      record.items.push(row);
+      if (row.dueIso && (!record.dueIso || row.dueIso < record.dueIso)) record.dueIso = row.dueIso;
+      if (row.timingBucket === "overdue") { record.missed = true; record.timingBucket = "overdue"; }
+      continue;
+    }
+    byKey.set(key, {
+      key, soRef: row.soRef, module: row.module, items: [row], dueIso: row.dueIso,
+      missed: row.timingBucket === "overdue", timingBucket: row.timingBucket,
+    });
+  }
+  return [...byKey.values()];
+}

@@ -74,6 +74,7 @@ export default function WorkActionPanel({
   primaryAct = null,
   openIsPrimary = false,
   communication = null,
+  primary = true,
 }: {
   item: OperationWorkItem;
   embedded?: ReactNode;
@@ -86,6 +87,9 @@ export default function WorkActionPanel({
    *  SO Batch Purchase on exactly that window) — then it is the one blue. */
   openIsPrimary?: boolean;
   communication?: WorkCommunication | null;
+  /** False for the second, third… act on an order: its buttons go neutral so
+   *  the panel keeps ONE blue (the first act). */
+  primary?: boolean;
 }) {
   /* The party is said once: `Call AL Logistics`, never `Call AL Logistics · AL Logistics`. */
   const partyInAction = Boolean(item.recipient && item.action.includes(item.recipient));
@@ -96,7 +100,7 @@ export default function WorkActionPanel({
   const missed = item.timing.placement === "missed";
   const when = item.timing.actionOn ? ACTION_COPY.due(fmtDate(item.timing.actionOn)) : null;
   const timingLine = [partyInAction ? null : item.recipient, when].filter(Boolean).join(" · ");
-  const blueIsMessage = Boolean(communication?.href) && !isEmbedded;
+  const blueIsMessage = Boolean(communication?.href) && !isEmbedded && primary;
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -133,12 +137,12 @@ export default function WorkActionPanel({
             {item.nextConsequence ? <Fact label={ACTION_COPY.next} testId="work-detail-next">{item.nextConsequence}</Fact> : null}
           </dl>
           <div className="flex flex-wrap items-center gap-2" data-testid="work-detail-open-row">
-            {primaryAct && !isEmbedded && !blueIsMessage ? (
+            {primaryAct && !isEmbedded && !blueIsMessage && primary ? (
               <Button type="button" size="touch" variant="primary" onClick={primaryAct.onClick} data-testid="work-detail-primary-act">
                 {primaryAct.label}
               </Button>
             ) : null}
-            <Button type="button" size="touch" variant={openIsPrimary && !blueIsMessage ? "primary" : "neutral"} onClick={onOpen} data-testid="work-detail-open">Open {item.object.label}</Button>
+            <Button type="button" size="touch" variant={openIsPrimary && !blueIsMessage && primary ? "primary" : "neutral"} onClick={onOpen} data-testid="work-detail-open">Open {item.object.label}</Button>
           </div>
         </div>
         {communication ? (
@@ -154,7 +158,7 @@ export default function WorkActionPanel({
                   href={communication.href}
                   target="_blank"
                   rel="noreferrer"
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-[13px] font-semibold leading-[18px] ${isEmbedded ? "border border-kit-slate-4 bg-white text-kit-slate-12" : "bg-kit-blue-9 text-white hover:bg-kit-blue-10"}`}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-[13px] font-semibold leading-[18px] ${blueIsMessage ? "bg-kit-blue-9 text-white hover:bg-kit-blue-10" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
                   data-testid="work-detail-open-chat"
                 >
                   <Icon name="message" size={14} />

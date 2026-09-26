@@ -181,6 +181,17 @@ const ORDER = "00000000-0000-4000-8000-00000000c001";
 const REQUESTED = addWorkingDays(REAL_TODAY, 3, { holidays: myHolidaySet() });
 const lc = new URLSearchParams(window.location.search).get("lc") ?? "due";
 const firstDelivery = FEED.items.find((i) => i.module === "delivery");
+/* The missed Payment act is on the SAME order (Jess, 2026-09-26 night: one
+   order, one row, every act inside it). */
+const missedPayment = FEED.items.find((i) => i.module === "payment" && i.timing.placement === "missed");
+if (missedPayment) {
+  missedPayment.object = { kind: "sales_order", id: ORDER, label: "SO-1362" };
+  missedPayment.id = "payment:SO-1362:collect_customer_balance";
+  missedPayment.destination = `/operation/orders/so/${ORDER}`;
+  missedPayment.interaction = { mode: "open_module", fallbackDestination: missedPayment.destination };
+  missedPayment.requiredResult = "Balance received";
+  missedPayment.completionStatement = "Balance received";
+}
 if (firstDelivery) {
   firstDelivery.object = { kind: "delivery_scope", id: ORDER, label: "SO-1362" };
   firstDelivery.id = "delivery:SO-1362:confirm_delivery_date";
