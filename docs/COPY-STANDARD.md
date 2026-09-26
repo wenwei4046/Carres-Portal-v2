@@ -4360,6 +4360,26 @@ changes, already written into the list below (built in migration 0576 and the we
   - Refusals (database): `Choose a card account that has a payout bank in Finance Settings.` ·
     `Choose the payout bank Finance Settings sets for this card account.`
 
+## Monthly demand words — owner ruling 2026-09-26 · APPROVED TARGET / NOT BUILT
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The rail's view selector | **`Order list`** · **`Monthly demand`** | Register · Report · Forecast · Dashboard |
+| The period controls | **`Starting month`** · **`6 months`** · **`3 months`**, resolved window printed as **`Oct 2026 – Mar 2027`** | Range · From/To · Horizon |
+| Matrix columns | **`Product`** · **`Earlier`** · **`{Mon YYYY}`** · **`Later`** · **`No date`** · **`Total`** | Overdue · Backlog · Beyond · TBD · Unknown |
+| Matrix rows | the catalog categories — `Mattress` · `Bedframe` · `Sofa` · `Accessory`; a line with no catalog row under **`Not in catalog`** | `Other goods` · Misc |
+| A cell whose source could not be read | **`Unavailable`** | `0` · a blank · a dash |
+| The data-quality count beside the header | **`{n} pieces have no delivery date`** | TBD · Undated demand |
+| The coverage strip | **`Still owed`** · **`Reserved from stock`** · **`On purchase orders`** · **`Still to buy`** · **`Supplier may be late`** · **`Arrival not known`** | Demand · Allocated · Covered · Shortage · Risk · ETA unknown |
+| Its door | **`Open SO Batch Purchase →`** | Buy now · Create PO |
+| A multi-select group's chosen count | **`{n} selected`** | `{n} filters` · Selected: n |
+| Filtered empty | **`No confirmed demand in these months`** | No data · No results |
+| Failed | **`Monthly demand could not be loaded`** + **`Try again`** | an API error string |
+| The Order list rail groups and rows | `Dealer / Sales Location` · `Delivery State / City` · `Date` (`Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date`; `All dates` · `Today` · `This week` · `This month` · `Custom`) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations` (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open cases` · `Closed cases only` · `No cases`) | Status · Stage · Progress |
+
+The 2026-09-22 ruling's `Today` / `This week` / `This month` are the names of RANGE CHOICES in a select,
+which the NO RELATIVE DATE WORDS rule permits; a printed date is still `fmtDate`.
+
 ## Sales Orders navigation — owner approved 2026-09-23 · BUILT 2026-09-23
 
 | Meaning | Approved wording | Do not use for this entry |

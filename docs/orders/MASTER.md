@@ -454,6 +454,62 @@ held at Diglant, production under an existing PO, verified shortage and unknown 
 unknowns before buying; a timing shortfall is not an automatic quantity purchase; evaluate each SO
 line separately. The operating target is approved, not built; expected supply remains non-Ready Stock.
 
+**UI, KIT AND SOURCES — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** The
+operating model above is unchanged; this fixes how it is drawn and where every number comes from.
+
+- **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (`+ New Sales Order` ·
+  Search · Export · Columns). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
+  top region with the view selector `Order list` · `Monthly demand`; the scrolling region shows only
+  the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
+  months) and Export produces the matrix.
+- **Order list groups:** `Dealer / Sales Location` (multi-select with search) · `Delivery State /
+  City` (two selects) · `Date` (field select `Proceed Date` · `SO Doc Date` · `Customer Requested
+  Delivery Date` + range select `All dates` · `Today` · `This week` · `This month` · `Custom`) ·
+  `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
+  (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
+  cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
+  select · `6 months` / `3 months`, the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
+  `Dealer / Sales Location` · `Delivery State / City` · `Product category` (multi-select, no
+  search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
+  pressing it again.
+- **Kit admission — `FilterRailMultiSelect`** (joins `workspace-rail.tsx`; the single-choice
+  `FilterRailSelect` and `FilterRailRow` are untouched): an optional 32px search box inside the
+  group; 36px rows = 16px `rounded-pill` checkbox + wrapping label + right-aligned count;
+  `role="checkbox"` / `aria-checked`; chosen rows sort first and stay visible; the group title's
+  right slot prints `{n} selected` in blue (the single-choice groups print the chosen value there);
+  Esc clears the search only.
+- **The matrix is the shared DataGrid** (`rowHeight={40}`, `Product` pinned left, §6.9 connected
+  expansion): columns `Product` · `Earlier` · one column per month of the window (`Oct 2026`) ·
+  `Later` · `No date` · `Total`; rows the catalog categories (`Mattress` · `Bedframe` · `Sofa` ·
+  `Accessory`), each expanding to model, then size/configuration; a `Total` footer row. A cell is
+  the physical pieces still owed to the customer in that month and category: the current effective
+  Revision's `order_lines.qty` less pieces actually delivered (Stock's `delivered` Units bound by
+  `reserved_order_line_id`); gifts under their real category; services never; a pending amendment
+  never. Month = `orders.delivery_date`; `No date` = legacy `delivery_date_tbd` rows only, with
+  `{n} pieces have no delivery date` beside the header. Zero prints `0`; a cell whose source read
+  failed prints `Unavailable`. Lines with no catalog row count under `Not in catalog` (never
+  dropped, never a kind of goods).
+- **Clicking a number selects the cell (blue-3) and expands that row** to the contributing orders
+  for that month — `SO No · Dealer · Customer Requested Delivery Date · Qty still owed · Coverage`
+  — under the same filters and permissions; `SO No` opens the order. No second timeline, no drawer.
+- **The coverage strip under the matrix reads the selected cell's month and category:** `Still
+  owed {n}` · `Reserved from stock {n}` (`ops_stock_items.reserved_order_line_id`) · `On purchase
+  orders {n}` (`po_line_sources`, non-cancelled — including Rental §5.6's evidenced Diglant supply,
+  counted once) · `Still to buy {n}` (`soBatchOrderLineOutstandingQty`, SO Batch's one arithmetic)
+  · `Supplier may be late {n}` (`effectiveArrivalOf` later than the requested date) · `Arrival not
+  known {n}` (no PO Delivery Date and no answer) · the door `Open SO Batch Purchase →`. Nothing is
+  bought or reserved here.
+- **States:** skeleton = rail groups + a 10-column, 3-row matrix + the strip; filtered empty `No
+  confirmed demand in these months` (the `No date` column still shows); whole failure `Monthly
+  demand could not be loaded` + `Try again`; a single failed source prints `Unavailable` in its
+  numbers only; permission follows the Register's scope.
+- **Responsive:** 1440 / 1180 rail beside a 1048px matrix (`Product` 200 · months 96 × 8 · `Total`
+  80) that scrolls inside its own frame with `Product` pinned; below 896px
+  (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the strip's six
+  numbers become two rows of three; at 390 `Period` moves under the toolbar and every target is
+  40px; the page never scrolls sideways.
+- Words registered in COPY-STANDARD § Monthly demand words with this ruling.
+
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
 gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
