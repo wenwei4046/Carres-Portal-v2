@@ -8,7 +8,7 @@
  *
  * The middle column is a PICKER, not the work: two lines in 300px, like an
  * inbox. Line 1 is the document number (bold) with the due date on the
- * right — red `Was due {date}` when missed, `No date` when none. Line 2 is
+ * right — red when missed, `No date` when none. Line 2 is
  * the action sentence, truncated. A covered row carries `For {normal owner}`
  * beside the number. Choosing a row shows it on the right; only the number
  * opens the record. The chosen row is the one blue of the list.
@@ -19,7 +19,9 @@ import type { WorkRow } from "../use-open-work";
 
 export function workDueWord(item: Pick<WorkRow, "timingBucket" | "dueIso">): { text: string; missed: boolean } {
   if (!item.dueIso) return { text: "No date", missed: false };
-  if (item.timingBucket === "overdue") return { text: `Was due ${fmtDate(item.dueIso)}`, missed: true };
+  /* A late row is the date in red — no word (Jess, 2026-09-26: "why was
+     due? remove"); the rail's Missed row already says it. */
+  if (item.timingBucket === "overdue") return { text: fmtDate(item.dueIso), missed: true };
   return { text: fmtDate(item.dueIso), missed: false };
 }
 

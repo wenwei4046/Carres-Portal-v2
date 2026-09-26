@@ -294,7 +294,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     const list = screen.getByTestId("work-list");
     const card = list.querySelector("[data-work-row]") as HTMLElement;
-    expect(card.getAttribute("aria-label")).toContain("Was due Wed, 5 Aug");
+    expect(card.getAttribute("aria-label")).toContain("Wed, 5 Aug");
+    expect(card.querySelector("[data-testid=work-row-due]")?.className).toContain("text-danger");
     expect(list).not.toHaveTextContent("working days missed");
   });
 });

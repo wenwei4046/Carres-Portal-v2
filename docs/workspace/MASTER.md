@@ -740,7 +740,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   16px from its last card to the next owner.
 - **THE WORK LIST ROW — 52px, two lines, in a 300px column (Jess, 2026-09-26; replaces the
   104px card).** The middle column is a PICKER: line 1 is the document number 13/18/600 with the
-  due date 12/16 on the right (`Thu, 1 Oct`; red 600 `Was due Wed, 9 Sep` when missed; `No date`);
+  due date 12/16 on the right (`Thu, 1 Oct`; the date alone in red 600 when missed — no word; `No date`);
   line 2 is the action sentence 13/18 slate-11 truncated. My Work marks a covered row `For {normal
   owner}` in an amber tag beside the number; Team Work says it once on the owner's group line.
   Rows sit edge to edge with a 1px rule; the chosen row is the pale-blue wash with the 2px left
