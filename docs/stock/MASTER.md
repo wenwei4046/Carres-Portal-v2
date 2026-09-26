@@ -741,7 +741,7 @@ stock use`, `Orders / dates`) are retired as design, and a Unit's further facts 
 Detail, opened from the Unit ID. `Site · Ownership · Condition · Category · Last verified ·
 Supplier · Last moved` remain one click away in `Columns`. Every identifier prints in its ruled
 form — `U1-000-084` · `SO2609-4827` · `PO260924-4827` · a five-digit `DO`/`SDO` — and a quantity
-row prints `—` for Unit ID with `×{qty}` beside the product. Measured on production 2026-09-25:
+row prints nothing for Unit ID (owner ruling 2026-09-26: no dash on a screen) with `×{qty}` beside the product. Measured on production 2026-09-25:
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
@@ -765,7 +765,7 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 | Column | Meaning | Absence |
 |---|---|---|
 | `Goods Received Date` | the day it entered Carres control (posted receipt; a Unit booked in before Receiving existed keeps its recorded date in) | `Not received` for an `Incoming` Unit (no Receiving record); `Not recorded` for goods Carres holds whose date was never captured — measured 2026-09-26: 27 opening-stock rows |
-| `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
+| `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints nothing (no dash on a screen, owner 2026-09-26) | nothing |
 | `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
 | `Stock Condition` | the physical state (owner rename 2026-09-25; the stock picker's `Condition` head follows so the portal keeps one word): `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
