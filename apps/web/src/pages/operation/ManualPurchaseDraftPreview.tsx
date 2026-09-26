@@ -39,7 +39,8 @@ export interface ManualPurchaseDraftLine {
   item: string;
   supplier: string | null;
   qty: number;
-  note: string | null;
+  /** 0591 — the line's configuration words (colour · fabric · size · options). */
+  configuration: string | null;
 }
 
 export default function ManualPurchaseDraftPreview({
@@ -91,7 +92,7 @@ export default function ManualPurchaseDraftPreview({
                         picked line shows, never the model word alone. */}
                     <span className="mp-preview-sku">{l.sku}</span>
                     <span className="mp-preview-item"> · {l.item}</span>
-                    {l.note ? <span className="mp-preview-note">{l.note}</span> : null}
+                    {l.configuration ? <span className="mp-preview-note">{l.configuration}</span> : null}
                   </td>
                   <td>{l.supplier ?? null}</td>
                   <td className="mp-preview-num">{l.qty}</td>

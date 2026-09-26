@@ -321,8 +321,8 @@ describe("R4 · Edit and send again", () => {
       p_for_staff_user_id: null,
       p_for_subsidiary_name: null,
       p_lines: [
-        { id: LINE, sku: "5539-2NA", qty: 3, remark: "left side" },
-        { id: null, sku: "5539-CNR", qty: 1, remark: null },
+        { id: LINE, sku: "5539-2NA", qty: 3, remark: "left side", attrs: null },
+        { id: null, sku: "5539-CNR", qty: 1, remark: null , attrs: null },
       ],
     });
   });

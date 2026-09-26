@@ -53,9 +53,9 @@ export interface ManualPurchaseIssueWall {
   deliveryMethod?: "we_collect" | "supplier_delivers" | null;
   sku: string;
   item: string;
-  note?: string | null;
+  /** 0591 — the line's configuration words, printed under the item. */
+  configuration?: string | null;
   requestNo?: string | null;
-  purchaseRequirement?: string | null;
   remainingQty: number;
 }
 
@@ -125,9 +125,8 @@ export function manualPurchaseReviewDocuments(
         so: null,
         /* `MPR No` in the Source column — a Manual Purchase has no SO. */
         sourceLabel: line.requestNo ?? null,
-        purchaseRequirement: line.purchaseRequirement ?? null,
         item: line.item,
-        variant: [line.purposeLabel, line.note].filter(Boolean).join(" · ") || null,
+        variant: [line.purposeLabel, line.configuration].filter(Boolean).join(" · ") || null,
         skus: [line.sku],
         qty: line.remainingQty,
         /* The MPR's own requested arrival date — the fact that SPLIT this

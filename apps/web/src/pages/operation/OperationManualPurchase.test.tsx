@@ -1034,21 +1034,22 @@ describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
 });
 
 describe("the create workspace — full page, never a dialog (card §3)", () => {
-  it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
+  it("the ITEMS block (owner, 2026-09-03 / 2026-09-26): Item and Qty captions, no free-text Note, one grid, `+ Add line` under the lines", async () => {
     await openWorkspace();
     const lines = screen.getByTestId("mp-lines");
-    // The word. COPY-STANDARD rules `Note` for this form's field; `Remark` was
-    // the retired dialog's word and may not survive the port.
     /* D1 — each cell also carries its own caption for the narrow reflow
-       (hidden on a wide form); the caption ROW is the one that sits over it. */
+       (hidden on a wide form); the caption ROW is the one that sits over it.
+       Owner 2026-09-26: the free-text `Note` column is gone — a line is
+       CONFIGURED through the Sales portal's `Configure` instead. */
     const caption = within(lines)
-      .getAllByText("Note")
+      .getAllByText("Qty")
       .find((el) => el.classList.contains("mp-line-head"))!;
     expect(lines.contains(caption)).toBe(true);
     expect(lines.textContent).not.toContain("Remark");
-    expect(screen.getByLabelText("Note")).toBe(document.getElementById("mp-note-0"));
-    // ONE grid: the caption row and the line share a parent, so the four
-    // tracks are resolved once and the caption sits over the note it names.
+    expect(within(lines).queryByText("Note")).toBeNull();
+    expect(document.getElementById("mp-note-0")).toBeNull();
+    // ONE grid: the caption row and the line share a parent, so the three
+    // tracks are resolved once and the caption sits over the cell it names.
     const line0 = screen.getByTestId("mp-line-0");
     expect(line0.parentElement).toBe(caption.parentElement);
     expect(line0.className).toContain("contents");
@@ -1250,18 +1251,19 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-preview-total").textContent).toBe("3");
   });
 
-  it("`Purchase requirement` is optional, on every purpose, and rides the wire", async () => {
-    /* ⭐ OWNER RULING 2026-09-22. It is NOT `What is this for?`: that one is
-       Other Purchase's required reason. `Ready Stock` is the default purpose
-       here, so this proves the requirement is asked where the reason is not. */
+  it("NO FREE TEXT (owner, 2026-09-26): no Purchase requirement, no Note — a line rides its configuration", async () => {
+    /* The owner's blueprint: "I order what, got colour to choose … no free
+       text". The retired 0562 requirement and the per-line Note are gone from
+       the form and from the wire; an unconfigured line sends `attrs: null`
+       and the picked line offers the Sales portal's `Configure`. */
     await openWorkspace();
-    expect(screen.queryByTestId("mp-why")).toBeNull();
+    expect(screen.queryByTestId("mp-requirement")).toBeNull();
+    expect(document.getElementById("mp-note-0")).toBeNull();
+    expect(screen.queryByText("Purchase requirement")).toBeNull();
     pickDeliveryDate();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
-    fireEvent.change(screen.getByTestId("mp-requirement"), {
-      target: { value: "Firm feel, king size only" },
-    });
+    expect(screen.getByTestId("mp-line-configure-0")).toHaveTextContent("Configure");
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() =>
@@ -1279,39 +1281,15 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
         String(c[0]).endsWith("/purchasing/requests"),
     )!;
     const body = JSON.parse(String((post[1] as RequestInit).body)) as {
-      purchaseRequirement?: string | null;
+      purchaseRequirement?: unknown;
+      lines: Array<{ sku: string; attrs: unknown; note?: unknown }>;
       why?: string | null;
     };
-    expect(body.purchaseRequirement).toBe("Firm feel, king size only");
+    expect("purchaseRequirement" in body).toBe(false);
+    expect(body.lines[0]).toMatchObject({ sku: "5539-2NA", attrs: null });
+    expect("note" in body.lines[0]!).toBe(false);
     /* The reason stays empty — a routine purpose is never asked it. */
     expect(body.why).toBeNull();
-  });
-
-  it("an EMPTY requirement rides as a real absence, never an empty string", async () => {
-    await openWorkspace();
-    pickDeliveryDate();
-    fireEvent.focus(document.getElementById("mp-item-0")!);
-    fireEvent.click(pickRow("5539-2NA"));
-    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
-    fireEvent.click(screen.getByTestId("mp-send"));
-    await waitFor(() =>
-      expect(
-        apiFetch.mock.calls.some(
-          (c) =>
-            (c[1] as RequestInit | undefined)?.method === "POST" &&
-            String(c[0]).endsWith("/purchasing/requests"),
-        ),
-      ).toBe(true),
-    );
-    const post = apiFetch.mock.calls.find(
-      (c) =>
-        (c[1] as RequestInit | undefined)?.method === "POST" &&
-        String(c[0]).endsWith("/purchasing/requests"),
-    )!;
-    const body = JSON.parse(String((post[1] as RequestInit).body)) as {
-      purchaseRequirement?: string | null;
-    };
-    expect(body.purchaseRequirement).toBeNull();
   });
 
   /* ⭐ RE-PINNED, NOT DELETED (0410, YH 2026-09-01).
@@ -3924,34 +3902,32 @@ describe("Round 2 · the object's rounds", () => {
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => expect(posts(`/${REQ1}/resubmit`).length).toBe(1));
     const body = JSON.parse(String((posts(`/${REQ1}/resubmit`)[0]![1] as RequestInit).body));
-    expect(body.lines).toEqual([{ id: "l1", sku: "5539-2NA", qty: 1, note: "grey, not beige" }]);
+    expect(body.lines).toEqual([{ id: "l1", sku: "5539-2NA", qty: 1, attrs: null }]);
     expect(body.requiredBy).toBe("2026-09-12");
     // Nothing new was created: no POST to the create door.
     expect(posts("/purchasing/requests").length).toBe(0);
   });
 
-  it("R4 · a returned request reopens with its requirement, and the round REPLACES it", async () => {
-    /* ⭐ 0562 · the requirement travels with the edit. Clearing it must be a
-       real edit — a coalesced column could never be emptied again. */
+  it("R4 · a returned request reopens with each line's configuration, and sends it again", async () => {
+    /* 0591 · the configuration travels with the edit, printed under the
+       item and sent back on the wire; nothing free-text rides beside it. */
+    const attrs = { color: "Sand", fabric_name: "Fabric CG-012" };
     await openObject(false, {
-      request: {
-        ...REGISTER.requests[0],
-        purpose: "ready_stock",
-        sent_back_at: "2026-08-21T01:00:00Z",
-        purchase_requirement: "Firm feel, king size only",
-      },
+      request: { ...REGISTER.requests[0], purpose: "ready_stock", sent_back_at: "2026-08-21T01:00:00Z" },
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ1).map((l) => ({ ...l, attrs })),
       canEditAndSendAgain: true,
     });
     fireEvent.click(screen.getByTestId("mp-edit-and-send-again"));
     await screen.findByTestId("manual-purchase-create");
-    expect(screen.getByTestId("mp-requirement")).toHaveValue("Firm feel, king size only");
-    fireEvent.change(screen.getByTestId("mp-requirement"), { target: { value: "" } });
+    expect(screen.getByTestId("mp-line-config-0")).toHaveTextContent("Sand");
+    expect(screen.queryByTestId("mp-requirement")).toBeNull();
     await answerStockQuestion();
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => expect(posts(`/${REQ1}/resubmit`).length).toBe(1));
     const body = JSON.parse(String((posts(`/${REQ1}/resubmit`)[0]![1] as RequestInit).body));
-    expect(body.purchaseRequirement).toBeNull();
+    expect(body.lines[0]).toMatchObject({ id: "l1", sku: "5539-2NA", attrs });
+    expect("purchaseRequirement" in body).toBe(false);
   });
 
   it("R3 · the requester withdraws after one confirmation; others never see the door", async () => {

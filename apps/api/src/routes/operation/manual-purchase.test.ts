@@ -1924,8 +1924,8 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     const [fn, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
     expect(fn).toBe("purchasing_create_request_with_lines");
     expect(args.p_lines).toEqual([
-      { sku: "5539-2NA", qty: 2, required_by: null, remark: null },
-      { sku: "5539-CNR", qty: 1, required_by: null, remark: null },
+      { sku: "5539-2NA", qty: 2, required_by: null, remark: null, attrs: null },
+      { sku: "5539-CNR", qty: 1, required_by: null, remark: null, attrs: null },
     ]);
     /* ONE call. The per-line loop is what this replaces. */
     expect(rpc).toHaveBeenCalledTimes(1);

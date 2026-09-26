@@ -4761,6 +4761,10 @@ export interface PurchaseRequestLineRow {
   stock_reserved_qty?: number;
   required_by: string | null;
   remark: string | null;
+  /** 0591 — the line's configuration, chosen like a Sales portal line
+   *  (colour · fabric · size · options); the shape of `order_lines.attrs`.
+   *  Absent on a payload from a Worker before 0591. */
+  attrs?: Record<string, unknown> | null;
   po_id: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
