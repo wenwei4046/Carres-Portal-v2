@@ -1317,8 +1317,8 @@ creates both actions for their own quantities.
 
 Each leg has its own Logistics Partner, linked DO scope, dates, handover, **Who has it** fact and
 proof. Leg 1 completion means accepted at the named JB warehouse; it never means the Singapore
-customer received the goods. Both leg DOs appear in Related Documents and in the relevant Route
-nodes. Delivery remains the writer; Sales provides doors only.
+customer received the goods. Both leg DOs appear as their own lanes' `DELIVERY ORDER` nodes on Order
+Route (`Related Documents` is retired). Delivery remains the writer; Sales provides doors only.
 
 Delivery owns confirmed operational arrangement facts. Sales Orders keeps the promised Customer
 Delivery date. If the customer request changes the commercial promise, it uses the governed Sales
@@ -1362,7 +1362,7 @@ Open Delivery Order →
 ```
 
 The authoritative Delivery Orders Register and DO object live under Delivery. The SO Register,
-Related Documents and Order Route only link to the documents. For Singapore, each linked leg keeps
+Order Route only links to the documents (`Related Documents` is retired). For Singapore, each linked leg keeps
 its own DO/document scope; split or rebooked documents remain separate history rather than
 overwriting one number.
 

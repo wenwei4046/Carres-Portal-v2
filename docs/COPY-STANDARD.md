@@ -2728,7 +2728,8 @@ inside the object already open, so it has no circular `Open SO-{n} →` action.
 | The day the customer asked for | **`Customer requested: {date}`** |
 | The day the delivery is due | **`Due: {date}`** |
 | The day the Purchase Order was issued | **`Issued: {date}`** |
-| What the supplier confirmed | **`Estimated ready: {date}`** |
+| The Purchase Order's immutable original date (owner ruling 2026-09-26) | **`PO Delivery Date: {date}`** |
+| The supplier's newest promise, when it differs (owner ruling 2026-09-26) | **`Expected arrival: {date}`** (` · Delayed · {reason}` / ` · Earlier`) |
 | The day the goods arrived | **`Received: {date}`** |
 | The agreed delivery day | **`Delivery appointment: {date}`** |
 | The booked day, before it happens | **`Scheduled: {date}`** |
