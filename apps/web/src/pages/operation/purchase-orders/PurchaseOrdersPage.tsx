@@ -1633,8 +1633,12 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
        `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
        the PANE rather than scroll inside it, and the document would be
        squeezed to nothing. */
-    <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="po-document-panes">
-      <div className="flex min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4 lg:w-1/2 lg:overflow-auto">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-visible" data-testid="po-document-panes">
+      {/* Below `lg` the two panes STACK and the page scrolls as one column, so
+          neither pane may shrink or clip (measured 2026-09-26 at 743px: the
+          document pane was drawn over the Terms field). Beside each other at
+          `lg`, each pane scrolls on its own so the paper holds its place. */}
+      <div className="flex min-w-0 shrink-0 flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:overflow-auto">
       <WorkCard row={row} owner={owner} />
       <Block title="Purchase order">
         {/* The Sales Order fact grammar (owner, 2026-09-26): label over value,
@@ -1754,7 +1758,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           while the facts scroll beside it — the whole reason the two are side
           by side. */}
       <aside
-        className="min-h-0 min-w-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto"
+        className="min-w-0 shrink-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:border-l lg:border-t-0 lg:overflow-auto"
         aria-label="Purchase order document"
         data-testid="po-document-column"
       >
