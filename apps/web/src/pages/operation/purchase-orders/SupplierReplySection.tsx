@@ -266,14 +266,15 @@ export default function SupplierReplySection({
           ) : null}
         </div>
         <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
-          {/* The READ table fits the half-width object pane (owner's 1074px
-              viewport ⇒ ~480px): no minimum width, the narrow columns are
-              fixed and the Item column takes the rest, wrapping its Unit IDs.
-              Only the EDIT table below, with its controls, may scroll. */}
-          <table className="w-full border-collapse text-meta" data-testid="po-supplier-reply-table">
+          {/* The READ table: the narrow columns are fixed and the Item column
+              takes the rest, wrapping its Unit IDs — but never below 180px
+              (measured 2026-09-26 at the owner's 1074px viewport: without a
+              floor the item name broke into one word per line). Below 560px
+              the card's own scroller takes over, like the Goods lines table. */}
+          <table className="w-full min-w-[560px] border-collapse text-meta" data-testid="po-supplier-reply-table">
             <thead className="bg-kit-slate-3">
               <tr>
-                <th className={readHead}>Item</th><th className={`${readHead} w-12 text-right`}>Qty</th><th className={`${readHead} w-16 text-right`}>To deliver</th>
+                <th className={`${readHead} min-w-[180px]`}>Item</th><th className={`${readHead} w-12 text-right`}>Qty</th><th className={`${readHead} w-16 text-right`}>To deliver</th>
                 <th className={`${readHead} w-[112px]`}>Supplier Confirmed Delivery Date</th><th className={`${readHead} w-[128px]`}>Last answer</th>
               </tr>
             </thead>
