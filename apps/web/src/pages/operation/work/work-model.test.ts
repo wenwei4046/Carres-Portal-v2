@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
-import { filterWork, parseWorkStatus, parseWorkWeek, toggleWorkStatus, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workSections, workWeek, workWeekWord } from "./work-model";
+import { filterWork, parseWorkMonth, parseWorkStatus, parseWorkWeek, toggleWorkStatus, workFocusDay, workHoliday, workLayoutFor, workModuleCounts, workRailDates, workRailMonth, workSections, workWeek } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
@@ -184,10 +184,29 @@ describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
 });
 
 describe("the rail's own words (Jess, 2026-09-26)", () => {
-  it("the header is one line: Week of {day Mon}, no weekday, no dash", () => {
-    expect(workWeekWord("2026-09-28")).toBe("Week of 28 Sep");
-    expect(workWeekWord("2026-10-01")).toBe("Week of 28 Sep");
-    expect(workWeekWord("2026-12-28")).toBe("Week of 28 Dec");
+  it("the month grid: Monday to Saturday, every week of the month, Sunday never drawn", () => {
+    const month = workRailMonth([
+      row({ id: "a", dueIso: "2026-09-19", timingBucket: "later" }),
+      row({ id: "b", dueIso: "2026-09-10", timingBucket: "overdue" }),
+    ], "2026-09-17", "2026-09");
+    expect(month.month).toBe("Sep 2026");
+    expect([month.previousMonth, month.nextMonth]).toEqual(["2026-08", "2026-10"]);
+    expect(month.weeks).toHaveLength(5);
+    expect(month.weeks[0]!.map((d) => d?.dayNumber ?? null)).toEqual([null, "1", "2", "3", "4", "5"]);
+    expect(month.weeks[2]!.map((d) => d?.dayNumber ?? null)).toEqual(["14", "15", "16", "17", "18", "19"]);
+    expect(month.weeks[4]!.map((d) => d?.dayNumber ?? null)).toEqual(["28", "29", "30", null, null, null]);
+    /* Saturday carries its count; a missed row is under Missed, not its day. */
+    expect(month.weeks[2]![5]!.count).toBe(1);
+    expect(month.weeks[1]![3]!.count).toBe(0);
+    expect(month.missed).toBe(1);
+    expect(month.weeks[2]![2]!.holiday).toBe("Malaysia Day");
+    expect(month.weeks[2]![3]!.today).toBe(true);
+    /* The year turns cleanly. */
+    expect(workRailMonth([], "2026-12-30", "2026-12").nextMonth).toBe("2027-01");
+    expect(workRailMonth([], "2027-01-05", "2027-01").previousMonth).toBe("2026-12");
+    expect(parseWorkMonth("2026-09-17")).toBe("2026-09");
+    expect(parseWorkMonth("2026-09")).toBe("2026-09");
+    expect(parseWorkMonth("next")).toBeNull();
   });
   it("Status: To do alone by default; more than one may be on; the last one on stays", () => {
     expect(parseWorkStatus(null)).toEqual(["todo"]);

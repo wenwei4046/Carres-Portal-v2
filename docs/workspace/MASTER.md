@@ -402,23 +402,23 @@ column); BUILT 2026-09-26.** The shared 240px `FilterRail` (`Hide filters` / `Sh
 remembered per browser), running from the page header to the bottom. Every row is a real button with
 a complete accessible name and a visible keyboard focus ring. Top to bottom:
 
-- **The week header — ONE line:** `Previous week` · **`Week of {d Mon}`** (`Week of 28 Sep`, the
-  week's Monday, no weekday, no dash) · `Next week`. The arrows move the visible week by one work
-  week and change neither the chosen Date, the Status, the Page nor any filter. The two-date label
-  (`Mon, 28 Sep – Fri, 2 Oct`) is retired: it wrapped to three lines in 240px.
-- **The week strip — ONE row of day tiles** (`FilterRailWeekStrip`, the calendar-icon tile the
-  owner chose 2026-09-26), 216px shared equally: five tiles Monday to Friday, six when Saturday
-  holds work (a Warehouse rail is fixed at six). A tile is a tinted band holding the uppercase
-  weekday over a white body holding the day number over the count line, all cut from the one
-  `fmtDate` spelling and moved by whole `YYYY-MM-DD` days. **No blue words:** weekday grey, number
-  black. The count line prints the number of open actions dated that day and is **empty** when
-  there are none — never `No work`, never `0`. A public holiday (and any non-working day) is the
-  grey-text tile, its name only in the accessible name and tooltip (`Malaysia Day`) — never `Hol`,
-  never `Public holiday ·`. **Today** is the black number with a dot under it; the word `Today` is
-  never on screen. The **chosen** day is the solid-blue tile with white text — the rail's ONE blue:
-  a group's `All …` row and the default `To do` row are bold, never washed. Today, closed and chosen
-  are independent states. A day can be chosen whether or not it is closed and counts the work dated
-  on it.
+- **The month header — ONE line:** `Previous month` · **`{Mon YYYY}`** (`Sep 2026`) · `Next
+  month`. The arrows move the visible month and change neither the chosen Date, the Status, the
+  Page nor any filter. (The 2026-09-24 two-week column and the 2026-09-26 one-week strip are
+  retired: the owner wants the whole month.)
+- **The month grid — Monday to Saturday, every week of the month** (`FilterRailMonthGrid`, Jess
+  2026-09-26: "full 1 month — need to see Sat work; office doesn't work Saturday, but the Workspace
+  needs to see it"). Six 36px tiles share the 216px row; Sunday is never drawn. A tile is the day
+  number over its count line, cut from the one `fmtDate` spelling and moved by whole `YYYY-MM-DD`
+  days. **No blue words:** the column heads `MON`–`SAT` grey, numbers black. The count line prints
+  the number of open actions dated that day and is **empty** when there are none — never
+  `No work`, never `0`. A public holiday (and any non-working day) is the grey-text tile, its name
+  only in the accessible name and tooltip (`Malaysia Day`) — never `Hol`, never `Public holiday ·`.
+  **Today** is the black number with a dot under it; the word `Today` is never on screen. The
+  **chosen** day is the solid-blue tile with white text — the page's ONE blue: a rail row choice is
+  bold with its left line, never washed; the only washed row on the page is the chosen work. Today,
+  closed and chosen are independent states. A day can be chosen whether or not it is closed and
+  counts the work dated on it.
 - **The fixed rows** `Missed {n}` and `No date {n}` — `0` printed. `Missed`, one tile and `No date`
   are one mutually exclusive Date choice. A missed occurrence counts once, under `Missed`, never
   again under its past weekday.
@@ -436,10 +436,10 @@ a complete accessible name and a visible keyboard focus ring. Top to bottom:
 Date, Status, Page and Owner combine. The rail is the only place these facts live: the middle
 column draws **no date heading, no count heading and no tabs** above the list.
 
-The URL carries the visible week (`week`, its Monday), the Date choice (`day` = `missed` ·
+The URL carries the visible month (`month`), the Date choice (`day` = `missed` ·
 `YYYY-MM-DD` · `no_date`) and the module (`module`); opening that URL restores all three. Without
-`week`, the rail shows the week of the chosen date, else the week of the focus day. The URL also
-carries the Status choice (`status` = a comma list of `todo` · `waiting` · `done`; absent = `To do`).
+`month` (`YYYY-MM`), the rail shows the month of the chosen date, else the month of the focus day.
+The URL also carries the Status choice (`status` = a comma list of `todo` · `waiting` · `done`; absent = `To do`).
 The opening focus list (no `day`) rings the focus day's tile. `day=all`, reached from the toolbar's timing
 filter or a Dashboard link, lists every open action and highlights no Date option.
 
@@ -643,7 +643,7 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px.
   **The left rail is the rail every page follows — the Payment Monitor's grammar (Jess,
   2026-09-26) with her same-day correction:** the shared 240px `FilterRail` with `Hide filters`;
-  the one-line header `‹ Week of 28 Sep ›`; the week as one strip of day tiles; the fixed rows
+  the one-line header `‹ Sep 2026 ›`; the Monday–Saturday month grid of day tiles; the fixed rows
   `Missed {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
   its count) and, in Team Work, the `Owner` select — exactly as §5.2 Panel 1 writes it. Hidden, it
   leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it

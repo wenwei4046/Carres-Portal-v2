@@ -37,8 +37,8 @@ import {
   filterWork,
   inWorkDay,
   isWorkDate,
+  parseWorkMonth,
   parseWorkStatus,
-  parseWorkWeek,
   toggleWorkStatus,
   WORK_MODULES,
   WORK_STATUS_ORDER,
@@ -46,10 +46,9 @@ import {
   workFocusDay,
   workLayoutFor,
   workModuleCounts,
-  workRailDates,
+  workRailMonth,
   workSections,
   workStatusOf,
-  workWeekWord,
   type WorkStatus,
   type WorkWhen,
 } from "./work/work-model";
@@ -59,7 +58,7 @@ import WorkParties, { type MissionReport, type Party } from "./work/WorkParties"
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailWeekStrip, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailMonthGrid, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
 import { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
 import WorkListRow from "./work/WorkListRow";
 
@@ -282,13 +281,13 @@ export default function OperationWork() {
     : filterWork(allItems, { ...filters, module: "all" }).filter((item) => !ownerFocus || ownerGroupKey(item) === ownerFocus)
   ).filter(inDay);
 
-  /** The rail's visible week (owner ruling 2026-09-24): the URL's `week`,
-   *  else the week of the chosen date, else the week of the focus day. The
-   *  arrows move it one work week without touching the chosen Date. */
-  const week = parseWorkWeek(params.get("week")) ?? (isWorkDate(day) ? day : focusDay);
+  /** The rail's visible MONTH (Jess, 2026-09-26): the URL's `month`, else the
+   *  month of the chosen date, else the month of the focus day. The arrows
+   *  move it one month without touching the chosen Date. */
+  const monthKey = parseWorkMonth(params.get("month")) ?? parseWorkMonth(isWorkDate(day) ? day : focusDay);
   const railDates = useMemo(
-    () => (week ? workRailDates(beforeDay, generatedOn, week) : null),
-    [beforeDay, generatedOn, week],
+    () => (monthKey ? workRailMonth(beforeDay, generatedOn, monthKey) : null),
+    [beforeDay, generatedOn, monthKey],
   );
   const railSelected = selectedDay === "missed" || selectedDay === "no_date" || isWorkDate(selectedDay) ? selectedDay : null;
   const moduleCounts = workModuleCounts(moduleCountRows);
@@ -431,8 +430,8 @@ export default function OperationWork() {
 
   /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26 — the Payment Monitor rail,
      then her correction the same day): ONE header line `‹ Week of 28 Sep ›`,
-     then the week as one row of day tiles (weekday · day number · count —
-     five, six when Saturday holds work), then the fixed rows `Missed` and
+     then the whole month as a Monday–Saturday grid of day tiles (day number
+     over count; Sunday never drawn), then the fixed rows `Missed` and
      `No date`, the `Status` rows (more than one may be on), the `Page` rows
      and — in Team Work — the Owner select. A non-working day is a grey tile
      with no count; today is the solid-blue tile; the chosen day is ringed.
@@ -450,21 +449,21 @@ export default function OperationWork() {
       onHide={() => { setRailOpen(false); setPhoneRailOverride(false); }}
       header={(
         <div data-testid="work-rail-week" className="flex items-center gap-1 pr-8">
-          <button type="button" aria-label="Previous week" title="Previous week" className={weekArrow} onClick={() => updateParam("week", railDates.previousWeek)}>
+          <button type="button" aria-label="Previous month" title="Previous month" className={weekArrow} onClick={() => updateParam("month", railDates.previousMonth)}>
             <Icon name="previous" size={16} />
           </button>
           <span className="min-w-0 flex-1 truncate text-center text-body font-semibold text-kit-slate-12" data-testid="work-rail-week-label">
-            {workWeekWord(week)}
+            {railDates.month}
           </span>
-          <button type="button" aria-label="Next week" title="Next week" className={weekArrow} onClick={() => updateParam("week", railDates.nextWeek)}>
+          <button type="button" aria-label="Next month" title="Next month" className={weekArrow} onClick={() => updateParam("month", railDates.nextMonth)}>
             <Icon name="forward" size={16} />
           </button>
         </div>
       )}
     >
-      <FilterRailWeekStrip
+      <FilterRailMonthGrid
         testId="work-rail-days"
-        days={railDates.days.map((d) => ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today }))}
+        weeks={railDates.weeks.map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
         chosenIso={railSelected}
         onPick={pickDay}
       />
@@ -651,7 +650,7 @@ export default function OperationWork() {
                     type="button"
                     onClick={() => setParams((before) => {
                       const next = new URLSearchParams(before);
-                      for (const key of ["q", "when", "module", "status", "owner", "day", "week", "selected"]) next.delete(key);
+                      for (const key of ["q", "when", "module", "status", "owner", "day", "month", "selected"]) next.delete(key);
                       return next;
                     }, { replace: true })}
                     className="ml-auto h-9 px-2 text-control text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12"

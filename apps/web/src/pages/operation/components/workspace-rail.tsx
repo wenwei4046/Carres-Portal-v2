@@ -646,22 +646,23 @@ export function useFilterRailOpen(
 }
 
 /**
- * ── THE WEEK STRIP — one row of day tiles under the rail's week header ─────
- * (Jess, 2026-09-26: Work; the Payment Monitor and Warehouse rails follow.)
+ * ── THE MONTH GRID — the rail's calendar, Monday to Saturday ──────────────
+ * (Jess, 2026-09-26: "full 1 month, need to see Sat work — office doesn't
+ * work Saturday, but the Workspace needs to see it". Sunday is never drawn.)
  *
  * ```
- *   ┌MON─┐ ┌TUE─┐ ┌WED─┐ ┌THU─┐ ┌FRI─┐
- *   │ 28 │ │ 29 │ │ 30 │ │  1 │ │  2 │     ← a tile: weekday band over the day
- *   └────┘ └─2──┘ └────┘ └─3──┘ └─2──┘        number over the count line
+ *    MON TUE WED THU FRI SAT
+ *          1   2   3   4   5
+ *      7   8   9  10  11  12
+ *     14  15  16  17  18  19      ← a tile: the day number over its count
+ *              2   3   2   1
  * ```
  *
- * The tile is the calendar-icon shape the owner chose: a tinted band holding
- * the weekday, a white body holding the day number, the count under it.
  * Nothing is written in words — the count line is EMPTY when nothing is due,
- * a closed day (public holiday) is the grey tile with its name only in the
+ * a closed day (public holiday) is grey text with its name only in the
  * accessible name and tooltip, and today is the black number with a dot
- * under it. The ONE blue is the chosen tile: solid band and body, white text.
- * Five tiles share the 216px row; a sixth (Saturday) shrinks them evenly.
+ * under it. The ONE blue is the chosen tile: solid, white text. Six columns
+ * share the 216px row (36px each).
  */
 export interface RailWeekDay {
   iso: string;
@@ -676,55 +677,58 @@ export interface RailWeekDay {
   today: boolean;
 }
 
-export function FilterRailWeekStrip({
-  days,
+const MONTH_GRID_COLUMNS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
+
+export function FilterRailMonthGrid({
+  weeks,
   chosenIso,
   onPick,
   testId,
 }: {
-  days: readonly RailWeekDay[];
+  weeks: readonly (readonly (RailWeekDay | null)[])[];
   chosenIso: string | null;
   onPick: (iso: string) => void;
   testId: string;
 }) {
   return (
-    <div
-      className="grid gap-1 py-3"
-      style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
-      data-testid={testId}
-    >
-      {days.map((d) => {
-        const chosen = chosenIso === d.iso;
-        const closed = d.closed !== null;
-        const name = `${d.label}${d.today ? " · Today" : ""}${d.closed ? ` · ${d.closed}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`;
-        return (
-          <button
-            key={d.iso}
-            type="button"
-            onClick={() => onPick(d.iso)}
-            aria-pressed={chosen}
-            aria-label={name}
-            title={d.closed ?? undefined}
-            data-testid={`${testId.replace(/s$/, "")}-${d.iso}`}
-            data-today={d.today ? "yes" : undefined}
-            data-closed={closed ? "yes" : undefined}
-            className={[
-              "flex min-w-0 flex-col overflow-hidden rounded-control text-center tabular-nums",
-              chosen ? "bg-kit-blue-9 text-white" : "bg-white text-kit-slate-12 hover:bg-kit-slate-2",
-            ].join(" ")}
-          >
-            <span className={`block text-[10px] font-semibold leading-4 ${chosen ? "bg-kit-blue-9 text-white" : closed ? "bg-kit-slate-3 text-kit-slate-9" : "bg-kit-slate-3 text-kit-slate-11"}`}>
-              {d.weekday}
-            </span>
-            <span className={`block pt-1 text-[15px] font-semibold leading-5 ${chosen ? "text-white" : closed ? "text-kit-slate-9" : "text-kit-slate-12"}`}>
-              {d.dayNumber}
-            </span>
-            <span className={`block h-4 text-[11px] leading-4 ${chosen ? "text-white" : "text-kit-slate-11"}`}>
-              {!closed && d.count > 0 ? d.count : d.today ? <span aria-hidden className={`mx-auto mt-1.5 block h-1 w-1 rounded-full ${chosen ? "bg-white" : "bg-kit-slate-12"}`} /> : ""}
-            </span>
-          </button>
-        );
-      })}
+    <div className="py-2" data-testid={testId}>
+      <div className="grid grid-cols-6 gap-x-1" aria-hidden="true">
+        {MONTH_GRID_COLUMNS.map((c) => (
+          <span key={c} className="text-center text-[10px] font-semibold leading-4 text-kit-slate-9">{c}</span>
+        ))}
+      </div>
+      {weeks.map((week, row) => (
+        <div key={row} className="grid grid-cols-6 gap-x-1 gap-y-1" data-testid={`${testId}-week-${row}`}>
+          {week.map((d, col) => {
+            if (!d) return <span key={col} aria-hidden="true" />;
+            const chosen = chosenIso === d.iso;
+            const closed = d.closed !== null;
+            const name = `${d.label}${d.today ? " · Today" : ""}${d.closed ? ` · ${d.closed}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`;
+            return (
+              <button
+                key={d.iso}
+                type="button"
+                onClick={() => onPick(d.iso)}
+                aria-pressed={chosen}
+                aria-label={name}
+                title={d.closed ?? undefined}
+                data-testid={`${testId.replace(/s$/, "")}-${d.iso}`}
+                data-today={d.today ? "yes" : undefined}
+                data-closed={closed ? "yes" : undefined}
+                className={[
+                  "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
+                  chosen ? "bg-kit-blue-9 text-white" : closed ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
+                ].join(" ")}
+              >
+                <span className="text-[13px] font-semibold leading-4">{d.dayNumber}</span>
+                <span className={`h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+                  {!closed && d.count > 0 ? d.count : d.today ? <span aria-hidden className={`mx-auto mt-1 block h-1 w-1 rounded-full ${chosen ? "bg-white" : "bg-kit-slate-12"}`} /> : ""}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

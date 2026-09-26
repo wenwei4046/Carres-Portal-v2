@@ -2,7 +2,7 @@ import type { OperationWorkModule } from "@carres/shared";
 import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { isWorkingDay } from "@carres/shared/working-days";
 import { addDaysIso, weekStartIso } from "@/lib/excel-date-filter";
-import { fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
+import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
 import type { WorkLayout } from "./WorkSplitShell";
 
@@ -146,10 +146,75 @@ export function parseWorkWeek(value: string | null): string | null {
   return value && ISO_DATE.test(value) ? weekStartIso(value) : null;
 }
 
-/** The rail header's one line: `Week of 28 Sep` — the Monday, no weekday, no
- *  dash (Jess, 2026-09-26: the two-date label wrapped to three lines). */
-export function workWeekWord(dateInWeek: string): string {
-  return `Week of ${fmtDateShort(weekStartIso(dateInWeek))}`;
+/** The `YYYY-MM` a `month` URL value names (a full date is accepted too), or
+ *  null when it names no month. */
+export function parseWorkMonth(value: string | null): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}$/.test(value)) return value;
+  return ISO_DATE.test(value) ? value.slice(0, 7) : null;
+}
+
+export interface WorkRailMonth {
+  /** `Sep 2026`. */
+  month: string;
+  monthKey: string;
+  previousMonth: string;
+  nextMonth: string;
+  missed: number;
+  noDate: number;
+  /** Monday to Saturday, one row per week; a slot outside the month is null.
+   *  Sunday is never drawn (Jess, 2026-09-26: Saturday for the Warehouse,
+   *  nobody on Sunday). */
+  weeks: (WorkRailDay | null)[][];
+}
+
+function railDayOf(items: readonly WorkRow[], today: string, iso: string): WorkRailDay {
+  const label = fmtDate(iso);
+  const [weekday = "", rest = ""] = label.split(", ");
+  return {
+    iso,
+    label,
+    dayNumber: rest.split(" ")[0] ?? "",
+    weekday: weekday.toUpperCase(),
+    holiday: workHoliday(iso),
+    count: items.filter((item) => item.dueIso === iso && item.timingBucket !== "overdue").length,
+    today: iso === today,
+  };
+}
+
+/**
+ * THE MONTH GRID (Jess, 2026-09-26: "full 1 month, need to see Sat work").
+ * One calendar month, Monday to Saturday, every week of the month as a row.
+ * Counted on `YYYY-MM-DD` strings moved by whole days — no clock, no zone.
+ */
+export function workRailMonth(items: readonly WorkRow[], today: string, monthKey: string): WorkRailMonth {
+  const first = `${monthKey}-01`;
+  const [y, m] = monthKey.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const last = `${monthKey}-${String(daysInMonth).padStart(2, "0")}`;
+  const weeks: (WorkRailDay | null)[][] = [];
+  let monday = weekStartIso(first);
+  while (monday <= last) {
+    const row: (WorkRailDay | null)[] = [];
+    for (let offset = 0; offset < 6; offset += 1) {
+      const iso = addDaysIso(monday, offset);
+      row.push(iso >= first && iso <= last ? railDayOf(items, today, iso) : null);
+    }
+    weeks.push(row);
+    monday = addDaysIso(monday, 7);
+  }
+  const prev = new Date(Date.UTC(y, m - 2, 1));
+  const next = new Date(Date.UTC(y, m, 1));
+  const key = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  return {
+    month: fmtMonth(first),
+    monthKey,
+    previousMonth: key(prev),
+    nextMonth: key(next),
+    missed: items.filter((item) => item.timingBucket === "overdue").length,
+    noDate: items.filter((item) => item.timingBucket === "no_date").length,
+    weeks,
+  };
 }
 
 export interface WorkRailDay {
