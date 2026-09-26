@@ -547,13 +547,15 @@ a door to its owner: SO → SO, PO → PO, DO → DO.
 **REGISTER CLOSE-OUT — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on
 production 2026-09-25 (`6ed021fac`):
 
-1. **The context menu reads `Edit · View · Print · ─ Request Delivery Order · ─ Cancel SO`** (§11's
-   locked order). Shipped: `View · Edit · Print PDF · ─ Cancel SO` (`SalesOrdersRegister.tsx:652-675`).
-   `Print` is the one word (the Export menu already says it). `Request Delivery Order` is a handoff,
-   never an act in the grid: it opens Delivery's own request door for this order (the Monitor row;
-   the server door `POST /:id/delivery-order/request` exists, `order-control.ts:767`). The row is
-   drawn only for an outstation order (Delivery §3 — it is the outstation trip's door); an
-   ineligible order has no row, never a greyed one.
+1. **The context menu reads `Edit · View · Print · ─ Cancel SO` — and NOTHING of Delivery's.**
+   OWNER RULING 2026-09-26 (Jess: *"sales order request delivery order?"* — no): `Request Delivery
+   Order` is Delivery's door (the Monitor row, the DO page; server door `POST
+   /:id/delivery-order/request`, `order-control.ts:767`) and a Sales Order surface offering it is a
+   second entrance to another module's act (Law C) and a work control on a truth register (§0
+   CHARTER). This overwrites the Loo 2026-08-11 fourth row and its 2026-08-16/19 re-wording in §11.
+   Shipped: `View · Edit · Print PDF · ─ Cancel SO` (`SalesOrdersRegister.tsx:652-675`); the order
+   becomes `Edit · View · Print` and the word is `Print` (the Export menu already says it). The only
+   Delivery door a Sales Order carries is Order Route's `Open Delivery →`.
 2. **An empty cell is empty.** The engine prints `—` for a blank value (`DataGrid.tsx:2580, :2592`),
    the banned absent-value glyph (SO-1312 / SO-1313 `Proceed Date`, SO-1312 `Customer Delivery
    Location`). A document that does not exist yet already has its word (`No PO yet` · `No DO yet`);
@@ -6316,10 +6318,12 @@ Edit
 View
 Print
 ────────
-Request Delivery Order
-────────
 Cancel SO
 ```
+
+**⛔ THE FOURTH ROW IS GONE — OWNER RULING 2026-09-26 (Jess).** `Request Delivery Order` left this
+menu: it is Delivery's door and never a Sales Order control (§0.1 REGISTER CLOSE-OUT). The
+paragraph below records how the row was worded while it existed.
 
 **The fourth row is re-worded by the system-issuance rulings** (Jess 2026-08-16 / 2026-08-19,
 overwriting the Loo 2026-08-11 `Issue Delivery Order` line): the SYSTEM issues the DO when the

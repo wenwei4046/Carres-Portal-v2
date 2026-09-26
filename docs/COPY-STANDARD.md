@@ -2560,7 +2560,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | The management-only door on Sales ownership | **`Change salesperson`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner · **`Change salesperson — needs approval`** (the previous ruling; retired 2026-08-26). The suffix was one of THREE statements of the same fact stacked around an unpressed button — a line above it, the suffix, and a line below. The rule now lives once, on the modal the button opens, where it is read at the moment it is acted on. The verb alone is the door |
 | Report a problem, now inside the `⋮` menu (icon only; its accessible name is `More actions` — owner ruling 2026-09-21) | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
-| The Sales Orders row context menu (owner ruling 2026-09-26) | **`Edit` · `View` · `Print` · `Request Delivery Order` (outstation orders only) · `Cancel SO`** | `Print PDF` (retired as a menu word 2026-09-26) · `Preview` · `Copy to new Sales Order` |
+| The Sales Orders row context menu (owner ruling 2026-09-26) | **`Edit` · `View` · `Print` · `Cancel SO`** | `Print PDF` (retired as a menu word 2026-09-26) · `Preview` · `Copy to new Sales Order` · `Request Delivery Order` (Delivery's door, never a Sales Order row — Jess 2026-09-26) |
 | A cell with no value, anywhere in a register | **`Not recorded`** | `Not given` · Not provided · None · N/A · — · a blank cell. **ONE word, YH 2026-08-29.** The Sales Orders register printed TWO — `Not given` for a fact the customer never told us, `Not recorded` for one Carres never wrote down — 20 cells against 18 on the same table. The distinction is real and invisible: an operator sees two spellings of empty and must work out whether they differ. `Not recorded` survives because it is honest about EVERY column; nobody *gives* us an invoice number or a showroom. Neither word had ever been registered here, while `lib/locality.ts` claimed `Not given` was governed by this file |
 | Sales Orders register `PO No` / `DO No` cell when no PO or DO exists for the order yet — OWNER RULING 2026-09-21 (Jess) · BUILT (Sales Orders Card 12) | **`No PO yet`** · **`No DO yet`**, muted, one line (owner preference 2026-09-21; also the SO goods expansion's `Deliver To` before any PO line). 🟡 SO Batch Purchase prints `Not ordered yet` for the same fact — converging it is Purchasing's own round | `Not recorded` (says Carres failed to write a number down; the document simply does not exist yet) · `No delivery order yet` (too long for the cell, and a second grammar beside `PO No`) · a blank cell |
 | Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
@@ -3375,6 +3375,22 @@ row, no dash for tax and no "tax included / excluded" claim appears.
 2026-09-21). A document states a charge only where it prints the fact behind it.
 
 ## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
+
+**⭐ NO DASH ANYWHERE ON A SCREEN — OWNER RULING 2026-09-26 (Jess: *"i don't want UI got dash — this bad
+UI"*), portal-wide, APPROVED TARGET / NOT BUILT.** A dash (`—` or `–`) never stands for a value, an
+empty cell, an unknown or a placeholder, on any page, in any register, table, card, route node,
+PDF or prepared message. An empty cell draws nothing (UI MASTER §6.0); a missing fact prints its
+word (`Not recorded`, `No PO yet`, `No {field word}`); a fact that is zero prints `0` / `RM 0.00`;
+a control's placeholder is its label's word. **Measured 2026-09-26: 154 source files in `apps/web`
+and `packages/shared` still print a dash as a value** — the register engine's empty cell
+(`DataGrid.tsx:2580, :2592`) and its filter placeholders (`:3536, :3552`), `fmt-date.ts` fallbacks,
+every PDF template's empty cell (`do-template`, `po-template`, `invoice-template`,
+`pickup-event-template`, `extension-agreement-template`), the WhatsApp templates' `REF: —`, the
+Guarantee strip, and page-local literals such as the Sales Order Items `Disc (RM)` cell. The sweep
+is one BUILD scope across the portal, not per module. Punctuation inside an owner-approved sentence
+(`Reconstructed copy — original issued document unavailable.`) is a sentence, not a value, and is
+untouched.
+
 
 **A boolean's missing before-value prints `Not recorded → No` / `Not recorded → Yes` (owner ruling
 2026-09-26); a stored History phrase the translation table does not know prints `Activity`, and the
