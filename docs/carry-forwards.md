@@ -210,8 +210,8 @@ hook — that would mean the budget was never the cause.
 
 ## `collection-owner-unassigned-copy` — ✅ CLOSED 2026-09-26 by owner ruling
 
-Jess: *why no assign? meaning system error.* An order with no assigned person is a defect (every
-order is dealt to a person), so the surface names the manager's door, not a Duty holder:
+Jess (2026-09-26): the system deals every order to a person; an order with nobody assigned means
+the Operation pool is empty, and only a manager can add a person or assign the order, so the surface names the manager's door, not a Duty holder:
 **`Nobody assigned to this order`** over **`Manager assigns in Sales Orders → Team`**. Replaces `Nobody holds Delivery
 Duty.` / `Set the holder in Workspace → Staff & Duties` in COPY-STANDARD, Delivery §13.1, Payment
 §3 and Workspace; the code constants (`NO_DELIVERY_DUTY_HOLDER`, `SET_HOLDER_DOOR` in
