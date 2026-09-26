@@ -2210,12 +2210,20 @@ verification or approval of unreviewed visual details.
 - Issued is not sent. Keep the one communication/evidence area, recording the
   actual version, recipient, channel, actor and time. Leaving an issued document
   does not delete it or reopen its covered demand. Download/print are not sending.
-- `Purchase requirement` is optional for every purpose and persists on create
-  and returned-request edit. It is distinct from the required Other Purchase
-  `What is this for?`. **BUILT (Card 13, migrations 0562–0563):** the create and
-  resubmit APIs carry `purchaseRequirement` separately from `why`; the form,
-  internal preview and saved detail read that same fact. Its authenticated saved
-  round trip remains owed; no request was submitted for the read-only walk.
+- **OWNER CORRECTION 2026-09-26 — NO FREE TEXT; THE LINE IS CONFIGURED LIKE THE SALES PORTAL.**
+  `Purchase requirement` (0562, Card 13) was NOT the owner's blueprint: Jess — "I order what, got
+  colour to choose, what I want more to write, no free text". Measured: a Sales portal line is
+  configured through `Configure` (Size · Mattress gap · Fabric · Colour · Options · Leg height ·
+  Special add-ons, all Catalog choices) and the choice lives in the line's `attrs`; a PO born from a
+  Sales Order prints that configuration under the item on the PO PDF (`Sand · Fabric CG-012`); a
+  Manual Purchase line carried only SKU · Qty · free-text `Note`, so its PO printed nothing.
+  **Ruling (Jess, 2026-09-26, "yes"):** every Manual Purchase goods line gets the SAME `Configure`
+  as the Sales portal — the same configurator components over the same Catalog option pools — and
+  its configuration travels MPR → PO line `attrs` → PO PDF exactly as a Sales-Order line does.
+  `Purchase requirement` (request level) and the per-line free-text `Note` are RETIRED from the
+  form, the internal MPR preview, PO review and the saved detail; the configurator's own small
+  remark slot (✎, the one Sales already has) is the only free note. The database columns stay
+  (never dropped); the doors stop writing them. `What is this for?` (Other Purchase) is unchanged.
 
 **Approval boundary — owner selected A, 2026-09-22; APPROVED.**
 Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,
