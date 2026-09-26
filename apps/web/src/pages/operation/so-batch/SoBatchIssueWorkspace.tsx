@@ -13,6 +13,7 @@ import {
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
+import { Block, Fact } from "../SalesOrderWorkspace";
 import PdfPreview from "@/components/kit/PdfPreview";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
@@ -445,7 +446,7 @@ export default function SoBatchIssueWorkspace({
       >
         {/* ── 50% · the only editable side ──────────────────────────────── */}
         <div
-          className={`${layoutStyles.issueWork} flex shrink-0 flex-col border-b border-kit-slate-5 bg-white p-4`}
+          className={`${layoutStyles.issueWork} flex shrink-0 flex-col border-b border-kit-slate-5 bg-kit-slate-3 p-4`}
           data-testid="so-batch-issue-work"
         >
           {mode === "review" && current ? (
@@ -456,32 +457,43 @@ export default function SoBatchIssueWorkspace({
               >
                 {current.supplierName ?? "Supplier"} → {destinationName(current.destinationId)}
               </h2>
-              <dl className="mt-3 grid grid-cols-1 gap-3 text-body">
-                <div>
-                  <dt className="text-label text-kit-slate-11">Supplier</dt>
-                  <dd>{current.supplierName ?? "Not recorded"}</dd>
-                  <dd className="whitespace-pre-wrap break-words text-meta">{current.supplierAddress || <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Address not recorded. Check Suppliers.</a>}</dd>
+              {/* The Sales Order card grammar (owner, 2026-09-26: "follow
+                  sales order ui kit"): one `Purchase order` card of facts —
+                  label over value, two to a row inside this half-width pane —
+                  then the goods. Nothing here is edited on this surface
+                  (addresses live in Suppliers / Purchasing Settings), so
+                  every fact prints PLAIN; a grey box means "changed with
+                  Edit" and nothing else. */}
+              <div className="mt-3">
+              <Block title="Purchase order">
+                <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2" data-testid="so-batch-issue-facts">
+                  <Fact idPrefix="po-review-fact" own={false} label="Supplier" value={
+                    <span className="flex flex-col">
+                      <span>{current.supplierName ?? "Not recorded"}</span>
+                      <span className="whitespace-pre-wrap break-words text-meta text-kit-slate-11">{current.supplierAddress || <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Address not recorded. Check Suppliers.</a>}</span>
+                    </span>
+                  } />
+                  <Fact idPrefix="po-review-fact" own={false} label="Supplier Deliver To" value={
+                    <span className="flex flex-col">
+                      <span>{current.destinationName || destinationName(current.destinationId) || "Not recorded"}</span>
+                      <span className="whitespace-pre-wrap break-words text-meta text-kit-slate-11">{current.destinationAddress || <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Address not recorded. Check Purchasing Settings.</a>}</span>
+                    </span>
+                  } />
+                  <Fact idPrefix="po-review-fact" own={false} label="Delivery Method" value={
+                    draftData?.delivery_method === "we_collect" ? "We collect" : draftData?.delivery_method === "supplier_delivers" ? "Supplier delivers" : <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Not recorded. Check Suppliers.</a>
+                  } />
+                  <Fact idPrefix="po-review-fact" own={false} label="PO Doc Date" hint="Provisional. The date is recorded when issued." value={
+                    current.poDate ? fmtDate(current.poDate) : "Not available. Go back and reload."
+                  } />
+                  <Fact idPrefix="po-review-fact" own={false} testId="po-review-fact-po-delivery-date" label={current.poDeliveryWorkingDays != null ? `PO ${current.poDeliveryWorkingDays}-Day Delivery Date` : "PO Delivery Date"} value={
+                    current.poDeliveryDate ? fmtDate(current.poDeliveryDate) : <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Not available. Check production days in Purchasing Settings.</a>
+                  } />
                 </div>
-                <div>
-                  <dt className="text-label text-kit-slate-11">Supplier Deliver To</dt>
-                  <dd>{current.destinationName || destinationName(current.destinationId) || "Not recorded"}</dd>
-                  <dd className="whitespace-pre-wrap break-words text-meta">{current.destinationAddress || <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Address not recorded. Check Purchasing Settings.</a>}</dd>
-                </div>
-                <div>
-                  <dt className="text-label text-kit-slate-11">Delivery Method</dt>
-                  <dd>{draftData?.delivery_method === "we_collect" ? "We collect" : draftData?.delivery_method === "supplier_delivers" ? "Supplier delivers" : <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Not recorded. Check Suppliers.</a>}</dd>
-                </div>
-                <div>
-                  <dt className="text-label text-kit-slate-11">PO Doc Date</dt>
-                  <dd>{current.poDate ? fmtDate(current.poDate) : "Not available. Go back and reload."}</dd>
-                  <dd className="text-meta text-kit-slate-11">Provisional. The date is recorded when issued.</dd>
-                </div>
-                <div>
-                  <dt className="text-label text-kit-slate-11">{current.poDeliveryWorkingDays != null ? `PO ${current.poDeliveryWorkingDays}-Day Delivery Date` : "PO Delivery Date"}</dt>
-                  <dd>{current.poDeliveryDate ? fmtDate(current.poDeliveryDate) : <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Not available. Check production days in Purchasing Settings.</a>}</dd>
-                </div>
-              </dl>
-              <div className="mt-3 overflow-x-auto">
+              </Block>
+              </div>
+              <div className="mt-3">
+              <Block title="Goods lines">
+              <div className="overflow-x-auto">
               <table className="w-full text-body">
                 <thead>
                   <tr className="border-b border-kit-slate-5 text-label uppercase text-kit-slate-11">
@@ -527,6 +539,8 @@ export default function SoBatchIssueWorkspace({
                   ))}
                 </tbody>
               </table>
+              </div>
+              </Block>
               </div>
 
               {/* ⭐ FAIL CLOSED, AND SAY WHAT TO DO (closure §9). LINE 1 is the

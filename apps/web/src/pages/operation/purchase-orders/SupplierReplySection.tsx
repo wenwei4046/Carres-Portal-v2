@@ -251,9 +251,9 @@ export default function SupplierReplySection({
   /* ── READ ────────────────────────────────────────────────────────────── */
   if (!editing) {
     return (
-      <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
+      <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">SUPPLIER REPLY</div>
+          <div className="text-label font-semibold text-kit-slate-11">Supplier reply</div>
           <div className="text-meta text-kit-slate-11">PO Delivery Date · {officialDeliveryDate ? fmtDate(officialDeliveryDate) : "Not recorded"}</div>
           <div className="flex-1" />
           {canRecord ? (
@@ -308,9 +308,9 @@ export default function SupplierReplySection({
   );
 
   return (
-    <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
+    <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">RECORD SUPPLIER ANSWER</div>
+        <div className="text-label font-semibold text-kit-slate-11">Record supplier answer</div>
         <label className="flex items-center gap-1.5 text-meta">
           <input type="checkbox" checked={doReceived} onChange={(e) => setDoReceived(e.target.checked)} data-testid="po-answer-do-received" />
           Supplier DO received

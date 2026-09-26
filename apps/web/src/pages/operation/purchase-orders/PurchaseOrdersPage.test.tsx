@@ -890,9 +890,11 @@ describe("Purchase Order object", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const facts = screen.getByTestId("po-document-panes").firstElementChild!;
     const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    /* Same card as the Sales Order: the mono, tracked heading face. */
+    /* Same card as the Sales Order: the blue, sentence-case title over a rule
+       (owner, 2026-09-26 — one card grammar for every Purchasing page). */
     const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
-    expect(po.className).toContain("font-mono");
+    expect(po.className).toContain("text-kit-blue-11");
+    expect(po.className).not.toContain("font-mono");
     /* Receiving, then Claims and returns, each a row of its own. No Unit IDs
        card: a unit is a row of its Goods line. */
     const order = ["Receiving", "Claims and returns"].map((t) => heads.indexOf(t));

@@ -123,7 +123,7 @@ import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 import type { IssuedPo } from "./components/PoIssueEvidence";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { Block } from "./SalesOrderWorkspace";
+import { Block, Fact as SharedFact } from "./SalesOrderWorkspace";
 import {
   RecordRanks,
   groupHistoryChronology,
@@ -3247,7 +3247,7 @@ function AlreadyHave({
       className="ml-1 flex flex-col gap-0.5 border-l-2 border-base-100 pl-3 text-meta"
       data-testid={`mp-already-have-${index}`}
     >
-      <span className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+      <span className="text-label font-semibold text-kit-slate-11">
         {MW.alreadyHave}
       </span>
       <span className="text-base-700">
@@ -3436,6 +3436,9 @@ function ObjectTable({
 }
 
 /** One REQUEST fact — label over value, the object's reading grammar. */
+/** The shared Sales Order fact (owner, 2026-09-26) in this page's id family.
+ *  A saved request's facts are not changed here — Deliver To has its own
+ *  door inside the value — so they print PLAIN, never as a grey box. */
 function Fact({
   label,
   children,
@@ -3447,14 +3450,7 @@ function Fact({
   testId?: string;
   wide?: boolean;
 }) {
-  return (
-    <div className={wide ? "col-span-full" : undefined}>
-      <dt className="text-meta text-kit-slate-11">{label}</dt>
-      <dd className="text-body text-base-900" data-testid={testId}>
-        {children}
-      </dd>
-    </div>
-  );
+  return <SharedFact idPrefix="mp-fact" own={false} label={label} value={<span className="flex min-w-0 flex-col">{children}</span>} testId={testId} wide={wide} />;
 }
 
 /**
@@ -4106,7 +4102,7 @@ function ManualPurchaseObject({
               Proceed Date · Delivery Date · Need for · For · Deliver To ·
               Requested By. */}
           <Block title={MW.secRequest}>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="mp-detail-facts">
               <Fact label={MW.colProceedDate} testId="mp-detail-proceed-date">
                 {fmtDate(request.created_at.slice(0, 10))}
               </Fact>
@@ -4180,7 +4176,7 @@ function ManualPurchaseObject({
                   {request.purchase_requirement}
                 </Fact>
               ) : null}
-            </dl>
+            </div>
           </Block>
 
           {/* ② ITEMS REQUESTED — read-only; Catalog human words beside the

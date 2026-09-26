@@ -175,7 +175,7 @@ function KindChip({ kind }: { kind: SupplierRow["kind"] }) {
 function Stat({ label, v }: { label: string; v: number | string }) {
   return (
     <div>
-      <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500">
+      <div className="text-label font-semibold text-kit-slate-11">
         {label}
       </div>
       <div className="text-strong font-semibold text-base-900 mt-0.5 tabular-nums">
@@ -244,7 +244,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
 
         <ScorecardBlock sc={supplier.scorecard} />
 
-        <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500 mb-2">
+        <div className="text-label font-semibold text-kit-slate-11 mb-2">
           Recent POs
         </div>
         <div className="border border-base-200 rounded">
@@ -311,7 +311,7 @@ function ScorecardBlock({ sc }: { sc: SupplierScorecard }) {
 
   return (
     <div className="mb-6">
-      <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500 mb-2">
+      <div className="text-label font-semibold text-kit-slate-11 mb-2">
         Scorecard
       </div>
       <div className="border border-base-200 rounded p-4">
@@ -327,7 +327,7 @@ function ScorecardBlock({ sc }: { sc: SupplierScorecard }) {
         </div>
 
         <div className="mt-4 pt-3 border-t border-base-100">
-          <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500">
+          <div className="text-label font-semibold text-kit-slate-11">
             Claims
           </div>
           <div className="text-meta text-base-800 mt-1 tabular-nums">
@@ -386,7 +386,7 @@ function Measure({
   const why = rateWhy(r);
   return (
     <div>
-      <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500">
+      <div className="text-label font-semibold text-kit-slate-11">
         {label}
       </div>
       <div className="text-strong font-semibold text-base-900 mt-0.5 tabular-nums">
