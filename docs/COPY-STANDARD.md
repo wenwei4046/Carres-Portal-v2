@@ -750,6 +750,14 @@ preparation; `Stop packing` is not a second spelling. The same day the owner rul
 Order` (the brief's first-panel control: the read-only Sales Order document unfolded in place) and
 the `ETA` field in the Logistics Details edit state.
 
+### Delivery Settings and the NETS page — owner ruling 2026-09-26
+
+| Where | The words |
+|---|---|
+| Settings rail row and page | `Logistics` (never `Logistics Partners`; `Partner` is banned) · sections `Company details` · `Coverage` · `Schedule` · `Transit points` · `Drivers and Vehicles` · `Services & charges` · `Portal access` · one `Save changes` per page · `Not configured` |
+| Delivery Rules | `Logistics contacts the customer` (fixed) · `Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number` · `Contact lead days` (reads the shared `chase` setting) · `Evidence required by result` |
+| NETS arrange page | `Delivery dates` · facts `Reference` · `Customer` · `Area` · `Goods` · `Requested delivery` · fields `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Result` · `Note` · `Reply screenshot` · acts `Save delivery date` · `Cannot deliver` (`Confirmed date`, `Time window`, `Save Delivery Arrangement` retired) · `Hold delivery` alone while the gate holds |
+
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
 
 The central Delivery report lives at `Reports → Delivery` (`/operation?tab=delivery-report`,
@@ -3480,7 +3488,7 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 | Communication | `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Copying or opening WhatsApp confirms nothing. Record the answer when it comes.`; the prepared message leads with the customer's reference, never the SO number, and ends `Answer here: {link}` |
 | History titles | `Logistics assigned` · `Logistics changed` · `Logistics removed` · `Scheduled delivery saved` · `Requested another date` · `Cannot deliver` |
 | External link page | `Delivery for` {company} · `Reference` · `Customer` · `Phone` · `Delivery address` · `Goods` · `Pickup` · `Requested delivery` · `Scheduled delivery`; answers `Scheduled date` · `Another date` · `Cannot deliver`; fields `Scheduled date` · `Scheduled time (optional)` · `Date you can deliver` · `Reason` · `Tell us more (optional)`; buttons `Save scheduled delivery` · `Save another date` · `Cannot deliver` |
-| Link page results and refusals | `Saved. Carres can see your scheduled delivery.` · `Saved. Carres will call the customer about your date.` · `Saved. Carres will decide the next step.` · `This link no longer works. Ask Carres for a new link.` · `The delivery could not be loaded. Try again.` · `Sunday is not a delivery day. Pick another date.` · `This date is a public holiday. Pick another date.` · `This date has passed. Pick another date.` |
+| Link page results and refusals | `Saved. Carres has your delivery date.` · `Saved. Carres will call the customer.` · `Saved. Carres will reply.` (owner ruling 2026-09-26, shortened) · `This link no longer works.` / `Ask Carres for a new link.` · `The delivery could not be loaded.` / `Try again.` · `Sunday is not a delivery day.` / `Pick another date.` · `This date is a public holiday.` / `Pick another date.` · `This date has passed.` / `Pick another date.` · `Hold delivery` (alone, while the gate holds) |
 | `Requested another date` reasons | `The customer asked for another date` · `We are full on that date` · `We do not go to that area on that date` · `The goods are not ready for pickup` |
 | Carres refusals | `Assign logistics before you create a link` · `{company} answers in its own portal.` · `This delivery already has an active link. Revoke it first.` · `This delivery has no active link.` |
 
