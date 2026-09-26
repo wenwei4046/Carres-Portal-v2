@@ -660,9 +660,10 @@ export function useFilterRailOpen(
  *
  * Nothing is written in words — the count line is EMPTY when nothing is due,
  * a closed day (public holiday) is grey text with its name only in the
- * accessible name and tooltip, and today is the black number with a dot
- * under it. The ONE blue is the chosen tile: solid, white text. Six columns
- * share the 216px row (36px each).
+ * accessible name and tooltip. Today is the number in a RING; the week that
+ * holds today is the tinted row (Jess, 2026-09-26: "circle the day you are
+ * today, not write today; the week should have colour"). The ONE blue is the
+ * chosen tile: solid, white text. Six columns share the 216px row.
  */
 export interface RailWeekDay {
   iso: string;
@@ -697,8 +698,10 @@ export function FilterRailMonthGrid({
           <span key={c} className="text-center text-[10px] font-semibold leading-4 text-kit-slate-9">{c}</span>
         ))}
       </div>
-      {weeks.map((week, row) => (
-        <div key={row} className="grid grid-cols-6 gap-x-1 gap-y-1" data-testid={`${testId}-week-${row}`}>
+      {weeks.map((week, row) => {
+        const thisWeek = week.some((d) => d?.today);
+        return (
+        <div key={row} className={`grid grid-cols-6 gap-x-1 gap-y-1 rounded-control ${thisWeek ? "bg-kit-slate-3" : ""}`} data-testid={`${testId}-week-${row}`} data-this-week={thisWeek ? "yes" : undefined}>
           {week.map((d, col) => {
             if (!d) return <span key={col} aria-hidden="true" />;
             const chosen = chosenIso === d.iso;
@@ -720,15 +723,16 @@ export function FilterRailMonthGrid({
                   chosen ? "bg-kit-blue-9 text-white" : closed ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
                 ].join(" ")}
               >
-                <span className="text-[13px] font-semibold leading-4">{d.dayNumber}</span>
+                <span className={`grid h-5 w-5 place-items-center rounded-full text-[13px] font-semibold leading-4 ${d.today ? chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12" : ""}`}>{d.dayNumber}</span>
                 <span className={`h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
-                  {!closed && d.count > 0 ? d.count : d.today ? <span aria-hidden className={`mx-auto mt-1 block h-1 w-1 rounded-full ${chosen ? "bg-white" : "bg-kit-slate-12"}`} /> : ""}
+                  {!closed && d.count > 0 ? d.count : ""}
                 </span>
               </button>
             );
           })}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

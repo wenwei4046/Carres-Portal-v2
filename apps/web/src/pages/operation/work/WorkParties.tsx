@@ -27,7 +27,9 @@ import { useDeliveryScopeCard, useOrderIdFromRef } from "../delivery-scope-card"
 import CustomerCard, { useCustomerCard } from "./CustomerCard";
 import LogisticsCard, { useLogisticsModel } from "./LogisticsCard";
 import SupplierCard, { supplierActRowOf, useSupplierCard } from "./SupplierCard";
-import WorkOrderRoute from "./WorkOrderRoute";
+import WorkOrderRoute, { useMissionRoute } from "./WorkOrderRoute";
+import { Link } from "react-router-dom";
+import Icon from "@/components/kit/Icon";
 import SalesOrderCard from "./SalesOrderCard";
 import { WORK_MODULE_WORD } from "./module-word";
 import { orderRefOf } from "./order-ref";
@@ -140,6 +142,29 @@ export default function WorkParties({
   return <Mission key={orderId as string} orderId={orderId as string} item={item} openParty={openParty} onOpenParty={onOpenParty} onReport={onReport} />;
 }
 
+/** THE RIGHT PANEL'S HEADER (Jess, 2026-09-26): the order number as the
+ *  title, its module beside it, the route's status word and the record door
+ *  on the right — a Gmail subject line, not a section label. */
+function MissionHeader({ orderId, label, module }: { orderId: string; label: string; module: string }) {
+  const { route } = useMissionRoute(orderId);
+  return (
+    <div className="flex items-center gap-2 px-1 pb-1" data-testid="work-mission-header">
+      <h2 className="text-[15px] font-semibold leading-5 text-kit-slate-12" data-testid="work-mission-title">{label}</h2>
+      <span className="text-[13px] leading-[18px] text-kit-slate-11">{module}</span>
+      <span className="ml-auto text-[12px] leading-4 text-kit-slate-11" data-testid="work-mission-status">{route?.header?.text ?? ""}</span>
+      <Link
+        to={`/operation/orders/so/${encodeURIComponent(orderId)}`}
+        className="grid h-7 w-7 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+        aria-label={`Open ${label}`}
+        title={`Open ${label}`}
+        data-testid="work-mission-open"
+      >
+        <Icon name="open" size={14} />
+      </Link>
+    </div>
+  );
+}
+
 function Mission({
   orderId,
   item,
@@ -214,8 +239,9 @@ function Mission({
       {/* Route FIRST, then the order's own facts, then the parties (Jess,
           2026-09-26). The Route's title line is the order, never the words
           "Order Route". */}
-      <WorkOrderRoute orderId={orderId} title={`${item.object.label} · ${WORK_MODULE_WORD[item.module]}`} onOpenParty={(party) => onOpenParty(party)} />
-      <SalesOrderCard orderId={orderId} label={item.object.label} />
+      <MissionHeader orderId={orderId} label={item.object.label} module={WORK_MODULE_WORD[item.module]} />
+      <WorkOrderRoute orderId={orderId} title={null} onOpenParty={(party) => onOpenParty(party)} />
+      <SalesOrderCard orderId={orderId} />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
         <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={visiblePrimary === "logistics"} />
       </div>

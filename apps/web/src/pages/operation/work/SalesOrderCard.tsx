@@ -16,10 +16,8 @@
  * spelled by the shared facts; nothing here is a form.
  */
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { displayCustomerName } from "@/lib/customer-name";
 import { fmtDate } from "@/lib/fmt-date";
-import Icon from "@/components/kit/Icon";
 import { useCatalog } from "@/lib/queries";
 import { moneyOfOrder } from "../sales-order-facts";
 import { useLogisticsModel } from "./LogisticsCard";
@@ -38,7 +36,7 @@ function Fact({ label, children, testId }: { label: string; children: React.Reac
   );
 }
 
-export default function SalesOrderCard({ orderId, label }: { orderId: string; label: string }) {
+export default function SalesOrderCard({ orderId }: { orderId: string }) {
   const lm = useLogisticsModel(orderId);
   const { route } = useMissionRoute(orderId);
   const catalogQ = useCatalog();
@@ -73,18 +71,7 @@ export default function SalesOrderCard({ orderId, label }: { orderId: string; la
   const customerDate = card.scope.customerDeliveryIso ? fmtDate(card.scope.customerDeliveryIso) : "No delivery date";
   return (
     <WorkSection className="shrink-0 px-3 py-2 min-[768px]:px-4" data-testid="work-sales-order" aria-label="Sales Order">
-      <div className="flex items-center justify-between">
-        <SectionTitle>Sales Order</SectionTitle>
-        <Link
-          to={`/operation/orders/so/${encodeURIComponent(orderId)}`}
-          className="grid h-7 w-7 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-          aria-label={`Open ${label}`}
-          title={`Open ${label}`}
-          data-testid="work-sales-order-open"
-        >
-          <Icon name="open" size={14} />
-        </Link>
-      </div>
+      <SectionTitle>Sales Order</SectionTitle>
       {/* Two columns from 768px so the panel's width carries the facts in
           three lines, not six (Jess, 2026-09-26: "width so empty"). */}
       <dl className="mt-1.5 grid grid-cols-[92px_minmax(0,1fr)] gap-x-2 gap-y-1 min-[768px]:grid-cols-[92px_minmax(0,1fr)_92px_minmax(0,1fr)]">
