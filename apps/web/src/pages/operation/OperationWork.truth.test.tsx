@@ -163,27 +163,46 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(new Date("2026-09-17T00:00:00").getTimezoneOffset()).toBe(-480);
   });
 
-  it("1 · a Thursday's rail shows Mon, 14 Sep … Fri, 18 Sep through fmtDate, today ringed", () => {
+  it("1 · a Thursday's rail is one strip Mon 14 … Fri 18 (names through fmtDate), today the solid-blue tile, header `Week of 14 Sep`", () => {
     show();
-    const names = within(screen.getByTestId("work-rail-days")).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    const strip = screen.getByTestId("work-rail-days");
+    const names = within(strip).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
     expect(names.map((n) => n.split(" · ")[0])).toEqual(["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep"]);
+    /* One row of tiles, never a column of cards (Jess, 2026-09-26). */
+    expect(strip.style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
     expect(dayCard("2026-09-17")).toHaveAttribute("data-today", "yes");
-    expect(dayCard("2026-09-17")).toHaveTextContent("Today");
-    expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent("Mon, 14 Sep – Fri, 18 Sep");
+    expect(dayCard("2026-09-17").className).toContain("bg-kit-blue-9");
+    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17/);
+    expect(dayCard("2026-09-17")).not.toHaveTextContent("Today");
+    expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent("Week of 14 Sep");
+    expect(screen.getByTestId("work-rail-week-label").textContent).not.toMatch(/[–-]/);
   });
 
-  it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep", () => {
+  it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep; a day with nothing prints nothing", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18")]);
     show();
-    expect(dayCard("2026-09-18")).toHaveTextContent("1 action to do");
-    expect(dayCard("2026-09-17")).toHaveTextContent("No work");
+    expect(dayCard("2026-09-18")).toHaveTextContent(/^FRI181$/);
+    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17$/);
+    expect(dayCard("2026-09-18")).toHaveAttribute("aria-label", "Fri, 18 Sep · 1 action");
   });
 
-  it("3 · Wed, 16 Sep names Malaysia Day and the fixed rows print their zero (owner review 2026-09-25 item 19)", () => {
+  it("3 · Wed, 16 Sep is the grey tile — no words, Malaysia Day only in its name — and the fixed rows print their zero", () => {
     show();
-    expect(dayCard("2026-09-16")).toHaveTextContent("Public holiday · Malaysia Day");
+    const holiday = dayCard("2026-09-16");
+    expect(holiday).toHaveAttribute("data-closed", "yes");
+    expect(holiday.className).toContain("bg-kit-slate-3");
+    expect(holiday).toHaveTextContent(/^WED16$/);
+    expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
+    expect(holiday).toHaveAttribute("title", "Malaysia Day");
     expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("0");
+    expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("No date");
     expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("0");
+    /* The Status rows (the three middle tabs moved here), To do on alone. */
+    expect(screen.getByTestId("work-rail-status-todo")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("work-rail-status-waiting")).toHaveTextContent("Waiting for answer");
+    expect(screen.getByTestId("work-rail-status-done")).toHaveTextContent("Done today");
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByTestId("work-list-heading")).toBeNull();
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
@@ -201,7 +220,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     first.unmount();
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
     show();
-    expect(dayCard("2026-09-19")).toHaveTextContent("1 action to do");
+    expect(dayCard("2026-09-19")).toHaveTextContent(/^SAT191$/);
+    expect(screen.getByTestId("work-rail-days").style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
   });
 
   it("6 · My Work with nothing today and 2 on Friday does not say Nothing assigned to you", () => {

@@ -37,15 +37,21 @@ import {
   filterWork,
   inWorkDay,
   isWorkDate,
+  parseWorkStatus,
   parseWorkWeek,
+  toggleWorkStatus,
   WORK_MODULES,
+  WORK_STATUS_ORDER,
+  WORK_STATUS_WORD,
   workFocusDay,
   workLayoutFor,
   workModuleCounts,
   workRailDates,
   workSections,
+  workStatusOf,
+  workWeekWord,
+  type WorkStatus,
   type WorkWhen,
-  workListTabOf,
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
@@ -54,7 +60,7 @@ import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
-import WorkCard, { WorkCardSkeleton, WorkListTabs, WorkSection, type WorkListTab } from "./work/WorkCard";
+import WorkCard, { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
 
 type ViewKey = "mine" | "team";
 
@@ -172,7 +178,7 @@ export default function OperationWork() {
   const moduleFilter: OperationWorkModule | "all" = WORK_MODULES.includes(moduleParam as OperationWorkModule)
     ? moduleParam as OperationWorkModule
     : "all";
-  const covered = params.get("covered") === "1";
+  const statuses = useMemo(() => parseWorkStatus(params.get("status")), [params]);
   const day = params.get("day") ?? (params.get("when") ? "all" : "focus");
 
   const updateParam = (key: string, value: string | null) => setParams((before) => {
@@ -189,7 +195,7 @@ export default function OperationWork() {
     () => (myUserId ? allItems.filter((i) => i.ownerId === myUserId) : []),
     [allItems, myUserId],
   );
-  const filters = useMemo(() => ({ search, when, module: moduleFilter, covered }), [search, when, moduleFilter, covered]);
+  const filters = useMemo(() => ({ search, when, module: moduleFilter }), [search, when, moduleFilter]);
   const mine = useMemo(() => filterWork(mineAll, filters), [filters, mineAll]);
   const filteredTeamItems = useMemo(() => filterWork(allItems, filters), [allItems, filters]);
 
@@ -259,15 +265,13 @@ export default function OperationWork() {
   const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
   const selectedDay = day === "focus" ? focusDay : day;
   const inDay = (item: WorkRow) => inWorkDay(item, day, generatedOn, focusDay);
-  const listTab: WorkListTab = params.get("list") === "waiting" || params.get("list") === "completed"
-    ? params.get("list") as WorkListTab
-    : "todo";
-  /* To do · Waiting (§5.10): one day's open set split by the recorded reply
-     state; the rail's counts keep the whole open set. */
+  /* Status (Jess, 2026-09-26: the rail's `Status` rows, more than one may be
+     on): one day's open set split by the recorded reply state; the rail's
+     date counts keep the whole open set. */
   const inDaySet = beforeDay.filter(inDay);
-  const todoRows = inDaySet.filter((item) => workListTabOf(item) === "todo");
-  const waitingRows = inDaySet.filter((item) => workListTabOf(item) === "waiting");
-  const visible = listTab === "waiting" ? waitingRows : listTab === "completed" ? [] : todoRows;
+  const statusCounts = Object.fromEntries(WORK_STATUS_ORDER.map((k) => [k, 0])) as Record<WorkStatus, number>;
+  for (const item of inDaySet) statusCounts[workStatusOf(item)] += 1;
+  const visible = inDaySet.filter((item) => statuses.includes(workStatusOf(item)));
 
   /** Module counts ignore the module filter and nothing else: scope · owner ·
    *  search · the other filters · the current list. With all modules they add
@@ -292,7 +296,7 @@ export default function OperationWork() {
   /* The four empty states, checked in order (HF-1, owner ruling 2026-09-17):
      a failed source · filters with no match · an empty day while other work
      is open · nothing open at all. Zero matches is never zero work. */
-  const filtersActive = Boolean(search) || when !== "all" || moduleFilter !== "all" || covered
+  const filtersActive = Boolean(search) || when !== "all" || moduleFilter !== "all"
     || (activeView === "team" && Boolean(ownerFocus));
   const missedCount = railDates?.missed ?? 0;
   const emptyDoor: { key: string; label: string } | null = (() => {
@@ -312,7 +316,7 @@ export default function OperationWork() {
         : "clear";
   const clearFilters = () => setParams((before) => {
     const next = new URLSearchParams(before);
-    for (const key of ["q", "when", "module", "covered", "owner", "selected"]) next.delete(key);
+    for (const key of ["q", "when", "module", "status", "owner", "selected"]) next.delete(key);
     return next;
   }, { replace: true });
   const emptyButton = "mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700";
@@ -401,15 +405,6 @@ export default function OperationWork() {
     return [{ ...g, items }];
   });
 
-  /** The heading names the chosen Date — the same words as the rail. */
-  const listHeading = selectedDay === "missed"
-    ? "Missed"
-    : selectedDay === "no_date"
-      ? "No working date"
-      : isWorkDate(selectedDay)
-        ? fmtDate(selectedDay)
-        : "Work";
-
   const card = (i: WorkRow) => (
     <WorkCard
       cover={i.ownerState === "covered" && i.activeCover
@@ -428,17 +423,15 @@ export default function OperationWork() {
     />
   );
 
-  /* THE §6.0 SHELL (owner ruling 2026-09-25): Date and Page are two toolbar
-     selects — the same facts and counts the rail held, in the register's
-     grammar. Every option prints its number, `0` included. */
-  /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26: the Payment Monitor rail):
-     ‹ week › over one card per work day, then the fixed rows `Missed` and
-     `No working date`, then the Page group and — in Team Work — the Owner
-     select. Hidden, it leaves a 44px `Show filters` strip; the choice is
-     remembered per browser (`useFilterRailOpen`). */
-  const weekLabel = railDates
-    ? `${fmtDate(railDates.days[0]?.iso ?? week)} – ${fmtDate(railDates.days[Math.min(4, railDates.days.length - 1)]?.iso ?? week)}`
-    : "";
+  /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26 — the Payment Monitor rail,
+     then her correction the same day): ONE header line `‹ Week of 28 Sep ›`,
+     then the week as one row of day tiles (weekday · day number · count —
+     five, six when Saturday holds work), then the fixed rows `Missed` and
+     `No date`, the `Status` rows (more than one may be on), the `Page` rows
+     and — in Team Work — the Owner select. A non-working day is a grey tile
+     with no count; today is the solid-blue tile; the chosen day is ringed.
+     Hidden, it leaves a 44px `Show filters` strip; the choice is remembered
+     per browser (`useFilterRailOpen`). */
   const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
   const pickDay = (key: string) => {
     updateParam("day", key);
@@ -450,25 +443,26 @@ export default function OperationWork() {
       ariaLabel="Work filters"
       onHide={() => { setRailOpen(false); setPhoneRailOverride(false); }}
       header={(
-        <div data-testid="work-rail-week" className="space-y-1.5 pr-8">
-          <div className="flex items-center gap-1">
-            <button type="button" aria-label="Previous week" title="Previous week" className={weekArrow} onClick={() => updateParam("week", railDates.previousWeek)}>
-              <Icon name="previous" size={16} />
-            </button>
-            <span className="min-w-0 flex-1 break-words text-center text-body font-semibold text-kit-slate-12" data-testid="work-rail-week-label" aria-label={weekLabel}>
-              <span className="whitespace-nowrap">{fmtDate(railDates.days[0]?.iso ?? week)} –</span>{" "}
-              <span className="whitespace-nowrap">{fmtDate(railDates.days[Math.min(4, railDates.days.length - 1)]?.iso ?? week)}</span>
-            </span>
-            <button type="button" aria-label="Next week" title="Next week" className={weekArrow} onClick={() => updateParam("week", railDates.nextWeek)}>
-              <Icon name="forward" size={16} />
-            </button>
-          </div>
+        <div data-testid="work-rail-week" className="flex items-center gap-1 pr-8">
+          <button type="button" aria-label="Previous week" title="Previous week" className={weekArrow} onClick={() => updateParam("week", railDates.previousWeek)}>
+            <Icon name="previous" size={16} />
+          </button>
+          <span className="min-w-0 flex-1 truncate text-center text-body font-semibold text-kit-slate-12" data-testid="work-rail-week-label">
+            {workWeekWord(week)}
+          </span>
+          <button type="button" aria-label="Next week" title="Next week" className={weekArrow} onClick={() => updateParam("week", railDates.nextWeek)}>
+            <Icon name="forward" size={16} />
+          </button>
         </div>
       )}
     >
-      <div className="flex flex-col gap-1 py-3" data-testid="work-rail-days">
+      {/* The week strip: 216px shared by five 40px tiles (six 34px tiles with
+          Saturday). Weekday over day number over the count; the count line is
+          empty on a working day with nothing due. */}
+      <div className="grid gap-1 py-3" style={{ gridTemplateColumns: `repeat(${railDates.days.length}, minmax(0, 1fr))` }} data-testid="work-rail-days">
         {railDates.days.map((d) => {
           const active = railSelected === d.iso;
+          const closed = d.holiday !== null;
           return (
             <button
               key={d.iso}
@@ -476,22 +470,24 @@ export default function OperationWork() {
               onClick={() => pickDay(d.iso)}
               aria-pressed={active}
               aria-label={`${d.label}${d.today ? " · Today" : ""}${d.holiday ? ` · ${d.holiday}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`}
+              title={d.holiday ?? undefined}
               data-testid={`work-rail-day-${d.iso}`}
               data-today={d.today ? "yes" : undefined}
+              data-closed={closed ? "yes" : undefined}
               className={[
-                "relative flex w-full flex-col items-stretch gap-0.5 rounded-control px-2 py-2 text-left text-body",
-                active ? "bg-kit-blue-3 text-kit-slate-12" : "text-kit-slate-12 hover:bg-kit-slate-3",
-                d.today ? "ring-1 ring-inset ring-kit-blue-9" : "",
+                "flex h-14 min-w-0 flex-col items-center justify-center rounded-control tabular-nums",
+                d.today
+                  ? "bg-kit-blue-9 text-white"
+                  : closed
+                    ? "bg-kit-slate-3 text-kit-slate-9"
+                    : "bg-white text-kit-slate-12 hover:bg-kit-slate-3",
+                active ? "ring-2 ring-inset ring-kit-blue-9" : closed || d.today ? "" : "ring-1 ring-inset ring-kit-slate-5",
               ].join(" ")}
             >
-              {active ? <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" /> : null}
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="font-semibold text-kit-slate-12">{d.label}</span>
-                {d.today ? <span className="rounded-full border border-kit-blue-9 px-1.5 text-label font-semibold text-kit-blue-11">Today</span> : null}
-              </span>
-              {d.holiday ? <span className="break-words text-meta text-kit-slate-11">Public holiday · {d.holiday}</span> : null}
-              <span className={`break-words ${d.count > 0 ? "text-body text-kit-slate-12" : "text-meta text-kit-slate-11"}`}>
-                {d.count > 0 ? `${d.count} ${d.count === 1 ? "action" : "actions"} to do` : "No work"}
+              <span className={`text-[10px] font-semibold leading-3 ${d.today ? "text-white" : closed ? "text-kit-slate-9" : "text-kit-slate-11"}`}>{d.weekday}</span>
+              <span className="text-[15px] font-semibold leading-5">{d.dayNumber}</span>
+              <span className={`h-3 text-[11px] leading-3 ${d.today ? "text-white" : "text-kit-slate-11"}`}>
+                {!closed && d.count > 0 ? d.count : ""}
               </span>
             </button>
           );
@@ -499,8 +495,14 @@ export default function OperationWork() {
       </div>
       <div className="border-t border-kit-slate-5 py-2">
         <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
-        <FilterRailRow label="No working date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
+        <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
       </div>
+      {/* Status rows: each one is on or off on its own; the last one on stays. */}
+      <FilterRailGroup title="Status" icon="flag" chosen={statuses.length === 1 && statuses[0] === "todo" ? null : statuses.map((k) => WORK_STATUS_WORD[k]).join(" · ")}>
+        {WORK_STATUS_ORDER.map((k) => (
+          <FilterRailRow key={k} label={WORK_STATUS_WORD[k]} count={statusCounts[k]} active={statuses.includes(k)} resets={k === "todo"} testId={`work-rail-status-${k}`} onClick={() => updateParam("status", toggleWorkStatus(statuses, k))} />
+        ))}
+      </FilterRailGroup>
       <FilterRailGroup title="Page" icon="modules" chosen={moduleFilter === "all" ? null : MODULE_LABEL[moduleFilter]}>
         <FilterRailRow label="All pages" count={moduleCountRows.length} active={moduleFilter === "all"} resets testId="work-rail-page-all" onClick={() => updateParam("module", "all")} />
         {railModules.map((m) => (
@@ -522,13 +524,11 @@ export default function OperationWork() {
     </FilterRail>
   ) : null;
 
-  /* One toolbar control: 36px from 768px, 40px below; 14/20; 12px sides. */
-  const toolbarButton = (active: boolean) =>
-    `inline-flex h-9 items-center gap-1.5 rounded-control border px-3 text-control ${active ? "border-kit-blue-9 bg-kit-blue-3 text-kit-slate-12" : "border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`;
-
-  const listBody = listTab === "completed" || (listTab === "waiting" && !loading && visible.length === 0) ? (
+  /* A status choice with nothing in it is its own sentence, never the day's
+     empty state (the day may well have To do work the choice hides). */
+  const listBody = !loading && visible.length === 0 && inDaySet.length > 0 ? (
     <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
-      {listTab === "waiting" ? "No work waiting for this selection." : "No work completed for this selection."}
+      No work for this Status choice.
     </p>
   ) : loading ? (
     <WorkCardSkeleton />
@@ -617,8 +617,9 @@ export default function OperationWork() {
             : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="work-right-column">
         {/* The toolbar row of the §6.0 shell: white, one bottom rule, no box.
-            My Work · Team Work · Search (340px) · Date · Page · Owner ·
-            Covering. Below 600px the controls wrap. */}
+            My Work · Team Work · Search (340px). Below 600px the controls
+            wrap. `Covering` is gone (Jess, 2026-09-26): cover shows on the
+            row itself, never as a toolbar button. */}
         <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-base-200 bg-white px-2 py-1.5" data-testid="work-toolbar">
           {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
           <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
@@ -662,14 +663,6 @@ export default function OperationWork() {
               placeholder="Search work…"
             />
           </div>
-          <button
-            type="button"
-            aria-pressed={covered}
-            onClick={() => updateParam("covered", covered ? null : "1")}
-            className={toolbarButton(covered)}
-          >
-            Covering
-          </button>
           {activeView === "team" && ownerFocus && (
             <button
               type="button"
@@ -681,12 +674,12 @@ export default function OperationWork() {
               · Clear
             </button>
           )}
-          {(search || when !== "all" || moduleFilter !== "all" || covered || day !== "focus") && (
+          {(search || when !== "all" || moduleFilter !== "all" || params.get("status") || day !== "focus") && (
             <button
               type="button"
               onClick={() => setParams((before) => {
                 const next = new URLSearchParams(before);
-                for (const key of ["q", "when", "module", "covered", "owner", "day", "week", "selected"]) next.delete(key);
+                for (const key of ["q", "when", "module", "status", "owner", "day", "week", "selected"]) next.delete(key);
                 return next;
               }, { replace: true })}
               className="h-9 px-2 text-control text-kit-blue-11"
@@ -702,23 +695,8 @@ export default function OperationWork() {
           railBeside={railVisible}
           list={(
             <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
-              {/* The heading and tabs stay put; the cards scroll beneath them. */}
-              <div className="shrink-0">
-                <h2 className="mb-2 flex min-h-6 flex-wrap items-baseline gap-x-1.5 text-[16px] font-semibold leading-[22px] text-work-ink" data-testid="work-list-heading">
-                  {/* Below 768px the toolbar's Date button already names the
-                      day, so the heading says only the count (item 25). */}
-                  {layout === "one" ? null : listHeading}
-                  <span className={layout === "one" ? "text-[16px] font-semibold leading-[22px] text-work-ink" : "text-[13px] font-medium leading-[18px] text-work-muted"}>
-                    {todoRows.length} action{todoRows.length === 1 ? "" : "s"} to do
-                  </span>
-                </h2>
-                {/* Every tab carries its number, `0` included (item 23). */}
-                <WorkListTabs
-                  value={listTab}
-                  counts={{ todo: todoRows.length, waiting: waitingRows.length, completed: 0 }}
-                  onChange={(tab) => updateParam("list", tab === "todo" ? null : tab)}
-                />
-              </div>
+              {/* No heading and no tabs above the cards (Jess, 2026-09-26): the
+                  rail already names the day and the Status. */}
               {!loading && !error && unhealthySources.length > 0 ? (
                 <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
                   {unhealthySources.map((source) => (
@@ -743,11 +721,11 @@ export default function OperationWork() {
                   </button>
                 </div>
               ) : null}
-              <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
-                <div key={listTab} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
+              <div className="min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
+                <div key={statuses.join(",")} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
                   {listBody}
                 </div>
-                {hasMore && listTab !== "completed" ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
+                {hasMore ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
               </div>
             </div>
           )}

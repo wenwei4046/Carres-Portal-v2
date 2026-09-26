@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import WorkCard, { WorkCardSkeleton, WorkListTabs, workDateStatus } from "./WorkCard";
+import WorkCard, { WorkCardSkeleton, workDateStatus } from "./WorkCard";
 import type { WorkRow } from "../use-open-work";
 
 const row = (over: Partial<WorkRow> = {}) => ({
@@ -92,17 +92,4 @@ describe("WorkCard", () => {
     }
   });
 
-  it("the tab bar is 36px, 3px padding, 13px tabs", () => {
-    render(<WorkListTabs value="todo" counts={{ todo: 4 }} onChange={vi.fn()} />);
-    const bar = screen.getByRole("tablist");
-    expect(bar.className).toContain("h-9");
-    expect(bar.className).toContain("p-[3px]");
-    expect(bar.className).toContain("gap-0.5");
-    expect(bar.className).toContain("rounded-[7px]");
-    const tab = screen.getByTestId("work-tab-todo");
-    expect(tab.className).toContain("text-[13px]");
-    expect(tab.className).toContain("leading-[18px]");
-    expect(tab.className).toContain("rounded-[5px]");
-    expect(tab.querySelector("span")?.className).toContain("font-medium");
-  });
 });
