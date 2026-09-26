@@ -544,6 +544,34 @@ Search, filters, sorting, Columns and Export remain. Selection scopes output onl
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
 a door to its owner: SO → SO, PO → PO, DO → DO.
 
+**REGISTER CLOSE-OUT — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on
+production 2026-09-25 (`6ed021fac`):
+
+1. **The context menu reads `Edit · View · Print · ─ Request Delivery Order · ─ Cancel SO`** (§11's
+   locked order). Shipped: `View · Edit · Print PDF · ─ Cancel SO` (`SalesOrdersRegister.tsx:652-675`).
+   `Print` is the one word (the Export menu already says it). `Request Delivery Order` is a handoff,
+   never an act in the grid: it opens Delivery's own request door for this order (the Monitor row;
+   the server door `POST /:id/delivery-order/request` exists, `order-control.ts:767`). The row is
+   drawn only for an outstation order (Delivery §3 — it is the outstation trip's door); an
+   ineligible order has no row, never a greyed one.
+2. **An empty cell is empty.** The engine prints `—` for a blank value (`DataGrid.tsx:2580, :2592`),
+   the banned absent-value glyph (SO-1312 / SO-1313 `Proceed Date`, SO-1312 `Customer Delivery
+   Location`). A document that does not exist yet already has its word (`No PO yet` · `No DO yet`);
+   every other blank prints nothing — §6.0 rule 3, an empty required fact is a system error, not a
+   value. One DataGrid change, every listing alike (UI MASTER §6.0 owns the line).
+3. **Fixtures without `proceeded_at` are data, not code.** The two `AutoCount Archive` rows
+   (SO-1312, SO-1313) are test data; nothing is backfilled (CLAUDE §6) and the column stays empty.
+4. **One population, one predicate.** The list takes `status ≠ place` (`orders.ts:334`) while the
+   total counts `place · proceed_order · delivered` (`:376`) and rentals leave in the browser
+   (`SalesOrdersRegister.tsx:582`). Both server reads use `status NOT IN (place, cancelled)` with
+   rentals excluded there; the Charter's `All` = every non-cancelled handed-over order, defined once.
+5. **`Old Orders` stays mounted** until its four boxes move (SALES-ORDER-CUTOVER); Service's
+   `CaseOrderLink` still opens it (`CaseOrderLink.tsx:56`) — Service's own round redirects it to
+   `/operation/orders/so/{id}`. Not built here; recorded as the cross-module consequence.
+
+Approved and still not built, outside this round: the optional `Guarantee` column (§11) and the
+`…` overflow with `Scan Order` (the Intake card).
+
 ### Listing Standard — owner approved 2026-09-16
 
 The shared ERP Listing Standard applies to this Register without changing what it is (a record

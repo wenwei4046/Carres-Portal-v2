@@ -1576,6 +1576,7 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             Another document's number opens that document
 3  WORDS    Only words in COPY-STANDARD
             A required fact prints no absence word (empty = system error)
+            An empty cell draws NO glyph — never `—` (owner ruling 2026-09-26)
             A document not made yet: No PO yet · No DO yet
             Loading · Could not be loaded + Try again · empty — never mixed
 4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
