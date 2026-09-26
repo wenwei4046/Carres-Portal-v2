@@ -393,22 +393,22 @@ and scroll). The page follows the Sales Order page's kit exactly (owner instruct
   are its acts; `Record payment` stays in `⋮` unless the fact is money received. A waiting order
   (`Arrival not confirmed` · `No delivery date` · `Payment due later`) has NO bar — one grey line
   under Money says why. The same sentence is the Monitor cell, this bar and the Work card.
-- **Left half, top to bottom, each a rounded-card block with the blue `text-strong` title and its
-  hairline:** `Money` (the SO page's payment-table style: `Goods` · `Storage` · `Total payable` ·
-  `Paid to date` · `Balance due`, then one grey line `Payment due {day} · Collection owner {name}`)
-  → `Storage` (only when a case exists; the block header's right side carries its two doors
-  `Request more free days` · `Check stored goods`; the body is the dictionary's three sentences
-  `{Group} · Day {n} · RM {x} so far` / `Free until {day}` / `Charge RM {x} every {n} calendar
-  days`) → `History` (the same table as the expansion, complete; events are dictionary words:
-  `Payment recorded` · `Payment message sent` · `Customer will pay on a date · promised {day}` ·
-  `Receipt sent` · `Invoice issued` · `Proceed`) → `Customer` (`Full name` · `Phone` ·
-  `Reference`, plain facts).
-- **No boxes:** the SO kit draws a bordered field only where a value is editable on that page;
-  nothing on the Payment page is edited in place, so every value is a plain fact. **No buttons in a
-  block body:** acts live in the header and in a block's own header line.
+- **Left half, top to bottom — the Sales Order page's own blocks, boxes included (owner correction
+  2026-09-26: the SO page shows its facts in the kit's readonly-field boxes, so the Payment page
+  does too):** `Payment` (the word is `Payment`, never `Money` — the SO page renamed MONEY →
+  Payment on 2026-09-21): three boxes `Payment due` · `Collection owner` · `Today's cover`, then
+  the SO page's payment table `Date · Payment received · Approval code · Collected by · Amount
+  (RM)`, then the totals `Goods · Storage · Total payable · Paid to date · Balance due` →
+  `Customer` (second, as on the SO page: `Full name` · `Phone` · `Email` · `Reference` ·
+  `Customer Requested Delivery Date` · `Scheduled delivery`; block-header door `Existing customer
+  · {n} orders ›`) → `Storage` (only when a case exists; boxes `Storage` (`{Group} · Day {n} · RM
+  {x} so far`) · `Free until` · `Charge`; block-header doors `Request more free days` · `Check
+  stored goods`) → `History` (`Date · Event · Amount · By · Document`).
+- **No buttons in a block body:** acts live in the action bar and in a block's own header line.
 - **Right half:** the paper the customer receives, one sheet with four tabs — `Sales Order`
-  (default; prints `Customer Requested Delivery Date`, `Total payable`, `Paid to date`, `BALANCE
-  DUE`) → `Message` while `Ask customer to pay` is open → `Receipt` while `Record payment` is
+  (default; the REAL Sales Order document, `sales-order-template.tsx`: Bill To · Sales Order Info ·
+  Deliver To · items with Goods/Services · `Total payable` · `Paid to date` · `BALANCE DUE` ·
+  Payments Received · Terms & Conditions) → `Message` while `Ask customer to pay` is open → `Receipt` while `Record payment` is
   open → `Invoice` once `Balance due` is RM 0. Below 1024px the paper stacks under the work.
 - `Ask customer to pay`, `Record the result` and `Record payment` replace the LEFT half with their
   existing compositions; the right half is their live paper. A recorded act adds one History row
