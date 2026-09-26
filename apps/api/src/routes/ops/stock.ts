@@ -37,6 +37,15 @@ import {
   unitLifecycleOutcome,
   canonicalUnitIdFrom,
 } from "@carres/shared";
+import {
+  buildIssueEnglish,
+  unitCountAgainAction,
+  unitProblemAction,
+  unitProblemChoice,
+  unitProblemIntake,
+  unitProblemReportInputSchema,
+  type UnitProblemUnit,
+} from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { stockMovementEvidence } from "../../lib/stock-movement-evidence";
 import { stockRegisterContext } from "../../lib/stock-register-context";
@@ -366,6 +375,168 @@ opsStockRouter.get("/register/:unitCode/movements", requireOperationOrPrincipal,
   if (error) throw mapErr(error);
   if (!unit || unit.identity_scope === "quantity") throw new HTTPException(404, { message: "No Unit with that ID" });
   return c.json({ evidence: await stockMovementEvidence(sb, unit.id) });
+});
+
+// =====================================================================
+// Unit Detail `⋮` — Report a problem · Make available for sale · Count again
+// Stock MASTER §6 · §7 · §12.4 (owner rulings 2026-09-25, design approved
+// 2026-09-26). Migration 0588.
+// =====================================================================
+
+const UNIT_ACTION_SELECT =
+  "id, unit_code, sku, warehouse_id, site_name, status, condition, needs_repair, " +
+  "hold_reason, reserved_ref, sold_order_id, availability, identity_scope";
+
+/** The exact Unit behind a `⋮` act — by its permanent ID, never a counted row. */
+async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string): Promise<UnitProblemUnit & { needsRepair: boolean }> {
+  const code = unitCode.replace(/([\\%_])/g, "\\$1");
+  const { data: found, error } = await sb.from("stock_unit_register_v").select(UNIT_ACTION_SELECT).ilike("unit_code", code).maybeSingle();
+  if (error) throw mapErr(error);
+  const data = (found ?? null) as Record<string, unknown> | null;
+  if (!data || data.identity_scope === "quantity") throw new HTTPException(404, { message: "No Unit with that ID" });
+  const { data: catalog } = await sb.from("product_skus").select("sku, variant, product_models(name)").eq("sku", data.sku as string).maybeSingle();
+  const model = catalog ? (Array.isArray(catalog.product_models) ? catalog.product_models[0] : catalog.product_models) : null;
+  return {
+    id: data.id as string,
+    unitCode: data.unit_code as string,
+    sku: data.sku as string,
+    productName: model?.name ? [model.name, catalog?.variant].filter(Boolean).join(" · ") : null,
+    availability: data.availability as string,
+    status: data.status as string,
+    reservedRef: (data.reserved_ref as string | null) ?? null,
+    soldOrderId: (data.sold_order_id as string | null) ?? null,
+    siteName: (data.site_name as string | null) ?? null,
+    needsRepair: Boolean(data.needs_repair),
+  };
+}
+
+/** The open Issues that name this Unit, with their current action. */
+async function openIssuesForUnit(sb: ReturnType<typeof userClient>, unitId: string) {
+  const { data, error } = await sb
+    .from("issues")
+    .select("id, issue_no, status, observed_problem, official_english, observed_on, issue_links!inner(object_kind, object_id), issue_actions(id, status, trigger, owner_rule, action, recipient, required_result, due_on)")
+    .eq("issue_links.object_kind", "unit")
+    .eq("issue_links.object_id", unitId)
+    .not("status", "in", "(closed,voided)")
+    .order("observed_on", { ascending: false });
+  if (error) throw mapErr(error);
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const actions = (row.issue_actions as Array<Record<string, unknown>> | null) ?? [];
+    const current = actions.find((a) => a.status === "open") ?? null;
+    return {
+      id: row.id as string,
+      issueNo: row.issue_no as string,
+      status: row.status as string,
+      observedProblem: row.observed_problem as string,
+      officialEnglish: row.official_english as string,
+      observedOn: row.observed_on as string,
+      currentAction: current
+        ? {
+            id: current.id as string,
+            trigger: current.trigger as string,
+            ownerRule: current.owner_rule as string,
+            action: current.action as string,
+            recipient: current.recipient as string,
+            requiredResult: current.required_result as string,
+            dueOn: current.due_on as string,
+          }
+        : null,
+    };
+  });
+}
+
+/** A door that refuses for a business reason answers 409 with its sentence. */
+function unitDoorRefusal(error: { code?: string; message?: string; details?: string }) {
+  const detail = error.details ?? "";
+  const refused = new Set(["problem_open", "in_repair", "in_transit", "no_site", "resolve_through_claim", "not_cannot_sell", "not_a_unit", "inspection_hold_needs_pool_unit"]);
+  if (refused.has(detail)) return new HTTPException(409, { message: error.message ?? detail });
+  if (error.code === "42501") return new HTTPException(403, { message: error.message ?? "forbidden" });
+  return mapErr(error);
+}
+
+// GET /register/:unitCode/issues — the Unit's open problems and their current action.
+opsStockRouter.get("/register/:unitCode/issues", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  return c.json({ issues: await openIssuesForUnit(sb, unit.id) });
+});
+
+// POST /register/:unitCode/report-problem — ONE door (0588): the Issue and the
+// derived protective control commit together or not at all.
+opsStockRouter.post("/register/:unitCode/report-problem", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, unitProblemReportInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  const today = todayIsoMYT();
+  const observedOn = parsed.observedOn ?? today;
+  const names = await resolveActorNames(sb, [c.var.auth.id]);
+  const foundByName = names.get(c.var.auth.id) ?? c.var.auth.email ?? "Warehouse";
+  const intake = unitProblemIntake(unit, parsed, foundByName, observedOn);
+  const action = unitProblemAction(unit, parsed.problem, today);
+  const { data, error } = await sb.rpc("stock_unit_report_problem", {
+    p_request_id: parsed.requestId,
+    p_item_id: unit.id,
+    p_observed: unitProblemChoice(parsed.problem).observed,
+    p_issue: {
+      problem_object: intake.problemObject,
+      observed_problem: intake.observedProblem,
+      source_module: "warehouse",
+      business_impact: intake.impact,
+      materiality: "routine",
+      observed_on: intake.observedOn,
+      affected_object: intake.affectedObject,
+      official_english: buildIssueEnglish(intake),
+      optional_detail: intake.optionalDetail ?? null,
+      found_by_kind: intake.foundByKind,
+      found_by_name: intake.foundByName,
+    },
+    p_links: intake.linkedObjects,
+    // Each file is its own proof line, so the Issue keeps the object key.
+    p_evidence: parsed.evidence.map((e) => ({ kind: e.kind, label: e.path })),
+    p_action: action,
+  });
+  if (error) throw unitDoorRefusal(error);
+  const result = data as { id: string; issue_no: string; official_english: string; replayed: boolean; protection: string };
+  return c.json({
+    issueId: result.id,
+    issueNo: result.issue_no,
+    officialEnglish: result.official_english,
+    protection: result.protection,
+    action,
+    replayed: result.replayed === true,
+  }, result.replayed ? 200 : 201);
+});
+
+// POST /register/:unitCode/make-available — the way back from Cannot sell (0588).
+opsStockRouter.post("/register/:unitCode/make-available", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  const { data, error } = await sb.rpc("stock_unit_make_available", { p_item_id: unit.id });
+  if (error) throw unitDoorRefusal(error);
+  return c.json(data ?? { item_id: unit.id });
+});
+
+// POST /register/:unitCode/count-again — a repeat look for a Unit an open
+// `Not found` report names: the current action gets its result and the next
+// dated look replaces it (Issue Tracker's one result door).
+opsStockRouter.post("/register/:unitCode/count-again", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  const issues = await openIssuesForUnit(sb, unit.id);
+  const notFound = issues.find((i) => i.observedProblem === "missing" && i.currentAction);
+  if (!notFound?.currentAction) {
+    throw new HTTPException(409, { message: "No open Not found report names this Unit" });
+  }
+  const next = unitCountAgainAction(unit, todayIsoMYT());
+  const { data, error } = await sb.rpc("issue_record_action_result", {
+    p_issue_id: notFound.id,
+    p_action_id: notFound.currentAction.id,
+    p_result_code: "answer_recorded",
+    p_result: "Count again requested",
+    p_next_action: next,
+  });
+  if (error) throw unitDoorRefusal(error);
+  return c.json({ issueId: notFound.id, action: next, result: data ?? null });
 });
 
 // =====================================================================

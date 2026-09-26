@@ -309,7 +309,7 @@ describe("the rail is STOCK · CATEGORY · OWNERSHIP · CONTROL", () => {
 it("returns from a Unit without losing the register, search, rail or scroll", async () => {
   apiFetchMock.mockImplementation((path: string) => {
     if (path.startsWith("/api/ops/stock/register/")) {
-      return Promise.resolve({ unit: UNITS[0], events: [] });
+      return Promise.resolve(path.endsWith("/issues") ? { issues: [] } : { unit: UNITS[0], events: [] });
     }
     if (path.startsWith("/api/ops/stock/register")) return Promise.resolve({ units: UNITS, total: UNITS.length });
     return Promise.resolve({ evidence: [] });
@@ -318,7 +318,8 @@ it("returns from a Unit without losing the register, search, rail or scroll", as
   fireEvent.click(screen.getByTestId("rail-category-bedframe"));
   fireEvent.click(screen.getByRole("link", { name: "U1-000-084" }));
   await screen.findByTestId("stock-unit-detail");
-  fireEvent.click(screen.getByRole("button", { name: "← Inventory" }));
+  // The object header's own back door (the Sales Order page's grammar, 2026-09-26).
+  fireEvent.click(screen.getByRole("link", { name: "Inventory" }));
   await waitFor(() => expect(screen.queryByTestId("stock-unit-detail")).not.toBeInTheDocument());
   expect(screen.getByText("U1-000-084")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();

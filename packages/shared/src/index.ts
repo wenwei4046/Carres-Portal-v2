@@ -1,6 +1,7 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
+export * from "./unit-problem";
 
 /* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
    the fee onto the order. The Worker cannot import from the web app, which
