@@ -69,6 +69,32 @@ STILL GATED    a NEW business rule · a change to an approved workflow or
 conversation deciding between options, sketch before code (Constitution §10). The gate that
 is gone is the one that parked autonomous production execution on a synchronous approval.
 
+## §1.1.1 · THE PRE-SHOW GATE — owner ruling, Jess 2026-09-26 · APPROVED / LOCKED
+
+**"How can I avoid having to look and check every time before you design my UI?"** The answer
+is a gate the chat runs on its own screenshot BEFORE the owner sees it. A page that fails any line
+is not shown; it is fixed first. The chat states the six results in one line with the screenshot.
+
+```
+1  WORDS      every visible word is in COPY-STANDARD, with its row named; none invented
+2  ONE BLUE   the page has ONE washed/filled blue = the chosen record/row; rail choices are
+              bold + left line; tabs are grey; no blue words; links grey underlined
+3  WIDTH      a card wider than 480px with more than three facts lays them in columns;
+              nothing is a single column of six lines with an empty right half
+4  ICONS      a record door is the kit's `open` icon with its accessible name, not the word
+              `Open …` beside a title (Gmail's reading pane, not a form)
+5  REFERENCE  the surface was put beside its reference (Gmail reading pane · Linear issue ·
+              the Sales Orders Register) and the difference is named or removed
+6  SELF-RATE  the chat rates its own screenshot out of 10 with the 🔴/🟡 list; under 8 it
+              is not shown
+```
+
+**Why:** the owner rated the first Work rebuild 3/10 after ten review rounds she had to lead
+herself ("i need always ask you check, copy who, how how how, rate rate rate"). Every one of the
+faults — invented column words, five blue rows, a six-line card with an empty right half, the word
+`Open` beside a title, a dashed date range — was visible in the chat's own screenshot before she saw
+it. **The owner reviews design; she does not run the checklist.**
+
 ## §1.2 · Plan / Design Research Law — APPROVED / LOCKED, owner ruling 2026-08-11
 
 Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED decisions are not

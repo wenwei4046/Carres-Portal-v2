@@ -23,13 +23,12 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { orderActionLines, workspaceDutyLabelOf, type OperationWorkItem, type OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
-import SearchInput from "@/components/kit/SearchInput";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
@@ -37,8 +36,8 @@ import {
   filterWork,
   inWorkDay,
   isWorkDate,
+  parseWorkMonth,
   parseWorkStatus,
-  parseWorkWeek,
   toggleWorkStatus,
   WORK_MODULES,
   WORK_STATUS_ORDER,
@@ -46,21 +45,23 @@ import {
   workFocusDay,
   workLayoutFor,
   workModuleCounts,
-  workRailDates,
+  workRailMonth,
   workSections,
+  groupByRecord,
+  type WorkRecord,
   workStatusOf,
-  workWeekWord,
   type WorkStatus,
   type WorkWhen,
 } from "./work/work-model";
 import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
-import WorkParties, { type MissionReport, type Party } from "./work/WorkParties";
+import WorkParties, { type Party } from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
-import WorkCard, { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailMonthGrid, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
+import { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
+import WorkListRow from "./work/WorkListRow";
 
 type ViewKey = "mine" | "team";
 
@@ -122,16 +123,9 @@ export default function OperationWork() {
   );
   const railVisible = layout === "one" ? railOpen && phoneRailOverride : railOpen;
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
-  /* §5.10: which party card is open (one at a time) and what the mission
-     reports — the summary opens a card and carries the one blue act while
-     every card is collapsed. Reset whenever another work item is chosen. */
+  /* §5.10: which fact card of the order is open (one at a time); reset when
+     another order is chosen. */
   const [openParty, setOpenParty] = useState<Party | null>(null);
-  const [mission, setMission] = useState<MissionReport>({ shown: false, act: null, openCardHasAct: false });
-  const reportMission = useCallback((report: MissionReport) => {
-    setMission((before) =>
-      before.shown === report.shown && before.act?.party === report.act?.party && before.act?.label === report.act?.label && before.openCardHasAct === report.openCardHasAct ? before : report,
-    );
-  }, []);
   /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -281,13 +275,13 @@ export default function OperationWork() {
     : filterWork(allItems, { ...filters, module: "all" }).filter((item) => !ownerFocus || ownerGroupKey(item) === ownerFocus)
   ).filter(inDay);
 
-  /** The rail's visible week (owner ruling 2026-09-24): the URL's `week`,
-   *  else the week of the chosen date, else the week of the focus day. The
-   *  arrows move it one work week without touching the chosen Date. */
-  const week = parseWorkWeek(params.get("week")) ?? (isWorkDate(day) ? day : focusDay);
+  /** The rail's visible MONTH (Jess, 2026-09-26): the URL's `month`, else the
+   *  month of the chosen date, else the month of the focus day. The arrows
+   *  move it one month without touching the chosen Date. */
+  const monthKey = parseWorkMonth(params.get("month")) ?? parseWorkMonth(isWorkDate(day) ? day : focusDay);
   const railDates = useMemo(
-    () => (week ? workRailDates(beforeDay, generatedOn, week) : null),
-    [beforeDay, generatedOn, week],
+    () => (monthKey ? workRailMonth(beforeDay, generatedOn, monthKey) : null),
+    [beforeDay, generatedOn, monthKey],
   );
   const railSelected = selectedDay === "missed" || selectedDay === "no_date" || isWorkDate(selectedDay) ? selectedDay : null;
   const moduleCounts = workModuleCounts(moduleCountRows);
@@ -353,16 +347,17 @@ export default function OperationWork() {
   );
 
   const selectedId = params.get("selected");
-  const selectedKey = (visible.find((item) => item.id === selectedId) ?? visible[0] ?? null)?.id ?? null;
-  /* A new item starts with every card collapsed. The mission (keyed per item)
-     reports itself on mount — child effects run first, so it is not reset here. */
-  useEffect(() => {
-    setOpenParty(null);
-  }, [selectedKey]);
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  /* ⭐ ONE ROW PER ORDER (Jess, 2026-09-26 night): the list and the panel work
+     in records; `selected` is the record's first act (the URL keeps an act id
+     so a deep link to one act still lands on its order). */
+  const allRecords = groupByRecord(visible);
+  const selectedRecord = allRecords.find((r) => r.items.some((i) => i.id === selectedId)) ?? allRecords[0] ?? null;
+  const selected = selectedRecord?.items.find((i) => i.id === selectedId) ?? selectedRecord?.items[0] ?? null;
   const visibleIds = new Set(visible.map((item) => item.id));
   // The date rail and its badge already say when; the list is one ordered run.
   const myItems = workSections(visible).flatMap((section) => section.items);
+  const myRecords = groupByRecord(myItems);
+  useEffect(() => { setOpenParty(null); }, [selectedRecord?.key]);
   const displayTeamGroups = visibleTeamGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
@@ -382,7 +377,7 @@ export default function OperationWork() {
   const listKey = [...params.entries()].filter(([key]) => key !== "selected").map(([k, v]) => `${k}=${v}`).join("&");
   useEffect(() => setCardLimit(CARD_STEP), [listKey]);
   const moreRef = useRef<HTMLDivElement>(null);
-  const listTotal = activeView === "mine" ? myItems.length : displayTeamGroups.reduce((n, g) => n + g.items.length, 0);
+  const listTotal = activeView === "mine" ? myRecords.length : displayTeamGroups.reduce((n, g) => n + groupByRecord(g.items).length, 0);
   const hasMore = listTotal > cardLimit;
   useEffect(() => {
     const sentinel = moreRef.current;
@@ -405,28 +400,33 @@ export default function OperationWork() {
     return [{ ...g, items }];
   });
 
-  const card = (i: WorkRow) => (
-    <WorkCard
-      cover={i.ownerState === "covered" && i.activeCover
-        ? activeView === "mine"
-          ? `Covered for ${i.normalOwner?.name ?? "normal owner"}`
-          : `Covered by ${i.activeCover.name ?? "cover"}`
-        : null}
-      key={`${i.orderId}:${i.ruleKey}`}
-      item={i}
-      moduleLabel={MODULE_LABEL[i.module]}
-      action={`${deliveryLines(i)?.act ?? i.action}`}
-      today={generatedOn}
-      selected={layout !== "one" && selected?.id === i.id}
-      onSelect={() => openRow(i)}
-      onOpenRecord={() => navigate(i.destination)}
+  /* The two-line picker row (Jess, 2026-09-26). A covered row names the
+     normal owner in My Work (`For Li Ching`); Team Work groups by that owner
+     already, so the row says nothing twice. */
+  const card = (r: WorkRecord) => (
+    <WorkListRow
+      key={r.key}
+      record={r}
+      acts={r.items.map((i) => `${deliveryLines(i)?.act ?? i.action}`)}
+      cover={activeView === "mine" && r.items.some((i) => i.ownerState === "covered") ? (r.items.find((i) => i.ownerState === "covered")?.normalOwner?.name ?? "normal owner") : null}
+      selected={layout !== "one" && selectedRecord?.key === r.key}
+      onSelect={() => openRow(r.items[0]!)}
+      onOpenRecord={() => navigate(r.items[0]!.destination)}
     />
   );
+  /** The one line over the list: the chosen Date, the rail's own words. */
+  const listHeading = selectedDay === "missed"
+    ? "Missed"
+    : selectedDay === "no_date"
+      ? "No date"
+      : isWorkDate(selectedDay)
+        ? fmtDate(selectedDay)
+        : null;
 
   /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26 — the Payment Monitor rail,
      then her correction the same day): ONE header line `‹ Week of 28 Sep ›`,
-     then the week as one row of day tiles (weekday · day number · count —
-     five, six when Saturday holds work), then the fixed rows `Missed` and
+     then the whole month as a Monday–Saturday grid of day tiles (day number
+     over count; Sunday never drawn), then the fixed rows `Missed` and
      `No date`, the `Status` rows (more than one may be on), the `Page` rows
      and — in Team Work — the Owner select. A non-working day is a grey tile
      with no count; today is the solid-blue tile; the chosen day is ringed.
@@ -444,55 +444,24 @@ export default function OperationWork() {
       onHide={() => { setRailOpen(false); setPhoneRailOverride(false); }}
       header={(
         <div data-testid="work-rail-week" className="flex items-center gap-1 pr-8">
-          <button type="button" aria-label="Previous week" title="Previous week" className={weekArrow} onClick={() => updateParam("week", railDates.previousWeek)}>
+          <button type="button" aria-label="Previous month" title="Previous month" className={weekArrow} onClick={() => updateParam("month", railDates.previousMonth)}>
             <Icon name="previous" size={16} />
           </button>
           <span className="min-w-0 flex-1 truncate text-center text-body font-semibold text-kit-slate-12" data-testid="work-rail-week-label">
-            {workWeekWord(week)}
+            {railDates.month}
           </span>
-          <button type="button" aria-label="Next week" title="Next week" className={weekArrow} onClick={() => updateParam("week", railDates.nextWeek)}>
+          <button type="button" aria-label="Next month" title="Next month" className={weekArrow} onClick={() => updateParam("month", railDates.nextMonth)}>
             <Icon name="forward" size={16} />
           </button>
         </div>
       )}
     >
-      {/* The week strip: 216px shared by five 40px tiles (six 34px tiles with
-          Saturday). Weekday over day number over the count; the count line is
-          empty on a working day with nothing due. */}
-      <div className="grid gap-1 py-3" style={{ gridTemplateColumns: `repeat(${railDates.days.length}, minmax(0, 1fr))` }} data-testid="work-rail-days">
-        {railDates.days.map((d) => {
-          const active = railSelected === d.iso;
-          const closed = d.holiday !== null;
-          return (
-            <button
-              key={d.iso}
-              type="button"
-              onClick={() => pickDay(d.iso)}
-              aria-pressed={active}
-              aria-label={`${d.label}${d.today ? " · Today" : ""}${d.holiday ? ` · ${d.holiday}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`}
-              title={d.holiday ?? undefined}
-              data-testid={`work-rail-day-${d.iso}`}
-              data-today={d.today ? "yes" : undefined}
-              data-closed={closed ? "yes" : undefined}
-              className={[
-                "flex h-14 min-w-0 flex-col items-center justify-center rounded-control tabular-nums",
-                d.today
-                  ? "bg-kit-blue-9 text-white"
-                  : closed
-                    ? "bg-kit-slate-3 text-kit-slate-9"
-                    : "bg-white text-kit-slate-12 hover:bg-kit-slate-3",
-                active ? "ring-2 ring-inset ring-kit-blue-9" : closed || d.today ? "" : "ring-1 ring-inset ring-kit-slate-5",
-              ].join(" ")}
-            >
-              <span className={`text-[10px] font-semibold leading-3 ${d.today ? "text-white" : closed ? "text-kit-slate-9" : "text-kit-slate-11"}`}>{d.weekday}</span>
-              <span className="text-[15px] font-semibold leading-5">{d.dayNumber}</span>
-              <span className={`h-3 text-[11px] leading-3 ${d.today ? "text-white" : "text-kit-slate-11"}`}>
-                {!closed && d.count > 0 ? d.count : ""}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <FilterRailMonthGrid
+        testId="work-rail-days"
+        weeks={railDates.weeks.map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
+        chosenIso={railSelected}
+        onPick={pickDay}
+      />
       <div className="border-t border-kit-slate-5 py-2">
         <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
         <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
@@ -541,14 +510,14 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="flex flex-col gap-2" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
+      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myRecords.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
   ) : (
     <div className="flex flex-col gap-4">
       {shownTeamGroups.map((g) => (
-        <section key={g.key} className="flex flex-col gap-2" data-testid={`work-owner-group-${g.key}`}>
+        <section key={g.key} className="flex flex-col" data-testid={`work-owner-group-${g.key}`}>
           <h3 className="flex h-8 min-w-0 items-center gap-2 whitespace-nowrap" data-testid={`work-owner-heading-${g.key}`}>
             {g.person ? (
               <span
@@ -587,7 +556,7 @@ export default function OperationWork() {
               </Link>
             </p>
           )}
-          {g.items.map(card)}
+          {groupByRecord(g.items).map(card)}
         </section>
       ))}
     </div>
@@ -615,88 +584,73 @@ export default function OperationWork() {
               </aside>
             )
             : null}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="work-right-column">
-        {/* The toolbar row of the §6.0 shell: white, one bottom rule, no box.
-            My Work · Team Work · Search (340px). Below 600px the controls
-            wrap. `Covering` is gone (Jess, 2026-09-26): cover shows on the
-            row itself, never as a toolbar button. */}
-        <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-base-200 bg-white px-2 py-1.5" data-testid="work-toolbar">
-          {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
-          <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
-            {(
-              [
-                ["mine", "My Work"],
-                ["team", "Team Work"],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                data-testid={`work-view-${k}`}
-                aria-pressed={activeView === k}
-                onClick={() => {
-                  setParams((before) => {
-                    const next = new URLSearchParams(before);
-                    if (k === "mine") {
-                      next.delete("scope");
-                      next.delete("owner");
-                    } else next.set("scope", "team");
-                    return next;
-                  }, { replace: true });
-                }}
-                className={`h-[34px] px-3 text-control max-[599px]:flex-1 ${
-                  activeView === k
-                    ? "bg-kit-blue-9 font-semibold text-white"
-                    : "bg-white text-kit-slate-11 hover:bg-kit-slate-3"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="w-[340px] shrink-0 max-[599px]:w-auto max-[599px]:basis-full">
-            <SearchInput
-              toolbar
-              id="work-search"
-              value={search}
-              onChange={(event) => updateParam("q", event.target.value)}
-              placeholder="Search work…"
-            />
-          </div>
-          {activeView === "team" && ownerFocus && (
-            <button
-              type="button"
-              data-testid="work-owner-clear"
-              onClick={() => updateParam("owner", null)}
-              className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
-            >
-              {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
-              · Clear
-            </button>
-          )}
-          {(search || when !== "all" || moduleFilter !== "all" || params.get("status") || day !== "focus") && (
-            <button
-              type="button"
-              onClick={() => setParams((before) => {
-                const next = new URLSearchParams(before);
-                for (const key of ["q", "when", "module", "status", "owner", "day", "week", "selected"]) next.delete(key);
-                return next;
-              }, { replace: true })}
-              className="h-9 px-2 text-control text-kit-blue-11"
-            >
-              Clear all
-            </button>
-          )}
-        </section>
-
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="work-right-column">
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
           railBeside={railVisible}
           list={(
-            <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
-              {/* No heading and no tabs above the cards (Jess, 2026-09-26): the
-                  rail already names the day and the Status. */}
+            /* The picker is ONE white card, like every card on the right (Jess,
+               2026-09-26: "why middle is not white?"). No search, no Clear
+               all: the rail's own rows reset themselves, the header's
+               Jump to… finds a record. */
+            <div className="flex min-h-0 flex-1 flex-col border-r border-kit-slate-5 bg-white px-3 pt-2" data-testid="work-list">
+                    {/* The picker's own controls, over the picker (Jess, 2026-09-26:
+                        "My Work, Team Work is under middle card"): the scope tabs on
+                        one line, the search on the next; never a bar across the
+                        detail. `Covering` is gone: cover shows on the row itself. */}
+              <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 pb-2" data-testid="work-toolbar">
+                {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
+                <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
+                  {(
+                    [
+                      ["mine", "My Work"],
+                      ["team", "Team Work"],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      data-testid={`work-view-${k}`}
+                      aria-pressed={activeView === k}
+                      onClick={() => {
+                        setParams((before) => {
+                          const next = new URLSearchParams(before);
+                          if (k === "mine") {
+                            next.delete("scope");
+                            next.delete("owner");
+                          } else next.set("scope", "team");
+                          return next;
+                        }, { replace: true });
+                      }}
+                      className={`h-[34px] px-3 text-control max-[599px]:flex-1 ${
+                        activeView === k
+                          ? "bg-kit-slate-3 font-semibold text-kit-slate-12"
+                          : "bg-white text-kit-slate-11 hover:bg-kit-slate-2"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {activeView === "team" && ownerFocus && (
+                  <button
+                    type="button"
+                    data-testid="work-owner-clear"
+                    onClick={() => updateParam("owner", null)}
+                    className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
+                  >
+                    {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
+                    · Clear
+                  </button>
+                )}
+              </section>
+
+              {/* One line: the chosen Date (Jess, 2026-09-26 — the calendar
+                  reference's `Monday, August 31`). No count, no tabs. */}
+              {listHeading && layout !== "one" ? (
+                <h2 className="shrink-0 pb-2 text-[13px] font-semibold leading-[18px] text-kit-slate-12" data-testid="work-list-heading">{listHeading}</h2>
+              ) : null}
               {!loading && !error && unhealthySources.length > 0 ? (
                 <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
                   {unhealthySources.map((source) => (
@@ -747,15 +701,9 @@ export default function OperationWork() {
               {selected.source.object.kind === "po_window" ? (
                 <PoWindowMission item={selected.source} onOpen={() => navigate(selected.destination)} />
               ) : (
-                <>
-                  <WorkActionPanel
-                    item={selected.source}
-                    hasParties={mission.shown}
-                    primaryAct={mission.act && !mission.openCardHasAct ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
-                    onOpen={() => navigate(selected.destination)}
-                  />
-                  <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
-                </>
+                /* Work is an inbox (ruling B, Jess 2026-09-26): the ACTION card
+                   is the panel; the whole order lives behind its door. */
+                <WorkParties key={selectedRecord?.key ?? selected.id} items={(selectedRecord?.items ?? [selected]).map((i) => i.source)} openParty={openParty} onOpenParty={setOpenParty} onOpenRecord={() => navigate(selected.destination)} />
               )}
               <WorkOwnerSource item={selected.source} />
             </>

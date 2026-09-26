@@ -105,8 +105,12 @@ export default function CustomerCard({
   open,
   onToggle,
   primary,
+  heading: headingProp,
+  trailing,
 }: {
   orderId: string;
+  heading?: string;
+  trailing?: React.ReactNode;
   leg?: number;
   open: boolean;
   onToggle: (open: boolean) => void;
@@ -130,6 +134,7 @@ export default function CustomerCard({
         testId="party-customer"
         anchorId={`party-customer-${orderId}`}
         party={C.heading}
+        trailing={trailing}
         heading={C.heading}
         status={<ToneLine tone={failed ? "attention" : "future"}>{C.unavailable}</ToneLine>}
         open={open}
@@ -155,7 +160,8 @@ export default function CustomerCard({
       testId="party-customer"
       anchorId={`party-customer-${orderId}`}
       party={C.heading}
-      heading={`${C.heading} · ${name ?? "Name not recorded"}`}
+      heading={headingProp ?? `${C.heading} · ${name ?? "Name not recorded"}`}
+      trailing={trailing}
       status={<ToneLine tone={model.status.tone} testId="party-customer-line">{model.status.text}</ToneLine>}
       open={open}
       onToggle={onToggle}
@@ -240,7 +246,7 @@ export default function CustomerCard({
 
 function DoorLink({ to, children }: { to: string; children: string }) {
   return (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to={to}>
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={to}>
       {children}
       <Icon name="open" size={14} />
     </Link>

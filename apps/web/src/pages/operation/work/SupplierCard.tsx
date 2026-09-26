@@ -67,8 +67,13 @@ export default function SupplierCard({
   open,
   onToggle,
   primary,
+  heading: headingProp,
+  trailing,
 }: {
   orderId: string;
+  /** The Route step this card is (Jess, 2026-09-27: every card tallies a Route step). */
+  heading?: string;
+  trailing?: React.ReactNode;
   /** The order's CR/TCF reference — a supplier message never carries the SO. */
   reference: string | null;
   open: boolean;
@@ -92,7 +97,8 @@ export default function SupplierCard({
       testId="party-supplier"
       anchorId={`party-supplier-${orderId}`}
       party={S.heading}
-      heading={model?.heading ?? S.heading}
+      heading={headingProp ?? model?.heading ?? S.heading}
+      trailing={trailing}
       status={
         failed ? (
           <ToneLine tone="attention">{S.unavailable}</ToneLine>
@@ -150,7 +156,7 @@ export default function SupplierCard({
 
 function OpenPurchasing() {
   return (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to="/operation/procurement">
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to="/operation/procurement">
       {S.openPurchasing}
       <Icon name="open" size={14} />
     </Link>
@@ -217,7 +223,7 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
               Copy message
             </Button>
             {group ? (
-              <a className="inline-flex min-h-10 items-center gap-1 text-label text-kit-blue-11 hover:underline" href={group} target="_blank" rel="noreferrer">
+              <a className="inline-flex min-h-10 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" href={group} target="_blank" rel="noreferrer">
                 <Icon name="message" size={14} />
                 Open WhatsApp group
               </a>
@@ -227,12 +233,12 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
           </>
         ) : null}
         {row.issued && !row.grnIso ? (
-          <Link className="inline-flex min-h-10 items-center gap-1 text-label text-kit-blue-11 hover:underline" to={poHref(row.poNo)} data-testid={`party-supplier-delay-${row.poNo}`}>
+          <Link className="inline-flex min-h-10 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={poHref(row.poNo)} data-testid={`party-supplier-delay-${row.poNo}`}>
             {S.recordDelay}
             <Icon name="open" size={14} />
           </Link>
         ) : null}
-        <Link className="inline-flex min-h-10 items-center gap-1 text-label text-kit-blue-11 hover:underline" to={poHref(row.poNo)}>
+        <Link className="inline-flex min-h-10 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={poHref(row.poNo)}>
           {S.openPo(row.poNo)}
           <Icon name="open" size={14} />
         </Link>

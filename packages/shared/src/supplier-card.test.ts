@@ -106,7 +106,7 @@ describe("the Order Route is one compact line", () => {
     const m = missionRouteModel(route());
     expect(m.points.map((p) => p.label)).toEqual(["Proceed", "PO", "GRN", "Contact", "Delivery"]);
     expect(m.points.map((p) => p.status)).toEqual(["Done", "2 of 3", "0 of 3", "Due today", "Requested"]);
-    expect(m.points.find((p) => p.key === "po")?.dateText).toBe("22–30 Oct");
+    expect(m.points.find((p) => p.key === "po")?.dateText).toBe("22 to 30 Oct");
     expect(m.points.filter((p) => p.tone === "current")).toHaveLength(1);
     expect(m.header).toEqual({ text: "3 days left", tone: "future" });
     expect(m.points.at(-1)?.final).toBe(true);
@@ -119,10 +119,10 @@ describe("the Order Route is one compact line", () => {
 
   it("payment is one exception line, never a point and never Blocked", () => {
     const m = missionRouteModel(route({ payment: { owedText: "RM 1,250.00", deadlineIso: "2026-10-23", affects: true, financeHold: false } }));
-    expect(m.paymentLine).toEqual({ text: "Payment · RM 1,250.00 to collect by 23 Oct", tone: "attention" });
+    expect(m.paymentLine).toEqual({ text: "Payment · Hold delivery · RM 1,250.00 unpaid · by 23 Oct", tone: "attention", deadlineText: "23 Oct" });
     expect(m.points.some((p) => /Payment|Blocked/.test(p.label + p.status))).toBe(false);
     expect(missionRouteModel(route({ payment: { owedText: "RM 5.00", deadlineIso: null, affects: false, financeHold: true } })).paymentLine?.text).toBe(
-      "Payment · Finance is holding this delivery",
+      "Payment · Hold delivery · Finance hold",
     );
   });
 

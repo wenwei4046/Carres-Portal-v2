@@ -402,20 +402,23 @@ column); BUILT 2026-09-26.** The shared 240px `FilterRail` (`Hide filters` / `Sh
 remembered per browser), running from the page header to the bottom. Every row is a real button with
 a complete accessible name and a visible keyboard focus ring. Top to bottom:
 
-- **The week header — ONE line:** `Previous week` · **`Week of {d Mon}`** (`Week of 28 Sep`, the
-  week's Monday, no weekday, no dash) · `Next week`. The arrows move the visible week by one work
-  week and change neither the chosen Date, the Status, the Page nor any filter. The two-date label
-  (`Mon, 28 Sep – Fri, 2 Oct`) is retired: it wrapped to three lines in 240px.
-- **The week strip — ONE row of day tiles**, 56px tall, 216px shared equally: five tiles Monday to
-  Friday, six when Saturday holds work (a Warehouse rail is fixed at six). A tile is the uppercase
-  weekday over the day number over the count line, all cut from the one `fmtDate` spelling and moved
-  by whole `YYYY-MM-DD` days. The count line prints the number of open actions dated that day and
-  is **empty** when there are none — never `No work`, never `0`. A public holiday (and any
-  non-working day) is the **grey tile**: grey number, empty count line, its name only in the
-  accessible name and tooltip (`Malaysia Day`) — never `Hol`, never `Public holiday ·`. **Today** is
-  the **solid-blue tile** with white text; the word `Today` is never on screen. The **chosen** day is
-  the ringed tile. Today, closed and chosen are independent states. A day can be chosen whether or
-  not it is closed and counts the work dated on it.
+- **The month header — ONE line:** `Previous month` · **`{Mon YYYY}`** (`Sep 2026`) · `Next
+  month`. The arrows move the visible month and change neither the chosen Date, the Status, the
+  Page nor any filter. (The 2026-09-24 two-week column and the 2026-09-26 one-week strip are
+  retired: the owner wants the whole month.)
+- **The month grid — Monday to Saturday, every week of the month** (`FilterRailMonthGrid`, Jess
+  2026-09-26: "full 1 month — need to see Sat work; office doesn't work Saturday, but the Workspace
+  needs to see it"). Six 36px tiles share the 216px row; Sunday is never drawn. A tile is the day
+  number over its count line, cut from the one `fmtDate` spelling and moved by whole `YYYY-MM-DD`
+  days. **No blue words:** the column heads `MON`–`SAT` grey, numbers black. The count line prints
+  the number of open actions dated that day and is **empty** when there are none — never
+  `No work`, never `0`. A public holiday (and any non-working day) is the grey-text tile, its name
+  only in the accessible name and tooltip (`Malaysia Day`) — never `Hol`, never `Public holiday ·`.
+  **Today** is the ringed black number, and this week's row is the tinted row; the word `Today` is
+  never on screen. The **chosen** day is the solid-blue tile with white text — the page's ONE blue: a rail row choice is
+  bold with its left line, never washed; the only washed row on the page is the chosen work. Today,
+  closed and chosen are independent states. A day can be chosen whether or not it is closed and
+  counts the work dated on it.
 - **The fixed rows** `Missed {n}` and `No date {n}` — `0` printed. `Missed`, one tile and `No date`
   are one mutually exclusive Date choice. A missed occurrence counts once, under `Missed`, never
   again under its past weekday.
@@ -433,10 +436,10 @@ a complete accessible name and a visible keyboard focus ring. Top to bottom:
 Date, Status, Page and Owner combine. The rail is the only place these facts live: the middle
 column draws **no date heading, no count heading and no tabs** above the list.
 
-The URL carries the visible week (`week`, its Monday), the Date choice (`day` = `missed` ·
+The URL carries the visible month (`month`), the Date choice (`day` = `missed` ·
 `YYYY-MM-DD` · `no_date`) and the module (`module`); opening that URL restores all three. Without
-`week`, the rail shows the week of the chosen date, else the week of the focus day. The URL also
-carries the Status choice (`status` = a comma list of `todo` · `waiting` · `done`; absent = `To do`).
+`month` (`YYYY-MM`), the rail shows the month of the chosen date, else the month of the focus day.
+The URL also carries the Status choice (`status` = a comma list of `todo` · `waiting` · `done`; absent = `To do`).
 The opening focus list (no `day`) rings the focus day's tile. `day=all`, reached from the toolbar's timing
 filter or a Dashboard link, lists every open action and highlights no Date option.
 
@@ -622,9 +625,10 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   hint (the `Search` rename was reverted by Jess 2026-09-26) · `Help` and `Settings` beside their
   icons · the right rail names each icon. **`Covering` is retired (Jess, 2026-09-26):** a covered row
   says so on the row itself; the toolbar carries no cover button.
-- **The Date rail** is the one-line week header and the week strip of tiles in §5.2 Panel 1 (Jess,
-  2026-09-26 — replaces the day cards, `Today` in words, `No work`, `Public holiday · {name}` and
-  the two-week column). `No date` (never `No working date`) is always listed.
+- **The Date rail** is the one-line month header and the Monday–Saturday month grid of §5.1
+  Panel 1 (Jess, 2026-09-26 — replaces the day cards, `Today` in words, `No work`,
+  `Public holiday · {name}`, the two-week column and the one-week strip). `No date` (never
+  `No working date`) is always listed.
 - **List tabs are retired** (Jess, 2026-09-26): `To do` · `Waiting for answer` · `Done today` are
   the rail's `Status` rows, more than one may be on.
 - **My Work / Team Work** active segment is kit blue. Search is 340px beside it at every width
@@ -640,13 +644,14 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px.
   **The left rail is the rail every page follows — the Payment Monitor's grammar (Jess,
   2026-09-26) with her same-day correction:** the shared 240px `FilterRail` with `Hide filters`;
-  the one-line header `‹ Week of 28 Sep ›`; the week as one strip of day tiles; the fixed rows
+  the one-line header `‹ Sep 2026 ›`; the Monday–Saturday month grid of day tiles; the fixed rows
   `Missed {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
   its count) and, in Team Work, the `Owner` select — exactly as §5.2 Panel 1 writes it. Hidden, it
   leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it
   floats over the list. The three-panel page is rail · list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
   right column and never spans above the rail (Jess, 2026-09-26).** The 72px header, framed toolbar, compact strip and toolbar selects are retired.
-  The card list itself keeps its approved 104px cards until the owner rules on the §6.0 table.
+  The middle column is the 300px two-line picker of §5.5 (Jess, 2026-09-26: "listing more important
+  than working panel?" — no); the 104px cards are retired.
 - **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
   sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
   `0 for you · {n} for the team` wraps instead of truncating. An empty list draws no
@@ -734,19 +739,28 @@ the same group and item grammar; zero matches is not the same as zero work.
   under ONE 32px owner line — `[SH] Shasha  49 actions to do · 88 missed`: 32px avatar with 12/16/600
   initials, 8px, owner name 15/20/600, count 12/16/400, missed 12/16/500; 8px to its first card,
   16px from its last card to the next owner.
-- **THE WORK CARD — 104px, never taller.** Full list width; grid `60px / remainder`; `rounded-work`,
-  1px edge, no shadow. **Date rail** 60px: 6px sides, 8px top/bottom; a 44px weekday/date block
-  (weekday 11/14/600 uppercase, date 22/24/600), 4px, then ONE status badge 9/11/600, 6px × 2px
-  padding, at most 17px tall — `Missed`, `Today` or `No date`, never `Upcoming`. **Content** 12px
-  sides, 8px top: a 14px module icon with the module 10/14/600 (0.06em) and `· {recipient}`
-  11/14/500; 2px; the problem 15/20/600 on ONE line; the action 12/16/500 on ONE line. **Footer**
-  28px with a 1px top edge, 12px left / 8px right: the document number (and cover fact) 11/16/400,
-  and the 32×32 open button with a 14px icon — it may overhang the footer by 2px; the card never
-  grows for it. The loading skeleton is the same 104px / 60px geometry. In a 704px list viewport
-  six cards show whole (6 × 104 + 5 × 8 = 664px). At 743px the card keeps exactly this geometry.
-- The detail column stacks independent white sections: the selected action's header, its action
-  section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order — in that order,
-  Logistics · Customer · Supplier.
+- **THE WORK CARD — four lines in a 300px column (Jess, 2026-09-26, "this format is correct";
+  replaces the 52px two-line row and the 104px card before it).** The middle column is an inbox
+  of cards, 12px padding, ~100px each: line 1 the document number 13/18/600 (opens the record)
+  with the due date 12/16 on the right (`Thu, 1 Oct`; the date alone in red 600 when missed — no
+  word; `No date`); line 2 the action sentence 13/18/500; line 3 the fact 12/16 slate-11; line 4
+  the chips 11/16 — the page word (`Delivery`) and the party (`AL Logistics`), plus `For {normal
+  owner}` in amber on a covered row in My Work (Team Work says it once on the owner's group line).
+  Every line is one line: a long sentence ends in `…` and shows whole on hover; the right panel
+  prints it in full. The column stays 300px (Jess: the width need not grow for the sentence).
+  Cards sit edge to edge with a 1px rule, no border, no radius; the chosen card is the pale-blue
+  wash with the 2px left line — the list's one blue. Over the list ONE line names the chosen Date
+  (`Thu, 1 Oct` · `Missed` · `No date`) — no count, no tabs. Reference: an inbox thread list
+  (title · sender · preview · tags · time), not a table (Jess rejected the §6.0 table for Work).
+  Rows draw 50 at a time as the list end scrolls into view; a failed refresh keeps the last good
+  list with one retry row. Team Work groups under ONE 32px owner line — `[SH] Shasha  49 actions to
+  do · 88 missed`: 32px avatar with 12/16/600 initials, 8px, owner name 15/20/600, count 12/16/400,
+  missed 12/16/500.
+- The detail column takes every pixel the rail and the 300px list leave (the working panel is the
+  page; the list only picks). It stacks independent white sections in the §5.10 order: Order Route
+  first, the Sales Order card, then the PARTY CARDS (§5.9) — Logistics · Customer · Supplier — then
+  the audit disclosure. The selected-work summary block is drawn only for work that names no Sales
+  Order (a PO window, an embedded proof review).
 - **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 768px, exact values:**
   12px canvas padding; sections 8px apart; `Back to work` a 40px row; the header card (12px
   padding, height follows content) carries the object line, the problem 16/22/600 and the action
@@ -1049,7 +1063,73 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · Complete Work right panel — owner-approved target 2026-09-25 / NOT BUILT
+### 5.10 · THE ORDER IS THE CORE — OWNER RULING, Jess 2026-09-26 night · APPROVED / NOT BUILT
+
+**"Order 就是那整个东西的核心。"** After three days of right-panel pictures the owner put the
+reference images side by side — Jobdrive's deal, AML's transaction, Plain's thread, the mail
+clients — and named what they share: **the centre is the one record, never the one act.** Work is
+therefore ORDER-CENTRED:
+
+- **One row = one order** (a Sales Order; for supplier work, a PO). An order appears ONCE in the
+  list, however many open acts it carries. The row says: the number, the customer, where the
+  Route stands, and what must be done today.
+- **The right panel = that order, whole:** its number and state with ONE big button (today's next
+  act) on top → the **Order Route**, one line, every point dated → **today's acts**, one line each,
+  each with its own prepared message and button (`Call AL Logistics` · `Ask customer to pay`) →
+  then the order's facts — Customer · Balance · Supplier · Logistics · what happened (history) —
+  collapsed, opened on click.
+- **An act lives inside its order** (Jobdrive's "Next drip · Follow up proposal · Scheduled for
+  tomorrow" sits inside the deal; AML's investigation sits inside the transaction). Work never
+  scatters one order's acts into separate rows.
+- The left rail stays the month calendar: pick the day, then see that day's orders.
+- **Every card tallies a Route step (Jess, 2026-09-27: "every card is tally every order route step").**
+  Below the Route the cards come in Route order — `Proceed · Sales Order` · `PO · Supplier` ·
+  `GRN · Warehouse` · `Contact · Logistics` · `Delivery · Customer` — each ONE row in three segments
+  (the step · its status line · that step's date and status word from the Route, plus the one
+  button when the order's act lands there), collapsed; expand = the detail, card in card, two
+  sides (facts left, message and history right). Not every section is read every time. The
+  order's acts land on their step: a delivery act on Contact · Logistics (the WhatsApp door with
+  its template picker; the message folded until `Show message`), every other act on the Sales
+  Order row (its door). The first act's button is the panel's ONE blue. "Long" is the failure:
+  the panel uses its width, never its height.
+
+**Retired by this ruling:** the per-act row (SO-1362 appearing once for Delivery and again for
+Payment); the ACTION-card-only panel (ruling B, same night — superseded within the hour once the
+owner saw it: "I want my Order Route"); the 2026-09-25 composition's summary-less panel. The
+components built for them (Route, Sales Order card, party cards, ACTION card) are the parts this
+composition reuses; nothing is drawn twice.
+
+**Build order (owner to say "build"):** 1 · the middle list grouped by order, one row per order with
+its today's acts · 2 · the order panel: header + big button, dated Route, the acts list with their
+messages · 3 · the collapsed fact cards and history. Each step is shown on the real page, walked by
+the owner with two questions per row — *do I know what to do? · did I have to open another page?*
+
+#### The former per-act right panel (rulings 2026-09-25 / B 2026-09-26) — superseded, kept for the parts
+
+**WORK IS AN INBOX. The right panel is the ACTION card and nothing else.** Asked "how does Work
+help me work?", the owner chose, from three operating models, **B · do it here**: the left list
+is the day's work; the right panel is *doing this one thing* — COPY's sections `ACTION` (the
+sentence, the party, `due {date}`, red when missed) · `CURRENT FACT` · `FINISH WHEN` ·
+`WHAT HAPPENS NEXT` (only when the source supplies one) · `COMMUNICATION` (the owning module's
+prepared message, `Open WhatsApp group` / `Open WhatsApp` as the panel's ONE blue, `Copy message`,
+and the module door that records the answer) · the `Open {object}` door. Buttons live only here.
+When no module message is admitted, `Open {object}` is the act.
+
+**Retired from Work by this ruling:** the Order Route, the Sales Order card, the Logistics,
+Customer and Supplier cards and the mission header (option C, "see the whole order, then decide",
+was rejected: "I don't know what I should do now"; option A, a bare list, was rejected for making
+every act a page change). The whole-order view lives on the Sales Order page behind the door and
+is not drawn a second time in Work. The party-card components and their laws below remain the
+owning pages' material (Delivery §5.5 Logistics; Sales Order Route) — Work does not render them.
+`Owner, timing and source` stays as the last, closed disclosure.
+
+**Admitted messages so far:** Delivery work — Delivery's own logistics message (customer
+reference, address, building, goods by catalogue name, customer date, the external link) to the
+partner's WhatsApp group, door `Open in Delivery`. **Next:** Purchasing (the supplier group, PO
+reference) and Payment (the customer) bring their own when their MASTERs admit them — never a
+Workspace draft.
+
+#### The former whole-order composition (owner-approved 2026-09-25) — kept for the owning pages, NOT drawn in Work
 
 This section is the canonical continuation of §5.9. It freezes the complete selected-mission
 composition so a later chat reads it from the repository rather than reconstructing it from chat.
@@ -1057,17 +1137,37 @@ The deployed left Date/Module rail, middle To do/Waiting/Completed cards, densit
 and Logistics behaviour in §5.9 are preserved. The build scope is the missing Customer card,
 multi-supplier Supplier card, compact Order Route and their shared communication/state behaviour.
 
-#### One fixed top-to-bottom composition
+#### One fixed top-to-bottom composition (Jess, 2026-09-26 — Route FIRST; BUILT)
 
-1. **Selected work summary** — the problem, the one immediate action and the owning record door.
-2. **Order Route** — one compact horizontal mission-health line; it is not a wizard or sequence.
-3. **Logistics card** — §5.9's deployed component and eight-section expansion, unchanged.
+1. **Order Route** — one compact horizontal mission-health line, first, always open; its title
+   line is `{object} · {module}` (`SO-1362 · Delivery`), never the words "Order Route"; it is not
+   a wizard or sequence.
+2. **Sales Order card** — the order's own facts, read-only, in two columns: `Customer` (name ·
+   phone) · `Deliver to` · `Goods` (`{name} ×{qty}` per line, catalogue names) · `Customer date` ·
+   `Balance` (`RM 0.00 · paid` / red `RM {n} · not paid · by {date}` — the collection deadline the
+   Route's payment line reads). The record door is the header's `open` icon (Jess, 2026-09-26).
+   The Balance is the panel's ONE money line.
+3. **Logistics card** — §5.9's deployed eight-section expansion, unchanged. Collapsed it reads like
+   Customer and Supplier (Jess, 2026-09-26): the heading row with `Checks {n} of 3`, then ONE
+   status line — the act in bold · its result · `due {date}` · the scheduled day · the one exception,
+   `·`-separated, wrapping, never a third row. Its money exception (`Hold delivery · RM {n}
+   unpaid`) is not printed on the right panel because the Balance already says it; the expanded
+   `1 working day before` check keeps it.
 4. **Customer card** — mission-relevant dates, contact checkpoint and structured answer only.
 5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
 6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
 
-The same sentence never appears in all three layers. The summary says what is wrong and what to do;
-the Route says which mission obligation needs attention; the party card says who must answer and
+**THE ACTION CARD IS BACK ON TOP — owner ruling, Jess 2026-09-26 evening ("I lost … I don't know why
+I see so many info for what"; she chose option C with hide/expand).** The right panel is two layers:
+**do**, then **look**. The first card is the selected work itself — COPY's own sections `ACTION`
+(the sentence, the party, `due {date}`, red when missed) · `CURRENT FACT` · `FINISH WHEN` ·
+`WHAT HAPPENS NEXT` (only when the source supplies one) · `COMMUNICATION` (the owning module's
+prepared message, `Open WhatsApp group` / `Open WhatsApp` as the panel's ONE blue, `Copy message`,
+and the door that records the answer). Buttons live only here. Below it every information card —
+Sales Order · Logistics · Customer · Supplier — is collapsed to one line and expands on click, one
+at a time, exactly as §5.9 built them; the Order Route stays open and each point explains itself on
+click. The 2026-09-26 afternoon retirement of the summary block is overturned by this ruling. No section is dragged or reordered; sections are always open on a desktop.
+The Route says which mission obligation needs attention; the party card says who must answer and
 exposes the owning action. Only one party card expands at a time, and it remains expanded after a
 save or refresh. On a screen below 768px `Back to work` restores the same list position and filters.
 
@@ -1123,7 +1223,16 @@ Collapsed height is exactly **72px**. It prints `Customer · {name}` and one sou
 after the arrangement; or the highest-material exception `Customer requested another date ·
 {date}` · `Customer refused delivery` · `Phone number is wrong` ·
 `Delivery delayed · customer notice required`. Phone, email, owner and history do not appear
-collapsed. Normal partner contact has no Carres button.
+collapsed.
+
+**THE CUSTOMER DOOR IS ALWAYS THERE — owner ruling, Jess 2026-09-26 ("customer still need
+communication, never know — example: inform the customer no stock once we place the PO").**
+The routine date agreement stays the Logistics company's job and generates no Carres task; but the
+Customer card, like Logistics and Supplier, always carries its communication side — WhatsApp
+(`Open WhatsApp` · `Copy message`), email where recorded, `Record as sent` and the history — so
+Operation can tell the customer anything the moment it is known (a supplier delay after the PO,
+no stock, a changed plan) without waiting for a governed exception to open a button. Opening a
+channel or copying text is never sent evidence; the message template is the owning module's.
 
 Expanded order:
 

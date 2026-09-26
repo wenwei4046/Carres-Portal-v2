@@ -19,7 +19,7 @@ import { WorkSection } from "./WorkCard";
 /** The five tones, as text colour + a glyph — done is a neutral dark tick. */
 export const TONE_TEXT: Record<PartyTone, string> = {
   done: "text-kit-slate-12",
-  current: "text-kit-blue-11",
+  current: "text-kit-slate-12",
   attention: "text-kit-amber-11",
   missed: "text-kit-red-11",
   future: "text-kit-slate-11",
@@ -65,7 +65,7 @@ export function escapeBelongsToControl(event: { defaultPrevented: boolean; targe
   return Boolean(el?.closest?.('input, textarea, select, [role="listbox"], [role="option"], [role="combobox"], [role="dialog"], [role="menu"]'));
 }
 
-export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, status, open, onToggle, children }: {
+export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, status, trailing, open, onToggle, children }: {
   testId: string;
   /** DOM id the Order Route scrolls to when it opens this card. */
   anchorId?: string;
@@ -74,6 +74,9 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
   headingTone?: string;
   progress?: string | null;
   status: ReactNode;
+  /** The row's third segment: the date, the one button — outside the toggle
+   *  (Jess, 2026-09-27: "一行分三段", use the width, not the height). */
+  trailing?: ReactNode;
   open: boolean;
   onToggle: (open: boolean) => void;
   children: ReactNode;
@@ -94,33 +97,42 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         }
       }}
     >
-      <button
-        ref={toggleRef}
-        type="button"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => onToggle(!open)}
-        className="flex h-[70px] w-full items-center gap-2 overflow-hidden rounded-work px-3 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:px-4"
-        data-testid={`${testId}-toggle`}
-      >
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 items-baseline justify-between gap-x-3">
-            <span className={`min-w-0 truncate text-[15px] font-semibold leading-5 ${headingTone}`} data-testid={`${testId}-heading`}>
+      <div className="flex min-h-[56px] items-center gap-2 pr-2">
+        <button
+          ref={toggleRef}
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => onToggle(!open)}
+          className="grid min-h-[56px] min-w-0 flex-1 grid-cols-[minmax(150px,230px)_minmax(0,1fr)] items-center gap-x-4 rounded-l-work px-3 py-2 text-left hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9 min-[768px]:px-4"
+          data-testid={`${testId}-toggle`}
+        >
+          <span className="flex min-w-0 flex-col">
+            <span className={`min-w-0 truncate text-[13px] font-semibold leading-[18px] ${headingTone}`} data-testid={`${testId}-heading`}>
               {heading}
             </span>
             {progress ? (
-              <span className="shrink-0 text-[12px] font-normal leading-4 tabular-nums text-kit-slate-11" data-testid={`${testId}-progress`}>
+              <span className="text-[12px] font-normal leading-4 tabular-nums text-kit-slate-11" data-testid={`${testId}-progress`}>
                 {progress}
               </span>
             ) : null}
           </span>
           <span className="flex min-w-0" data-testid={`${testId}-status`}>{status}</span>
-        </span>
-        <span className="sr-only">{`${open ? "Hide" : "Show"} ${party} details`}</span>
-        <span className="grid h-10 w-10 shrink-0 place-items-center text-kit-slate-11" aria-hidden="true" data-testid={`${testId}-chevron`}>
+          <span className="sr-only">{`${open ? "Hide" : "Show"} ${party} details`}</span>
+        </button>
+        {trailing ? <div className="flex shrink-0 items-center gap-2" data-testid={`${testId}-trailing`}>{trailing}</div> : null}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          aria-label={`${open ? "Hide" : "Show"} ${party} details`}
+          onClick={() => onToggle(!open)}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-2 focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          data-testid={`${testId}-chevron`}
+        >
           <Icon name={open ? "collapse" : "expand"} size={16} />
-        </span>
-      </button>
+        </button>
+      </div>
       {open ? (
         <div id={bodyId} className="flex flex-col gap-2 border-t border-work-line px-3 py-2.5 min-[768px]:px-4" data-testid={`${testId}-body`}>
           {children}

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import WorkActionPanel from "./WorkActionPanel";
@@ -58,14 +59,16 @@ describe("WorkActionPanel", () => {
   it("is one compact summary: 16/22 problem, 13/18 action, the door beside it, no audit inside", () => {
     render(<WorkActionPanel item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
     const header = screen.getByTestId("work-detail-header");
-    expect(header.className).toContain("p-3");
+    expect(header.className).toContain("px-3");
     expect(header.className).toContain("rounded-work");
     expect(header.className).not.toMatch(/min-h-/);
     const title = screen.getByTestId("work-detail-title");
-    expect(title.className).toContain("text-[16px]");
-    expect(title.className).toContain("leading-[22px]");
+    expect(title).toHaveTextContent("Review the delivery proof");
+    expect(title.className).toContain("text-[15px]");
+    expect(title.className).toContain("leading-5");
     expect(title.className).toContain("font-semibold");
-    expect(screen.getByTestId("work-detail-action").className).toContain("text-[13px]");
+    expect(screen.getByTestId("work-detail-action")).toHaveTextContent("due Thu, 17 Sep");
+    expect(screen.getByTestId("work-detail-fact")).toHaveTextContent("Delivery proof needs review");
     expect(screen.getByTestId("work-detail-open-row")).toContainElement(screen.getByRole("button", { name: "Open DO-140926-0007" }));
     /* No party cards → the required result says what finishes the act. */
     expect(screen.getByTestId("work-detail-result")).toHaveTextContent("Proof review recorded");
@@ -73,14 +76,43 @@ describe("WorkActionPanel", () => {
     expect(screen.queryByText("Owner, timing and source")).not.toBeInTheDocument();
   });
 
-  it("with party cards the result stays on the cards, not repeated in the summary", () => {
+  it("with party cards FINISH WHEN prints the operator-safe completion statement, never the predicate", () => {
     render(<WorkActionPanel hasParties item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
-    expect(screen.queryByTestId("work-detail-result")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-detail-result")).toHaveTextContent("The proof review is recorded");
+    expect(screen.queryByText("delivery_proof_reviews exists")).not.toBeInTheDocument();
+  });
+
+  it("COMMUNICATION: the owning module's message, the WhatsApp door as the one blue, Copy message and the record door", () => {
+    render(
+      <MemoryRouter>
+        <WorkActionPanel
+          hasParties
+          primaryAct={{ label: "Contact logistics today", onClick: () => {} }}
+          communication={{ party: "AL Logistics", channel: "WhatsApp group", templates: [{ key: "details", label: "Delivery details", message: "TCF0541 · LIM KUAN YANG" }], href: "https://chat.whatsapp.com/x", recordDoor: { label: "Open in Delivery", to: "/operation?tab=delivery" } }}
+          item={{ ...base, action: "Call AL Logistics", recipient: "AL Logistics", interaction: { mode: "open_module" } } as OperationWorkItem}
+          onOpen={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    /* Short by default (Jess): the template is named, the message is folded. */
+    expect(screen.queryByTestId("work-detail-message")).not.toBeInTheDocument();
+    expect(screen.getByText("Delivery details")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("work-detail-toggle-message"));
+    expect(screen.getByTestId("work-detail-message")).toHaveTextContent("TCF0541 · LIM KUAN YANG");
+    const chat = screen.getByTestId("work-detail-open-chat");
+    expect(chat).toHaveTextContent("Open WhatsApp group");
+    expect(chat.className).toContain("bg-kit-blue-9");
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeInTheDocument();
+    expect(screen.getByTestId("work-detail-record-door")).toHaveTextContent("Open in Delivery");
+    /* One blue: the message door holds it, so no second blue act and a neutral Open door. */
+    expect(screen.queryByTestId("work-detail-primary-act")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-kit-blue-9");
   });
 
   it("says the party once", () => {
     render(<WorkActionPanel item={{ ...base, action: "Call AL Logistics", recipient: "AL Logistics", interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
-    expect(screen.getByTestId("work-detail-action")).toHaveTextContent(/^Call AL Logistics$/);
+    expect(screen.getByTestId("work-detail-title")).toHaveTextContent(/^Call AL Logistics$/);
+    expect(screen.getByTestId("work-detail-action")).not.toHaveTextContent("AL Logistics");
   });
 
   it("with every card collapsed the summary carries the ONE blue act, which opens that card", () => {

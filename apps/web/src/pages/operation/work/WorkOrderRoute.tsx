@@ -112,9 +112,15 @@ export function useMissionRoute(orderId: string) {
 
 export default function WorkOrderRoute({
   orderId,
+  title,
   onOpenParty,
 }: {
   orderId: string;
+  /** `null` = no title row at all: the Work right panel's own header names
+   *  the order and carries the route's status word (Jess, 2026-09-26: a
+   *  small uppercase label is not a header). Omitted = the governed heading,
+   *  for callers outside the Work right panel. */
+  title?: string | null;
   onOpenParty: (party: "logistics" | "customer" | "supplier") => void;
 }) {
   const { route, lm, supplier, customer, factsQ, loading, failed } = useMissionRoute(orderId);
@@ -145,7 +151,8 @@ export default function WorkOrderRoute({
 
   const firstCurrent = route.points.find((p) => p.tone === "current")?.key ?? null;
   const exceptions: Array<{ text: string; tone: RouteTone }> = [];
-  if (route.paymentLine) exceptions.push(route.paymentLine);
+  /* The payment line lives on the Sales Order card's Balance (Jess,
+     2026-09-26: said once, never under the Route and again below it). */
   if (!lm.partnerName && !lm.o?.delivered_at) exceptions.push({ text: "Logistics not assigned", tone: "attention" });
   else if (lm.facts?.answer?.kind === "cannot_deliver" && lm.model?.exception) exceptions.push({ text: `Logistics · ${lm.model.exception}`, tone: "missed" });
 
@@ -153,14 +160,14 @@ export default function WorkOrderRoute({
 
   return (
     <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
-      <div className="flex h-[14px] items-center justify-between">
-        <SectionTitle>{R.heading}</SectionTitle>
+      {title === null ? null : <div className="flex h-[14px] items-center justify-between">
+        <SectionTitle>{title ?? R.heading}</SectionTitle>
         {route.header ? (
           <span className={`text-[11px] font-semibold leading-[14px] ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
             {route.header.text}
           </span>
         ) : null}
-      </div>
+      </div>}
       <div ref={scrollRef} className="-mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="work-route-scroll">
         <ol className="relative flex h-[60px] w-full min-w-max items-stretch px-1" data-testid="work-route-line">
           {route.points.map((point, index) => (

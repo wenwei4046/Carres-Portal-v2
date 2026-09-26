@@ -386,10 +386,14 @@ export function FilterRailRow({
            label simply adds its second 18px line — natural height, same font,
            never a tooltip. `items-start` keeps the count on the first line. */
         "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
-        active ? "bg-kit-blue-3 font-semibold" : "hover:bg-kit-slate-3",
+        /* ONE BLUE PER PAGE (Jess, 2026-09-26): a rail choice is bold with the
+           2px left line, never a wash; the group's `All …` row is the
+           unfiltered state — bold, nothing else. The only washed row on a
+           page is the chosen work/record row. */
+        active ? "font-semibold" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
-      {active && (
+      {active && !resets && (
         <span
           aria-hidden
           className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
@@ -639,4 +643,96 @@ export function useFilterRailOpen(
     [storageKey],
   );
   return [open, setVisible];
+}
+
+/**
+ * ── THE MONTH GRID — the rail's calendar, Monday to Saturday ──────────────
+ * (Jess, 2026-09-26: "full 1 month, need to see Sat work — office doesn't
+ * work Saturday, but the Workspace needs to see it". Sunday is never drawn.)
+ *
+ * ```
+ *    MON TUE WED THU FRI SAT
+ *          1   2   3   4   5
+ *      7   8   9  10  11  12
+ *     14  15  16  17  18  19      ← a tile: the day number over its count
+ *              2   3   2   1
+ * ```
+ *
+ * Nothing is written in words — the count line is EMPTY when nothing is due,
+ * a closed day (public holiday) is grey text with its name only in the
+ * accessible name and tooltip. Today is the number in a RING; the week that
+ * holds today is the tinted row (Jess, 2026-09-26: "circle the day you are
+ * today, not write today; the week should have colour"). The ONE blue is the
+ * chosen tile: solid, white text. Six columns share the 216px row.
+ */
+export interface RailWeekDay {
+  iso: string;
+  /** `Mon, 28 Sep` — the accessible name's first part. */
+  label: string;
+  /** `MON` · `28`, both cut from that one spelling. */
+  weekday: string;
+  dayNumber: string;
+  /** The holiday's name when the day is closed, else null. */
+  closed: string | null;
+  count: number;
+  today: boolean;
+}
+
+const MONTH_GRID_COLUMNS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
+
+export function FilterRailMonthGrid({
+  weeks,
+  chosenIso,
+  onPick,
+  testId,
+}: {
+  weeks: readonly (readonly (RailWeekDay | null)[])[];
+  chosenIso: string | null;
+  onPick: (iso: string) => void;
+  testId: string;
+}) {
+  return (
+    <div className="py-2" data-testid={testId}>
+      <div className="grid grid-cols-6 gap-x-1" aria-hidden="true">
+        {MONTH_GRID_COLUMNS.map((c) => (
+          <span key={c} className="text-center text-[10px] font-semibold leading-4 text-kit-slate-9">{c}</span>
+        ))}
+      </div>
+      {weeks.map((week, row) => {
+        const thisWeek = week.some((d) => d?.today);
+        return (
+        <div key={row} className={`grid grid-cols-6 gap-x-1 gap-y-1 rounded-control ${thisWeek ? "bg-kit-slate-3" : ""}`} data-testid={`${testId}-week-${row}`} data-this-week={thisWeek ? "yes" : undefined}>
+          {week.map((d, col) => {
+            if (!d) return <span key={col} aria-hidden="true" />;
+            const chosen = chosenIso === d.iso;
+            const closed = d.closed !== null;
+            const name = `${d.label}${d.today ? " · Today" : ""}${d.closed ? ` · ${d.closed}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`;
+            return (
+              <button
+                key={d.iso}
+                type="button"
+                onClick={() => onPick(d.iso)}
+                aria-pressed={chosen}
+                aria-label={name}
+                title={d.closed ?? undefined}
+                data-testid={`${testId.replace(/s$/, "")}-${d.iso}`}
+                data-today={d.today ? "yes" : undefined}
+                data-closed={closed ? "yes" : undefined}
+                className={[
+                  "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
+                  chosen ? "bg-kit-blue-9 text-white" : closed ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
+                ].join(" ")}
+              >
+                <span className={`grid h-5 w-5 place-items-center rounded-full text-[13px] font-semibold leading-4 ${d.today ? chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12" : ""}`}>{d.dayNumber}</span>
+                <span className={`h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+                  {!closed && d.count > 0 ? d.count : ""}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        );
+      })}
+    </div>
+  );
 }

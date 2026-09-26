@@ -20,7 +20,11 @@ const refetch = vi.fn();
 /* The party cards read Delivery through their own queries; their behaviour is
    held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
-vi.mock("./work/WorkParties", () => ({ default: () => null }));
+vi.mock("./work/WorkParties", async () => {
+  /* The page tests stand the ACTION card in for the mission (no order reads). */
+  const { default: WorkActionPanel } = await import("./work/WorkActionPanel");
+  return { default: ({ items, onOpenRecord }: { items: import("@carres/shared").OperationWorkItem[]; onOpenRecord?: () => void }) => <>{items.map((item) => <WorkActionPanel key={item.id} item={item} onOpen={onOpenRecord ?? (() => {})} />)}</> };
+});
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return { ...actual, useOperationWork: () => ({ ...workState, refetch }) };
@@ -163,26 +167,26 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(new Date("2026-09-17T00:00:00").getTimezoneOffset()).toBe(-480);
   });
 
-  it("1 · a Thursday's rail is one strip Mon 14 … Fri 18 (names through fmtDate), today the solid-blue tile, header `Week of 14 Sep`", () => {
+  it("1 · a Thursday's rail is the whole month, Monday to Saturday (names through fmtDate); the chosen day is the one blue tile; header `Sep 2026`", () => {
     show();
-    const strip = screen.getByTestId("work-rail-days");
-    const names = within(strip).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
-    expect(names.map((n) => n.split(" · ")[0])).toEqual(["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep"]);
-    /* One row of tiles, never a column of cards (Jess, 2026-09-26). */
-    expect(strip.style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
+    const grid = screen.getByTestId("work-rail-days");
+    const week = within(screen.getByTestId("work-rail-days-week-2")).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    expect(week.map((n) => n.split(" · ")[0])).toEqual(["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep", "Sat, 19 Sep"]);
+    expect(within(grid).getAllByRole("button")).toHaveLength(26); // 30 days minus 4 Sundays
+    expect(screen.queryByTestId("work-rail-day-2026-09-20")).toBeNull(); // Sunday never drawn
     expect(dayCard("2026-09-17")).toHaveAttribute("data-today", "yes");
+    expect(dayCard("2026-09-17")).toHaveAttribute("aria-pressed", "true"); // the focus day is chosen
     expect(dayCard("2026-09-17").className).toContain("bg-kit-blue-9");
-    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17/);
+    expect(dayCard("2026-09-14").className).not.toContain("bg-kit-blue");
     expect(dayCard("2026-09-17")).not.toHaveTextContent("Today");
-    expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent("Week of 14 Sep");
-    expect(screen.getByTestId("work-rail-week-label").textContent).not.toMatch(/[–-]/);
+    expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent(/^Sep 2026$/);
   });
 
   it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep; a day with nothing prints nothing", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18")]);
     show();
-    expect(dayCard("2026-09-18")).toHaveTextContent(/^FRI181$/);
-    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17$/);
+    expect(dayCard("2026-09-18")).toHaveTextContent(/^181$/);
+    expect(dayCard("2026-09-17")).toHaveTextContent(/^17$/);
     expect(dayCard("2026-09-18")).toHaveAttribute("aria-label", "Fri, 18 Sep · 1 action");
   });
 
@@ -190,8 +194,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     const holiday = dayCard("2026-09-16");
     expect(holiday).toHaveAttribute("data-closed", "yes");
-    expect(holiday.className).toContain("bg-kit-slate-3");
-    expect(holiday).toHaveTextContent(/^WED16$/);
+    expect(holiday.className).toContain("text-kit-slate-9");
+    expect(holiday).toHaveTextContent(/^16$/);
     expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
     expect(holiday).toHaveAttribute("title", "Malaysia Day");
     expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("0");
@@ -202,7 +206,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.getByTestId("work-rail-status-waiting")).toHaveTextContent("Waiting for answer");
     expect(screen.getByTestId("work-rail-status-done")).toHaveTextContent("Done today");
     expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByTestId("work-list-heading")).toBeNull();
+    /* The one line over the list names the chosen Date and nothing else. */
+    expect(screen.getByTestId("work-list-heading")).toHaveTextContent(/^Thu, 17 Sep$/);
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
@@ -214,14 +219,13 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(within(list).getAllByRole("button", { name: /Ask customer for a delivery date/ })).toHaveLength(1);
   });
 
-  it("5 · Saturday is a day card only when something is due Sat, 19 Sep", () => {
+  it("5 · Saturday is always drawn (the Warehouse works it) and carries its count when something is due Sat, 19 Sep", () => {
     const first = show();
-    expect(screen.queryByTestId("work-rail-day-2026-09-19")).toBeNull();
+    expect(dayCard("2026-09-19")).toHaveTextContent(/^19$/);
     first.unmount();
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
     show();
-    expect(dayCard("2026-09-19")).toHaveTextContent(/^SAT191$/);
-    expect(screen.getByTestId("work-rail-days").style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    expect(dayCard("2026-09-19")).toHaveTextContent(/^191$/);
   });
 
   it("6 · My Work with nothing today and 2 on Friday does not say Nothing assigned to you", () => {
@@ -293,8 +297,9 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     workState.data = feed("2026-09-17", [missed]);
     show();
     const list = screen.getByTestId("work-list");
-    const card = list.querySelector("[data-work-card]") as HTMLElement;
-    expect(card.getAttribute("aria-label")).toContain("Wednesday, 5 August 2026 · Missed");
+    const card = list.querySelector("[data-work-row]") as HTMLElement;
+    expect(card.getAttribute("aria-label")).toContain("Wed, 5 Aug");
+    expect(card.querySelector("[data-testid=work-row-due]")?.className).toContain("text-danger");
     expect(list).not.toHaveTextContent("working days missed");
   });
 });
