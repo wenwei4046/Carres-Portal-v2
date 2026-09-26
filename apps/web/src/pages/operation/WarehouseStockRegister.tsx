@@ -21,8 +21,7 @@ import {
   type InventoryStatus,
   type StockRailSelection,
   type StockRegisterUnit,
-  type UnitLifecycleOutcome,
-} from "@carres/shared";
+  type UnitLifecycleOutcome, goodsReceivedAbsence } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -241,7 +240,7 @@ export default function WarehouseStockRegister() {
   const dateColumn = (
     key: "goodsReceivedDate" | "shipDate" | "soDate" | "poDate" | "expectedArrival" | "lastVerifiedAt" | "lastEventAt",
     label: string,
-    options: { absent?: string; defaultHidden?: boolean; chooserGroup: string; width?: number; headerLines?: readonly [string, string] },
+    options: { absent?: string | ((u: StockRegisterUnit) => string); defaultHidden?: boolean; chooserGroup: string; width?: number; headerLines?: readonly [string, string] },
   ): DataGridColumn<StockRegisterUnit> => ({
     key,
     label,
@@ -257,7 +256,7 @@ export default function WarehouseStockRegister() {
       u[key] ? (
         <span className="text-body text-base-900">{fmtDate(u[key]!)}</span>
       ) : options.absent ? (
-        <span className="text-body text-kit-slate-11">{options.absent}</span>
+        <span className="text-body text-kit-slate-11">{typeof options.absent === "function" ? options.absent(u) : options.absent}</span>
       ) : (
         <Blank />
       ),
@@ -268,7 +267,10 @@ export default function WarehouseStockRegister() {
       // A governed header sets the column's minimum width; the two-line
       // presentation keeps the label and recovers the width a one-line
       // `Goods Received Date` would spend (Receiving does the same).
-      dateColumn("goodsReceivedDate", "Goods Received Date", { absent: "Not received", chooserGroup: "Dates", width: 112, headerLines: ["Goods Received", "Date"] }),
+      // `Not received` is a Unit with no Receiving record (Incoming); a Unit
+      // Carres holds whose date was never captured (opening stock) reads the
+      // unknown-fact word, because it WAS received (COPY: Inventory absence words).
+      dateColumn("goodsReceivedDate", "Goods Received Date", { absent: goodsReceivedAbsence, chooserGroup: "Dates", width: 112, headerLines: ["Goods Received", "Date"] }),
       dateColumn("shipDate", "Ship Date", { chooserGroup: "Dates" }),
       {
         key: "so",

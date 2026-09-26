@@ -1305,8 +1305,7 @@ export {
   stillToArriveLine,
   stockConditionOf,
   type InventoryStatus,
-  type InventoryWordsInput,
-} from "./inventory-words";
+  type InventoryWordsInput, goodsReceivedAbsence } from "./inventory-words";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {

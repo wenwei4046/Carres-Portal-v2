@@ -5,8 +5,7 @@ import {
   stockSiteVisits,
   UNIT_LIFECYCLE_OUTCOME_LABEL,
   UNIT_OWNERSHIP_LABEL,
-  type UnitLifecycleOutcome,
-} from "@carres/shared";
+  type UnitLifecycleOutcome, goodsReceivedAbsence } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
@@ -114,7 +113,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
                   {UNIT_OWNERSHIP_LABEL[unit.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? unit.ownership}
                 </Fact>
                 <Fact label="Goods Received Date">
-                  {unit.goodsReceivedDate ? fmtDate(unit.goodsReceivedDate) : <Absent>Not received</Absent>}
+                  {unit.goodsReceivedDate ? fmtDate(unit.goodsReceivedDate) : <Absent>{goodsReceivedAbsence(unit)}</Absent>}
                 </Fact>
                 <Fact label="Item">
                   {unit.productName ?? unit.sku}

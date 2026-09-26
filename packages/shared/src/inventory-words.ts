@@ -77,3 +77,11 @@ export function isHeldUnit(u: Pick<InventoryWordsInput, "availability">): boolea
 export function stillToArriveLine(incoming: number): string | null {
   return incoming > 0 ? `${incoming} still to arrive · see Inbound` : null;
 }
+
+/** COPY "Inventory absence words": `Not received` = no Receiving record (an
+ *  Incoming Unit); `Not recorded` = the fact was never captured for goods
+ *  Carres holds — it WAS received. One arithmetic for the register and Unit
+ *  Detail. */
+export function goodsReceivedAbsence(u: { availability: string }): "Not received" | "Not recorded" {
+  return u.availability === "incoming" ? "Not received" : "Not recorded";
+}

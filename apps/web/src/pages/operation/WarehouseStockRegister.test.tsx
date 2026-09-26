@@ -241,6 +241,19 @@ describe("one row is one Unit, one cell is one fact", () => {
     expect(within(incoming).getByText("Not received")).toBeInTheDocument();
   });
 
+  it("opening stock Carres holds with no date captured reads Not recorded, never Not received", async () => {
+    // Production 2026-09-26: 27 held rows booked in without a date printed
+    // `Not received` while standing in Carres Klang. They WERE received; the
+    // fact was never captured (COPY: Inventory absence words).
+    apiFetchMock.mockImplementation(() =>
+      Promise.resolve({ units: [unit({ id: "u", unitCode: "U1-000-120", goodsReceivedDate: null, dateIn: null })], total: 1 }),
+    );
+    renderRegister();
+    const undated = (await screen.findByText("U1-000-120")).closest("tr")!;
+    expect(within(undated).getByText("Not recorded")).toBeInTheDocument();
+    expect(screen.queryByText("Not received")).not.toBeInTheDocument();
+  });
+
   it("an SO No opens the Sales Order only when the order exists in this portal", async () => {
     await renderLoaded();
     expect(screen.getByRole("button", { name: "SO2609-4827" })).toBeInTheDocument();
