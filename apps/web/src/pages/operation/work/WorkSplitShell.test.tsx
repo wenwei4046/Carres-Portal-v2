@@ -6,7 +6,7 @@ describe("WorkSplitShell — the unframed workspace (owner correction 2026-09-24
   it("lays three columns 240 · 420 · rest with 16px gaps and no frame of its own", () => {
     render(<WorkSplitShell layout="three" rail="Days" list="Actions" detail="Detail" />);
     const shell = screen.getByTestId("work-split-shell");
-    expect(shell.className).toContain("grid-cols-[240px_420px_minmax(480px,1fr)]");
+    expect(shell.className).toContain("grid-cols-[240px_300px_minmax(480px,1fr)]");
     expect(shell.className).toContain("gap-4");
     expect(shell.className).not.toMatch(/\b(border|bg-white|rounded|shadow)/);
   });

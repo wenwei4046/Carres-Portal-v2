@@ -406,16 +406,19 @@ a complete accessible name and a visible keyboard focus ring. Top to bottom:
   week's Monday, no weekday, no dash) · `Next week`. The arrows move the visible week by one work
   week and change neither the chosen Date, the Status, the Page nor any filter. The two-date label
   (`Mon, 28 Sep – Fri, 2 Oct`) is retired: it wrapped to three lines in 240px.
-- **The week strip — ONE row of day tiles**, 56px tall, 216px shared equally: five tiles Monday to
-  Friday, six when Saturday holds work (a Warehouse rail is fixed at six). A tile is the uppercase
-  weekday over the day number over the count line, all cut from the one `fmtDate` spelling and moved
-  by whole `YYYY-MM-DD` days. The count line prints the number of open actions dated that day and
-  is **empty** when there are none — never `No work`, never `0`. A public holiday (and any
-  non-working day) is the **grey tile**: grey number, empty count line, its name only in the
-  accessible name and tooltip (`Malaysia Day`) — never `Hol`, never `Public holiday ·`. **Today** is
-  the **solid-blue tile** with white text; the word `Today` is never on screen. The **chosen** day is
-  the ringed tile. Today, closed and chosen are independent states. A day can be chosen whether or
-  not it is closed and counts the work dated on it.
+- **The week strip — ONE row of day tiles** (`FilterRailWeekStrip`, the calendar-icon tile the
+  owner chose 2026-09-26), 216px shared equally: five tiles Monday to Friday, six when Saturday
+  holds work (a Warehouse rail is fixed at six). A tile is a tinted band holding the uppercase
+  weekday over a white body holding the day number over the count line, all cut from the one
+  `fmtDate` spelling and moved by whole `YYYY-MM-DD` days. **No blue words:** weekday grey, number
+  black. The count line prints the number of open actions dated that day and is **empty** when
+  there are none — never `No work`, never `0`. A public holiday (and any non-working day) is the
+  grey-text tile, its name only in the accessible name and tooltip (`Malaysia Day`) — never `Hol`,
+  never `Public holiday ·`. **Today** is the black number with a dot under it; the word `Today` is
+  never on screen. The **chosen** day is the solid-blue tile with white text — the rail's ONE blue:
+  a group's `All …` row and the default `To do` row are bold, never washed. Today, closed and chosen
+  are independent states. A day can be chosen whether or not it is closed and counts the work dated
+  on it.
 - **The fixed rows** `Missed {n}` and `No date {n}` — `0` printed. `Missed`, one tile and `No date`
   are one mutually exclusive Date choice. A missed occurrence counts once, under `Missed`, never
   again under its past weekday.
@@ -646,7 +649,8 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it
   floats over the list. The three-panel page is rail · list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
   right column and never spans above the rail (Jess, 2026-09-26).** The 72px header, framed toolbar, compact strip and toolbar selects are retired.
-  The card list itself keeps its approved 104px cards until the owner rules on the §6.0 table.
+  The middle column is the 300px two-line picker of §5.5 (Jess, 2026-09-26: "listing more important
+  than working panel?" — no); the 104px cards are retired.
 - **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
   sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
   `0 for you · {n} for the team` wraps instead of truncating. An empty list draws no
@@ -734,19 +738,23 @@ the same group and item grammar; zero matches is not the same as zero work.
   under ONE 32px owner line — `[SH] Shasha  49 actions to do · 88 missed`: 32px avatar with 12/16/600
   initials, 8px, owner name 15/20/600, count 12/16/400, missed 12/16/500; 8px to its first card,
   16px from its last card to the next owner.
-- **THE WORK CARD — 104px, never taller.** Full list width; grid `60px / remainder`; `rounded-work`,
-  1px edge, no shadow. **Date rail** 60px: 6px sides, 8px top/bottom; a 44px weekday/date block
-  (weekday 11/14/600 uppercase, date 22/24/600), 4px, then ONE status badge 9/11/600, 6px × 2px
-  padding, at most 17px tall — `Missed`, `Today` or `No date`, never `Upcoming`. **Content** 12px
-  sides, 8px top: a 14px module icon with the module 10/14/600 (0.06em) and `· {recipient}`
-  11/14/500; 2px; the problem 15/20/600 on ONE line; the action 12/16/500 on ONE line. **Footer**
-  28px with a 1px top edge, 12px left / 8px right: the document number (and cover fact) 11/16/400,
-  and the 32×32 open button with a 14px icon — it may overhang the footer by 2px; the card never
-  grows for it. The loading skeleton is the same 104px / 60px geometry. In a 704px list viewport
-  six cards show whole (6 × 104 + 5 × 8 = 664px). At 743px the card keeps exactly this geometry.
-- The detail column stacks independent white sections: the selected action's header, its action
-  section, then the PARTY CARDS (§5.9) when the work names exactly one Sales Order — in that order,
-  Logistics · Customer · Supplier.
+- **THE WORK LIST ROW — 52px, two lines, in a 300px column (Jess, 2026-09-26; replaces the
+  104px card).** The middle column is a PICKER: line 1 is the document number 13/18/600 with the
+  due date 12/16 on the right (`Thu, 1 Oct`; red 600 `Was due Wed, 9 Sep` when missed; `No date`);
+  line 2 is the action sentence 13/18 slate-11 truncated. My Work marks a covered row `For {normal
+  owner}` in an amber tag beside the number; Team Work says it once on the owner's group line.
+  Rows sit edge to edge with a 1px rule; the chosen row is the pale-blue wash with the 2px left
+  line — the list's one blue. The number opens the record; the row shows it on the right. Over the
+  list ONE line names the chosen Date (`Thu, 1 Oct` · `Missed` · `No date`) — no count, no tabs.
+  Rows draw 50 at a time as the list end scrolls into view; a failed refresh keeps the last good
+  list with one retry row. Team Work groups under ONE 32px owner line — `[SH] Shasha  49 actions to
+  do · 88 missed`: 32px avatar with 12/16/600 initials, 8px, owner name 15/20/600, count 12/16/400,
+  missed 12/16/500.
+- The detail column takes every pixel the rail and the 300px list leave (the working panel is the
+  page; the list only picks). It stacks independent white sections in the §5.10 order: Order Route
+  first, the Sales Order card, then the PARTY CARDS (§5.9) — Logistics · Customer · Supplier — then
+  the audit disclosure. The selected-work summary block is drawn only for work that names no Sales
+  Order (a PO window, an embedded proof review).
 - **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 768px, exact values:**
   12px canvas padding; sections 8px apart; `Back to work` a 40px row; the header card (12px
   padding, height follows content) carries the object line, the problem 16/22/600 and the action
@@ -1057,17 +1065,23 @@ The deployed left Date/Module rail, middle To do/Waiting/Completed cards, densit
 and Logistics behaviour in §5.9 are preserved. The build scope is the missing Customer card,
 multi-supplier Supplier card, compact Order Route and their shared communication/state behaviour.
 
-#### One fixed top-to-bottom composition
+#### One fixed top-to-bottom composition (Jess, 2026-09-26 — Route FIRST; BUILT)
 
-1. **Selected work summary** — the problem, the one immediate action and the owning record door.
-2. **Order Route** — one compact horizontal mission-health line; it is not a wizard or sequence.
+1. **Order Route** — one compact horizontal mission-health line, first, always open; its title
+   line is `{object} · {module}` (`SO-1362 · Delivery`), never the words "Order Route"; it is not
+   a wizard or sequence.
+2. **Sales Order card** — the order's own facts, read-only: `Customer` (name · phone) · `Deliver to`
+   · `Goods` (`{name} ×{qty}` per line) · `Customer date` · `Balance` (`RM 0.00 · paid` / red
+   `RM {n} · not paid`), with the `Open {SO}` door on its title line.
 3. **Logistics card** — §5.9's deployed component and eight-section expansion, unchanged.
 4. **Customer card** — mission-relevant dates, contact checkpoint and structured answer only.
 5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
 6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
 
-The same sentence never appears in all three layers. The summary says what is wrong and what to do;
-the Route says which mission obligation needs attention; the party card says who must answer and
+The selected-work summary block (problem · action · `Open {object}`) is retired for order missions
+(Jess, 2026-09-26: with the parties below it said everything twice); it is drawn only for work that
+names no Sales Order. No section is dragged or reordered; sections are always open on a desktop.
+The Route says which mission obligation needs attention; the party card says who must answer and
 exposes the owning action. Only one party card expands at a time, and it remains expanded after a
 save or refresh. On a screen below 768px `Back to work` restores the same list position and filters.
 

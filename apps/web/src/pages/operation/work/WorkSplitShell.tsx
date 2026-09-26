@@ -11,7 +11,7 @@
  *     16px       ┌ card 104 ┐   8px      ┌ detail section ─────────┐
  *   ┌ Module ┐   ┌ card 104 ┐            └─────────────────────────┘
  *   └────────┘
- *    240px   16   420px               16   remaining (≥480px)
+ *    240px   16   300px               16   remaining (≥480px)
  * ```
  *
  * The workspace is an UNFRAMED grid: no border, fill, radius or shadow
@@ -20,7 +20,7 @@
  *
  *   three  ≥1280px of page — rail · list · detail
  *   two    768–1279px      — the rail collapses (a toolbar control reopens
- *                            it); the list is exactly 400px and can never
+ *                            it); the list is exactly 300px and can never
  *                            be collapsed
  *   one    <768px          — Date and Module open from compact controls; the
  *                            list (100% wide) and the detail share ONE stage
@@ -71,13 +71,16 @@ export default function WorkSplitShell({
      a 140px detail is no detail): the rail beside the list, or the list
      beside the detail. Choosing a card hides the rail. */
   const hideDetail = layout === "two" && (showRail || railBeside);
+  /* THE LIST IS A PICKER, THE DETAIL IS THE WORK (Jess, 2026-09-26: "listing
+     more important than working panel?"). The list is 300px — two lines per
+     row — and the detail takes everything else. */
   const columns = layout === "three"
-    ? showRail ? "grid-cols-[240px_420px_minmax(480px,1fr)]" : "grid-cols-[420px_minmax(480px,1fr)]"
+    ? showRail ? "grid-cols-[240px_300px_minmax(480px,1fr)]" : "grid-cols-[300px_minmax(480px,1fr)]"
     : showRail
       ? "grid-cols-[240px_minmax(0,1fr)]"
       : hideDetail
         ? "grid-cols-[minmax(0,1fr)]"
-        : "grid-cols-[400px_minmax(0,1fr)]";
+        : "grid-cols-[300px_minmax(0,1fr)]";
   return (
     <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 gap-4 ${columns}`}>
       {showRail ? (

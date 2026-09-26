@@ -157,7 +157,7 @@ describe("Operation Work — one server feed", () => {
     show();
     const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
     expect(row).toHaveTextContent("SO-1318");
-    expect(row).toHaveTextContent("No delivery date");
+    expect(row).toHaveTextContent("Mon, 7 Sep");
     expect(row).toHaveTextContent("Ask customer for a delivery date");
     expect(row).not.toHaveTextContent("Shasha");
   });
@@ -176,13 +176,15 @@ describe("Operation Work — one server feed", () => {
     })];
     authState.email = "yujun@carres.test";
     show();
+    /* My Work names the normal owner on the row (`For Shasha`, Jess
+       2026-09-26); Team Work says it once, on the owner's group line. */
     expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date"))
-      .toHaveTextContent("Covered for Shasha");
+      .toHaveTextContent("For Shasha");
     fireEvent.click(screen.getByTestId("work-view-team"));
     const group = screen.getByTestId(`work-owner-group-${SH}`);
-    expect(within(group).getByText(/Shasha/)).toBeInTheDocument();
+    expect(within(group).getByTestId(`work-owner-heading-${SH}`)).toHaveTextContent("Cover today: Yu Jun");
     expect(within(group).getByTestId("work-row-SO-1318-ask_delivery_date"))
-      .toHaveTextContent("Covered by Yu Jun");
+      .not.toHaveTextContent("For Shasha");
   });
 
   it("keeps the governed My Work order in one card run: broken, missed, then No date", () => {
@@ -192,7 +194,7 @@ describe("Operation Work — one server feed", () => {
       item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
     ];
     show("/operation?tab=work&day=all");
-    const cards = [...screen.getByTestId("work-section-list").querySelectorAll("[data-work-card]")];
+    const cards = [...screen.getByTestId("work-section-list").querySelectorAll("[data-work-row]")];
     expect(cards.map((card) => card.getAttribute("data-testid"))).toEqual([
       "work-row-SO-1318-ask_delivery_date",
       "work-row-SO-1318-issue_po",
@@ -362,7 +364,7 @@ describe("Operation Work — one server feed", () => {
       object: { kind: "sales_order", id: `so-${n}`, label: `SO-${2000 + n}` },
     }));
     show("/operation?tab=work&day=all");
-    const cards = () => screen.getByTestId("work-section-list").querySelectorAll("[data-work-card]");
+    const cards = () => screen.getByTestId("work-section-list").querySelectorAll("[data-work-row]");
     expect(cards()).toHaveLength(50);
     act(() => reveal?.());
     expect(cards()).toHaveLength(100);

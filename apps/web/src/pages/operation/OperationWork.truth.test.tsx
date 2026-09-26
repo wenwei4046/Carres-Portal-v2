@@ -190,7 +190,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     const holiday = dayCard("2026-09-16");
     expect(holiday).toHaveAttribute("data-closed", "yes");
-    expect(holiday.className).toContain("bg-kit-slate-3");
+    expect(holiday.querySelector("span")?.className).toContain("bg-kit-slate-3");
     expect(holiday).toHaveTextContent(/^WED16$/);
     expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
     expect(holiday).toHaveAttribute("title", "Malaysia Day");
@@ -202,7 +202,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.getByTestId("work-rail-status-waiting")).toHaveTextContent("Waiting for answer");
     expect(screen.getByTestId("work-rail-status-done")).toHaveTextContent("Done today");
     expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByTestId("work-list-heading")).toBeNull();
+    /* The one line over the list names the chosen Date and nothing else. */
+    expect(screen.getByTestId("work-list-heading")).toHaveTextContent(/^Thu, 17 Sep$/);
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
@@ -293,8 +294,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     workState.data = feed("2026-09-17", [missed]);
     show();
     const list = screen.getByTestId("work-list");
-    const card = list.querySelector("[data-work-card]") as HTMLElement;
-    expect(card.getAttribute("aria-label")).toContain("Wednesday, 5 August 2026 · Missed");
+    const card = list.querySelector("[data-work-row]") as HTMLElement;
+    expect(card.getAttribute("aria-label")).toContain("Was due Wed, 5 Aug");
     expect(list).not.toHaveTextContent("working days missed");
   });
 });

@@ -386,10 +386,13 @@ export function FilterRailRow({
            label simply adds its second 18px line — natural height, same font,
            never a tooltip. `items-start` keeps the count on the first line. */
         "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
-        active ? "bg-kit-blue-3 font-semibold" : "hover:bg-kit-slate-3",
+        /* ONE BLUE PER RAIL (Jess, 2026-09-26): only a real choice is washed
+           blue. The group's `All …` row is the unfiltered state — bold, no
+           wash, no left line — so five default rows never light up at once. */
+        active && !resets ? "bg-kit-blue-3 font-semibold" : active ? "font-semibold" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
-      {active && (
+      {active && !resets && (
         <span
           aria-hidden
           className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
@@ -639,4 +642,88 @@ export function useFilterRailOpen(
     [storageKey],
   );
   return [open, setVisible];
+}
+
+/**
+ * ── THE WEEK STRIP — one row of day tiles under the rail's week header ─────
+ * (Jess, 2026-09-26: Work; the Payment Monitor and Warehouse rails follow.)
+ *
+ * ```
+ *   ┌MON─┐ ┌TUE─┐ ┌WED─┐ ┌THU─┐ ┌FRI─┐
+ *   │ 28 │ │ 29 │ │ 30 │ │  1 │ │  2 │     ← a tile: weekday band over the day
+ *   └────┘ └─2──┘ └────┘ └─3──┘ └─2──┘        number over the count line
+ * ```
+ *
+ * The tile is the calendar-icon shape the owner chose: a tinted band holding
+ * the weekday, a white body holding the day number, the count under it.
+ * Nothing is written in words — the count line is EMPTY when nothing is due,
+ * a closed day (public holiday) is the grey tile with its name only in the
+ * accessible name and tooltip, and today is the black number with a dot
+ * under it. The ONE blue is the chosen tile: solid band and body, white text.
+ * Five tiles share the 216px row; a sixth (Saturday) shrinks them evenly.
+ */
+export interface RailWeekDay {
+  iso: string;
+  /** `Mon, 28 Sep` — the accessible name's first part. */
+  label: string;
+  /** `MON` · `28`, both cut from that one spelling. */
+  weekday: string;
+  dayNumber: string;
+  /** The holiday's name when the day is closed, else null. */
+  closed: string | null;
+  count: number;
+  today: boolean;
+}
+
+export function FilterRailWeekStrip({
+  days,
+  chosenIso,
+  onPick,
+  testId,
+}: {
+  days: readonly RailWeekDay[];
+  chosenIso: string | null;
+  onPick: (iso: string) => void;
+  testId: string;
+}) {
+  return (
+    <div
+      className="grid gap-1 py-3"
+      style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
+      data-testid={testId}
+    >
+      {days.map((d) => {
+        const chosen = chosenIso === d.iso;
+        const closed = d.closed !== null;
+        const name = `${d.label}${d.today ? " · Today" : ""}${d.closed ? ` · ${d.closed}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`;
+        return (
+          <button
+            key={d.iso}
+            type="button"
+            onClick={() => onPick(d.iso)}
+            aria-pressed={chosen}
+            aria-label={name}
+            title={d.closed ?? undefined}
+            data-testid={`${testId.replace(/s$/, "")}-${d.iso}`}
+            data-today={d.today ? "yes" : undefined}
+            data-closed={closed ? "yes" : undefined}
+            className={[
+              "flex min-w-0 flex-col overflow-hidden rounded-control text-center tabular-nums",
+              chosen ? "bg-kit-blue-9 text-white" : "bg-white text-kit-slate-12 ring-1 ring-inset ring-kit-slate-4 hover:ring-kit-slate-6",
+            ].join(" ")}
+          >
+            <span className={`block text-[10px] font-semibold leading-4 ${chosen ? "bg-kit-blue-9 text-white" : closed ? "bg-kit-slate-3 text-kit-slate-9" : "bg-kit-slate-3 text-kit-slate-11"}`}>
+              {d.weekday}
+            </span>
+            <span className={`block pt-1 text-[15px] font-semibold leading-5 ${chosen ? "text-white" : closed ? "text-kit-slate-9" : "text-kit-slate-12"}`}>
+              {d.dayNumber}
+            </span>
+            <span className={`block h-4 text-[11px] leading-4 ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+              {!closed && d.count > 0 ? d.count : d.today ? <span aria-hidden className={`mx-auto mt-1.5 block h-1 w-1 rounded-full ${chosen ? "bg-white" : "bg-kit-slate-12"}`} /> : ""}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }

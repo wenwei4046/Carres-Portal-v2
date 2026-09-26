@@ -112,9 +112,14 @@ export function useMissionRoute(orderId: string) {
 
 export default function WorkOrderRoute({
   orderId,
+  title,
   onOpenParty,
 }: {
   orderId: string;
+  /** The title line over the route — the order and its module (Jess,
+   *  2026-09-26: never the words "Order Route" on screen). Omitted = the
+   *  governed heading, for callers outside the Work right panel. */
+  title?: string;
   onOpenParty: (party: "logistics" | "customer" | "supplier") => void;
 }) {
   const { route, lm, supplier, customer, factsQ, loading, failed } = useMissionRoute(orderId);
@@ -154,7 +159,7 @@ export default function WorkOrderRoute({
   return (
     <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
       <div className="flex h-[14px] items-center justify-between">
-        <SectionTitle>{R.heading}</SectionTitle>
+        <SectionTitle>{title ?? R.heading}</SectionTitle>
         {route.header ? (
           <span className={`text-[11px] font-semibold leading-[14px] ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
             {route.header.text}

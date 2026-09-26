@@ -59,8 +59,9 @@ import WorkParties, { type MissionReport, type Party } from "./work/WorkParties"
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
-import WorkCard, { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailWeekStrip, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
+import { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
+import WorkListRow from "./work/WorkListRow";
 
 type ViewKey = "mine" | "team";
 
@@ -405,23 +406,28 @@ export default function OperationWork() {
     return [{ ...g, items }];
   });
 
+  /* The two-line picker row (Jess, 2026-09-26). A covered row names the
+     normal owner in My Work (`For Li Ching`); Team Work groups by that owner
+     already, so the row says nothing twice. */
   const card = (i: WorkRow) => (
-    <WorkCard
-      cover={i.ownerState === "covered" && i.activeCover
-        ? activeView === "mine"
-          ? `Covered for ${i.normalOwner?.name ?? "normal owner"}`
-          : `Covered by ${i.activeCover.name ?? "cover"}`
-        : null}
+    <WorkListRow
       key={`${i.orderId}:${i.ruleKey}`}
       item={i}
-      moduleLabel={MODULE_LABEL[i.module]}
       action={`${deliveryLines(i)?.act ?? i.action}`}
-      today={generatedOn}
+      cover={activeView === "mine" && i.ownerState === "covered" ? (i.normalOwner?.name ?? "normal owner") : null}
       selected={layout !== "one" && selected?.id === i.id}
       onSelect={() => openRow(i)}
       onOpenRecord={() => navigate(i.destination)}
     />
   );
+  /** The one line over the list: the chosen Date, the rail's own words. */
+  const listHeading = selectedDay === "missed"
+    ? "Missed"
+    : selectedDay === "no_date"
+      ? "No date"
+      : isWorkDate(selectedDay)
+        ? fmtDate(selectedDay)
+        : null;
 
   /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26 — the Payment Monitor rail,
      then her correction the same day): ONE header line `‹ Week of 28 Sep ›`,
@@ -456,43 +462,12 @@ export default function OperationWork() {
         </div>
       )}
     >
-      {/* The week strip: 216px shared by five 40px tiles (six 34px tiles with
-          Saturday). Weekday over day number over the count; the count line is
-          empty on a working day with nothing due. */}
-      <div className="grid gap-1 py-3" style={{ gridTemplateColumns: `repeat(${railDates.days.length}, minmax(0, 1fr))` }} data-testid="work-rail-days">
-        {railDates.days.map((d) => {
-          const active = railSelected === d.iso;
-          const closed = d.holiday !== null;
-          return (
-            <button
-              key={d.iso}
-              type="button"
-              onClick={() => pickDay(d.iso)}
-              aria-pressed={active}
-              aria-label={`${d.label}${d.today ? " · Today" : ""}${d.holiday ? ` · ${d.holiday}` : ""} · ${d.count} ${d.count === 1 ? "action" : "actions"}`}
-              title={d.holiday ?? undefined}
-              data-testid={`work-rail-day-${d.iso}`}
-              data-today={d.today ? "yes" : undefined}
-              data-closed={closed ? "yes" : undefined}
-              className={[
-                "flex h-14 min-w-0 flex-col items-center justify-center rounded-control tabular-nums",
-                d.today
-                  ? "bg-kit-blue-9 text-white"
-                  : closed
-                    ? "bg-kit-slate-3 text-kit-slate-9"
-                    : "bg-white text-kit-slate-12 hover:bg-kit-slate-3",
-                active ? "ring-2 ring-inset ring-kit-blue-9" : closed || d.today ? "" : "ring-1 ring-inset ring-kit-slate-5",
-              ].join(" ")}
-            >
-              <span className={`text-[10px] font-semibold leading-3 ${d.today ? "text-white" : closed ? "text-kit-slate-9" : "text-kit-slate-11"}`}>{d.weekday}</span>
-              <span className="text-[15px] font-semibold leading-5">{d.dayNumber}</span>
-              <span className={`h-3 text-[11px] leading-3 ${d.today ? "text-white" : "text-kit-slate-11"}`}>
-                {!closed && d.count > 0 ? d.count : ""}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <FilterRailWeekStrip
+        testId="work-rail-days"
+        days={railDates.days.map((d) => ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today }))}
+        chosenIso={railSelected}
+        onPick={pickDay}
+      />
       <div className="border-t border-kit-slate-5 py-2">
         <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
         <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
@@ -541,14 +516,14 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="flex flex-col gap-2" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
+      <div className="flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
   ) : (
     <div className="flex flex-col gap-4">
       {shownTeamGroups.map((g) => (
-        <section key={g.key} className="flex flex-col gap-2" data-testid={`work-owner-group-${g.key}`}>
+        <section key={g.key} className="flex flex-col" data-testid={`work-owner-group-${g.key}`}>
           <h3 className="flex h-8 min-w-0 items-center gap-2 whitespace-nowrap" data-testid={`work-owner-heading-${g.key}`}>
             {g.person ? (
               <span
@@ -695,8 +670,11 @@ export default function OperationWork() {
           railBeside={railVisible}
           list={(
             <div className="flex min-h-0 flex-1 flex-col" data-testid="work-list">
-              {/* No heading and no tabs above the cards (Jess, 2026-09-26): the
-                  rail already names the day and the Status. */}
+              {/* One line: the chosen Date (Jess, 2026-09-26 — the calendar
+                  reference's `Monday, August 31`). No count, no tabs. */}
+              {listHeading && layout !== "one" ? (
+                <h2 className="shrink-0 pb-2 text-[13px] font-semibold leading-[18px] text-kit-slate-12" data-testid="work-list-heading">{listHeading}</h2>
+              ) : null}
               {!loading && !error && unhealthySources.length > 0 ? (
                 <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
                   {unhealthySources.map((source) => (
@@ -748,12 +726,17 @@ export default function OperationWork() {
                 <PoWindowMission item={selected.source} onOpen={() => navigate(selected.destination)} />
               ) : (
                 <>
-                  <WorkActionPanel
-                    item={selected.source}
-                    hasParties={mission.shown}
-                    primaryAct={mission.act && !mission.openCardHasAct ? { label: mission.act.label, onClick: () => setOpenParty(mission.act?.party ?? null) } : null}
-                    onOpen={() => navigate(selected.destination)}
-                  />
+                  {/* Route first (Jess, 2026-09-26): an order's mission opens
+                      on its Route and Sales Order card; the summary block is
+                      drawn only for work that names no order. */}
+                  {!mission.shown ? (
+                    <WorkActionPanel
+                      item={selected.source}
+                      hasParties={false}
+                      primaryAct={null}
+                      onOpen={() => navigate(selected.destination)}
+                    />
+                  ) : null}
                   <WorkParties key={selected.id} item={selected.source} openParty={openParty} onOpenParty={setOpenParty} onReport={reportMission} />
                 </>
               )}

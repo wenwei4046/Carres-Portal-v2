@@ -28,6 +28,8 @@ import CustomerCard, { useCustomerCard } from "./CustomerCard";
 import LogisticsCard, { useLogisticsModel } from "./LogisticsCard";
 import SupplierCard, { supplierActRowOf, useSupplierCard } from "./SupplierCard";
 import WorkOrderRoute from "./WorkOrderRoute";
+import SalesOrderCard from "./SalesOrderCard";
+import { WORK_MODULE_WORD } from "./module-word";
 import { orderRefOf } from "./order-ref";
 import { WorkSection } from "./WorkCard";
 
@@ -209,7 +211,11 @@ function Mission({
 
   return (
     <div className="flex flex-col gap-2" data-testid="work-parties">
-      <WorkOrderRoute orderId={orderId} onOpenParty={(party) => onOpenParty(party)} />
+      {/* Route FIRST, then the order's own facts, then the parties (Jess,
+          2026-09-26). The Route's title line is the order, never the words
+          "Order Route". */}
+      <WorkOrderRoute orderId={orderId} title={`${item.object.label} · ${WORK_MODULE_WORD[item.module]}`} onOpenParty={(party) => onOpenParty(party)} />
+      <SalesOrderCard orderId={orderId} label={item.object.label} />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
         <LogisticsCard orderId={orderId} open={openParty === "logistics"} onToggle={toggle("logistics")} primary={visiblePrimary === "logistics"} />
       </div>
