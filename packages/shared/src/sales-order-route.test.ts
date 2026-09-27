@@ -3,6 +3,7 @@ import {
   resolveSalesOrderRoute,
   ROUTE_TEXT_BUDGET,
   wrapRouteText,
+  type RouteDeliveryScope,
   type RouteNode,
   type RoutePurchaseOrder,
   type SalesOrderRouteInput,
@@ -1143,5 +1144,267 @@ describe("every line names WHO (owner ruling 2026-09-27: who + object + who + ac
       "Logistics has not delivered the goods",
       "Logistics has not uploaded the delivery photo",
     ]));
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE A2 · THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS (owner ruling
+ * 2026-09-26). A scope is one (leg, trip) of `ops_delivery_orders`; each takes
+ * a lane. Measured on SO-1362: two arrangements, two Delivery Orders, two
+ * delivered attempts — and the map printed `Logistics not assigned`.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const scope = (over: Partial<RouteDeliveryScope> & { leg: number }): RouteDeliveryScope => ({
+  trip: 0,
+  plate: null,
+  transfer: false,
+  legStop: null,
+  partnerName: null,
+  confirmedDate: null,
+  confirmedTime: null,
+  deliveryOrder: null,
+  tripGroups: null,
+  attempts: [],
+  handoverEvents: [],
+  photos: [],
+  ...over,
+});
+
+const journey = (): SalesOrderRouteInput =>
+  input({
+    order: {
+      id: "order-1",
+      so: 1362,
+      customerName: "CARD 14 JOURNEY WALK",
+      placedAt: "2026-09-13",
+      deliveryDate: "2026-09-17",
+      deliveredAt: "2026-09-13",
+    },
+    allocation: {
+      orderId: "order-1",
+      soRef: "SO-1362",
+      lines: [
+        line({
+          sku: "JAGER-SS",
+          committedQty: 1,
+          soldUnits: [unit({ id: "u1", unitCode: "id-dtd627907", sku: "JAGER-SS", status: "sold" })],
+          soldQty: 1,
+        }),
+      ],
+      unmatchedUnits: [],
+      totals: { committedQty: 1, reservedQty: 0, soldQty: 1, outstandingQty: 0 },
+    },
+    lineLabels: { "JAGER-SS": "Jager · Super Single" },
+    purchaseOrders: [],
+    money: { known: true, outstanding: 0 },
+    delivery: {
+      logistics: null,
+      booking: null,
+      attempts: [],
+      scopes: [
+        scope({
+          leg: 1,
+          plate: "Leg 1 · Carres Klang → JB transit warehouse",
+          transfer: true,
+          legStop: "JB transit warehouse",
+          partnerName: "NETS",
+          confirmedDate: "2026-09-15",
+          confirmedTime: "10 AM to 1 PM",
+          deliveryOrder: { id: "do-1", number: "DO-130926-0842" },
+          attempts: [{ result: "delivered", reasonKey: null, recordedAt: "2026-09-13T04:00:00Z" }],
+        }),
+        scope({
+          leg: 2,
+          plate: "Leg 2 · JB transit warehouse → customer",
+          partnerName: "AL",
+          confirmedDate: "2026-09-17",
+          confirmedTime: "2 PM to 5 PM",
+          deliveryOrder: { id: "do-2", number: "DO-130926-3223" },
+          attempts: [{ result: "delivered", reasonKey: null, recordedAt: "2026-09-13T08:00:00Z" }],
+        }),
+      ],
+    },
+  });
+
+describe("one delivery scope is one lane (owner ruling 2026-09-26)", () => {
+  it("SO-1362: two legs draw two lanes, two issued Delivery Orders, Delivered to customer and Customer paid in full", () => {
+    const map = resolveSalesOrderRoute(journey());
+    const plates = kinds(map, "delivery-lane");
+    expect(plates.map((p) => p.spoken.join(" "))).toEqual([
+      "Leg 1 · Carres Klang → JB transit warehouse",
+      "Leg 2 · JB transit warehouse → customer",
+    ]);
+    expect(node(map, "logistics:1:0").spoken).toEqual(["NETS"]);
+    expect(node(map, "logistics:2:0").spoken).toEqual(["AL"]);
+    expect(node(map, "delivery-date:1:0").spoken).toEqual(["Scheduled delivery: 2026-09-15", "10 AM to 1 PM"]);
+    const gates = kinds(map, "delivery-order");
+    expect(gates.map((g) => g.spoken[0])).toEqual(["DO-130926-0842", "DO-130926-3223"]);
+    expect(gates.every((g) => g.mark === "complete")).toBe(true);
+    /* The door opens the document by its row id — a number may change format. */
+    expect(gates[0]!.door).toEqual({ label: "Open DO-130926-0842 →", href: "/operation/delivery-orders/do-1" });
+    expect(node(map, "deliver:1:0").spoken[0]).toBe("Arrived at JB transit warehouse");
+    expect(node(map, "deliver:2:0").spoken[0]).toBe("Delivered to customer");
+    expect(node(map, "money").spoken).toEqual(["Customer paid in full"]);
+    expect(map.nodes.some((n) => n.spoken.includes("Logistics not assigned"))).toBe(false);
+  });
+
+  it("a transfer leg draws no DELIVERY PHOTO, and the last node of a lane has no trailing line", () => {
+    const map = resolveSalesOrderRoute(journey());
+    expect(map.nodes.some((n) => n.id === "delivery-photo:1:0")).toBe(false);
+    expect(map.nodes.some((n) => n.id === "delivery-photo:2:0")).toBe(true);
+    expect(map.edges.filter((e) => e.from === "deliver:1:0")).toHaveLength(0);
+    expect(map.edges.filter((e) => e.from === "delivery-photo:2:0")).toHaveLength(0);
+  });
+
+  it("CURRENT stays ONE for the whole DELIVERY group — the earliest unfinished lane", () => {
+    const base = journey();
+    const map = resolveSalesOrderRoute({
+      ...base,
+      order: { ...base.order, deliveredAt: null },
+      delivery: {
+        ...base.delivery,
+        scopes: [
+          base.delivery.scopes![0]!,
+          scope({ leg: 2, plate: "Leg 2 · JB transit warehouse → customer", partnerName: null }),
+        ],
+      },
+    });
+    const current = map.nodes.filter((n) => n.current && n.branch === "delivery");
+    expect(current.map((n) => n.id)).toEqual(["logistics:2:0"]);
+    expect(node(map, "logistics:2:0").spoken).toEqual(["Logistics not assigned"]);
+  });
+
+  it("leg 2's gate carries the extra requirement about leg 1, and every goods tail joins leg 1's gate", () => {
+    const base = journey();
+    const waiting = resolveSalesOrderRoute({
+      ...base,
+      order: { ...base.order, deliveredAt: null },
+      delivery: {
+        ...base.delivery,
+        scopes: [
+          scope({ ...base.delivery.scopes![0]!, deliveryOrder: null, attempts: [] }),
+          scope({ ...base.delivery.scopes![1]!, deliveryOrder: null, attempts: [] }),
+        ],
+      },
+    });
+    const gate2 = node(waiting, "delivery-order:2:0");
+    expect(gate2.requirements.map((r) => r.text)).toContain("Leg 1 not arrived yet");
+    expect(node(waiting, "delivery-order:1:0").requirements.some((r) => r.id === "previous-leg")).toBe(false);
+    expect(edge(waiting, "JAGER-SS:stock", "delivery-order:1:0")).toBeDefined();
+    expect(edge(waiting, "JAGER-SS:stock", "delivery-order:2:0")).toBeUndefined();
+
+    const arrived = resolveSalesOrderRoute({
+      ...base,
+      delivery: {
+        ...base.delivery,
+        scopes: [base.delivery.scopes![0]!, scope({ ...base.delivery.scopes![1]!, deliveryOrder: null, attempts: [] })],
+      },
+    });
+    expect(node(arrived, "delivery-order:2:0").requirements).toContainEqual({
+      id: "previous-leg",
+      met: true,
+      text: "Leg 1 arrived at JB transit warehouse",
+    });
+  });
+
+  it("a split delivery: one lane per trip, and each goods tail joins the gate of the trip that carries it", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        allocation: {
+          orderId: "order-1",
+          soRef: "SO-1319",
+          lines: [
+            line({ sku: "MATTRESS-K", committedQty: 1, reservedQty: 1, reservedUnits: [unit({ id: "m1", sku: "MATTRESS-K" })] }),
+            line({ sku: "SOFA-3S", committedQty: 1, outstandingQty: 1 }),
+          ],
+          unmatchedUnits: [],
+          totals: { committedQty: 2, reservedQty: 1, soldQty: 0, outstandingQty: 1 },
+        },
+        lineLabels: { "MATTRESS-K": "Mattress · King", "SOFA-3S": "Sofa · 3 Seater" },
+        lineGroups: { "MATTRESS-K": "bed", "SOFA-3S": "sofa" },
+        purchaseOrders: [],
+        delivery: {
+          logistics: null,
+          booking: null,
+          attempts: [],
+          scopes: [
+            scope({ leg: 0, trip: 1, plate: "Trip 1 · Mattress, 1 item", tripGroups: ["bed"], partnerName: "NETS", confirmedDate: "2026-09-22" }),
+            scope({ leg: 0, trip: 2, plate: "Trip 2 · not booked yet", tripGroups: ["sofa"] }),
+          ],
+        },
+      }),
+    );
+    expect(kinds(map, "delivery-lane").map((p) => p.spoken.join(" "))).toEqual([
+      "Trip 1 · Mattress, 1 item",
+      "Trip 2 · not booked yet",
+    ]);
+    expect(edge(map, "MATTRESS-K:stock", "delivery-order:0:1")).toBeDefined();
+    expect(edge(map, "SOFA-3S:stock", "delivery-order:0:2")).toBeDefined();
+    /* Readiness follows the shipment, not the whole Sales Order. */
+    expect(node(map, "delivery-order:0:1").requirements.find((r) => r.id === "goods")).toEqual({
+      id: "goods",
+      met: true,
+      text: "Warehouse has 1 Unit ready",
+    });
+    expect(node(map, "delivery-order:0:2").requirements.find((r) => r.id === "goods")?.met).toBe(false);
+  });
+
+  it("an ordinary order has one scope, no plate, and exactly the single chain — read from Delivery's record", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          /* The V1 booking fields say nothing; Delivery's own record does. */
+          logistics: null,
+          booking: null,
+          attempts: [],
+          scopes: [scope({ leg: 0, partnerName: "NETS", confirmedDate: "2026-09-30" })],
+        },
+      }),
+    );
+    expect(kinds(map, "delivery-lane")).toHaveLength(0);
+    expect(node(map, "logistics").spoken).toEqual(["NETS"]);
+    expect(node(map, "delivery-date").spoken).toEqual(["Scheduled delivery: 2026-09-30"]);
+    expect(requirement(map, "logistics")).toEqual({ id: "logistics", met: true, text: "Logistics chosen (NETS)" });
+    expect(node(map, "deliver").spoken[0]).toBe("Logistics has not delivered the goods");
+    /* The payment deadline anchors on Delivery's scheduled day. */
+    expect(node(map, "money").spoken[1]).toBe("Customer has not paid RM 1,249.00 · Customer must pay by 2026-09-28");
+  });
+
+  it("DELIVER prints Delivery's words through its one label function once a Delivery Order exists", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        delivery: {
+          logistics: null,
+          booking: null,
+          attempts: [],
+          scopes: [
+            scope({
+              leg: 0,
+              partnerName: "NETS",
+              confirmedDate: "2026-09-30",
+              deliveryOrder: { id: "do-9", number: "DO2609-4827" },
+              handoverEvents: [{ kind: "received_by_logistics", recordedAt: "2026-09-30T01:00:00Z" }],
+            }),
+          ],
+        },
+      }),
+    );
+    expect(node(map, "deliver").spoken[0]).toBe("Collected by NETS");
+    expect(node(map, "delivery-order").door?.href).toBe("/operation/delivery-orders/do-9");
+  });
+
+  it("no two nodes overlap and no node is an orphan on a two-lane map", () => {
+    const map = resolveSalesOrderRoute(journey());
+    for (const a of map.nodes) {
+      for (const b of map.nodes) {
+        if (a.id >= b.id) continue;
+        const apart = a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+        expect(apart, `${a.id} overlaps ${b.id}`).toBe(true);
+      }
+    }
+    for (const n of map.nodes) {
+      if (n.kind === "sales-order") continue;
+      expect(map.edges.some((e) => e.to === n.id), `${n.id} is an orphan`).toBe(true);
+    }
   });
 });
