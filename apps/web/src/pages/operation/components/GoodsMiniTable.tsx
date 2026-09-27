@@ -42,7 +42,7 @@ import { fmtDate } from "@/lib/fmt-date";
  *   nothing and gets the same table without it (a register selects nothing).
  *   The header row never carries a checkbox — select-all belongs to the parent
  *   row, which is the whole-order switch. A line nothing can be bought for
- *   prints `—` in that cell and cannot be ticked.
+ *   has no box; its `To buy` cell says why.
  */
 // design-standard: not-a-list-page — this is the CHILD of a register row, not
 // a page. It has no destination, no toolbar and no header of its own; the
@@ -53,7 +53,7 @@ import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { OverflowText } from "@/components/register/DataGrid";
-import { lineClass } from "@carres/shared";
+import { GOODS_ABSENCE_WORDS, lineClass } from "@carres/shared";
 
 /**
  * The owner's re-ruled column order (2026-08-15), and the measured widths.
@@ -399,8 +399,8 @@ export interface GoodsMiniLine {
   wrongItemQty?: number | null;
   extraQty?: number | null;
   /**
-   * FALSE = nothing can be bought for this line (a Service). It prints `—` in
-   * the ☑ cell and select-all skips it. Ignored when the page passes no
+   * FALSE = nothing can be bought for this line. The ☑ cell draws no box
+   * and select-all skips it. Ignored when the page passes no
    * `selection` at all.
    */
   selectable: boolean;
@@ -444,7 +444,7 @@ function ReceiptQty({
   value: number | null | undefined;
   tone?: "issue" | "extra";
 }) {
-  if (value == null) return <Absence>—</Absence>;
+  if (value == null) return <Absence>{GOODS_ABSENCE_WORDS.notCounted}</Absence>;
   const ink =
     value > 0 && tone === "issue"
       ? "text-kit-red-11"
@@ -1019,19 +1019,19 @@ export default function GoodsMiniTable({
                   return line.status ? (
                     <span data-testid={`goods-status-${line.key}`}>{line.status}</span>
                   ) : (
-                    <Absence>—</Absence>
+                    <Absence>{GOODS_ABSENCE_WORDS.notRecorded}</Absence>
                   );
                 case "fromStock":
                   /* THE PAGE DRAWS THIS CELL WHEN IT CAN ACT ON IT. Absent =
                      the plain figure, exactly as every other caller has it. */
                   if (line.fromStockNode != null) return line.fromStockNode;
                   return !line.fromStock ? (
-                    <Absence>—</Absence>
+                    <span className="tabular-nums">0</span>
                   ) : (
                     <span className="tabular-nums">{line.fromStock}</span>
                   );
                 case "orderBy":
-                  return <span className="tabular-nums">{line.orderBy ? fmtDate(line.orderBy) : line.orderByAbsence ?? "—"}</span>;
+                  return <span className="tabular-nums">{line.orderBy ? fmtDate(line.orderBy) : line.orderByAbsence ?? GOODS_ABSENCE_WORDS.notRecorded}</span>;
                 case "toBuy":
                   /* ⭐ A NUMBER ONLY WHERE THERE IS ONE TO ACT ON, and the note
                      belongs to BOTH branches (owner correction 2026-09-11).
@@ -1042,7 +1042,11 @@ export default function GoodsMiniTable({
                   return (
                     <span title={line.toBuyNoteWhy}>
                       {line.toBuy == null || line.toBuy <= 0 ? (
-                        <Absence>—</Absence>
+                        /* The row's own note already says why; the general
+                           word prints only when no note does. */
+                        line.toBuyNote?.length ? null : (
+                          <Absence>{GOODS_ABSENCE_WORDS.nothingToBuy}</Absence>
+                        )
                       ) : (
                         <span className="tabular-nums font-medium">{line.toBuy}</span>
                       )}
@@ -1065,7 +1069,7 @@ export default function GoodsMiniTable({
                      orders are named once, in the read-only details table
                      below; a collection of them never sets this row's height. */
                   const qty = line.orderedQty ?? 0;
-                  if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? "—"}</Absence>;
+                  if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? GOODS_ABSENCE_WORDS.notRecorded}</Absence>;
                   return onOpenPoDetails ? (
                     <button
                       type="button"
@@ -1102,7 +1106,7 @@ export default function GoodsMiniTable({
                   return line.supplier ? (
                     line.supplier
                   ) : (
-                    <Absence>{line.supplierAbsence ?? "—"}</Absence>
+                    <Absence>{line.supplierAbsence ?? GOODS_ABSENCE_WORDS.supplierNotSet}</Absence>
                   );
                 case "poUnit":
                   /* ⭐ ONE IDENTITY, TWO LINES. The document first, at the
@@ -1118,7 +1122,7 @@ export default function GoodsMiniTable({
                       <span className="font-mono">
                         {line.poNos?.length
                           ? line.poNos.map((po) => <span key={po} className="block">{poLink(po)}</span>)
-                          : <Absence>{line.poNoAbsence ?? "—"}</Absence>}
+                          : <Absence>{line.poNoAbsence ?? GOODS_ABSENCE_WORDS.noPoYet}</Absence>}
                       </span>
                       <span className="font-mono text-meta text-kit-slate-11">
                         {line.unitNode != null ? line.unitNode : line.unitIds.length ? (
@@ -1139,7 +1143,7 @@ export default function GoodsMiniTable({
                   return line.poNos?.length ? (
                     line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
                   ) : (
-                    <Absence>{line.poNoAbsence ?? "—"}</Absence>
+                    <Absence>{line.poNoAbsence ?? GOODS_ABSENCE_WORDS.noPoYet}</Absence>
                   );
                 case "sourceUnit":
                   /* THE SOURCE NUMBER LEADS, the exact Units follow beneath
@@ -1151,7 +1155,7 @@ export default function GoodsMiniTable({
                       {line.sourceNo ? (
                         <div className="font-medium">{line.sourceNo}</div>
                       ) : (
-                        <Absence>{line.sourceNoAbsence ?? "—"}</Absence>
+                        <Absence>{line.sourceNoAbsence ?? GOODS_ABSENCE_WORDS.notRecorded}</Absence>
                       )}
                       {line.unitIds.length ? (
                         line.unitIds.map((id) => (
@@ -1178,7 +1182,7 @@ export default function GoodsMiniTable({
                   return line.poDeliveryDate ? (
                     line.poDeliveryDate
                   ) : (
-                    <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
+                    <Absence>{line.poDeliveryDateAbsence ?? GOODS_ABSENCE_WORDS.noPoYet}</Absence>
                   );
                 default:
                   return null;
@@ -1212,7 +1216,14 @@ export default function GoodsMiniTable({
                         onChange={() => selection.onToggle(line.key)}
                       />
                     ) : (
-                      <Absence>—</Absence>
+                      /* A 28px tick column cannot hold a word, and a greyed box
+                         would read as a tick that might come back. The cell
+                         stays clear; the reason is announced here and printed
+                         in the row's own `To buy` cell (owner ruling
+                         2026-09-27: no dash, the reason is written). */
+                      <span className="sr-only" data-absence="true">
+                        {GOODS_ABSENCE_WORDS.nothingToBuy}
+                      </span>
                     )}
                   </td>
                 ) : null}

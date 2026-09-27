@@ -2314,6 +2314,7 @@ export {
   type ToOrderRow,
   type ToOrderSortKey,
   type ToOrderSupplier,
+  GOODS_ABSENCE_WORDS,
 } from "./to-order";
 export {
   MANUAL_PURCHASE_WORDS,

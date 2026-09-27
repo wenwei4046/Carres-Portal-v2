@@ -568,7 +568,8 @@ describe("Purchase Orders Register", () => {
 
     line.identity_mode = "quantity";
     const counted = renderPage();
-    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("—");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("Counted by quantity");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("—");
     expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("do not send this PO");
     counted.unmount();
 
@@ -803,12 +804,14 @@ describe("Purchase Order object", () => {
     expect(cell.queryByText("incoming")).not.toBeInTheDocument();
   });
 
-  it("prints `—` for a quantity-scoped line — intentional, never `Not allocated`", () => {
+  it("says `Counted by quantity` for a quantity-scoped line — never a dash, never `Not allocated`", () => {
     queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "quantity";
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const cell = within(screen.getByTestId("po-line-units-line-1"));
-    expect(cell.getByText("—")).toBeInTheDocument();
+    /* Owner ruling 2026-09-27: no dash — the cell says why it holds nothing. */
+    expect(cell.getByText("Counted by quantity")).toBeInTheDocument();
+    expect(cell.queryByText("—")).toBeNull();
     expect(cell.queryByText("Not allocated")).not.toBeInTheDocument();
     expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
     expect(cell.queryByRole("alert")).not.toBeInTheDocument();

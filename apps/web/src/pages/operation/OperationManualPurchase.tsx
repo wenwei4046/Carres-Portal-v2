@@ -61,6 +61,7 @@ import {
   type ManualPurchaseStatusKind,
   type OrderActionTone,
   type ProductCategory,
+  GOODS_ABSENCE_WORDS,
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -2053,7 +2054,7 @@ function RequestExpansion({
       /* The ruled Unit ID column is not drawn here, so these two are unread —
          the shape still requires them, and an honest absence costs nothing. */
       unitIds: [],
-      unitAbsence: "—",
+      unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
       deliverTo: g.deliverTo ? [g.deliverTo] : [],
       deliverToAbsence: MW.notRecorded,
       supplier: g.supplier || undefined,
@@ -2066,7 +2067,7 @@ function RequestExpansion({
           ? MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead
           : MW.notOrderedYet,
       poDeliveryDate: g.poDeliveryDate ? fmtDate(g.poDeliveryDate) : undefined,
-      poDeliveryDateAbsence: "—",
+      poDeliveryDateAbsence: GOODS_ABSENCE_WORDS.noPoYet,
       sku: g.sku,
       qty: g.qty,
       item: g.item,

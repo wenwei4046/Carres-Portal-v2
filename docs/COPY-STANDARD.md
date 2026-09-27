@@ -1207,7 +1207,7 @@ with an absence word that implies one is owed.
 | Fact | Word | Do NOT use |
 |---|---|---|
 | The goods-line column of an opened PO, and the PO PDF heading | **`Unit ID`** (screen) · **`UNIT ID`** (paper) | Item ID · Unit IDs · Serial · Code |
-| A quantity-scoped goods line — it has no Unit ID by law | **`—`** | Not allocated · No Unit ID · Not created yet · Pending |
+| A quantity-scoped goods line — it has no Unit ID by law (owner ruling 2026-09-27: no dash, the cell says why) | **`Counted by quantity`** | `—` · Not allocated · No Unit ID · Not created yet · Pending |
 | An exact-unit line with no Unit IDs after official issue — an integrity failure, never an ordinary empty state | **`Unit IDs missing on this line — do not send this PO`** | No Unit ID · a blank cell · Not allocated |
 | Catalog's per-SKU answer to *how does Stock count this?* | **`Stock identity`** with the values **`Unit ID`** · **`Quantity`**, and **`Not set`** while Catalog has not said | Tracking mode · Serialised · Bulk · Traceable flag |
 | Official PO issue refused because Catalog has not said | **`Set the stock identity (Unit ID or Quantity) for {sku} in Catalog before issuing a PO`** | Unknown mode · Configuration missing · Contact admin |
@@ -1341,7 +1341,7 @@ These stock-picker words do not rename every Warehouse screen.
 | `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Waiting for goods from supplier`** · **`Sending not confirmed`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
 | A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
 | HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
-| `To buy` — a figure ONLY where the page offers the buy | `To buy` means *what is left to buy*, so on a row the register does not offer it prints the governed absence `—` and the row says which state it is in. **Covered** (the engine's `fullyOnPo`): `—` · **`Already on a PO`** · **`Nothing to buy here`**, titled `An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.` — the door's own words (`purchasingRefusal("already_on_po")`) at cell width, so the operator meets ONE sentence, not two. **Not checked** (no flag in the payload): `—` · **`Coverage not checked`**, titled `Whether an open Purchase Order already covers this line could not be checked, so it is not offered for buying. Reopen the page to check again.` — unknown is not yes, and a page may not describe an eligibility nobody verified. **The engine's covering quantity is never printed under this head**: it is a covering quantity, not a purchasing one, and the customer's `Qty` and the historical `Ordered Qty` carry the facts two columns away. Notes are WRITTEN as short lines, never left to wrap — the long sentence takes the item row to 91px. **Never `Open PO …`** — a retired column head. |
+| `To buy` — a figure ONLY where the page offers the buy | `To buy` means *what is left to buy*, so on a row the register does not offer it prints the governed absence `Nothing to buy` (owner ruling 2026-09-27: never `—`) and the row says which state it is in. **Covered** (the engine's `fullyOnPo`): `Nothing to buy` · **`Already on a PO`** · **`Nothing to buy here`**, titled `An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.` — the door's own words (`purchasingRefusal("already_on_po")`) at cell width, so the operator meets ONE sentence, not two. **Not checked** (no flag in the payload): `—` · **`Coverage not checked`**, titled `Whether an open Purchase Order already covers this line could not be checked, so it is not offered for buying. Reopen the page to check again.` — unknown is not yes, and a page may not describe an eligibility nobody verified. **The engine's covering quantity is never printed under this head**: it is a covering quantity, not a purchasing one, and the customer's `Qty` and the historical `Ordered Qty` carry the facts two columns away. Notes are WRITTEN as short lines, never left to wrap — the long sentence takes the item row to 91px. **Never `Open PO …`** — a retired column head. |
 | A document fact that is not on file | `Not recorded` — the same word Purchase Orders uses, never back-filled from a planning date. |
 
 **MANUAL PURCHASE — the internal buy's own words.**
@@ -2033,6 +2033,27 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | Shared saved-evidence viewer controls (Purchasing §9.5 approved contract) | `Photo {n}` · `Video {n}` · `Zoom out` · `Zoom in` · `Reset` · `Previous` · `Next` · `Close` · `Loading…` · `Try again` | Read-only; context prints the recorded source/event and proven Unit IDs. Video uses native playback controls, never local zoom |
 | One saved evidence file that could not be read | `Photo {n} could not be loaded` + `Try again` | A file the record HAS but the viewer could not read. A file the record never had is absent, not failed — the two never render alike |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
+
+### A goods cell with nothing in it says why — OWNER RULING (Jess, 2026-09-27) · BUILT 2026-09-27
+
+Jess: "dash meaning not showing as blank, I want just write clear why blank." No `—` and no empty
+cell on a Purchasing goods table. One constant (`GOODS_ABSENCE_WORDS`, `packages/shared`) holds the
+words; the shared `GoodsMiniTable` and every Purchasing page read it.
+
+| Where | Exact wording | What it means |
+|---|---|---|
+| `Unit ID` · a line Catalog counts by quantity (accessories only — furniture always carries Unit IDs from the official PO) | `Counted by quantity` | No Unit ID by law |
+| `Unit ID` · before the PO exists | `Created when PO is issued` | Units are born with the official PO |
+| `Order By` · the line is already ordered | `Already ordered` | No order-by date applies |
+| `Ordered Qty` · Ready Stock answered the line | `From ready stock` | Nothing was ordered |
+| `Supplier Deliver To` · nothing is bought for the line | `No purchase needed` | The line is covered or is not goods |
+| `Supplier` · Catalog names none | `Supplier not set` | The rail's own word |
+| `PO Delivery Date` · no PO yet | `No PO yet` | The date exists once the PO does |
+| The select cell · a service line | `Service` | Not goods; nothing to buy |
+| `Status` · none recorded | `Not recorded` | Nobody recorded the fact |
+| `From Stock` · none taken | `0` | A number, not a word |
+| `To buy` · nothing left | `Nothing to buy` | The line is covered |
+| Receiving quantities before the count | `Not counted` | The count has not been entered |
 
 <a id="record-supplier-answer-words"></a>
 ### Record supplier answer words — APPROVED (Jess, 2026-09-25) · BUILT 2026-09-26

@@ -1,3 +1,4 @@
+import TableScroller from "@/components/TableScroller";
 // design-standard: not-a-list-page — one section of the Purchase Order object page (its
 // facts column), drawn as a per-line table inside the page's own shell; not a List page.
 import { useMemo, useState } from "react";
@@ -265,7 +266,7 @@ export default function SupplierReplySection({
             </button>
           ) : null}
         </div>
-        <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
+        <div className="mt-2"><TableScroller label="Supplier reply">
           {/* The READ table: the narrow columns are fixed and the Item column
               takes the rest, wrapping its Unit IDs — but never below 180px
               (measured 2026-09-26 at the owner's 1074px viewport: without a
@@ -293,7 +294,7 @@ export default function SupplierReplySection({
               })}
             </tbody>
           </table>
-        </div>
+        </TableScroller></div>
         <div className="mt-2 flex flex-wrap gap-x-4 text-meta text-kit-slate-11" data-testid="po-supplier-reply-foot">
           <span>Supplier DO · {supplierDo?.number ? <span className="font-medium text-kit-slate-12">{supplierDo.number}</span> : "Not recorded"}{supplierDo?.uploadedAt ? ` · ${fmtDate(supplierDo.uploadedAt)}` : ""}{supplierDo?.file ? <> · <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void openFile(supplierDo.file!)}>PDF</button></> : null}</span>
           <span>Last answer · {lastAnswer ? `${fmtDate(lastAnswer.recordedAt)}${lastAnswer.recordedByName ? ` · recorded by ${lastAnswer.recordedByName}` : ""} · Evidence ${evidenceCount}` : "None recorded yet"}</span>

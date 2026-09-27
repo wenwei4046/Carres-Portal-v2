@@ -34,6 +34,7 @@
  * A separate vite entry, not a route: `vite build` only emits `index.html`'s
  * graph, so this cannot reach production.
  */
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import GoodsMiniTable, { type GoodsMiniLine } from "@/pages/operation/components/GoodsMiniTable";
@@ -78,7 +79,7 @@ const BUYING_LINES: GoodsMiniLine[] = [
     key: "buy-1",
     category: "Mattress",
     unitIds: [],
-    unitAbsence: "—",
+    unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
     fromStock: 1,
     orderedQty: 2,
     orderedQtyAbsence: "Not ordered yet",
@@ -86,7 +87,7 @@ const BUYING_LINES: GoodsMiniLine[] = [
     deliverTo: [],
     deliverToAbsence: "Not chosen",
     supplier: "Nice Future",
-    supplierAbsence: "—",
+    supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
     sku: "L1201S-K",
     qty: 4,
     item: "Laveo",
@@ -97,7 +98,7 @@ const BUYING_LINES: GoodsMiniLine[] = [
     key: "buy-2",
     category: "Mattress",
     unitIds: [],
-    unitAbsence: "—",
+    unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
     orderedQty: 14,
     orderedQtyAbsence: "Not ordered yet",
     /* ⛔ NO PURCHASING QUANTITY on a covered row: the engine figure here is
@@ -111,7 +112,7 @@ const BUYING_LINES: GoodsMiniLine[] = [
     deliverTo: [],
     deliverToAbsence: "Not chosen",
     supplier: "Ohana",
-    supplierAbsence: "—",
+    supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
     sku: "JAGER-SS",
     qty: 1,
     item: "Jager",
@@ -123,13 +124,13 @@ const BUYING_LINES: GoodsMiniLine[] = [
     key: "buy-3",
     category: "Mattress protector",
     unitIds: [],
-    unitAbsence: "—",
+    unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
     orderedQty: 0,
     orderedQtyAbsence: "Not ordered yet",
     toBuy: null,
     deliverTo: [],
-    deliverToAbsence: "—",
-    supplierAbsence: "—",
+    deliverToAbsence: GOODS_ABSENCE_WORDS.noPurchaseNeeded,
+    supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
     sku: "MP-K",
     qty: 1,
     item: "Microfiber Waterproof",

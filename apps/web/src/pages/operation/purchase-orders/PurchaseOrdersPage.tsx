@@ -25,6 +25,7 @@ import {
   type PurchaseOrderRegisterFacts,
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
+  GOODS_ABSENCE_WORDS,
 } from "@carres/shared";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -44,6 +45,7 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
 import { Block, Fact } from "../SalesOrderWorkspace";
+import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,
@@ -1196,7 +1198,7 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
       category: goodsCategoryOf(line),
       unitIds: counted ? [] : unitIds,
       unitNode: counted
-        ? <Absence>—</Absence>
+        ? <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
         : unitsQ.isError
         ? <span className="text-kit-amber-11">Unit IDs could not be read</span>
         : unitsQ.isLoading
@@ -1679,8 +1681,9 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         />
       </Block>
       <Block title="Goods lines">
-        {/* Keep horizontal scrolling inside the card's padded content. */}
-        <div className="min-w-0 max-w-full overflow-x-auto">
+        {/* Wider than the half pane: it scrolls inside the card and SAYS so
+            (the Sales Order Items grammar — fade + one step button). */}
+        <TableScroller label="Goods lines" testId="po-goods-lines-scroller">
           <table className="w-full min-w-[900px] border-collapse text-body">
             <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-11">
               <tr><th className="px-3 py-2.5 align-top text-left">SKU</th><th className="px-3 py-2.5 align-top text-left">Item</th><th className="px-3 py-2.5 align-top text-left">Unit ID</th><th className="px-3 py-2.5 align-top text-left">Source</th><th className="px-3 py-2.5 align-top text-left">Deliver To</th><th className="px-3 py-2.5 align-top text-left">Order Qty</th><th className="px-3 py-2.5 align-top text-left">Received Qty</th><th className="px-3 py-2.5 align-top text-left">Pending Delivery Qty</th></tr>
@@ -1693,7 +1696,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                   {/* The Units are the line's own rows: one permanent Unit ID
                       per physical piece, born with the official PO and bound
                       to this line (0442/0443). A quantity line has none by
-                      law and prints `—`; an exact-unit line with none is an
+                      law and says `Counted by quantity`; an exact-unit line with none is an
                       integrity failure, never an ordinary empty state. They
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
@@ -1701,7 +1704,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                     unitLoading ? <span className="text-kit-slate-11">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
-                      ? <Absence>—</Absence>
+                      ? <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
                     : unitsOf(line).length
                       ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
@@ -1733,7 +1736,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroller>
       </Block>
       {/* Two cards, each its own row across the pane (YH, 2026-09-04).
           Half-width cards left every receipt and claim wrapping. The Unit

@@ -5,6 +5,7 @@
 // windows-inside-windows AutoCount pattern the Constitution rejects (§2). Its
 // table follows GoodsMiniTable's grammar, its sibling.
 import type { ReactNode, Ref } from "react";
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import {
   READY_STOCK_CONDITION_ABSENT,
   SO_BATCH_PURCHASE_WORDS as W,
@@ -242,7 +243,7 @@ export default function ReadyStockTable({
                           onChange={() => selection.onToggle(u.itemId)}
                         />
                       ) : (
-                        <Absence>—</Absence>
+                        <span className="sr-only" data-absence="true">{blocked}</span>
                       )}
                     </td>
                   ) : null}
@@ -280,7 +281,7 @@ export default function ReadyStockTable({
                     <SecondLine>
                       {/* 0453: a counted row's key is not a Unit ID and never
                           prints as one — what the goods ARE takes its place. */}
-                      {u.identityScope === "unit" && u.unitCode ? u.unitCode : (blocked ?? "—")}
+                      {u.identityScope === "unit" && u.unitCode ? u.unitCode : (blocked ?? GOODS_ABSENCE_WORDS.countedByQuantity)}
                     </SecondLine>
                     {/* ⭐ AND A ROW THAT LOST ITS CHECKBOX SAYS WHY. The approved
                         six columns hold no `why` column, and a Unit that cannot
@@ -384,19 +385,19 @@ export default function ReadyStockTable({
                         onChange={() => selection.onToggle(u.itemId)}
                       />
                     ) : (
-                      <Absence>—</Absence>
+                      <span className="sr-only" data-absence="true">{blocked}</span>
                     )}
                   </td>
                 ) : null}
                 <td className="px-2">
                   {/* A counted row's key is NOT a Unit ID and never prints
                       under this heading as if it were. The governed answer for
-                      a quantity-scoped goods line is the absence dash —
+                      a quantity-scoped goods line says why it has none —
                       `No Unit ID` would imply one is owed. */}
                   {u.identityScope === "unit" && u.unitCode ? (
                     u.unitCode
                   ) : (
-                    <Absence>—</Absence>
+                    <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
                   )}
                 </td>
                 <td className="px-2">
