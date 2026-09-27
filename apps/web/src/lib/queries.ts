@@ -3200,6 +3200,9 @@ export interface operationOrderDetailHistoryRow {
    *  event's own facts prove automation; the browser never infers it from a
    *  null id. Optional: an older Worker does not send it. */
   actor_kind?: "human" | "system" | "missing";
+  /** The governed role word of the account that acted — kept beside
+   *  `Staff identity not recorded` when the account is a shared login. */
+  actor_role?: string | null;
   /** The structured half of the event — reason/note/changed/revision. */
   metadata?: unknown;
 }
@@ -5522,6 +5525,9 @@ export interface SalesOrderRevisionRow {
   /** Server-side classification of the recorder; the browser never infers
    *  `system` from a null id. Optional: an older Worker does not send it. */
   actor_kind?: "human" | "system" | "missing";
+  /** The governed role word of the account that acted — kept beside
+   *  `Staff identity not recorded` when the account is a shared login. */
+  actor_role?: string | null;
   /** CARD 1 (0340) — who asked: staff_correction | customer_change. NULL on
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
