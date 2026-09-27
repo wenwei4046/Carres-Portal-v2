@@ -1199,6 +1199,12 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      Answer `No change` (default) · `Confirmed` · `New date` · `Split delivery`; `New date` adds the date
      and one of the eight `PO_DELAY_REASONS`; `Split delivery` adds batch rows; Save waits for an
      answer. It sits on one surface, never a card inside a card.
+   - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
+     inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
+     module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
+     Payment's record-payment, Delivery's arrangement), so a save writes the same one record the
+     module page writes (ERP-ARCH laws A and C: a door, never a duplicate). Seeing a form never
+     grants saving it: without the Duty or permission the form shows, Save is disabled and says why.
    - **Tally (Jess, 2026-09-27: "to do how to tally and know where im doing?"):** the open act is lit
      on BOTH sides at once, the checklist line in the Order Route and its To do item, with the pale-blue
      wash and the 3px blue edge; pressing a red `!` in the Order Route opens its To do and switches
