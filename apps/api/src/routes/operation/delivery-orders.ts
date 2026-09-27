@@ -141,7 +141,7 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   let query = sb
     .from("ops_delivery_orders")
     .select(
-      `id, order_id, do_number, leg, issued_at, trip_groups, delivery_date, time_slot,
+      `id, order_id, do_number, leg, trip, issued_at, trip_groups, delivery_date, time_slot,
        logistics_partner, voided_at, void_reason, ${ORDER_EMBED}`,
     )
     .order("issued_at", { ascending: false })
@@ -218,7 +218,7 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
   let query = sb
     .from("ops_delivery_orders")
     .select(
-      `id, order_id, do_number, leg, issued_at, trip_groups, delivery_date, time_slot,
+      `id, order_id, do_number, leg, trip, issued_at, trip_groups, delivery_date, time_slot,
        logistics_partner, voided_at, void_reason,
        orders!inner(id, so, customer_name, customer_phone, customer_emergency,
          customer_address, customer_address_city, customer_address_state,
