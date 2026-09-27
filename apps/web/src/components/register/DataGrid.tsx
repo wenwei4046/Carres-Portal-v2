@@ -2513,11 +2513,13 @@ function DataGridInner<T>({
                 </td>
               );
             }
-            /* Empty-cell standard (Commander 2026-06-18) — render an em-dash
-               for a primitive-empty cell (null / undefined / '') so the whole
-               system stops mixing blanks and dashes. 0 / false / JSX elements
-               are preserved (a real 0 must show as 0); synthetic columns
-               (__expand__ / __select__) render nothing, not a dash. */
+            /* ⭐ AN EMPTY CELL IS EMPTY — owner ruling 2026-09-26 (COPY-STANDARD
+               "NO DASH ANYWHERE ON A SCREEN", UI MASTER §6.0). A
+               primitive-empty cell (null / undefined / '') draws NOTHING: no
+               glyph, no title, nothing for a screen reader to announce.
+               0 / false / JSX elements are values and are preserved (a real
+               0 must show as 0). A fact with a word for its absence prints
+               that word from its own column renderer, never from here. */
             const content = col.overflowText
               ? <OverflowText text={col.overflowText(row)} label={col.label} />
               : col.accessor(row);
@@ -2577,7 +2579,7 @@ function DataGridInner<T>({
                       &#9656;
                     </span>
                     <span style={{ minWidth: 0, flex: 1 }}>
-                      {isEmpty ? "—" : content}
+                      {isEmpty ? null : content}
                     </span>
                   </button>
                 </td>
@@ -2589,7 +2591,7 @@ function DataGridInner<T>({
                 className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${wrapClass}${pinClass(col.key)}`}
                 style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
               >
-                {isEmpty ? (col.key.startsWith("__") ? null : "—") : content}
+                {isEmpty ? null : content}
               </td>
             );
           })}
@@ -3533,7 +3535,7 @@ function DataGridInner<T>({
                     <input
                       type="number"
                       inputMode="decimal"
-                      placeholder="–"
+                      placeholder="Min"
                       value={numberFilters[filterMenu.colKey]?.min ?? ""}
                       onChange={(e) => setNumberBound(filterMenu.colKey, "min", e.target.value)}
                       style={{
@@ -3549,7 +3551,7 @@ function DataGridInner<T>({
                     <input
                       type="number"
                       inputMode="decimal"
-                      placeholder="–"
+                      placeholder="Max"
                       value={numberFilters[filterMenu.colKey]?.max ?? ""}
                       onChange={(e) => setNumberBound(filterMenu.colKey, "max", e.target.value)}
                       style={{

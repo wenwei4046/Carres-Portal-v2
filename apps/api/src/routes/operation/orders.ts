@@ -177,6 +177,28 @@ async function resolveSkuLabels(
 }
 
 // ----- GET / list -----
+/* ⭐ ONE POPULATION, ONE PREDICATE — owner ruling 2026-09-26 (Orders MASTER
+   §0.1 REGISTER CLOSE-OUT item 4). The Sales Orders Register is every
+   non-cancelled order Sales has handed to Operation, rentals excluded. It is
+   defined HERE, once, and both reads the Register makes — its rows and its
+   total — call it, so `{n} of {m}` can never count two different sets.
+
+   Rentals are recognised by the same fact the Register's browser test reads
+   (`source_system === "rental"`, `isRental` in sales-order-facts.ts); a NULL
+   `source_system` is a native order and stays. The list is shared with
+   Delivery, Work, Payments, the dashboard and the old Orders control: this
+   predicate rides only `?stage=proceeded`, the parameter the Register sends,
+   so what every other caller receives is unchanged. */
+const SALES_ORDER_REGISTER_EXCLUDED_STATUSES = "(place,cancelled)";
+const SALES_ORDER_REGISTER_NOT_RENTAL = "source_system.is.null,source_system.neq.rental";
+function salesOrderRegisterPopulation<
+  Q extends { not(column: string, operator: string, value: string): Q; or(filters: string): Q },
+>(q: Q): Q {
+  return q
+    .not("status", "in", SALES_ORDER_REGISTER_EXCLUDED_STATUSES)
+    .or(SALES_ORDER_REGISTER_NOT_RENTAL);
+}
+
 operationOrdersRouter.get("/", requireOperation, async (c) => {
   const parsed = ListOperationOrdersQuery.safeParse({
     stage: c.req.query("stage") ?? undefined,
@@ -296,22 +318,25 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // from the surface it links to.
       "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
+    ;
+
+  if (stage === "proceeded") {
+    // The Sales Orders Register's population — the ONE predicate its total
+    // below is counted with (salesOrderRegisterPopulation).
+    q = salesOrderRegisterPopulation(q);
+  } else {
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
     // before; existing M2 tests still pass.
-    .in("status", ["place", "proceed_order", "delivered"]);
-
-  if (stage === "placed") {
-    // 'placed' is a synthetic stage derived from `status='place'` (pre-push
-    // orders may have NULL operation_stage or 'placed' depending on whether
-    // they were seeded post-0024). Filter on status, not stage.
-    q = q.eq("status", "place");
-  } else if (stage === "proceeded") {
-    // The Sales Orders Register's population (owner ruling 2026-09-21): only
-    // orders Sales has handed to Operation. Synthetic too, so on status.
-    q = q.neq("status", "place");
-  } else if (stage !== "all") {
-    q = q.eq("operation_stage", stage);
+    q = q.in("status", ["place", "proceed_order", "delivered"]);
+    if (stage === "placed") {
+      // 'placed' is a synthetic stage derived from `status='place'` (pre-push
+      // orders may have NULL operation_stage or 'placed' depending on whether
+      // they were seeded post-0024). Filter on status, not stage.
+      q = q.eq("status", "place");
+    } else if (stage !== "all") {
+      q = q.eq("operation_stage", stage);
+    }
   }
   // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
   // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
@@ -342,7 +367,8 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   /* ⭐ THE REGISTER'S TOTAL IS A COUNT, NEVER THE ROWS IT HAPPENED TO LOAD
      (Listing Standard follow-up, 2026-09-17). `{n} of {m} sales orders` needs
      `m` = every Sales Order the caller may read in this stage/channel scope —
-     rentals excluded exactly as the Register excludes them, and the SEARCH
+     rentals excluded, the Register's own path through the SAME predicate as
+     its rows (salesOrderRegisterPopulation), and the SEARCH
      NOT applied, so a search answered first still has its denominator. The
      list above stops at 500 rows and a search replaces the rows, so neither
      `rows.length` nor a remembered number is the total. Same RLS client, one
@@ -350,12 +376,16 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
      prints no `of` rather than guess. */
   let totalQ = sb
     .from("orders")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["place", "proceed_order", "delivered"])
-    .or("source_system.is.null,source_system.neq.rental");
-  if (stage === "placed") totalQ = totalQ.eq("status", "place");
-  else if (stage === "proceeded") totalQ = totalQ.neq("status", "place");
-  else if (stage !== "all") totalQ = totalQ.eq("operation_stage", stage);
+    .select("id", { count: "exact", head: true });
+  if (stage === "proceeded") {
+    totalQ = salesOrderRegisterPopulation(totalQ);
+  } else {
+    totalQ = totalQ
+      .in("status", ["place", "proceed_order", "delivered"])
+      .or("source_system.is.null,source_system.neq.rental");
+    if (stage === "placed") totalQ = totalQ.eq("status", "place");
+    else if (stage !== "all") totalQ = totalQ.eq("operation_stage", stage);
+  }
   if (channel === "dealers") totalQ = totalQ.is("outlet_id", null);
   if (channel === "showrooms") totalQ = totalQ.not("outlet_id", "is", null);
 

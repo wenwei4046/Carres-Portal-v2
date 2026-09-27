@@ -147,6 +147,29 @@ which overwrites the 2026-09-21 "remain blue" ruling on this page.
 a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
 longer offers prints an empty box.
 
+**Scope D, first half · Register close-out — BUILT 2026-09-28, production walk owed.** The row menu
+reads `Edit · View · Print · ─ Cancel SO`, and carries nothing of Delivery's. The engine draws
+NOTHING for a blank cell (`DataGrid`, every listing alike); `0` still prints `0`. The Register's
+rows and its total call ONE predicate (`salesOrderRegisterPopulation`: status not in `place`,
+`cancelled`; rentals excluded on the server), riding only `?stage=proceeded`, so what Delivery, Work,
+Payments and the dashboard receive from the shared list is unchanged. Measured: on that shared path
+the count excludes rentals while the rows include them — left as it is, because changing it changes
+what other modules receive.
+**Scope D, second half · the portal-wide dash sweep — NOT BUILT.** Measured 2026-09-28: 160 source
+files in `apps/web` and `packages/shared` still write a dash as a value from their own column or
+template (the engine no longer adds one). It crosses every module and several open PRs, so it ships
+as its own change, module by module.
+
+**Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
+(`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's
+`EmptyState` and `Button`, centred, at most 480px wide. The Register, the object page, Revisions,
+History and the Order Route all call it, and `SalesOrderAbsence` is the same block. A 403 prints the
+permission words with the way back and no retry (the Register prints no button and its footer no
+count); a 404 or an invalid parameter prints `Sales Order not found.`; anything else keeps the
+surface's own sentence with `Try again`. No transport message reaches the screen.
+**Not built in E:** loading does not yet reserve the final geometry on the object page (two panes)
+or the Route (the 320px canvas skeleton); both still draw the kit `Loading` line.
+
 **The office create door — RETIRED IN CODE 2026-09-28 (owner ruling 2026-09-27), production walk
 owed.** The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;
 `POST /api/operation/orders` answers 410 `office_create_retired` before any database client opens,
