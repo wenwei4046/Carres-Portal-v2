@@ -62,7 +62,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 | Slice | What it carries | State |
 |---|---|---|
 | **A1 · the Route tells the truth, and every line names WHO** | route facts load only with `?route=1` · `⚠ unreadable` for Delivery and Payments (a failed read never blanks the map, never prints a business sentence) · the `PAYMENT` node and band with `paymentDeadlineOf` · `SO Doc Date` and `Customer requested` · **every line is who + object + action (owner ruling 2026-09-27; words in COPY-STANDARD § The Order Route words)** · the `PROPOSED CHANGE` banner says who asked, **what changes** (the Order tab's own rows, first three) and who decides · a node that acts also shows its door | **BUILT 2026-09-27 — production walk owed** |
-| **A2 · DELIVERY reads Delivery's own records** | one lane per `(leg, trip)`, the per-lane gate, `DELIVER` through `deliveryWorkStatusOf`, photos per Delivery Order | APPROVED TARGET / NOT BUILT |
+| **A2 · DELIVERY reads Delivery's own records** | one lane per `(leg, trip)` arranged by `routeDeliveryScopesOf` (Journey = two or more stops · split = a live document with `trip > 0` · ordinary = one scope, no plate) · the per-lane gate, issued = the row exists · leg 2's `Leg 1 arrived at {stop}` requirement · `DELIVER` through `deliveryWorkStatusOf` · photos bound to the Delivery Order's number · a transfer leg draws no photo · doors open a Delivery Order by its row id · the payment deadline counts 3 working days for an outstation partner | **BUILT 2026-09-28 — production walk owed** |
 | **A3 · GOODS reads Purchasing, Receiving and Stock** | `po_line_sources` lineage, `PO Delivery Date` and `Expected arrival`, `receivingSummaryOf` counts, `Choose Ready Unit`, a failed Purchasing read per line | APPROVED TARGET / NOT BUILT |
 
 **Measured while building A1, and fixed in it (2026-09-27, 1440 / 1180 / 820 / 743 / 390):** the
@@ -71,6 +71,21 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 second; the resolver's geometry and the canvas draw the same rows, and a screen reader is given the
 unbroken fact (`RouteNode.spoken`). The `CURRENT` node's 2px border took 2px from its last row; it
 now takes them from the padding.
+
+**Found and fixed while building A2 (2026-09-27/28).** `Open {DO No} →` failed for every number
+minted since 0575 (the door asked `/^do-/`), and `Open Delivery →` sent `?order=`, which the
+Delivery page never read — both shipped in #1680. On the rendered Journey: a line into a lane's gate
+ran behind the nodes above it (it now turns in the gap just above the gate), `DELIVERY PHOTO` was
+cut to make room for `Current`, and the photo step printed `Delivery date not recorded` beside a
+delivered leg.
+
+**REAL GAPS recorded by A2, not built (Delivery owns them).** The server issues leg 2's Delivery
+Order without asking whether leg 1 arrived (`attemptLegDocumentIssue` has no such requirement); the
+Route states the requirement, the door does not yet enforce it. A split trip has no arrangement of
+its own — `ops_delivery_arrangements` is keyed by leg — so a trip's partner and date are read from
+its Delivery Order. The whole-order scheduled day still has two writers (`ops_order_control` and the
+leg 0 arrangement) with no sync; the Route reads Delivery Order, then arrangement, then the booking,
+the Delivery page's own order.
 
 **REAL GAPS found in A1 — words the dictionary does not hold, so the build did not invent them.**
 A failed read of Stock (the allocation), Receiving, Loans, Service Cases or Supplier Claims has no
