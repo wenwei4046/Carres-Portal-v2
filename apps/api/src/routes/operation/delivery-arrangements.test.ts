@@ -294,6 +294,31 @@ describe("GET / — every arrangement, every contact, every Cannot Deliver (Card
   });
 });
 
+describe("GET /?order= — one Sales Order's arrangements, for the Order Route (A2)", () => {
+  it("narrows every read to the order, so the Route never loads the whole table", async () => {
+    const { from } = mockSb([
+      { data: [{ id: "arr-1", order_id: ORDER_A, leg: 1, partner_id: NETS }] },
+      { data: [] },
+      { data: [] },
+    ]);
+    const res = await call(`?order=${ORDER_A}`, "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { arrangements: Array<{ order_id: string; leg: number }> };
+    expect(body.arrangements.map((a) => a.leg)).toEqual([1]);
+    const chains = from.mock.results.map((r) => r.value as { eq: { mock: { calls: unknown[][] } } });
+    for (const chain of chains) {
+      expect(chain.eq.mock.calls).toContainEqual(["order_id", ORDER_A]);
+    }
+  });
+
+  it("without ?order= it reads everything, as the Delivery page needs", async () => {
+    const { from } = mockSb([{ data: [] }, { data: [] }, { data: [] }]);
+    await call("", "operation");
+    const first = from.mock.results[0]!.value as { eq: { mock: { calls: unknown[][] } } };
+    expect(first.eq.mock.calls.some((c) => c[0] === "order_id")).toBe(false);
+  });
+});
+
 describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
   /** The feed's fixed query order (0424): arrangements · orders ·
    *  delivery orders · SCOPE (delivery_order_units) · units · prep ·

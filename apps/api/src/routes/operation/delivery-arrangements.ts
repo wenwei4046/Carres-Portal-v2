@@ -166,18 +166,28 @@ function refusedDeliveryDay(dateIso: string): string | null {
  *  all in one round trip; the status ladder reads the latest contact. */
 deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  /* `?order=<uuid>` narrows every read to one Sales Order — the Order Route's
+     read (owner ruling 2026-09-26). Same shape, same arithmetic, one door. */
+  const orderScope = c.req.query("order") ?? null;
+  let arrangementsQ = sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT);
+  let contactsQ = sb.from("ops_delivery_contacts").select(CONTACT_SELECT);
+  /* Card 17 — every recorded `Cannot Deliver` (0417), for the central
+     Delivery report's partner measures. Its own read; a failure here leaves
+     the field ABSENT (the report prints `Not available`, never 0) and the
+     workspace still opens. */
+  let cannotQ = sb
+    .from("ops_delivery_arrangement_events")
+    .select("id, order_id, leg, from_partner_id, reason_key, note, recorded_at")
+    .eq("event", "cannot_deliver");
+  if (orderScope) {
+    arrangementsQ = arrangementsQ.eq("order_id", orderScope);
+    contactsQ = contactsQ.eq("order_id", orderScope);
+    cannotQ = cannotQ.eq("order_id", orderScope);
+  }
   const [{ data, error }, contactsRes, cannotRes] = await Promise.all([
-    sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT),
-    sb.from("ops_delivery_contacts").select(CONTACT_SELECT).order("contacted_at", { ascending: false }),
-    /* Card 17 — every recorded `Cannot Deliver` (0417), for the central
-       Delivery report's partner measures. Its own read; a failure here leaves
-       the field ABSENT (the report prints `Not available`, never 0) and the
-       workspace still opens. */
-    sb
-      .from("ops_delivery_arrangement_events")
-      .select("id, order_id, leg, from_partner_id, reason_key, note, recorded_at")
-      .eq("event", "cannot_deliver")
-      .order("recorded_at", { ascending: false }),
+    arrangementsQ,
+    contactsQ.order("contacted_at", { ascending: false }),
+    cannotQ.order("recorded_at", { ascending: false }),
   ]);
   if (error) {
     const m = mapPgError(error);

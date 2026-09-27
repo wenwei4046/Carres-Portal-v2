@@ -5666,6 +5666,15 @@ export interface SalesOrderRouteFactsResponse {
    *  in COPY-STANDARD fail soft; any other failed read still fails the route
    *  whole, because drawing nothing as if nothing existed is the lie. */
   failed: { delivery: boolean; payments: boolean };
+  /** ⭐ A2 — Delivery's OWN records for this order (owner ruling 2026-09-26):
+   *  every leg's arrangement, every Delivery Order with its attempts and
+   *  handover facts. Null only when Delivery could not be read. */
+  delivery: {
+    arrangements: DeliveryArrangementRow[];
+    deliveryOrders: DeliveryOrderRow[];
+    attempts: DeliveryOrderAttemptRow[];
+    handoverEvents: DeliveryHandoverKindRow[];
+  } | null;
 }
 
 /** One loan-offer record as the API returns it, with the offered Unit's ID. */
@@ -5694,7 +5703,7 @@ export function useSalesOrderRouteFacts(
         );
       const [
         allocation, loans, refunds, cases, claims, loanOffers, receiving,
-        booking, attempts, financeExceptions, paymentApprovals,
+        booking, attempts, financeExceptions, paymentApprovals, arrangements, documents,
       ] = await Promise.all([
         apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
         apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
@@ -5717,8 +5726,11 @@ export function useSalesOrderRouteFacts(
         // reads, so the canvas and the refusal can never disagree (Law D).
         soft(apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`)),
         soft(apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`)),
+        // A2 — Delivery's own records, narrowed to this order by the door itself.
+        soft(apiFetch<DeliveryArrangementsPayload>(`/api/operation/delivery-arrangements?order=${id}`)),
+        soft(apiFetch<DeliveryOrdersRegisterPayload>(`/api/operation/delivery-orders?order=${id}`)),
       ]);
-      const deliveryFailed = !booking.ok || !attempts.ok;
+      const deliveryFailed = !booking.ok || !attempts.ok || !arrangements.ok || !documents.ok;
       const paymentsFailed = !financeExceptions.ok || !paymentApprovals.ok;
       return {
         allocation: allocation.allocation,
@@ -5733,6 +5745,15 @@ export function useSalesOrderRouteFacts(
         paymentApprovals: paymentApprovals.ok && !paymentsFailed ? paymentApprovals.value : [],
         loanOffers: loanOffers.offers,
         failed: { delivery: deliveryFailed, payments: paymentsFailed },
+        delivery:
+          !deliveryFailed && arrangements.ok && documents.ok
+            ? {
+                arrangements: arrangements.value.arrangements,
+                deliveryOrders: documents.value.deliveryOrders,
+                attempts: documents.value.attempts,
+                handoverEvents: documents.value.handoverEvents,
+              }
+            : null,
       };
     },
     enabled: !!orderId && open,
@@ -6847,6 +6868,8 @@ export interface DeliveryOrderRow {
   do_number: string;
   /** 0491 — 0 the whole-order trip; 1..n one leg of the order's Journey. */
   leg?: number | null;
+  /** 0542 — 0 unsplit; 1..3 one trip of a split delivery. */
+  trip?: number | null;
   issued_at: string;
   trip_groups: string[] | null;
   delivery_date: string | null;

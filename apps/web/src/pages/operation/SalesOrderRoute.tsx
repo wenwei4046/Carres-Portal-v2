@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, wrapRouteText } from "@carres/shared";
+import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, routeLateElbow, wrapRouteText } from "@carres/shared";
 import type {
   NodeMark,
   RouteEdge,
@@ -159,7 +159,18 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   });
   const expanded = groupBounds.find((group) => group.plate.id === expandedPlateId) ?? groupBounds[0] ?? null;
   const goodsWidth = Math.max(ROUTE_NODE_W, expanded?.width ?? ROUTE_NODE_W);
-  const deliveryWidth = ROUTE_NODE_W;
+  /* ⭐ ONE DELIVERY SCOPE IS ONE LANE (owner ruling 2026-09-26). With lanes,
+     every lane carries its own gate and tail, so the resolver's own geometry
+     for the DELIVERY group is kept whole and only moved into place. */
+  const laneNodes = route.nodes.some((node) => node.kind === "delivery-lane")
+    ? route.nodes.filter((node) => node.branch === "delivery" || node.branch === "gate")
+    : [];
+  const laned = laneNodes.length > 0;
+  const laneMinX = laned ? Math.min(...laneNodes.map((node) => node.x)) : 0;
+  const laneMinY = laned ? Math.min(...laneNodes.map((node) => node.y)) : 0;
+  const deliveryWidth = laned
+    ? Math.max(...laneNodes.map((node) => node.x + node.w)) - laneMinX
+    : ROUTE_NODE_W;
   const moneyWidth = ROUTE_NODE_W;
   const loanNodes = route.nodes.filter((node) => node.branch === "loan");
   const loanWidth = loanNodes.length > 0
@@ -211,15 +222,28 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
     });
     return bottom;
   };
-  const deliveryBottom = placeChain("delivery", deliveryX);
+  let deliveryBottom = rowTop;
+  if (laned) {
+    for (const node of laneNodes) {
+      const next = { ...node, x: deliveryX + node.x - laneMinX, y: rowTop + node.y - laneMinY };
+      placed.set(node.id, next);
+      deliveryBottom = Math.max(deliveryBottom, next.y + next.h);
+    }
+  } else {
+    deliveryBottom = placeChain("delivery", deliveryX);
+  }
   const moneyBottom = placeChain("money", moneyX);
   const loanBottom = placeChain("loan", loanX);
   const deepest = Math.max(goodsY - MAP_ROW_GAP, deliveryBottom, moneyBottom, loanBottom);
 
   const gateSource = route.nodes.find((node) => node.kind === "delivery-order")!;
-  const gate = { ...gateSource, x: centreX - gateSource.w / 2, y: deepest + MAP_GATE_GAP };
+  /* With lanes the gates already stand in their lanes; a collapsed goods
+     line points at the first lane's gate. */
+  const gate = laned
+    ? placed.get(gateSource.id)!
+    : { ...gateSource, x: centreX - gateSource.w / 2, y: deepest + MAP_GATE_GAP };
   placed.set(gate.id, gate);
-  let tailY = gate.y + gate.h + MAP_ROW_GAP;
+  let tailY = laned ? deepest + MAP_ROW_GAP : gate.y + gate.h + MAP_ROW_GAP;
   for (const node of route.nodes.filter((item) => item.branch === "tail")) {
     const next = { ...node, x: centreX - node.w / 2, y: tailY };
     placed.set(node.id, next);
@@ -232,7 +256,7 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
     .map((edge) => {
       const from = placed.get(edge.from)!;
       const to = placed.get(edge.to)!;
-      return { ...edge, points: routeElbow(from, to), labelAt: null };
+      return { ...edge, points: edge.late ? routeLateElbow(from, to) : routeElbow(from, to), labelAt: null };
     });
   for (const group of groupBounds) {
     if (group.plate.id === expanded?.plate.id) continue;
@@ -242,14 +266,16 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
       to: gate.id,
       style: "dashed",
       labelLines: [],
-      points: routeElbow(placed.get(group.plate.id)!, gate),
+      points: laned
+        ? routeLateElbow(placed.get(group.plate.id)!, gate)
+        : routeElbow(placed.get(group.plate.id)!, gate),
       labelAt: null,
     });
   }
 
   const bands = [
     { id: "goods" as const, label: "GOODS", x: MAP_PAD, y: bandY, w: goodsWidth, h: MAP_BAND_HEIGHT },
-    { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
+    { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: deliveryWidth, h: MAP_BAND_HEIGHT },
     { id: "money" as const, label: "PAYMENT", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
     ...(loanNodes.length > 0
       ? [{ id: "loan" as const, label: "LOAN", x: loanX, y: bandY, w: loanWidth, h: MAP_BAND_HEIGHT }]
@@ -407,6 +433,46 @@ function Node({
       </button>
     );
   }
+  /* A delivery lane's plate — the same grey header grammar, and not a station:
+     no glyph, no state word, no action, no door, nothing to press. */
+  if (node.kind === "delivery-lane") {
+    return (
+      <div
+        data-testid={`route-node-${node.id}`}
+        data-kind={node.kind}
+        data-mark={node.mark}
+        role="group"
+        tabIndex={0}
+        aria-label={node.spoken.join(" — ")}
+        onFocus={() => onReveal?.(node)}
+        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        style={{
+          left: node.x,
+          top: node.y,
+          width: node.w,
+          height: node.h,
+          paddingTop: BOX_PAD_Y,
+          paddingBottom: BOX_PAD_Y,
+        }}
+      >
+        <div
+          className="text-label font-semibold text-base-900"
+          style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
+        >
+          {node.title}{" "}
+        </div>
+        {node.lines.map((line, i) => (
+          <div
+            key={`${node.id}-line-${i}`}
+            className="whitespace-nowrap text-label text-base-600"
+            style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+          >
+            {line}{" "}
+          </div>
+        ))}
+      </div>
+    );
+  }
   const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
   const actionContext = node.action?.context.detail ?? null;
 
@@ -476,11 +542,16 @@ function Node({
         >
           <Glyph size={14} />
         </span>
-        <span className="truncate text-label font-semibold uppercase tracking-wide text-base-600">
+        {/* The station's name is never cut to make room for `Current`
+            (measured 2026-09-28: `DELIVERY PHO…`). The word gives up its
+            letter spacing first. */}
+        <span
+          className={`whitespace-nowrap text-label font-semibold uppercase text-base-600 ${node.current ? "" : "tracking-wide"}`}
+        >
           {node.title}
         </span>
         {node.current && (
-          <span className="ml-auto shrink-0 text-label font-semibold uppercase tracking-wide text-kit-blue-11">
+          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-kit-blue-11">
             Current
           </span>
         )}

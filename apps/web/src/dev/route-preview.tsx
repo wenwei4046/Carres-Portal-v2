@@ -138,9 +138,70 @@ const input: SalesOrderRouteInput = {
  *   unreadable  Delivery and Payments could not be read
  *   paid        nothing owed
  */
+/* `?s=journey` — a two-leg Delivery Journey, delivered: the shape measured on
+ * production as SO-1362. `{braces}` stand where a real record would print. */
+const lane = {
+  trip: 0,
+  plate: null,
+  transfer: false,
+  legStop: null,
+  partnerName: null,
+  confirmedDate: null,
+  confirmedTime: null,
+  deliveryOrder: null,
+  tripGroups: null,
+  attempts: [],
+  handoverEvents: [],
+  photos: [],
+};
+const journey: SalesOrderRouteInput = {
+  ...input,
+  order: { ...input.order, so: 1362, customerName: "{customer}", placedAt: "2026-09-13", deliveryDate: "2026-09-17" },
+  lineLabels: { "MATT-K": "{goods line}" },
+  allocation: {
+    ...input.allocation,
+    lines: [input.allocation.lines[0]!],
+    totals: { committedQty: 1, reservedQty: 1, soldQty: 0, outstandingQty: 0 },
+  },
+  purchaseOrders: [],
+  money: { known: true, outstanding: 0 },
+  loans: [],
+  delivery: {
+    logistics: null,
+    booking: null,
+    attempts: [],
+    scopes: [
+      {
+        ...lane,
+        leg: 1,
+        plate: "Leg 1 · Carres Klang → JB transit warehouse",
+        transfer: true,
+        legStop: "JB transit warehouse",
+        partnerName: "NETS",
+        confirmedDate: "2026-09-15",
+        confirmedTime: "10 AM to 1 PM",
+        deliveryOrder: { id: "do-1", number: "DO-130926-0842" },
+        attempts: [{ result: "delivered", reasonKey: null, recordedAt: "2026-09-15T04:00:00Z" }],
+      },
+      {
+        ...lane,
+        leg: 2,
+        plate: "Leg 2 · JB transit warehouse → customer",
+        partnerName: "AL",
+        confirmedDate: "2026-09-17",
+        confirmedTime: "2 PM to 5 PM",
+        deliveryOrder: { id: "do-2", number: "DO-130926-3223" },
+        attempts: [{ result: "delivered", reasonKey: null, recordedAt: "2026-09-17T08:00:00Z" }],
+      },
+    ],
+  },
+};
+
 const scenario = new URLSearchParams(window.location.search).get("s");
 const seeded: SalesOrderRouteInput =
-  scenario === "waiting"
+  scenario === "journey"
+    ? journey
+    : scenario === "waiting"
     ? { ...input, amendment: {
         status: "submitted",
         submittedAt: "2026-09-23",
