@@ -1153,6 +1153,16 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
+7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
+   then expand checklist … we should set format").** Every step is the same title row: date · dot ·
+   step name · the step's own document number when it has exactly one (Proceed's `SO No`) · status
+   on the right · a chevron. Pressing the title opens or closes its checklist. A step opens by
+   itself only when it holds an open act of the signed-in person; every other step shows its title
+   alone. The checklist is one line per item in three aligned columns: **what** (party or fact
+   name) · **its state** · **its document** (underlined, opens the PDF). No item takes a second
+   line. Proceed lists only `Customer`: the money lives on Payment and the dates on Customer
+   delivery, never repeated. Example: PO → `Sleepwell · Confirmed · PO260910-1180` /
+   `3 ABC Furniture · Not confirmed · PO260911-1188` / `XYZ Bedding · No PO yet · Li Ching`.
 8a. **One title per panel, one row (Jess, 2026-09-27: "we need align each panel got one title like
    communication but not too big font size").** Every column opens with the same 48px title row,
    14px semibold, aligned across the page: the left column's `My Work` · `Team Work` switch ·
@@ -1178,7 +1188,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 - **B2 · SIZES (revision 5)** — no Order header (A4). The action area (the record panel) is
   340px, the same width as Communication (Jess, 2026-09-27: "record panel same width with
   communication"); the Route takes the rest (≥316px). At 1440: Inbox 280 · Route 480 · Record 340 ·
-  Communication 340. Each column fills the height and scrolls alone. Narrower than 1280: Record
+  Communication 340. Each column fills the height and scrolls alone. Narrower than 1400 (the Route needs ≥440px): Record
   and Communication share one 340 column (Record on top, Communication under it, scrolling
   together); narrower than 900: the left rail STAYS visible (Jess, 2026-09-27: "i want left nav rail") and
   Order Route, To do and Communication stack in one column beside it. The page never scrolls sideways (Jess, 2026-09-27: "why here need
