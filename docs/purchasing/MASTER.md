@@ -1059,6 +1059,16 @@ remains usable but carries concrete label work.
 
 ### 7.1 SO purchase
 
+**WHERE A SALES ORDER COMES FROM — cross-module notice, owner ruling 2026-09-27 (Jess).** A customer
+Sales Order is born in the **Sales Portal only** (`pos.carresofficial.com`, a dealer / showroom / bd
+login, the new-order wizard). The Operation create door (`/operation/orders/so/new`, `POST
+/api/operation/orders`) and the Register's `New Sales Order` button are **retired — APPROVED TARGET,
+still mounted today until Sales Orders scope C/D removes them**. A Purchasing chat that needs a
+Sales Order to test SO Batch Purchase, Manual Purchase or a preview: use a Sales Portal login on
+test data, or the committed fixture harnesses (`apps/web/src/dev/so-batch-listing-preview.tsx`,
+`so-batch-preview.tsx`, `so-workspace-shell-preview.tsx`) — never build a second create door and
+never depend on the office door in a new test. Buying without a customer order is `Manual Purchase`.
+
 ```text
 Sales Order line
 → Stock reads available/reserved/incoming quantity
