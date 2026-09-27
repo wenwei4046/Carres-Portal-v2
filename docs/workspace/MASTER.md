@@ -710,53 +710,35 @@ the same group and item grammar; zero matches is not the same as zero work.
   Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
   on the right, 72px tall with 24px sides from 768px wide; below 768px 24/30/600, 12/16/400, 64px,
   16px sides. No breadcrumb row, no second title, KPI band or card header.
-- **Toolbar** — ONE white section (`rounded-work`), 12px padding (10px below 600px), 8px between
-  controls. Every control is 36px (40px below 768px), 14/20/400 (`text-control`), 12px sides,
-  `rounded-control`; the active `My Work`/`Team Work` segment is 600. Search is 240px from 768px
-  and fills its row below. From 768px the toolbar is one row (`Filters` · `My Work · Team Work` ·
-  Search · Owner · `Covered` · `Clear all`). **Below 768px it is exactly two rows** — `Date · Module ·
-  My Work/Team Work`, then `Search · Owner · Covered` — **and below 600px exactly four**: `Date ·
-  Module` / `My Work · Team Work` / Search / `Owner · Covered`; rows are 40px apart by 8px. The ruling's
-  table put the 36/40px switch at 600px, but its 743px acceptance requires 40px rows; the
-  acceptance is the more specific line, so controls (and the 12px canvas padding) switch at
-  768px with the header, and only the toolbar's own 12/10px padding and the four-row split switch
-  at 600px. Freshness is a read fact, not a manual business action.
-- **THE WORK SHELL — owner correction 2026-09-24, APPROVED / BUILT.** The workspace is an UNFRAMED
-  grid on the light-grey canvas with 16px padding (12px below 768px): no frame, fill, radius or
-  shadow around it. The toolbar is one white section; 16px below it the columns sit 16px apart.
-  Every white surface is its own section: 1px `work-line` (`#ccd7e5`) edge, 9px `rounded-work`
-  radius, no shadow, no coloured corner. Breakpoints read the Work page's own width:
-  **≥1280px** three columns `240px · 420px · remainder (≥480px)` — Date and Module as two separate
-  rail sections, the list, the detail; **768–1279px** the rail collapses behind the toolbar
-  `Filters` control and the list is exactly 400px (it never collapses); **<768px** Date and Module
-  open from compact toolbar controls and the list (100% wide) and the detail share ONE stage with
-  `Back to work`.
-- **The list column** — the heading (the chosen Date, 16/22/600, with `{n} actions to do` 13/18/500
-  on the same 24px line; at 390px it may wrap once, never grow), 8px, the 36px `To do · Waiting ·
-  Completed` tabs (`?list=`; 3px padding, 2px between tabs, tab 13/18/600 with its count 13/18/500,
-  tab radius 5px, bar 7px), 8px, then the work cards 8px apart, drawn 50 at a time as the list end
-  scrolls into view; a failed refresh keeps the last good list with one retry row. Team Work groups
-  under ONE 32px owner line — `[SH] Shasha  49 actions to do · 88 missed`: 32px avatar with 12/16/600
-  initials, 8px, owner name 15/20/600, count 12/16/400, missed 12/16/500; 8px to its first card,
-  16px from its last card to the next owner.
-- **THE WORK CARD — four lines in a 300px column (Jess, 2026-09-26, "this format is correct";
-  replaces the 52px two-line row and the 104px card before it).** The middle column is an inbox
-  of cards, 12px padding, ~100px each: line 1 the document number 13/18/600 (opens the record)
-  with the due date 12/16 on the right (`Thu, 1 Oct`; the date alone in red 600 when missed — no
-  word; `No date`); line 2 the action sentence 13/18/500; line 3 the fact 12/16 slate-11; line 4
-  the chips 11/16 — the page word (`Delivery`) and the party (`AL Logistics`), plus `For {normal
-  owner}` in amber on a covered row in My Work (Team Work says it once on the owner's group line).
-  Every line is one line: a long sentence ends in `…` and shows whole on hover; the right panel
-  prints it in full. The column stays 300px (Jess: the width need not grow for the sentence).
-  Cards sit edge to edge with a 1px rule, no border, no radius; the chosen card is the pale-blue
-  wash with the 2px left line — the list's one blue. Over the list ONE line names the chosen Date
-  (`Thu, 1 Oct` · `Missed` · `No date`) — no count, no tabs. Reference: an inbox thread list
-  (title · sender · preview · tags · time), not a table (Jess rejected the §6.0 table for Work).
-  Rows draw 50 at a time as the list end scrolls into view; a failed refresh keeps the last good
-  list with one retry row. Team Work groups under ONE 32px owner line — `[SH] Shasha  49 actions to
-  do · 88 missed`: 32px avatar with 12/16/600 initials, 8px, owner name 15/20/600, count 12/16/400,
-  missed 12/16/500.
-- The detail column takes every pixel the rail and the 300px list leave (the working panel is the
+- **THE WORK SHELL — owner ruling 2026-09-27, APPROVED TARGET.** Work is one continuous white
+  operating surface with quiet 1px dividers, no outer frame, large gutters, shadows or card field.
+  The application sidebar remains 88px and the global right rail remains 56px. Inside them, the
+  desktop Work surface is `280px Inbox · flexible Mission (minimum 560px) · 340px Communication`.
+  At compact desktop it is `260px · flexible Mission (minimum 420px) · 300px`. When that minimum
+  cannot be kept, the surface becomes `300px Inbox · Mission`; Communication is a 340px overlay
+  drawer and never squeezes the Mission. Below 760px, Inbox → Mission → Messages are one full-width
+  stage at a time. The page does not own one long desktop scroll: each column scrolls independently
+  beneath its fixed heading; Communication also has a fixed action footer.
+- **THE WORK INBOX — owner ruling 2026-09-27, APPROVED TARGET.** The left column owns scope,
+  search, Filters, the Monday–Saturday month and the action list. It defaults to the whole month;
+  pressing `{Mon YYYY}` contracts it to the selected week, and the last choice is remembered.
+  Its fixed area is no more than 246px: 36px scope, 8px, 36px search/Filters, 8px, 32px month head,
+  about 126px month grid and 36px `Missed`/`No date`. `Missed`, one chosen date and `No date` are
+  mutually exclusive. With Missed work, first open selects Missed and lists only Missed; otherwise
+  it selects today (or the next admitted day with work). Filters open from one door and contain
+  Page, Owner and cover facts; active choices are removable chips below Search. They do not create
+  a second permanent toolbar.
+- **THE ACTION ROW — owner ruling 2026-09-27, APPROVED TARGET.** One row is exactly one Work
+  occurrence and one action; an order with Payment, Purchasing and Delivery actions has separate
+  rows and may have different owners. The row is 76px, edge-to-edge with a 1px divider, 12px sides,
+  no radius, shadow, chips or card gap. Line 1 is `{document}` 12/16/500 and the date 12/16 on the
+  right (red when Missed); line 2 is the action 14/20/600; line 3 is the short context 12/18,
+  normally `{page} · {fact or party}`. Every line truncates with `…` and exposes the whole string
+  on hover/focus. Selection is a 3px blue left edge plus pale-blue wash and never changes height.
+  The month already names the selected date, so there is no repeated list heading or list tab bar.
+  Rows draw 50 at a time; selection never shrinks the rendered range; a failed refresh keeps the
+  last safe list and adds one retry row. Team Work may retain one 32px owner group line.
+- The Mission column takes every pixel the Inbox and Communication leave (the working panel is the
   page; the list only picks). It stacks independent white sections in the §5.10 order: Order Route
   first, the Sales Order card, then the PARTY CARDS (§5.9) — Logistics · Customer · Supplier — then
   the audit disclosure. The selected-work summary block is drawn only for work that names no Sales
