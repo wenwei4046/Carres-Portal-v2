@@ -1090,6 +1090,13 @@ checklist. Revision 2 carries her corrections of the same day. Nothing here is l
    component in place (for a PO answer, Purchasing's `Record supplier answer` form with its own
    words: `Confirmed` · `New date` · `Split delivery`, the eight governed reasons, `Evidence`,
    `Supplier DO received`, `Save`) — never a Workspace copy. The left column scrolls alone.
+   **APPROVED (Jess, 2026-09-27: "good thing is route got date, module title + checklist"):** the left
+   column reads as a vertical timeline like her references — the step's date in a fixed left
+   column, a dot on one line (solid where done, dashed ahead), the module title with its status on
+   the right, and its checklist beneath, each item one title line plus one grey line. Only the
+   module being worked is coloured (a larger blue dot, blue date, title and count); attention is an
+   amber dot; everything else is grey. No boxes between modules — the line and white space separate
+   them.
 6. The chosen item is the pale-blue wash with the 3px blue edge; the card's primary button is the
    only other blue. Done is a dark tick, open is a hollow circle, a missed or blocking item is red,
    a warning is amber.
