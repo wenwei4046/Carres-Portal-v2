@@ -63,7 +63,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 |---|---|---|
 | **A1 · the Route tells the truth, and every line names WHO** | route facts load only with `?route=1` · `⚠ unreadable` for Delivery and Payments (a failed read never blanks the map, never prints a business sentence) · the `PAYMENT` node and band with `paymentDeadlineOf` · `SO Doc Date` and `Customer requested` · **every line is who + object + action (owner ruling 2026-09-27; words in COPY-STANDARD § The Order Route words)** · the `PROPOSED CHANGE` banner says who asked, **what changes** (the Order tab's own rows, first three) and who decides · a node that acts also shows its door | **BUILT 2026-09-27 — production walk owed** |
 | **A2 · DELIVERY reads Delivery's own records** | one lane per `(leg, trip)` arranged by `routeDeliveryScopesOf` (Journey = two or more stops · split = a live document with `trip > 0` · ordinary = one scope, no plate) · the per-lane gate, issued = the row exists · leg 2's `Leg 1 arrived at {stop}` requirement · `DELIVER` through `deliveryWorkStatusOf` · photos bound to the Delivery Order's number · a transfer leg draws no photo · doors open a Delivery Order by its row id · the payment deadline counts 3 working days for an outstation partner | **BUILT 2026-09-28 — production walk owed** |
-| **A3 · GOODS reads Purchasing, Receiving and Stock** | `po_line_sources` lineage, `PO Delivery Date` and `Expected arrival`, `receivingSummaryOf` counts, `Choose Ready Unit`, a failed Purchasing read per line | APPROVED TARGET / NOT BUILT |
+| **A3 · GOODS reads Purchasing, Receiving and Stock** | one read (`GET /orders/:id/route-goods`) arranged per Sales Order LINE by `routeGoodsLinesOf`: `po_line_sources` is the only lineage (two lines of one SKU draw two lanes) · a cancelled Purchase Order covers nothing · `PO Delivery Date` and the newest evidenced answer through `poExpectedArrivalsOf` · `Confirm ready date` only while `tomorrowDeliveryCallOf` says the day-before check is open · `receivingSummaryOf` counts, the posted GRN by its stored number, damaged or wrong · Units by `reserved_order_line_id` · `Choose Ready Unit` (the order's owner) only when eligible Ready Stock exists · a failed Purchasing read yellows the lines that read it, collapsed or not | **BUILT 2026-09-28 — production walk owed** |
 
 **Measured while building A1, and fixed in it (2026-09-27, 1440 / 1180 / 820 / 743 / 390):** the
 208px node ended every long line in an ellipsis, the new payment line included. One shared rule
@@ -71,6 +71,20 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 second; the resolver's geometry and the canvas draw the same rows, and a screen reader is given the
 unbroken fact (`RouteNode.spoken`). The `CURRENT` node's 2px border took 2px from its last row; it
 now takes them from the padding.
+
+**Measured while building A3 (2026-09-28), and what the build did about each.**
+`GET /orders/:id` finds an order's Purchase Orders by the legacy `so` / `so_refs` match, keeps
+cancelled ones and merges two lines of one SKU; the Route no longer reads it for goods. The old
+RECEIVING node took the first session with a `goods_received_at`, which every draft has; a GRN is now
+a POSTED receipt carrying its stored `grn_no`. A waiting step that owes nothing today (SUPPLIER
+outside the day-before check, STOCK with no Ready Stock to choose) is neither ticked nor `CURRENT`.
+On the rendered map a line from the Sales Order to a stacked goods line ran behind SUPPLIER; a
+stacked line now hangs from the node above it.
+**REAL GAPS recorded, not built:** `purchasing_revise_po` changes a Purchase Order line's quantity
+and never the lineage, so after a revision `po_line_sources.qty` can differ from the line
+(Purchasing owns it). A Purchase Order line shared by several Sales Order lines is counted as
+received in lineage order, because no record says which Unit answers which line until it is bound.
+`Open Ready Stock →` opens SO Batch with the order searched; it does not yet open the row.
 
 **Found and fixed while building A2 (2026-09-27/28).** `Open {DO No} →` failed for every number
 minted since 0575 (the door asked `/^do-/`), and `Open Delivery →` sent `?order=`, which the
