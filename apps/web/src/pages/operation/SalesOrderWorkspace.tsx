@@ -876,7 +876,11 @@ export function Block({
           owner has since ruled the answer, so the older reasoning is removed
           rather than left beside it to be re-argued. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-kit-slate-5 pb-2">
-        <h2 id={headingId} className="text-strong text-kit-blue-11">
+        {/* ONE KIT LAW (Jess, 2026-09-27): the card title is BLACK bold
+            `text-strong` slate-12 — never blue (blue is the primary button,
+            links and selection only), never a band. Overwrites the
+            2026-09-21 "remain blue" ruling in the one place every page draws from. */}
+        <h2 id={headingId} className="text-strong text-kit-slate-12">
           {title}
         </h2>
         {headerSlot}

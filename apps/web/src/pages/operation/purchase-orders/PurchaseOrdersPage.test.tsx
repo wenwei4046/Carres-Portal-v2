@@ -881,7 +881,9 @@ describe("Purchase Order object", () => {
     /* Same card as the Sales Order: the blue, sentence-case title over a rule
        (owner, 2026-09-26 — one card grammar for every Purchasing page). */
     const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
-    expect(po.className).toContain("text-kit-blue-11");
+    /* ONE KIT LAW (Jess, 2026-09-27): black bold, never blue. */
+    expect(po.className).toContain("text-kit-slate-12");
+    expect(po.className).not.toContain("text-kit-blue-11");
     expect(po.className).not.toContain("font-mono");
     /* Receiving, then Claims and returns, each a row of its own. No Unit IDs
        card: a unit is a row of its Goods line. */

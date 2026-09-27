@@ -71,6 +71,7 @@ import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
+import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "./components/so-document-table";
 import ConfigureDrawer from "@/pages/dealer/pos/ConfigureDrawer";
 import { buildCatalogIndex } from "@/pages/dealer/pos/catalog-index";
 import { useCatalog } from "@/lib/queries";
@@ -2272,7 +2273,6 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
   },
 ];
 
-const LINE_GRID = "minmax(0,1fr) 53px auto";
 /** The picker window. Bounded because `/demand/pick-items` returns every
  *  supplied SKU (to-order.ts) — the ceiling is a render budget, not a rule.
  *  The list scrolls inside a `max-h-64` box, so a needle that matches many
@@ -3021,109 +3021,123 @@ function CreateRequestWorkspace({
             </Block>
 
             <Block title={MW.secCreateItems}>
-      {/* ── ITEMS · one row per SKU, the dialog's proven split ──
-          ONE grid holds the caption row and every line, so the four tracks are
-          resolved once and `Note` sits over the note it names. Two grids
-          sharing a template do not share widths — the trailing `auto` track
-          held nothing in the caption row and `Remove` in the lines, and the
-          captions drifted (owner, 2026-09-03). A line is `contents`: its four
-          cells join the grid directly; whatever stacks under it (supplier,
-          lead gap, already-have, error, picker) spans the full row. */}
-      <div className="mp-create-items flex min-w-0 flex-col gap-3" data-testid="mp-lines">
-
-        {/* D1 — below a 640px form the four tracks reflow: the item takes the
-            whole row, Qty · Note · Remove sit under it, and each cell carries
-            its own caption (the caption row hides). `manual-purchase-create.css`. */}
-        <div
-          className="mp-create-lines grid items-center gap-x-2 gap-y-2"
-          style={{ gridTemplateColumns: LINE_GRID }}
-        >
-          <span className="mp-line-head text-label text-kit-slate-11">{W.itemLabel}</span>
-          <span className="mp-line-head text-label text-kit-slate-11">{W.itemsColQty}</span>
-          <span className="mp-line-head" />
-
+      {/* ── ITEMS · THE DOCUMENT TABLE (recipe 3 of the ONE KIT LAW, owner
+          2026-09-27; owner "yes" to the sketch, 2026-09-26): the same table
+          the Sales Order `Items` card draws — `#` · `Item Code` ·
+          `Description` (name · configuration · `Configure` / `Remove`) ·
+          `Supplier` (a Manual Purchase may carry several; the PO grouping at
+          Issue PO splits them) · `Qty` in the row — no money columns, because
+          a Manual Purchase has no price. What stacks under a line (a lead
+          gap, WHAT WE ALREADY HAVE, the picker) takes its own row across the
+          table. `+ Add line` follows the table, where the eye ends. */}
+      <div className="flex flex-col gap-3" data-testid="mp-lines">
+        <div className="overflow-x-auto">
+          <table className={SO_TABLE} data-testid="mp-lines-table">
+            <thead>
+              <tr className={SO_HEAD_ROW}>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ width: 28 }}>#</th>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 220 }}>Item Code</th>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 200 }}>Description</th>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 120 }}>{W.supplierLabel}</th>
+                <th className={`${SO_TH} mp-line-head text-center`} style={{ width: 72 }}>{W.itemsColQty}</th>
+              </tr>
+            </thead>
           {lines.map((line, i) => {
             const picked = items.find((it) => it.sku === line.sku) ?? null;
             const showPicker = line.id === active && line.sku == null;
             const done = line.state === "created";
             return (
-              <div key={line.id} className="contents" data-testid={`mp-line-${i}`}>
-                {/* SKU + Model, never the model word alone — four Booqit
-                    variants rendered as the single word `Booqit` is P15's
-                    own defect returned (2026-08-19 owner walk). */}
-                <div className="mp-line-item min-w-0">
-                  <span className="mp-line-caption text-label text-kit-slate-11" aria-hidden>
-                    {W.itemLabel}
-                  </span>
-                  <SearchInput
-                    id={`mp-item-${i}`}
-                    aria-label={W.itemLabel}
-                    value={picked ? `${picked.sku} · ${picked.label}` : line.needle}
-                    disabled={done}
-                    onFocus={() => setActiveId(line.id)}
-                    onChange={(e) => {
-                      setActiveId(line.id);
-                      patch(line.id, { needle: e.target.value, sku: null });
-                    }}
-                    placeholder={W.searchItem}
-                  />
-                  {/* ⭐ CONFIGURED LIKE A SALES PORTAL LINE (owner, 2026-09-26):
-                      the chosen colour · fabric · size · options print here
-                      and travel MPR → PO → PO PDF; `Configure` opens the
-                      Sales portal's own drawer over the same Catalog. */}
-                  {picked && !done ? (
-                    <span className="mt-1 flex flex-wrap items-center gap-x-3 text-meta">
-                      {configWords(line.attrs) ? (
-                        <span className="text-kit-slate-11" data-testid={`mp-line-config-${i}`}>{configWords(line.attrs)}</span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="text-kit-blue-11 hover:underline"
-                        aria-label={`Configure ${picked.label}`}
-                        data-testid={`mp-line-configure-${i}`}
-                        onClick={() => setConfigureId(line.id)}
-                      >
-                        Configure
-                      </button>
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mp-line-qty min-w-0">
-                  <span className="mp-line-caption text-label text-kit-slate-11" aria-hidden>
-                    {W.itemsColQty}
-                  </span>
-                  <Input
-                    id={`mp-qty-${i}`}
-                    aria-label={W.itemsColQty}
-                    inputMode="numeric"
-                    value={line.qty}
-                    disabled={done}
-                    onChange={(e) => patch(line.id, { qty: e.target.value })}
-                  />
-                </div>
-                <div className="mp-line-action">
-                  {done ? (
-                    <span className="text-meta text-kit-slate-11">{W.createdWord}</span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      onClick={() => removeLine(line.id)}
-                      data-testid={`mp-line-remove-${i}`}
-                    >
-                      {MW.remove}
-                    </Button>
-                  )}
-                </div>
-
-                {/* Everything that stacks under the line spans the row. An
-                    empty stack draws nothing, so it costs no grid gap. */}
-                <div className="col-span-full flex flex-col gap-1 empty:hidden">
-                  {picked?.supplier ? (
-                    <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
-                      {W.supplierLabel}: {picked.supplier}
-                    </p>
-                  ) : null}
-
+              <tbody key={line.id} data-testid={`mp-line-${i}`}>
+                <tr className={`${SO_ROW} align-top`}>
+                  <td className={`${SO_TD} text-base-500`}>{i + 1}</td>
+                  <td className={SO_TD}>
+                    {/* SKU + Model, never the model word alone — four Booqit
+                        variants rendered as the single word `Booqit` is P15's
+                        own defect returned (2026-08-19 owner walk). */}
+                    <SearchInput
+                      id={`mp-item-${i}`}
+                      aria-label={W.itemLabel}
+                      value={picked ? `${picked.sku} · ${picked.label}` : line.needle}
+                      disabled={done}
+                      onFocus={() => setActiveId(line.id)}
+                      onChange={(e) => {
+                        setActiveId(line.id);
+                        patch(line.id, { needle: e.target.value, sku: null });
+                      }}
+                      placeholder={W.searchItem}
+                    />
+                  </td>
+                  <td className={SO_TD}>
+                    {picked ? (
+                      <span className="flex min-w-0 flex-col">
+                        <span>{picked.label}</span>
+                        {/* ⭐ CONFIGURED LIKE A SALES PORTAL LINE (owner,
+                            2026-09-26): the chosen colour · fabric · size ·
+                            options print here and travel MPR → PO → PO PDF;
+                            `Configure` opens the Sales portal's own drawer. */}
+                        {configWords(line.attrs) ? (
+                          <span className="text-meta text-kit-slate-11" data-testid={`mp-line-config-${i}`}>{configWords(line.attrs)}</span>
+                        ) : null}
+                        {done ? (
+                          <span className="text-meta text-kit-slate-11">{W.createdWord}</span>
+                        ) : (
+                          <span className="mt-1 inline-flex flex-wrap gap-x-4 text-meta">
+                            <button
+                              type="button"
+                              className="text-kit-blue-11 hover:underline"
+                              aria-label={`Configure ${picked.label}`}
+                              data-testid={`mp-line-configure-${i}`}
+                              onClick={() => setConfigureId(line.id)}
+                            >
+                              Configure
+                            </button>
+                            <button
+                              type="button"
+                              className="text-danger hover:underline"
+                              aria-label={`${MW.remove} ${picked.label}`}
+                              data-testid={`mp-line-remove-${i}`}
+                              onClick={() => removeLine(line.id)}
+                            >
+                              {MW.remove}
+                            </button>
+                          </span>
+                        )}
+                      </span>
+                    ) : done ? null : (
+                      <span className="inline-flex text-meta">
+                        <button
+                          type="button"
+                          className="text-danger hover:underline"
+                          aria-label={MW.remove}
+                          data-testid={`mp-line-remove-${i}`}
+                          onClick={() => removeLine(line.id)}
+                        >
+                          {MW.remove}
+                        </button>
+                      </span>
+                    )}
+                  </td>
+                  <td className={SO_TD}>
+                    {picked?.supplier ? <span data-testid={`mp-supplier-${i}`}>{picked.supplier}</span> : null}
+                  </td>
+                  <td className={`${SO_TD} text-center`}>
+                    <div className="mx-auto min-w-[56px] max-w-[72px]">
+                      <Input
+                        id={`mp-qty-${i}`}
+                        aria-label={W.itemsColQty}
+                        inputMode="numeric"
+                        value={line.qty}
+                        disabled={done}
+                        onChange={(e) => patch(line.id, { qty: e.target.value })}
+                      />
+                    </div>
+                  </td>
+                </tr>
+                <tr className="[&:has(>td>div:empty)]:hidden">
+                  <td className="px-2 pb-2" colSpan={5}>
+                {/* Everything that stacks under the line: its own row across
+                    the table. An empty stack draws nothing. */}
+                <div className="flex flex-col gap-1 empty:hidden">
                   {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
                       the governed two lines, and the act deep-links Settings.
                       Send stays `Send — lead days are not set` until repaired;
@@ -3172,16 +3186,17 @@ function CreateRequestWorkspace({
                     />
                   ) : null}
                 </div>
-              </div>
+                  </td>
+                </tr>
+              </tbody>
             );
           })}
+          </table>
         </div>
 
         {/* The add control sits where the operator's eye ends — under the last
-            line — and wears the neutral box, not the ghost: in this block it
-            is the only road to a second item, and a boxless grey word next to
-            grey captions read as one more caption (owner, 2026-09-03). Not
-            `primary`: `Send for approval` already holds the screen's one. */}
+            line — and wears the neutral box, not the ghost (owner, 2026-09-03).
+            Not `primary`: `Send for approval` already holds the screen's one. */}
         <div className="flex">
           <Button variant="neutral" onClick={addLine} data-testid="mp-line-add">
             {MW.addLine}

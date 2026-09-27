@@ -535,8 +535,9 @@ door to change them. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
 Jess, on the Review Purchase Orders pane: *"pls follow sales order ui kit … make sure every page of
 purchasing fix this problem yourself."* The Sales Order object card is therefore the portal's ONE
 section chrome for facts: a white card (`rounded-card`, `kit-slate-5` hairline, `px-4 py-3`), a
-**blue sentence-case `text-strong` title over a 1px `kit-slate-5` rule** (owner ruling 2026-09-21/22,
-`../orders/MASTER.md` § CARD ORDER AND NAMES), one 12px body gap, and inside it the Sales Order fact
+**black bold sentence-case `text-strong` (slate-12) title over a 1px `kit-slate-5` rule** (ONE KIT LAW,
+owner ruling 2026-09-27 — it overwrites the 2026-09-21/22 "remain blue": blue is the primary button,
+links and selection only), one 12px body gap, and inside it the Sales Order fact
 grammar — `text-label` label over a 13px value, three to a row on a full-width page, two in a
 half-width pane, one on a phone. **The shared `Block` (`SalesOrderWorkspace.tsx`) has exactly this
 chrome and no second tone:** the former "shared" tone — a mono UPPERCASE title beside a left band —

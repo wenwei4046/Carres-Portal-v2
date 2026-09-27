@@ -1034,31 +1034,28 @@ describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
 });
 
 describe("the create workspace — full page, never a dialog (card §3)", () => {
-  it("the ITEMS block (owner, 2026-09-03 / 2026-09-26): Item and Qty captions, no free-text Note, one grid, `+ Add line` under the lines", async () => {
+  it("the ITEMS block is the Sales Order document table (ONE KIT LAW, 2026-09-27): # · Item Code · Description · Supplier · Qty, no free-text Note, `+ Add line` under it", async () => {
     await openWorkspace();
     const lines = screen.getByTestId("mp-lines");
-    /* D1 — each cell also carries its own caption for the narrow reflow
-       (hidden on a wide form); the caption ROW is the one that sits over it.
-       Owner 2026-09-26: the free-text `Note` column is gone — a line is
+    const table = screen.getByTestId("mp-lines-table");
+    expect(lines.contains(table)).toBe(true);
+    /* The table's OWN header — the stock picker under a line is a table of its own. */
+    expect([...(table as HTMLTableElement).tHead!.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["#", "Item Code", "Description", "Supplier", "Qty"]);
+    /* Owner 2026-09-26: the free-text `Note` column is gone — a line is
        CONFIGURED through the Sales portal's `Configure` instead. */
-    const caption = within(lines)
-      .getAllByText("Qty")
-      .find((el) => el.classList.contains("mp-line-head"))!;
-    expect(lines.contains(caption)).toBe(true);
-    expect(lines.textContent).not.toContain("Remark");
     expect(within(lines).queryByText("Note")).toBeNull();
     expect(document.getElementById("mp-note-0")).toBeNull();
-    // ONE grid: the caption row and the line share a parent, so the three
-    // tracks are resolved once and the caption sits over the cell it names.
+    expect(lines.textContent).not.toContain("Remark");
+    // ONE table: every line is a row group of the same table as the header.
     const line0 = screen.getByTestId("mp-line-0");
-    expect(line0.parentElement).toBe(caption.parentElement);
-    expect(line0.className).toContain("contents");
-    // The add control FOLLOWS the list, where the operator's eye ends.
+    expect(line0.tagName).toBe("TBODY");
+    expect(line0.closest("table")).toBe(table);
+    // The add control FOLLOWS the table, where the operator's eye ends.
     const add = screen.getByTestId("mp-line-add");
     expect(lines.contains(add)).toBe(true);
-    expect(line0.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(add);
-    expect(screen.getByTestId("mp-line-1").parentElement).toBe(caption.parentElement);
+    expect(screen.getByTestId("mp-line-1").closest("table")).toBe(table);
   });
 
   it("offers exactly the approved six purposes (Cards 03/04)", () => {
@@ -4009,9 +4006,10 @@ describe("Round 2 · D1 · the create form keeps Send reachable when narrow", ()
     expect(screen.getByTestId("mp-send")).toBeInTheDocument();
     const footer = screen.getByTestId("mp-create-footer");
     expect(within(footer).getByTestId("mp-send-footer").textContent).toBe(screen.getByTestId("mp-send").textContent);
-    // Each line cell carries its own caption for the narrow reflow.
-    const line0 = screen.getByTestId("mp-line-0");
-    expect(line0.querySelector(".mp-line-item .mp-line-caption")).not.toBeNull();
-    expect(line0.querySelector(".mp-line-qty .mp-line-caption")).not.toBeNull();
+    // The document table (ONE KIT LAW, 2026-09-27) scrolls inside its own box
+    // on a narrow screen — never the page — so no per-cell captions exist.
+    const table = screen.getByTestId("mp-lines-table");
+    expect(table.parentElement?.className).toContain("overflow-x-auto");
+    expect(screen.getByTestId("mp-line-0").querySelector(".mp-line-caption")).toBeNull();
   });
 });
