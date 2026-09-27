@@ -1163,6 +1163,16 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    line. Proceed lists only `Customer`: the money lives on Payment and the dates on Customer
    delivery, never repeated. Example: PO → `Sleepwell · Confirmed · PO260910-1180` /
    `3 ABC Furniture · Not confirmed · PO260911-1188` / `XYZ Bedding · No PO yet · Li Ching`.
+7a-i. **The Logistics step lists its three checks (Jess, 2026-09-27: "logistic check blueprint, it
+   should before 3 days need call. show t1, t2, t3"),** read from §5.9 "The three checks" and
+   Delivery §5.2, never re-invented. Screen words are the governed labels, never `T1/T2/T3`. The
+   Logistics checklist gets a date column: `AL Logistics · Assigned` · `3 working days before · {date}
+   · Details not received yet` · `2 working days before · {date} · Not scheduled yet` · `1 working day
+   before · {date} · Opens {date}`; on its date the 1-day check lists one line per gap (`Goods not
+   ready` · `Hold delivery · RM {amount} unpaid` …). Dates count back from the Scheduled date, else
+   the Requested date, Mon to Sat with public holidays; a done or missed check keeps its date. One
+   `Record scheduled delivery` save closes the 3-day and 2-day checks together. The Route needs
+   ≥500px for this row to stay one line (B2).
 7b. **Route and To do say the same words; open work cannot be folded (Jess, 2026-09-27: "order
    route not tally the to do 1 2 3 title … once done can hide and expand, before complete, cannot
    hide").** Each To do item opens with a two-line summary header: line 1 = the number and EXACTLY
@@ -1195,9 +1205,9 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 - **B1 · AGREED WITH CORRECTIONS** — as A5.
 - **B2 · SIZES (revision 6)** — no Order header (A4). Always four columns side by side; Communication
   never moves under To do (Jess, 2026-09-27: "communication why you change under to do?").
-  1420 and wider: rail 280 · Route (rest, ≥460) · To do 340 · Communication 340. 1300 to 1419: rail
-  240 · Route ≥460 · To do 300 · Communication 300. Narrower than 1300 the whole page scales down to
-  fit (never stacks, never scrolls sideways). The Route needs ≥460 so a checklist row
+  1460 and wider: rail 280 · Route (rest, ≥500) · To do 340 · Communication 340. 1340 to 1459: rail
+  240 · Route ≥500 · To do 300 · Communication 300. Narrower than 1340 the whole page scales down to
+  fit (never stacks, never scrolls sideways). The Route needs ≥500 so a checklist row
   (`Sleepwell · Received 25 Sep · GRN-20260925-0412`) stays one line. Each column fills the height
   and scrolls alone; the left rail is never hidden.
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
