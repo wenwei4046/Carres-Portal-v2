@@ -1159,7 +1159,11 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 - **B2 · SIZES (revision 5)** — no Order header (A4). The action area (the record panel) is
   340px, the same width as Communication (Jess, 2026-09-27: "record panel same width with
   communication"); the Route takes the rest (≥316px). At 1440: Inbox 280 · Route 480 · Record 340 ·
-  Communication 340. Each column fills the height and scrolls alone; one column when narrow.
+  Communication 340. Each column fills the height and scrolls alone. Narrower than 1280: Record
+  and Communication share one 340 column (Record on top, Communication under it, scrolling
+  together); narrower than 900: the Inbox becomes a drawer opened by `My Work {n}` in the header;
+  narrower than 640: one column. The page never scrolls sideways (Jess, 2026-09-27: "why here need
+  scroll left and right").
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
   Proposed wording (Jess 2026-09-27):
   `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
