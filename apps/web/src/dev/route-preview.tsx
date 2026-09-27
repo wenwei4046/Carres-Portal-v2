@@ -197,10 +197,107 @@ const journey: SalesOrderRouteInput = {
   },
 };
 
+/* `?s=goods` — the goods chain read from its owners: a delayed Purchase Order,
+ * a partly received one, a line Ready Stock can fill, and a line whose
+ * Purchasing read failed. `{braces}` stand where a real record would print. */
+const source = {
+  qty: 1,
+  issuedAt: "2026-09-03",
+  poDeliveryDate: "2026-09-18",
+  expectedArrival: null,
+  confirmed: false,
+  dayBeforeCheckOpen: false,
+  receivedQty: 0,
+  pendingQty: 1,
+  damagedOrWrongQty: 0,
+  latestGrn: null,
+};
+const goods: SalesOrderRouteInput = {
+  ...input,
+  order: { ...input.order, so: 1319, customerName: "{customer}" },
+  loans: [],
+  money: { known: true, outstanding: 1249 },
+  goods: [
+    {
+      lineId: "L1",
+      sku: "B1201S",
+      label: "{goods line 1}",
+      qty: 1,
+      sources: [
+        {
+          ...source,
+          poId: "{PO No}",
+          expectedArrival: { date: "2026-09-28", change: "delayed", reason: "Production delay" },
+          dayBeforeCheckOpen: true,
+        },
+      ],
+      onOrderQty: 1,
+      readyQty: 0,
+      unitCodes: [],
+      uncoveredQty: 0,
+      shortBecause: "not-received",
+      readyStockQty: 0,
+    },
+    {
+      lineId: "L2",
+      sku: "PILLOW",
+      label: "{goods line 2}",
+      qty: 5,
+      sources: [
+        {
+          ...source,
+          poId: "{PO No 2}",
+          qty: 5,
+          confirmed: true,
+          receivedQty: 3,
+          pendingQty: 2,
+          damagedOrWrongQty: 1,
+          latestGrn: { id: "r2", number: "{GRN No}", receivedAt: "2026-09-19" },
+        },
+      ],
+      onOrderQty: 2,
+      readyQty: 3,
+      unitCodes: ["{Unit ID}", "{Unit ID}", "{Unit ID}"],
+      uncoveredQty: 0,
+      shortBecause: "not-received",
+      readyStockQty: 0,
+    },
+    {
+      lineId: "L3",
+      sku: "SOFA-L",
+      label: "{goods line 3}",
+      qty: 1,
+      sources: [],
+      onOrderQty: 0,
+      readyQty: 0,
+      unitCodes: [],
+      uncoveredQty: 1,
+      shortBecause: "not-ordered",
+      readyStockQty: 2,
+    },
+    {
+      lineId: "L4",
+      sku: "MATT-K",
+      label: "{goods line 4}",
+      qty: 1,
+      sources: [],
+      onOrderQty: 0,
+      readyQty: 0,
+      unitCodes: [],
+      uncoveredQty: 1,
+      shortBecause: "not-ordered",
+      readyStockQty: 0,
+    },
+  ],
+  unreadable: { purchasing: ["L4"] },
+};
+
 const scenario = new URLSearchParams(window.location.search).get("s");
 const seeded: SalesOrderRouteInput =
   scenario === "journey"
     ? journey
+    : scenario === "goods"
+      ? goods
     : scenario === "waiting"
     ? { ...input, amendment: {
         status: "submitted",
