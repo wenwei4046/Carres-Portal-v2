@@ -247,6 +247,20 @@ line drawn in it would change colour at the header and read as two lines.
 
 **They are structure, not content: never dark enough to compete with the text.**
 
+**WHEN THE LINE IS DRAWN AT ALL — owner ruling 2026-09-27 (Jess), checked against international
+guidance first.** A column separator is for a table where the eye has to track a column across many
+or look-alike neighbours; a short table of distinct columns reads better without one (NN/g and
+Carbon: separators are optional, keep them where columns are many or adjacent content is similar,
+1px light grey; Material: none, column padding and row hover instead).
+
+| Table | Column separators |
+|---|---|
+| a Register or grid of **7 or more columns**, or with adjacent same-kind columns (`Proceed Date · SO Doc Date`, `PO No · DO No`) | **yes** — 1px `slate-5` on the right, as ruled above (Sales Orders, Purchase Orders, Delivery Monitor, Receiving …) |
+| a table of **6 or fewer columns**, or one whose columns are numbers under distinct words | **no** — row hairlines only (Monthly demand, totals tables, Dashboard tables, the SO Items and Payment tables) |
+
+The value never changes; only whether it is drawn. `DataGrid` takes the choice from its column count
+by default (`columnRules="auto"`), and a page states an exception in its own MASTER.
+
 **Four rules about where it stops.**
 
 - **The last cell in a row never carries one.** It would sit 1px inside the

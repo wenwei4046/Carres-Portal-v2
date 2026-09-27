@@ -20,7 +20,7 @@ docs/ENGINEERING.md          stack, migrations, deployment, testing, measuring
 | `ready-stock-shipped-cards.md` · `inventory-module-proposal.md` | `docs/stock/MASTER.md` |
 | `payment-module-proposal.md` | `docs/payment/MASTER.md` |
 | `service-shipped-cards.md` | `docs/service/MASTER.md` |
-| `UI-KIT-superseded.md` · `ui-kit-shipped-cards.md` · `ui-reference-review.md` · `right-rail-widgets-proposal.md` | `docs/ui/MASTER.md` |
+| ~~`UI-KIT-superseded.md` · `ui-kit-shipped-cards.md` · `ui-reference-review.md`~~ (DELETED 2026-09-27 — owner: one kit, old kit gone; Git history keeps them) · `right-rail-widgets-proposal.md` | `docs/ui/MASTER.md` |
 | `hr-system-full-spec.md` | `docs/hr/MASTER.md` |
 | `rental-service-plan-proposal.md` · `subscription-mattress-proposal.md` | `docs/rental/MASTER.md` · `docs/purchasing/MASTER.md` §10 |
 | `execution-queues-index.md` · `HOW-TO-RUN-A-CHAT.md` · `NEW-CHAT-KICKOFF.md` · `OPS-BUILD-BRIEF.md` · `PANEL-PROPOSALS-FOR-REVIEW.md` · `PROJECT-HANDOVER.md` · `CARRES_SYSTEM_MASTERPLAN.md` | `CLAUDE.md` + `docs/ENGINEERING.md` |
