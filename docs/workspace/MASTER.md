@@ -1045,7 +1045,61 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · THE ORDER IS THE CORE — OWNER RULING, Jess 2026-09-26 night · APPROVED / NOT BUILT
+### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, awaiting Jess (2026-09-27)
+
+**Why this section exists.** Four days of Work design were done by rebuilding the live page round
+after round, with three planners (this chat, ChatGPT, a second Claude chat) editing at once. Jess
+agreed (2026-09-27) to stop: one written spec, her decisions on its open points, then ONE chat builds
+all of it and shows it once with a checklist. Until she says "定", everything under "B" is a
+proposal; the shell and the Inbox (above, 2026-09-27) are her rulings.
+
+**A · Settled (owner rulings 2026-09-26/27 — not reopened).**
+1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules as
+   in "THE WORK SHELL" above. Global right rail (Calendar · Customers · Activity) is separate and
+   not in this build.
+2. Inbox: one row = one act (76px, three lines); Missed first on open; one date choice at a time.
+3. The ORDER is the core: every act on an order opens the same order in the Mission.
+4. Mission = order header (≈80px) · Order Route (≈96px, a SUMMARY: each point's date and short
+   status, the current point, and the warnings beneath it) · ONE step detail. The Route is the
+   Mission's navigation: pressing a point replaces the detail in place. Steps never stack.
+5. The act chosen in the Inbox opens its step's detail. The step detail holds that step's
+   checklist, its document facts and the ONE primary button that completes the act.
+6. Document facts use the document's own words and values (the Sales Order PDF for Proceed, the PO
+   PDF for PO); a missing fact prints `Not recorded`; nothing is guessed. `↗` opens the full record.
+7. Communication follows the step shown: PO → Supplier · Logistics → Logistics · Customer, Proceed
+   and Payment → Customer · GRN → `No communication needed`. Tabs Logistics | Customer | Supplier
+   are always there. Copying or opening WhatsApp completes nothing.
+8. Customer: the logistics company normally contacts the customer; the Customer tab is always
+   available (Jess 2026-09-26). A supplier delay that moves the customer's date is a SEPARATE act.
+9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact.
+
+**B · Open — Jess decides each (recommendation first).**
+- B1 Route points: `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Delivery`, with
+  Payment as the warning line beneath the Route that opens its own detail (recommended), or
+  `… · Logistics · Customer`.
+- B2 Step detail layout: two columns when the Mission is ≥ 640px wide — left 40% checklist and the
+  document list, right 60% the chosen document's facts and its button; one column below
+  (recommended).
+- B3 Supplier "Confirm tomorrow's delivery" WhatsApp template: Purchasing has only `Reminder` and
+  `Date passed`. Recommended: add one Purchasing template, wording approved by Jess once.
+- B4 Customer decision after a supplier delay (Accept new date · Choose another date · Deliver
+  available items first · Change the item · Cancel the item · Needs manager review · No answer):
+  this is a new record Sales Orders does not store today. Recommended: approve the list now, build
+  it as its own slice after this page (it needs a migration).
+- B5 Logistics missed the customer-contact checkpoint → a Carres act `Contact the customer first`.
+  Delivery does not create this act today. Recommended: approve now, build after this page.
+
+**C · Not in this build (named so nobody draws it).** Right-rail Calendar/Customers/Activity;
+`{n} of {m} done` progress and auto-advance after completion (needs closure receipts, §5.2.1);
+`3 new actions` refresh banner.
+
+**Acceptance (the builder checks, Jess only confirms).** 1440 / 1180 / 820 / 390; one difficult
+order (three suppliers, one delayed, partial GRN, unpaid, Logistics not confirmed, customer asked
+another date); no page scroll; each column scrolls alone; no dash; one blue; every word in COPY;
+and the one test that matters: pick an act in the Inbox, finish it in the Mission, contact the right
+party in Communication, never open a second page.
+
+#### The order-centred ruling of 2026-09-26 night (superseded in its layout by A4 above)
 
 **"Order 就是那整个东西的核心。"** After three days of right-panel pictures the owner put the
 reference images side by side — Jobdrive's deal, AML's transaction, Plain's thread, the mail
