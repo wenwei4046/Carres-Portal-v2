@@ -1045,16 +1045,16 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, revision 4 awaiting Jess (2026-09-27)
+### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, revision 5 awaiting Jess (2026-09-27)
 
 **Why this section exists.** Four days of Work design were done by rebuilding the live page round
 after round, with three planners editing at once. Jess agreed (2026-09-27) to stop: one written
 spec, her decisions on its open points, then ONE chat builds all of it and shows it once with a
-checklist. Revisions 2 to 4 carry her corrections of the same day, made on the design images
-(output/shots/whole-v4 … v11). Nothing here is law until she says
+checklist. Revisions 2 to 5 carry her corrections of the same day, made on the design images
+(output/shots/whole-v4 … v12). Nothing here is law until she says
 "定"; the shell and the Inbox rulings above are already hers.
 
-**A · The page (settled direction, revision 4 wording).**
+**A · The page (settled direction, revision 5 wording).**
 1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules
    as in "THE WORK SHELL" above. The global right rail is separate and not in this build.
 2. Inbox: one row = one act (76px, three lines); Missed first on open; one date choice at a time.
@@ -1116,19 +1116,22 @@ checklist. Revisions 2 to 4 carry her corrections of the same day, made on the d
       as ICONS plus `Copy message` — then History, folded to one line `History {n}` and opened on press. The owning
       module's form is the Mission card, so the pane shows no answer door while it is open (Jess,
       2026-09-27: "history can hide").
-   2. The action card opens, under its title, with two or three facts that explain the act (for a
-      PO answer: `PO Delivery Date` · `Supplier answer` · `Supplier DO`) as plain label rows above
-      the form; no grey box and no `Why` heading (Jess, 2026-09-27: the extra boxes read as extra
-      missions).
-      The card never repeats the checklist; the left column already has it.
-   3. Each module in the timeline carries one grey line saying what the step is. PROPOSED words
-      (COPY on lock): Proceed `Sales Order` · PO `Supplier confirmation` · GRN `Goods received` ·
-      Logistics `Delivery arrangement` · Customer delivery `Delivery to the customer` · Payment
-      `Customer balance`.
+   2. **Every fact appears once (Jess, 2026-09-27: "every module why repeated … no use word").** The
+      Route carries the facts; the action area under it carries only its title and the owning
+      module's form, never a fact the Route already shows (no `Why` rows, no party line). An item
+      line never repeats its step's date. A step's items state that step's own fact (a PO item says
+      `Confirmed`, never GRN's `Received`), and GRN lists only goods that have a PO; nothing is
+      given a guessed date.
+   3. No grey line under each step: the step name already says what it is (the proposed
+      `Sales Order` / `Supplier confirmation` / … lines are withdrawn).
    4. `Missed {n}` and `No date {n}` under the Inbox month are two pressable boxes, not text rows.
    5. Delivery first, money last: with no Order header (A4) the Requested date sits on Proceed,
       the Scheduled date on Customer delivery and the balance on the Payment step
       (`RM {amount} unpaid` / `Must be paid by {date}`), the money only while owed.
+   6. **All white, no card in the Mission (Jess, 2026-09-27: "it should all white base. remove card
+      at middle").** The Mission's right side is white like the other two columns, with no border,
+      shadow or grey panel; the column rule alone separates it. `Done` is grey; the only meaning
+      colours are red, amber and blue (A6).
    Not taken: grouped multi-act inbox rows, a Route without dates, the SO number in an outside
    party's message, `No working date`, `Create delivery link`.
 7. Document facts use the document's own words and values (Sales Order PDF for Proceed; PO PDF for
