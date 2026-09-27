@@ -1185,14 +1185,13 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 
 **B · Decisions (revision 2).**
 - **B1 · AGREED WITH CORRECTIONS** — as A5.
-- **B2 · SIZES (revision 5)** — no Order header (A4). The action area (the record panel) is
-  340px, the same width as Communication (Jess, 2026-09-27: "record panel same width with
-  communication"); the Route takes the rest (≥316px). At 1440: Inbox 280 · Route 480 · Record 340 ·
-  Communication 340. Each column fills the height and scrolls alone. Narrower than 1400 (the Route needs ≥440px): Record
-  and Communication share one 340 column (Record on top, Communication under it, scrolling
-  together); narrower than 900: the left rail STAYS visible (Jess, 2026-09-27: "i want left nav rail") and
-  Order Route, To do and Communication stack in one column beside it. The page never scrolls sideways (Jess, 2026-09-27: "why here need
-  scroll left and right").
+- **B2 · SIZES (revision 6)** — no Order header (A4). Always four columns side by side; Communication
+  never moves under To do (Jess, 2026-09-27: "communication why you change under to do?").
+  1420 and wider: rail 280 · Route (rest, ≥460) · To do 340 · Communication 340. 1300 to 1419: rail
+  240 · Route ≥460 · To do 300 · Communication 300. Narrower than 1300 the whole page scales down to
+  fit (never stacks, never scrolls sideways). The Route needs ≥460 so a checklist row
+  (`Sleepwell · Received 25 Sep · GRN-20260925-0412`) stays one line. Each column fills the height
+  and scrolls alone; the left rail is never hidden.
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
   Proposed wording (Jess 2026-09-27):
   `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
