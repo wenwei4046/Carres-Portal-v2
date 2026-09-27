@@ -1045,59 +1045,107 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, awaiting Jess (2026-09-27)
+### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, revision 2 awaiting Jess (2026-09-27)
 
 **Why this section exists.** Four days of Work design were done by rebuilding the live page round
-after round, with three planners (this chat, ChatGPT, a second Claude chat) editing at once. Jess
-agreed (2026-09-27) to stop: one written spec, her decisions on its open points, then ONE chat builds
-all of it and shows it once with a checklist. Until she says "定", everything under "B" is a
-proposal; the shell and the Inbox (above, 2026-09-27) are her rulings.
+after round, with three planners editing at once. Jess agreed (2026-09-27) to stop: one written
+spec, her decisions on its open points, then ONE chat builds all of it and shows it once with a
+checklist. Revision 2 carries her corrections of the same day. Nothing here is law until she says
+"定"; the shell and the Inbox rulings above are already hers.
 
-**A · Settled (owner rulings 2026-09-26/27 — not reopened).**
-1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules as
-   in "THE WORK SHELL" above. Global right rail (Calendar · Customers · Activity) is separate and
-   not in this build.
+**A · The page (settled direction, revision 2 wording).**
+1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules
+   as in "THE WORK SHELL" above. The global right rail is separate and not in this build.
 2. Inbox: one row = one act (76px, three lines); Missed first on open; one date choice at a time.
-3. The ORDER is the core: every act on an order opens the same order in the Mission.
-4. Mission = order header (≈80px) · Order Route (≈96px, a SUMMARY: each point's date and short
-   status, the current point, and the warnings beneath it) · ONE step detail. The Route is the
-   Mission's navigation: pressing a point replaces the detail in place. Steps never stack.
-5. The act chosen in the Inbox opens its step's detail. The step detail holds that step's
-   checklist, its document facts and the ONE primary button that completes the act.
-6. Document facts use the document's own words and values (the Sales Order PDF for Proceed, the PO
-   PDF for PO); a missing fact prints `Not recorded`; nothing is guessed. `↗` opens the full record.
-7. Communication follows the step shown: PO → Supplier · Logistics → Logistics · Customer, Proceed
-   and Payment → Customer · GRN → `No communication needed`. Tabs Logistics | Customer | Supplier
-   are always there. Copying or opening WhatsApp completes nothing.
-8. Customer: the logistics company normally contacts the customer; the Customer tab is always
-   available (Jess 2026-09-26). A supplier delay that moves the customer's date is a SEPARATE act.
+3. **What the Mission's top shows.** The top is ALWAYS a summary of the record the act belongs to,
+   and no step detail ever replaces it:
+   - an act on a Sales Order, or on anything that resolves to exactly one Sales Order (a Delivery
+     Order, a delivery scope): the **Order header + Order Route** of that order;
+   - a PO-level act whose PO serves **exactly one** Sales Order and carries no stock purpose: that
+     Sales Order's header + Route, with the `PO` point chosen and that PO chosen inside it;
+   - a PO-level act whose PO serves **two or more** Sales Orders, or stock: the **PO header** (no
+     Order Route — choosing one order's Route would be a guess) and, under it, the PO detail and
+     `Related orders · {n}`, one line per order: `SO No · customer · Requested {date} · Scheduled
+     {date or Not scheduled} · {Customer delivery status}`. A stock PO reads `For stock` instead.
+     The act stays ONE Work occurrence on the PO; it is never copied onto each order. Pressing a
+     related order shows that order's header + Route in the Mission with the `PO` point chosen and
+     a `Back to {PO No}` line above it; it creates and completes nothing.
+   Source of "which orders": the PO's own source-order record (`so`, `so_refs` and the per-line
+   `po_line_sources`, 0382) and its purpose (0361) — the same facts the PO PDF's `SO NO` column
+   prints. Work never infers orders from goods or suppliers.
+4. **The Order header — two lines, 76px, never a third line or a wrapped sentence.** Line 1:
+   `SO No · Customer · {status} · ↗`. Line 2: `Requested {date} · Scheduled {date or Not
+   scheduled} · {Customer delivery status}`. The PO header follows the same two lines: `PO No ·
+   Supplier · {status} · ↗` / `PO Delivery Date {date} · Expected arrival {date} · Related orders
+   · {n}`.
+5. **The Order Route (~92px), fixed under the header, is the Mission's navigation:**
+   `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Customer delivery`. The last
+   point is called `Customer delivery` — never `Customer` alone, never `Delivery` alone. `GRN` is the
+   Warehouse's fact under the label `GRN`. Each point prints its date and a short status. Colour:
+   blue means ONLY the step being worked here; done is a dark-grey tick; future is hollow; attention
+   is amber; missed is red. Payment is never a point: only when an unpaid balance, an approval or a
+   payment rule affects the delivery does a warning line appear under the Route, and pressing it
+   shows the Payment detail. Other warnings (goods expected after the customer's date) sit on the
+   same lines, in plain words.
+6. **One Step Detail under the Route, using the remaining height and scrolling alone.** Pressing a
+   point replaces the detail in place; steps never stack. The act chosen in the Inbox opens its
+   step. Wide enough: left 40% the checklist and the document list, right 60% the chosen document's
+   facts and the ONE button that completes the act. Narrow: the same single step, one column.
+7. Document facts use the document's own words and values (Sales Order PDF for Proceed; PO PDF for
+   PO: `PO Doc Date`, `PO {n}-Day Delivery Date`, `Deliver To`, `Delivery Method`). A missing fact
+   prints `Not recorded`; nothing is guessed. `↗` opens the full record. `Expected arrival` (the
+   supplier's newest date) prints beside the PDF's `PO Delivery Date`, never instead of it.
+8. Communication follows the step shown: PO → Supplier · Logistics → Logistics · Customer delivery,
+   Proceed and Payment → Customer · GRN → `No communication needed`. Tabs Logistics | Customer |
+   Supplier are always there. Copying or opening WhatsApp completes nothing.
 9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact.
 
-**B · Open — Jess decides each (recommendation first).**
-- B1 Route points: `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Delivery`, with
-  Payment as the warning line beneath the Route that opens its own detail (recommended), or
-  `… · Logistics · Customer`.
-- B2 Step detail layout: two columns when the Mission is ≥ 640px wide — left 40% checklist and the
-  document list, right 60% the chosen document's facts and its button; one column below
-  (recommended).
-- B3 Supplier "Confirm tomorrow's delivery" WhatsApp template: Purchasing has only `Reminder` and
-  `Date passed`. Recommended: add one Purchasing template, wording approved by Jess once.
-- B4 Customer decision after a supplier delay (Accept new date · Choose another date · Deliver
-  available items first · Change the item · Cancel the item · Needs manager review · No answer):
-  this is a new record Sales Orders does not store today. Recommended: approve the list now, build
-  it as its own slice after this page (it needs a migration).
-- B5 Logistics missed the customer-contact checkpoint → a Carres act `Contact the customer first`.
-  Delivery does not create this act today. Recommended: approve now, build after this page.
+**B · Decisions (revision 2).**
+- **B1 · AGREED WITH CORRECTIONS** — as A5.
+- **B2 · AGREED WITH SIZES** — as A4 and A6: header 76px (two lines), Route ~92px fixed, one detail
+  in the remaining height, scrolling alone; 40/60 when wide, one column when narrow.
+- **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
+  Proposed wording (Jess 2026-09-27):
+  `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
+  {date}.` / `Please send the Supplier DO when available. If delivery will be delayed, reply with
+  the new delivery date and reason.` — Challenge for the lock: `{date}` should be the date the
+  check is about, which is Purchasing's anchor for the tomorrow check (the supplier's newest
+  Expected arrival when one exists, else the PO Delivery Date). Quoting only the PO Delivery Date
+  would ask about the wrong day after a supplier moved it. When Supplier, Deliver To, the date or
+  a contact method is missing, no message is built and the pane names what is missing.
+- **B4 · LIST AGREED, BUILD LATER (own data and flow change; no control that cannot save).** The
+  customer's decision after a supplier delay is one of: `Accept new date` · `Choose another date` ·
+  `Deliver available items first` · `Change product` · `Cancel delayed item` · `Needs manager
+  decision` · `No reply`. `Change product`, `Cancel delayed item` and `Needs manager decision` enter
+  their approval / amendment flow; a sentence alone never completes them.
+- **B5 · PROPOSED TRIGGER, from Delivery MASTER §§5.1–5.2 and §9's act table:**
+  - *Checkpoint:* the Logistics card's `2 working days before` check — counted back from the
+    Scheduled delivery date, else the Requested date, on the Mon–Sat delivery week with Malaysian
+    public holidays (Delivery §5.2, the one deadline the Route and the Customer step already read).
+  - *Missing fact at that check:* no Scheduled delivery date recorded (Delivery §5: a scheduled
+    date alone completes the arrangement), AND no customer contact record (0487,
+    `ops_delivery_contacts`) that settles it — i.e. none with `Confirmed`, `Requested Another Date`,
+    `Customer Refused Delivery` or `Contact Details Incorrect`. The last three already raise their
+    own §5.10 customer exception acts. A record with `No Answer`, `Asked to Call Again` or
+    `Waiting for Customer Reply` does NOT stop the escalation (the customer is still not reached).
+  - *The act:* a separate occurrence, dated that check day, with Delivery's governed words for the
+    Carres-contacts row — line 1 `Call the customer`, line 2 `Get the scheduled delivery date` (no
+    new words; the partner-chase row `Call {logistics}` stays its own occurrence).
+  - *Owner:* the Sales Order PIC; Buddy cover acts; the Delivery Duty only when there is no PIC
+    (Delivery §9, every Delivery act's owner rule).
+  - *What closes it:* a Scheduled delivery date recorded, OR a customer contact record written by
+    Carres (not on behalf of the partner) with a structured result. Opening or copying WhatsApp
+    never closes it.
+  - *Status:* Delivery does not raise this act today — build after this page, in Delivery.
 
-**C · Not in this build (named so nobody draws it).** Right-rail Calendar/Customers/Activity;
-`{n} of {m} done` progress and auto-advance after completion (needs closure receipts, §5.2.1);
-`3 new actions` refresh banner.
+**C · Not in this build.** The right-rail Calendar/Customers/Activity; `{n} of {m} done` and
+auto-advance (need closure receipts, §5.2.1); the `3 new actions` banner; B4 and B5.
 
 **Acceptance (the builder checks, Jess only confirms).** 1440 / 1180 / 820 / 390; one difficult
 order (three suppliers, one delayed, partial GRN, unpaid, Logistics not confirmed, customer asked
-another date); no page scroll; each column scrolls alone; no dash; one blue; every word in COPY;
-and the one test that matters: pick an act in the Inbox, finish it in the Mission, contact the right
-party in Communication, never open a second page.
+another date) AND one PO serving three orders; no page scroll; each column scrolls alone; no dash;
+one blue; every word in COPY; and the one test that matters: pick an act in the Inbox, finish it in
+the Mission, contact the right party in Communication, never open a second page.
 
 #### The order-centred ruling of 2026-09-26 night (superseded in its layout by A4 above)
 
