@@ -19,6 +19,7 @@ export {
   NODE_W as ROUTE_NODE_W,
   ROUTE_TEXT_BUDGET,
   wrapRouteText,
+  type RouteDeliveryScope,
   type RouteProposedChange,
   type RouteUnreadable,
   type GateRequirement,
@@ -43,6 +44,7 @@ export {
   type SalesOrderRouteMap,
   type StationOwnerKey,
 } from "./sales-order-route";
+export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
   INSTALMENT_MONTHS,
