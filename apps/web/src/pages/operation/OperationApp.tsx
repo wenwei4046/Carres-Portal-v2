@@ -512,8 +512,8 @@ export default function OperationApp() {
                 promised never changes and is never reused. */}
             <Route path="stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
             {/* STAGE 1 — the workspace route the register's rows open.
-                STAGE 2 — `so/new` is the office birth door ([+ New Sales
-                Order]); static `new` outranks `:orderId`. Declared before
+                `so/new` was the office birth door, retired 2026-09-27; static
+                `new` outranks `:orderId`. Declared before
                 `orders/:stage` in source for the reader; React Router ranks
                 them higher anyway. */}
             {/* The one Settings Workspace. Reached only from the Page Header
@@ -531,7 +531,10 @@ export default function OperationApp() {
             <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
-            <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
+            {/* The office create door is RETIRED (owner ruling 2026-09-27): a
+                Sales Order is born in the Sales Portal. A saved or pasted link
+                lands on the Register. */}
+            <Route path="orders/so/new" element={<Navigate to="/operation/orders" replace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route path="orders/:stage" element={<SalesOrdersRegister />} />
             {/* ⭐ THE TEMPORARY DOOR — the old control table, on its own route.
