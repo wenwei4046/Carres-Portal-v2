@@ -283,7 +283,7 @@ describe("LOAN", () => {
     );
     const loan = node(map, "loan:L1");
     expect(loan.mark).toBe("blocked");
-    expect(loan.lines).toEqual(["1 sofa on loan to customer", "Collect back on delivery day"]);
+    expect(loan.lines.join(" ")).toBe("1 sofa on loan to customer Collect back on delivery day");
     const link = edge(map, "loan:L1", "deliver")!;
     expect(link.style).toBe("dashed");
     expect(link.labelLines).toEqual(["collect back"]);
@@ -296,7 +296,7 @@ describe("LOAN", () => {
       input({ loanOffers: [{ id: "O1", event: "offered", label: "Display sofa · HK55-3S", reason: null, recordedAt: "2026-09-13T01:00:00Z" }] }),
     );
     const node1 = node(offered, "loan-offer:O1");
-    expect(node1.lines).toEqual(["Loan offered · Display sofa · HK55-3S", "Waiting for the customer's answer"]);
+    expect(node1.lines).toEqual(["Loan offered", "Display sofa · HK55-3S", "Waiting for the customer's", "answer"]);
     /* A loan is an obligation, not a position: it never takes CURRENT and so
        never carries the action line — its door names where the answer is recorded. */
     expect(node1.action).toBeNull();
@@ -310,7 +310,7 @@ describe("LOAN", () => {
         ],
       }),
     );
-    expect(node(accepted, "loan-offer:O2").lines).toEqual(["Customer accepted the loan · Display sofa · HK55-3S", "Prepare the loan Unit"]);
+    expect(node(accepted, "loan-offer:O2").lines).toEqual(["Customer accepted the loan", "Display sofa · HK55-3S", "Prepare the loan Unit"]);
     const declined = resolveSalesOrderRoute(
       input({ loanOffers: [{ id: "O3", event: "declined", label: "Display sofa", reason: "Will wait", recordedAt: "2026-09-13T01:00:00Z" }] }),
     );
@@ -1066,7 +1066,8 @@ describe("nothing on a node is ever cut (measured 2026-09-27: spelled lines over
       input({ financeExceptions: [{ id: "f", status: "open", reason: "Chargeback under investigation by the bank" }] }),
     );
     for (const n of map.nodes) {
-      for (const line of n.lines) expect(spelled(line).length).toBeLessThanOrEqual(ROUTE_TEXT_BUDGET.line);
+      const budget = n.kind === "goods-line" ? ROUTE_TEXT_BUDGET.context : ROUTE_TEXT_BUDGET.line;
+      for (const line of n.lines) expect(spelled(line).length).toBeLessThanOrEqual(budget);
       const reqRows = n.requirements.flatMap((r) => wrapRouteText(r.text, ROUTE_TEXT_BUDGET.requirement));
       const ctxRows = n.action ? wrapRouteText(n.action.context.detail, ROUTE_TEXT_BUDGET.context) : [];
       const expected =

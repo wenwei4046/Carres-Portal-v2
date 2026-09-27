@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { ROUTE_NODE_W } from "@carres/shared";
+import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, wrapRouteText } from "@carres/shared";
 import type {
   NodeMark,
   RouteEdge,
@@ -495,25 +495,34 @@ function Node({
         </div>
       ))}
 
-      {node.requirements.map((req) => (
-        <div
-          key={req.id}
-          data-testid={`route-requirement-${req.id}`}
-          data-met={req.met ? "true" : "false"}
-          className="flex items-center gap-1 truncate text-label"
-          style={{ height: REQ_H, lineHeight: `${REQ_H}px` }}
-        >
-          <span
-            className={req.met ? "text-kit-green-11" : "text-kit-slate-9"}
-            aria-hidden="true"
+      {/* One requirement, as many rows as the shared wrap gives it — the
+          geometry counted the same rows, so nothing is cut (measured 2026-09-27). */}
+      {node.requirements.map((req) => {
+        const rows = wrapRouteText(req.text, ROUTE_TEXT_BUDGET.requirement);
+        return (
+          <div
+            key={req.id}
+            data-testid={`route-requirement-${req.id}`}
+            data-met={req.met ? "true" : "false"}
+            className="flex items-start gap-1 text-label"
+            style={{ height: REQ_H * rows.length, lineHeight: `${REQ_H}px` }}
           >
-            {req.met ? "✓" : "·"}
-          </span>
-          <span className={`truncate ${req.met ? "text-base-600" : "text-base-900"}`}>
-            {spellDates(req.text)}
-          </span>
-        </div>
-      ))}
+            <span
+              className={`w-2 shrink-0 ${req.met ? "text-kit-green-11" : "text-kit-slate-9"}`}
+              aria-hidden="true"
+            >
+              {req.met ? "✓" : "·"}
+            </span>
+            <span className={`min-w-0 ${req.met ? "text-base-600" : "text-base-900"}`}>
+              {rows.map((row, i) => (
+                <span key={i} className="block whitespace-nowrap">
+                  {spellDates(row)}
+                </span>
+              ))}
+            </span>
+          </div>
+        );
+      })}
 
       {node.action && (
         /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
@@ -531,10 +540,14 @@ function Node({
       {node.action && actionContext && (
         <div
           data-testid={`route-context-${node.id}`}
-          className="truncate text-label text-base-600"
-          style={{ height: CONTEXT_H, lineHeight: `${CONTEXT_H}px` }}
+          className="text-label text-base-600"
+          style={{ lineHeight: `${CONTEXT_H}px` }}
         >
-          {spellDates(actionContext)}
+          {wrapRouteText(actionContext, ROUTE_TEXT_BUDGET.context).map((row, i) => (
+            <span key={i} className="block whitespace-nowrap" style={{ height: CONTEXT_H }}>
+              {spellDates(row)}
+            </span>
+          ))}
         </div>
       )}
 

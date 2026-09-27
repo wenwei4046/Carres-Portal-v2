@@ -17,6 +17,10 @@ export {
 export {
   resolveSalesOrderRoute,
   NODE_W as ROUTE_NODE_W,
+  ROUTE_TEXT_BUDGET,
+  wrapRouteText,
+  type RouteProposedChange,
+  type RouteUnreadable,
   type GateRequirement,
   type GateRequirementId,
   type LinkedProblem,

@@ -673,7 +673,10 @@ function sealChain(
           : isHead
             ? "waiting"
             : "future";
-    const lines = truthy(draft.lines).flatMap(wrapWords);
+    /* The plate prints `text-label` 11px, so its row holds what a context row holds. */
+    const lines = truthy(draft.lines).flatMap((line) =>
+      draft.kind === "goods-line" ? wrapRouteText(line, ROUTE_TEXT_BUDGET.context) : wrapWords(line),
+    );
     const requirements = draft.requirements ?? [];
     /* An action belongs to the position being worked, not to a queue of nodes
        nobody has reached. */
