@@ -2708,8 +2708,11 @@ function SalesOrderWorkspaceBody() {
           disabled={!printData}
           onClick={() => void openPrint()}
           data-testid="workspace-print"
+          aria-label={mode === "oldrev" ? "Print this version" : "Print"}
         >
-          <Printer size={14} /> {mode === "oldrev" ? "Print this version" : "Print ▾"}
+          {/* Below 480px `Print` is its icon; the word stays for a reader. */}
+          <Printer size={14} aria-hidden="true" />
+          <span className="max-[479px]:sr-only">{mode === "oldrev" ? "Print this version" : "Print ▾"}</span>
         </Button>
       )}
       {canEditOrder && !editing && (
