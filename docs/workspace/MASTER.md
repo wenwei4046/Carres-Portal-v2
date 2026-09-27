@@ -1100,6 +1100,24 @@ checklist. Revision 2 carries her corrections of the same day. Nothing here is l
 6. The chosen item is the pale-blue wash with the 3px blue edge; the card's primary button is the
    only other blue. Done is a dark tick, open is a hollow circle, a missed or blocking item is red,
    a warning is amber.
+6a. **Five adaptations from the ChatGPT order-desk prototype (Jess "ok", 2026-09-27).** Ours stays
+   the base; these five are added:
+   1. The Communication pane follows its layout: `To` is a select (the party's contact or group),
+      `Template` a select with the message shown beneath, the doors in one row — WhatsApp and Email
+      as ICONS plus `Copy message` — then the owning module's answer door, then history last.
+   2. The action card opens with a short `Why` block — two or three facts that explain the act
+      (for a PO answer: `PO Delivery Date` · `Supplier answer` · `Supplier DO`) — above the form.
+      The card never repeats the checklist; the left column already has it.
+   3. Each module in the timeline carries one grey line saying what the step is. PROPOSED words
+      (COPY on lock): Proceed `Sales Order` · PO `Supplier confirmation` · GRN `Goods received` ·
+      Logistics `Delivery arrangement` · Customer delivery `Delivery to the customer` · Payment
+      `Customer balance`.
+   4. `Missed {n}` and `No date {n}` under the Inbox month are two pressable boxes, not text rows.
+   5. The Order header's second line reads delivery first, money last: `Requested {date} ·
+      Scheduled {date or Not recorded} · {n} days left · RM {amount} unpaid` (the money only while
+      owed).
+   Not taken: grouped multi-act inbox rows, a Route without dates, the SO number in an outside
+   party's message, `No working date`, `Create delivery link`.
 7. Document facts use the document's own words and values (Sales Order PDF for Proceed; PO PDF for
    PO: `PO Doc Date`, `PO {n}-Day Delivery Date`, `Deliver To`, `Delivery Method`). A missing fact
    prints `Not recorded`; nothing is guessed. `↗` opens the full record. `Expected arrival` (the
