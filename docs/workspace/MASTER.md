@@ -1182,12 +1182,23 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    - **The nine fixes Jess approved 2026-09-27 ("yes"), measured after:** all three column title rows
      are 64px and share one bottom line; the open form does not repeat its name; the module line
      prints progress `{done}/{steps}` (`1/2`) and a tick only when all are done (`✓ 2/2`), with `›`
-     only when there are finished lines to open; a module with any red line prints `Missed`; a fact
-     line (`Order Total`) carries no mark; PO numbers print in the ruled form `PO260903-4316`; the
+     only when there are finished lines to open; a module prints `Missed` only when it holds a missed
+     open act; a fact line (`Order Total`) carries no mark; PO numbers print in the ruled form `PO260903-4316`; the
      Supplier templates are Purchasing's own two tones `Chase` (date passed) and `Remind`; type uses
      only the governed tokens (24/600 · 20/600 · 15/600 · 14/400 · 13/400 · 12/400 · 11/500, plus the
      approved 13/600 over 11/400 pair) and no 700/900; spacing uses only 2 · 4 · 6 · 8 · 12 · 16 · 24
      · 32. Measured: 0 off-token type, 0 off-scale spacing, no sideways scroll at 1440 and 1023.
+   - **Readable Route (Jess, 2026-09-27 "yes", after "circle is what meaning? … why order route still
+     very hard to read?"):** only two marks exist, a red `!` (an open act, the ONLY red line) and `✓`
+     (done, folded); a line that has not happened carries NO mark (the `○` read as an unticked
+     option). Only an open act's title is 600; every other title is 400. A party's group line
+     (`Ohana … PO260903-4316`) is a 12/400 grey label at the item indent, so module → party → item
+     read as three levels. Measured: 4 bold titles = 4 open acts, 4 red lines, 0 circles.
+   - **The supplier answer form is Purchasing's own table** (`SupplierReplySection`): `Supplier DO
+     received` (then `Supplier DO No` and the DO file) · `Item · Qty · Answer` one row per goods line,
+     Answer `No change` (default) · `Confirmed` · `New date` · `Split delivery`; `New date` adds the date
+     and one of the eight `PO_DELAY_REASONS`; `Split delivery` adds batch rows; Save waits for an
+     answer. It sits on one surface, never a card inside a card.
    - **Tally (Jess, 2026-09-27: "to do how to tally and know where im doing?"):** the open act is lit
      on BOTH sides at once, the checklist line in the Order Route and its To do item, with the pale-blue
      wash and the 3px blue edge; pressing a red `!` in the Order Route opens its To do and switches
