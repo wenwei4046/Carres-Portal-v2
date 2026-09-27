@@ -634,7 +634,9 @@ line two (`Cody` / `Super King`) instead of repeating the SKU. Its columns stay
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
 contains no owner, avatar, next-action sentence, Priority or workflow button — **and no `New Sales
 Order` button (OWNER RULING 2026-09-27, Jess: "add new sales order should not be here").** A
-customer order is born in the Sales Portal (POS) and nowhere else; Operation receives it. The office
+customer order is the dealer's / showroom's act in the Sales Portal and nowhere else; Operation receives
+it, never creates it, and never opens the Sales Portal — the only order Operation places is a Manual
+Purchase (owner, 2026-09-27). The office
 create door `/operation/orders/so/new` and `POST /api/operation/orders` are retired with the button
 (measured 2026-09-27: every one of the 58 `Order created` events came from principal / operation /
 bd office logins — test data — and none from a dealer or showroom). Buying without a customer order
