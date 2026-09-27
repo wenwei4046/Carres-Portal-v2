@@ -3337,8 +3337,11 @@ describe("GET /api/operation/orders/:id/revisions", () => {
       salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
     });
     const body = await revisions();
-    expect(rpc).toHaveBeenCalledTimes(1);
+    /* Two doors since 0592 — the name and the person marker — and each is
+       asked ONCE, for the distinct ids. */
+    expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc).toHaveBeenCalledWith("actor_display_names", { p_ids: [SELLER, STAFF] });
+    expect(rpc).toHaveBeenCalledWith("actor_identities", { p_ids: [SELLER, STAFF] });
     expect(salespersonsIn).toHaveBeenCalledTimes(1);
     expect(salespersonsIn).toHaveBeenCalledWith("user_id", [SELLER, STAFF]);
     expect(body.revisions.map((r: { created_by_name: string | null }) => r.created_by_name)).toEqual([

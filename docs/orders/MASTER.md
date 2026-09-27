@@ -118,6 +118,21 @@ exports are `defaultExpandedGoods`, `compactOrderRoute` and `RouteActionOwners` 
 `SalesOrderRoute.tsx`, all used inside the file or by its test. Nothing was deleted (red line 5);
 the acceptance line is answered when the owner of that sentence names the files.
 
+**Scope B · Identity and History — BUILT 2026-09-28, production walk owed; migration 0592 must be
+APPLIED through the governed path before the identity rule takes effect.** `actor_identities`
+(0592) returns the account's role and `is_person`; `resolveActorIdentities` + `actorKindOf`
+(`apps/api/src/lib/actor-names.ts`) are the one classification History and Revisions read. A shared
+login's name never reaches the screen; its role word does. Until 0592 is applied the Worker reads
+the old door and nobody is called a shared login on a guess. History drops the V1 pipeline phrase
+`awaiting logistics triage` and prints `Activity` for a stored enum it does not know; a change arrow
+prints `Not recorded` beside a Yes / No answer and `No {field word}` otherwise, on either side
+(`describeRevisionChanges`, so History, Revisions and the amendment request change together). The
+object header is two rows below 768px, measured at 375 / 390 / 743 with no overlap and no sideways
+scroll; `Print` is its icon below 480px and `⋮` is 40px.
+**Not built in B:** a line 3 note longer than one line still wraps whole instead of ending in `…`
+through `OverflowText` — the ledger is not a Register row and the engine's component is not mounted
+there yet.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyTouchesDeliveryDate, salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
-import { resolveActorNames } from "../../lib/actor-names";
+import { actorKindOf, actorRoleWord, resolveActorIdentities, resolveActorNames } from "../../lib/actor-names";
 import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
 import type { Context, MiddlewareHandler } from "hono";
@@ -128,30 +128,6 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
     };
   }
   return mapPgError(error);
-}
-
-/**
- * The server's truthful classification of who acted — the browser renders it
- * and never re-derives it (the Card's contract: "The browser does not infer
- * `System` from a null id").
- *
- *   human    a person id was recorded and resolved to a real name
- *   system   the event's own structured facts prove the portal/automation
- *            acted (`metadata.actor === "system"`, the marker an automated
- *            writer stamps). A missing person id is NEVER promoted to this.
- *   missing  the actor was not recorded, or the recorded id cannot be
- *            resolved to a name — an audit-data defect the UI states plainly
- *            (`Staff identity not recorded`), never a person guess.
- */
-function actorKindOf(
-  byUserId: string | null | undefined,
-  resolvedName: string | null,
-  metadata?: unknown,
-): "human" | "system" | "missing" {
-  if (byUserId) return resolvedName ? "human" : "missing";
-  const meta = metadata as Record<string, unknown> | null | undefined;
-  if (meta && typeof meta === "object" && meta.actor === "system") return "system";
-  return "missing";
 }
 
 /**
@@ -1052,13 +1028,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
      * without this route being redeployed. */
     metadata: unknown;
   }>;
-  const actorById = await resolveActorNames(sb, historyRows.map((h) => h.by_user_id));
+  /* ⭐ WHO ACTED IS DECIDED ONCE (owner ruling 2026-09-26): History and
+     Revisions read the one classification. A shared role login is nobody — its
+     name never reaches the screen, its role word does. */
+  const actorById = await resolveActorIdentities(sb, historyRows.map((h) => h.by_user_id));
   const historyWithActor = historyRows.map((h) => {
-    const actor = h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null;
+    const identity = h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null;
+    const actor_kind = actorKindOf(h.by_user_id, identity, h.metadata);
     return {
       ...h,
-      actor,
-      actor_kind: actorKindOf(h.by_user_id, actor, h.metadata),
+      actor: actor_kind === "human" ? (identity?.name ?? null) : null,
+      actor_kind,
+      actor_role: actorRoleWord(identity),
     };
   });
 
@@ -1220,14 +1201,16 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   } catch (e) {
     console.error("revision documents unreadable", { orderId: id, reason: e instanceof Error ? e.message : String(e) });
   }
-  const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
+  const identityById = await resolveActorIdentities(sb, rows.map((r) => r.created_by));
   const revisions = rows.map((r) => {
-    const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
+    const identity = r.created_by ? (identityById.get(r.created_by) ?? null) : null;
+    const actor_kind = actorKindOf(r.created_by, identity);
     const doc = docByRevision.get(r.revision) ?? null;
     return {
       ...r,
-      created_by_name,
-      actor_kind: actorKindOf(r.created_by, created_by_name),
+      created_by_name: actor_kind === "human" ? (identity?.name ?? null) : null,
+      actor_kind,
+      actor_role: actorRoleWord(identity),
       document_path: doc?.path ?? null,
       document_stored_at: doc?.stored_at ?? null,
     };
