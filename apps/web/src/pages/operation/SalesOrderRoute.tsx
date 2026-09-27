@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, wrapRouteText } from "@carres/shared";
+import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, routeLateElbow, wrapRouteText } from "@carres/shared";
 import type {
   NodeMark,
   RouteEdge,
@@ -256,7 +256,7 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
     .map((edge) => {
       const from = placed.get(edge.from)!;
       const to = placed.get(edge.to)!;
-      return { ...edge, points: routeElbow(from, to), labelAt: null };
+      return { ...edge, points: edge.late ? routeLateElbow(from, to) : routeElbow(from, to), labelAt: null };
     });
   for (const group of groupBounds) {
     if (group.plate.id === expanded?.plate.id) continue;
@@ -266,7 +266,9 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
       to: gate.id,
       style: "dashed",
       labelLines: [],
-      points: routeElbow(placed.get(group.plate.id)!, gate),
+      points: laned
+        ? routeLateElbow(placed.get(group.plate.id)!, gate)
+        : routeElbow(placed.get(group.plate.id)!, gate),
       labelAt: null,
     });
   }
@@ -540,11 +542,16 @@ function Node({
         >
           <Glyph size={14} />
         </span>
-        <span className="truncate text-label font-semibold uppercase tracking-wide text-base-600">
+        {/* The station's name is never cut to make room for `Current`
+            (measured 2026-09-28: `DELIVERY PHO…`). The word gives up its
+            letter spacing first. */}
+        <span
+          className={`whitespace-nowrap text-label font-semibold uppercase text-base-600 ${node.current ? "" : "tracking-wide"}`}
+        >
           {node.title}
         </span>
         {node.current && (
-          <span className="ml-auto shrink-0 text-label font-semibold uppercase tracking-wide text-kit-blue-11">
+          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-kit-blue-11">
             Current
           </span>
         )}

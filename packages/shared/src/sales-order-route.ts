@@ -234,6 +234,11 @@ export interface RouteEdge {
   labelLines: string[];
   /** The orthogonal elbow, ready for one `<polyline>`. */
   points: RoutePoint[];
+  /** The line turns in the gap just above its target instead of half way
+   *  down — a line into a lane's gate would otherwise run behind the nodes
+   *  standing above that gate. The page keeps the same turn when it re-lays
+   *  the map. */
+  late?: boolean;
   labelAt: RoutePoint | null;
 }
 
@@ -675,6 +680,24 @@ function elbow(from: RouteNode, to: RouteNode): RoutePoint[] {
     { x: x1, y: midY },
     { x: x2, y: midY },
     { x: x2, y: y2 },
+  ];
+}
+
+/** The same elbow, turning late: down the source's own column to the gap just
+ *  above the target, then across and in. */
+export function lateElbow(
+  from: { x: number; y: number; w: number; h: number },
+  to: { x: number; y: number; w: number; h: number },
+): RoutePoint[] {
+  const x1 = from.x + from.w / 2;
+  const x2 = to.x + to.w / 2;
+  const turn = to.y - ROW_GAP / 2;
+  if (x1 === x2) return [{ x: x1, y: from.y + from.h }, { x: x2, y: to.y }];
+  return [
+    { x: x1, y: from.y + from.h },
+    { x: x1, y: turn },
+    { x: x2, y: turn },
+    { x: x2, y: to.y },
   ];
 }
 
@@ -1424,8 +1447,14 @@ function deliverDraft(input: SalesOrderRouteInput): NodeDraft {
   };
 }
 
-function photoDraft(input: SalesOrderRouteInput): NodeDraft {
+function photoDraft(input: SalesOrderRouteInput, scope: RouteDeliveryScope | null = null): NodeDraft {
   const photo = (input.delivery.photos ?? [])[0] ?? null;
+  /* The day is the one Delivery recorded on THIS scope's delivered result. */
+  const deliveredOn =
+    [...(scope?.attempts ?? [])]
+      .filter((attempt) => attempt.result === "delivered")
+      .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0]
+      ?.recordedAt.slice(0, 10) ?? input.order.deliveredAt;
   return {
     id: "delivery-photo",
     kind: "delivery-photo",
@@ -1438,7 +1467,7 @@ function photoDraft(input: SalesOrderRouteInput): NodeDraft {
       ownerKey: "delivery",
       label: "Upload delivery photo",
       context: {
-        detail: `${input.delivery.doNumber ?? "Delivery order"} · ${dated("Delivered", input.order.deliveredAt) ?? "Delivery date not recorded"}`,
+        detail: `${input.delivery.doNumber ?? "Delivery order"} · ${dated("Delivered", deliveredOn) ?? "Delivery date not recorded"}`,
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -1776,7 +1805,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
     const tailDrafts = [
       scopeDeliverDraft(given, scope, `deliver:${key}`),
       /* A transfer leg draws no DELIVERY PHOTO: the customer leg owes the proof. */
-      ...(scope.transfer ? [] : [rename(photoDraft(seen))]),
+      ...(scope.transfer ? [] : [rename(photoDraft(seen, scope))]),
     ];
     const tail =
       gate.mark === "complete"
@@ -1938,7 +1967,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
         ]).map((draft) => ({ ...draft, lines: [UNREADABLE.delivery.what], door: null }))
       : [
           soleScope ? scopeDeliverDraft(given, soleScope, "deliver") : deliverDraft(input),
-          photoDraft(input),
+          photoDraft(input, soleScope),
         ],
     "tail",
     false,
@@ -1968,8 +1997,14 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
 
   /* ── connectors ──────────────────────────────────────────────────────── */
   const edges: RouteEdge[] = [];
-  const segment = (from: RouteNode, to: RouteNode, labelLines: string[], forceDashed = false) => {
-    const points = elbow(from, to);
+  const segment = (
+    from: RouteNode,
+    to: RouteNode,
+    labelLines: string[],
+    forceDashed = false,
+    late = false,
+  ) => {
+    const points = late ? lateElbow(from, to) : elbow(from, to);
     const style: RouteEdge["style"] =
       forceDashed || from.mark !== "complete" ? "dashed" : "solid";
     const drop = points[points.length - 1]!;
@@ -1981,6 +2016,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
       labelLines,
       points,
       labelAt: labelLines.length > 0 ? { x: drop.x, y: to.y - 10 } : null,
+      ...(late ? { late: true } : {}),
     });
   };
 
@@ -2004,7 +2040,8 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
     /* A goods tail joins the gate of the trip that carries it; on a Journey
        every tail joins leg 1's gate. */
     const line = lines.find((item) => `${item.sku}:stock` === stock.id);
-    segment(stock, laned ? deliveryLanes[line ? goodsLane(line) : 0]!.gate : gate, []);
+    if (laned) segment(stock, deliveryLanes[line ? goodsLane(line) : 0]!.gate, [], false, true);
+    else segment(stock, gate, []);
   }
   for (const lane of deliveryLanes) {
     segment(origin, lane.plate, []);
@@ -2013,7 +2050,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
       segment(lane.column[i]!, lane.column[i + 1]!, []);
     }
     /* The last node of a lane has no trailing line. */
-    segment(moneyChain[moneyChain.length - 1]!, lane.gate, []);
+    segment(moneyChain[moneyChain.length - 1]!, lane.gate, [], false, true);
   }
   if (!laned) {
     segment(origin, deliveryChain[0]!, []);

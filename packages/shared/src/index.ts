@@ -18,6 +18,7 @@ export {
   resolveSalesOrderRoute,
   NODE_W as ROUTE_NODE_W,
   ROUTE_TEXT_BUDGET,
+  lateElbow as routeLateElbow,
   wrapRouteText,
   type RouteDeliveryScope,
   type RouteProposedChange,

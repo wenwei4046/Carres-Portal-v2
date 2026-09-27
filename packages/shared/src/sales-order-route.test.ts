@@ -1406,3 +1406,24 @@ describe("one delivery scope is one lane (owner ruling 2026-09-26)", () => {
     }
   });
 });
+
+describe("found on the rendered Journey (2026-09-28)", () => {
+  it("the photo step names the day Delivery recorded, never `Delivery date not recorded` beside a delivered leg", () => {
+    const map = resolveSalesOrderRoute({ ...journey(), order: { ...journey().order, deliveredAt: null } });
+    const photo = node(map, "delivery-photo:2:0");
+    expect(photo.action?.context.detail).toBe("DO-130926-3223 · Delivered: 2026-09-13");
+  });
+
+  it("a line into a lane's gate turns in the gap just above the gate, so it never runs behind a node", () => {
+    const map = resolveSalesOrderRoute(journey());
+    const gate = node(map, "delivery-order:1:0");
+    for (const from of ["JAGER-SS:stock", "money"]) {
+      const line = edge(map, from, "delivery-order:1:0")!;
+      expect(line.late).toBe(true);
+      const across = line.points[1]!.y;
+      expect(across).toBe(line.points[2]!.y);
+      expect(across).toBeLessThan(gate.y);
+      expect(across).toBeGreaterThan(node(map, "delivery-date:1:0").y + node(map, "delivery-date:1:0").h);
+    }
+  });
+});
