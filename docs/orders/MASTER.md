@@ -57,6 +57,38 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 | **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
 | **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
 
+**Scope A is delivered in three dependency-ordered slices (BUILD lane, 2026-09-27).**
+
+| Slice | What it carries | State |
+|---|---|---|
+| **A1 · the Route tells the truth, and every line names WHO** | route facts load only with `?route=1` · `⚠ unreadable` for Delivery and Payments (a failed read never blanks the map, never prints a business sentence) · the `PAYMENT` node and band with `paymentDeadlineOf` · `SO Doc Date` and `Customer requested` · **every line is who + object + action (owner ruling 2026-09-27; words in COPY-STANDARD § The Order Route words)** · the `PROPOSED CHANGE` banner says who asked, **what changes** (the Order tab's own rows, first three) and who decides · a node that acts also shows its door | **BUILT 2026-09-27 — production walk owed** |
+| **A2 · DELIVERY reads Delivery's own records** | one lane per `(leg, trip)`, the per-lane gate, `DELIVER` through `deliveryWorkStatusOf`, photos per Delivery Order | APPROVED TARGET / NOT BUILT |
+| **A3 · GOODS reads Purchasing, Receiving and Stock** | `po_line_sources` lineage, `PO Delivery Date` and `Expected arrival`, `receivingSummaryOf` counts, `Choose Ready Unit`, a failed Purchasing read per line | APPROVED TARGET / NOT BUILT |
+
+**Measured while building A1, and fixed in it (2026-09-27, 1440 / 1180 / 820 / 743 / 390):** the
+208px node ended every long line in an ellipsis, the new payment line included. One shared rule
+(`wrapRouteText`, `packages/shared`) now breaks a row at the ` · ` separator first and on a word
+second; the resolver's geometry and the canvas draw the same rows, and a screen reader is given the
+unbroken fact (`RouteNode.spoken`). The `CURRENT` node's 2px border took 2px from its last row; it
+now takes them from the padding.
+
+**REAL GAPS found in A1 — words the dictionary does not hold, so the build did not invent them.**
+A failed read of Stock (the allocation), Receiving, Loans, Service Cases or Supplier Claims has no
+registered failure sentence. Until the owner rules the words, a failure of any of those reads still
+fails the Route whole (`This order route could not be opened`) — it never draws an empty strip as
+if nothing existed. **PROPOSAL / NOT LAW**, same grammar as the three registered sentences:
+`Could not read Stock for this line.` / `This does not mean there are no Units.` ·
+`Could not read Receiving for this line.` / `This does not mean nothing has arrived.` ·
+`Could not read the linked problems for this order.` / `This does not mean there are none.` ·
+`Could not read the loan for this order.` / `This does not mean nothing is on loan.`
+Falsifier: a Route opened with one of those reads failing that still draws its other groups.
+
+**"The four orphaned components deleted" names no component.** No document, PR or commit lists the
+four. Measured 2026-09-27: no Order Route component file has zero importers; the only unused
+exports are `defaultExpandedGoods`, `compactOrderRoute` and `RouteActionOwners` in
+`SalesOrderRoute.tsx`, all used inside the file or by its test. Nothing was deleted (red line 5);
+the acceptance line is answered when the owner of that sentence names the files.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
@@ -1811,10 +1843,12 @@ must see it on Order Route.
 - **One banner, above the canvas, never inside it.** The map keeps meaning *what is true now*; an
   amendment is precisely not yet true. It is the same `warning` band kind every Register uses
   (`role="alert"`, amber, zero height while absent) — no new kit component.
-- **Three sentences, no more:** the fact with who and when, the door, and the sentence that stops
-  the wrong reading — *the map below shows the order as it stands today, not the change.*
-- **It links, it never duplicates** (Law C): the Before/After lives on the `Order` tab; the banner
-  opens it. No proposed lane is drawn in a ghost style on the canvas — two truths on one surface
+- **It says who asked, what changes and who decides (owner ruling 2026-09-27 — Jess could not see
+  what the Sales Order changed).** Line 1 names the sender and the approver; up to three rows print
+  `{field}: {before} → {after}`; the last sentence stops the wrong reading — *the map shows the
+  order as it stands today, not the change.*
+- **One arithmetic (Law D):** the rows are the `Order` tab's own request rows, handed to the Route;
+  the full Before/After and the decision stay on the `Order` tab, which the banner opens. No proposed lane is drawn in a ghost style on the canvas — two truths on one surface
   is the defect the 2026-08-16 ruling removed.
 - **Reads:** `sales_order_amendment_live` (the same read the Order tab makes) — status `submitted`
   or `stale`, submitted by, submitted at. A `rejected` or `applied` request renders nothing.

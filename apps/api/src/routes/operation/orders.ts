@@ -2303,7 +2303,26 @@ operationOrdersRouter.get("/:id/amendment", requireOperation, async (c) => {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
-  return c.json(data);
+  /* ⭐ `PROPOSED CHANGE` names WHO submitted the request (owner ruling
+     2026-09-25). The live read returns no sender, so the door reads the
+     request's own `submitted_by` and names it through the ONE resolver. FAILS
+     OPEN: an unread or unresolved sender stays unnamed — a person is never
+     invented and the request is never dropped. */
+  const amendment = (data as { amendment?: Record<string, unknown> | null } | null)?.amendment ?? null;
+  if (!amendment || typeof amendment.id !== "string") return c.json(data);
+  const sender = await sb
+    .from("sales_order_amendments")
+    .select("submitted_by")
+    .eq("id", amendment.id)
+    .maybeSingle();
+  const senderId = sender.error
+    ? null
+    : ((sender.data as { submitted_by?: string | null } | null)?.submitted_by ?? null);
+  const names = senderId ? await resolveActorNames(sb, [senderId]) : new Map<string, string>();
+  return c.json({
+    ...(data as object),
+    amendment: { ...amendment, submitted_by_name: (senderId && names.get(senderId)) || null },
+  });
 });
 
 operationOrdersRouter.post("/:id/amendment", requireOperation, async (c) => {

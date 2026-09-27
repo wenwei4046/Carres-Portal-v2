@@ -5649,7 +5649,8 @@ export interface DeliveryPaymentApprovalRow {
 
 export interface SalesOrderRouteFactsResponse {
   allocation: SalesOrderAllocation;
-  brief: BookingBrief;
+  /** Null only when Delivery's read failed — see `failed.delivery`. */
+  brief: BookingBrief | null;
   attempts: DeliveryAttemptRow[];
   loans: SofaLoanDto[];
   refunds: SalesOrderRouteRefund[];
@@ -5660,6 +5661,11 @@ export interface SalesOrderRouteFactsResponse {
   paymentApprovals: DeliveryPaymentApprovalRow[];
   /** 0492 (Card 15) — the loan offer conversation on the Sales Order. */
   loanOffers: LoanOfferView[];
+  /** ⭐ OWNER RULING 2026-09-26 — a failed read yellows its own group and
+   *  never blanks the map. Only the owners whose failure words are registered
+   *  in COPY-STANDARD fail soft; any other failed read still fails the route
+   *  whole, because drawing nothing as if nothing existed is the lie. */
+  failed: { delivery: boolean; payments: boolean };
 }
 
 /** One loan-offer record as the API returns it, with the offered Unit's ID. */
@@ -5681,40 +5687,52 @@ export function useSalesOrderRouteFacts(
     queryKey: orderId ? ([...qk.operation.orderRoute(orderId), poKey] as const) : (["operation", "orders", "null", "route"] as const),
     queryFn: async () => {
       const id = encodeURIComponent(orderId ?? "");
-      const receivingPromise = Promise.all(poIds.map((poId) =>
-        apiFetch<{ sessions: SalesOrderRouteReceivingSession[] }>(
-          `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
-        ),
-      ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals, loanOffers] =
-        await Promise.all([
-          apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
-          apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
-          apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`),
-          apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
-          apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
-          apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
-          apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
-          // The gate's two money records (0355 + 0362, owner ruling
-          // 2026-08-19). The route reads the same tables the server-side gate
-          // reads, so the canvas and the refusal can never disagree (Law D).
-          apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
-          apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
-          apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
-        ]);
-      const receiving = await receivingPromise;
+      const soft = <T,>(read: Promise<T>) =>
+        read.then(
+          (value) => ({ ok: true as const, value }),
+          () => ({ ok: false as const }),
+        );
+      const [
+        allocation, loans, refunds, cases, claims, loanOffers, receiving,
+        booking, attempts, financeExceptions, paymentApprovals,
+      ] = await Promise.all([
+        apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
+        apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
+        apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
+        apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
+        apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
+        apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
+        /* Inside the one `Promise.all`, so a failed receiving read rejects the
+           query instead of escaping as an unhandled rejection. */
+        Promise.all(poIds.map((poId) =>
+          apiFetch<{ sessions: SalesOrderRouteReceivingSession[] }>(
+            `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
+          ),
+        )),
+        // Delivery's reads — a failure is `unreadable`, never `Logistics not assigned`.
+        soft(apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`)),
+        soft(apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`)),
+        // The gate's two money records (0355 + 0362, owner ruling
+        // 2026-08-19). The route reads the same tables the server-side gate
+        // reads, so the canvas and the refusal can never disagree (Law D).
+        soft(apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`)),
+        soft(apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`)),
+      ]);
+      const deliveryFailed = !booking.ok || !attempts.ok;
+      const paymentsFailed = !financeExceptions.ok || !paymentApprovals.ok;
       return {
         allocation: allocation.allocation,
-        brief: booking.brief,
-        attempts: attempts.attempts,
+        brief: booking.ok && !deliveryFailed ? booking.value.brief : null,
+        attempts: attempts.ok && !deliveryFailed ? attempts.value.attempts : [],
         loans: loans.loans,
         refunds: refunds.refunds,
         cases: cases.items,
         receiving: receiving.flatMap((result) => result.sessions),
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
-        financeExceptions,
-        paymentApprovals,
+        financeExceptions: financeExceptions.ok && !paymentsFailed ? financeExceptions.value : [],
+        paymentApprovals: paymentApprovals.ok && !paymentsFailed ? paymentApprovals.value : [],
         loanOffers: loanOffers.offers,
+        failed: { delivery: deliveryFailed, payments: paymentsFailed },
       };
     },
     enabled: !!orderId && open,
@@ -6010,6 +6028,9 @@ export interface SalesOrderAmendment {
   customer_agreement_covers_proposal?: boolean;
   /** Who sent the request (0562 · the whole-page lane names the sender). */
   submitted_by?: string | null;
+  /** The sender's real name, resolved by the API through the one actor
+   *  resolver. Null when unresolved — a person is never invented. */
+  submitted_by_name?: string | null;
 }
 
 /** How the customer's acceptance is evidenced (0562). A signed document, a

@@ -73,4 +73,46 @@ describe("useSalesOrderRouteFacts", () => {
     expect(result.current.data?.receiving.map((row) => row.id)).toEqual(["r1", "r2"]);
     expect(result.current.data?.claims.map((claim) => claim.claim_no)).toEqual(["CL-1"]);
   });
+
+  /* ⭐ OWNER RULING 2026-09-26 — one branch failing never blanks the map. */
+  it("a failed Delivery read is reported as unreadable and every other owner still answers", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.endsWith("/booking-brief") ? Promise.reject(new Error("boom")) : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, ["PO-1"]), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.failed).toEqual({ delivery: true, payments: false });
+    expect(result.current.data?.brief).toBeNull();
+    expect(result.current.data?.receiving.map((row) => row.id)).toEqual(["r1"]);
+  });
+
+  it("a failed Payments read is reported as unreadable", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.startsWith("/api/finance/exceptions/") ? Promise.reject(new Error("boom")) : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.failed).toEqual({ delivery: false, payments: true });
+    expect(result.current.data?.financeExceptions).toEqual([]);
+  });
+
+  it("a read with no registered failure words still fails the route whole, never silently", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.endsWith("/allocation") ? Promise.reject(new Error("boom")) : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it("a failed receiving read rejects the query instead of escaping unhandled", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.includes("/receiving") ? Promise.reject(new Error("boom")) : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, ["PO-1"]), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
 });

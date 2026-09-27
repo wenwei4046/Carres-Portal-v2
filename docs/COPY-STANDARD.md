@@ -2655,15 +2655,39 @@ to point at one of them and be wrong about the others.
 | The issued document | **`{DO number}`** + **`Delivery order issued`** | Released · Approved · Done |
 | The zoom controls | **`Zoom out`** · **`Zoom in`** · **`Fit the whole route`** (aria-labels) | Reset · Recenter · 100% |
 
-**THE `PROPOSED CHANGE` BANNER — owner ruling 2026-09-25 (Jess), APPROVED TARGET / NOT BUILT.**
-Printed above the canvas only while an amendment is `submitted` or `stale`; nothing otherwise.
+**⭐ EVERY ROUTE LINE NAMES WHO — OWNER RULING 2026-09-27 (Jess: *"confused. need clear who + object
++ who + action"* · *"i don't see sales order change what"*), APPROVED · BUILT 2026-09-27.** A line
+on the Order Route is a sentence with its subject: WHO · the OBJECT · what they did or have not
+done. A status with no subject (`Not received yet`, `2 on order`) is retired on this surface. This
+ruling OVERWRITES every earlier spelling of the rows below, wherever this section still prints one.
+**Unchanged by the owner's word the same day: `Logistics not assigned`.**
+
+| Where | Use exactly | Retired 2026-09-27 |
+|---|---|---|
+| Goods plate | **`Customer ordered {n}`** · **`Carres ordered {m} from supplier`** · **`Carres has not ordered {k} yet`** | `Qty {n}` · `{m} on order` · `{m} to buy` · `{m} to buy from factory` |
+| PURCHASING, no PO | **`Carres has not issued a Purchase Order`** | `No Purchase Order yet` |
+| SUPPLIER, no date | **`Supplier has not confirmed the ready date`** | `Ready date not confirmed` |
+| RECEIVING, nothing in | **`Warehouse has not received the goods`** | `Not received yet` |
+| DELIVERY DATE, none | **`Logistics has not scheduled the delivery`** | `Not scheduled yet` |
+| DELIVER, not done | **`Logistics has not delivered the goods`** | `Not delivered yet` |
+| DELIVERY PHOTO, none | **`Logistics has not uploaded the delivery photo`** | `No delivery photo yet` |
+| PAYMENT, owing | **`Hold delivery`** over **`Customer has not paid RM {amount}`** over **`Customer must pay by {weekday, date}`** | `RM {amount} unpaid · by {date}` |
+| PAYMENT, paid | **`Customer paid in full`** | `Paid` |
+| Gate, goods | **`Warehouse has {n} of {m} Units ready`** · met **`Warehouse has {n} Units ready`** · scoped **`Warehouse has {n} Units ready for this delivery · {m} Units still open`** · **`Customer ordered no goods`** | `Goods not ready ({n} of {m})` · `Goods ready ({n} Units)` · `No goods on this order` |
+| Gate, scheduled day | **`Logistics scheduled the delivery`** · **`Logistics has not scheduled the delivery`** | `Scheduled delivery recorded` · `Scheduled delivery not recorded` |
+| Gate, money | **`Customer has not paid RM {amount}`** · met **`Customer paid in full`** | `Hold delivery · RM {amount} unpaid` · `Paid` |
+
+**THE `PROPOSED CHANGE` BANNER — owner rulings 2026-09-25 and 2026-09-27 (Jess) · BUILT 2026-09-27.**
+Printed above the canvas only while an amendment is `submitted` or `stale`; nothing otherwise. It
+says WHO asked, WHAT changes and WHO decides. No dash is printed.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Line 1 — the fact | **`A change to this order is waiting for approval — submitted {weekday, date} by {real staff name}.`** | Pending amendment · Amendment in progress · Proposed |
+| Line 1 · who asked, who decides | **`{real staff name} asked to change this order on {weekday, date}. {approver name} has not approved it yet.`** The approver is named by Staff & Duties; when it names nobody, **`The approver has not approved it yet.`** | `A change to this order is waiting for approval — submitted …` (retired 2026-09-27) · Pending amendment |
+| What changes · up to three rows | **`{field word}: {before} → {after}`** (`Customer Requested Delivery Date: Thu, 24 Sep → Mon, 5 Oct`); an empty side prints **`Not recorded`**; more than three rows end with **`and {n} more`** | announcing a change without saying what changes · a dash on either side of the arrow |
 | The door | **`Open the request →`** | View · Details · See change |
-| Line 2 — the reading rule | **`The map shows the order as it stands today, not the change.`** | omitting it — without it a reader assumes the map already shows the change |
-| An out-of-date request | line 1 becomes **`A change to this order is out of date — submitted {weekday, date} by {real staff name}.`**; door and line 2 unchanged | Stale · Conflict |
+| The reading rule | **`The map shows the order as it stands today, not the change.`** | omitting it |
+| An out of date request | line 1 becomes **`{real staff name} asked to change this order on {weekday, date}. The order changed after that. {real staff name} must send the request again.`** | Stale · Conflict · `is out of date — submitted` (retired) |
 
 **THE GATE REQUIREMENTS — one plain sentence each, with the count that makes them countable.**
 
