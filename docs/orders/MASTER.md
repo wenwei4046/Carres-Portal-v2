@@ -910,8 +910,9 @@ PAYMENT                 the same money zone as the PDF, one arithmetic (owner ap
                         `STAIR_CARRY`, bare by design per 0393) or a historical key prints exactly as saved.
                         Nothing is upper-cased or rewritten; `order_addons.addon_key` stays the identity. The SO
                         document payload now carries the code (it printed `ADD-ON` before).
-                        Totals: a compact two-column block, every figure 13px; a 1px rule over `Total payable`
-                        and over `Balance due`, which alone are weight 600
+                        Totals: the kit `TotalsSummary` — two columns, 1px line between rows, no outer
+                        frame, every figure 13px; `Total payable` and `Balance due` alone are weight 600
+                        (owner 2026-09-27)
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
@@ -2478,8 +2479,9 @@ planned `proceed_date`.
     These saved details use three labelled read-only fields (`Method · Reference · Slip`),
     with the same FieldFrame, resting border, body text and insets as Delivery; narrow views
     stack the fields. Actual transactions retain the shared Items/Payment table. The totals
-    occupy a full-width bordered two-column summary with a divider under each row,
-    body-size text and 8px cell insets; Total payable and Balance due remain bold.
+    are the kit `TotalsSummary` (UI §6.0 TABLE RECIPES, owner 2026-09-27): two columns, a 1px line
+    between rows, 13px, 8px insets, NO outer frame — the 2026-09-22 bordered frame is retired;
+    Total payable and Balance due remain bold.
     Delivery uses two equal field columns throughout (single column on narrow screens):
     address lines, state/city, postcode/building, floor/lift, stair count/services.
     Labels, control sizes and the 12px field gaps stay governed by the existing kit.

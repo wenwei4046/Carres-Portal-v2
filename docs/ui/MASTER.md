@@ -1610,6 +1610,19 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
 12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard
 ```
 
+**TABLE RECIPES — owner ruling 2026-09-27 (Jess: "every chat doesn't know how to draw this UI").**
+The portal has exactly FOUR tables. Each is a kit component with a live `/ui` example; a page
+IMPORTS one and never draws a `<table>` of its own — `check-design-standard.mjs` refuses page-local
+table styling. A fifth table does not exist until it joins the kit.
+
+| # | Where | Component | Recipe (locked numbers) |
+|---|---|---|---|
+| 1 | a Register / listing | `DataGrid` (kit) | header 36px slate-3 11/600 · 40px one-line rows · 8px insets · column separators by column count (tokens §5.1) · hover slate-3, selection blue-3 · 32px footer |
+| 2 | a row's goods expansion | `GoodsMiniTable` (kit) | header 27px · 51px two-line rows · four-sided frame · §6.9 connector |
+| 3 | a document table inside a card (SO `Items`, `Payment` rows, PO lines) | `DocumentTable` — **admit to the kit** (today `components/so-document-table.ts`, page-local) | header 11/500 slate-11 over a 1px slate-5 line · 13px rows, 8px cell insets, 1px slate-5 line beneath each · NO vertical lines · amounts right, tabular · only the closing total 600 |
+| 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
+
+
 **Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
 PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
 no other page moves until its own round. First adopter: Sales Orders (Card 12, NOT BUILT). The four pages
