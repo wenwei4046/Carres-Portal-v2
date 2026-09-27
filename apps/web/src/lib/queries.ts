@@ -319,6 +319,11 @@ import {
   type PurchaseReturnListRow,
 } from "@carres/shared";
 import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
+import {
+  soBatchOrderRemainingQty,
+  soBatchPurchaseResponseSchema,
+  type MonthlyDemandOrder,
+} from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -5783,6 +5788,41 @@ export function useSalesOrderRouteFacts(
     enabled: !!orderId && open,
     staleTime: 10_000,
     ...opts,
+  });
+}
+
+/**
+ * MONTHLY DEMAND's facts (Orders MASTER, Monthly demand). Two reads in one
+ * query, each from its owner's existing door:
+ *
+ *   the orders   REQUIRED. Without them there is no view, so the query fails.
+ *   To buy       SOFT. SO Batch Purchase's own arithmetic per order. A read
+ *                that fails or does not parse is `null`, which the page prints
+ *                as `Unavailable`, never as zero.
+ */
+export interface MonthlyDemandFacts {
+  orders: MonthlyDemandOrder[];
+  toBuyByOrder: Map<string, number> | null;
+}
+
+export function useMonthlyDemandFacts(enabled: boolean) {
+  return useQuery<MonthlyDemandFacts>({
+    queryKey: ["operation", "orders", "monthly-demand"] as const,
+    enabled,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const [demand, toBuyByOrder] = await Promise.all([
+        apiFetch<{ orders: MonthlyDemandOrder[] }>("/api/operation/orders/monthly-demand"),
+        Promise.resolve()
+          .then(() => apiFetch<unknown>("/api/operation/purchase/demands"))
+          .then((body) => {
+            const read = soBatchPurchaseResponseSchema.parse(body);
+            return new Map(read.registerRows.map((row) => [row.orderId, soBatchOrderRemainingQty(row)]));
+          })
+          .catch(() => null),
+      ]);
+      return { orders: demand.orders ?? [], toBuyByOrder };
+    },
   });
 }
 
