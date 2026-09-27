@@ -719,7 +719,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   drawer and never squeezes the Mission. Below 760px, Inbox → Mission → Messages are one full-width
   stage at a time. The page does not own one long desktop scroll: each column scrolls independently
   beneath its fixed heading; Communication also has a fixed action footer.
-- **THE WORK INBOX — owner ruling 2026-09-27, APPROVED TARGET.** The left column owns scope,
+- **THE WORK INBOX — owner ruling 2026-09-27, APPROVED / LOCKED (Jess: "Left rail proposal approved and locked").** The left column owns scope,
   search, Filters, the Monday–Saturday month and the action list. It defaults to the whole month;
   pressing `{Mon YYYY}` contracts it to the selected week, and the last choice is remembered.
   Its fixed area is no more than 246px: 36px scope, 8px, 36px search/Filters, 8px, 32px month head,
@@ -728,7 +728,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   it selects today (or the next admitted day with work). Filters open from one door and contain
   Page, Owner and cover facts; active choices are removable chips below Search. They do not create
   a second permanent toolbar.
-- **THE ACTION ROW — owner ruling 2026-09-27, APPROVED TARGET.** One row is exactly one Work
+- **THE ACTION ROW — owner ruling 2026-09-27, APPROVED / LOCKED.** One row is exactly one Work
   occurrence and one action; an order with Payment, Purchasing and Delivery actions has separate
   rows and may have different owners. The row is 76px, edge-to-edge with a 1px divider, 12px sides,
   no radius, shadow, chips or card gap. Line 1 is `{document}` 12/16/500 and the date 12/16 on the
