@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { deliveryOrderLookup } from "../../lib/delivery-order-lookup";
 import type { Context } from "hono";
 import {
   attemptEvidenceInput,
@@ -230,7 +231,10 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
          ops_order_control(customer_request, action_for_logistic),
          order_lines(sku, qty))`,
     );
-  query = /^do-/i.test(id) ? query.eq("do_number", id.toUpperCase()) : query.eq("id", id);
+  {
+    const find = deliveryOrderLookup(id);
+    query = query.eq(find.column, find.value);
+  }
   const { data: row, error } = await query.maybeSingle();
   if (error) {
     return c.json({ error: "delivery_order_read_failed", message: error.message }, 500);
@@ -635,9 +639,8 @@ async function documentNumberOf(
   | { response: (c: Context<AppEnv>) => Response }
 > {
   let query = sb.from("ops_delivery_orders").select("id, do_number, order_id");
-  query = /^do-/i.test(idOrNumber)
-    ? query.eq("do_number", idOrNumber.toUpperCase())
-    : query.eq("id", idOrNumber);
+  const find = deliveryOrderLookup(idOrNumber);
+  query = query.eq(find.column, find.value);
   const { data, error } = await query.maybeSingle();
   if (error) {
     const m = mapPgError(error);
@@ -666,7 +669,10 @@ deliveryOrdersRouter.get("/:id/signed-document", requireOperationOrPrincipal, as
   let query = sb
     .from("ops_delivery_orders")
     .select("id, do_number, orders!inner(id, do_number, do_file_path, do_uploaded_at)");
-  query = /^do-/i.test(id) ? query.eq("do_number", id.toUpperCase()) : query.eq("id", id);
+  {
+    const find = deliveryOrderLookup(id);
+    query = query.eq(find.column, find.value);
+  }
   const { data: row, error } = await query.maybeSingle();
   if (error) {
     return c.json({ error: "delivery_order_read_failed", message: error.message }, 500);

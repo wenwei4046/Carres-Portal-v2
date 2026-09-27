@@ -769,7 +769,7 @@ describe("doors", () => {
     });
     expect(node(map, "logistics").door).toEqual({
       label: "Open Delivery →",
-      href: "/operation?tab=delivery&order=order-1",
+      href: "/operation?tab=delivery&view=all&open=order-1",
     });
     expect(node(map, "money").door).toEqual({
       label: "Open Payments →",

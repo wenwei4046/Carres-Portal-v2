@@ -443,7 +443,10 @@ const receivingHref = (recordId: string) =>
   `/operation?tab=receiving&receipt=${encodeURIComponent(recordId)}`;
 const stockHref = "/operation?tab=stock-onhand";
 const deliveryHref = (orderId: string) =>
-  `/operation?tab=delivery&order=${encodeURIComponent(orderId)}`;
+  /* The Delivery page opens a row from `open`, on its `All delivery work`
+     view — the one spelling `monitorRowHref` and the Work cards already use.
+     `?order=` was read by nothing (found 2026-09-27). */
+  `/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}`;
 // THE MONEY DOOR OPENS THE CANONICAL REGISTER (payment/MASTER.md §16).
 // `/operation?tab=payments` was the Master-Sheet Balance desk — a SECOND form
 // for one act, which ownership Law C forbids. The order context travels as
