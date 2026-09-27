@@ -52,7 +52,7 @@ import {
 } from "@/components/register/DataGrid";
 import Money from "@/components/Money";
 import Button from "@/components/kit/Button";
-import EmptyState from "@/components/kit/EmptyState";
+import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import Popover from "@/components/kit/Popover";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -556,7 +556,7 @@ export default function SalesOrdersRegister() {
   /* ⭐ POPULATION — owner ruling 2026-09-21: only orders Sales has handed to
      Operation. A `Placed` order is not on this Register, so the server is
      asked for the `proceeded` stage and counts its total the same way. */
-  const { data, isLoading, isError, refetch } = useOperationOrders(
+  const { data, isLoading, isError, error, refetch } = useOperationOrders(
     serverSearch ? { stage: "proceeded", search: serverSearch } : { stage: "proceeded" },
   );
   /* The product NAME behind a SKU — the same catalog read the expansion makes
@@ -722,16 +722,11 @@ export default function SalesOrdersRegister() {
                depend on the list loading. No raw transport message. */
             errorState={
               isError ? (
-                <div role="alert">
-                  <EmptyState
-                    title="Sales orders could not be loaded"
-                    action={
-                      <Button variant="neutral" onClick={() => void refetch()}>
-                        Try again
-                      </Button>
-                    }
-                  />
-                </div>
+                <SalesOrderReadFailure
+                  error={error}
+                  surface="sales-orders-register"
+                  onRetry={() => void refetch()}
+                />
               ) : undefined
             }
             rows={rows}

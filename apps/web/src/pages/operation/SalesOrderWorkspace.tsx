@@ -152,6 +152,7 @@ import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
+import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import SalesOrderRoute, { type RouteRetryOwner } from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
@@ -1199,17 +1200,10 @@ function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
 /** The absence the object page prints for a number or param no order carries
  *  (COPY-STANDARD: `Sales Order not found.`). */
 function SalesOrderAbsence() {
-  const navigate = useNavigate();
+  /* The kit's own block and button, through the one translator (owner ruling 2026-09-26). */
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2" data-testid="so-not-found">
-      <p className="text-body text-base-700">Sales Order not found.</p>
-      <button
-        type="button"
-        className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-        onClick={() => navigate("/operation/orders")}
-      >
-        Back to Sales Orders
-      </button>
+    <div className="flex h-full flex-col items-center justify-center" data-testid="so-not-found">
+      <SalesOrderReadFailure error={{ status: 404 }} surface="sales-order" />
     </div>
   );
 }
@@ -4172,10 +4166,10 @@ function SalesOrderWorkspaceBody() {
             <Loading label="Opening the order route" />
           ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white">
-              <EmptyState
-                title="This order route could not be opened"
-                detail={(routeFactsQ.error as Error | undefined)?.message ?? (detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
-                action={<Button variant="neutral" onClick={() => void routeFactsQ.refetch()}>Try again</Button>}
+              <SalesOrderReadFailure
+                error={detailQ.error ?? revisionsQ.error ?? routeFactsQ.error}
+                surface="order-route"
+                onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); void routeFactsQ.refetch(); }}
               />
             </div>
           ) : orderRoute ? (
@@ -4205,14 +4199,10 @@ function SalesOrderWorkspaceBody() {
             {detailQ.isLoading || revisionsQ.isLoading ? (
               <Loading label={objectView === "History" ? "Opening the history" : "Opening the revisions"} />
             ) : detailQ.isError || revisionsQ.isError ? (
-              <EmptyState
-                title={objectView === "History" ? "This history could not be opened" : "These revisions could not be opened"}
-                detail={(detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
-                action={
-                  <Button variant="neutral" onClick={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}>
-                    Try again
-                  </Button>
-                }
+              <SalesOrderReadFailure
+                error={detailQ.error ?? revisionsQ.error}
+                surface={objectView === "History" ? "history" : "revisions"}
+                onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}
               />
             ) : (
             <SalesOrderLedger
@@ -4269,14 +4259,10 @@ function SalesOrderWorkspaceBody() {
           {!isNew && !detailQ.isLoading && detailQ.isError && (
             <div className="px-4 py-4">
               <div className="rounded-card border border-kit-slate-5 bg-white">
-                <EmptyState
-                  title="This sales order could not be opened"
-                  detail={(detailQ.error as Error | undefined)?.message}
-                  action={
-                    <Button variant="neutral" onClick={() => void detailQ.refetch()}>
-                      Try again
-                    </Button>
-                  }
+                <SalesOrderReadFailure
+                  error={detailQ.error}
+                  surface="sales-order"
+                  onRetry={() => void detailQ.refetch()}
                 />
               </div>
             </div>
