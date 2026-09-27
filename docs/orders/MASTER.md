@@ -539,6 +539,10 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   scrolls sideways; the bars share one row); below 896px
   (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the four numbers become two rows of two and the bars wrap under them; at 390 `Period` moves under the toolbar and every target is
   40px; the page never scrolls sideways.
+- **Flat data-table treatment — owner ruling 2026-09-27:** the month table (9 columns, numbers under
+  distinct words) draws NO column separators (tokens §5.1 column-count rule); the Register (11 columns,
+  look-alike neighbours) keeps its 1px lines; header filter icons appear on hover, focus or an active
+  filter only (UI §6.0 rule 6); each rail group carries its 11px supporting line (UI §6.7).
 - Words registered in COPY-STANDARD § Monthly demand words with this ruling.
 
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,

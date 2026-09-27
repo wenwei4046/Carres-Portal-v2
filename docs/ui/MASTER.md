@@ -1590,7 +1590,8 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             never cut. The row never grows
             Own approved designs, not this rule: SO Batch Purchase ·
             Manual Purchase · Payment Monitor · Delivery Monitor
-6  HEADER   11px/600 grey band · the same simple filter icon on every column
+6  HEADER   11px/600 grey band · the filter icon shows on hover, focus, or while
+            that column is filtered — never on every column at rest (owner 2026-09-27)
             Sort = a 12px arrow icon (ArrowUp / ArrowDown) in the header ink,
             never a letter; its direction is spoken to a screen reader
 7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
@@ -1728,7 +1729,10 @@ This is the shared default for ALL Portal listings, not a PO visual pilot. It su
 listing typography, rail appearance and blue-grey surface prescriptions in this document.
 Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
 
-- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, collapsible groups with remembered
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles — and, from 2026-09-27
+  (owner ruling, after the flat data-table dashboard reference), ONE 11px slate-11 supporting line under
+  the title saying what the group narrows (`Dealer / Sales Location` · `Where the order was sold`) through
+  the existing `supportingText` slot, no new component; collapsible groups with remembered
   expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
   leave that space empty. Icons supplement labels and come from the existing kit. Each group
   remains single-choice; no new multi-select. Preserve each page's filter content and control type:
