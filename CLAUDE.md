@@ -641,6 +641,13 @@ Never create an empty master for symmetry.
   nothing was read** — Law 4 already requires the challenge; this rule says it is not optional
   and it is not on request.
 - **She agrees, then you build.** A settled decision is not reopened unless she reopens it.
+- **⭐ TOP-TO-TOE IS AUTOMATIC, AND SHE NEVER POINTS TWICE — owner ruling 2026-09-27 (Jess).** Before a
+  surface reaches her: walk ALL of it against the ONE KIT and the dictionary AND against two or three
+  NAMED international products (Shopify · Stripe · Linear · SAP Fiori · NN/g; AutoCount / 2990 for the
+  team's habits), then bring EVERY deviation with its fix and a PNG of the whole page in ONE message.
+  Never fix the one thing she pointed at and wait for the next; never make her ask "is this
+  international?" or "which brand do we copy?" — say it first. Every UI segment starts by invoking the
+  installed UI/UX design skill and says so.
 - **Count before you propose UI.** Measure fill rates with SQL; empty fields do not reach the
   screen.
 - Anything she must paste elsewhere is written in **English**.
