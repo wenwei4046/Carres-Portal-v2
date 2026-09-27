@@ -1158,14 +1158,17 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    14px semibold, aligned across the page: the left column's `My Work` · `Team Work` switch ·
    `Order Route` · `To do {n}` (the record panel: this order's open acts) · `Communication`.
    PROPOSED: `To do` is the rail's governed Status word, reused as the panel's name.
-8b. **The left column follows the locked Panel 1 rail (Jess, 2026-09-27: "i want the left nav rail,
-   follow"),** top to bottom: search and `Filters` · the month · the Mon to Sat grid with a count
-   on every day that has open work (a past day's work counts once, under `Missed`) · `Missed {n}` ·
-   `No date {n}` (rows, replacing 6a.4's boxes) · `Status` (`To do` · `Waiting for answer` ·
-   `Done today`) · `Page` (`All pages` · `Sales Orders` · `Purchasing` · `Warehouse` · `Delivery`
-   · `Payment`). The act list (one act per row, LOCKED) opens directly under the chosen Page, as in
-   the ChatGPT order-desk rail; the other Pages follow it. A finished Route step folds to one line;
-   Proceed keeps the order's facts.
+8b. **The left column copies the ChatGPT order-desk rail (Jess, 2026-09-27: "i want the left nav
+   rail, follow" / "i asked you copy").** Top to bottom: search and `Filters` · the month · the Mon
+   to Sat grid with each day's count printed under its number (today ringed, the chosen day a
+   pale-blue chip; a past day's work counts once, under `Missed`) · `ATTENTION`: `! Missed {n}` ·
+   `○ No date {n}` · `MODULE`: `All modules {n}`, then the list, then `Sales Orders` ·
+   `Purchasing` · `Warehouse` · `Delivery` · `Payment`, each with its icon and count. **The list
+   is one row per order** (`SO-1362` / `2 actions` / `Missed` or its date), opening directly under
+   the chosen module, and it overwrites the earlier one-act-per-row Inbox ruling: the order's acts
+   are the numbered `To do` list (A6). A chosen row is the pale-blue wash with the 3px blue edge.
+   Kept from Carres law against the prototype: `No date` (not `No working date`) and no count on a
+   past day. The icons are placeholders until the kit supplies them.
 9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact. The
    live Logistics templates (`wa-templates.ts` `buildLogisticReminder` / `buildLogisticChase`) still
    print `—` and `today`; the build removes both.
