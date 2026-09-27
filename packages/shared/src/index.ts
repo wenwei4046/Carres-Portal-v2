@@ -45,6 +45,7 @@ export {
   type SalesOrderRouteMap,
   type StationOwnerKey,
 } from "./sales-order-route";
+export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
