@@ -63,6 +63,12 @@ import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
 import { paymentApprovalOpensGate } from "./delivery-payment-approval";
 import { openFinanceExceptions } from "./finance-exception";
 import { paymentDeadlineOf } from "./logistics-card";
+import type { DeliveryHandoverKind, DeliveryOrderAttemptFact } from "./delivery-order-status";
+import {
+  deliveryJourneyProgressFromStatus,
+  deliveryWorkStatusOf,
+  type DeliveryStatusSpell,
+} from "./delivery-work-status";
 import { fmtMoney } from "./money-format";
 import type { AllocationUnit, SalesOrderAllocation } from "./sales-order-allocation";
 import { normalizeSkuKey } from "./sku-code";
@@ -129,6 +135,10 @@ export type RouteNodeKind =
   | "delivery-photo"
   | "loan"
   | "cancelled"
+  /** A delivery lane's caption plate — `Leg 1 · Carres Klang → JB transit
+   *  warehouse` · `Trip 2 · Sofa, 2 items`. Like the goods plate, it is not a
+   *  station: no state, no action, no door. */
+  | "delivery-lane"
   /** The goods line's caption plate — the product name and quantity, drawn as
    *  a small grey header ABOVE the lane so it never sits on a connector. It is
    *  not a station: no action, no door, no state of its own. */
@@ -179,7 +189,9 @@ export type GateRequirementId =
   | "appointment"
   | "money"
   | "finance-exception"
-  | "refused-day";
+  | "refused-day"
+  /** Leg 2 and later: the leg before it must have arrived at its stop. */
+  | "previous-leg";
 
 export interface RouteNode {
   id: string;
@@ -341,6 +353,37 @@ export interface RouteLinkedClaim {
   closed: boolean;
 }
 
+/**
+ * ⭐ ONE DELIVERY SCOPE — one `(leg, trip)` of `ops_delivery_orders` (owner
+ * ruling 2026-09-26). Every field is Delivery's own record for that scope: the
+ * arrangement, the live Delivery Order, its attempts, its handover facts and
+ * the photos bound to its number. The Route reads them; it never infers one
+ * from the Sales Order.
+ */
+export interface RouteDeliveryScope {
+  /** 0 = the whole order; 1.. = a leg of a Delivery Journey. */
+  leg: number;
+  /** 0 = unsplit; 1..3 = a trip of a split delivery. */
+  trip: number;
+  /** The lane's caption, already in the dictionary's words. Null on an
+   *  ordinary order, which has one scope and no plate. */
+  plate: string | null;
+  /** A Journey leg before the last: it arrives at a stop, not at the customer,
+   *  and owes no delivery photo. */
+  transfer: boolean;
+  legStop: string | null;
+  partnerName: string | null;
+  confirmedDate: string | null;
+  confirmedTime: string | null;
+  /** The live (non-void) document. The door opens it by its row id. */
+  deliveryOrder: { id: string; number: string } | null;
+  /** The delivery groups this trip carries. Null = everything. */
+  tripGroups: ReadonlyArray<DeliveryGroupKey> | null;
+  attempts: ReadonlyArray<DeliveryOrderAttemptFact & { reason?: string | null }>;
+  handoverEvents: ReadonlyArray<{ kind: DeliveryHandoverKind; recordedAt?: string | null }>;
+  photos: ReadonlyArray<RouteDeliveryPhoto>;
+}
+
 export interface SalesOrderRouteInput {
   order: {
     id: string;
@@ -382,6 +425,10 @@ export interface SalesOrderRouteInput {
     doNumber?: string | null;
     /** `ops_order_control.delivery_photos` (0280). */
     photos?: ReadonlyArray<RouteDeliveryPhoto>;
+    /** Delivery's own records, one entry per scope, in lane order. When
+     *  present they OVERWRITE `logistics`, `booking`, `doNumber`, `photos` and
+     *  `attempts`, which read the V1 booking fields. */
+    scopes?: ReadonlyArray<RouteDeliveryScope>;
     /** The assigned company is not a Klang Valley default — payment must be
      *  complete 3 working days before the delivery instead of 2. */
     outstation?: boolean;
@@ -644,6 +691,8 @@ interface NodeDraft {
   blocked?: boolean;
   /** The owning read failed. Overrides every other state. */
   unreadable?: boolean;
+  /** What a screen reader speaks, when it is not simply the lines. */
+  spoken?: string[];
   lines: (string | null | undefined)[];
   requirements?: GateRequirement[];
   action?: NodeAction | null;
@@ -693,7 +742,7 @@ function sealChain(
             ? "waiting"
             : "future";
     /* The plate prints `text-label` 11px, so its row holds what a context row holds. */
-    const spoken = truthy(draft.lines);
+    const spoken = draft.spoken ?? truthy(draft.lines);
     const lines = truthy(draft.lines).flatMap((line) =>
       draft.kind === "goods-line" ? wrapRouteText(line, ROUTE_TEXT_BUDGET.context) : wrapWords(line),
     );
@@ -1276,6 +1325,9 @@ function gateDraft(
   requirements: GateRequirement[],
   doNumber: string | null,
   failed: UnreadableOwner | null = null,
+  /** The document's row id, when Delivery's record carries it. A number may
+   *  change format; the id never does. */
+  doId: string | null = null,
 ): NodeDraft {
   if (failed) {
     /* A gate that cannot read one of its requirements counts nothing: `3 of 5
@@ -1292,7 +1344,10 @@ function gateDraft(
   }
   const met = requirements.filter((r) => r.met).length;
   const total = requirements.length;
-  const ready = met === total;
+  /* ⭐ ISSUED = THE ROW EXISTS (owner ruling 2026-09-26). When Delivery's own
+     record names the live document, the document is the fact; the Route does
+     not re-judge a Delivery Order the system already issued. */
+  const ready = met === total || Boolean(doId && doNumber);
   return {
     id: "delivery-order",
     kind: "delivery-order",
@@ -1314,7 +1369,7 @@ function gateDraft(
        never to a control. */
     door:
       ready && doNumber
-        ? open(doNumber, `/operation/delivery-orders/${doNumber}`)
+        ? open(doNumber, `/operation/delivery-orders/${encodeURIComponent(doId ?? doNumber)}`)
         : null,
   };
 }
@@ -1392,7 +1447,116 @@ function photoDraft(input: SalesOrderRouteInput): NodeDraft {
  * The resolver — branches, then geometry, then connectors.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderRouteMap {
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Delivery scopes — one lane each.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Dates leave this module as ISO and the page spells them. */
+const ROUTE_SPELL: DeliveryStatusSpell = {
+  date: (iso) => iso.slice(0, 10),
+  dateTime: (iso) => iso.slice(0, 10),
+  time: (value) => value,
+};
+
+const scopeKey = (scope: RouteDeliveryScope) => `${scope.leg}:${scope.trip}`;
+
+const arrivedOrDelivered = (scope: RouteDeliveryScope) =>
+  scope.attempts.some((attempt) => attempt.result === "delivered");
+
+/** The same input, seen from ONE scope: Delivery's record for that scope
+ *  stands where the V1 booking fields stood, so every draft below reads the
+ *  owner's record through the one path it already had. */
+function scopedInput(input: SalesOrderRouteInput, scope: RouteDeliveryScope): SalesOrderRouteInput {
+  return {
+    ...input,
+    delivery: {
+      ...input.delivery,
+      logistics: scope.partnerName?.trim() ? { partnerName: scope.partnerName } : null,
+      booking: scope.confirmedDate
+        ? { confirmedDate: scope.confirmedDate, slot: scope.confirmedTime, scope: null }
+        : null,
+      doNumber: scope.deliveryOrder?.number ?? null,
+      photos: scope.photos,
+      attempts: [],
+    },
+  };
+}
+
+/**
+ * ⭐ `DELIVER` PRINTS DELIVERY'S WORDS, NOT ITS OWN (owner ruling 2026-09-26).
+ * Line one is the scope's rung through Delivery's ONE label function; a second
+ * label function on this surface is a Law D defect. The Route's own sentence
+ * survives only for a scope with no Delivery Order yet.
+ */
+function scopeDeliverDraft(
+  input: SalesOrderRouteInput,
+  scope: RouteDeliveryScope,
+  id: string,
+): NodeDraft {
+  const doorway = open("Delivery", deliveryHref(input.order.id));
+  if (!scope.deliveryOrder) {
+    return {
+      id,
+      kind: "deliver",
+      title: "DELIVER",
+      complete: false,
+      lines: ["Logistics has not delivered the goods", dated("Scheduled", scope.confirmedDate)],
+      door: doorway,
+    };
+  }
+  const facts = {
+    partnerName: scope.partnerName,
+    confirmedDate: scope.confirmedDate,
+    confirmedTime: scope.confirmedTime,
+    hasDeliveryOrder: true,
+    handoverEvents: scope.handoverEvents,
+    attempts: scope.attempts,
+    intermediateLeg: scope.transfer,
+    legStop: scope.legStop,
+    missingFacts: [],
+    todayIso: null,
+  };
+  const status = deliveryWorkStatusOf(facts, ROUTE_SPELL);
+  const progress = deliveryJourneyProgressFromStatus(status, facts);
+  const done = status.kind === "delivered" || status.kind === "arrived";
+  const latest = [...scope.attempts].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
+  const second = done
+    ? dated(scope.transfer ? "Arrived" : "Delivered", latest?.recordedAt?.slice(0, 10) ?? null)
+    : status.kind === "failed"
+      ? (latest?.reason ?? status.reasonLabel ?? status.second)
+      : status.kind === "confirmed"
+        ? dated("Scheduled", scope.confirmedDate)
+        : status.second;
+  return {
+    id,
+    kind: "deliver",
+    title: "DELIVER",
+    complete: done,
+    blocked: status.kind === "failed",
+    lines: [progress.label, second],
+    action:
+      status.kind === "failed"
+        ? {
+            ownerKey: "delivery",
+            label: "Arrange new delivery date",
+            context: { detail: scope.deliveryOrder.number },
+          }
+        : null,
+    door: doorway,
+  };
+}
+
+export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderRouteMap {
+  /* ⭐ DELIVERY'S OWN RECORDS WIN (owner ruling 2026-09-26). An ordinary order
+     has one scope and keeps today's single chain, read from that scope. Two or
+     more scopes each take a lane; the money deadline then anchors on the first
+     scope that reaches the customer. */
+  const scopes =
+    given.unreadable?.delivery === true ? [] : [...(given.delivery.scopes ?? [])];
+  const anchor = scopes.find((scope) => !scope.transfer) ?? scopes[0] ?? null;
+  const input = anchor ? scopedInput(given, anchor) : given;
+  const laneScopes = scopes.length > 1 ? scopes : [];
+  const soleScope = scopes.length === 1 ? scopes[0]! : null;
   const soNumber = `SO-${input.order.so}`;
   const lines: LineFacts[] = input.allocation.lines.map((line) => ({
     sku: line.sku,
@@ -1520,9 +1684,105 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
           { id: "logistics", kind: "logistics", title: "LOGISTICS" },
           { id: "delivery-date", kind: "delivery-date", title: "DELIVERY DATE" },
         ])
-      : [logisticsDraft(input), deliveryDateDraft(input)],
+      : laneScopes.length > 0
+        ? []
+        : [logisticsDraft(input), deliveryDateDraft(input)],
     "delivery",
   );
+
+  /* ── ONE DELIVERY SCOPE IS ONE LANE (owner ruling 2026-09-26). The plate
+     names the scope; the lane carries its own LOGISTICS → DELIVERY DATE →
+     DELIVERY ORDER → DELIVER → DELIVERY PHOTO. `CURRENT` stays ONE for the
+     whole group — `seal` hands it to the earliest unfinished lane. ───────── */
+  interface DeliveryLane {
+    scope: RouteDeliveryScope;
+    plate: RouteNode;
+    gate: RouteNode;
+    /** Every node under the plate, in reading order. */
+    column: RouteNode[];
+    deliver: RouteNode;
+  }
+  const paymentsFailed = input.unreadable?.payments === true;
+  const goodsLane = (line: LineFacts): number => {
+    if (laneScopes.every((scope) => scope.trip === 0)) return 0;
+    const group = deliveryGroupOf(line.sku);
+    const index = laneScopes.findIndex(
+      (scope) => group != null && (scope.tripGroups ?? []).includes(group),
+    );
+    return index >= 0 ? index : 0;
+  };
+  const deliveryLanes: DeliveryLane[] = laneScopes.map((scope, index) => {
+    const key = scopeKey(scope);
+    const seen = scopedInput(given, scope);
+    const rename = (draft: NodeDraft): NodeDraft => ({ ...draft, id: `${draft.id}:${key}` });
+    const plate = sealChain(
+      [
+        {
+          id: `delivery-lane:${key}`,
+          kind: "delivery-lane",
+          /* `Leg 1` heads the plate; its two places take the rows under it,
+             so a long stop name is never cut. */
+          title: (scope.plate ?? "").split(" · ")[0] || `Trip ${scope.trip}`,
+          complete: true,
+          lines: [(scope.plate ?? "").split(" · ").slice(1).join(" · ")],
+          spoken: [scope.plate ?? `Trip ${scope.trip}`],
+        },
+      ],
+      "delivery",
+      false,
+    ).nodes[0]!;
+    const head = seal([rename(logisticsDraft(seen)), rename(deliveryDateDraft(seen))], "delivery");
+
+    /* Readiness follows the shipment: a trip counts the goods it carries, a
+       Journey's first leg counts the order, and a later leg counts nothing —
+       its goods are the ones the leg before it brought. */
+    const carried =
+      scope.trip > 0
+        ? lines.filter((line) => goodsLane(line) === index)
+        : index === 0
+          ? lines
+          : [];
+    const laneRequirements = gateRequirements(carried, goodsTotals(carried), seen).filter(
+      (requirement) => requirement.id !== "goods" || scope.trip > 0 || index === 0,
+    );
+    const before = scope.leg > 1 ? laneScopes[index - 1] ?? null : null;
+    if (before) {
+      const arrived = arrivedOrDelivered(before);
+      const stop = before.legStop?.trim();
+      laneRequirements.push({
+        id: "previous-leg",
+        met: arrived,
+        text: arrived
+          ? `Leg ${before.leg} arrived${stop ? ` at ${stop}` : ""}`
+          : `Leg ${before.leg} not arrived yet`,
+      });
+    }
+    const gate = sealChain(
+      [
+        rename(
+          gateDraft(
+            laneRequirements,
+            scope.deliveryOrder?.number ?? null,
+            paymentsFailed ? "payments" : null,
+            scope.deliveryOrder?.id ?? null,
+          ),
+        ),
+      ],
+      "gate",
+      false,
+    ).nodes[0]!;
+    const tailDrafts = [
+      scopeDeliverDraft(given, scope, `deliver:${key}`),
+      /* A transfer leg draws no DELIVERY PHOTO: the customer leg owes the proof. */
+      ...(scope.transfer ? [] : [rename(photoDraft(seen))]),
+    ];
+    const tail =
+      gate.mark === "complete"
+        ? seal(tailDrafts, "delivery")
+        : sealChain(tailDrafts, "delivery", false).nodes;
+    return { scope, plate, gate, column: [...head, gate, ...tail], deliver: tail[0]! };
+  });
+
   const moneyChain = seal([paymentDraft(input)], "money");
   const loanNodes = loanDrafts(input).map(
     (draft) => sealChain([draft], "loan", false).nodes[0]!,
@@ -1536,7 +1796,14 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       : 0;
   const groups: { key: RouteBranchKey; label: string; w: number }[] = [];
   if (lanes.length > 0) groups.push({ key: "goods", label: "GOODS", w: goodsW });
-  groups.push({ key: "delivery", label: "DELIVERY", w: NODE_W });
+  groups.push({
+    key: "delivery",
+    label: "DELIVERY",
+    w:
+      deliveryLanes.length > 0
+        ? deliveryLanes.length * NODE_W + (deliveryLanes.length - 1) * COL_GAP
+        : NODE_W,
+  });
   groups.push({ key: "money", label: "PAYMENT", w: NODE_W });
   if (loanNodes.length > 0) {
     groups.push({
@@ -1610,6 +1877,19 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
         }
         laneX += lane.w + COL_GAP;
       }
+    } else if (group.key === "delivery" && deliveryLanes.length > 0) {
+      deliveryLanes.forEach((lane, index) => {
+        const x = groupX + index * PITCH;
+        lane.plate.x = x;
+        lane.plate.y = rowTop;
+        let y = rowTop + lane.plate.h + ROW_GAP;
+        for (const laneNode of lane.column) {
+          laneNode.x = x;
+          laneNode.y = y;
+          y += laneNode.h + ROW_GAP;
+        }
+        deepest = Math.max(deepest, y - ROW_GAP);
+      });
     } else if (group.key === "delivery" || group.key === "money") {
       const chain = group.key === "delivery" ? deliveryChain : moneyChain;
       let y = rowTop;
@@ -1635,13 +1915,14 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       ? "payments"
       : null;
   const { nodes: gateNodes } = sealChain(
-    [gateDraft(requirements, doNumber, gateFailed)],
+    [gateDraft(requirements, doNumber, gateFailed, soleScope?.deliveryOrder?.id ?? null)],
     "gate",
     false,
   );
   const gate = gateNodes[0]!;
   gate.x = centreX - NODE_W / 2;
   gate.y = deepest + GATE_GAP;
+  const laned = deliveryLanes.length > 0;
 
   const { nodes: tailNodes } = sealChain(
     deliveryFailed
@@ -1649,7 +1930,10 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
           { id: "deliver", kind: "deliver", title: "DELIVER" },
           { id: "delivery-photo", kind: "delivery-photo", title: "DELIVERY PHOTO" },
         ]).map((draft) => ({ ...draft, lines: [UNREADABLE.delivery.what], door: null }))
-      : [deliverDraft(input), photoDraft(input)],
+      : [
+          soleScope ? scopeDeliverDraft(given, soleScope, "deliver") : deliverDraft(input),
+          photoDraft(input),
+        ],
     "tail",
     false,
   );
@@ -1668,10 +1952,12 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       lane.solo ? [lane.solo] : [lane.plate!, ...lane.chains.flat(), lane.stock!],
     ),
     ...deliveryChain,
+    ...deliveryLanes.flatMap((lane) => [lane.plate, ...lane.column]),
     ...moneyChain,
     ...loanNodes,
-    gate,
-    ...tailNodes,
+    /* With lanes, every lane carries its own gate and tail; the one central
+       gate is not drawn. */
+    ...(laned ? [] : [gate, ...tailNodes]),
   ];
 
   /* ── connectors ──────────────────────────────────────────────────────── */
@@ -1709,29 +1995,47 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       segment(chain[chain.length - 1]!, stock, []);
     }
     if (lane.chains.length === 0) segment(plate, stock, []);
-    segment(stock, gate, []);
+    /* A goods tail joins the gate of the trip that carries it; on a Journey
+       every tail joins leg 1's gate. */
+    const line = lines.find((item) => `${item.sku}:stock` === stock.id);
+    segment(stock, laned ? deliveryLanes[line ? goodsLane(line) : 0]!.gate : gate, []);
   }
-  segment(origin, deliveryChain[0]!, []);
-  for (let i = 0; i < deliveryChain.length - 1; i += 1) {
-    segment(deliveryChain[i]!, deliveryChain[i + 1]!, []);
+  for (const lane of deliveryLanes) {
+    segment(origin, lane.plate, []);
+    segment(lane.plate, lane.column[0]!, []);
+    for (let i = 0; i < lane.column.length - 1; i += 1) {
+      segment(lane.column[i]!, lane.column[i + 1]!, []);
+    }
+    /* The last node of a lane has no trailing line. */
+    segment(moneyChain[moneyChain.length - 1]!, lane.gate, []);
   }
-  segment(deliveryChain[deliveryChain.length - 1]!, gate, []);
+  if (!laned) {
+    segment(origin, deliveryChain[0]!, []);
+    for (let i = 0; i < deliveryChain.length - 1; i += 1) {
+      segment(deliveryChain[i]!, deliveryChain[i + 1]!, []);
+    }
+    segment(deliveryChain[deliveryChain.length - 1]!, gate, []);
+  }
   segment(origin, moneyChain[0]!, []);
   for (let i = 0; i < moneyChain.length - 1; i += 1) {
     segment(moneyChain[i]!, moneyChain[i + 1]!, []);
   }
-  segment(moneyChain[moneyChain.length - 1]!, gate, []);
+  if (!laned) segment(moneyChain[moneyChain.length - 1]!, gate, []);
+  /* The loan is collected back where the customer is — the last lane. */
+  const collectAt = laned ? deliveryLanes[deliveryLanes.length - 1]!.deliver : deliver;
   for (const loanNode of loanNodes) {
     segment(origin, loanNode, []);
-    segment(loanNode, deliver, ["collect back"], true);
+    segment(loanNode, collectAt, ["collect back"], true);
   }
 
-  segment(gate, deliver, []);
-  segment(deliver, photo, []);
+  if (!laned) {
+    segment(gate, deliver, []);
+    segment(deliver, photo, []);
+  }
   /* The last node has no trailing line. */
 
   const width = PAD * 2 + spanW;
-  const height = photo.y + photo.h + PAD;
+  const height = (laned ? deepest : photo.y + photo.h) + PAD;
 
   const linkedProblems: LinkedProblem[] = [
     ...input.cases

@@ -1314,14 +1314,12 @@ describe("one delivery scope is one lane (owner ruling 2026-09-26)", () => {
           orderId: "order-1",
           soRef: "SO-1319",
           lines: [
-            line({ sku: "MATTRESS-K", committedQty: 1, reservedQty: 1, reservedUnits: [unit({ id: "m1", sku: "MATTRESS-K" })] }),
-            line({ sku: "SOFA-3S", committedQty: 1, outstandingQty: 1 }),
+            line({ sku: "MS12 Firmcare 10inch Queen", committedQty: 1, reservedQty: 1, reservedUnits: [unit({ id: "m1", sku: "MS12 Firmcare 10inch Queen" })] }),
+            line({ sku: "SF03 Muro 2 Seater", committedQty: 1, outstandingQty: 1 }),
           ],
           unmatchedUnits: [],
           totals: { committedQty: 2, reservedQty: 1, soldQty: 0, outstandingQty: 1 },
         },
-        lineLabels: { "MATTRESS-K": "Mattress · King", "SOFA-3S": "Sofa · 3 Seater" },
-        lineGroups: { "MATTRESS-K": "bed", "SOFA-3S": "sofa" },
         purchaseOrders: [],
         delivery: {
           logistics: null,
@@ -1338,8 +1336,8 @@ describe("one delivery scope is one lane (owner ruling 2026-09-26)", () => {
       "Trip 1 · Mattress, 1 item",
       "Trip 2 · not booked yet",
     ]);
-    expect(edge(map, "MATTRESS-K:stock", "delivery-order:0:1")).toBeDefined();
-    expect(edge(map, "SOFA-3S:stock", "delivery-order:0:2")).toBeDefined();
+    expect(edge(map, "MS12 Firmcare 10inch Queen:stock", "delivery-order:0:1")).toBeDefined();
+    expect(edge(map, "SF03 Muro 2 Seater:stock", "delivery-order:0:2")).toBeDefined();
     /* Readiness follows the shipment, not the whole Sales Order. */
     expect(node(map, "delivery-order:0:1").requirements.find((r) => r.id === "goods")).toEqual({
       id: "goods",
