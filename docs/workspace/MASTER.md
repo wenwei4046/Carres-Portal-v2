@@ -1162,7 +1162,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    Warehouse · Payment · Delivery`. LEFT cell: the module name, its control date, its status (red
    Missed · amber Due · grey otherwise), laid out as line 1 = module name with its date on the right,
    line 2 = status (Jess, 2026-09-27: "Proceed is header, then follow date at right. status under
-   header"). RIGHT cell: that module's WHOLE checklist in one aligned
+   header"), and THE MODULE'S CHECKLIST sits in this Order Route cell under the status (Jess,
+   2026-09-27: "the checklist put at order route"); the right column is `To do {n}`: only that
+   module's open acts (same words as their checklist line) and the form that opens under one.
+   Superseded wording that follows about the right cell holding the checklist: RIGHT cell: that module's WHOLE checklist in one aligned
    grid down the page — `mark · what · date or state · document` — with a party's group line
    (`Ohana … PO-20260903-4316 V1`) above its own lines; ✓ done, ○ not yet, red `!` an open act.
    Pressing an `!` line opens its owning module's form in place under it, one form at a time; after
