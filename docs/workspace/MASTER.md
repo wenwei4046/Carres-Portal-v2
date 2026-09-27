@@ -1155,19 +1155,29 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
-7. **REVISION 9 · CLEAN MODULE ROWS (Jess, 2026-09-27).** Under the 48px `{SO No} {customer} ·
-   Requested delivery {date}` row, one heading row `Order Route | To do {n}`, then ONE row per
-   module in order `Proceed · Purchasing · Receiving · Warehouse · Payment · Delivery`.
-   - **Order Route cell (left):** line 1 = the module name with its date on the right; line 2 = its
-     status (red Missed · amber Due · grey otherwise) ("Proceed is header, then follow date at
-     right. status under header"); then THE MODULE'S WHOLE CHECKLIST ("the checklist put at order
-     route"): `mark · what · date or state · document`, with a party's group line (`Ohana …
-     PO-20260903-4316 V1`) above its own lines; ✓ done, ○ not yet, red `!` an open act. Finished
-     lines without a document fold into one `✓ {n} done` line. Document numbers appear only here.
-   - **To do cell (right, same row):** only that module's open acts, each titled with the exact
-     words of its checklist line (`Supplier answer · Ohana`) over the owning form's name. The first
-     missed act opens its form in place, one form at a time; after Save it shows `✓ … Saved` and
-     the next open act opens.
+7. **REVISION 10 · ORDER HEADER + CLEAN MODULE ROWS (Jess, 2026-09-27).**
+   - **Order header (three blocks, two lines each):** left = the `SO No` in the link blue,
+     underlined, opening the Sales Order PDF, over the customer name; middle = `Proceed Date` over
+     its date; right corner = `Customer Requested Delivery Date` over its date. `Proceed Date` is
+     the day Sales handed the order to Operations (`orders.proceeded_at`), never the planned
+     production start (`orders.proceed_date`) (COPY-STANDARD). Because the header carries them,
+     there is NO Proceed row.
+   - **One heading row `Order Route | To do {n}`, then one row per module:** `Purchasing ·
+     Receiving · Warehouse · Payment · Delivery`.
+   - **Order Route cell (left):** the module name, its status under it (red Missed · amber Due ·
+     grey otherwise), then THE MODULE'S WHOLE CHECKLIST ("the checklist put at order route"). A
+     party's group line (`Ohana … PO-20260903-4316 V1`) sits above its own lines.
+   - **Every checklist item is two lines (Jess: "every checklist no title then 2nd line
+     description"): a title (13/600) over a description (11/400) that NAMES what its date is**
+     (`Supplier answer` / `PO Delivery Date Mon, 14 Sep · Not recorded`; `1× CODY-Q · Ohana` /
+     `Expected Arrival Mon, 14 Sep · Not received`; `Balance` / `RM 2,284.00 · not paid · by Sat,
+     26 Sep`). No bare date appears anywhere ("now you all date every where but i dont know refer to
+     what?"). Dates print `fmtDate` (`Mon, 14 Sep`). ✓ done, ○ not yet, red `!` an open act;
+     finished items fold into `✓ {n} done`. Document numbers appear only on group lines and in the
+     header.
+   - **To do cell (right, same row):** only that module's open acts, each titled with its checklist
+     item's words (`Supplier answer · Ohana`) over the owning form's name; one form opens at a time;
+     after Save it shows `✓ … Saved` and the next open act opens.
    - **Jess chose this layout over B (steps along the top) and C (sorted by what to do), 2026-09-27:
      "i want my previous, i never want on top". Never put the steps along the top.**
 7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
