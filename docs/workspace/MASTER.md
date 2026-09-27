@@ -1164,8 +1164,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      there is NO Proceed row.
    - **One heading row `Order Route | To do {n}`, then one row per module:** `Purchasing ·
      Receiving · Warehouse · Payment · Delivery`.
-   - **Order Route cell (left):** the module name, its status under it (red Missed · amber Due ·
-     grey otherwise), then THE MODULE'S WHOLE CHECKLIST ("the checklist put at order route"). A
+   - **Order Route cell (left), ONE format for every module (Jess, 2026-09-27: "i confused your
+     format"):** line 1 the module name (with `✓ {n} done ›` at its right corner); line 2 ONLY red
+     `Missed` or amber `Due`, and no line 2 otherwise (no invented counts such as `0 of 2 in store`);
+     then THE MODULE'S WHOLE CHECKLIST ("the checklist put at order route"). A
      party's group line (`Ohana … PO-20260903-4316 V1`) sits above its own lines.
    - **Every checklist item is two lines (Jess: "every checklist no title then 2nd line
      description"): a title (13/600) over a description (11/400) that NAMES what its date is**
