@@ -1155,31 +1155,36 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
-7. **REVISION 11 · MODULE STOPS WITH ONE BOX PER CHECK (Jess, 2026-09-27/28; PROPOSAL until she
-   says 定).** Order header as before (SO link blue over the customer · `Proceed Date` · `Customer
-   Requested Delivery Date`; no Proceed row). Under `Order Route · To do {n}`, a vertical line of
-   stops, ONE STOP PER MODULE in Route order (`Purchasing · Receiving · Warehouse · Payment ·
-   Delivery`); the line joins modules only, never parties. Stop: a dot (red missed · amber due ·
-   grey otherwise) and the module name with `Missed` / `Due` at the right.
-   - **Every module has at least one box** ("why every module dont have?"): a white box with a 1px
-     line; ONE check per box, its title bold and its facts in grey lines under it; red only on the
-     missed fact, amber on the due fact. A box with an open act carries that act's words at its top
-     right in blue, and ONLY that act (the act belongs to the check in the same box). Pressing it
-     expands the box and the whole box fills pale blue with the owning module's form ("change to box
-     and when click expand, its blue to fill up"); nothing opens by itself, and Save closes it.
-   - **Content, from authority (verified 2026-09-28 on SO-1333):** Purchasing: one box per
-     supplier/PO — `Supplier answer · {supplier}` / `{PO No} · {qty}× {item}` / `PO Delivery Date
-     {date} · Arrival missed · Follow up supplier` (§5.9 Supplier card) / `PO sent to supplier · Not
-     recorded` when `po_sends` has no row → `Record supplier answer` (Purchasing's own table).
-     Receiving: one box per goods line, `Expected Arrival {date} · Not received`, no act before
-     arrival. Warehouse: `Not received yet` until goods arrive (goods are not repeated). Payment:
-     `RM {amount} unpaid` / `Paid … · Order Total …` and NO deadline and NO act until a Scheduled
-     delivery exists: `Payment must be complete` is 2 working days before Scheduled delivery and
-     asking starts 3 working days before it (Payment MASTER Collection timing); a Requested date never
-     sets a payment deadline. Delivery: one box per check — `3 working days before · {date}` → act
-     `Contact logistics`, which records Delivery's contact result (the seven 0487 results);
-     `2 working days before · {date}` → `Record scheduled delivery`; `1 working day before · {date}`
-     with its gaps (`⚠ Hold delivery · RM {amount} unpaid`).
+7. **REVISION 12 · THE CARD BLUEPRINT — built from the module acts (Jess, 2026-09-28: "your job to
+   plan and blueprint what to do, check with every module what mission and show"; PROPOSAL until
+   定).** Order header as before. Under `Order Route · To do {n}`, one stop per module in Route order
+   (`Purchasing · Receiving · Warehouse · Payment · Delivery`); the line joins modules only.
+   - **Card = the Sales Order `Block`:** white, 1px `slate-5` line, 6px radius, 12/16 padding.
+     Every module has at least one card.
+   - **A card with work:** title (15/600, black) = WHAT TO DO, the act's own row line from
+     COPY-STANDARD; line 2 = WHY (13px, red when missed, amber when due today); a hairline, then
+     the facts in grey (document link · goods · Deliver To). The owning module's button sits at the
+     top right as an outline button. Pressing it opens that module's form INSIDE the card, laid out
+     like the SO info grid (label over a bordered field, three per row, white). **The only blue is
+     the primary `Save`** (and document links). Save closes the form; nothing opens by itself.
+   - **A card without work:** title = the module's current state (`Not received yet` ·
+     `RM {amount} unpaid`); facts under it; no button.
+   - **Which cards carry work = the Work feed registry (§5.2.1), never invented:**
+
+     | Module act (registry) | Card title (COPY row line) | Why line | Button (owning form) |
+     |---|---|---|---|
+     | `purchasing.supplier_date_passed` | `Ask {supplier} when the goods will arrive` | `The supplier delivery date passed on {date}` | `Record supplier answer` |
+     | `purchasing.confirm_tomorrows_delivery` | `Ask {supplier} for the Supplier DO or confirmation for {date}` | `Confirm tomorrow's supplier delivery` | `Record supplier answer` |
+     | `purchasing.confirm_balance_delivery_date` | `Ask {supplier} for the balance delivery date` | `The balance delivery date is missing` | `Record balance date` |
+     | `receiving.check_in` (only after the PO is marked sent) | `Check in {PO No} from {supplier}` | `Supplier date passed · nothing received yet` | Receiving's check-in |
+     | `delivery.assign_logistics` | `Assign logistics` | `3 working days before · {date}` | `Assign logistics` |
+     | `delivery.confirm_delivery_date` | `Call {logistics}` | `Get the scheduled delivery date · due {date}` | `Update date and time` → `Save scheduled delivery` |
+     | `delivery.deliver_today` | `Deliver on {weekday, date}` | — | `Record Delivery Result` |
+     | `payment.collect_customer_balance` (only once a Scheduled delivery sets the deadline) | `Collect RM {amount} from {customer}` | `Payment must be complete by {date}` | `Record payment` |
+
+   - **Verified on SO-1333 (2026-09-28):** two `supplier_date_passed` cards (Ohana 14 Sep, Nice
+     Future 15 Sep), one `confirm_delivery_date` card due today (NETS). Receiving has no act
+     (neither PO carries a send mark). Payment has no act (no Scheduled delivery). `To do 3`.
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
