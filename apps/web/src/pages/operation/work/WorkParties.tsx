@@ -14,7 +14,10 @@
  * permission words; an order outside the Operation list draws its acts only.
  */
 import type { ReactNode } from "react";
-import type { OperationWorkItem, RoutePointKey } from "@carres/shared";
+import type { OperationWorkItem, PartyTone, RoutePointKey } from "@carres/shared";
+import { displayCustomerName } from "@/lib/customer-name";
+import { moneyOfOrder } from "../sales-order-facts";
+import type { CardFact } from "./PartyCardShell";
 import { fmtDate } from "@/lib/fmt-date";
 import GrnCard from "./GrnCard";
 import Button from "@/components/kit/Button";
@@ -28,12 +31,14 @@ import LogisticsCard, { useLogisticsModel, useLogisticsMessage } from "./Logisti
 import { WORK_MODULE_WORD } from "./module-word";
 import { orderRefOf } from "./order-ref";
 import SalesOrderCard from "./SalesOrderCard";
-import SupplierCard from "./SupplierCard";
+import SupplierCard, { useSupplierCard } from "./SupplierCard";
 import WorkActionPanel from "./WorkActionPanel";
 import { WorkSection } from "./WorkCard";
 import WorkOrderRoute, { useMissionRoute } from "./WorkOrderRoute";
 
 export { orderRefOf };
+
+const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const PARTIES_COPY = {
   unavailableTitle: "Order details unavailable",
@@ -126,17 +131,26 @@ function Order({ orderId, items, openParty, onOpenParty, onOpenRecord }: {
 }) {
   const lm = useLogisticsModel(orderId);
   const logisticsMessage = useLogisticsMessage(orderId);
+  const supplier = useSupplierCard(orderId);
   const { route } = useMissionRoute(orderId);
   const first = items[0]!;
   const toggle = (party: Party) => (open: boolean) => onOpenParty(open ? party : null);
   const reference = (lm.o?.source_ref ?? []).filter(Boolean).join(" · ") || null;
   /* ⭐ EVERY CARD TALLIES A ROUTE STEP (Jess, 2026-09-27): the row's third
      segment repeats that step's date and status word from the Route. */
-  const step = (key: RoutePointKey): ReactNode => {
-    const point = route?.points.find((p) => p.key === key);
-    if (!point) return null;
-    return <span className="whitespace-nowrap text-[12px] leading-4 text-kit-slate-11" data-testid={`work-step-${key}`}>{[point.dateText, point.status].filter(Boolean).join(" · ")}</span>;
-  };
+  const point = (key: RoutePointKey) => route?.points.find((p) => p.key === key) ?? null;
+  const pillOf = (key: RoutePointKey) => { const pt = point(key); return pt ? { text: pt.status, tone: pt.tone as PartyTone } : null; };
+  const dateOf = (key: RoutePointKey) => point(key)?.dateText ?? null;
+  const o = lm.o;
+  const customerName = o ? displayCustomerName(o.customer_name) || "Name not recorded" : null;
+  const customerPhone = (o?.customer_phone ?? "").trim() || null;
+  const customerDate = lm.card?.scope.customerDeliveryIso ? fmtDate(lm.card.scope.customerDeliveryIso) : null;
+  const money = o ? moneyOfOrder(o) : null;
+  const owed = Boolean(money?.known && money.outstanding > 0);
+  const balanceText = !money?.known ? "Value not recorded" : owed ? `RM ${RM.format(money.outstanding)} · not paid${route?.paymentLine?.deadlineText ? ` · by ${route.paymentLine.deadlineText}` : ""}` : "RM 0.00 · paid";
+  const supplierNames = [...new Set((supplier.model?.rows ?? []).map((r) => r.supplier).filter(Boolean))] as string[];
+  const deliverTo = (supplier.model?.rows ?? []).map((r) => r.deliverTo).find(Boolean) ?? null;
+  const fact = (icon: CardFact["icon"], text: ReactNode | null, tone?: CardFact["tone"]): CardFact[] => (text ? [{ icon, text, tone }] : []);
   /* The order's acts land on their step: delivery acts on Contact ·
      Logistics (the message button), every other act on the Sales Order row
      (its door). The FIRST act's button is the panel's ONE blue. */
@@ -147,18 +161,30 @@ function Order({ orderId, items, openParty, onOpenParty, onOpenRecord }: {
     text: [i.action, i.recipient && !i.action.includes(i.recipient) ? i.recipient : null, i.timing.actionOn ? `due ${fmtDate(i.timing.actionOn)}` : null].filter(Boolean).join(" · "),
     missed: i.timing.placement === "missed",
   });
-  const chat = logisticsMessage?.href ? (
+  /* Doors are ICONS (Jess, 2026-09-27: "simple whatsapp icon, email icon"),
+     36px, named for the screen reader; the one blue is the first act's. */
+  const iconDoor = (href: string, name: "message" | "mail", label: string, blue: boolean, testId: string) => (
     <a
-      href={logisticsMessage.href}
+      href={href}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-[13px] font-semibold leading-[18px] ${blueOn === "logistics" && deliveryActs.length > 0 ? "bg-kit-blue-9 text-white hover:bg-kit-blue-10" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
-      data-testid="work-logistics-chat"
+      aria-label={label}
+      title={label}
+      className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${blue ? "bg-kit-blue-9 text-white hover:bg-kit-blue-10" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
+      data-testid={testId}
     >
-      <Icon name="message" size={14} />
-      Open WhatsApp group
+      <Icon name={name} size={16} />
     </a>
-  ) : null;
+  );
+  const chat = logisticsMessage?.href ? iconDoor(logisticsMessage.href, "message", "Open WhatsApp group", blueOn === "logistics" && deliveryActs.length > 0, "work-logistics-chat") : null;
+  const phone = (lm.o?.customer_phone ?? "").replace(/\D/g, "");
+  const email = (lm.o?.customer_email ?? "").trim();
+  const customerDoors = (
+    <>
+      {phone ? iconDoor(`https://wa.me/${phone.startsWith("0") ? `6${phone}` : phone}`, "message", "Open WhatsApp", false, "work-customer-whatsapp") : null}
+      {email ? iconDoor(`mailto:${email}`, "mail", "Open email", false, "work-customer-email") : null}
+    </>
+  );
   return (
     <div className="flex flex-col gap-2" data-testid="work-parties">
       <OrderHeader orderId={orderId} label={first.object.label} module={WORK_MODULE_WORD[first.module]} />
@@ -166,18 +192,22 @@ function Order({ orderId, items, openParty, onOpenParty, onOpenRecord }: {
       <SalesOrderCard
         orderId={orderId}
         heading="Proceed · Sales Order"
+        pill={pillOf("proceed")}
+        facts={[...fact("customer", customerName), ...fact("call", customerPhone), ...fact("date", customerDate), ...fact("money", balanceText, owed ? "danger" : undefined)]}
         act={orderActs[0] ? actLine(orderActs[0]) : null}
-        trailing={<>{step("proceed")}{orderActs[0] ? <Button size="touch" variant={blueOn === "order" ? "primary" : "neutral"} onClick={onOpenRecord} data-testid="work-order-act-door">Open {first.object.label}</Button> : null}</>}
+        trailing={orderActs[0] ? <Button size="touch" variant={blueOn === "order" ? "primary" : "neutral"} onClick={onOpenRecord} data-testid="work-order-act-door">Open {first.object.label}</Button> : null}
         open={openParty === "order"}
         onToggle={toggle("order")}
       />
-      <SupplierCard orderId={orderId} reference={reference} heading="PO · Supplier" trailing={step("po")} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={false} />
-      <GrnCard orderId={orderId} heading="GRN · Warehouse" trailing={step("grn")} open={openParty === "grn"} onToggle={toggle("grn")} />
+      <SupplierCard orderId={orderId} reference={reference} heading="PO · Supplier" pill={pillOf("po")} facts={[...fact("supplier", supplierNames.join(" · ") || null), ...fact("date", dateOf("po"))]} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={false} />
+      <GrnCard orderId={orderId} heading="GRN · Warehouse" pill={pillOf("grn")} facts={[...fact("warehouse", deliverTo), ...fact("date", dateOf("grn"))]} open={openParty === "grn"} onToggle={toggle("grn")} />
       <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
         <LogisticsCard
           orderId={orderId}
           heading="Contact · Logistics"
-          trailing={<>{step("contact")}{chat}</>}
+          pill={pillOf("contact")}
+          facts={[...fact("delivery", lm.partnerName ?? "Logistics not assigned"), ...fact("ready", lm.model ? `Checks ${lm.model.doneCount} of 3` : null), ...fact("date", dateOf("contact"))]}
+          trailing={chat}
           communication={logisticsMessage}
           open={openParty === "logistics"}
           onToggle={toggle("logistics")}
@@ -185,7 +215,7 @@ function Order({ orderId, items, openParty, onOpenParty, onOpenRecord }: {
           moneyOnBalance
         />
       </div>
-      <CustomerCard orderId={orderId} heading="Delivery · Customer" trailing={step("delivery")} open={openParty === "customer"} onToggle={toggle("customer")} primary={false} />
+      <CustomerCard orderId={orderId} heading="Delivery · Customer" pill={pillOf("delivery")} facts={[...fact("customer", customerName), ...fact("call", customerPhone), ...fact("date", dateOf("delivery"))]} trailing={customerDoors} open={openParty === "customer"} onToggle={toggle("customer")} primary={false} />
     </div>
   );
 }

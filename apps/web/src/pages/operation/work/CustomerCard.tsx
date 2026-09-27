@@ -1,3 +1,4 @@
+import type { PartyTone } from "@carres/shared";
 /**
  * THE CUSTOMER PARTY CARD — Workspace MASTER §5.10 (owner approval 2026-09-25,
  * OWNER CORRECTION 2026-09-25).
@@ -34,6 +35,7 @@ import { displayCustomerName } from "@/lib/customer-name";
 import { useDeliveryArrangements, useOperationStaff, useOperationWork } from "@/lib/queries";
 import { useLogisticsModel } from "./LogisticsCard";
 import { Fact, PartyCardShell, SectionTitle, ToneLine } from "./PartyCardShell";
+import type { CardFact } from "./PartyCardShell";
 
 /* A date never splits over two lines (§5.10). */
 const spell = (iso: string) => fmtDateShort(iso).replace(" ", " ");
@@ -107,10 +109,14 @@ export default function CustomerCard({
   primary,
   heading: headingProp,
   trailing,
+  pill,
+  facts,
 }: {
   orderId: string;
   heading?: string;
   trailing?: React.ReactNode;
+  pill?: { text: string; tone: PartyTone } | null;
+  facts?: CardFact[];
   leg?: number;
   open: boolean;
   onToggle: (open: boolean) => void;
@@ -135,6 +141,8 @@ export default function CustomerCard({
         anchorId={`party-customer-${orderId}`}
         party={C.heading}
         trailing={trailing}
+      pill={pill}
+      facts={facts}
         heading={C.heading}
         status={<ToneLine tone={failed ? "attention" : "future"}>{C.unavailable}</ToneLine>}
         open={open}
@@ -162,6 +170,8 @@ export default function CustomerCard({
       party={C.heading}
       heading={headingProp ?? `${C.heading} · ${name ?? "Name not recorded"}`}
       trailing={trailing}
+      pill={pill}
+      facts={facts}
       status={<ToneLine tone={model.status.tone} testId="party-customer-line">{model.status.text}</ToneLine>}
       open={open}
       onToggle={onToggle}

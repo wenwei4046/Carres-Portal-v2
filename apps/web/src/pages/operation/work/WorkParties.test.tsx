@@ -23,23 +23,24 @@ vi.mock("../delivery-scope-card", () => ({
 }));
 
 describe("the party-card shell", () => {
-  it("is exactly 72px collapsed with a 15/20 heading, one 12/16 status line and a 40×40 chevron", () => {
+  it("collapsed: the title row with its pill, the status line under a rule, a 36px chevron", () => {
     render(
       <PartyCardShell testId="party-x" party="Customer" heading="Customer · Lim Kuan Yang" progress="1 of 3" status={<ToneLine tone="current">Contact due today</ToneLine>} open={false} onToggle={() => {}}>
         <p>body</p>
       </PartyCardShell>,
     );
+    /* The three-layer card (Jess, 2026-09-27): title row with its pill, the
+       fact line, a rule, then the status line; the chevron is its own 36px door. */
     const toggle = screen.getByTestId("party-x-toggle");
-    expect(toggle.className).toContain("h-[56px]"); // the compact card (Jess, 2026-09-26)
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    /* The name carries the party, its state and the act — not a bare verb. */
-    expect(toggle).toHaveAccessibleName(/Customer · Lim Kuan Yang.*Contact due today.*Show Customer details/);
-    expect(screen.getByTestId("party-x-heading").className).toContain("text-[13px]");
-    expect(screen.getByTestId("party-x-heading").className).toContain("leading-[18px]");
+    expect(toggle).toHaveAccessibleName(/Customer · Lim Kuan Yang.*1 of 3.*Show Customer details/);
+    expect(screen.getByTestId("party-x-heading").className).toContain("text-[14px]");
+    expect(screen.getByTestId("party-x-heading").className).toContain("leading-5");
+    expect(screen.getByTestId("party-x-status")).toHaveTextContent("Contact due today");
     expect(screen.getByText("Contact due today").parentElement?.className).toContain("text-[12px]");
     expect(screen.queryByText("body")).not.toBeInTheDocument();
-    expect(screen.getByTestId("party-x-chevron").className).toContain("h-10");
-    expect(screen.getByTestId("party-x-chevron").className).toContain("w-10");
+    expect(screen.getByTestId("party-x-chevron").className).toContain("h-9");
+    expect(screen.getByTestId("party-x-chevron").className).toContain("w-9");
   });
 
   it("Escape collapses the open card and returns focus to its heading", () => {

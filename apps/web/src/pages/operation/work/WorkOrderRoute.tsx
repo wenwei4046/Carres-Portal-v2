@@ -316,7 +316,7 @@ function RouteDetail({
     case "contact":
       return (
         <>
-          {row("Customer", customerLine ?? "—")}
+          {row("Customer", customerLine ?? "No contact recorded yet")}
           {row("Logistics", logisticsLine)}
           <div className="flex flex-wrap gap-2">{partyButton("Open Customer card", "customer")}{partyButton("Open Logistics card", "logistics")}</div>
         </>

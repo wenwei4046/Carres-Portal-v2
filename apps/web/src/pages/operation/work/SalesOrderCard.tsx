@@ -1,3 +1,4 @@
+import type { PartyTone } from "@carres/shared";
 /**
  * THE SALES ORDER CARD — the right panel's second block (Jess, 2026-09-26):
  * after the Route, before the parties, the order's own facts in five lines so
@@ -22,6 +23,7 @@ import { useLogisticsModel } from "./LogisticsCard";
 import { useMissionRoute } from "./WorkOrderRoute";
 import { useGoodsName } from "./goods-name";
 import { PartyCardShell } from "./PartyCardShell";
+import type { CardFact } from "./PartyCardShell";
 
 const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -34,11 +36,13 @@ function Fact({ label, children, testId }: { label: string; children: React.Reac
   );
 }
 
-export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sales Order", trailing, act }: {
+export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sales Order", trailing, act, pill, facts }: {
   orderId: string; open: boolean; onToggle: (open: boolean) => void;
   /** The Route step this card is (`Proceed · Sales Order`). */
   heading?: string;
   trailing?: React.ReactNode;
+  pill?: { text: string; tone: PartyTone } | null;
+  facts?: CardFact[];
   /** The order's own open act (payment, a customer decision): the status line leads with it. */
   act?: { text: string; missed: boolean } | null;
 }) {
@@ -69,13 +73,15 @@ export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sal
   const status = (
     <span className="flex min-w-0 flex-col" data-testid="work-so-status">
       {act ? <span className={`text-[13px] font-semibold leading-[18px] ${act.missed ? "text-danger" : "text-kit-slate-12"}`} data-testid="work-so-act">{act.text}</span> : null}
-      <span className="min-w-0 truncate text-[12px] leading-4 text-kit-slate-11">
-        {name}{phone ? ` · ${phone}` : ""} · {customerDate} · <span className={owed ? "font-semibold text-danger" : "text-kit-slate-12"}>{balance}</span>
-      </span>
+      {!facts || facts.length === 0 || !act ? (
+        <span className="min-w-0 truncate text-[12px] leading-4 text-kit-slate-11">
+          {name}{phone ? ` · ${phone}` : ""} · {customerDate} · <span className={owed ? "font-semibold text-danger" : "text-kit-slate-12"}>{balance}</span>
+        </span>
+      ) : null}
     </span>
   );
   return (
-    <PartyCardShell testId="work-sales-order" party="Sales Order" heading={heading} trailing={trailing} status={status} open={open} onToggle={onToggle}>
+    <PartyCardShell testId="work-sales-order" party="Sales Order" heading={heading} trailing={trailing} pill={pill} facts={facts} status={status} open={open} onToggle={onToggle}>
       {/* Two columns from 768px so the panel's width carries the facts in
           three lines, not six (Jess, 2026-09-26: "width so empty"). */}
       <dl className="grid grid-cols-[92px_minmax(0,1fr)] gap-x-2 gap-y-1 min-[768px]:grid-cols-[92px_minmax(0,1fr)_92px_minmax(0,1fr)]">

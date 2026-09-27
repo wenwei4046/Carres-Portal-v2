@@ -1,3 +1,4 @@
+import type { PartyTone } from "@carres/shared";
 /**
  * THE GRN STEP — the Route's `GRN` point as a card (Jess, 2026-09-27: every
  * card tallies a Route step). Collapsed: `{r} of {n} received`. Expanded: one
@@ -8,10 +9,12 @@
 import type { ReactNode } from "react";
 import { fmtDateShort } from "@/lib/fmt-date";
 import { PartyCardShell, ToneLine } from "./PartyCardShell";
+import type { CardFact } from "./PartyCardShell";
 import { useSupplierCard } from "./SupplierCard";
 
-export default function GrnCard({ orderId, open, onToggle, heading = "GRN · Warehouse", trailing }: {
+export default function GrnCard({ orderId, open, onToggle, heading = "GRN · Warehouse", trailing, pill, facts }: {
   orderId: string; open: boolean; onToggle: (open: boolean) => void; heading?: string; trailing?: ReactNode;
+  pill?: { text: string; tone: PartyTone } | null; facts?: CardFact[];
 }) {
   const { model } = useSupplierCard(orderId);
   const rows = model?.rows ?? [];
@@ -22,7 +25,7 @@ export default function GrnCard({ orderId, open, onToggle, heading = "GRN · War
     ? <ToneLine tone="future">Not received yet</ToneLine>
     : <ToneLine tone={received === pos.length ? "done" : "future"} testId="work-grn-line">{`${received} of ${pos.length} received`}</ToneLine>;
   return (
-    <PartyCardShell testId="work-grn" party="GRN" heading={heading} trailing={trailing} status={status} open={open} onToggle={onToggle}>
+    <PartyCardShell testId="work-grn" party="GRN" heading={heading} trailing={trailing} pill={pill} facts={facts} status={status} open={open} onToggle={onToggle}>
       {pos.length === 0 ? (
         <p className="text-body text-kit-slate-11">No purchase order for this Sales Order</p>
       ) : (

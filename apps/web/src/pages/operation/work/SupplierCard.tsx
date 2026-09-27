@@ -1,3 +1,4 @@
+import type { PartyTone } from "@carres/shared";
 /**
  * THE SUPPLIER PARTY CARD — Workspace MASTER §5.10 (owner approval 2026-09-25).
  *
@@ -22,6 +23,7 @@ import { useLogisticsCardFacts, useOperationSuppliers, useSupplierCardFacts } fr
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { buildSupplierChase, buildSupplierReminder } from "@/lib/wa-templates";
 import { Fact, PartyCardShell, ToneLine } from "./PartyCardShell";
+import type { CardFact } from "./PartyCardShell";
 
 /* A date never splits over two lines (§5.10): `27 Oct` joined by a no-break space. */
 const spell = (iso: string) => fmtDateShort(iso).replace(" ", "\u00a0");
@@ -69,8 +71,12 @@ export default function SupplierCard({
   primary,
   heading: headingProp,
   trailing,
+  pill,
+  facts,
 }: {
   orderId: string;
+  pill?: { text: string; tone: PartyTone } | null;
+  facts?: CardFact[];
   /** The Route step this card is (Jess, 2026-09-27: every card tallies a Route step). */
   heading?: string;
   trailing?: React.ReactNode;
@@ -99,6 +105,8 @@ export default function SupplierCard({
       party={S.heading}
       heading={headingProp ?? model?.heading ?? S.heading}
       trailing={trailing}
+      pill={pill}
+      facts={facts}
       status={
         failed ? (
           <ToneLine tone="attention">{S.unavailable}</ToneLine>
@@ -171,7 +179,7 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
     poNo: row.poNo,
     ref: reference,
     lines: row.lines ?? [],
-    deadline: row.effectiveIso ? spell(row.effectiveIso) : "—",
+    deadline: row.effectiveIso ? spell(row.effectiveIso) : "TBD",
   });
   return (
     <section aria-label={`${row.supplier ?? row.poNo} · ${row.poNo}`} className="flex flex-col gap-1 border-b border-kit-slate-4 pb-3 last:border-b-0 last:pb-0" data-testid={`party-supplier-row-${row.poNo}`}>

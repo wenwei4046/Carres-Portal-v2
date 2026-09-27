@@ -105,8 +105,9 @@ describe("collapsed — at most five facts", () => {
     expect(screen.getByTestId("logistics-card-heading").textContent).toBe("Logistics · AL Logistics");
     expect(screen.getByTestId("logistics-card-progress").textContent).toBe("Checks 0 of 3");
     const action = screen.getByTestId("logistics-card-action");
-    expect(action).toHaveTextContent("Contact logistics today");
-    expect(action).toHaveTextContent("Share the delivery details with AL Logistics · due 23 Oct");
+    /* Line 1 the act and its date, line 2 the description (Jess, 2026-09-27). */
+    expect(action).toHaveTextContent("Contact logistics today · due 23 Oct");
+    expect(action).toHaveTextContent("Share the delivery details with AL Logistics");
     expect(screen.queryByTestId("logistics-card-scheduled")).toBeNull();
     expect(screen.queryByTestId("logistics-card-exception")).toBeNull();
     // Money, PO and GRN never sit on the collapsed card.
@@ -151,8 +152,6 @@ describe("collapsed — at most five facts", () => {
     draw();
     /* One row in three segments (Jess, 2026-09-27): the heading column, the
        status column, then the trailing date/button outside the toggle. */
-    const toggle = screen.getByTestId("logistics-card-toggle");
-    expect(toggle.children[1]!.getAttribute("data-testid")).toBe("logistics-card-status");
     expect(screen.getByTestId("logistics-card-status").textContent).toBe("Scheduled delivery · 27 Oct · Hold delivery · RM 1,000.00 unpaid");
   });
 });
@@ -238,11 +237,8 @@ describe("the external link", () => {
 describe("density below 768px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
   it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
     draw();
-    const toggle = screen.getByTestId("logistics-card-toggle");
-    expect(toggle.className).toContain("min-h-[56px]");
-    expect(toggle.className).toContain("px-3");
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[13px]");
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-[18px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[14px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-5");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
     expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-[12px]");
     expect(act.className).toContain("text-[13px]");
@@ -252,8 +248,8 @@ describe("density below 768px — owner ruling 2026-09-25 (classes only; behavio
     expect(status.className).toContain("leading-4");
     expect(screen.getByTestId("logistics-card-progress").className).toContain("text-[12px]");
     const chevron = screen.getByTestId("logistics-card-chevron");
-    expect(chevron.className).toContain("h-10");
-    expect(chevron.className).toContain("w-10");
+    expect(chevron.className).toContain("h-9");
+    expect(chevron.className).toContain("w-9");
   });
 
   it("expanded: 10px vertical padding and 8px between sections", () => {

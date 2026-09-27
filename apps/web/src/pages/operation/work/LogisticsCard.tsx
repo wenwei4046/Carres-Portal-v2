@@ -1,3 +1,4 @@
+import type { PartyTone } from "@carres/shared";
 /**
  * THE LOGISTICS PARTY CARD — the Work right panel (owner rulings 2026-09-24,
  * docs/workspace/MASTER.md §5.9).
@@ -51,6 +52,7 @@ import { moneyOfOrder } from "../sales-order-facts";
 import { useGoodsName } from "./goods-name";
 import { WorkSection } from "./WorkCard";
 import { PartyCardShell } from "./PartyCardShell";
+import type { CardFact } from "./PartyCardShell";
 import Select from "@/components/kit/Select";
 import { ACTION_COPY, type WorkCommunication } from "./WorkActionPanel";
 
@@ -111,7 +113,8 @@ function spell(iso: string) {
 /** A due date's words: `due 24 Oct` · missed keeps the day it missed. */
 function dueText(action: LogisticsAction): string | null {
   if (!action.dueIso) return null;
-  return action.timing === "missed" ? `Late — was due ${spell(action.dueIso)}` : `due ${spell(action.dueIso)}`;
+  /* No dash, no word (Jess): a late act is its red date. */
+  return `due ${spell(action.dueIso)}`;
 }
 
 function StateIcon({ row }: { row: LogisticsCheckRow }) {
@@ -266,6 +269,8 @@ export default function LogisticsCard({
   heading: headingProp,
   trailing,
   communication = null,
+  pill,
+  facts: cardFacts,
 }: {
   orderId: string;
   leg?: number;
@@ -281,6 +286,8 @@ export default function LogisticsCard({
   heading?: string;
   /** The row's third segment: date · status word · the one button. */
   trailing?: ReactNode;
+  pill?: { text: string; tone: PartyTone } | null;
+  facts?: CardFact[];
   /** Delivery's governed message templates (`useLogisticsMessage`). */
   communication?: WorkCommunication | null;
 }) {
@@ -397,9 +404,12 @@ export default function LogisticsCard({
   const status = (
     <span className="flex min-w-0 flex-col text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-status-lines">
       {action ? (
-        <span className="min-w-0" data-testid="logistics-card-action">
-          <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">{action.act}</span>
-          <span className={`text-[12px] leading-4 ${timingTone}`}>{` · ${[action.result, dueText(action)].filter(Boolean).join(" · ")}`}</span>
+        <span className="flex min-w-0 flex-col" data-testid="logistics-card-action">
+          <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">
+            {action.act}
+            {dueText(action) ? <span className={`font-normal ${timingTone}`}>{` · ${dueText(action)}`}</span> : null}
+          </span>
+          <span className="text-[12px] leading-4 text-kit-slate-11">{action.result}</span>
         </span>
       ) : null}
       <span className="min-w-0 truncate">
@@ -420,9 +430,11 @@ export default function LogisticsCard({
       party={LOGISTICS_COPY.heading}
       heading={headingProp ?? heading}
       headingTone={partnerName ? "text-kit-slate-12" : "text-kit-amber-11"}
-      progress={LOGISTICS_COPY.checks(model.doneCount)}
+      progress={cardFacts ? null : LOGISTICS_COPY.checks(model.doneCount)}
       status={status}
       trailing={trailing}
+      pill={pill}
+      facts={cardFacts}
       open={open}
       onToggle={(next) => setOpen(next)}
     >
