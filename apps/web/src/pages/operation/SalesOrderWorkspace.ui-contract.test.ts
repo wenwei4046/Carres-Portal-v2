@@ -67,7 +67,8 @@ describe("Sales Order object template contract", () => {
        whole-page draft. The retired `?edit=1` URL state stays retired: the
        mode is page state, never a bookmarkable parameter. */
     expect(workspace).toContain('data-testid="workspace-edit"');
-    expect(workspace).toContain("const formLocked = mode === \"object\" && !editing;");
+    /* The lock grew to cover a historical version (THE LOCKED STATE, owner ruling 2026-09-26). */
+    expect(workspace).toContain('const formLocked = (mode === "object" && !editing) || mode === "oldrev";');
     expect(workspace).toContain("<fieldset disabled={formLocked}");
     expect(workspace).not.toContain('next.set("edit", "1")');
     expect(workspace).toContain('if (!params.get("edit")) return');
@@ -353,7 +354,9 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain('data-testid="amend-date-waiting"');
     expect(workspace).not.toContain("<SubHead>Change delivery date</SubHead>");
     expect(workspace).toContain('<DatePicker id="so-promised" label="Customer Requested Delivery Date"');
-    expect(workspace).toContain("Delivery date to be confirmed");
+    /* Edit offers no TBD tick (owner ruling 2026-09-26); the word survives for History translation only. */
+    expect(workspace).not.toContain('label="Delivery date to be confirmed"');
+    expect(workspace).toContain('delivery_date_tbd: "Delivery date to be confirmed"');
     expect(workspace).toContain("<WaitingRequest");
     expect(panels).toContain("Waiting for management");
     expect(panels).toContain("Out of date — propose again");
@@ -1632,5 +1635,84 @@ describe("Order Route reads its owners only when it is open", () => {
     expect(workspace).toContain("payments: facts.failed.payments");
     expect(workspace).toContain("amendment: amendmentQ.isError");
     expect(workspace).toContain("onRetry={retryRouteRead}");
+  });
+});
+
+/* ⭐ THE LOCKED STATE — OWNER RULING 2026-09-26 (Jess), `docs/orders/MASTER.md`
+   § THE LOCKED STATE rules 1 to 5. View and a historical version are ONE locked
+   presentation; Edit and Create are the only states that draw controls. */
+describe("the locked state (owner ruling 2026-09-26)", () => {
+  const table = workspace.slice(
+    workspace.indexOf("const editItemsTable = ("),
+    workspace.indexOf("/* ── THE LEFT PANE"),
+  );
+  const form = workspace.slice(workspace.indexOf("/* ── THE LEFT PANE"));
+
+  it("has ONE lock, and a historical version wears it", () => {
+    expect(workspace).toContain(
+      'const formLocked = (mode === "object" && !editing) || mode === "oldrev";',
+    );
+    expect(workspace.match(/const formLocked = /g)).toHaveLength(1);
+  });
+
+  it("rule 1 — a locked goods line prints text, never a number box", () => {
+    expect(table).not.toBe("");
+    /* Both boxes sit behind the lock, so no qty or price <input> exists in View or oldrev. */
+    expect(table.match(/\{formLocked \|\| l\.removed \|\| protectedLine\(l\) \? /g)).toHaveLength(2);
+    expect(table).toContain("<span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price)}</span>");
+    /* Every number box left in the table is on the unlocked side of those two gates. */
+    expect(table.match(/type="number"/g)).toHaveLength(2);
+  });
+
+  it("rule 2 — `Disc (RM)` prints money, never a dash", () => {
+    expect(workspace).not.toContain('text-base-500">—</td>');
+    expect(table).not.toContain(">—</td>");
+    expect(table.match(/\{fmtMoney\(discountOf\((l|a)\)\)\}<\/td>/g)).toHaveLength(2);
+    /* Zero unless the line really carries a numeric discount. */
+    expect(workspace).toContain('typeof (row as { discount?: unknown }).discount === "number"');
+  });
+
+  it("rule 3 — Edit offers no `Delivery date to be confirmed`, and a date is required to commit", () => {
+    expect(workspace).not.toContain('id="so-promised-tbd"');
+    expect(workspace).not.toContain('onCheckedChange={(v) => setField("delivery_date_tbd", v)}');
+    expect(form).not.toContain('label="Delivery date to be confirmed"');
+    /* The governed refusal (COPY-STANDARD § The Sales Order entry-gate words). */
+    expect(workspace).toContain(
+      'if (!needDealer && !draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";',
+    );
+    /* Picking a date in Edit ends the legacy TBD state in the same draft. */
+    expect(workspace).toContain(
+      "setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: mode === \"create\" ? d.delivery_date_tbd : false }))",
+    );
+    /* A legacy order keeps its amber note in View. */
+    expect(form).toContain(">No delivery date</span>");
+  });
+
+  it("rule 4 — a historical version draws no writer, no placeholder and no editing hint", () => {
+    expect(table).toContain("{!formLocked && editing && (");
+    expect(form).toContain("{!formLocked && editing && serviceOptions.length > 0 && (");
+    /* Absent values print through the ONE read-only field. */
+    expect(workspace).toContain('<Fact label={label} value="Not recorded" />');
+    for (const id of ["so-race", "so-gender", "so-birthday", "so-state", "so-city", "so-postcode", "so-building-type", "so-floor", "so-stair-items"]) {
+      const at = form.indexOf(`id="${id}"`);
+      expect(at, id).toBeGreaterThan(-1);
+      expect(form.slice(Math.max(0, at - 260), at), `${id} sits behind the lock`).toMatch(/lockedFact\(|formLocked \?/);
+    }
+    /* The hints belong to editing. */
+    expect(form).not.toMatch(/hint=\{!draft\.customer_address_(state|city) \?/);
+    expect(form).toContain("!formLocked && !draft.customer_address_unknown && !draft.building_type");
+    /* The never-recorded proceed date reads as a Fact until Edit opens it. */
+    expect(form).toContain('{mode === "create" || (mode === "object" && editing) ? (');
+    /* The fieldsets stay as the backstop. */
+    expect(form.match(/<fieldset disabled=\{formLocked\} className="contents">/g)).toHaveLength(4);
+  });
+
+  it("rule 5 — the required star belongs to Edit and Create only", () => {
+    const gates = [...workspace.matchAll(/\brequired=\{([^}]*)\}/g)].map((m) => m[1]);
+    expect(gates.length).toBeGreaterThan(0);
+    for (const g of gates) expect(g).toMatch(/^!(formLocked|locked)( && |$)/);
+    /* No bare `required` prop survives on a field. */
+    expect(workspace).not.toMatch(/"\s+required\s+(value|error|\/?>)/);
+    expect(workspace).not.toMatch(/\}\s+required\s/);
   });
 });
