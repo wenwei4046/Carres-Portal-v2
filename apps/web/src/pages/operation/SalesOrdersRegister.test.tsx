@@ -259,18 +259,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
-    /* §6.7 — Row 1 carries global utilities only. The one primary create action
-     * lives on the LEFT of Row 2. Reversing either half is the defect. */
-    expect(
-      within(screen.getByTestId("work-toolbar")).getByRole("button", {
-        name: "New Sales Order",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("sales-orders-destination-header")).queryByRole("button", {
-        name: "New Sales Order",
-      }),
-    ).not.toBeInTheDocument();
+    /* ⭐ OWNER RULING 2026-09-27 (Jess: "add new sales order should not be
+     * here"). A customer order is born in the Sales Portal and nowhere else:
+     * the Register carries no create button, on either row. */
+    expect(screen.queryByRole("button", { name: "New Sales Order" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sales-order")).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
@@ -1202,15 +1195,6 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 selected sales order\b/);
   });
 
-  it("draws New Sales Order as the kit primary 32px control, not a page-local capsule", () => {
-    mount();
-    const create = screen.getByTestId("new-sales-order");
-    expect(create).toHaveAttribute("data-kit", "button");
-    expect(create.className).toContain("h-8");
-    expect(create.className).not.toContain("rounded-full");
-    expect(create.querySelector("svg")).toHaveAttribute("stroke-width", "2");
-  });
-
   it("says a failed load in one kit error with the fact and Try again", () => {
     const refetch = vi.fn();
     listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("socket hang up"), refetch };
@@ -1224,10 +1208,10 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it("keeps the toolbar and New Sales Order when the list fails to load", () => {
+  it("keeps the toolbar when the list fails to load", () => {
     listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("x"), refetch: vi.fn() };
     mount();
-    expect(within(screen.getByTestId("work-toolbar")).getByTestId("new-sales-order")).toBeInTheDocument();
+    expect(screen.getByTestId("work-toolbar")).toBeInTheDocument();
     expect(screen.getByTestId("grid-footer")).not.toHaveTextContent("sales order");
   });
 

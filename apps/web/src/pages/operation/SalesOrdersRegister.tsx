@@ -792,19 +792,9 @@ export default function SalesOrdersRegister() {
                 },
               },
             ]}
-            toolbarStart={
-              /* The kit primary control (32px, kit `add` glyph at the governed
-                 stroke) — never a raw page-local capsule. */
-              <Button
-                variant="primary"
-                size="md"
-                icon="add"
-                data-testid="new-sales-order"
-                onClick={() => navigate("/operation/orders/so/new")}
-              >
-                New Sales Order
-              </Button>
-            }
+            /* ⭐ NO `New Sales Order` — owner ruling 2026-09-27 (Jess). A customer
+               order is the dealer's or showroom's act in the Sales Portal and
+               nowhere else; Operation receives it and never creates it. */
             statusSummary={(filtered, selectedRows) => (
               <RegisterResultSummary
                 filtered={filtered}

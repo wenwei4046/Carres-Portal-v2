@@ -1067,22 +1067,6 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
 // this file writes orders/order_lines directly.
 // ─────────────────────────────────────────────────────────────
 
-const revisionLineInput = z.object({
-  /** Present = update this line in place (keeps attrs + source_po); absent =
-   *  a new line. */
-  id: z.string().uuid().optional(),
-  sku: z.string().trim().min(1, "A line needs a SKU"),
-  qty: z.number().int().min(1, "Qty must be at least 1"),
-  unit_price: z.number().min(0, "Unit price must be 0 or more"),
-  /** The line's CONFIGURATION — sofa fabric, bedframe colour/gap, the cascade
-   *  payload Create-PO reads. Honoured by the CREATE door only (0374); the
-   *  SAVE door keeps a line's attrs by matching on `id`, so it neither needs
-   *  nor accepts them here. Absent stays NULL: a line with no configuration
-   *  must not gain an empty object that later code reads as "configured, with
-   *  nothing in it". */
-  attrs: z.record(z.unknown()).optional(),
-});
-
 /**
  * The editable header keys — mirrors the SAVE RPC whitelist verbatim.
  *
@@ -2001,105 +1985,21 @@ operationOrdersRouter.post(
   return c.json(data, 201);
 });
 
-// POST / — the office birth door ([+ New Sales Order]). Normal orders are
-// still born in the Sales Portal; this one inserts status='place' and mints
-// Rev 1 from the created state.
-const createOrderInput = z.object({
-  header: revisionHeaderInput
-    .extend({
-      customer_name: z.string().trim().min(1, "Customer name is required"),
-      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-      delivery_date_tbd: z.boolean().optional(),
-      dealer_id: z.string().uuid({ message: "A dealer is required" }),
-      // orders_salesperson_required (0296) — every portal-written order
-      // names who sold it; only the AutoCount archive importer is exempt.
-      salesperson_id: z.string().uuid({ message: "A salesperson is required" }),
-      // A birth NAMES the parties; `sales_order_create` derives channel from
-      // whether an outlet is given. Only the EDIT door lost these to 0329.
-      outlet_id: z.string().uuid().nullable().optional(),
-      /**
-       * 0391 — the office door names the production start, as the POS door
-       * already did (owner ruling YH, 2026-08-28).
-       *
-       * ⭐ TIGHTENED HERE, NOT ON `revisionHeaderInput`. The same object is
-       * reused by the EDIT door above, where `.nullable().optional()` is
-       * exactly what Jess's read-only ruling wants left alone — a save that
-       * only fixes a phone number must not be forced to restate a date it is
-       * not allowed to change. A birth and a correction ask different things
-       * of the same field, so only the birth is narrowed.
-       *
-       * The MASTER long read "`createOrderInput` refuses an order without
-       * one". That was true of the POS's `createOrderInputSchema` and never
-       * of THIS object, which merely shares its name — so the office could
-       * mint an order the object page then renders read-only as
-       * `Not recorded` forever. `sales_order_create` refuses it again on its
-       * own side (0391), because one layer is not a guard.
-       */
-      /* ⛔ THE MESSAGE RIDES `required_error`, NOT ONLY `.regex()`. A regex
-         message fires only when a STRING fails the pattern; an ABSENT field
-         reports Zod's own `"Required"` — which is the commonest case here and
-         the one an operator actually meets. Carrying the ruled sentence on all
-         three arms is what makes the refusal teach instead of merely refuse
-         (COPY-STANDARD rule 6). Caught by the test, not by reading. */
-      proceed_date: z
-        .string({
-          required_error: "Proceed date — pick the day production should start",
-          invalid_type_error: "Proceed date — pick the day production should start",
-        })
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "Proceed date — pick the day production should start"),
-    })
-    .strict(),
-  lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),
-});
-
-operationOrdersRouter.post("/", requireOperation, async (c) => {
-  const raw = await c.req.json().catch(() => ({}));
-  const parsed = createOrderInput.safeParse(raw);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
-      },
-      422,
-    );
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("sales_order_create", {
-    p_header: parsed.data.header,
-    p_lines: parsed.data.lines,
-  });
-  if (error) {
-    const m = mapPipelineV2Error(error);
-    return c.json(m.body, m.status);
-  }
-
-  /* 0393/0394 — STAIR CARRY ON AN OFFICE-BORN ORDER. Reported from
-     `/operation/orders/so/new`: the fee showed on the form and reached neither
-     the SO nor MONEY.
-
-     The POS door appends the fee into `create_order`’s payload, but
-     `sales_order_create` (0374) takes only a header and lines — it has no addon
-     parameter at all, so there is nothing to append TO. Rather than widen a
-     locked birth RPC, the order is stamped immediately after it exists, through
-     the SAME 0394 door the edit path uses. One writer, two callers.
-
-     Non-fatal for the same reason as the edit path: the order is already born
-     and its Rev 1 minted, so failing here would report a lost create that was
-     not lost. */
-  const createdId = (data as { id?: string } | null)?.id;
-  if (createdId) {
-    const stamped = await restampStairCarry(sb, createdId);
-    if (!stamped.ok) {
-      console.error("stair carry stamp failed on office create", {
-        orderId: createdId,
-        reason: stamped.reason,
-      });
-    }
-  }
-  return c.json(data, 201);
-});
+/* ⭐ THE OFFICE CREATE DOOR IS RETIRED — owner ruling 2026-09-27 (Jess). A
+   customer order is the dealer's or showroom's act in the Sales Portal and
+   nowhere else; Operation receives it and never creates it. Measured: every
+   one of the 58 `Order created` events from this door came from office logins
+   — test data. The permission boundary is kept; a stale client is refused
+   before any database client opens. */
+operationOrdersRouter.post("/", requireOperation, (c) =>
+  c.json(
+    {
+      error: "This action is no longer available. A Sales Order is created in the Sales Portal.",
+      code: "office_create_retired",
+    },
+    410,
+  ),
+);
 
 // POST /:id/floors — 3.2's read-only consequence evaluator. A POST for the
 // body's sake only: it calls ONE read-only definer function

@@ -147,6 +147,13 @@ which overwrites the 2026-09-21 "remain blue" ruling on this page.
 a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
 longer offers prints an empty box.
 
+**The office create door — RETIRED IN CODE 2026-09-28 (owner ruling 2026-09-27), production walk
+owed.** The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;
+`POST /api/operation/orders` answers 410 `office_create_retired` before any database client opens,
+with the Operation permission boundary kept. **Not removed yet:** the page's own Create mode
+(`mode === "create"` in `SalesOrderWorkspace.tsx`) is now unreachable and still in the file; the
+`sales_order_create` database function is untouched.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
