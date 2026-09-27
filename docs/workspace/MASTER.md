@@ -1163,6 +1163,14 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    line. Proceed lists only `Customer`: the money lives on Payment and the dates on Customer
    delivery, never repeated. Example: PO → `Sleepwell · Confirmed · PO260910-1180` /
    `3 ABC Furniture · Not confirmed · PO260911-1188` / `XYZ Bedding · No PO yet · Li Ching`.
+7b. **Route and To do say the same words; open work cannot be folded (Jess, 2026-09-27: "order
+   route not tally the to do 1 2 3 title … once done can hide and expand, before complete, cannot
+   hide").** Each To do item opens with a two-line summary header: line 1 = the number and EXACTLY
+   the Route item's words (`① Delivery details · Not received`), line 2 grey = `{step} · {the owning
+   form's name}` (`Logistics · Record scheduled delivery`); the form follows. A Route step holding
+   an open act and every open To do item stay open and show no fold arrow. After Save the item
+   moves to the end of To do as one line (`✓ Delivery details · Received` / `Logistics · Saved`),
+   which opens on press to show what was recorded; its Route step then folds and can be opened.
 8a. **One title per panel, one row (Jess, 2026-09-27: "we need align each panel got one title like
    communication but not too big font size").** Every column opens with the same 48px title row,
    14px semibold, aligned across the page: the left column's `My Work` · `Team Work` switch ·
