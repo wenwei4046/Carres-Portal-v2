@@ -250,7 +250,7 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   const bands = [
     { id: "goods" as const, label: "GOODS", x: MAP_PAD, y: bandY, w: goodsWidth, h: MAP_BAND_HEIGHT },
     { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
-    { id: "money" as const, label: "MONEY", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
+    { id: "money" as const, label: "PAYMENT", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
     ...(loanNodes.length > 0
       ? [{ id: "loan" as const, label: "LOAN", x: loanX, y: bandY, w: loanWidth, h: MAP_BAND_HEIGHT }]
       : []),
@@ -272,6 +272,8 @@ const MARK_GLYPH: Record<NodeMark, typeof Check> = {
   waiting: Circle,
   blocked: AlertTriangle,
   future: Circle,
+  /* Amber like `blocked`: it IS an exception, just not a business one. */
+  unreadable: AlertTriangle,
 };
 
 const MARK_BADGE: Record<NodeMark, string> = {
@@ -280,6 +282,7 @@ const MARK_BADGE: Record<NodeMark, string> = {
   waiting: "bg-kit-slate-3 text-kit-slate-9",
   blocked: "bg-kit-amber-3 text-kit-amber-11",
   future: "bg-kit-slate-3 text-kit-slate-9",
+  unreadable: "bg-kit-amber-3 text-kit-amber-11",
 };
 
 /**
@@ -294,6 +297,14 @@ const MARK_BOX: Record<NodeMark, string> = {
   waiting: "border-kit-slate-5 bg-white",
   blocked: "border-kit-slate-5 bg-kit-amber-3",
   future: "border-dashed border-kit-slate-5 bg-white",
+  unreadable: "border-kit-slate-5 bg-kit-amber-3",
+};
+
+/** The owners whose failed read the operator can ask for again. */
+export type RouteRetryOwner = "delivery" | "payments" | "purchasing" | "amendment";
+const retryOwnerOf = (href: string): RouteRetryOwner | null => {
+  const match = /^#retry-(delivery|payments|purchasing|amendment)$/.exec(href);
+  return match ? (match[1] as RouteRetryOwner) : null;
 };
 
 function ownerOf(owners: RouteActionOwners, key: StationOwnerKey): RoutePerson | null {
@@ -340,9 +351,11 @@ function Node({
   onReveal,
   goodsExpanded,
   onToggleGoods,
+  onRetry,
 }: {
   node: RouteNode;
   owners: RouteActionOwners;
+  onRetry?: (owner: RouteRetryOwner) => void;
   /** Slice 4 — the page pans the transformed surface so a focused node is
    *  visible; the browser cannot do it for a CSS-transformed canvas. */
   onReveal?: (node: RouteNode) => void;
@@ -414,8 +427,12 @@ function Node({
     .filter(Boolean)
     .join(" — ");
 
+  /* `Try again →` is not a place: it asks the page to read that owner again. */
+  const retryOwner = node.door ? retryOwnerOf(node.door.href) : null;
   const go = () => {
-    if (node.door) navigate(node.door.href);
+    if (!node.door) return;
+    if (retryOwner) onRetry?.(retryOwner);
+    else navigate(node.door.href);
   };
 
   return (
@@ -424,13 +441,13 @@ function Node({
       data-kind={node.kind}
       data-mark={node.mark}
       data-current={node.current ? "true" : "false"}
-      role={node.door ? "link" : "group"}
+      role={node.door && !retryOwner ? "link" : "group"}
       tabIndex={0}
       aria-label={spoken}
       aria-current={node.current ? "step" : undefined}
       onFocus={() => onReveal?.(node)}
       onKeyDown={(e) => {
-        if (node.door && (e.key === "Enter" || e.key === " ")) {
+        if (node.door && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           go();
         }
@@ -521,7 +538,19 @@ function Node({
         </div>
       )}
 
-      {!node.action && node.door && (
+      {node.door && retryOwner && (
+        <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
+          <button
+            type="button"
+            onClick={go}
+            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          >
+            {node.door.label}
+          </button>
+        </div>
+      )}
+
+      {node.door && !retryOwner && (
         <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
           <Link
             to={node.door.href}
@@ -584,10 +613,13 @@ export default function SalesOrderRoute({
   route,
   owners = { purchasing: null, receiving: null },
   loading = false,
+  onRetry,
 }: {
   route: RouteMap;
   owners?: RouteActionOwners;
   loading?: boolean;
+  /** A node's or the banner's `Try again →` — the page reads that owner again. */
+  onRetry?: (owner: RouteRetryOwner) => void;
 }) {
   const frame = useRef<HTMLDivElement | null>(null);
   const initialExpanded = useMemo(() => defaultExpandedGoods(route), [route]);
@@ -685,6 +717,38 @@ export default function SalesOrderRoute({
 
   return (
     <div className="flex flex-col gap-3" data-testid="sales-order-route">
+      {/* ⭐ `PROPOSED CHANGE` — owner ruling 2026-09-25. ABOVE the canvas, never
+          inside it: the map keeps meaning what is true now. The same amber
+          `warning` band every Register draws; nothing is rendered while no
+          request waits. */}
+      {route.proposedChange && (
+        <div
+          role="alert"
+          data-testid="route-proposed-change"
+          data-kind={route.proposedChange.kind}
+          className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-card border border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+        >
+          <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+          <span>{spellDates(route.proposedChange.fact)}</span>
+          {retryOwnerOf(route.proposedChange.door.href) ? (
+            <button
+              type="button"
+              onClick={() => onRetry?.("amendment")}
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+            >
+              {route.proposedChange.door.label}
+            </button>
+          ) : (
+            <Link
+              to={route.proposedChange.door.href}
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            >
+              {route.proposedChange.door.label}
+            </Link>
+          )}
+          {route.proposedChange.rule && <span className="basis-full">{route.proposedChange.rule}</span>}
+        </div>
+      )}
       {/* A linked exception is NOT a node: a node is a stage every Sales Order
           passes through, and Service is not one. It stays a conditional strip
           beside the map, rendered only when one is open. */}
@@ -742,7 +806,7 @@ export default function SalesOrderRoute({
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
           }}
         >
-          {/* The route names live on these bands — GOODS · DELIVERY · MONEY —
+          {/* The route names live on these bands — GOODS · DELIVERY · PAYMENT —
               never on the connectors (owner ruling 2026-08-17). */}
           {map.bands.map((band) => (
             <div
@@ -767,6 +831,7 @@ export default function SalesOrderRoute({
               node={node}
               owners={owners}
               onReveal={revealNode}
+              onRetry={onRetry}
               goodsExpanded={node.kind === "goods-line" ? node.id === expandedGoods : undefined}
               onToggleGoods={(id) => setExpandedGoods((current) => current === id ? current : id)}
             />

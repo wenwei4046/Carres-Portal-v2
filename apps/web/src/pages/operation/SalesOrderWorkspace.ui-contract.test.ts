@@ -1618,3 +1618,19 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
     expect(workspace).not.toContain('<h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>');
   });
 });
+
+/* ⭐ SCOPE A — owner rulings 2026-09-25 / 2026-09-26 (Orders MASTER §0.0). */
+describe("Order Route reads its owners only when it is open", () => {
+  it("fires the route fan-in only with ?route=1, never on every opened order", () => {
+    expect(workspace).toMatch(/useSalesOrderRouteFacts\(\s*isNew \? null : \(orderId \?\? null\),\s*showRoute,/);
+    expect(workspace).not.toMatch(/useSalesOrderRouteFacts\(\s*isNew \? null : \(orderId \?\? null\),\s*!isNew && Boolean\(orderId\),/);
+  });
+
+  it("hands the resolver the failed reads and the waiting change request", () => {
+    expect(workspace).toContain("unreadable: {");
+    expect(workspace).toContain("delivery: facts.failed.delivery");
+    expect(workspace).toContain("payments: facts.failed.payments");
+    expect(workspace).toContain("amendment: amendmentQ.isError");
+    expect(workspace).toContain("onRetry={retryRouteRead}");
+  });
+});

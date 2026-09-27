@@ -8,7 +8,7 @@
  *
  *   · one LANE per goods line, chains converging on the line's ONE STOCK
  *   · caption plates carry the product names — nothing sits on a connector
- *   · GOODS / DELIVERY / MONEY / LOAN group bands, 72px between groups
+ *   · GOODS / DELIVERY / PAYMENT / LOAN group bands, 72px between groups
  *   · the load fit never drops below 0.7×
  *
  * A separate vite entry (`route-preview.html`), not a route: `vite build`
@@ -132,18 +132,35 @@ const input: SalesOrderRouteInput = {
   claims: [],
 };
 
-const map = resolveSalesOrderRoute(input);
+/* `?s=` picks the state to photograph (Scope A, owner rulings 2026-09-25/26):
+ *   (none)      the four-line order above
+ *   waiting     a change request waiting for approval — the banner
+ *   unreadable  Delivery and Payments could not be read
+ *   paid        nothing owed
+ */
+const scenario = new URLSearchParams(window.location.search).get("s");
+const seeded: SalesOrderRouteInput =
+  scenario === "waiting"
+    ? { ...input, amendment: { status: "submitted", submittedAt: "2026-09-23", submittedBy: "Shasha" } }
+    : scenario === "unreadable"
+      ? { ...input, unreadable: { delivery: true, payments: true } }
+      : scenario === "paid"
+        ? { ...input, money: { known: true, outstanding: 0 } }
+        : input;
+
+const map = resolveSalesOrderRoute(seeded);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MemoryRouter>
-      <div className="min-h-screen bg-white p-6">
+      <div className="min-h-screen bg-kit-slate-3 px-4 py-4">
         <SalesOrderRoute
           route={map}
           owners={{
             purchasing: { userId: "u-yj", name: "Yu Jun", email: "yujun@carres.my" },
             receiving: { userId: "u-sh", name: "Shasha", email: "shasha@carres.my" },
           }}
+          onRetry={() => undefined}
         />
       </div>
     </MemoryRouter>

@@ -153,7 +153,7 @@ describe("Order Route — one canvas", () => {
     draw();
     expect(screen.getByTestId("route-band-goods")).toHaveTextContent("GOODS");
     expect(screen.getByTestId("route-band-delivery")).toHaveTextContent("DELIVERY");
-    expect(screen.getByTestId("route-band-money")).toHaveTextContent("MONEY");
+    expect(screen.getByTestId("route-band-money")).toHaveTextContent("PAYMENT");
     const plate = nodeEl("B1201S:goods-line");
     expect(plate).toHaveTextContent("B1201S · King");
     expect(plate).toHaveTextContent("Qty 3 · 3 to buy from factory");
@@ -194,7 +194,7 @@ describe("Order Route — the nodes", () => {
 
   it("spells a date through the one date format and never ships a bare ISO string", () => {
     draw();
-    expect(nodeEl("sales-order")).toHaveTextContent("SO Date: Wed, 12 Aug");
+    expect(nodeEl("sales-order")).toHaveTextContent("SO Doc Date: Wed, 12 Aug");
     expect(nodeEl("sales-order")).not.toHaveTextContent("2026-08-12");
   });
 
@@ -222,7 +222,7 @@ describe("Order Route — the nodes", () => {
     expect(action).toHaveTextContent("Confirm ready date");
     expect(action).toHaveClass("text-label");
     expect(context).toHaveTextContent(
-      "PO-2048 · 3 Units · Carres Warehouse · Requested Delivery Date: Thu, 24 Sep",
+      "PO-2048 · 3 Units · Carres Warehouse · Customer requested: Thu, 24 Sep",
     );
     expect(context).not.toHaveTextContent(/Due:|No due date|Next Action|Priority/i);
     expect(context).toHaveClass("text-label", "text-base-600");
@@ -262,14 +262,12 @@ describe("Order Route — the gate", () => {
     expect(gate).toHaveTextContent("NOT READY FOR DELIVERY");
     /* Owner ruling 2026-08-19 — the order owes RM 1,249 and the gate COUNTS
        it again: money in full, or an approved payment approval. The balance
-       also stays on the MONEY branch with its open collect. */
+       also stays on the PAYMENT branch with its open collect. */
     expect(gate).toHaveTextContent("1 of 5 requirements met");
     expect(gate).toHaveTextContent("Goods not ready (0 of 3)");
     expect(gate).toHaveTextContent("Logistics not assigned");
     expect(gate).toHaveTextContent("Scheduled delivery not recorded");
-    expect(gate).toHaveTextContent(
-      "RM 1,249.00 still outstanding — collect, or request a payment approval",
-    );
+    expect(gate).toHaveTextContent("Hold delivery · RM 1,249.00 unpaid");
     expect(gate).toHaveTextContent("No Finance hold");
   });
 
@@ -335,7 +333,7 @@ describe("Order Route — accessibility", () => {
     const supplier = nodeEl("PO-2048:supplier");
     expect(supplier).toHaveAttribute("tabindex", "0");
     expect(supplier.getAttribute("aria-label")).toBe(
-      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · 3 Units · Carres Warehouse · Requested Delivery Date: Thu, 24 Sep",
+      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · 3 Units · Carres Warehouse · Customer requested: Thu, 24 Sep",
     );
     expect(supplier).toHaveAttribute("aria-current", "step");
   });
@@ -426,5 +424,83 @@ describe("Order Route — linked problems", () => {
     const strip = screen.getByTestId("linked-problems");
     expect(strip).toHaveTextContent("SC-1031 · Investigation in progress");
     expect(screen.queryByTestId("route-node-case:c1")).not.toBeInTheDocument();
+  });
+});
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE A · owner rulings 2026-09-25 / 2026-09-26.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("PAYMENT, a failed read and a waiting change on the canvas", () => {
+  it("prints the PAYMENT node in two lines with the spelled deadline", () => {
+    draw();
+    const payment = nodeEl("money");
+    expect(payment).toHaveTextContent("PAYMENT");
+    expect(payment).toHaveTextContent("Hold delivery");
+    expect(payment).toHaveTextContent("RM 1,249.00 unpaid · by Tue, 22 Sep");
+    expect(payment).not.toHaveTextContent("still to collect");
+  });
+
+  it("an unreadable node carries its own mark, its warning glyph and both sentences whole", () => {
+    draw(map({ unreadable: { delivery: true } }));
+    const logistics = nodeEl("logistics");
+    expect(logistics).toHaveAttribute("data-mark", "unreadable");
+    expect(logistics).toHaveAttribute("data-current", "false");
+    expect(logistics.getAttribute("aria-label")).toContain(
+      "Could not read Delivery for this order. This does not mean nothing is arranged.",
+    );
+    expect(within(logistics).getByRole("button", { name: "Try again →" })).toBeInTheDocument();
+    expect(logistics).not.toHaveTextContent("Logistics not assigned");
+    /* The other groups draw from their own reads. */
+    expect(nodeEl("money")).toHaveAttribute("data-mark", "current");
+  });
+
+  it("Try again asks the page to read that owner again and never navigates", () => {
+    const onRetry = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/operation/orders/so/order-1?route=1"]}>
+        <SalesOrderRoute route={map({ unreadable: { payments: true } })} owners={owners} onRetry={onRetry} />
+        <Where />
+      </MemoryRouter>,
+    );
+    fireEvent.click(within(nodeEl("money")).getByRole("button", { name: "Try again →" }));
+    expect(onRetry).toHaveBeenCalledWith("payments");
+    expect(screen.getByTestId("where")).toHaveTextContent("/operation/orders/so/order-1?route=1");
+  });
+
+  it("announces a waiting change above the canvas, in three sentences and one door", () => {
+    draw(map({ amendment: { status: "submitted", submittedAt: "2026-09-24", submittedBy: "Mei Ling" } }));
+    const banner = screen.getByTestId("route-proposed-change");
+    expect(banner).toHaveAttribute("role", "alert");
+    expect(banner).toHaveTextContent(
+      "A change to this order is waiting for approval — submitted Thu, 24 Sep by Mei Ling.",
+    );
+    expect(banner).toHaveTextContent("The map shows the order as it stands today, not the change.");
+    expect(within(banner).getByRole("link", { name: "Open the request →" })).toHaveAttribute(
+      "href",
+      "/operation/orders/so/order-1",
+    );
+    /* Above the canvas, never inside it. */
+    expect(screen.getByTestId("route-canvas")).not.toContainElement(banner);
+    expect(banner.compareDocumentPosition(screen.getByTestId("route-canvas")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("draws no banner when nothing is waiting", () => {
+    draw();
+    expect(screen.queryByTestId("route-proposed-change")).not.toBeInTheDocument();
+  });
+
+  it("a failed read of the change requests says so and offers Try again", () => {
+    const onRetry = vi.fn();
+    render(
+      <MemoryRouter>
+        <SalesOrderRoute route={map({ unreadable: { amendment: true } })} owners={owners} onRetry={onRetry} />
+      </MemoryRouter>,
+    );
+    const banner = screen.getByTestId("route-proposed-change");
+    expect(banner).toHaveTextContent("Could not read the change requests for this order.");
+    fireEvent.click(within(banner).getByRole("button", { name: "Try again →" }));
+    expect(onRetry).toHaveBeenCalledWith("amendment");
   });
 });

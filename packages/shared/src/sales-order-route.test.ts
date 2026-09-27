@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveSalesOrderRoute,
+  ROUTE_TEXT_BUDGET,
+  wrapRouteText,
   type RouteNode,
   type RoutePurchaseOrder,
   type SalesOrderRouteInput,
@@ -429,7 +431,7 @@ describe("the DELIVERY ORDER gate", () => {
        still acts. It does not HOLD the delivery, so it does not say so. */
     const money = node(map, "money");
     expect(money.mark).not.toBe("complete");
-    expect(money.lines).toEqual(["RM 1,249.00 unpaid · by 2026-09-22"]);
+    expect(money.lines).toEqual(["RM 1,249.00 unpaid", "by 2026-09-22"]);
     expect(money.action?.label).toBe("Collect");
   });
 
@@ -821,7 +823,8 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
     const map = resolveSalesOrderRoute(input());
     expect(node(map, "money").lines).toEqual([
       "Hold delivery",
-      "RM 1,249.00 unpaid · by 2026-09-22",
+      "RM 1,249.00 unpaid",
+      "by 2026-09-22",
     ]);
     expect(requirement(map, "money")).toEqual({
       id: "money",
@@ -841,7 +844,7 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
         },
       }),
     );
-    expect(node(map, "money").lines[1]).toBe("RM 1,249.00 unpaid · by 2026-09-26");
+    expect(node(map, "money").lines.slice(1)).toEqual(["RM 1,249.00 unpaid", "by 2026-09-26"]);
   });
 
   it("paid: one word, and the gate line agrees", () => {
@@ -857,7 +860,7 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
         financeExceptions: [{ id: "fx1", status: "open", reason: "Cheque bounced" }],
       }),
     );
-    expect(node(map, "money").lines).toEqual(["Hold delivery", "Finance hold · Cheque bounced"]);
+    expect(node(map, "money").lines).toEqual(["Hold delivery", "Finance hold", "Cheque bounced"]);
     expect(node(map, "money").mark).not.toBe("complete");
     expect(requirement(map, "finance-exception")).toEqual({
       id: "finance-exception",
@@ -926,7 +929,7 @@ describe("a failed read is unreadable, never a business sentence (owner ruling 2
       "Could not read Delivery for this order. This does not mean nothing is arranged.",
     );
     /* No sentence is cut by the 208px box: every line fits the node. */
-    for (const l of logistics.lines) expect(l.length).toBeLessThanOrEqual(28);
+    for (const l of logistics.lines) expect(l.length).toBeLessThanOrEqual(ROUTE_TEXT_BUDGET.line);
     expect(logistics.door).toEqual({ label: "Try again →", href: "#retry-delivery" });
     expect(logistics.action).toBeNull();
     for (const id of ["delivery-date", "delivery-order", "deliver", "delivery-photo"]) {
@@ -1026,5 +1029,52 @@ describe("PROPOSED CHANGE is announced above the map (owner ruling 2026-09-25)",
       door: { label: "Try again →", href: "#retry-amendment" },
       rule: null,
     });
+  });
+});
+
+describe("a node that acts still shows its door (approved mock 2026-09-26)", () => {
+  it("PAYMENT owing carries Collect AND Open Payments, and the box is tall enough for both", () => {
+    const map = resolveSalesOrderRoute(input());
+    const payment = node(map, "money");
+    expect(payment.action?.label).toBe("Collect");
+    expect(payment.door).toEqual({ label: "Open Payments →", href: "/finance/payments?order=1319" });
+    /* pad 22 + title 20 + the fact rows × 18 + action 22 + context 18 + door 18 */
+    expect(payment.h).toBe(22 + 20 + payment.lines.length * 18 + 22 + 18 + 18);
+  });
+});
+
+describe("nothing on a node is ever cut (measured 2026-09-27: spelled lines overflowed the 208px box)", () => {
+  const spelled = (text: string) => text.replace(/\d{4}-\d{2}-\d{2}/g, "Thu, 24 Sep");
+
+  it("wraps on a word, counts a date at its SPELLED length and never drops a word", () => {
+    /* A row breaks at the ` · ` separator first: the line break does its work. */
+    expect(wrapRouteText("RM 1,500.00 unpaid · by 2026-09-22", ROUTE_TEXT_BUDGET.line)).toEqual([
+      "RM 1,500.00 unpaid",
+      "by 2026-09-22",
+    ]);
+    /* Facts that fit one row stay on it, separator and all. */
+    expect(wrapRouteText("Qty 3 · 2 on order", ROUTE_TEXT_BUDGET.line)).toEqual(["Qty 3 · 2 on order"]);
+    /* One long fact is broken on a word, and no word is dropped. */
+    const sentence = "This does not mean there is no purchase order.";
+    const rows = wrapRouteText(sentence, ROUTE_TEXT_BUDGET.line);
+    expect(rows.join(" ")).toBe(sentence);
+    for (const row of rows) expect(spelled(row).length).toBeLessThanOrEqual(ROUTE_TEXT_BUDGET.line);
+  });
+
+  it("every fact line, requirement row and context row fits its budget, and the box is tall enough", () => {
+    const map = resolveSalesOrderRoute(
+      input({ financeExceptions: [{ id: "f", status: "open", reason: "Chargeback under investigation by the bank" }] }),
+    );
+    for (const n of map.nodes) {
+      for (const line of n.lines) expect(spelled(line).length).toBeLessThanOrEqual(ROUTE_TEXT_BUDGET.line);
+      const reqRows = n.requirements.flatMap((r) => wrapRouteText(r.text, ROUTE_TEXT_BUDGET.requirement));
+      const ctxRows = n.action ? wrapRouteText(n.action.context.detail, ROUTE_TEXT_BUDGET.context) : [];
+      const expected =
+        22 + 20 + n.lines.length * 18 + reqRows.length * 16 +
+        (n.action ? 22 + ctxRows.length * 18 : 0) + (n.door ? 18 : 0);
+      expect(n.h).toBe(expected);
+    }
+    const gate = node(map, "delivery-order");
+    expect(gate.requirements.map((r) => r.text)).toContain("Hold delivery · RM 1,249.00 unpaid");
   });
 });

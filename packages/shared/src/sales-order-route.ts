@@ -467,24 +467,52 @@ const unitNames = (list: ReadonlyArray<AllocationUnit>) =>
 const truthy = (list: ReadonlyArray<string | null | undefined>): string[] =>
   list.filter((line): line is string => Boolean(line && line.trim().length > 0));
 
-/** A node is 208px wide and its lines never wrap in the box, so a SENTENCE is
- *  broken here, on a word, into lines the box can print whole. A rule the
- *  operator must read may not end in an ellipsis. */
-const WRAP_AT = 28;
-function wrapWords(text: string): string[] {
-  const out: string[] = [];
-  let line = "";
-  for (const word of text.split(" ")) {
-    if (line && `${line} ${word}`.length > WRAP_AT) {
-      out.push(line);
-      line = word;
-    } else {
-      line = line ? `${line} ${word}` : word;
+/**
+ * ⭐ NOTHING ON A NODE IS EVER CUT. Measured 2026-09-27 at 1440/1180/820/743/390:
+ * the 208px box ended `RM 1,500.00 unpaid · by Tue, 22 Sep`, the gate's money
+ * line and every action context in an ellipsis. The box draws one row per
+ * line, so text is broken HERE, on a word, and the geometry counts the rows —
+ * the page draws the rows this function returns and no others.
+ *
+ * Budgets are characters per row at the governed type scale inside the box's
+ * 184px of text: `text-body` 13px fact lines, `text-label` 11px context rows,
+ * and requirement rows that give 12px to their tick.
+ */
+export const ROUTE_TEXT_BUDGET = { line: 26, requirement: 30, context: 32 } as const;
+
+/** A date travels as ISO and is SPELLED by the page (`Thu, 24 Sep`), one
+ *  character longer. The row is measured at the length the operator reads. */
+const spelledLength = (text: string) =>
+  text.replace(/\d{4}-\d{2}-\d{2}/g, "ddd, dd mmm").length;
+
+/**
+ * Facts are joined by ` · `, so a row breaks at a separator first — the line
+ * break then does the separator's work and no row starts or ends with a dot.
+ * Only a single fact longer than the row is broken on a word.
+ */
+export function wrapRouteText(text: string, budget: number): string[] {
+  const rows: string[] = [];
+  let row = "";
+  for (const fact of text.split(" · ")) {
+    if (row && spelledLength(`${row} · ${fact}`) <= budget) {
+      row = `${row} · ${fact}`;
+      continue;
+    }
+    if (row) rows.push(row);
+    row = "";
+    for (const word of fact.split(" ")) {
+      if (row && spelledLength(`${row} ${word}`) > budget) {
+        rows.push(row);
+        row = word;
+      } else {
+        row = row ? `${row} ${word}` : word;
+      }
     }
   }
-  if (line) out.push(line);
-  return out;
+  if (row) rows.push(row);
+  return rows;
 }
+const wrapWords = (text: string) => wrapRouteText(text, ROUTE_TEXT_BUDGET.line);
 
 /* The read-failure words — `docs/COPY-STANDARD.md` § The Order Route words. */
 const UNREADABLE = {
@@ -554,9 +582,17 @@ function nodeHeight(node: {
     BOX_PAD +
     TITLE_H +
     node.lines.length * LINE_H +
-    node.requirements.length * REQ_H +
-    (node.action ? ACTION_H + CONTEXT_H : 0) +
-    (!node.action && node.door ? DOOR_H : 0)
+    node.requirements.reduce(
+      (rows, req) => rows + wrapRouteText(req.text, ROUTE_TEXT_BUDGET.requirement).length,
+      0,
+    ) * REQ_H +
+    (node.action
+      ? ACTION_H +
+        wrapRouteText(node.action.context.detail, ROUTE_TEXT_BUDGET.context).length * CONTEXT_H
+      : 0) +
+    /* A node that acts still shows its door: `Collect` tells the operator what
+       to do, `Open Payments →` is where (approved mock 2026-09-26). */
+    (node.door ? DOOR_H : 0)
   );
 }
 
@@ -637,7 +673,7 @@ function sealChain(
           : isHead
             ? "waiting"
             : "future";
-    const lines = truthy(draft.lines);
+    const lines = truthy(draft.lines).flatMap(wrapWords);
     const requirements = draft.requirements ?? [];
     /* An action belongs to the position being worked, not to a queue of nodes
        nobody has reached. */

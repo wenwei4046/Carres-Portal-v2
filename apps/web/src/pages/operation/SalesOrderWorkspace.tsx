@@ -82,6 +82,7 @@ import {
   salesOrderParamOf,
   supplierClaimStatusLabel,
   myHolidaySet,
+  mytDayOf,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
@@ -146,7 +147,7 @@ import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
-import SalesOrderRoute from "./SalesOrderRoute";
+import SalesOrderRoute, { type RouteRetryOwner } from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 
@@ -1290,9 +1291,12 @@ function SalesOrderWorkspaceBody() {
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
   const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
+  /* ⭐ ROUTE FACTS LOAD ONLY WHEN THE ROUTE IS OPEN (owner ruling 2026-09-26).
+     Measured: the fan-in fired on every opened order — eleven requests the
+     Order tab never reads. */
   const routeFactsQ = useSalesOrderRouteFacts(
     isNew ? null : (orderId ?? null),
-    !isNew && Boolean(orderId),
+    showRoute,
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
@@ -2426,10 +2430,10 @@ function SalesOrderWorkspaceBody() {
         doNumber: detail.order.do_number ?? null,
         /* Delivery's own answer about who carries this order — the LOGISTICS
            node never infers a company from the region default. */
-        logistics: facts.brief.assignedLogistics
+        logistics: facts.brief?.assignedLogistics
           ? { partnerName: facts.brief.assignedLogistics.partnerName }
           : null,
-        booking: facts.brief.appointment
+        booking: facts.brief?.appointment
           ? {
               confirmedDate: facts.brief.appointment.dateIso,
               slot: facts.brief.appointment.slot,
@@ -2504,6 +2508,24 @@ function SalesOrderWorkspaceBody() {
       /* Sunday and Malaysian public holidays are the two days no company runs
          (§8) — the gate names the refused day instead of failing silently. */
       publicHolidays: [...myHolidaySet()],
+      /* ⭐ A FAILED READ IS `unreadable`, NEVER A BUSINESS SENTENCE (owner
+         ruling 2026-09-26). The group whose owner could not be read says so;
+         every other group draws from its own read. */
+      unreadable: {
+        delivery: facts.failed.delivery,
+        payments: facts.failed.payments,
+        amendment: amendmentQ.isError,
+      },
+      /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
+         still waiting for a decision is announced. */
+      amendment:
+        liveAmendment && (liveAmendment.status === "submitted" || liveAmendment.stale)
+          ? {
+              status: liveAmendment.stale ? "stale" : "submitted",
+              submittedAt: liveAmendment.submitted_at ? mytDayOf(liveAmendment.submitted_at) : null,
+              submittedBy: liveAmendment.submitted_by_name?.trim() || null,
+            }
+          : null,
     });
   }, [
     orderId,
@@ -2513,7 +2535,17 @@ function SalesOrderWorkspaceBody() {
     serviceCasesQ.data,
     cancelledLines,
     money,
+    liveAmendment,
+    amendmentQ.isError,
   ]);
+
+  const retryRouteRead = useCallback(
+    (owner: RouteRetryOwner) => {
+      if (owner === "amendment") void amendmentQ.refetch();
+      else void routeFactsQ.refetch();
+    },
+    [amendmentQ, routeFactsQ],
+  );
 
   /* The Route hands out the action-engine line; the ROSTER names the person.
      One duty read, the same one the Team board and the PO chips use. */
@@ -4038,7 +4070,7 @@ function SalesOrderWorkspaceBody() {
               />
             </div>
           ) : orderRoute ? (
-            <SalesOrderRoute route={orderRoute} owners={routeOwners} />
+            <SalesOrderRoute route={orderRoute} owners={routeOwners} onRetry={retryRouteRead} />
           ) : (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <EmptyState title="No route facts were found for this sales order" />

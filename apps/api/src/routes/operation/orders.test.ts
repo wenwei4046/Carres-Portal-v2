@@ -2463,6 +2463,82 @@ describe("POST /api/operation/orders/:id/save", () => {
 describe("Sales Order amendment decision lane", () => {
   const AMENDMENT_ID = "00000000-0000-0000-0000-000000000a01";
 
+  /* ⭐ `PROPOSED CHANGE` (owner ruling 2026-09-25) names WHO submitted the
+     request. `sales_order_amendment_live` returns no sender, so the door reads
+     the request's own `submitted_by` and names it through the ONE resolver. */
+  describe("GET /:id/amendment names the sender", () => {
+    const ORDER = "00000000-0000-0000-0000-0000000000c1";
+    const SENDER = "00000000-0000-0000-0000-0000000000f1";
+    const live = { id: AMENDMENT_ID, status: "submitted", stale: false, submitted_at: "2026-09-24T03:00:00Z" };
+
+    function client(opts: { sender?: string | null; senderError?: boolean; names?: Array<{ id: string; name: string | null }> }) {
+      const rpc = vi.fn((fn: string) =>
+        fn === "sales_order_amendment_live"
+          ? Promise.resolve({ data: { amendment: live }, error: null })
+          : fn === "actor_display_names"
+            ? Promise.resolve({ data: opts.names ?? [], error: null })
+            : Promise.resolve({ data: null, error: null }),
+      );
+      const from = vi.fn((table: string) => {
+        if (table === "sales_order_amendments") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve(
+                    opts.senderError
+                      ? { data: null, error: { message: "boom" } }
+                      : { data: { submitted_by: opts.sender ?? null }, error: null },
+                  ),
+              }),
+            }),
+          };
+        }
+        return { select: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) };
+      });
+      return { rpc, from };
+    }
+
+    async function read(c: ReturnType<typeof client>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(c as any);
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER}/amendment`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("adds the sender's real name to the live request", async () => {
+      const body = await read(client({ sender: SENDER, names: [{ id: SENDER, name: "Mei Ling" }] }));
+      expect(body.amendment).toEqual({ ...live, submitted_by_name: "Mei Ling" });
+    });
+
+    it("never invents a person: an unresolved sender stays unnamed and the request still reads", async () => {
+      expect((await read(client({ sender: SENDER, names: [] }))).amendment.submitted_by_name).toBeNull();
+      expect((await read(client({ senderError: true }))).amendment).toEqual({ ...live, submitted_by_name: null });
+    });
+
+    it("returns no amendment untouched", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: { amendment: null }, error: null });
+      const from = vi.fn();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER}/amendment`, { headers: { Authorization: `Bearer ${jwt}` } }),
+        env,
+      );
+      expect(await res.json()).toEqual({ amendment: null });
+      expect(from).not.toHaveBeenCalled();
+    });
+  });
+
   it("returns the owner impact preview without writing another module", async () => {
     const impact = {
       amendment_id: AMENDMENT_ID,
