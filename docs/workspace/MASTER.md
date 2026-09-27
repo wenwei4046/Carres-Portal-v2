@@ -1101,8 +1101,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    order follow A6. No boxes between modules — the line and white space separate
    them.
 6. **Order of work, one meaning per colour (Jess, 2026-09-27: "又有红又有蓝，没有让我知道先要做什么").**
-   Every open act of the signed-in person on this order carries a number badge on its checklist
-   item (1, 2, 3) in the order to do them: missed first, oldest first, then due, ties in Route order.
+   Every open act of the signed-in person on this order carries a mark on its checklist item: a red
+   `!` when missed, an amber `!` when due (Jess, 2026-09-27: "confused the numbering work?" — the
+   1, 2, 3 badges were removed because they did not read top to bottom). The first missed act in
+   Route order opens by itself.
    **One page, no paging (Jess, 2026-09-27: "why working record panel need turn to next? i want
    one page"):** the record panel lists every open act of this order at once, stacked in number
    order, each headed by its number badge and title with its owning module's form beneath. The act
@@ -1160,9 +1162,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    Requested delivery {date}` and one heading row `Order Route | To do`. Each row: LEFT (220px) =
    the module name, its one control date, its status (red Missed · amber Due · grey otherwise) and
    Proceed's SO document; RIGHT = that module's checklist (marker · what · date · state · document,
-   aligned in one grid down the whole page). An open act carries its order number (1, 2, 3: missed
-   first, ties in Route order); pressing it opens its owning module's form INLINE under that line
-   in a pale-blue block, and only one form is open at a time. After Save the next number opens.
+   aligned in one grid down the whole page). An open act carries a red or amber `!` (A6); pressing it opens its owning module's form INLINE under that line
+   in a pale-blue block, and only one form is open at a time. After Save the next open act opens.
    A row with an open act, a red or amber line, or a single line never folds; any other row folds
    to its line names with a chevron. Complex acts (receiving, taking money) open their owning page
    and return to the same order. The Logistics checks (7a-i) are the Delivery row's lines.
