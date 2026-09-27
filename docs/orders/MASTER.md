@@ -1002,6 +1002,18 @@ that draw controls. Measured on production 2026-09-25 (`6ed021fac`, SO-1365 / SO
    fieldset stays as the backstop.
 5. **The required star belongs to Edit and Create only.** `required` reaches every state
    (`:3291-3323`, `:3480`), so View labels read `Full name *`. A locked field is not a question.
+6. **The office create door offers the service editor — OWNER FINDING 2026-09-27 (Jess: "disposal
+   missing?").** On `/operation/orders/so/new` the `Delivery` card ends at `Items needing stair
+   carry`: the one service editor renders only while `editing` or while a service already exists
+   (`:3611`), and `editing` is an object-mode flag, so a NEW order cannot take a disposal service
+   here at all. The editor (rows · qty · per-unit Size · `Add service`) renders in Create exactly as
+   in Edit — Delivery owns the ONE service editor (owner correction 2026-09-24) on every writing
+   state.
+7. **The office create door carries no `Address not given yet` tick.** It still draws one while the
+   address is blank (`:3424`), which the 2026-09-13 ruling retired at every create door (COPY: *the
+   `Fill in address later` tick is RETIRED at every create door*; the refusal is `Delivery address —
+   ask the customer for the address before you save the order`). The tick survives only on a legacy
+   row that already carries it, read-only, so it can be unticked.
 
 **ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
 items stay (existing Class A rule). The one journey is:
