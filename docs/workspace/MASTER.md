@@ -1160,7 +1160,9 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    48px `{SO No} {customer} · Requested delivery {date}` row, one heading row `Order Route |
    Checklist · To do {n}`, then ONE row per module in order `Proceed · Purchasing · Receiving ·
    Warehouse · Payment · Delivery`. LEFT cell: the module name, its control date, its status (red
-   Missed · amber Due · grey otherwise). RIGHT cell: that module's WHOLE checklist in one aligned
+   Missed · amber Due · grey otherwise), laid out as line 1 = module name with its date on the right,
+   line 2 = status (Jess, 2026-09-27: "Proceed is header, then follow date at right. status under
+   header"). RIGHT cell: that module's WHOLE checklist in one aligned
    grid down the page — `mark · what · date or state · document` — with a party's group line
    (`Ohana … PO-20260903-4316 V1`) above its own lines; ✓ done, ○ not yet, red `!` an open act.
    Pressing an `!` line opens its owning module's form in place under it, one form at a time; after
