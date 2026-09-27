@@ -2524,6 +2524,13 @@ function SalesOrderWorkspaceBody() {
               status: liveAmendment.stale ? "stale" : "submitted",
               submittedAt: liveAmendment.submitted_at ? mytDayOf(liveAmendment.submitted_at) : null,
               submittedBy: liveAmendment.submitted_by_name?.trim() || null,
+              /* WHAT changes — the same rows the Order tab's request shows
+                 (one arithmetic, Law D). The Route prints the first three. */
+              changes: (requestView?.rows ?? []).map((row) => ({
+                what: row.what,
+                before: row.before,
+                after: row.after,
+              })),
             }
           : null,
     });
@@ -2537,6 +2544,7 @@ function SalesOrderWorkspaceBody() {
     money,
     liveAmendment,
     amendmentQ.isError,
+    requestView,
   ]);
 
   const retryRouteRead = useCallback(

@@ -182,7 +182,7 @@ describe("goods forks", () => {
   it("still walks the whole chain for a quantity no Purchase Order covers", () => {
     const map = resolveSalesOrderRoute(input({ purchaseOrders: [] }));
     const purchasing = node(map, "B1201S:unassigned:purchasing");
-    expect(purchasing.lines).toContain("No Purchase Order yet");
+    expect(purchasing.lines.join(" ")).toBe("Carres has not issued a Purchase Order");
     expect(purchasing.action).toEqual({
       ownerKey: "purchasing",
       label: "Issue PO",
@@ -347,10 +347,10 @@ describe("the DELIVERY ORDER gate", () => {
        requirement again (owner ruling 2026-08-19). */
     expect(gate.lines).toEqual(["NOT READY FOR DELIVERY", "1 of 5 requirements met"]);
     expect(gate.requirements.map((r) => r.text)).toEqual([
-      "Goods not ready (1 of 3)",
+      "Warehouse has 1 of 3 Units ready",
       "Logistics not assigned",
-      "Scheduled delivery not recorded",
-      "Hold delivery · RM 1,249.00 unpaid",
+      "Logistics has not scheduled the delivery",
+      "Customer has not paid RM 1,249.00",
       "No Finance hold",
     ]);
   });
@@ -411,7 +411,7 @@ describe("the DELIVERY ORDER gate", () => {
     expect(requirement(map, "money")).toEqual({
       id: "money",
       met: false,
-      text: "Hold delivery · RM 1,249.00 unpaid",
+      text: "Customer has not paid RM 1,249.00",
     });
     const money = node(map, "money");
     expect(money.mark).not.toBe("complete");
@@ -425,13 +425,13 @@ describe("the DELIVERY ORDER gate", () => {
     expect(requirement(map, "money")).toEqual({
       id: "money",
       met: true,
-      text: "Paid",
+      text: "Customer paid in full",
     });
     /* The approval does not forgive the money: the branch still owes and
        still acts. It does not HOLD the delivery, so it does not say so. */
     const money = node(map, "money");
     expect(money.mark).not.toBe("complete");
-    expect(money.lines).toEqual(["RM 1,249.00 unpaid", "by 2026-09-22"]);
+    expect(money.lines).toEqual(["Customer has not paid", "RM 1,249.00", "Customer must pay by", "2026-09-22"]);
     expect(money.action?.label).toBe("Collect");
   });
 
@@ -441,7 +441,7 @@ describe("the DELIVERY ORDER gate", () => {
     );
     const req = requirement(map, "money")!;
     expect(req.met).toBe(false);
-    expect(req.text).toBe("Hold delivery · RM 1,249.00 unpaid");
+    expect(req.text).toBe("Customer has not paid RM 1,249.00");
   });
 
   it("paid in full meets the money requirement with no approval", () => {
@@ -451,7 +451,7 @@ describe("the DELIVERY ORDER gate", () => {
     expect(requirement(map, "money")).toEqual({
       id: "money",
       met: true,
-      text: "Paid",
+      text: "Customer paid in full",
     });
   });
 
@@ -606,7 +606,7 @@ describe("the tail after the gate", () => {
 
   it("says what is missing, why and who does what next", () => {
     const map = resolveSalesOrderRoute(input());
-    expect(node(map, "delivery-photo").lines).toEqual(["No delivery photo yet"]);
+    expect(node(map, "delivery-photo").lines.join(" ")).toBe("Logistics has not uploaded the delivery photo");
     for (const banned of ["No data", "No results", "Not available"]) {
       expect(JSON.stringify(map)).not.toContain(banned);
     }
@@ -674,7 +674,7 @@ describe("connectors", () => {
     /* The product name lives on the plate, never on a line. */
     const plate = node(map, "B1201S:goods-line");
     expect(plate.title).toBe("B1201S · King");
-    expect(plate.lines).toEqual(["Qty 3 · 2 on order"]);
+    expect(plate.lines).toEqual(["Customer ordered 3", "Carres ordered 2 from supplier"]);
     expect(plate.door).toBeNull();
     expect(plate.action).toBeNull();
   });
@@ -823,13 +823,15 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
     const map = resolveSalesOrderRoute(input());
     expect(node(map, "money").lines).toEqual([
       "Hold delivery",
-      "RM 1,249.00 unpaid",
-      "by 2026-09-22",
+      "Customer has not paid",
+      "RM 1,249.00",
+      "Customer must pay by",
+      "2026-09-22",
     ]);
     expect(requirement(map, "money")).toEqual({
       id: "money",
       met: false,
-      text: "Hold delivery · RM 1,249.00 unpaid",
+      text: "Customer has not paid RM 1,249.00",
     });
   });
 
@@ -844,13 +846,13 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
         },
       }),
     );
-    expect(node(map, "money").lines.slice(1)).toEqual(["RM 1,249.00 unpaid", "by 2026-09-26"]);
+    expect(node(map, "money").lines.slice(-2)).toEqual(["Customer must pay by", "2026-09-26"]);
   });
 
   it("paid: one word, and the gate line agrees", () => {
     const map = resolveSalesOrderRoute(input({ money: { known: true, outstanding: 0 } }));
-    expect(node(map, "money").lines).toEqual(["Paid"]);
-    expect(requirement(map, "money")).toEqual({ id: "money", met: true, text: "Paid" });
+    expect(node(map, "money").lines).toEqual(["Customer paid in full"]);
+    expect(requirement(map, "money")).toEqual({ id: "money", met: true, text: "Customer paid in full" });
   });
 
   it("an OPEN Finance exception: Hold delivery over Finance hold and its reason", () => {
@@ -899,7 +901,7 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
     const map = resolveSalesOrderRoute(
       input({ paymentApprovals: [{ id: "a", status: "approved" }] }),
     );
-    expect(requirement(map, "money")).toEqual({ id: "money", met: true, text: "Paid" });
+    expect(requirement(map, "money")).toEqual({ id: "money", met: true, text: "Customer paid in full" });
   });
 });
 
@@ -995,7 +997,9 @@ describe("PROPOSED CHANGE is announced above the map (owner ruling 2026-09-25)",
     );
     expect(map.proposedChange).toEqual({
       kind: "waiting",
-      fact: "A change to this order is waiting for approval — submitted 2026-09-24 by Mei Ling.",
+      fact: "Mei Ling asked to change this order on 2026-09-24. The approver has not approved it yet.",
+      changes: [],
+      more: 0,
       door: { label: "Open the request →", href: "/operation/orders/so/order-1" },
       rule: "The map shows the order as it stands today, not the change.",
     });
@@ -1006,7 +1010,7 @@ describe("PROPOSED CHANGE is announced above the map (owner ruling 2026-09-25)",
       input({ amendment: { status: "stale", submittedAt: "2026-09-24", submittedBy: "Mei Ling" } }),
     );
     expect(map.proposedChange?.fact).toBe(
-      "A change to this order is out of date — submitted 2026-09-24 by Mei Ling.",
+      "Mei Ling asked to change this order on 2026-09-24. The order changed after that. Mei Ling must send the request again.",
     );
     expect(map.proposedChange?.rule).toBe("The map shows the order as it stands today, not the change.");
   });
@@ -1026,6 +1030,8 @@ describe("PROPOSED CHANGE is announced above the map (owner ruling 2026-09-25)",
     expect(map.proposedChange).toEqual({
       kind: "unreadable",
       fact: "Could not read the change requests for this order.",
+      changes: [],
+      more: 0,
       door: { label: "Try again →", href: "#retry-amendment" },
       rule: null,
     });
@@ -1052,6 +1058,11 @@ describe("nothing on a node is ever cut (measured 2026-09-27: spelled lines over
       "RM 1,500.00 unpaid",
       "by 2026-09-22",
     ]);
+    /* An amount is one word: RM never ends a row with its number on the next. */
+    expect(wrapRouteText("Customer has not paid RM 1,500.00", ROUTE_TEXT_BUDGET.line)).toEqual([
+      "Customer has not paid",
+      "RM 1,500.00",
+    ]);
     /* Facts that fit one row stay on it, separator and all. */
     expect(wrapRouteText("Qty 3 · 2 on order", ROUTE_TEXT_BUDGET.line)).toEqual(["Qty 3 · 2 on order"]);
     /* One long fact is broken on a word, and no word is dropped. */
@@ -1076,6 +1087,61 @@ describe("nothing on a node is ever cut (measured 2026-09-27: spelled lines over
       expect(n.h).toBe(expected);
     }
     const gate = node(map, "delivery-order");
-    expect(gate.requirements.map((r) => r.text)).toContain("Hold delivery · RM 1,249.00 unpaid");
+    expect(gate.requirements.map((r) => r.text)).toContain("Customer has not paid RM 1,249.00");
+  });
+});
+
+describe("every line names WHO (owner ruling 2026-09-27: who + object + who + action)", () => {
+  it("the plate says who ordered what, and what Carres has not ordered", () => {
+    const map = resolveSalesOrderRoute(input({ purchaseOrders: [po({ id: "PO-2048", lines: [{ sku: "B1201S", qty: 1, receivedQty: 0 }] })] }));
+    expect(node(map, "B1201S:goods-line").lines).toEqual([
+      "Customer ordered 3",
+      "Carres ordered 1 from supplier",
+      "Carres has not ordered 1 yet",
+    ]);
+  });
+
+  it("the banner says WHAT changes, who asked and who decides", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        amendment: {
+          status: "submitted",
+          submittedAt: "2026-09-23",
+          submittedBy: "Shasha",
+          approver: "Jess",
+          changes: [
+            { what: "Customer Requested Delivery Date", before: "2026-09-24", after: "2026-10-05" },
+            { what: "Latex Pillow", before: "Qty 4", after: "Qty 2" },
+            { what: "Address", before: "—", after: "12 Jalan Satu" },
+            { what: "Phone", before: "012", after: "013" },
+          ],
+        },
+      }),
+    );
+    expect(map.proposedChange?.fact).toBe(
+      "Shasha asked to change this order on 2026-09-23. Jess has not approved it yet.",
+    );
+    expect(map.proposedChange?.changes).toEqual([
+      "Customer Requested Delivery Date: 2026-09-24 → 2026-10-05",
+      "Latex Pillow: Qty 4 → Qty 2",
+      "Address: Not recorded → 12 Jalan Satu",
+    ]);
+    expect(map.proposedChange?.more).toBe(1);
+  });
+
+  it("no waiting or missing line is left without its subject, and no dash is printed", () => {
+    const map = resolveSalesOrderRoute(input({ purchaseOrders: [] }));
+    const printed = map.nodes.flatMap((n) => n.spoken);
+    for (const retired of ["Not received yet", "Ready date not confirmed", "No Purchase Order yet", "Not scheduled yet", "Not delivered yet", "No delivery photo yet", "on order", "to buy"]) {
+      expect(printed.join("\n")).not.toContain(retired);
+    }
+    expect(printed).toEqual(expect.arrayContaining([
+      "Carres has not issued a Purchase Order",
+      "Supplier has not confirmed the ready date",
+      "Warehouse has not received the goods",
+      "Logistics has not scheduled the delivery",
+      "Logistics has not delivered the goods",
+      "Logistics has not uploaded the delivery photo",
+    ]));
   });
 });

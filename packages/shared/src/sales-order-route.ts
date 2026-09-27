@@ -1168,22 +1168,22 @@ function goodsRequirement(
         return {
           id: "goods",
           met: true,
-          text: `Goods ready for this delivery (${units(scopeCommitted)} in, ${units(remaining)} still open)`,
+          text: `Warehouse has ${units(scopeCommitted)} ready for this delivery · ${units(remaining)} still open`,
         };
       }
     }
   }
 
   if (totals.committedQty === 0) {
-    return { id: "goods", met: true, text: "No goods on this order" };
+    return { id: "goods", met: true, text: "Customer ordered no goods" };
   }
   if (totals.readyQty >= totals.committedQty) {
-    return { id: "goods", met: true, text: `Goods ready (${units(totals.committedQty)})` };
+    return { id: "goods", met: true, text: `Warehouse has ${units(totals.committedQty)} ready` };
   }
   return {
     id: "goods",
     met: false,
-    text: `Goods not ready (${totals.readyQty} of ${totals.committedQty})`,
+    text: `Warehouse has ${totals.readyQty} of ${totals.committedQty} Units ready`,
   };
 }
 
@@ -1226,18 +1226,18 @@ function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
     return { id: "money", met: true, text: NO_PRICE };
   }
   if (input.money.outstanding <= 0) {
-    return { id: "money", met: true, text: "Paid" };
+    return { id: "money", met: true, text: "Customer paid in full" };
   }
   /* The door closed on 2026-09-01 and no surface invites an approval. One
      granted before that is history honoured: the line is met and reads `Paid`
      on the terms recorded — the DO prints its COD instruction (Delivery §3). */
   if (paymentApprovalOpensGate(input.paymentApprovals)) {
-    return { id: "money", met: true, text: "Paid" };
+    return { id: "money", met: true, text: "Customer paid in full" };
   }
   return {
     id: "money",
     met: false,
-    text: `Hold delivery · ${ringgit(input.money.outstanding)} unpaid`,
+    text: `Customer has not paid ${ringgit(input.money.outstanding)}`,
   };
 }
 
@@ -1259,7 +1259,7 @@ function gateRequirements(
     {
       id: "appointment",
       met: Boolean(confirmed),
-      text: confirmed ? "Scheduled delivery recorded" : "Scheduled delivery not recorded",
+      text: confirmed ? "Logistics scheduled the delivery" : "Logistics has not scheduled the delivery",
     },
     moneyRequirement(input),
     financeExceptionRequirement(input),
@@ -1771,6 +1771,9 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
  * sentence that stops the wrong reading. It links to the request (Law C); no
  * proposed lane is ever drawn on the map.
  */
+const valueWord = (value: string) =>
+  !value.trim() || /^[—–-]$/.test(value.trim()) ? "Not recorded" : value.trim();
+
 function proposedChangeOf(input: SalesOrderRouteInput): RouteProposedChange | null {
   if (input.unreadable?.amendment) {
     return {
@@ -1795,7 +1798,11 @@ function proposedChangeOf(input: SalesOrderRouteInput): RouteProposedChange | nu
     fact: stale
       ? `${who} asked to change this order${when}. The order changed after that. ${who} must send the request again.`
       : `${who} asked to change this order${when}. ${approver ?? "The approver"} has not approved it yet.`,
-    changes: rows.slice(0, 3).map((row) => `${row.what}: ${row.before} → ${row.after}`),
+    /* No dash stands for a value (owner ruling 2026-09-26): an empty side of
+       the arrow prints its word. */
+    changes: rows
+      .slice(0, 3)
+      .map((row) => `${row.what}: ${valueWord(row.before)} → ${valueWord(row.after)}`),
     more: Math.max(0, rows.length - 3),
     door: door("Open the request →", `/operation/orders/so/${encodeURIComponent(input.order.id)}`),
     rule: "The map shows the order as it stands today, not the change.",

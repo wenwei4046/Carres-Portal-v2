@@ -61,7 +61,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 
 | Slice | What it carries | State |
 |---|---|---|
-| **A1 · the Route tells the truth about what it could not read** | route facts load only with `?route=1` · `⚠ unreadable` for Delivery and Payments (a failed read never blanks the map, never prints a business sentence) · the `PAYMENT` node and band, two lines with `paymentDeadlineOf` · gate lines `Hold delivery · RM {amount} unpaid` / `Paid` / `Hold delivery · Finance hold · {reason}` · `SO Doc Date` and `Customer requested` · the `PROPOSED CHANGE` banner with the sender's real name (the amendment door now names `submitted_by`) · the plate's `on order` / `to buy` · a node that acts also shows its door | **BUILT 2026-09-27 — production walk owed** |
+| **A1 · the Route tells the truth, and every line names WHO** | route facts load only with `?route=1` · `⚠ unreadable` for Delivery and Payments (a failed read never blanks the map, never prints a business sentence) · the `PAYMENT` node and band with `paymentDeadlineOf` · `SO Doc Date` and `Customer requested` · **every line is who + object + action (owner ruling 2026-09-27; words in COPY-STANDARD § The Order Route words)** · the `PROPOSED CHANGE` banner says who asked, **what changes** (the Order tab's own rows, first three) and who decides · a node that acts also shows its door | **BUILT 2026-09-27 — production walk owed** |
 | **A2 · DELIVERY reads Delivery's own records** | one lane per `(leg, trip)`, the per-lane gate, `DELIVER` through `deliveryWorkStatusOf`, photos per Delivery Order | APPROVED TARGET / NOT BUILT |
 | **A3 · GOODS reads Purchasing, Receiving and Stock** | `po_line_sources` lineage, `PO Delivery Date` and `Expected arrival`, `receivingSummaryOf` counts, `Choose Ready Unit`, a failed Purchasing read per line | APPROVED TARGET / NOT BUILT |
 
@@ -1843,10 +1843,12 @@ must see it on Order Route.
 - **One banner, above the canvas, never inside it.** The map keeps meaning *what is true now*; an
   amendment is precisely not yet true. It is the same `warning` band kind every Register uses
   (`role="alert"`, amber, zero height while absent) — no new kit component.
-- **Three sentences, no more:** the fact with who and when, the door, and the sentence that stops
-  the wrong reading — *the map below shows the order as it stands today, not the change.*
-- **It links, it never duplicates** (Law C): the Before/After lives on the `Order` tab; the banner
-  opens it. No proposed lane is drawn in a ghost style on the canvas — two truths on one surface
+- **It says who asked, what changes and who decides (owner ruling 2026-09-27 — Jess could not see
+  what the Sales Order changed).** Line 1 names the sender and the approver; up to three rows print
+  `{field}: {before} → {after}`; the last sentence stops the wrong reading — *the map shows the
+  order as it stands today, not the change.*
+- **One arithmetic (Law D):** the rows are the `Order` tab's own request rows, handed to the Route;
+  the full Before/After and the decision stay on the `Order` tab, which the banner opens. No proposed lane is drawn in a ghost style on the canvas — two truths on one surface
   is the defect the 2026-08-16 ruling removed.
 - **Reads:** `sales_order_amendment_live` (the same read the Order tab makes) — status `submitted`
   or `stale`, submitted by, submitted at. A `rejected` or `applied` request renders nothing.
