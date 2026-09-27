@@ -1185,6 +1185,23 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    - **Verified on SO-1333 (2026-09-28):** two `supplier_date_passed` cards (Ohana 14 Sep, Nice
      Future 15 Sep), one `confirm_delivery_date` card due today (NETS). Receiving has no act
      (neither PO carries a send mark). Payment has no act (no Scheduled delivery). `To do 3`.
+   - **REVISION 13 · STOPS = THE SALES ORDER ORDER ROUTE NODES, ONE CHECKLIST FORMAT (Jess,
+     2026-09-28: "yes. direction is correct … split to supplier, receiving, etc, what order route from
+     sales order do"; "every module step checklist progress is the same"; PROPOSAL until 定).** The
+     stops are the orders MASTER node map in its order, under its bands: `GOODS` (`PURCHASING` ·
+     `SUPPLIER` · `RECEIVING` · `STOCK`), `DELIVERY` (`LOGISTICS` · `DELIVERY DATE`), `PAYMENT`, then
+     `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`. The stop label is small grey uppercase (11/500)
+     with `Missed` / `Due` and `{n} of {m} done` on its line; the card title (15/600) is what to do,
+     else the node's who + object sentence from the resolver (`Warehouse has not received the goods`);
+     the second line says why. Every card carries its checklist: a square box per step, ✓ filled when
+     done, empty when not yet, red or amber `!` for the step that is the act now, and `{n} of {m} done`.
+     A fact (a date that is not a step) is never a checklist row. The DELIVERY ORDER card lists the
+     gate's five requirements as its checklist. SO-1333 (resolver run on origin/main 2026-09-28):
+     Payment IS due today — the one shared `paymentDeadlineOf` anchors on the Scheduled delivery,
+     else the Customer Requested Delivery Date (Wed 30 Sep → Mon 28 Sep); revision 11's "no deadline
+     until Scheduled delivery" is withdrawn. To do 4: two supplier answers, `Call NETS`,
+     `Collect RM 2,284.00 from 12341234` (`Record payment`). UI/UX skill rules applied: stop label
+     and card title are two ranks; grey text at least 4.5:1 (slate-11); buttons 36px; only Save blue.
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
