@@ -1087,10 +1087,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    visible, in order `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Customer
    delivery · Payment (only when it affects the delivery)` — each with its status word and its
    checklist directly beneath. A tick, an open circle or a warning comes from a recorded fact;
-   staff never tick anything. More than one module may show an open item. RIGHT: ONE card — the
-   exact form or action that completes the selected checklist item, and nothing else (it does not
-   repeat the order). The Inbox act opens with its item selected; pressing another open item swaps
-   the card; after Save the checklist re-reads its facts. The card is the owning module's own
+   staff never tick anything. More than one module may show an open item. RIGHT: the record panel —
+   the exact forms that complete this order's open acts, stacked (A6), and nothing else (it does
+   not repeat the order). The Inbox act opens with its item selected; after Save the checklist
+   re-reads its facts. The card is the owning module's own
    component in place (for a PO answer, Purchasing's `Record supplier answer` form with its own
    words: `Confirmed` · `New date` · `Split delivery`, the eight governed reasons, `Evidence`,
    `Supplier DO received`, `Save`) — never a Workspace copy. The left column scrolls alone.
@@ -1103,8 +1103,11 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 6. **Order of work, one meaning per colour (Jess, 2026-09-27: "又有红又有蓝，没有让我知道先要做什么").**
    Every open act of the signed-in person on this order carries a number badge on its checklist
    item (1, 2, 3) in the order to do them: missed first, oldest first, then due, ties in Route order.
-   The card's top line reads `{n} of {m} on this order` with ‹ › to the neighbour acts (PROPOSED
-   words, COPY on lock). Red = missed; amber = due on the chosen day (`Due {date}`, PROPOSED); blue
+   **One page, no paging (Jess, 2026-09-27: "why working record panel need turn to next? i want
+   one page"):** the record panel lists every open act of this order at once, stacked in number
+   order, each headed by its number badge and title with its owning module's form beneath. The act
+   being worked carries the 3px blue edge and drives Communication's tab; pressing a Route item
+   scrolls to its form; after Save the act leaves the list and the rest renumber. Red = missed; amber = due on the chosen day (`Due {date}`, PROPOSED); blue
    = only the one item open now (pale-blue wash, 3px edge) and the card's primary button. An open
    item owned by someone else is grey, unnumbered, and names its owner (`No PO yet · Li Ching`).
    Done is a dark tick; waiting is a hollow circle. Step dots are dark when done, red when missed,
