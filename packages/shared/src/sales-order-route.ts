@@ -744,7 +744,9 @@ function sealChain(
     /* The plate prints `text-label` 11px, so its row holds what a context row holds. */
     const spoken = draft.spoken ?? truthy(draft.lines);
     const lines = truthy(draft.lines).flatMap((line) =>
-      draft.kind === "goods-line" ? wrapRouteText(line, ROUTE_TEXT_BUDGET.context) : wrapWords(line),
+      draft.kind === "goods-line" || draft.kind === "delivery-lane"
+        ? wrapRouteText(line, ROUTE_TEXT_BUDGET.context)
+        : wrapWords(line),
     );
     const requirements = draft.requirements ?? [];
     /* An action belongs to the position being worked, not to a queue of nodes
@@ -1878,6 +1880,10 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
         laneX += lane.w + COL_GAP;
       }
     } else if (group.key === "delivery" && deliveryLanes.length > 0) {
+      /* The plates share one height, so every lane's stations start on the
+         same row and a leg reads across as easily as down. */
+      const plateH = Math.max(...deliveryLanes.map((lane) => lane.plate.h));
+      for (const lane of deliveryLanes) lane.plate.h = plateH;
       deliveryLanes.forEach((lane, index) => {
         const x = groupX + index * PITCH;
         lane.plate.x = x;

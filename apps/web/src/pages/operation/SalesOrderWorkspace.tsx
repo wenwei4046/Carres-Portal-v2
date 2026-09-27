@@ -78,6 +78,7 @@ import {
   receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
+  routeDeliveryScopesOf,
   salesOrderNumberWord,
   salesOrderParamOf,
   supplierClaimStatusLabel,
@@ -125,6 +126,7 @@ import {
   useSalesOrderAmendment,
   useSalesOrderRevisions,
   useSalesOrderExpansion,
+  useLogisticsCardFacts,
   useSalesOrderRouteFacts,
   useSalesOrderIdByNumber,
   useSalespersons,
@@ -1299,6 +1301,12 @@ function SalesOrderWorkspaceBody() {
     showRoute,
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
+  /* The leg that reaches the customer decides the payment deadline's clock. */
+  const routeCustomerLeg = useMemo(() => {
+    const stops = detailQ.data?.order?.delivery_stops ?? [];
+    return stops.length >= 2 ? Math.max(...stops.map((stop) => Number(stop.leg) || 0)) : 0;
+  }, [detailQ.data]);
+  const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
      owns that translation. The route facts carry only open/closed. */
   const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
@@ -2424,6 +2432,29 @@ function SalesOrderWorkspaceBody() {
         receivedAt: record.goods_received_at,
       })),
       delivery: {
+        /* ⭐ DELIVERY'S OWN RECORDS, ONE SCOPE PER LANE (owner ruling
+           2026-09-26). The arrangement, the live Delivery Order, its attempts,
+           its handover facts and the photos bound to its number — arranged by
+           the shared `routeDeliveryScopesOf`. The V1 booking fields below are
+           only the fallback for an order Delivery has recorded nothing on. */
+        scopes: facts.delivery
+          ? routeDeliveryScopesOf({
+              stops: detail.order.delivery_stops ?? [],
+              arrangements: facts.delivery.arrangements,
+              deliveryOrders: facts.delivery.deliveryOrders,
+              attempts: facts.delivery.attempts,
+              handoverEvents: facts.delivery.handoverEvents,
+              photos: detail.control?.delivery_photos ?? [],
+              lines: detail.lines.map((line) => ({ sku: line.sku, qty: Number(line.qty) })),
+              fallbackPartnerName: facts.brief?.assignedLogistics?.partnerName ?? null,
+              fallbackConfirmedDate: facts.brief?.appointment?.dateIso ?? null,
+              fallbackConfirmedTime: facts.brief?.appointment?.slot ?? null,
+            })
+          : undefined,
+        /* Payment must be complete 3 working days before an outstation
+           delivery, 2 in the Klang Valley — the Work panel's own reading of
+           the partner (Law D). */
+        outstation: routePartnerQ.data?.partner ? !routePartnerQ.data.partner.kvDefault : false,
         /* The document's own number (0356/Law D) — the gate stops depending on
            an attempt existing before it can print the number the system
            already minted. */
@@ -2545,6 +2576,7 @@ function SalesOrderWorkspaceBody() {
     liveAmendment,
     amendmentQ.isError,
     requestView,
+    routePartnerQ.data,
   ]);
 
   const retryRouteRead = useCallback(

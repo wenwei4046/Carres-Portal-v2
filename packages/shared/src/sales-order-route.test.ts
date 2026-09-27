@@ -1078,7 +1078,7 @@ describe("nothing on a node is ever cut (measured 2026-09-27: spelled lines over
       input({ financeExceptions: [{ id: "f", status: "open", reason: "Chargeback under investigation by the bank" }] }),
     );
     for (const n of map.nodes) {
-      const budget = n.kind === "goods-line" ? ROUTE_TEXT_BUDGET.context : ROUTE_TEXT_BUDGET.line;
+      const budget = n.kind === "goods-line" || n.kind === "delivery-lane" ? ROUTE_TEXT_BUDGET.context : ROUTE_TEXT_BUDGET.line;
       for (const line of n.lines) expect(spelled(line).length).toBeLessThanOrEqual(budget);
       const reqRows = n.requirements.flatMap((r) => wrapRouteText(r.text, ROUTE_TEXT_BUDGET.requirement));
       const ctxRows = n.action ? wrapRouteText(n.action.context.detail, ROUTE_TEXT_BUDGET.context) : [];

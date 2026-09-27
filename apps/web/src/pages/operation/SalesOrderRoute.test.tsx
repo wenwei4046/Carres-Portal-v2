@@ -526,3 +526,110 @@ describe("PAYMENT, a failed read and a waiting change on the canvas", () => {
     expect(onRetry).toHaveBeenCalledWith("amendment");
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE A2 · one delivery scope is one lane (owner ruling 2026-09-26).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("DELIVERY lanes on the canvas", () => {
+  const lane = (over: Record<string, unknown>) => ({
+    trip: 0,
+    plate: null,
+    transfer: false,
+    legStop: null,
+    partnerName: null,
+    confirmedDate: null,
+    confirmedTime: null,
+    deliveryOrder: null,
+    tripGroups: null,
+    attempts: [],
+    handoverEvents: [],
+    photos: [],
+    ...over,
+  });
+  const journey = () =>
+    map({
+      money: { known: true, outstanding: 0 },
+      delivery: {
+        logistics: null,
+        booking: null,
+        attempts: [],
+        scopes: [
+          lane({
+            leg: 1,
+            plate: "Leg 1 · Carres Klang → JB transit warehouse",
+            transfer: true,
+            legStop: "JB transit warehouse",
+            partnerName: "NETS",
+            confirmedDate: "2026-09-15",
+            deliveryOrder: { id: "do-1", number: "DO-130926-0842" },
+            attempts: [{ result: "delivered", reasonKey: null, recordedAt: "2026-09-13T04:00:00Z" }],
+          }),
+          lane({
+            leg: 2,
+            plate: "Leg 2 · JB transit warehouse → customer",
+            partnerName: "AL",
+            confirmedDate: "2026-09-17",
+            deliveryOrder: { id: "do-2", number: "DO-130926-3223" },
+            attempts: [{ result: "delivered", reasonKey: null, recordedAt: "2026-09-13T08:00:00Z" }],
+          }),
+        ] as never,
+      },
+    });
+
+  it("draws one plate and one chain per leg, each with its own Delivery Order", () => {
+    draw(journey());
+    const plate = nodeEl("delivery-lane:1:0");
+    expect(plate).toHaveTextContent("Leg 1");
+    expect(plate).toHaveTextContent("Carres Klang → JB transit");
+    expect(plate.getAttribute("aria-label")).toBe("Leg 1 · Carres Klang → JB transit warehouse");
+    /* A plate is not a station: it is no button and carries no door. */
+    expect(plate.tagName).toBe("DIV");
+    expect(nodeEl("logistics:1:0")).toHaveTextContent("NETS");
+    expect(nodeEl("logistics:2:0")).toHaveTextContent("AL");
+    expect(nodeEl("delivery-order:1:0")).toHaveTextContent("DO-130926-0842");
+    expect(nodeEl("delivery-order:2:0")).toHaveTextContent("DO-130926-3223");
+    expect(nodeEl("deliver:1:0")).toHaveTextContent("Arrived at JB transit");
+    expect(nodeEl("deliver:2:0")).toHaveTextContent("Delivered to customer");
+    expect(screen.queryByTestId("route-node-delivery-photo:1:0")).not.toBeInTheDocument();
+  });
+
+  it("keeps the two lanes side by side under one DELIVERY band, and nothing overlaps", () => {
+    draw(journey());
+    const box = (id: string) => {
+      const el = nodeEl(id) as HTMLElement;
+      return {
+        x: parseFloat(el.style.left),
+        y: parseFloat(el.style.top),
+        w: parseFloat(el.style.width),
+        h: parseFloat(el.style.height),
+      };
+    };
+    const one = box("logistics:1:0");
+    const two = box("logistics:2:0");
+    expect(two.x).toBe(one.x + 208 + 32);
+    expect(two.y).toBe(one.y);
+    const band = screen.getByTestId("route-band-delivery") as HTMLElement;
+    expect(parseFloat(band.style.width)).toBe(208 * 2 + 32);
+    const ids = [...document.querySelectorAll<HTMLElement>("[data-testid^='route-node-']")].map(
+      (el) => el.dataset.testid!.replace("route-node-", ""),
+    );
+    for (const a of ids) {
+      for (const b of ids) {
+        if (a >= b) continue;
+        const p = box(a);
+        const q = box(b);
+        const apart = p.x + p.w <= q.x || q.x + q.w <= p.x || p.y + p.h <= q.y || q.y + q.h <= p.y;
+        expect(apart, `${a} overlaps ${b}`).toBe(true);
+      }
+    }
+  });
+
+  it("opens a Delivery Order by its row id", () => {
+    draw(journey());
+    expect(within(nodeEl("delivery-order:2:0")).getByRole("link", { name: "Open DO-130926-3223 →" })).toHaveAttribute(
+      "href",
+      "/operation/delivery-orders/do-2",
+    );
+  });
+});

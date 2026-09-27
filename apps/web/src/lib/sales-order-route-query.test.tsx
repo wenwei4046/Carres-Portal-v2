@@ -23,6 +23,17 @@ beforeEach(() => {
     if (url.endsWith("/allocation")) return Promise.resolve({ allocation: { lines: [] } });
     if (url.endsWith("/booking-brief")) return Promise.resolve({ brief: { appointment: null } });
     if (url.endsWith("/delivery-attempts")) return Promise.resolve({ attempts: [] });
+    /* A2 — Delivery's own records for this order. */
+    if (url === "/api/operation/delivery-arrangements?order=order-1") {
+      return Promise.resolve({ arrangements: [{ order_id: "order-1", leg: 1, partner_name: "NETS" }], contacts: [] });
+    }
+    if (url === "/api/operation/delivery-orders?order=order-1") {
+      return Promise.resolve({
+        deliveryOrders: [{ id: "d1", do_number: "DO2609-4827", leg: 1, trip: 0 }],
+        attempts: [{ do_number: "DO2609-4827", result: "delivered" }],
+        handoverEvents: [{ delivery_order_id: "d1", kind: "handed_over" }],
+      });
+    }
     if (url.endsWith("/loans")) return Promise.resolve({ loans: [] });
     /* 0492 (Card 15) — the loan offer conversation rides the same fan-in. */
     if (url.endsWith("/loan-offers")) return Promise.resolve({ offers: [] });
@@ -114,5 +125,31 @@ describe("useSalesOrderRouteFacts", () => {
     );
     const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, ["PO-1"]), { wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  /* ⭐ A2 — the DELIVERY group reads Delivery's own records (owner ruling 2026-09-26). */
+  it("reads this order's arrangements and Delivery Orders, never the whole table", async () => {
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.delivery).toEqual({
+      arrangements: [{ order_id: "order-1", leg: 1, partner_name: "NETS" }],
+      deliveryOrders: [{ id: "d1", do_number: "DO2609-4827", leg: 1, trip: 0 }],
+      attempts: [{ do_number: "DO2609-4827", result: "delivered" }],
+      handoverEvents: [{ delivery_order_id: "d1", kind: "handed_over" }],
+    });
+    const urls = apiFetch.mock.calls.map((call) => call[0]);
+    expect(urls).not.toContain("/api/operation/delivery-arrangements");
+    expect(urls).not.toContain("/api/operation/delivery-orders");
+  });
+
+  it("a failed read of Delivery's records is Delivery unreadable, and no scope is invented", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.startsWith("/api/operation/delivery-orders?") ? Promise.reject(new Error("boom")) : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.failed.delivery).toBe(true);
+    expect(result.current.data?.delivery).toBeNull();
   });
 });
