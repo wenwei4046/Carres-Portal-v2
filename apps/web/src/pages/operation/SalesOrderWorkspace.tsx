@@ -2725,7 +2725,7 @@ function SalesOrderWorkspaceBody() {
           {/* `⋮` LAST, ICON ONLY — owner ruling (Jess, 2026-09-21); its accessible
               name and tooltip are `More actions`. The retired `Propose a change to
               the customer` door is gone: the whole-page Edit carries that change. */}
-          <summary className="btn-ghost cursor-pointer list-none px-2 text-body" aria-label="More actions" title="More actions">⋮</summary>
+          <summary className="btn-ghost cursor-pointer list-none px-2 text-body max-md:inline-grid max-md:h-10 max-md:w-10 max-md:place-items-center max-md:px-0" aria-label="More actions" title="More actions">⋮</summary>
           <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
             <button
               type="button"
