@@ -133,6 +133,20 @@ scroll; `Print` is its icon below 480px and `⋮` is 40px.
 through `OverflowText` — the ledger is not a Register row and the engine's component is not mounted
 there yet.
 
+**Scope C · SO page locked state — BUILT 2026-09-28, production walk owed.** ONE lock
+(`formLocked`): View and a historical version are the same locked presentation. Measured on the
+rendered page at 1440 / 1180 / 820 / 743 / 390: no number box, no enabled control, no label ending in
+`*`, no dash, no `Select` / `Pick a date` placeholder; `Unit (RM)` prints `RM 1,890.00` and `Disc (RM)`
+prints `RM 0.00`. Edit carries no `Delivery date to be confirmed`; a legacy order with no date must
+pick one before it commits (`Delivery date is required. Ask the customer for the date before you save
+the order.`). Card titles are black bold (`text-strong` slate-12) under the ONE KIT LAW of 2026-09-27,
+which overwrites the 2026-09-21 "remain blue" ruling on this page.
+**Rules 6 and 7 of THE LOCKED STATE are superseded, not built:** the owner's correction of 2026-09-27
+— Operation never creates a Sales Order by any door — removes the office create door they describe.
+**Not built in C:** a locked field that HAS a value still draws its disabled box (name, phone, address,
+a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
+longer offers prints an empty box.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
