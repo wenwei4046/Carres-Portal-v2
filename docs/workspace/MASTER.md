@@ -1109,7 +1109,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    being worked carries the 3px blue edge and drives Communication's tab; pressing a Route item
    scrolls to its form; after Save the act leaves the list and the rest renumber. Red = missed; amber = due on the chosen day (`Due {date}`, PROPOSED); blue
    = only the one item open now (pale-blue wash, 3px edge) and the card's primary button. An open
-   item owned by someone else is grey, unnumbered, and names its owner (`No PO yet · Li Ching`).
+   item owned by someone else is grey, unnumbered, and names its owner (`No PO yet · {owner}`).
    Done is a dark tick; waiting is a hollow circle. Step dots are dark when done, red when missed,
    grey otherwise; there is no larger "current step" dot.
 6a. **Five adaptations from the ChatGPT order-desk prototype (Jess "ok", 2026-09-27).** Ours stays
@@ -1174,8 +1174,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    alone. The checklist is one line per item in three aligned columns: **what** (party or fact
    name) · **its state** · **its document** (underlined, opens the PDF). No item takes a second
    line. Proceed lists only `Customer`: the money lives on Payment and the dates on Customer
-   delivery, never repeated. Example: PO → `Sleepwell · Confirmed · PO260910-1180` /
-   `3 ABC Furniture · Not confirmed · PO260911-1188` / `XYZ Bedding · No PO yet · Li Ching`.
+   delivery, never repeated. Example: PO → `{supplier} · Confirmed · {PO No}` /
+   `3 {supplier} · Not confirmed · {PO No}` / `{supplier} · No PO yet · {owner}`.
 7a-i. **The Logistics step lists its three checks (Jess, 2026-09-27: "logistic check blueprint, it
    should before 3 days need call. show t1, t2, t3"),** read from §5.9 "The three checks" and
    Delivery §5.2, never re-invented. Screen words are the governed labels, never `T1/T2/T3`. The
