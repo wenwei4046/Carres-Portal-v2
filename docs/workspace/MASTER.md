@@ -1153,6 +1153,19 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
+8a. **One title per panel, one row (Jess, 2026-09-27: "we need align each panel got one title like
+   communication but not too big font size").** Every column opens with the same 48px title row,
+   14px semibold, aligned across the page: the left column's `My Work` · `Team Work` switch ·
+   `Order Route` · `To do {n}` (the record panel: this order's open acts) · `Communication`.
+   PROPOSED: `To do` is the rail's governed Status word, reused as the panel's name.
+8b. **The left column follows the locked Panel 1 rail (Jess, 2026-09-27: "i want the left nav rail,
+   follow"),** top to bottom: search and `Filters` · the month · the Mon to Sat grid with a count
+   on every day that has open work (a past day's work counts once, under `Missed`) · `Missed {n}` ·
+   `No date {n}` (rows, replacing 6a.4's boxes) · `Status` (`To do` · `Waiting for answer` ·
+   `Done today`) · `Page` (`All pages` · `Sales Orders` · `Purchasing` · `Warehouse` · `Delivery`
+   · `Payment`). The act list (one act per row, LOCKED) opens directly under the chosen Page, as in
+   the ChatGPT order-desk rail; the other Pages follow it. A finished Route step folds to one line;
+   Proceed keeps the order's facts.
 9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact. The
    live Logistics templates (`wa-templates.ts` `buildLogisticReminder` / `buildLogisticChase`) still
    print `—` and `today`; the build removes both.
