@@ -1211,6 +1211,13 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    are the numbered `To do` list (A6). A chosen row is the pale-blue wash with the 3px blue edge.
    Kept from Carres law against the prototype: `No date` (not `No working date`) and no count on a
    past day. The icons are placeholders until the kit supplies them.
+8c. **Names (Jess, 2026-09-27: "work change to Workspace … My Task, Team Work").** The page title
+   is `Workspace`; the scope switch reads `My Task` · `Team Work` (replacing `My Work`). COPY entry
+   owed on lock. There is no per-person tab (no `Jess` tab): an approval request is a Work
+   occurrence owned by the person holding the approver Duty (§§3–4: Purchasing Approver, Payment
+   Approver, Finance Approver and the others), so it arrives in that holder's `My Task`. PROPOSAL /
+   NOT LAW: an ATTENTION row `To approve {n}` for the signed-in person's approval occurrences, so
+   an approver finds them in one press.
 9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact. The
    live Logistics templates (`wa-templates.ts` `buildLogisticReminder` / `buildLogisticChase`) still
    print `—` and `today`; the build removes both.
