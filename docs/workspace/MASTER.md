@@ -1078,19 +1078,21 @@ checklist. Revision 2 carries her corrections of the same day. Nothing here is l
    scheduled} · {Customer delivery status}`. The PO header follows the same two lines: `PO No ·
    Supplier · {status} · ↗` / `PO Delivery Date {date} · Expected arrival {date} · Related orders
    · {n}`.
-5. **The Order Route (~92px), fixed under the header, is the Mission's navigation:**
-   `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Customer delivery`. The last
-   point is called `Customer delivery` — never `Customer` alone, never `Delivery` alone. `GRN` is the
-   Warehouse's fact under the label `GRN`. Each point prints its date and a short status. Colour:
-   blue means ONLY the step being worked here; done is a dark-grey tick; future is hollow; attention
-   is amber; missed is red. Payment is never a point: only when an unpaid balance, an approval or a
-   payment rule affects the delivery does a warning line appear under the Route, and pressing it
-   shows the Payment detail. Other warnings (goods expected after the customer's date) sit on the
-   same lines, in plain words.
-6. **One Step Detail under the Route, using the remaining height and scrolling alone.** Pressing a
-   point replaces the detail in place; steps never stack. The act chosen in the Inbox opens its
-   step. Wide enough: left 40% the checklist and the document list, right 60% the chosen document's
-   facts and the ONE button that completes the act. Narrow: the same single step, one column.
+5. **Revision 3 (Jess, 2026-09-27: "Yes. This is clearer.") — under the full-width header the
+   Mission is two columns.** LEFT (≈264px): the Route as a vertical list — every module always
+   visible, in order `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Customer
+   delivery · Payment (only when it affects the delivery)` — each with its status word and its
+   checklist directly beneath. A tick, an open circle or a warning comes from a recorded fact;
+   staff never tick anything. More than one module may show an open item. RIGHT: ONE card — the
+   exact form or action that completes the selected checklist item, and nothing else (it does not
+   repeat the order). The Inbox act opens with its item selected; pressing another open item swaps
+   the card; after Save the checklist re-reads its facts. The card is the owning module's own
+   component in place (for a PO answer, Purchasing's `Record supplier answer` form with its own
+   words: `Confirmed` · `New date` · `Split delivery`, the eight governed reasons, `Evidence`,
+   `Supplier DO received`, `Save`) — never a Workspace copy. The left column scrolls alone.
+6. The chosen item is the pale-blue wash with the 3px blue edge; the card's primary button is the
+   only other blue. Done is a dark tick, open is a hollow circle, a missed or blocking item is red,
+   a warning is amber.
 7. Document facts use the document's own words and values (Sales Order PDF for Proceed; PO PDF for
    PO: `PO Doc Date`, `PO {n}-Day Delivery Date`, `Deliver To`, `Delivery Method`). A missing fact
    prints `Not recorded`; nothing is guessed. `↗` opens the full record. `Expected arrival` (the
