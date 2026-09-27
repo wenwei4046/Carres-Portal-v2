@@ -141,7 +141,16 @@ const input: SalesOrderRouteInput = {
 const scenario = new URLSearchParams(window.location.search).get("s");
 const seeded: SalesOrderRouteInput =
   scenario === "waiting"
-    ? { ...input, amendment: { status: "submitted", submittedAt: "2026-09-23", submittedBy: "Shasha" } }
+    ? { ...input, amendment: {
+        status: "submitted",
+        submittedAt: "2026-09-23",
+        submittedBy: "Shasha",
+        approver: "Jess",
+        changes: [
+          { what: "Customer Requested Delivery Date", before: "2026-09-24", after: "2026-10-05" },
+          { what: "Latex Pillow", before: "Qty 4", after: "Qty 2" },
+        ],
+      } }
     : scenario === "unreadable"
       ? { ...input, unreadable: { delivery: true, payments: true } }
       : scenario === "paid"

@@ -103,6 +103,10 @@ export interface RouteUnreadable {
 export interface RouteProposedChange {
   kind: "waiting" | "out-of-date" | "unreadable";
   fact: string;
+  /** WHAT changes — `Delivery date: Thu, 24 Sep → Mon, 28 Sep`. At most three
+   *  rows; `more` counts the rest, which the request itself lists. */
+  changes: string[];
+  more: number;
   door: RouteDoor;
   /** The sentence that stops the wrong reading. Null only on a failed read. */
   rule: string | null;
@@ -423,6 +427,9 @@ export interface SalesOrderRouteInput {
     status: "submitted" | "stale";
     submittedAt: string | null;
     submittedBy: string | null;
+    /** Who decides it, named by Staff & Duties — never hard-coded. */
+    approver?: string | null;
+    changes?: ReadonlyArray<{ what: string; before: string; after: string }>;
   } | null;
 }
 
@@ -503,7 +510,13 @@ export function wrapRouteText(text: string, budget: number): string[] {
     }
     if (row) rows.push(row);
     row = "";
-    for (const word of fact.split(" ")) {
+    /* An amount is one word: `RM` never ends a row with its number on the next. */
+    const words = fact.split(" ").reduce<string[]>((list, word) => {
+      if (list.length > 0 && list[list.length - 1] === "RM") list[list.length - 1] = `RM ${word}`;
+      else list.push(word);
+      return list;
+    }, []);
+    for (const word of words) {
       if (row && spelledLength(`${row} ${word}`) > budget) {
         rows.push(row);
         row = word;
@@ -785,7 +798,7 @@ function purchaseChain(
       kind: "supplier",
       title: "SUPPLIER",
       complete: Boolean(po.expectedReadyDate),
-      lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Ready date not confirmed"],
+      lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Supplier has not confirmed the ready date"],
       action: {
         ownerKey: "purchasing",
         label: "Confirm ready date",
@@ -808,7 +821,7 @@ function purchaseChain(
         : [
             receivedQty > 0 && receivedQty < orderedQty
               ? `${receivedQty} of ${orderedQty} received`
-              : "Not received yet",
+              : "Warehouse has not received the goods",
           ],
       action: {
         ownerKey: "receiving",
@@ -836,7 +849,7 @@ function unassignedChain(
       title: "PURCHASING",
       complete: false,
       blocked: true,
-      lines: ["No Purchase Order yet"],
+      lines: ["Carres has not issued a Purchase Order"],
       action: {
         ownerKey: "purchasing",
         label: "Issue PO",
@@ -851,14 +864,14 @@ function unassignedChain(
       kind: "supplier",
       title: "SUPPLIER",
       complete: false,
-      lines: ["Ready date not confirmed"],
+      lines: ["Supplier has not confirmed the ready date"],
     },
     {
       id: `${line.sku}:unassigned:receiving`,
       kind: "receiving",
       title: "RECEIVING",
       complete: false,
-      lines: ["Not received yet"],
+      lines: ["Warehouse has not received the goods"],
     },
   ];
 }
@@ -966,7 +979,7 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
     complete: Boolean(confirmed),
     lines: confirmed
       ? [dated("Scheduled delivery", confirmed), ...(booking?.slot ? [booking.slot] : [])]
-      : ["Not scheduled yet", dated("Requested delivery", input.order.deliveryDate)],
+      : ["Logistics has not scheduled the delivery", dated("Requested delivery", input.order.deliveryDate)],
     action: {
       ownerKey: "sales",
       label: "Confirm delivery date",
@@ -1009,7 +1022,7 @@ function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
     if (!input.money.known) {
       return { ...base, complete: false, lines: [NO_PRICE], door: payments };
     }
-    return { ...base, complete: true, lines: ["Paid"], door: payments };
+    return { ...base, complete: true, lines: ["Customer paid in full"], door: payments };
   }
 
   const scheduled = input.delivery.booking?.confirmedDate ?? null;
@@ -1019,7 +1032,7 @@ function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
     outstation: input.delivery.outstation === true,
     holidays: input.publicHolidays ? new Set(input.publicHolidays) : undefined,
   });
-  const amount = `${ringgit(input.money.outstanding)} unpaid${deadline ? ` · by ${deadline}` : ""}`;
+  const amount = `Customer has not paid ${ringgit(input.money.outstanding)}${deadline ? ` · Customer must pay by ${deadline}` : ""}`;
   /* An approval granted before the door closed is still honoured by the 0362
      predicate, so the delivery is NOT held — the money is simply still owed. */
   const honoured = paymentApprovalOpensGate(input.paymentApprovals) && !financeLine;
@@ -1346,7 +1359,7 @@ function deliverDraft(input: SalesOrderRouteInput): NodeDraft {
     kind: "deliver",
     title: "DELIVER",
     complete: false,
-    lines: confirmed ? ["Not delivered yet", dated("Scheduled", confirmed)] : ["Not delivered yet"],
+    lines: confirmed ? ["Logistics has not delivered the goods", dated("Scheduled", confirmed)] : ["Logistics has not delivered the goods"],
     door: open("Delivery", deliveryHref(input.order.id)),
   };
 }
@@ -1360,7 +1373,7 @@ function photoDraft(input: SalesOrderRouteInput): NodeDraft {
     complete: Boolean(photo),
     lines: photo
       ? [photo.by ? `Uploaded by ${photo.by}` : "Uploaded", dated("Uploaded", photo.at)]
-      : ["No delivery photo yet"],
+      : ["Logistics has not uploaded the delivery photo"],
     action: {
       ownerKey: "delivery",
       label: "Upload delivery photo",
@@ -1459,13 +1472,9 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
           title: line.label,
           complete: true,
           lines: [
-            [
-              `Qty ${line.committedQty}`,
-              onOrderQty > 0 ? `${onOrderQty} on order` : null,
-              unassignedQty > 0 ? `${unassignedQty} to buy` : null,
-            ]
-              .filter(Boolean)
-              .join(" · "),
+`Customer ordered ${line.committedQty}`,
+            onOrderQty > 0 ? `Carres ordered ${onOrderQty} from supplier` : null,
+            unassignedQty > 0 ? `Carres has not ordered ${unassignedQty} yet` : null,
           ],
         },
       ],
@@ -1767,6 +1776,8 @@ function proposedChangeOf(input: SalesOrderRouteInput): RouteProposedChange | nu
     return {
       kind: "unreadable",
       fact: "Could not read the change requests for this order.",
+      changes: [],
+      more: 0,
       door: { label: "Try again →", href: "#retry-amendment" },
       rule: null,
     };
@@ -1774,11 +1785,18 @@ function proposedChangeOf(input: SalesOrderRouteInput): RouteProposedChange | nu
   const request = input.amendment ?? null;
   if (!request) return null;
   const stale = request.status === "stale";
-  const when = request.submittedAt ? ` ${request.submittedAt.slice(0, 10)}` : "";
-  const who = request.submittedBy?.trim() ? ` by ${request.submittedBy.trim()}` : "";
+  const who = request.submittedBy?.trim() || "Staff";
+  const when = request.submittedAt ? ` on ${request.submittedAt.slice(0, 10)}` : "";
+  const approver = request.approver?.trim() || null;
+  const rows = request.changes ?? [];
   return {
     kind: stale ? "out-of-date" : "waiting",
-    fact: `A change to this order is ${stale ? "out of date" : "waiting for approval"} — submitted${when}${who}.`,
+    /* WHO asked · WHAT object · WHO decides · WHAT they must do (owner, 2026-09-27). */
+    fact: stale
+      ? `${who} asked to change this order${when}. The order changed after that. ${who} must send the request again.`
+      : `${who} asked to change this order${when}. ${approver ?? "The approver"} has not approved it yet.`,
+    changes: rows.slice(0, 3).map((row) => `${row.what}: ${row.before} → ${row.after}`),
+    more: Math.max(0, rows.length - 3),
     door: door("Open the request →", `/operation/orders/so/${encodeURIComponent(input.order.id)}`),
     rule: "The map shows the order as it stands today, not the change.",
   };

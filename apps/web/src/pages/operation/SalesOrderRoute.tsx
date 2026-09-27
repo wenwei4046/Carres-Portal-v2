@@ -763,6 +763,12 @@ export default function SalesOrderRoute({
               {route.proposedChange.door.label}
             </Link>
           )}
+          {route.proposedChange.changes.map((row, i) => (
+            <span key={i} className="basis-full font-semibold">{spellDates(row)}</span>
+          ))}
+          {route.proposedChange.more > 0 && (
+            <span className="basis-full">and {route.proposedChange.more} more</span>
+          )}
           {route.proposedChange.rule && <span className="basis-full">{route.proposedChange.rule}</span>}
         </div>
       )}
