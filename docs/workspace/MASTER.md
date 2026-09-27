@@ -1045,39 +1045,43 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, revision 2 awaiting Jess (2026-09-27)
+### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, revision 4 awaiting Jess (2026-09-27)
 
 **Why this section exists.** Four days of Work design were done by rebuilding the live page round
 after round, with three planners editing at once. Jess agreed (2026-09-27) to stop: one written
 spec, her decisions on its open points, then ONE chat builds all of it and shows it once with a
-checklist. Revision 2 carries her corrections of the same day. Nothing here is law until she says
+checklist. Revisions 2 to 4 carry her corrections of the same day, made on the design images
+(output/shots/whole-v4 … v11). Nothing here is law until she says
 "定"; the shell and the Inbox rulings above are already hers.
 
-**A · The page (settled direction, revision 2 wording).**
+**A · The page (settled direction, revision 4 wording).**
 1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules
    as in "THE WORK SHELL" above. The global right rail is separate and not in this build.
 2. Inbox: one row = one act (76px, three lines); Missed first on open; one date choice at a time.
 3. **What the Mission's top shows.** The top is ALWAYS a summary of the record the act belongs to,
    and no step detail ever replaces it:
    - an act on a Sales Order, or on anything that resolves to exactly one Sales Order (a Delivery
-     Order, a delivery scope): the **Order header + Order Route** of that order;
+     Order, a delivery scope): that order's **Order Route**, whose Proceed step carries the
+     order's facts (A4);
    - a PO-level act whose PO serves **exactly one** Sales Order and carries no stock purpose: that
-     Sales Order's header + Route, with the `PO` point chosen and that PO chosen inside it;
+     Sales Order's Route, with the `PO` point chosen and that PO chosen inside it;
    - a PO-level act whose PO serves **two or more** Sales Orders, or stock: the **PO header** (no
      Order Route — choosing one order's Route would be a guess) and, under it, the PO detail and
      `Related orders · {n}`, one line per order: `SO No · customer · Requested {date} · Scheduled
      {date or Not scheduled} · {Customer delivery status}`. A stock PO reads `For stock` instead.
      The act stays ONE Work occurrence on the PO; it is never copied onto each order. Pressing a
-     related order shows that order's header + Route in the Mission with the `PO` point chosen and
+     related order shows that order's Route in the Mission with the `PO` point chosen and
      a `Back to {PO No}` line above it; it creates and completes nothing.
    Source of "which orders": the PO's own source-order record (`so`, `so_refs` and the per-line
    `po_line_sources`, 0382) and its purpose (0361) — the same facts the PO PDF's `SO NO` column
    prints. Work never infers orders from goods or suppliers.
-4. **The Order header — two lines, 76px, never a third line or a wrapped sentence.** Line 1:
-   `SO No · Customer · {status} · ↗`. Line 2: `Requested {date} · Scheduled {date or Not
-   scheduled} · {Customer delivery status}`. The PO header follows the same two lines: `PO No ·
-   Supplier · {status} · ↗` / `PO Delivery Date {date} · Expected arrival {date} · Related orders
-   · {n}`.
+4. **No Order header (Jess, 2026-09-27: "header remove … order route start from Proceed").** The
+   Route starts at the top of the Mission. Proceed carries the Sales Order's minimum facts from the
+   SO PDF: the SO No (its document link, A7) · `{Customer} · {area}` · `Requested delivery {date}` ·
+   `Order Total RM {amount}`. No status tag sits beside the customer (a `Missed` there read as "the
+   customer missed"); a status sits only on the step it belongs to. A PO serving several orders, or
+   stock, keeps a two-line PO header: `PO No · Supplier` / `PO Delivery Date {date} · Expected
+   arrival {date} · Related orders · {n}`.
 5. **Revision 3 (Jess, 2026-09-27: "Yes. This is clearer.") — under the full-width header the
    Mission is two columns.** LEFT (≈264px): the Route as a vertical list — every module always
    visible, in order `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Customer
@@ -1093,44 +1097,64 @@ checklist. Revision 2 carries her corrections of the same day. Nothing here is l
    **APPROVED (Jess, 2026-09-27: "good thing is route got date, module title + checklist"):** the left
    column reads as a vertical timeline like her references — the step's date in a fixed left
    column, a dot on one line (solid where done, dashed ahead), the module title with its status on
-   the right, and its checklist beneath, each item one title line plus one grey line. Only the
-   module being worked is coloured (a larger blue dot, blue date, title and count); attention is an
-   amber dot; everything else is grey. No boxes between modules — the line and white space separate
+   the right, and its checklist beneath, each item one title line plus one grey line. Colour and
+   order follow A6. No boxes between modules — the line and white space separate
    them.
-6. The chosen item is the pale-blue wash with the 3px blue edge; the card's primary button is the
-   only other blue. Done is a dark tick, open is a hollow circle, a missed or blocking item is red,
-   a warning is amber.
+6. **Order of work, one meaning per colour (Jess, 2026-09-27: "又有红又有蓝，没有让我知道先要做什么").**
+   Every open act of the signed-in person on this order carries a number badge on its checklist
+   item (1, 2, 3) in the order to do them: missed first, oldest first, then due, ties in Route order.
+   The card's top line reads `{n} of {m} on this order` with ‹ › to the neighbour acts (PROPOSED
+   words, COPY on lock). Red = missed; amber = due on the chosen day (`Due {date}`, PROPOSED); blue
+   = only the one item open now (pale-blue wash, 3px edge) and the card's primary button. An open
+   item owned by someone else is grey, unnumbered, and names its owner (`No PO yet · Li Ching`).
+   Done is a dark tick; waiting is a hollow circle. Step dots are dark when done, red when missed,
+   grey otherwise; there is no larger "current step" dot.
 6a. **Five adaptations from the ChatGPT order-desk prototype (Jess "ok", 2026-09-27).** Ours stays
    the base; these five are added:
    1. The Communication pane follows its layout: `To` is a select (the party's contact or group),
       `Template` a select with the message shown beneath, the doors in one row — WhatsApp and Email
-      as ICONS plus `Copy message` — then the owning module's answer door, then history last.
-   2. The action card opens with a short `Why` block — two or three facts that explain the act
-      (for a PO answer: `PO Delivery Date` · `Supplier answer` · `Supplier DO`) — above the form.
+      as ICONS plus `Copy message` — then History, folded to one line `History {n}` and opened on press. The owning
+      module's form is the Mission card, so the pane shows no answer door while it is open (Jess,
+      2026-09-27: "history can hide").
+   2. The action card opens, under its title, with two or three facts that explain the act (for a
+      PO answer: `PO Delivery Date` · `Supplier answer` · `Supplier DO`) as plain label rows above
+      the form; no grey box and no `Why` heading (Jess, 2026-09-27: the extra boxes read as extra
+      missions).
       The card never repeats the checklist; the left column already has it.
    3. Each module in the timeline carries one grey line saying what the step is. PROPOSED words
       (COPY on lock): Proceed `Sales Order` · PO `Supplier confirmation` · GRN `Goods received` ·
       Logistics `Delivery arrangement` · Customer delivery `Delivery to the customer` · Payment
       `Customer balance`.
    4. `Missed {n}` and `No date {n}` under the Inbox month are two pressable boxes, not text rows.
-   5. The Order header's second line reads delivery first, money last: `Requested {date} ·
-      Scheduled {date or Not recorded} · {n} days left · RM {amount} unpaid` (the money only while
-      owed).
+   5. Delivery first, money last: with no Order header (A4) the Requested date sits on Proceed,
+      the Scheduled date on Customer delivery and the balance on the Payment step
+      (`RM {amount} unpaid` / `Must be paid by {date}`), the money only while owed.
    Not taken: grouped multi-act inbox rows, a Route without dates, the SO number in an outside
    party's message, `No working date`, `Create delivery link`.
 7. Document facts use the document's own words and values (Sales Order PDF for Proceed; PO PDF for
    PO: `PO Doc Date`, `PO {n}-Day Delivery Date`, `Deliver To`, `Delivery Method`). A missing fact
-   prints `Not recorded`; nothing is guessed. `↗` opens the full record. `Expected arrival` (the
+   prints `Not recorded`; nothing is guessed. **Every document number appears once, on the Route**
+   (Jess, 2026-09-27: "doc no all show at order route there, dont repeated every where"): SO on
+   Proceed, each PO on its supplier's PO item, each GRN on its received item, the DO on Customer
+   delivery. It is underlined in ink, and the underline alone says it can be pressed; there is no
+   `↗` icon. Pressing it opens that document's official PDF as paper in a sheet over the page
+   (`Print` · `Download` · close; Esc closes; the page stays where it was), painted by the existing
+   `usePdfCanvases`. The card title, the Communication pane and the Inbox never repeat it as a link
+   (the Inbox's line 1 stays plain text). `Expected arrival` (the
    supplier's newest date) prints beside the PDF's `PO Delivery Date`, never instead of it.
-8. Communication follows the step shown: PO → Supplier · Logistics → Logistics · Customer delivery,
-   Proceed and Payment → Customer · GRN → `No communication needed`. Tabs Logistics | Customer |
-   Supplier are always there. Copying or opening WhatsApp completes nothing.
-9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact.
+8. Communication has one tab per outside party on the Route, always there, in Route order:
+   `Supplier` · `Warehouse` · `Logistics` · `Customer` (Jess, 2026-09-27: "communication should got
+   warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
+   Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
+   none. Copying or opening WhatsApp completes nothing.
+9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact. The
+   live Logistics templates (`wa-templates.ts` `buildLogisticReminder` / `buildLogisticChase`) still
+   print `—` and `today`; the build removes both.
 
 **B · Decisions (revision 2).**
 - **B1 · AGREED WITH CORRECTIONS** — as A5.
-- **B2 · AGREED WITH SIZES** — as A4 and A6: header 76px (two lines), Route ~92px fixed, one detail
-  in the remaining height, scrolling alone; 40/60 when wide, one column when narrow.
+- **B2 · SIZES (revision 4)** — no Order header (A4); the Route timeline column (≈316px) and the
+  card take the full Mission height, each scrolling alone; one column when narrow.
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
   Proposed wording (Jess 2026-09-27):
   `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
