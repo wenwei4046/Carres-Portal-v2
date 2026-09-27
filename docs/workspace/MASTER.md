@@ -1155,25 +1155,21 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
-7. **REVISION 9 · CLEAN MODULE ROWS WITH THE FULL CHECKLIST (Jess, 2026-09-27: "stop ! why you
-   back to old??? i want the new clean format, just info stay!").** Overwrites revision 8. Under the
-   48px `{SO No} {customer} · Requested delivery {date}` row, one heading row `Order Route |
-   Checklist · To do {n}`, then ONE row per module in order `Proceed · Purchasing · Receiving ·
-   Warehouse · Payment · Delivery`. LEFT cell: the module name, its control date, its status (red
-   Missed · amber Due · grey otherwise), laid out as line 1 = module name with its date on the right,
-   line 2 = status (Jess, 2026-09-27: "Proceed is header, then follow date at right. status under
-   header"), and THE MODULE'S CHECKLIST sits in this Order Route cell under the status (Jess,
-   2026-09-27: "the checklist put at order route"); the right column is `To do {n}`: only that
-   module's open acts (same words as their checklist line) and the form that opens under one.
-   Superseded wording that follows about the right cell holding the checklist: RIGHT cell: that module's WHOLE checklist in one aligned
-   grid down the page — `mark · what · date or state · document` — with a party's group line
-   (`Ohana … PO-20260903-4316 V1`) above its own lines; ✓ done, ○ not yet, red `!` an open act.
-   Pressing an `!` line opens its owning module's form in place under it, one form at a time; after
-   Save the line turns ✓ and the next open act opens. Document numbers appear only here.
-   **Jess chose this layout (A · row by row) over B (steps on top, one step shown) and C (sorted by
-   what to do) on the live prototype, 2026-09-27: "i want my previous, i never want on top". Do not
-   change it; never put the steps along the top.**
-   Finished lines without a document fold into one `✓ {n} done` line per module.
+7. **REVISION 9 · CLEAN MODULE ROWS (Jess, 2026-09-27).** Under the 48px `{SO No} {customer} ·
+   Requested delivery {date}` row, one heading row `Order Route | To do {n}`, then ONE row per
+   module in order `Proceed · Purchasing · Receiving · Warehouse · Payment · Delivery`.
+   - **Order Route cell (left):** line 1 = the module name with its date on the right; line 2 = its
+     status (red Missed · amber Due · grey otherwise) ("Proceed is header, then follow date at
+     right. status under header"); then THE MODULE'S WHOLE CHECKLIST ("the checklist put at order
+     route"): `mark · what · date or state · document`, with a party's group line (`Ohana …
+     PO-20260903-4316 V1`) above its own lines; ✓ done, ○ not yet, red `!` an open act. Finished
+     lines without a document fold into one `✓ {n} done` line. Document numbers appear only here.
+   - **To do cell (right, same row):** only that module's open acts, each titled with the exact
+     words of its checklist line (`Supplier answer · Ohana`) over the owning form's name. The first
+     missed act opens its form in place, one form at a time; after Save it shows `✓ … Saved` and
+     the next open act opens.
+   - **Jess chose this layout over B (steps along the top) and C (sorted by what to do), 2026-09-27:
+     "i want my previous, i never want on top". Never put the steps along the top.**
 7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
    then expand checklist … we should set format").** Every step is the same title row: date · dot ·
    step name · the step's own document number when it has exactly one (Proceed's `SO No`) · status
