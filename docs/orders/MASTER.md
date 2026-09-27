@@ -57,6 +57,38 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 | **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
 | **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
 
+**Scope A is delivered in three dependency-ordered slices (BUILD lane, 2026-09-27).**
+
+| Slice | What it carries | State |
+|---|---|---|
+| **A1 · the Route tells the truth about what it could not read** | route facts load only with `?route=1` · `⚠ unreadable` for Delivery and Payments (a failed read never blanks the map, never prints a business sentence) · the `PAYMENT` node and band, two lines with `paymentDeadlineOf` · gate lines `Hold delivery · RM {amount} unpaid` / `Paid` / `Hold delivery · Finance hold · {reason}` · `SO Doc Date` and `Customer requested` · the `PROPOSED CHANGE` banner with the sender's real name (the amendment door now names `submitted_by`) · the plate's `on order` / `to buy` · a node that acts also shows its door | **BUILT 2026-09-27 — production walk owed** |
+| **A2 · DELIVERY reads Delivery's own records** | one lane per `(leg, trip)`, the per-lane gate, `DELIVER` through `deliveryWorkStatusOf`, photos per Delivery Order | APPROVED TARGET / NOT BUILT |
+| **A3 · GOODS reads Purchasing, Receiving and Stock** | `po_line_sources` lineage, `PO Delivery Date` and `Expected arrival`, `receivingSummaryOf` counts, `Choose Ready Unit`, a failed Purchasing read per line | APPROVED TARGET / NOT BUILT |
+
+**Measured while building A1, and fixed in it (2026-09-27, 1440 / 1180 / 820 / 743 / 390):** the
+208px node ended every long line in an ellipsis, the new payment line included. One shared rule
+(`wrapRouteText`, `packages/shared`) now breaks a row at the ` · ` separator first and on a word
+second; the resolver's geometry and the canvas draw the same rows, and a screen reader is given the
+unbroken fact (`RouteNode.spoken`). The `CURRENT` node's 2px border took 2px from its last row; it
+now takes them from the padding.
+
+**REAL GAPS found in A1 — words the dictionary does not hold, so the build did not invent them.**
+A failed read of Stock (the allocation), Receiving, Loans, Service Cases or Supplier Claims has no
+registered failure sentence. Until the owner rules the words, a failure of any of those reads still
+fails the Route whole (`This order route could not be opened`) — it never draws an empty strip as
+if nothing existed. **PROPOSAL / NOT LAW**, same grammar as the three registered sentences:
+`Could not read Stock for this line.` / `This does not mean there are no Units.` ·
+`Could not read Receiving for this line.` / `This does not mean nothing has arrived.` ·
+`Could not read the linked problems for this order.` / `This does not mean there are none.` ·
+`Could not read the loan for this order.` / `This does not mean nothing is on loan.`
+Falsifier: a Route opened with one of those reads failing that still draws its other groups.
+
+**"The four orphaned components deleted" names no component.** No document, PR or commit lists the
+four. Measured 2026-09-27: no Order Route component file has zero importers; the only unused
+exports are `defaultExpandedGoods`, `compactOrderRoute` and `RouteActionOwners` in
+`SalesOrderRoute.tsx`, all used inside the file or by its test. Nothing was deleted (red line 5);
+the acceptance line is answered when the owner of that sentence names the files.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
