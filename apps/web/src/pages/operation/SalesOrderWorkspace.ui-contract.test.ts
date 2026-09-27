@@ -96,14 +96,13 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("const seed = `${orderId}:${detailQ.dataUpdatedAt}`");
   });
 
-  /* ⭐ THE CARD TITLE IS BLUE — OWNER RULING (Jess, 2026-09-21), re-affirmed
-     2026-09-22 **"remain blue"**, kept after the challenge that blue elsewhere
-     means clickable. This OVERRIDES the older "blue appears once on a screen"
-     reading of `01-design-tokens.md` §2.2 for this page's card titles: a
-     module-specific owner ruling is not overturned by a shared document's
-     general guidance. The grey-blue band is retired for a 1px rule. */
-  it("draws card titles blue and sentence case over a 1px rule, with no band", () => {
-    expect(workspace).toContain('"text-strong text-kit-blue-11"');
+  /* ⭐ THE CARD TITLE IS BLACK BOLD — ONE KIT LAW, owner ruling 2026-09-27
+     (Jess). It overwrites the 2026-09-21 / 2026-09-22 "remain blue" ruling:
+     every page follows the one kit, and the kit's title is `text-strong`
+     15/600 slate-12, never blue. The 1px rule under it stays. */
+  it("draws card titles black bold and sentence case over a 1px rule, with no band", () => {
+    expect(workspace).toContain('"text-strong text-kit-slate-12"');
+    expect(workspace).not.toContain("text-strong text-kit-blue-11");
     expect(workspace).toContain('"border-b border-kit-slate-5 pb-2"');
     /* ⭐ AND THE BLUE IS THE SALES ORDER'S ALONE. `Block` is shared with
        `PurchaseOrdersPage`, so the ruling is opt-in: every Sales Order card
@@ -1479,7 +1478,7 @@ describe("Sales Order object page — one form grammar", () => {
        the card's own name. It now renders as the ordinary field-group
        heading (`text-strong`, `01-design-tokens.md` §1): the ordinary face,
        the ordinary case, one step down in size from the card title. */
-    const title = '"text-strong text-kit-blue-11"';
+    const title = '"text-strong text-kit-slate-12"';
     /* Two ranks only (orders/MASTER § "Order view"): the in-card label is
        13px/600 slate-11, one rank below the 15px card title. */
     const sub = "text-body font-semibold text-kit-slate-11";

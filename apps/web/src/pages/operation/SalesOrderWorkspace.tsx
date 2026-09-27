@@ -890,7 +890,9 @@ export function Block({
           id={headingId}
           className={
             titleTone === "sales-order"
-              ? "text-strong text-kit-blue-11"
+              ? /* ONE KIT LAW (owner ruling 2026-09-27): a card title is black bold,
+                   never blue. It overwrites the 2026-09-21 "remain blue" ruling. */
+                "text-strong text-kit-slate-12"
               : "font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
           }
         >
