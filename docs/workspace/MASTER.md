@@ -1153,6 +1153,19 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
+7. **REVISION 7 · MODULE ROWS (Jess, 2026-09-27: "i like the ui and whole page clean and neat now" on
+   the ChatGPT structure wireframe, then "ok").** This overwrites the separate To do column and
+   the stacked Route below. The Mission is ONE list of module rows, in order `Proceed · Purchasing
+   · Receiving · Warehouse · Payment · Delivery`, under a 48px title row `{SO No} {customer} ·
+   Requested delivery {date}` and one heading row `Order Route | To do`. Each row: LEFT (220px) =
+   the module name, its one control date, its status (red Missed · amber Due · grey otherwise) and
+   Proceed's SO document; RIGHT = that module's checklist (marker · what · date · state · document,
+   aligned in one grid down the whole page). An open act carries its order number (1, 2, 3: missed
+   first, ties in Route order); pressing it opens its owning module's form INLINE under that line
+   in a pale-blue block, and only one form is open at a time. After Save the next number opens.
+   A row with an open act, a red or amber line, or a single line never folds; any other row folds
+   to its line names with a chevron. Complex acts (receiving, taking money) open their owning page
+   and return to the same order. The Logistics checks (7a-i) are the Delivery row's lines.
 7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
    then expand checklist … we should set format").** Every step is the same title row: date · dot ·
    step name · the step's own document number when it has exactly one (Proceed's `SO No`) · status
@@ -1203,13 +1216,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 
 **B · Decisions (revision 2).**
 - **B1 · AGREED WITH CORRECTIONS** — as A5.
-- **B2 · SIZES (revision 6)** — no Order header (A4). Always four columns side by side; Communication
-  never moves under To do (Jess, 2026-09-27: "communication why you change under to do?").
-  1460 and wider: rail 280 · Route (rest, ≥500) · To do 340 · Communication 340. 1340 to 1459: rail
-  240 · Route ≥500 · To do 300 · Communication 300. Narrower than 1340 the whole page scales down to
-  fit (never stacks, never scrolls sideways). The Route needs ≥500 so a checklist row
-  (`Sleepwell · Received 25 Sep · GRN-20260925-0412`) stays one line. Each column fills the height
-  and scrolls alone; the left rail is never hidden.
+- **B2 · SIZES (revision 7)** — three columns: rail 280 · Mission (rest, ≥720: Route 220 + To do)
+  · Communication 340; each column fills the height and scrolls alone; Communication is always its
+  own column. Narrower than 1340 the whole page scales down to fit (never stacks, never scrolls
+  sideways). The left rail is never hidden.
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
   Proposed wording (Jess 2026-09-27):
   `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
