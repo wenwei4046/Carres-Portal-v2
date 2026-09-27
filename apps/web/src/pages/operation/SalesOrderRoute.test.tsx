@@ -156,7 +156,7 @@ describe("Order Route — one canvas", () => {
     expect(screen.getByTestId("route-band-money")).toHaveTextContent("PAYMENT");
     const plate = nodeEl("B1201S:goods-line");
     expect(plate).toHaveTextContent("B1201S · King");
-    expect(plate).toHaveTextContent("Qty 3 · 3 to buy from factory");
+    expect(plate).toHaveTextContent("Qty 3 · 3 on order");
     /* The edge layer draws no caption text at all. */
     expect(screen.getByTestId("route-edges").querySelectorAll("text")).toHaveLength(0);
   });
@@ -279,7 +279,7 @@ describe("Order Route — the gate", () => {
     /* The only page controls are goods disclosure plus the three zoom controls. */
     const labels = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
     expect(labels).toEqual([
-      "B1201S · King — Qty 3 · 3 to buy from factory",
+      "B1201S · King — Qty 3 · 3 on order",
       "Zoom out",
       "Zoom in",
       "Fit the whole route",

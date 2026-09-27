@@ -1447,7 +1447,10 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       "goods",
     )[0]!;
 
-    const buyQty = slices.reduce((sum, slice) => sum + slice.qty, 0) + unassignedQty;
+    /* Owner ruling 2026-09-26: `on order` is covered by an issued PO, `to buy`
+       is covered by none. `to buy from factory` said *buy* about goods already
+       bought, and is retired. */
+    const onOrderQty = slices.reduce((sum, slice) => sum + slice.qty, 0);
     const { nodes: plateNodes } = sealChain(
       [
         {
@@ -1456,9 +1459,13 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
           title: line.label,
           complete: true,
           lines: [
-            buyQty > 0
-              ? `Qty ${line.committedQty} · ${buyQty} to buy from factory`
-              : `Qty ${line.committedQty}`,
+            [
+              `Qty ${line.committedQty}`,
+              onOrderQty > 0 ? `${onOrderQty} on order` : null,
+              unassignedQty > 0 ? `${unassignedQty} to buy` : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
           ],
         },
       ],

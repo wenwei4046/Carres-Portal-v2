@@ -459,10 +459,13 @@ function Node({
         top: node.y,
         width: node.w,
         height: node.h,
-        paddingTop: BOX_PAD_Y,
-        paddingBottom: BOX_PAD_Y,
-        paddingLeft: 12,
-        paddingRight: 12,
+        /* The CURRENT border is 2px. It takes its extra pixel from the padding,
+           never from the rows: measured 2026-09-27, the last row of every
+           CURRENT node sat 2px under the box's edge. */
+        paddingTop: BOX_PAD_Y - (node.mark === "current" ? 1 : 0),
+        paddingBottom: BOX_PAD_Y - (node.mark === "current" ? 1 : 0),
+        paddingLeft: node.mark === "current" ? 11 : 12,
+        paddingRight: node.mark === "current" ? 11 : 12,
         borderWidth: node.mark === "current" ? 2 : 1,
       }}
     >
@@ -509,7 +512,7 @@ function Node({
             style={{ height: REQ_H * rows.length, lineHeight: `${REQ_H}px` }}
           >
             <span
-              className={`w-2 shrink-0 ${req.met ? "text-kit-green-11" : "text-kit-slate-9"}`}
+              className={`w-3 shrink-0 ${req.met ? "text-kit-green-11" : "text-kit-slate-9"}`}
               aria-hidden="true"
             >
               {req.met ? "✓" : "·"}

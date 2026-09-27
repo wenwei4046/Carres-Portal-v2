@@ -674,7 +674,7 @@ describe("connectors", () => {
     /* The product name lives on the plate, never on a line. */
     const plate = node(map, "B1201S:goods-line");
     expect(plate.title).toBe("B1201S · King");
-    expect(plate.lines).toEqual(["Qty 3 · 2 to buy from factory"]);
+    expect(plate.lines).toEqual(["Qty 3 · 2 on order"]);
     expect(plate.door).toBeNull();
     expect(plate.action).toBeNull();
   });
