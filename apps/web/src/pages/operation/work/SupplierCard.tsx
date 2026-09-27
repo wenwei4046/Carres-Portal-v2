@@ -73,8 +73,10 @@ export default function SupplierCard({
   trailing,
   pill,
   facts,
+  active,
 }: {
   orderId: string;
+  active?: boolean;
   pill?: { text: string; tone: PartyTone } | null;
   facts?: CardFact[];
   /** The Route step this card is (Jess, 2026-09-27: every card tallies a Route step). */
@@ -107,6 +109,7 @@ export default function SupplierCard({
       trailing={trailing}
       pill={pill}
       facts={facts}
+      active={active}
       status={
         failed ? (
           <ToneLine tone="attention">{S.unavailable}</ToneLine>

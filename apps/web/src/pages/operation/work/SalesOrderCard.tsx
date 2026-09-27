@@ -36,13 +36,14 @@ function Fact({ label, children, testId }: { label: string; children: React.Reac
   );
 }
 
-export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sales Order", trailing, act, pill, facts }: {
+export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sales Order", trailing, act, pill, facts, active }: {
   orderId: string; open: boolean; onToggle: (open: boolean) => void;
   /** The Route step this card is (`Proceed · Sales Order`). */
   heading?: string;
   trailing?: React.ReactNode;
   pill?: { text: string; tone: PartyTone } | null;
   facts?: CardFact[];
+  active?: boolean;
   /** The order's own open act (payment, a customer decision): the status line leads with it. */
   act?: { text: string; missed: boolean } | null;
 }) {
@@ -81,7 +82,7 @@ export default function SalesOrderCard({ orderId, open, onToggle, heading = "Sal
     </span>
   );
   return (
-    <PartyCardShell testId="work-sales-order" party="Sales Order" heading={heading} trailing={trailing} pill={pill} facts={facts} status={status} open={open} onToggle={onToggle}>
+    <PartyCardShell testId="work-sales-order" party="Sales Order" heading={heading} trailing={trailing} pill={pill} facts={facts} active={active} status={status} open={open} onToggle={onToggle}>
       {/* Two columns from 768px so the panel's width carries the facts in
           three lines, not six (Jess, 2026-09-26: "width so empty"). */}
       <dl className="grid grid-cols-[92px_minmax(0,1fr)] gap-x-2 gap-y-1 min-[768px]:grid-cols-[92px_minmax(0,1fr)_92px_minmax(0,1fr)]">

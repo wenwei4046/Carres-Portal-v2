@@ -47,8 +47,6 @@ import {
   workModuleCounts,
   workRailMonth,
   workSections,
-  groupByRecord,
-  type WorkRecord,
   workStatusOf,
   type WorkStatus,
   type WorkWhen,
@@ -59,7 +57,9 @@ import WorkParties, { type Party } from "./work/WorkParties";
 import WorkOwnerSource from "./work/WorkOwnerSource";
 import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
 import ModuleHeader from "./components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailMonthGrid, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
+import { FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailMonthGrid } from "./components/workspace-rail";
+import SearchInput from "@/components/kit/SearchInput";
+import WorkCommunication from "./work/WorkCommunication";
 import { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
 import WorkListRow from "./work/WorkListRow";
 
@@ -114,14 +114,16 @@ export default function OperationWork() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const workAreaRef = useRef<HTMLDivElement>(null);
-  /* On one stage the rail floats over the list only while `Show filters` is
-     pressed; a pick or Hide closes it (the Payment Monitor's own rule). */
-  const [phoneRailOverride, setPhoneRailOverride] = useState(false);
-  const [railOpen, setRailOpen] = useFilterRailOpen("carres.work.rail", workAreaRef);
+  /* ≥1280px of canvas the columns are 280 · ≥560 · 340; 1040–1279 they are
+     260 · ≥420 · 300 (Jess, 2026-09-27). Below 1040 the communication pane
+     is a drawer the person opens. The inbox shows ONE week; the month opens
+     from its name. */
+  const [wide, setWide] = useState(true);
+  const [commOpen, setCommOpen] = useState(false);
+  const [monthOpen, setMonthOpen] = useState(true);
   const [layout, setLayout] = useState<WorkLayout>(() =>
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
-  const railVisible = layout === "one" ? railOpen && phoneRailOverride : railOpen;
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
   /* §5.10: which fact card of the order is open (one at a time); reset when
      another order is chosen. */
@@ -144,6 +146,7 @@ export default function OperationWork() {
     const measure = () => {
       const width = area.getBoundingClientRect().width;
       setLayout(workLayoutFor(width > 0 ? width : window.innerWidth));
+      setWide((width > 0 ? width : window.innerWidth) >= 1280);
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -350,23 +353,26 @@ export default function OperationWork() {
   /* ⭐ ONE ROW PER ORDER (Jess, 2026-09-26 night): the list and the panel work
      in records; `selected` is the record's first act (the URL keeps an act id
      so a deep link to one act still lands on its order). */
-  const allRecords = groupByRecord(visible);
-  const selectedRecord = allRecords.find((r) => r.items.some((i) => i.id === selectedId)) ?? allRecords[0] ?? null;
-  const selected = selectedRecord?.items.find((i) => i.id === selectedId) ?? selectedRecord?.items[0] ?? null;
+  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  /* ONE CARD = ONE ACT (Jess, 2026-09-27); the middle is the WHOLE order: the
+     chosen act first, then every other open act on the same record. */
+  const missionItems = selected ? [selected, ...allItems.filter((i) => i.orderId === selected.orderId && i.id !== selected.id)] : [];
+  const stepOfSelected: Party | null = !selected ? null
+    : selected.module === "delivery" ? "logistics"
+    : selected.module === "purchasing" ? "supplier"
+    : selected.module === "receiving" ? "grn"
+    : "order";
   const visibleIds = new Set(visible.map((item) => item.id));
   // The date rail and its badge already say when; the list is one ordered run.
   const myItems = workSections(visible).flatMap((section) => section.items);
-  const myRecords = groupByRecord(myItems);
-  useEffect(() => { setOpenParty(null); }, [selectedRecord?.key]);
+  /* The step the chosen act belongs to opens by itself. */
+  useEffect(() => { setOpenParty(stepOfSelected); setCommOpen(false); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const displayTeamGroups = visibleTeamGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
   const openRow = (i: WorkRow) => {
     updateParam("selected", i.id);
     if (layout === "one") setActivePanel("detail");
-    /* At `two` the detail replaces the rail (WorkSplitShell): the pick hides
-       the rail, remembered like Hide filters. */
-    if (layout === "two" && railVisible) setRailOpen(false);
   };
 
   /* Card kit §List states: past 50 cards the list draws 50 more each time its
@@ -377,7 +383,7 @@ export default function OperationWork() {
   const listKey = [...params.entries()].filter(([key]) => key !== "selected").map(([k, v]) => `${k}=${v}`).join("&");
   useEffect(() => setCardLimit(CARD_STEP), [listKey]);
   const moreRef = useRef<HTMLDivElement>(null);
-  const listTotal = activeView === "mine" ? myRecords.length : displayTeamGroups.reduce((n, g) => n + groupByRecord(g.items).length, 0);
+  const listTotal = activeView === "mine" ? myItems.length : displayTeamGroups.reduce((n, g) => n + g.items.length, 0);
   const hasMore = listTotal > cardLimit;
   useEffect(() => {
     const sentinel = moreRef.current;
@@ -403,15 +409,15 @@ export default function OperationWork() {
   /* The two-line picker row (Jess, 2026-09-26). A covered row names the
      normal owner in My Work (`For Li Ching`); Team Work groups by that owner
      already, so the row says nothing twice. */
-  const card = (r: WorkRecord) => (
+  const card = (i: WorkRow) => (
     <WorkListRow
-      key={r.key}
-      record={r}
-      acts={r.items.map((i) => `${deliveryLines(i)?.act ?? i.action}`)}
-      cover={activeView === "mine" && r.items.some((i) => i.ownerState === "covered") ? (r.items.find((i) => i.ownerState === "covered")?.normalOwner?.name ?? "normal owner") : null}
-      selected={layout !== "one" && selectedRecord?.key === r.key}
-      onSelect={() => openRow(r.items[0]!)}
-      onOpenRecord={() => navigate(r.items[0]!.destination)}
+      key={i.id}
+      item={i}
+      action={`${deliveryLines(i)?.act ?? i.action}`}
+      cover={activeView === "mine" && i.ownerState === "covered" ? (i.normalOwner?.name ?? "normal owner") : null}
+      selected={layout !== "one" && selected?.id === i.id}
+      onSelect={() => openRow(i)}
+      onOpenRecord={() => navigate(i.destination)}
     />
   );
   /** The one line over the list: the chosen Date, the rail's own words. */
@@ -433,39 +439,55 @@ export default function OperationWork() {
      Hidden, it leaves a 44px `Show filters` strip; the choice is remembered
      per browser (`useFilterRailOpen`). */
   const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
-  const pickDay = (key: string) => {
-    updateParam("day", key);
-    if (layout === "one") setPhoneRailOverride(false);
+  const pickDay = (key: string) => updateParam("day", key);
+  /* The week the inbox shows: the chosen day's, else today's, else the first. */
+  const weekOf = (weeks: NonNullable<typeof railDates>["weeks"]) =>
+    weeks.find((w) => w.some((d) => d && d.iso === railSelected)) ?? weeks.find((w) => w.some((d) => d?.today)) ?? weeks[0] ?? [];
+  const shiftWeek = (days: number) => {
+    if (!railDates) return;
+    const anchor = weekOf(railDates.weeks).find(Boolean)?.iso;
+    if (!anchor) return;
+    const d = new Date(`${anchor}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    const iso = d.toISOString().slice(0, 10);
+    setParams((before) => {
+      const next = new URLSearchParams(before);
+      next.set("day", iso);
+      next.set("month", iso.slice(0, 7));
+      return next;
+    }, { replace: true });
   };
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const rail = railDates ? (
-    <FilterRail
-      testId="work-rail"
-      ariaLabel="Work filters"
-      onHide={() => { setRailOpen(false); setPhoneRailOverride(false); }}
-      header={(
-        <div data-testid="work-rail-week" className="flex items-center gap-1 pr-8">
-          <button type="button" aria-label="Previous month" title="Previous month" className={weekArrow} onClick={() => updateParam("month", railDates.previousMonth)}>
-            <Icon name="previous" size={16} />
-          </button>
-          <span className="min-w-0 flex-1 truncate text-center text-body font-semibold text-kit-slate-12" data-testid="work-rail-week-label">
-            {railDates.month}
-          </span>
-          <button type="button" aria-label="Next month" title="Next month" className={weekArrow} onClick={() => updateParam("month", railDates.nextMonth)}>
-            <Icon name="forward" size={16} />
-          </button>
-        </div>
-      )}
-    >
+    <div className="flex shrink-0 flex-col border-b border-kit-slate-4 pb-2" data-testid="work-rail" aria-label="Work filters" role="group">
+      <div data-testid="work-rail-week" className="flex items-center gap-1 pb-1">
+        <button type="button" aria-label={monthOpen ? "Previous month" : "Previous week"} title={monthOpen ? "Previous month" : "Previous week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.previousMonth) : shiftWeek(-7))}>
+          <Icon name="previous" size={16} />
+        </button>
+        <button type="button" aria-expanded={monthOpen} onClick={() => setMonthOpen((v) => !v)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 rounded-control py-1 text-body font-semibold text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-rail-week-label">
+          {railDates.month}
+          <Icon name={monthOpen ? "collapse" : "expand"} size={14} />
+        </button>
+        <button type="button" aria-label={monthOpen ? "Next month" : "Next week"} title={monthOpen ? "Next month" : "Next week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.nextMonth) : shiftWeek(7))}>
+          <Icon name="forward" size={16} />
+        </button>
+      </div>
       <FilterRailMonthGrid
         testId="work-rail-days"
-        weeks={railDates.weeks.map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
+        weeks={(monthOpen ? railDates.weeks : [weekOf(railDates.weeks)]).map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
         chosenIso={railSelected}
         onPick={pickDay}
       />
-      <div className="border-t border-kit-slate-5 py-2">
+      <div className="grid grid-cols-2 gap-x-2 pt-1">
         <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
         <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
       </div>
+      <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)} className="mt-1 inline-flex h-8 items-center gap-1.5 self-start rounded-control px-2 text-body text-kit-slate-11 hover:bg-kit-slate-3" data-testid="work-filters-toggle">
+        <Icon name="filter" size={14} />
+        Filters
+        <Icon name={filtersOpen ? "collapse" : "expand"} size={14} />
+      </button>
+      {filtersOpen ? (<div data-testid="work-filters">
       {/* Status rows: each one is on or off on its own; the last one on stays. */}
       <FilterRailGroup title="Status" icon="flag" chosen={statuses.length === 1 && statuses[0] === "todo" ? null : statuses.map((k) => WORK_STATUS_WORD[k]).join(" · ")}>
         {WORK_STATUS_ORDER.map((k) => (
@@ -490,7 +512,8 @@ export default function OperationWork() {
           />
         </FilterRailGroup>
       ) : null}
-    </FilterRail>
+      </div>) : null}
+    </div>
   ) : null;
 
   /* A status choice with nothing in it is its own sentence, never the day's
@@ -510,7 +533,7 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myRecords.slice(0, cardLimit).map(card)}</div>
+      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
@@ -556,7 +579,7 @@ export default function OperationWork() {
               </Link>
             </p>
           )}
-          {groupByRecord(g.items).map(card)}
+          {g.items.map(card)}
         </section>
       ))}
     </div>
@@ -572,23 +595,13 @@ export default function OperationWork() {
       {/* The rail runs from the page header to the bottom (Jess, 2026-09-26:
           the toolbar is the right column's, never a bar across the rail). */}
       <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        {railVisible
-          ? (layout === "one"
-              ? <div className="absolute inset-y-0 left-0 z-20 flex shadow-lg">{rail}</div>
-              : rail)
-          : layout !== "one"
-            ? (
-              <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="work-rail-collapsed">
-                <ShowFiltersButton onShow={() => setRailOpen(true)} testId="work-show-filters-rail" />
-                <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
-              </aside>
-            )
-            : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="work-right-column">
         <WorkSplitShell
           layout={layout}
           activePanel={activePanel}
-          railBeside={railVisible}
+          wide={wide}
+          commOpen={commOpen}
+          comm={selected && selected.source.object.kind !== "po_window" ? <WorkCommunication items={[selected.source]} party={openParty === "order" ? "customer" : openParty === "grn" ? "supplier" : openParty ?? undefined} onClose={layout === "two" ? () => setCommOpen(false) : undefined} /> : null}
           list={(
             /* The picker is ONE white card, like every card on the right (Jess,
                2026-09-26: "why middle is not white?"). No search, no Clear
@@ -600,7 +613,6 @@ export default function OperationWork() {
                         one line, the search on the next; never a bar across the
                         detail. `Covering` is gone: cover shows on the row itself. */}
               <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 pb-2" data-testid="work-toolbar">
-                {!railVisible ? <ShowFiltersButton onShow={() => { setRailOpen(true); setPhoneRailOverride(true); }} testId="work-show-filters" /> : null}
                 <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
                   {(
                     [
@@ -646,10 +658,13 @@ export default function OperationWork() {
                 )}
               </section>
 
-              {/* One line: the chosen Date (Jess, 2026-09-26 — the calendar
-                  reference's `Monday, August 31`). No count, no tabs. */}
+              <div className="shrink-0 pb-2">
+                <SearchInput id="work-search" toolbar placeholder="Search work…" value={search} onChange={(event) => updateParam("q", event.target.value || null)} data-testid="work-search" />
+              </div>
+              {rail}
+              {/* One line: the chosen Date. No count, no tabs. */}
               {listHeading && layout !== "one" ? (
-                <h2 className="shrink-0 pb-2 text-[13px] font-semibold leading-[18px] text-kit-slate-12" data-testid="work-list-heading">{listHeading}</h2>
+                <h2 className="shrink-0 pb-2 pt-2 text-[13px] font-semibold leading-[18px] text-kit-slate-12" data-testid="work-list-heading">{listHeading}</h2>
               ) : null}
               {!loading && !error && unhealthySources.length > 0 ? (
                 <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
@@ -701,9 +716,14 @@ export default function OperationWork() {
               {selected.source.object.kind === "po_window" ? (
                 <PoWindowMission item={selected.source} onOpen={() => navigate(selected.destination)} />
               ) : (
-                /* Work is an inbox (ruling B, Jess 2026-09-26): the ACTION card
-                   is the panel; the whole order lives behind its door. */
-                <WorkParties key={selectedRecord?.key ?? selected.id} items={(selectedRecord?.items ?? [selected]).map((i) => i.source)} openParty={openParty} onOpenParty={setOpenParty} onOpenRecord={() => navigate(selected.destination)} />
+                <>
+                  {layout === "two" ? (
+                    <div className="flex shrink-0 justify-end">
+                      <Button size="touch" icon="message" onClick={() => setCommOpen((v) => !v)} data-testid="work-open-communication">Communication</Button>
+                    </div>
+                  ) : null}
+                  <WorkParties key={selected.orderId} items={missionItems.map((i) => i.source)} activeStep={stepOfSelected} openParty={openParty} onOpenParty={setOpenParty} onOpenRecord={() => navigate(selected.destination)} />
+                </>
               )}
               <WorkOwnerSource item={selected.source} />
             </>

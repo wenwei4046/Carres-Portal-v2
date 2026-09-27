@@ -114,7 +114,11 @@ export default function WorkOrderRoute({
   orderId,
   title,
   onOpenParty,
+  header,
 }: {
+  /** The order's own header, drawn inside the Route's card (one card: the
+   *  order and its mission). */
+  header?: React.ReactNode;
   orderId: string;
   /** `null` = no title row at all: the Work right panel's own header names
    *  the order and carries the route's status word (Jess, 2026-09-26: a
@@ -151,8 +155,13 @@ export default function WorkOrderRoute({
 
   const firstCurrent = route.points.find((p) => p.tone === "current")?.key ?? null;
   const exceptions: Array<{ text: string; tone: RouteTone }> = [];
-  /* The payment line lives on the Sales Order card's Balance (Jess,
-     2026-09-26: said once, never under the Route and again below it). */
+  /* What threatens this delivery, said under the Route (Jess, 2026-09-27):
+     goods that arrive after the customer's day, and money that holds it. */
+  const customerIso = lm.card?.scope.customerDeliveryIso ?? null;
+  if (supplier?.arrivalRange && customerIso && supplier.arrivalRange.toIso > customerIso && !lm.o?.delivered_at) {
+    exceptions.push({ text: "Supplier date misses the customer commitment", tone: "missed" });
+  }
+  if (route.paymentLine && route.paymentLine.tone === "attention") exceptions.push({ text: route.paymentLine.text, tone: "attention" });
   if (!lm.partnerName && !lm.o?.delivered_at) exceptions.push({ text: "Logistics not assigned", tone: "attention" });
   else if (lm.facts?.answer?.kind === "cannot_deliver" && lm.model?.exception) exceptions.push({ text: `Logistics · ${lm.model.exception}`, tone: "missed" });
 
@@ -160,6 +169,7 @@ export default function WorkOrderRoute({
 
   return (
     <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
+      {header ? <div className="-mx-3 mb-2 border-b border-kit-slate-4 px-3 pb-2.5 pt-1.5 min-[768px]:-mx-4 min-[768px]:px-4">{header}</div> : null}
       {title === null ? null : <div className="flex h-[14px] items-center justify-between">
         <SectionTitle>{title ?? R.heading}</SectionTitle>
         {route.header ? (

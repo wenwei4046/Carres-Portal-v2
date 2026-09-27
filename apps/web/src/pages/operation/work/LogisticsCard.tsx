@@ -269,8 +269,10 @@ export default function LogisticsCard({
   heading: headingProp,
   trailing,
   communication = null,
+  communicationInPane = false,
   pill,
   facts: cardFacts,
+  active,
 }: {
   orderId: string;
   leg?: number;
@@ -288,8 +290,11 @@ export default function LogisticsCard({
   trailing?: ReactNode;
   pill?: { text: string; tone: PartyTone } | null;
   facts?: CardFact[];
+  active?: boolean;
   /** Delivery's governed message templates (`useLogisticsMessage`). */
   communication?: WorkCommunication | null;
+  /** The page's communication pane carries the message: the card draws none. */
+  communicationInPane?: boolean;
 }) {
   const [openLocal, setOpenLocal] = useState(false);
   const [templateKey, setTemplateKey] = useState<string | undefined>(undefined);
@@ -435,6 +440,7 @@ export default function LogisticsCard({
       trailing={trailing}
       pill={pill}
       facts={cardFacts}
+      active={active}
       open={open}
       onToggle={(next) => setOpen(next)}
     >
@@ -624,6 +630,7 @@ export default function LogisticsCard({
             )}
           </section>
 
+          {communicationInPane ? null : (<>
           {/* 7 · Communication — the prepared words; the channel is HOW, never proof */}
           <section aria-label={PARTY_COPY.communication} className="flex flex-col gap-1.5">
             <SectionTitle>{PARTY_COPY.communication}</SectionTitle>
@@ -664,6 +671,8 @@ export default function LogisticsCard({
               <p className="text-body text-kit-slate-11">{PARTY_COPY.assignFirst}</p>
             )}
           </section>
+
+          </>)}
 
           {/* 8 · Evidence and recent history */}
           <section aria-label={PARTY_COPY.history} className="flex flex-col gap-1.5">

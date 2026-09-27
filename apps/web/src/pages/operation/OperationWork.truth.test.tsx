@@ -25,6 +25,7 @@ vi.mock("./work/WorkParties", async () => {
   const { default: WorkActionPanel } = await import("./work/WorkActionPanel");
   return { default: ({ items, onOpenRecord }: { items: import("@carres/shared").OperationWorkItem[]; onOpenRecord?: () => void }) => <>{items.map((item) => <WorkActionPanel key={item.id} item={item} onOpen={onOpenRecord ?? (() => {})} />)}</> };
 });
+vi.mock("./work/WorkCommunication", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return { ...actual, useOperationWork: () => ({ ...workState, refetch }) };
@@ -128,11 +129,16 @@ function feed(generatedOn: string, items: OperationWorkItem[]): OperationWorkRes
 }
 
 function show(url = "/operation?tab=work") {
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[url]}>
       <OperationWork />
     </MemoryRouter>,
   );
+  /* Status, Page and Owner sit behind the inbox's `Filters` door (Jess,
+     2026-09-27); the tests read them open. */
+  const filters = screen.queryByTestId("work-filters-toggle");
+  if (filters && filters.getAttribute("aria-expanded") === "false") fireEvent.click(filters);
+  return view;
 }
 
 /* The rail every page follows (Payment Monitor's): one card per work day,
@@ -265,21 +271,15 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
-  it("9 · a 1180px page shows the rail beside the list; Hide filters leaves the Show filters strip", () => {
+  it("9 · a 1180px page keeps three columns; the calendar sits in the inbox, never a rail of its own", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       width: 1180, height: 800, top: 0, left: 0, right: 1180, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect);
     show();
-    expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
-    expect(rail()).toBeInTheDocument();
-    /* Rail OR detail at this width — never a 140px detail. */
-    expect(screen.queryByRole("region", { name: "Selected work" })).toBeNull();
-    fireEvent.click(within(rail()).getByRole("button", { name: "Hide filters" }));
-    expect(screen.queryByTestId("work-rail")).toBeNull();
+    expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "three");
+    expect(within(screen.getByTestId("work-list")).getByTestId("work-rail")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Selected work" })).toBeInTheDocument();
-    expect(screen.getByTestId("work-rail-collapsed")).toHaveTextContent("Show filters");
-    fireEvent.click(screen.getByTestId("work-show-filters-rail"));
-    expect(screen.getByTestId("work-rail")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-rail-collapsed")).toBeNull();
   });
 
   it("10 · a link that opens every open action (`day=all`) still lists them all", () => {

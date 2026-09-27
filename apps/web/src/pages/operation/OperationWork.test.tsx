@@ -19,8 +19,9 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 vi.mock("./work/WorkParties", async () => {
   /* The page tests stand the ACTION card in for the mission (no order reads). */
   const { default: WorkActionPanel } = await import("./work/WorkActionPanel");
-  return { default: ({ items, onOpenRecord }: { items: import("@carres/shared").OperationWorkItem[]; onOpenRecord?: () => void }) => <>{items.map((item) => <WorkActionPanel key={item.id} item={item} onOpen={onOpenRecord ?? (() => {})} />)}</> };
+  return { default: ({ items, onOpenRecord }: { items: import("@carres/shared").OperationWorkItem[]; onOpenRecord?: () => void }) => <WorkActionPanel item={items[0]!} onOpen={onOpenRecord ?? (() => {})} /> };
 });
+vi.mock("./work/WorkCommunication", () => ({ default: () => null }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
@@ -114,11 +115,16 @@ function item(overrides: Partial<OperationWorkItem> = {}): OperationWorkItem {
 }
 
 function show(url = "/operation?tab=work") {
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[url]}>
       <OperationWork />
     </MemoryRouter>,
   );
+  /* Status, Page and Owner sit behind the inbox's `Filters` door (Jess,
+     2026-09-27); the tests read them open. */
+  const filters = screen.queryByTestId("work-filters-toggle");
+  if (filters && filters.getAttribute("aria-expanded") === "false") fireEvent.click(filters);
+  return view;
 }
 
 beforeEach(() => {
@@ -154,12 +160,12 @@ describe("Operation Work — one server feed", () => {
     authState = { role: "principal", email: "shasha@carres.test" };
     show();
     expect(screen.getByTestId("work-view-mine")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("work-row-SO-1318")).toBeInTheDocument();
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
   });
 
   it("renders object, problem, then action without repeating the owner", () => {
     show();
-    const row = screen.getByTestId("work-row-SO-1318");
+    const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
     expect(row).toHaveTextContent("SO-1318");
     expect(row).toHaveTextContent("Mon, 7 Sep");
     expect(row).toHaveTextContent("Ask customer for a delivery date");
@@ -182,16 +188,16 @@ describe("Operation Work — one server feed", () => {
     show();
     /* My Work names the normal owner on the row (`For Shasha`, Jess
        2026-09-26); Team Work says it once, on the owner's group line. */
-    expect(screen.getByTestId("work-row-SO-1318"))
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date"))
       .toHaveTextContent("For Shasha");
     fireEvent.click(screen.getByTestId("work-view-team"));
     const group = screen.getByTestId(`work-owner-group-${SH}`);
     expect(within(group).getByTestId(`work-owner-heading-${SH}`)).toHaveTextContent("Cover today: Yu Jun");
-    expect(within(group).getByTestId("work-row-SO-1318"))
+    expect(within(group).getByTestId("work-row-SO-1318-ask_delivery_date"))
       .not.toHaveTextContent("For Shasha");
   });
 
-  it("one order is ONE row carrying every open act (Jess, 2026-09-26): broken, missed and undated acts on SO-1318 make one card, dated by its earliest act", () => {
+  it("keeps the governed My Work order in one card run: broken, missed, then No date", () => {
     workState.data!.items = [
       item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
       item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
@@ -199,32 +205,31 @@ describe("Operation Work — one server feed", () => {
     ];
     show("/operation?tab=work&day=all");
     const cards = [...screen.getByTestId("work-section-list").querySelectorAll("[data-work-row]")];
-    expect(cards.map((card) => card.getAttribute("data-testid"))).toEqual(["work-row-SO-1318"]);
-    expect(cards[0]!.querySelector("[data-testid=work-row-due]")).toHaveTextContent("Fri, 4 Sep");
-    expect(cards[0]!.querySelector("[data-testid=work-row-due]")?.className).toContain("text-danger");
+    expect(cards.map((card) => card.getAttribute("data-testid"))).toEqual([
+      "work-row-SO-1318-ask_delivery_date",
+      "work-row-SO-1318-issue_po",
+      "work-row-SO-1318-confirm_supplier_date",
+    ]);
+    expect(cards[2]).toHaveTextContent("No date");
   });
 
   /* THE §6.0 SHELL (owner ruling 2026-09-25): Work follows the Sales Orders
      shell — the 50px Destination Header, one plain toolbar row, search 340px,
      Date and Page as selects, no rail and no Filters button. */
-  it("draws the Sales Orders shell with the Payment Monitor rail: Destination Header, plain toolbar row, search 340px, rail", () => {
+  it("draws the inbox column: Destination Header, the scope tabs, Search, the calendar, Missed and No date, Filters", () => {
     show();
     expect(screen.getByTestId("work-destination-header")).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-header")).toBeNull();
     expect(screen.queryByTestId("work-header-count")).toBeNull();
     const toolbar = screen.getByTestId("work-toolbar");
-    /* The picker's controls sit over the picker, unframed (Jess, 2026-09-26). */
     expect(toolbar.className).not.toMatch(/rounded-work|border-work-line|border-b/);
-    expect(within(toolbar).queryByTestId("work-filters-toggle")).toBeNull();
     expect(within(toolbar).getByTestId("work-view-mine").className).toContain("h-[34px]");
-    /* The scope tabs and the search sit over the picker column (Jess, 2026-09-26). */
-    expect(screen.queryByRole("searchbox")).toBeNull(); // no search on Work (Jess, 2026-09-26)
+    /* Search lives once, in the inbox (Jess, 2026-09-27). */
+    expect(within(screen.getByTestId("work-list")).getByTestId("work-search")).toHaveAttribute("placeholder", "Search work…");
     expect(screen.getByTestId("work-list").className).toContain("bg-white");
-    expect(within(screen.getByTestId("work-list")).getByTestId("work-toolbar")).toBeInTheDocument();
-    /* No `Covering` button (Jess, 2026-09-26): cover shows on the row. */
     expect(within(toolbar).queryByRole("button", { name: "Covering" })).toBeNull();
     const rail = screen.getByTestId("work-rail");
-    expect(within(rail).getByRole("button", { name: "Hide filters" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("work-list")).getByTestId("work-rail")).toBe(rail);
     expect(screen.getByTestId("work-rail-week")).toBeInTheDocument();
     expect(screen.getByTestId("work-rail-missed")).toBeInTheDocument();
     expect(screen.getByTestId("work-rail-page-all")).toHaveTextContent("All pages");
@@ -263,8 +268,8 @@ describe("Operation Work — one server feed", () => {
       }),
     ];
     show("/operation?tab=work&q=Acme&module=payment&when=no_date");
-    expect(screen.queryByTestId("work-row-SO-1318")).not.toBeInTheDocument();
-    expect(screen.getByTestId("work-row-INV-2041")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-row-SO-1318-ask_delivery_date")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-row-INV-2041-collect")).toBeInTheDocument();
   });
 
   it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {
@@ -296,7 +301,7 @@ describe("Operation Work — one server feed", () => {
 
   it("selects work in the action panel before opening the owning module", () => {
     show();
-    fireEvent.click(screen.getByTestId("work-row-SO-1318"));
+    fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
     /* §5.10: a Sales Order's result lives on its party cards; the summary
        says what is wrong, what to do and which record opens. */
     expect(screen.getByRole("region", { name: "Work summary" })).toHaveTextContent("Ask customer for a delivery date");
@@ -316,7 +321,7 @@ describe("Operation Work — one server feed", () => {
       destination: "/operation/delivery-orders/DO-2041",
     })];
     show();
-    fireEvent.click(screen.getByTestId("work-row-DO-2041"));
+    fireEvent.click(screen.getByTestId("work-row-DO-2041-deliver_today"));
     fireEvent.click(screen.getByRole("button", { name: "Open DO-2041" }));
     expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
   });
@@ -332,7 +337,7 @@ describe("Operation Work — one server feed", () => {
       destination: "/finance/invoices?invoice=invoice-1",
     })];
     show();
-    fireEvent.click(screen.getByTestId("work-row-INV-2041"));
+    fireEvent.click(screen.getByTestId("work-row-INV-2041-payment.collect_customer_balance"));
     fireEvent.click(screen.getByRole("button", { name: "Open INV-2041" }));
     expect(navigate).toHaveBeenCalledWith("/finance/invoices?invoice=invoice-1");
   });
@@ -349,7 +354,7 @@ describe("Operation Work — one server feed", () => {
     workState = { ...workState, isError: true };
     show("/operation?tab=work&day=all");
     expect(screen.getByTestId("work-refresh-failed")).toHaveTextContent("Work could not be loaded. Try again.");
-    expect(screen.getByTestId("work-row-SO-1318")).toBeInTheDocument();
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
     expect(screen.queryByTestId("work-error")).not.toBeInTheDocument();
     fireEvent.click(within(screen.getByTestId("work-refresh-failed")).getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledOnce();

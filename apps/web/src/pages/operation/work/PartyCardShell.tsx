@@ -74,7 +74,7 @@ export function partyPillTone(tone: PartyTone): "danger" | "warning" | "success"
 
 export interface CardFact { icon: IconName; text: ReactNode; tone?: "danger" | "muted" }
 
-export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, pill, facts, status, trailing, open, onToggle, children }: {
+export function PartyCardShell({ testId, anchorId, party, heading, headingTone = "text-kit-slate-12", progress, pill, facts, status, trailing, active = false, open, onToggle, children }: {
   testId: string;
   /** DOM id the Order Route scrolls to when it opens this card. */
   anchorId?: string;
@@ -90,6 +90,8 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
   status: ReactNode;
   /** The header's right side: the doors (icons), outside the toggle. */
   trailing?: ReactNode;
+  /** The step the chosen act belongs to: a darker edge, never a second blue. */
+  active?: boolean;
   open: boolean;
   onToggle: (open: boolean) => void;
   children: ReactNode;
@@ -99,7 +101,8 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
   return (
     <WorkSection
       id={anchorId}
-      className="shrink-0 scroll-mt-2"
+      className={`shrink-0 scroll-mt-2 ${active ? "!border-kit-slate-9" : ""}`}
+      data-active={active || undefined}
       data-testid={testId}
       aria-label={party}
       onKeyDown={(event) => {

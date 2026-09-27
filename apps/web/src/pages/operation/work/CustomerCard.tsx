@@ -111,8 +111,10 @@ export default function CustomerCard({
   trailing,
   pill,
   facts,
+  active,
 }: {
   orderId: string;
+  active?: boolean;
   heading?: string;
   trailing?: React.ReactNode;
   pill?: { text: string; tone: PartyTone } | null;
@@ -143,6 +145,7 @@ export default function CustomerCard({
         trailing={trailing}
       pill={pill}
       facts={facts}
+      active={active}
         heading={C.heading}
         status={<ToneLine tone={failed ? "attention" : "future"}>{C.unavailable}</ToneLine>}
         open={open}
@@ -172,6 +175,7 @@ export default function CustomerCard({
       trailing={trailing}
       pill={pill}
       facts={facts}
+      active={active}
       status={<ToneLine tone={model.status.tone} testId="party-customer-line">{model.status.text}</ToneLine>}
       open={open}
       onToggle={onToggle}

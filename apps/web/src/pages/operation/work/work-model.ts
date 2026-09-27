@@ -294,7 +294,10 @@ export const WORK_MODULES: readonly OperationWorkModule[] = [
 
 /** Panels follow the Work area's own width, never the window's. */
 export function workLayoutFor(width: number): WorkLayout {
-  return width >= 1280 ? "three" : width >= 768 ? "two" : "one";
+  /* Three columns from 1040px of canvas (260 · ≥420 · 300; 280 · ≥560 · 340
+     from 1280), inbox + order with a communication drawer from 760, one
+     stage below (Jess, 2026-09-27). */
+  return width >= 1040 ? "three" : width >= 760 ? "two" : "one";
 }
 
 /** Source words for Work source health — never the raw feed key. */
