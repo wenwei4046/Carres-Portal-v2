@@ -17,7 +17,7 @@ import type { ReactNode } from "react";
 import type { OperationWorkItem, PartyTone, RoutePointKey } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import { moneyOfOrder } from "../sales-order-facts";
-import type { CardFact } from "./PartyCardShell";
+import { OrderSheetContext, type CardFact } from "./PartyCardShell";
 import { fmtDate } from "@/lib/fmt-date";
 import GrnCard from "./GrnCard";
 import Button from "@/components/kit/Button";
@@ -118,7 +118,7 @@ function OrderHeader({ orderId, label, customer, missed, deliveryWord, deliveryD
   const tone = route?.header?.tone === "missed" ? "font-semibold text-danger" : "text-kit-slate-11";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="work-mission-header">
-      <h2 className="text-[18px] font-semibold leading-6 text-kit-slate-12" data-testid="work-mission-title">{label}</h2>
+      <h2 className="text-[20px] font-semibold leading-[26px] text-kit-slate-12" data-testid="work-mission-title">{label}</h2>
       {customer ? <span className="text-[14px] leading-5 text-kit-slate-11">{customer}</span> : null}
       {missed ? <StatusPill tone="danger">Missed</StatusPill> : null}
       <span className="ml-auto text-[13px] leading-[18px] text-kit-slate-12" data-testid="work-mission-status">
@@ -174,7 +174,8 @@ function Order({ orderId, items, activeStep, openParty, onOpenParty, onOpenRecor
     missed: i.timing.placement === "missed",
   });
   return (
-    <div className="flex flex-col gap-2" data-testid="work-parties">
+    <OrderSheetContext.Provider value>
+    <div className="flex flex-col divide-y divide-kit-slate-4 border-b border-kit-slate-4 bg-white [&>section]:rounded-none [&>section]:border-0" data-testid="work-parties">
       <WorkOrderRoute
         orderId={orderId}
         title={null}
@@ -202,7 +203,7 @@ function Order({ orderId, items, activeStep, openParty, onOpenParty, onOpenRecor
       />
       <SupplierCard orderId={orderId} reference={reference} heading="PO · Supplier" active={activeStep === "supplier"} pill={pillOf("po")} facts={[...fact("supplier", supplierNames.join(" · ") || null), ...fact("date", dateOf("po"))]} open={openParty === "supplier"} onToggle={toggle("supplier")} primary={false} />
       <GrnCard orderId={orderId} heading="GRN · Warehouse" active={activeStep === "grn"} pill={pillOf("grn")} facts={[...fact("warehouse", deliverTo), ...fact("date", dateOf("grn"))]} open={openParty === "grn"} onToggle={toggle("grn")} />
-      <div id={`party-logistics-${orderId}`} className="scroll-mt-2">
+      <div id={`party-logistics-${orderId}`} className="scroll-mt-2 [&>section]:rounded-none [&>section]:border-0">
         <LogisticsCard
           orderId={orderId}
           heading="Contact · Logistics" active={activeStep === "logistics"}
@@ -218,5 +219,6 @@ function Order({ orderId, items, activeStep, openParty, onOpenParty, onOpenRecor
       </div>
       <CustomerCard orderId={orderId} heading="Delivery · Customer" active={activeStep === "customer"} pill={pillOf("delivery")} facts={[...fact("customer", customerName), ...fact("call", customerPhone), ...fact("date", dateOf("delivery"))]} open={openParty === "customer"} onToggle={toggle("customer")} primary={false} />
     </div>
+    </OrderSheetContext.Provider>
   );
 }

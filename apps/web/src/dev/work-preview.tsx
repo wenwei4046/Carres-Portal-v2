@@ -281,7 +281,7 @@ const SUPPLIERS = sp === "none"
     ? [{ poNo: "PO260910-4827", supplier: "Hookka Industries", issued: true, originalIso: plusDays(-2), effectiveIso: plusDays(-2), reply: null, supplierDo: { number: "DO-5531", atIso: `${plusDays(-3)}T02:00:00Z` }, deliverTo: "Carres Klang Warehouse", grnIso: plusDays(-2), orderedQty: 2, receivedQty: 2, lines: [{ sku: "M1401F-K", qty: 1 }] }]
     : [
         { poNo: "PO260910-4827", supplier: "Sleepwell", issued: true, originalIso: plusDays(1), effectiveIso: plusDays(6), reply: { answer: "delayed", reason: "Production Delay", evidence: "arrangement/wa-1.jpg", recordedAtIso: `${REAL_TODAY}T01:00:00Z` }, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "M1401F-K", qty: 1 }] },
-        { poNo: "PO260911-1188", supplier: "ABC Furniture", issued: true, originalIso: plusDays(2), effectiveIso: plusDays(2), reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 1, receivedQty: 0, lines: [{ sku: "B1201S-K", qty: 1 }] },
+        { poNo: "PO260911-1188", supplier: "ABC Furniture", issued: true, originalIso: plusDays(-1), effectiveIso: plusDays(-1), reply: null, supplierDo: { number: "DO-7712", atIso: `${plusDays(-2)}T02:00:00Z` }, deliverTo: "Carres Klang Warehouse", grnIso: plusDays(-1), orderedQty: 1, receivedQty: 1, lines: [{ sku: "B1201S-K", qty: 1 }] },
         { poNo: "PO260912-2044", supplier: "XYZ Bedding", issued: false, originalIso: null, effectiveIso: null, reply: null, supplierDo: null, deliverTo: "Carres Klang Warehouse", grnIso: null, orderedQty: 2, receivedQty: 0, lines: [{ sku: "pillow:P01", qty: 2 }] },
       ];
 let linkActive = lc === "link";

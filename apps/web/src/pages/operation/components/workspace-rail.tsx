@@ -685,14 +685,18 @@ export function FilterRailMonthGrid({
   chosenIso,
   onPick,
   testId,
+  compact = false,
 }: {
+  /** The Work inbox's month: 25px rows, the count beside the number, a day
+   *  with work dark and a day without it grey (Jess, 2026-09-27). */
+  compact?: boolean;
   weeks: readonly (readonly (RailWeekDay | null)[])[];
   chosenIso: string | null;
   onPick: (iso: string) => void;
   testId: string;
 }) {
   return (
-    <div className="py-2" data-testid={testId}>
+    <div className={compact ? "py-1" : "py-2"} data-testid={testId}>
       <div className="grid grid-cols-6 gap-x-1" aria-hidden="true">
         {MONTH_GRID_COLUMNS.map((c) => (
           <span key={c} className="text-center text-[10px] font-semibold leading-4 text-kit-slate-9">{c}</span>
@@ -719,12 +723,14 @@ export function FilterRailMonthGrid({
                 data-today={d.today ? "yes" : undefined}
                 data-closed={closed ? "yes" : undefined}
                 className={[
-                  "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
-                  chosen ? "bg-kit-blue-9 text-white" : closed ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
+                  compact
+                    ? "flex h-[22px] min-w-0 items-center justify-center gap-0.5 rounded-control tabular-nums"
+                    : "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
+                  chosen ? "bg-kit-blue-9 text-white" : closed || (compact && d.count === 0) ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
                 ].join(" ")}
               >
-                <span className={`grid h-5 w-5 place-items-center rounded-full text-[13px] font-semibold leading-4 ${d.today ? chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12" : ""}`}>{d.dayNumber}</span>
-                <span className={`h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-[12px] ${d.count > 0 && !closed ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12" : ""}`}>{d.dayNumber}</span>
+                <span className={compact ? `min-w-[10px] text-left text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
                   {!closed && d.count > 0 ? d.count : ""}
                 </span>
               </button>

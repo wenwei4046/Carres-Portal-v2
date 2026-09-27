@@ -420,14 +420,6 @@ export default function OperationWork() {
       onOpenRecord={() => navigate(i.destination)}
     />
   );
-  /** The one line over the list: the chosen Date, the rail's own words. */
-  const listHeading = selectedDay === "missed"
-    ? "Missed"
-    : selectedDay === "no_date"
-      ? "No date"
-      : isWorkDate(selectedDay)
-        ? fmtDate(selectedDay)
-        : null;
 
   /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26 — the Payment Monitor rail,
      then her correction the same day): ONE header line `‹ Week of 28 Sep ›`,
@@ -458,35 +450,7 @@ export default function OperationWork() {
     }, { replace: true });
   };
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const rail = railDates ? (
-    <div className="flex shrink-0 flex-col border-b border-kit-slate-4 pb-2" data-testid="work-rail" aria-label="Work filters" role="group">
-      <div data-testid="work-rail-week" className="flex items-center gap-1 pb-1">
-        <button type="button" aria-label={monthOpen ? "Previous month" : "Previous week"} title={monthOpen ? "Previous month" : "Previous week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.previousMonth) : shiftWeek(-7))}>
-          <Icon name="previous" size={16} />
-        </button>
-        <button type="button" aria-expanded={monthOpen} onClick={() => setMonthOpen((v) => !v)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 rounded-control py-1 text-body font-semibold text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-rail-week-label">
-          {railDates.month}
-          <Icon name={monthOpen ? "collapse" : "expand"} size={14} />
-        </button>
-        <button type="button" aria-label={monthOpen ? "Next month" : "Next week"} title={monthOpen ? "Next month" : "Next week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.nextMonth) : shiftWeek(7))}>
-          <Icon name="forward" size={16} />
-        </button>
-      </div>
-      <FilterRailMonthGrid
-        testId="work-rail-days"
-        weeks={(monthOpen ? railDates.weeks : [weekOf(railDates.weeks)]).map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
-        chosenIso={railSelected}
-        onPick={pickDay}
-      />
-      <div className="grid grid-cols-2 gap-x-2 pt-1">
-        <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
-        <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
-      </div>
-      <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)} className="mt-1 inline-flex h-8 items-center gap-1.5 self-start rounded-control px-2 text-body text-kit-slate-11 hover:bg-kit-slate-3" data-testid="work-filters-toggle">
-        <Icon name="filter" size={14} />
-        Filters
-        <Icon name={filtersOpen ? "collapse" : "expand"} size={14} />
-      </button>
+  const filtersPanel = railDates ? (<>
       {filtersOpen ? (<div data-testid="work-filters">
       {/* Status rows: each one is on or off on its own; the last one on stays. */}
       <FilterRailGroup title="Status" icon="flag" chosen={statuses.length === 1 && statuses[0] === "todo" ? null : statuses.map((k) => WORK_STATUS_WORD[k]).join(" · ")}>
@@ -513,6 +477,32 @@ export default function OperationWork() {
         </FilterRailGroup>
       ) : null}
       </div>) : null}
+  </>) : null;
+  const rail = railDates ? (
+    <div className="flex shrink-0 flex-col border-b border-kit-slate-4 pb-1" data-testid="work-rail" aria-label="Work filters" role="group">
+      <div data-testid="work-rail-week" className="flex h-8 items-center gap-1">
+        <button type="button" aria-label={monthOpen ? "Previous month" : "Previous week"} title={monthOpen ? "Previous month" : "Previous week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.previousMonth) : shiftWeek(-7))}>
+          <Icon name="previous" size={16} />
+        </button>
+        <button type="button" aria-expanded={monthOpen} onClick={() => setMonthOpen((v) => !v)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 rounded-control py-1 text-body font-semibold text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-rail-week-label">
+          {railDates.month}
+          <Icon name={monthOpen ? "collapse" : "expand"} size={14} />
+        </button>
+        <button type="button" aria-label={monthOpen ? "Next month" : "Next week"} title={monthOpen ? "Next month" : "Next week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.nextMonth) : shiftWeek(7))}>
+          <Icon name="forward" size={16} />
+        </button>
+      </div>
+      <FilterRailMonthGrid
+        testId="work-rail-days"
+        compact
+        weeks={(monthOpen ? railDates.weeks : [weekOf(railDates.weeks)]).map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
+        chosenIso={railSelected}
+        onPick={pickDay}
+      />
+      <div className="grid grid-cols-2 gap-x-2">
+        <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
+        <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
+      </div>
     </div>
   ) : null;
 
@@ -658,14 +648,17 @@ export default function OperationWork() {
                 )}
               </section>
 
-              <div className="shrink-0 pb-2">
-                <SearchInput id="work-search" toolbar placeholder="Search work…" value={search} onChange={(event) => updateParam("q", event.target.value || null)} data-testid="work-search" />
+              <div className="flex shrink-0 items-center gap-2 pb-1">
+                <div className="min-w-0 flex-1">
+                  <SearchInput id="work-search" toolbar placeholder="Search work…" value={search} onChange={(event) => updateParam("q", event.target.value || null)} data-testid="work-search" />
+                </div>
+                <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-4 px-2.5 text-body text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-filters-toggle">
+                  <Icon name="filter" size={14} />
+                  Filters
+                </button>
               </div>
+              {filtersPanel}
               {rail}
-              {/* One line: the chosen Date. No count, no tabs. */}
-              {listHeading && layout !== "one" ? (
-                <h2 className="shrink-0 pb-2 pt-2 text-[13px] font-semibold leading-[18px] text-kit-slate-12" data-testid="work-list-heading">{listHeading}</h2>
-              ) : null}
               {!loading && !error && unhealthySources.length > 0 ? (
                 <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
                   {unhealthySources.map((source) => (

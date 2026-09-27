@@ -49,7 +49,7 @@ const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFra
 
 const DOT: Record<RouteTone, string> = {
   done: "bg-kit-slate-12 border-kit-slate-12",
-  current: "bg-kit-blue-9 border-kit-blue-9",
+  current: "bg-kit-slate-12 border-kit-slate-12 ring-2 ring-kit-slate-6",
   attention: "bg-kit-amber-11 border-kit-amber-11",
   missed: "bg-kit-red-9 border-kit-red-9",
   future: "bg-white border-kit-slate-9",
@@ -159,7 +159,7 @@ export default function WorkOrderRoute({
      goods that arrive after the customer's day, and money that holds it. */
   const customerIso = lm.card?.scope.customerDeliveryIso ?? null;
   if (supplier?.arrivalRange && customerIso && supplier.arrivalRange.toIso > customerIso && !lm.o?.delivered_at) {
-    exceptions.push({ text: "Supplier date misses the customer commitment", tone: "missed" });
+    exceptions.push({ text: `Goods expected ${spell(supplier.arrivalRange.toIso)}, after ${lm.card?.confirmedDate ? "scheduled" : "requested"} delivery ${spell(lm.card?.confirmedDate ?? customerIso)}`, tone: "missed" });
   }
   if (route.paymentLine && route.paymentLine.tone === "attention") exceptions.push({ text: route.paymentLine.text, tone: "attention" });
   if (!lm.partnerName && !lm.o?.delivered_at) exceptions.push({ text: "Logistics not assigned", tone: "attention" });

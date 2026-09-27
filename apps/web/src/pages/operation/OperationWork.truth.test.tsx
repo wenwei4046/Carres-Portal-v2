@@ -143,7 +143,6 @@ function show(url = "/operation?tab=work") {
 
 /* The rail every page follows (Payment Monitor's): one card per work day,
    then the fixed rows and the Page group. */
-const rail = () => screen.getByTestId("work-rail");
 const dayCard = (iso: string) => screen.getByTestId(`work-rail-day-${iso}`);
 
 const savedTz = process.env.TZ;
@@ -213,7 +212,8 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.getByTestId("work-rail-status-done")).toHaveTextContent("Done today");
     expect(screen.queryByRole("tablist")).toBeNull();
     /* The one line over the list names the chosen Date and nothing else. */
-    expect(screen.getByTestId("work-list-heading")).toHaveTextContent(/^Thu, 17 Sep$/);
+    /* The calendar names the day; the list repeats no heading (Jess, 2026-09-27). */
+    expect(screen.queryByTestId("work-list-heading")).toBeNull();
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {

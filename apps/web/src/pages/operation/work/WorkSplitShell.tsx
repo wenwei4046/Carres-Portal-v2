@@ -70,7 +70,7 @@ export default function WorkSplitShell({
   return (
     <div data-testid="work-split-shell" data-layout={layout} className={`relative grid min-h-0 flex-1 ${columns}`}>
       <section aria-label="Work actions" className={COLUMN}>{list}</section>
-      <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto ${wide ? "p-4" : "p-3"}`}>{detail}</section>
+      <section aria-label="Selected work" className={`${COLUMN} overflow-y-auto bg-white`}>{detail}</section>
       {comm && three ? <aside aria-label="Communication" className={`${COLUMN} overflow-y-auto border-l border-kit-slate-5 bg-white`}>{comm}</aside> : null}
       {comm && !three && commOpen ? (
         <aside aria-label="Communication" className={`${COLUMN} absolute inset-y-0 right-0 z-20 w-[340px] max-w-full overflow-y-auto border-l border-kit-slate-5 bg-white shadow-lg`}>{comm}</aside>

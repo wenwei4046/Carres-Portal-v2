@@ -13,7 +13,7 @@ export default function WorkOwnerSource({ item }: { item: OperationWorkItem }) {
   const acting = item.owner.acting?.name ?? null;
   const read = item.observedAt;
   return (
-    <WorkSection className="shrink-0" data-testid="work-owner-source">
+    <WorkSection className="mx-4 my-3 shrink-0 min-[768px]:mx-6" data-testid="work-owner-source">
       <details className="group">
         <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-work px-3 text-[12px] font-medium leading-4 text-kit-slate-12 hover:bg-kit-slate-2 min-[768px]:px-4 [&::-webkit-details-marker]:hidden">
           Owner, timing and source

@@ -125,7 +125,8 @@ function StateIcon({ row }: { row: LogisticsCheckRow }) {
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h4 className="text-[11px] font-semibold uppercase leading-[14px] tracking-[0.04em] text-kit-slate-11">{children}</h4>;
+  /* Plain case, 12/16 (Jess, 2026-09-27: no small uppercase titles). */
+  return <h4 className="text-[12px] font-semibold leading-4 text-kit-slate-11">{children}</h4>;
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -446,17 +447,20 @@ export default function LogisticsCard({
     >
       {/* ── EXPANDED: the facts on the left, the message and history on the
           right — card in card, two sides (Jess, 2026-09-26/27) ── */}
-      <div className="grid grid-cols-1 gap-4 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[900px]:gap-x-8">
+      <div className={`grid grid-cols-1 gap-4 ${communicationInPane ? "" : "min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[900px]:gap-x-8"}`}>
         <div className="flex min-w-0 flex-col gap-4">
           {/* 1 · Current action */}
           <section aria-label={PARTY_COPY.currentAction} className="flex flex-col gap-2">
-            <SectionTitle>{PARTY_COPY.currentAction}</SectionTitle>
+            {communicationInPane ? null : <SectionTitle>{PARTY_COPY.currentAction}</SectionTitle>}
             {action ? (
               <>
+                {/* In the order sheet the row above already says the act: only its doors follow. */}
+                {communicationInPane ? null : (
                 <div>
                   <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[768px]:text-[14px] min-[768px]:leading-5">{action.act}</div>
                   <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
                 </div>
+                )}
                 {editing === null ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {doorFor(action.door)}
@@ -583,7 +587,7 @@ export default function LogisticsCard({
           </section>
 
         </div>
-        <div className="flex min-w-0 flex-col gap-4 min-[900px]:border-l min-[900px]:border-work-line min-[900px]:pl-8">
+        <div className={`flex min-w-0 flex-col gap-4 ${communicationInPane ? "" : "min-[900px]:border-l min-[900px]:border-work-line min-[900px]:pl-8"}`}>
           {/* 6 · External link */}
           <section aria-label={LINK_COPY.heading} className="flex flex-col gap-1.5" data-testid="logistics-card-link">
             <SectionTitle>{LINK_COPY.heading}</SectionTitle>
