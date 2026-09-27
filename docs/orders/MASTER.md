@@ -147,6 +147,19 @@ which overwrites the 2026-09-21 "remain blue" ruling on this page.
 a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
 longer offers prints an empty box.
 
+**Scope D, first half · Register close-out — BUILT 2026-09-28, production walk owed.** The row menu
+reads `Edit · View · Print · ─ Cancel SO`, and carries nothing of Delivery's. The engine draws
+NOTHING for a blank cell (`DataGrid`, every listing alike); `0` still prints `0`. The Register's
+rows and its total call ONE predicate (`salesOrderRegisterPopulation`: status not in `place`,
+`cancelled`; rentals excluded on the server), riding only `?stage=proceeded`, so what Delivery, Work,
+Payments and the dashboard receive from the shared list is unchanged. Measured: on that shared path
+the count excludes rentals while the rows include them — left as it is, because changing it changes
+what other modules receive.
+**Scope D, second half · the portal-wide dash sweep — NOT BUILT.** Measured 2026-09-28: 160 source
+files in `apps/web` and `packages/shared` still write a dash as a value from their own column or
+template (the engine no longer adds one). It crosses every module and several open PRs, so it ships
+as its own change, module by module.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`

@@ -102,18 +102,26 @@ describe("GET /api/operation/orders", () => {
   /* ⭐ `{n} of {m}` needs the SERVER's count of the permitted scope — not the
      500-row page, not the search answer. */
   describe("salesOrderTotal — the Register's authoritative total", () => {
+    /* Which table each recorded call was made on — kept beside the calls so
+       the recorded shape the older assertions compare stays unchanged. */
+    let tableOfCall = new WeakMap<object, string>();
     function mockWithCount(opts: { rows: unknown[]; count: number | null; countError?: unknown }) {
       const calls: Array<{ head: boolean; method: string; args: unknown[] }> = [];
-      const from = vi.fn(() => {
+      tableOfCall = new WeakMap();
+      const record = (table: string, call: { head: boolean; method: string; args: unknown[] }) => {
+        tableOfCall.set(call, table);
+        calls.push(call);
+      };
+      const from = vi.fn((table: string) => {
         let head = false;
         const chain: Record<string, unknown> = {};
         chain.select = vi.fn((_cols: string, o?: { count?: string; head?: boolean }) => {
           head = Boolean(o?.head);
-          calls.push({ head, method: "select", args: [_cols, o] });
+          record(table, { head, method: "select", args: [_cols, o] });
           return chain;
         });
         for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
-          chain[m] = vi.fn((...args: unknown[]) => { calls.push({ head, method: m, args }); return chain; });
+          chain[m] = vi.fn((...args: unknown[]) => { record(table, { head, method: m, args }); return chain; });
         chain.then = (resolve: (v: unknown) => unknown) =>
           resolve(head ? { count: opts.count, error: opts.countError ?? null, data: null } : { data: opts.rows, error: null });
         return chain;
@@ -156,19 +164,50 @@ describe("GET /api/operation/orders", () => {
       expect(countCalls).toContainEqual({ head: true, method: "not", args: ["outlet_id", "is", null] });
     });
 
-    /* ⭐ THE SALES ORDERS REGISTER POPULATION — owner ruling 2026-09-21: only
-       orders Sales has handed to Operation. The rows and the total are both
-       narrowed off `place`, and each row carries the actual handoff moment. */
-    it("stage=proceeded drops Placed orders from the rows AND the total, and serves proceeded_at", async () => {
+    /* ⭐ THE SALES ORDERS REGISTER POPULATION — ONE POPULATION, ONE PREDICATE
+       (owner ruling 2026-09-26, Orders MASTER §0.1 REGISTER CLOSE-OUT item 4).
+       Every non-cancelled handed-over order, rentals excluded ON THE SERVER,
+       and the rows and the total are narrowed by the SAME calls. */
+    const populationCalls = (calls: Array<{ head: boolean; method: string; args: unknown[] }>, head: boolean) =>
+      calls
+        .filter((c) => c.head === head && tableOfCall.get(c) === "orders")
+        .filter((c) =>
+          (["in", "eq", "neq", "not"].includes(c.method) && c.args[0] === "status") ||
+          (c.method === "or" && String(c.args[0]).includes("source_system")))
+        .map((c) => ({ method: c.method, args: c.args }));
+
+    it("stage=proceeded reads the rows AND the total through one predicate, and serves proceeded_at", async () => {
       const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
       const body = await get("?stage=proceeded");
       expect(body.salesOrderTotal).toBe(29);
-      expect(calls).toContainEqual({ head: false, method: "neq", args: ["status", "place"] });
-      expect(calls).toContainEqual({ head: true, method: "neq", args: ["status", "place"] });
+      const expected = [
+        { method: "not", args: ["status", "in", "(place,cancelled)"] },
+        { method: "or", args: ["source_system.is.null,source_system.neq.rental"] },
+      ];
+      expect(populationCalls(calls, false)).toEqual(expected);
+      expect(populationCalls(calls, true)).toEqual(expected);
       const listSelect = calls.find((c) => !c.head && c.method === "select");
       expect(String(listSelect?.args[0])).toContain("proceeded_at");
       /* Never the planned production-start field in its place. */
       expect(calls.some((c) => c.method === "eq" && c.args[0] === "operation_stage")).toBe(false);
+    });
+
+    it("stage=proceeded keeps one predicate when a search narrows the rows", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
+      await get("?stage=proceeded&search=Tan");
+      expect(populationCalls(calls, false)).toEqual(populationCalls(calls, true));
+      expect(populationCalls(calls, false)).toHaveLength(2);
+    });
+
+    /* The list is shared (Delivery, Work, Payments, the dashboard, the old
+       Orders control). Off the Register's path nothing they receive changes:
+       Placed rows and rentals still ride the list. */
+    it("leaves every other caller's list as it was — no Register predicate without stage=proceeded", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 40 });
+      await get();
+      expect(populationCalls(calls, false)).toEqual([
+        { method: "in", args: ["status", ["place", "proceed_order", "delivered"]] },
+      ]);
     });
 
     it("says UNKNOWN (null), never a guess, when the count cannot be read", async () => {

@@ -25,8 +25,8 @@
  * ▸ EXPAND    ships (2990's register expands; SO-1's "never expands" came
  *             from a docs-only commit). ONE job: the order's own lines.
  * ROW OPENS   double-click → the WORKSPACE ROUTE, a full page — the panel is
- *             superseded (closed ruling). Right-click: Open · Edit ·
- *             Print PDF · Copy SO No — nothing else.
+ *             superseded (closed ruling). Right-click: Edit · View ·
+ *             Print · ─ Cancel SO — nothing else, and nothing of Delivery's.
  * ROLES       Operations opens with money hidden (openable); Finance /
  *             Principal open with money visible. defaultHidden is NOT
  *             permission — a restricted fact is removed from the API
@@ -579,6 +579,10 @@ export default function SalesOrdersRegister() {
   const all = useMemo<RegisterRow[]>(
     () =>
       (data?.orders ?? [])
+        /* The SERVER owns the population (`?stage=proceeded` excludes
+           rentals, Placed and Cancelled through one predicate). This filter
+           changes nothing against the current Worker; it stays only so a
+           page served beside an OLDER Worker still shows no rental. */
         .filter((o) => !isRental(o))
         .map((o) =>
           buildRegisterRow(o, o.ops_delivery_orders ?? [], (sku) => catalogNames.get(skuKey(sku))?.name),
@@ -651,8 +655,10 @@ export default function SalesOrdersRegister() {
      a draft; the register still writes nothing. */
   const contextMenu = useCallback(
     (r: RegisterRow): DataGridContextMenuItem[] => [
-      { label: "View", onClick: () => openWorkspace(r) },
+      /* REGISTER CLOSE-OUT — owner ruling 2026-09-26: `Edit · View · Print ·
+         ─ Cancel SO`, and nothing of Delivery's. */
       { label: "Edit", onClick: () => openWorkspace(r) },
+      { label: "View", onClick: () => openWorkspace(r) },
       /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` sat here calling
          `openSalesOrderPdf(r.id, r.so)` — byte-identical to the line below
          it. Two menu rows, one behaviour, so the reader was asked to choose
@@ -660,8 +666,9 @@ export default function SalesOrdersRegister() {
          meant them as separate acts (a preview door and a document output);
          the implementation never built the first. Retiring the duplicate
          label loses no capability. If Carres later wants a real preview act,
-         it is a BUILD, not a restoration of this line. */
-      { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
+         it is a BUILD, not a restoration of this line. The word is `Print`
+         (owner ruling 2026-09-26) — the Export menu already says it. */
+      { label: "Print", onClick: () => void openSalesOrderPdf(r.id, r.so) },
       /* The MASTER's locked menu ends with the one destructive entry, alone
          below a divider so it is never reached by a slipped click. */
       { divider: true },

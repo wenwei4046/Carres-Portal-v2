@@ -1022,34 +1022,33 @@ describe("Cancel SO", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
   });
 
-  it("keeps the destructive entry last, below a divider, so a slipped click cannot reach it", () => {
+  /* REGISTER CLOSE-OUT — owner ruling 2026-09-26 (Orders MASTER §0.1 item 1):
+     `Edit · View · Print · ─ Cancel SO`, and nothing of Delivery's. */
+  it("reads Edit, View, Print, then Cancel SO alone below the divider", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    const labels = screen
-      .getAllByRole("menuitem")
-      .map((b) => b.textContent?.trim())
-      .filter((t): t is string =>
-        [
-          "View",
-          "Edit",
-          "Print PDF",
-          "Cancel SO",
-        ].includes(t ?? ""),
-      );
+    const labels = screen.getAllByRole("menuitem").map((b) => b.textContent?.trim());
+    expect(labels).toEqual(["Edit", "View", "Print", "Cancel SO"]);
     expect(labels[labels.length - 1]).toBe("Cancel SO");
   });
 
-  /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` and `Print PDF` were
-     two rows calling one handler with one argument list, so the menu offered
-     a choice that did not exist. This pins the INTENT — the row menu names an
-     act once — not the surviving spelling of the word. */
-  it("names the document act ONCE — no Preview row shadowing Print", () => {
+  it("carries nothing of Delivery's — no Delivery Order act on a Sales Order row", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    const labels = screen.getAllByRole("menuitem").map((b) => b.textContent?.trim() ?? "");
+    expect(labels.some((l) => l.includes("Delivery Order"))).toBe(false);
+  });
+
+  /* ONE ACT, ONE NAME (YH, 2026-08-28). The row menu names the document act
+     once, and the word is `Print` — the Export menu's own word. */
+  it("names the document act ONCE, as Print — never Print PDF or Preview PDF", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
     const labels = screen
       .getAllByRole("menuitem")
       .map((b) => b.textContent?.trim());
-    expect(labels).toContain("Print PDF");
+    expect(labels.filter((l) => l === "Print")).toHaveLength(1);
+    expect(labels).not.toContain("Print PDF");
     expect(labels).not.toContain("Preview PDF");
   });
 });
