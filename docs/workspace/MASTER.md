@@ -1155,65 +1155,37 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
-7. **REVISION 10 · ORDER HEADER + CLEAN MODULE ROWS (Jess, 2026-09-27).**
-   - **Order header (three blocks, two lines each):** left = the `SO No` in the link blue,
-     underlined, opening the Sales Order PDF, over the customer name; middle = `Proceed Date` over
-     its date; right corner = `Customer Requested Delivery Date` over its date. `Proceed Date` is
-     the day Sales handed the order to Operations (`orders.proceeded_at`), never the planned
-     production start (`orders.proceed_date`) (COPY-STANDARD). Because the header carries them,
-     there is NO Proceed row.
-   - **One heading row `Order Route | To do {n}`, then one row per module:** `Purchasing ·
-     Receiving · Warehouse · Payment · Delivery`.
-   - **Order Route cell (left), ONE format for every module (Jess, 2026-09-27: "i confused your
-     format"):** ONE line: the module name, and at its right corner the status (ONLY red `Missed` or
-     amber `Due`, nothing otherwise; no invented counts such as `0 of 2 in store`) followed by
-     `✓ {n} done ›` (Jess, 2026-09-27: "the status should align same line done at right header");
-     then THE MODULE'S WHOLE CHECKLIST ("the checklist put at order route"). A
-     party's group line (`Ohana … PO-20260903-4316 V1`) sits above its own lines.
-   - **Every checklist item is two lines (Jess: "every checklist no title then 2nd line
-     description"): a title (13/600) over a description (11/400) that NAMES what its date is**
-     (`Supplier answer` / `PO Delivery Date Mon, 14 Sep · Not recorded`; `1× CODY-Q · Ohana` /
-     `Expected Arrival Mon, 14 Sep · Not received`; `Balance` / `RM 2,284.00 · not paid · by Sat,
-     26 Sep`). No bare date appears anywhere ("now you all date every where but i dont know refer to
-     what?"). Dates print `fmtDate` (`Mon, 14 Sep`). ✓ done, ○ not yet, red `!` an open act;
-     finished items fold into `✓ {n} done ›`, printed at the right corner of the module name line
-     (Jess, 2026-09-27: "2 done why bottom? move to header same line"). Document numbers appear only
-     on group lines and in the header.
-   - **The nine fixes Jess approved 2026-09-27 ("yes"), measured after:** all three column title rows
-     are 64px and share one bottom line; the open form does not repeat its name; the module line
-     prints progress `{done}/{steps}` (`1/2`) and a tick only when all are done (`✓ 2/2`), with `›`
-     only when there are finished lines to open; a module prints `Missed` only when it holds a missed
-     open act; a fact line (`Order Total`) carries no mark; PO numbers print in the ruled form `PO260903-4316`; the
-     Supplier templates are Purchasing's own two tones `Chase` (date passed) and `Remind`; type uses
-     only the governed tokens (24/600 · 20/600 · 15/600 · 14/400 · 13/400 · 12/400 · 11/500, plus the
-     approved 13/600 over 11/400 pair) and no 700/900; spacing uses only 2 · 4 · 6 · 8 · 12 · 16 · 24
-     · 32. Measured: 0 off-token type, 0 off-scale spacing, no sideways scroll at 1440 and 1023.
-   - **Readable Route (Jess, 2026-09-27 "yes", after "circle is what meaning? … why order route still
-     very hard to read?"):** only two marks exist, a red `!` (an open act, the ONLY red line) and `✓`
-     (done, folded); a line that has not happened carries NO mark (the `○` read as an unticked
-     option). Only an open act's title is 600; every other title is 400. A party's group line
-     (`Ohana … PO260903-4316`) is a 12/400 grey label at the item indent, so module → party → item
-     read as three levels. Measured: 4 bold titles = 4 open acts, 4 red lines, 0 circles.
-   - **The supplier answer form is Purchasing's own table** (`SupplierReplySection`): `Supplier DO
-     received` (then `Supplier DO No` and the DO file) · `Item · Qty · Answer` one row per goods line,
-     Answer `No change` (default) · `Confirmed` · `New date` · `Split delivery`; `New date` adds the date
-     and one of the eight `PO_DELAY_REASONS`; `Split delivery` adds batch rows; Save waits for an
-     answer. It sits on one surface, never a card inside a card.
+7. **REVISION 11 · MODULE STOPS WITH ONE BOX PER CHECK (Jess, 2026-09-27/28; PROPOSAL until she
+   says 定).** Order header as before (SO link blue over the customer · `Proceed Date` · `Customer
+   Requested Delivery Date`; no Proceed row). Under `Order Route · To do {n}`, a vertical line of
+   stops, ONE STOP PER MODULE in Route order (`Purchasing · Receiving · Warehouse · Payment ·
+   Delivery`); the line joins modules only, never parties. Stop: a dot (red missed · amber due ·
+   grey otherwise) and the module name with `Missed` / `Due` at the right.
+   - **Every module has at least one box** ("why every module dont have?"): a white box with a 1px
+     line; ONE check per box, its title bold and its facts in grey lines under it; red only on the
+     missed fact, amber on the due fact. A box with an open act carries that act's words at its top
+     right in blue, and ONLY that act (the act belongs to the check in the same box). Pressing it
+     expands the box and the whole box fills pale blue with the owning module's form ("change to box
+     and when click expand, its blue to fill up"); nothing opens by itself, and Save closes it.
+   - **Content, from authority (verified 2026-09-28 on SO-1333):** Purchasing: one box per
+     supplier/PO — `Supplier answer · {supplier}` / `{PO No} · {qty}× {item}` / `PO Delivery Date
+     {date} · Arrival missed · Follow up supplier` (§5.9 Supplier card) / `PO sent to supplier · Not
+     recorded` when `po_sends` has no row → `Record supplier answer` (Purchasing's own table).
+     Receiving: one box per goods line, `Expected Arrival {date} · Not received`, no act before
+     arrival. Warehouse: `Not received yet` until goods arrive (goods are not repeated). Payment:
+     `RM {amount} unpaid` / `Paid … · Order Total …` and NO deadline and NO act until a Scheduled
+     delivery exists: `Payment must be complete` is 2 working days before Scheduled delivery and
+     asking starts 3 working days before it (Payment MASTER Collection timing); a Requested date never
+     sets a payment deadline. Delivery: one box per check — `3 working days before · {date}` → act
+     `Contact logistics`, which records Delivery's contact result (the seven 0487 results);
+     `2 working days before · {date}` → `Record scheduled delivery`; `1 working day before · {date}`
+     with its gaps (`⚠ Hold delivery · RM {amount} unpaid`).
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
      Payment's record-payment, Delivery's arrangement), so a save writes the same one record the
      module page writes (ERP-ARCH laws A and C: a door, never a duplicate). Seeing a form never
      grants saving it: without the Duty or permission the form shows, Save is disabled and says why.
-   - **Tally (Jess, 2026-09-27: "to do how to tally and know where im doing?"):** the open act is lit
-     on BOTH sides at once, the checklist line in the Order Route and its To do item, with the pale-blue
-     wash and the 3px blue edge; pressing a red `!` in the Order Route opens its To do and switches
-     Communication to its party.
-   - **To do cell (right, same row):** only that module's open acts, each titled with its checklist
-     item's words (`Supplier answer · Ohana`) over the owning form's name; one form opens at a time;
-     after Save it shows `✓ … Saved` and the next open act opens.
-   - **Jess chose this layout over B (steps along the top) and C (sorted by what to do), 2026-09-27:
-     "i want my previous, i never want on top". Never put the steps along the top.**
 7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
    then expand checklist … we should set format").** Every step is the same title row: date · dot ·
    step name · the step's own document number when it has exactly one (Proceed's `SO No`) · status
