@@ -486,8 +486,8 @@ line separately. The operating target is approved, not built; expected supply re
 **UI, KIT AND SOURCES — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** The
 operating model above is unchanged; this fixes how it is drawn and where every number comes from.
 
-- **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (`+ New Sales Order` ·
-  Search · Export · Columns). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
+- **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (Search · Export · Columns;
+  no create button — owner 2026-09-27). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
   top region with the view selector `Order list` · `Monthly demand`; the scrolling region shows only
   the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
   months) and Export produces the matrix.
@@ -632,7 +632,16 @@ line two (`Cody` / `Super King`) instead of repeating the SKU. Its columns stay
 `Category | Unit ID | Deliver To | SKU | Qty | Item`; `Deliver To` with no PO line reads `No PO yet`.
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
-contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
+contains no owner, avatar, next-action sentence, Priority or workflow button — **and no `New Sales
+Order` button (OWNER RULING 2026-09-27, Jess: "add new sales order should not be here").** A
+customer order is born in the Sales Portal (POS) and nowhere else; Operation receives it. The office
+create door `/operation/orders/so/new` and `POST /api/operation/orders` are retired with the button
+(measured 2026-09-27: every one of the 58 `Order created` events came from principal / operation /
+bd office logins — test data — and none from a dealer or showroom). Buying without a customer order
+is Purchasing's `Manual Purchase`; a Subscription order is born in Rental (0275). `Scan Order` is
+NOT built — its whole purpose was to prefill this door (§11 stays as the record of that decision).
+This overwrites Loo's 2026-08-11 line that `New Sales Order` is the one permanently visible primary
+action, and the 2026-09-11 "New Sales Order consistency" approval falls with the door. A document number is
 a door to its owner: SO → SO, PO → PO, DO → DO.
 
 **REGISTER CLOSE-OUT — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on
@@ -684,7 +693,7 @@ FOOTER     `{n} sales orders` unfiltered; `{n} of {m}` only when search, a heade
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
 ACTIONS    every act reachable from the order detail (View/Edit = open · Print · Cancel SO);
            right-click and Menu key / Shift+F10 are shortcuts only · no row buttons
-VISUAL     one shared register grammar · kit primary `New Sales Order` (32px, kit `add`)
+VISUAL     one shared register grammar · NO create button (owner 2026-09-27: orders are born in the Sales Portal)
 STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` ·
            `No sales orders match these filters` + `Clear filters`
 NARROW     toolbar wraps and stays usable · grid scrolls itself · no page sideways scroll
@@ -846,8 +855,7 @@ was not sold from a showroom (0144), so it is always filled. The page reads:
 word as the Register column and the PDF; `Goods` stays the Order Route readiness word); Dealer, Sales Location
 and Salesperson join `SO info` (the Register also reads Sales Location · Salesperson beside SO No) and the
 `Sales ownership` heading is retired; **headings have two ranks only** — card title `text-strong` 15px/600 sentence case,
-**blue (`kit-blue-11`) — owner ruling, Jess 2026-09-22: "remain blue"**, kept after the challenge that blue
-elsewhere means clickable; on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
+**BLACK BOLD `text-strong` (15/600 slate-12) — owner ruling, Jess 2026-09-27 ("make it black bold", every page), OVERWRITING the 2026-09-22 "remain blue"**: blue is the primary button, links and selection only, and the Sales Order page keeps no title exception; on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
 amounts never borrow the heading size: every amount is 13px, and `Total payable` and `Balance due` alone
 are weight 600 (owner card "KEEP Existing UI Kit Sizes", 2026-09-23 — overwrites "only the balance line").
 
@@ -969,7 +977,7 @@ Salesperson · Dealer (approval), catalogue-backed Item Code · Qty · Unit (gov
 Proceed Date — EXCEPT three, which print as plain text because they are not this page's to change:
 `SO Doc Date` (the order's birth stamp), the payment rows (Payments owns them; the door is `Open this
 order in Payments →`) and the computed totals (`TOTAL PAYABLE` · `Paid to date` · `Balance due`).
-Type order: card title 15px/600 blue (largest) → value 13px dark → label 11px/500 grey (smallest) — the kit's
+Type order: card title 15px/600 black (largest) → value 13px dark → label 11px/500 grey (smallest) — the kit's
 `text-label`, which `FieldFrame` already rendered; the earlier "12px" wording contradicted the kit and is
 overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section spaces its field groups with ONE
 12px body gap (`Block`, SO tone); controls keep the kit's 32px — the page no longer resizes them.

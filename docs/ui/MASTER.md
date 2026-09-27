@@ -1567,8 +1567,14 @@ detailed record and lose to this page wherever they disagree. The reference page
 Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is not proof of build.
 
 ```
+0  KIT      ONE kit, every page (owner ruling 2026-09-27). A card / panel / block
+            title is `text-strong` 15/600 slate-12 — BLACK BOLD, never blue, never a
+            band; blue is the primary button, links and selection only. No dash as a
+            value anywhere. A page that differs is a defect, not a style.
 1  PAGE     Header 50px: page name + Jump to · alerts · help · settings only
-            Toolbar: one blue create button · Search · Export · Columns
+            Toolbar: the module's create button ONLY where the module is the
+            record's birthplace (Sales Orders has none — orders are born in the
+            Sales Portal) · Search · Export · Columns
             Table · 32px footer. Nothing above the table (no KPI cards)
 2  COLUMNS  Order = the module MASTER's owner-approved list, never guessed
             Record date(s) first, then the document number

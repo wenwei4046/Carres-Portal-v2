@@ -46,6 +46,19 @@ On a conflict, Business wins.
   `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one
   inline "just this once".
+- **THE ONE KIT LAW — owner ruling 2026-09-27 (Jess: "every page must follow · delete the old UI
+  kit, update the new · chats don't read and create new").** There is ONE UI kit:
+  `docs/01-design-tokens.md` · `docs/02-components.md` · `docs/03-page-patterns.md` ·
+  `docs/ui/MASTER.md` §6.0. Every page, every module, every chat follows it; a page that differs
+  is a defect, never a "page style". Before ANY UI proposal, mock or build, read §6.0 and the
+  tokens — a chat that has not read them may not draw. Never create a new component, colour, type
+  size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
+  (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
+  the kit in the same change — never leave two versions. The old kit files are gone
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
+  recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
+  **card titles are black bold `text-strong`, never blue** · **column separators by column
+  count** · **rail = icon + title + one supporting line** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's
