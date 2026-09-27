@@ -132,6 +132,7 @@ scroll; `Print` is its icon below 480px and `⋮` is 40px.
 **Not built in B:** a line 3 note longer than one line still wraps whole instead of ending in `…`
 through `OverflowText` — the ledger is not a Register row and the engine's component is not mounted
 there yet.
+
 **Scope C · SO page locked state — BUILT 2026-09-28, production walk owed.** ONE lock
 (`formLocked`): View and a historical version are the same locked presentation. Measured on the
 rendered page at 1440 / 1180 / 820 / 743 / 390: no number box, no enabled control, no label ending in
