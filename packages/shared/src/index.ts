@@ -1,6 +1,7 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
+export * from "./unit-problem";
 
 /* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
    the fee onto the order. The Worker cannot import from the web app, which
@@ -1010,6 +1011,9 @@ export {
   poDateHistoryOf,
   poSupplierReplyOf,
   poSupplierDeliveryDateOf,
+  poLevelSupplierAnswerOf,
+  poLineSupplierAnswersOf,
+  poSupplierAnswerSummaryOf,
   poReplyDateOf,
   poRecordedReplyOf,
   poDocumentNumberOf,
@@ -1024,6 +1028,9 @@ export {
   type PoDateHistory,
   type PoDateHistoryEntry,
   type PoDatePromise,
+  type PoSupplierAnswerBatch,
+  type PoLineSupplierAnswer,
+  type PoSupplierAnswerSummary,
   type PoRiskRow,
   type PoRiskRung,
   type PoWorkspacePo,
@@ -1291,6 +1298,15 @@ export {
   type StockRegisterTotals,
   type StockRegisterUnit,
 } from "./stock-register";
+export {
+  INVENTORY_STATUS_RAIL,
+  STOCK_CONDITION_WORDS,
+  inventoryStatusOf,
+  isHeldUnit,
+  stillToArriveLine,
+  stockConditionOf,
+  type InventoryStatus,
+  type InventoryWordsInput, goodsReceivedAbsence } from "./inventory-words";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {
@@ -3196,7 +3212,8 @@ export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 
-export { recordArrivalConfirmationInput, recordSupplierReplyInput } from "./schemas/operation";
+export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export type { RecordSupplierAnswersInput } from "./schemas/operation";
 
 export {
   purchaseOrderReplyWorkItems,

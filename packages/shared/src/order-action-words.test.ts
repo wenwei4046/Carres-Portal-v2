@@ -332,9 +332,14 @@ describe("purchasing action words — the dictionary, verbatim", () => {
   });
 
   it("P3's two rows carry all five strings", () => {
-    expect(purchasingActionLine("confirm_tomorrows_delivery", { supplier: "Ohana" }))
-      .toBe("Call Ohana — confirm tomorrow's delivery");
-    expect(purchasingActionButton("confirm_tomorrows_delivery")).toBe("Record answer");
+    /* Owner wording 2026-09-25: click the supplier's channel, ask for the Supplier DO for the PO. */
+    expect(purchasingActionLine("confirm_tomorrows_delivery", { supplier: "Ohana", poNo: "PO260903-4316", channel: "whatsapp" }))
+      .toBe("Click WhatsApp, ask Ohana for the Supplier DO for PO260903-4316");
+    expect(purchasingActionLine("confirm_tomorrows_delivery", { supplier: "Ohana", poNo: "PO260903-4316", channel: "email" }))
+      .toBe("Click Email, ask Ohana for the Supplier DO for PO260903-4316");
+    expect(purchasingActionLine("confirm_tomorrows_delivery", { supplier: "Ohana", poNo: "PO260903-4316" }))
+      .toBe("Ask Ohana for the Supplier DO for PO260903-4316");
+    expect(purchasingActionButton("confirm_tomorrows_delivery")).toBe("Record supplier answer");
     expect(purchasingActionDone("confirm_tomorrows_delivery")).toBe("Answer recorded");
     expect(purchasingActionEmpty("confirm_tomorrows_delivery"))
       .toBe("Nothing arriving tomorrow.");
@@ -351,7 +356,7 @@ describe("purchasing action words — the dictionary, verbatim", () => {
 
   it("falls back to the role word, never to an empty gap", () => {
     expect(purchasingActionLine("confirm_tomorrows_delivery"))
-      .toBe("Call supplier — confirm tomorrow's delivery");
+      .toBe("Ask the supplier for the Supplier DO for the PO");
     expect(purchasingActionLine("confirm_balance_delivery_date", { supplier: "  " }))
       .toBe("Call supplier — confirm balance delivery date");
   });

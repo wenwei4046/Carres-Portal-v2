@@ -21,15 +21,19 @@ import { supabase } from "../lib/supabase";
  * invents a path — the server names every object key.
  */
 
+export type EvidenceKind = "photo" | "video" | "pdf";
+
 export interface EvidenceEntry {
   path: string;
-  kind: "photo" | "video";
+  /** 0587 — a supplier's PDF (a DO, an invoice page) is evidence too; a
+   *  caller that passes no `pdfMimes` never receives one. */
+  kind: EvidenceKind;
 }
 
 interface FileState {
   id: string;
   name: string;
-  kind: "photo" | "video";
+  kind: "photo" | "video" | "pdf";
   previewUrl: string;
   status: "uploading" | "failed" | "done";
   error?: string;
@@ -37,16 +41,19 @@ interface FileState {
   file: File;
 }
 
-type Props = {
-  /** Successful uploads, owned by the caller's form state. */
-  entries: EvidenceEntry[];
-  onChange: (entries: EvidenceEntry[]) => void;
+type Props<E extends { path: string; kind: string }> = {
+  /** Successful uploads, owned by the caller's form state. A caller keeps its
+   *  own narrower entry type (photo | video) and receives only those kinds. */
+  entries: E[];
+  onChange: (entries: E[]) => void;
   /** The caller's own signing door — returns a signed upload slot. */
   sign: (file: File) => Promise<{ token: string; path: string }>;
   /** The private storage bucket the signed slot belongs to. */
   bucket: string;
   imageMimes: readonly string[];
   videoMimes: readonly string[];
+  /** Absent = PDFs are not accepted (every caller before 0587). */
+  pdfMimes?: readonly string[];
   imageMaxBytes: number;
   videoMaxBytes: number;
   maxFiles: number;
@@ -57,20 +64,21 @@ type Props = {
 
 const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 
-export default function EvidenceUploadField({
+export default function EvidenceUploadField<E extends { path: string; kind: string }>({
   entries,
   onChange,
   sign,
   bucket,
   imageMimes,
   videoMimes,
+  pdfMimes = [],
   imageMaxBytes,
   videoMaxBytes,
   maxFiles,
   ariaLabel,
   disabled,
   testId,
-}: Props) {
+}: Props<E>) {
   const [files, setFiles] = useState<FileState[]>([]);
   const [pickError, setPickError] = useState<string | null>(null);
   /* onChange must see the freshest entries even when two uploads finish in
@@ -104,7 +112,7 @@ export default function EvidenceUploadField({
       );
       onChange([
         ...entriesRef.current,
-        { path: slot.path, kind: state.kind },
+        { path: slot.path, kind: state.kind } as E,
       ]);
     } catch (err) {
       setFiles((prev) =>
@@ -134,7 +142,8 @@ export default function EvidenceUploadField({
     for (const file of picked) {
       const isVideo = videoMimes.includes(file.type);
       const isImage = imageMimes.includes(file.type);
-      if (!isVideo && !isImage) {
+      const isPdf = pdfMimes.includes(file.type);
+      if (!isVideo && !isImage && !isPdf) {
         setPickError(`${file.name}: this file type is not accepted.`);
         continue;
       }
@@ -146,7 +155,7 @@ export default function EvidenceUploadField({
       const state: FileState = {
         id: crypto.randomUUID(),
         name: file.name,
-        kind: isVideo ? "video" : "photo",
+        kind: isVideo ? "video" : isPdf ? "pdf" : "photo",
         previewUrl: URL.createObjectURL(file),
         status: "uploading",
         file,
@@ -165,12 +174,13 @@ export default function EvidenceUploadField({
 
   const photos = entries.filter((x) => x.kind === "photo").length;
   const videos = entries.filter((x) => x.kind === "video").length;
+  const pdfs = entries.filter((x) => x.kind === "pdf").length;
 
   return (
     <div data-testid={testId}>
       <input
         type="file"
-        accept={[...imageMimes, ...videoMimes].join(",")}
+        accept={[...imageMimes, ...videoMimes, ...pdfMimes].join(",")}
         multiple
         onChange={handlePick}
         disabled={disabled}
@@ -181,7 +191,7 @@ export default function EvidenceUploadField({
       {/* The limits are stated BEFORE a file is chosen (§9). */}
       <p className="mt-0.5 text-label text-base-500">
         Photos (JPG, PNG, WEBP) up to {mb(imageMaxBytes)} · videos (MP4, MOV,
-        WEBM) up to {mb(videoMaxBytes)} · up to {maxFiles} files. Pick several
+        WEBM) up to {mb(videoMaxBytes)}{pdfMimes.length ? ` · PDF up to ${mb(imageMaxBytes)}` : ""} · up to {maxFiles} files. Pick several
         at once, or add more later.
       </p>
       {files.length > 0 && (
@@ -198,6 +208,8 @@ export default function EvidenceUploadField({
                   alt={f.name}
                   className="h-10 w-10 rounded border border-kit-slate-5 object-cover"
                 />
+              ) : f.kind === "pdf" ? (
+                <span className="flex h-10 w-10 items-center justify-center rounded border border-kit-slate-5 text-label text-kit-slate-11">PDF</span>
               ) : (
                 <video
                   src={f.previewUrl}
@@ -241,7 +253,7 @@ export default function EvidenceUploadField({
           ))}
         </ul>
       )}
-      {(photos > 0 || videos > 0) && (
+      {(photos > 0 || videos > 0 || pdfs > 0) && (
         <p
           className="mt-0.5 text-label text-success"
           data-testid={testId ? `${testId}-count` : undefined}
@@ -249,6 +261,7 @@ export default function EvidenceUploadField({
           {[
             photos > 0 ? `${photos} photo${photos === 1 ? "" : "s"}` : null,
             videos > 0 ? `${videos} video${videos === 1 ? "" : "s"}` : null,
+            pdfs > 0 ? `${pdfs} PDF${pdfs === 1 ? "" : "s"}` : null,
           ]
             .filter(Boolean)
             .join(" · ")}{" "}

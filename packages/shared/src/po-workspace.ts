@@ -382,6 +382,12 @@ export function poCurrentActionOf(
  * is our guess, not their promise).
  */
 export interface PoDatePromise {
+  id?: string | null;
+  /** 0587 · a line-level answer names its PO goods line and batch quantity;
+   *  the rows of one recorded answer share `answer_group`. */
+  po_line_id?: string | null;
+  about_qty?: number | null;
+  answer_group?: string | null;
   po_version?: number | null;
   channel?: string | null;
   recipient?: string | null;
@@ -439,6 +445,134 @@ export function poRecordedReplyOf(promises: readonly PoDatePromise[] | null | un
 export function poSupplierDeliveryDateOf(promises: readonly PoDatePromise[] | null | undefined, version: number): string | null {
   const reply = poSupplierReplyOf(promises, version);
   return reply ? poReplyDateOf(reply) : null;
+}
+
+/**
+ * ⭐ THE SUPPLIER'S ANSWER, PER GOODS LINE — Purchasing §5.7 (owner 2026-09-25).
+ *
+ * One line's newest evidenced answer on the current version, as its batches:
+ * one batch (`Confirmed` / `New date`) or several (`Split delivery`, each with
+ * its own quantity and date). A PO-level answer recorded before 0587 (or by
+ * the retired one-date form) still answers every line that has no answer of
+ * its own — it is a fact somebody wrote down, never dropped to tidy a screen.
+ * ONE reader, so the PO page, the Register expansion, the Register parent and
+ * the Work Supplier card cannot disagree (Law D).
+ */
+export interface PoSupplierAnswerBatch {
+  qty: number | null;
+  date: string;
+  /** confirmed · earlier · delayed · reported — the SERVER's classification. */
+  answer: string;
+  reason: string | null;
+  remarks: string | null;
+}
+
+export interface PoLineSupplierAnswer {
+  poLineId: string | null;
+  batches: PoSupplierAnswerBatch[];
+  recordedAt: string;
+  answerGroup: string | null;
+  previousDate: string | null;
+  recordedByName: string | null;
+  evidence: string | null;
+}
+
+const evidenced = (row: PoDatePromise, version: number) =>
+  row.kind === "tomorrow_delivery" && row.po_version === version &&
+  !!row.channel?.trim() && !!row.recipient?.trim() && !!row.evidence?.trim() &&
+  !!row.reported_by?.trim() && !!row.reported_at && !!row.recorded_by && !!row.recorded_at &&
+  !!poReplyDateOf(row);
+
+const batchOf = (row: PoDatePromise): PoSupplierAnswerBatch => ({
+  qty: row.about_qty ?? null,
+  date: poReplyDateOf(row)!,
+  answer: row.answer,
+  reason: row.reason ?? null,
+  remarks: row.remarks ?? null,
+});
+
+/** The newest PO-level (line-less) evidenced answer, or null. */
+export function poLevelSupplierAnswerOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+  version: number,
+): PoLineSupplierAnswer | null {
+  const row = [...(promises ?? [])]
+    .filter((r) => evidenced(r, version) && !r.po_line_id)
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
+  return row
+    ? { poLineId: null, batches: [batchOf(row)], recordedAt: row.recorded_at, answerGroup: row.answer_group ?? null,
+        previousDate: row.previous_date ?? null, recordedByName: row.recorded_by_name ?? null, evidence: row.evidence ?? null }
+    : null;
+}
+
+/**
+ * The newest evidenced answer for EACH goods line: the line's own newest
+ * answer group (all of its batches, in date order), else the PO-level one.
+ * A line with no answer at all is absent from the map.
+ */
+export function poLineSupplierAnswersOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+  version: number,
+  lineIds: readonly string[],
+): Map<string, PoLineSupplierAnswer> {
+  const rows = [...(promises ?? [])].filter((r) => evidenced(r, version) && !!r.po_line_id);
+  const poLevel = poLevelSupplierAnswerOf(promises, version);
+  const out = new Map<string, PoLineSupplierAnswer>();
+  for (const lineId of lineIds) {
+    const own = rows.filter((r) => r.po_line_id === lineId).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+    const newest = own[0];
+    if (newest) {
+      const group = own.filter((r) =>
+        newest.answer_group ? r.answer_group === newest.answer_group : r.recorded_at === newest.recorded_at);
+      const batches = group.map(batchOf).sort((a, b) => a.date.localeCompare(b.date));
+      out.set(lineId, {
+        poLineId: lineId, batches, recordedAt: newest.recorded_at, answerGroup: newest.answer_group ?? null,
+        previousDate: newest.previous_date ?? null, recordedByName: newest.recorded_by_name ?? null, evidence: newest.evidence ?? null,
+      });
+    } else if (poLevel) {
+      out.set(lineId, { ...poLevel, poLineId: lineId });
+    }
+  }
+  return out;
+}
+
+/**
+ * What the Register PARENT prints for `Supplier Confirmed Delivery Date`
+ * (Purchasing §9.3, Blueprint segment 2): ONE date when every answered
+ * line/batch names the same day; `{n} dates` when they differ; null when no
+ * line has an answer. `changed` counts lines whose newest date is not the
+ * original PO Delivery Date; `changedFrom` is that original when exactly one
+ * line moved (the second line prints `Supplier changed from {date}`).
+ */
+export interface PoSupplierAnswerSummary {
+  date: string | null;
+  distinctDates: string[];
+  answeredLines: number;
+  changed: number;
+  changedFrom: string | null;
+}
+
+export function poSupplierAnswerSummaryOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+  version: number,
+  lineIds: readonly string[],
+  originalDate: string | null | undefined,
+): PoSupplierAnswerSummary {
+  const answers = poLineSupplierAnswersOf(promises, version, lineIds);
+  const dates = new Set<string>();
+  let changed = 0;
+  for (const answer of answers.values()) {
+    for (const b of answer.batches) dates.add(b.date);
+    if (answer.batches.some((b) => originalDate != null && b.date !== originalDate)) changed += 1;
+  }
+  const distinctDates = [...dates].sort();
+  return {
+    date: distinctDates.length === 1 ? distinctDates[0] : null,
+    distinctDates,
+    answeredLines: answers.size,
+    changed,
+    changedFrom: changed === 1 && originalDate ? originalDate : null,
+  };
 }
 
 export interface PoDateHistoryEntry {

@@ -176,7 +176,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 |---|---|---|
 | Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
-| Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` · `Public holiday` · `Holiday operation` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
+| Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
@@ -190,7 +190,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work closure without an authorised receipt | icon plus `No longer needed` | This work is no longer open. · invented person/result |
 | Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
 | Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
-| Work left rail (owner-approved UI, 2026-09-24) | section `Date` with `Previous week` · `{Mon YYYY}` (`Sep 2026`) · `Next week`; options `Missed` · a calendar badge per governed weekday (day number over `MON`–`SAT`, cut from `fmtDate`) with the holiday name beside it (`Malaysia Day`) · `No working date` only while it has work · section `Module` with first row `All modules`, then each admitted module name; a count only when above zero. Accessible names: `{fmtDate} · {holiday} · Today · {n} action(s)` (each part only when true) | the word `Today` on screen · `Working day` / `WORKING DAY` as the heading · `All` as a date option · `Public holiday ·` before the name · a printed `0` · an icon beside each module row · an icon standing alone for `Missed` or `No working date` |
+| Work left rail (owner-approved UI, Jess 2026-09-26 — replaces 2026-09-24) | header `Previous week` · **`Week of {d Mon}`** (`Week of 28 Sep`, one line) · `Next week`; the week strip's tiles: uppercase weekday over the day number over the count (empty when none); a closed day is the grey tile with its name in the accessible name/tooltip only; today is the solid-blue tile; fixed rows `Missed` · `No date` (`0` printed); `Status` rows **`To do`** · **`Waiting for answer`** · **`Done today`**; `Page` with first row `All pages`; `Owner` select `All owners`. Accessible names: `{fmtDate} · Today · {holiday} · {n} action(s)` (each part only when true) | `Today` on screen · `No work` · `Public holiday ·` · `Hol` · a two-date week label · a dash anywhere in the rail · `No working date` · `Waiting` alone · `Completed` · tabs of any kind · `Covering` · a hidden `0` on a fixed row · an icon beside each page row |
 | Work centre heading (owner ruling 2026-09-17) | `Missed {n} · {weekday, date} {n}` on first open · `{weekday, date} {n}` when one day is selected | a list-count suffix · a heading count that differs from `All modules` |
 | Work centre groups, in order (owner ruling 2026-09-17) | `BROKEN COMMITMENT` → `MISSED` → `{WEEKDAY, DATE}` · a broken commitment is a red group heading plus a thin red row edge, no row badge, and still counts under its own working day | a Broken badge on the row · a `BLOCKED` group · counting a broken commitment twice |
 | Work blocked job (owner ruling 2026-09-17) | `Blocked by {dependency}` on the row, inside its own working-day group · filter option `Blocked` | `Blocked` as a group · `Waiting` alone · hiding a blocked missed job |
@@ -222,6 +222,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
 | Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
 | Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Workspace → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
+| Rail Customers door (owner-confirmed 2026-09-26, UI MASTER §5) | `Customers` · `Customers you can see` · `Name, phone or order number` · `Back to results` · `Matched by phone` · `Possible match` · `Orders` · `History` | Customer 360 · CRM · Contacts · merging a name-only match into one customer |
 | Rail Calendar day rows (owner-confirmed 2026-09-25, UI MASTER §5) | `{n} scheduled deliveries` · `{n} {company} contact deadline(s)` · `{n} arriving` · `{n} pickups` · `Pickup By {company}` · `{n} return pickup(s)` · `{n} promised payment(s)` · `{n} free storage ends` · `{n} service visit(s)`; zero prints nothing; a failed source says it could not be loaded | `supplier arrival` · `pickups by logistics` · `{n} jobs` · `0` for a failed source |
 | Right Rail healthy clear — **retires with the rail My Work slot (UI MASTER §5, owner 2026-09-24)** | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure — **retires with the rail My Work slot** | `My Work could not be refreshed` | No work due now · No open work |
@@ -541,7 +542,8 @@ borrow the other's words.
 
 ```
 Delivery Order document — the DOCUMENT's own life
-  Created · Out for delivery · Arrived · Delivered · Delivery exception · Cancelled
+  Created · Out for delivery · Arrived · Delivered · Partially Delivered · Failed Delivery · Cancelled
+  (`Delivery exception` retired 2026-09-25: the result itself says what happened; `Exception` is banned)
   (`Arrived` only on an intermediate Journey leg's document — the goods reached the
    named partner warehouse; `Delivered` is the customer leg's word — Card 20, 2026-09-13)
 
@@ -652,7 +654,7 @@ headings are **`WORK TO DO` · `STATE` · `LOGISTICS` · `DELIVERY STATUS`** (`R
 unpicks and `Clear filters` clears). `scope` and `leg` are not employee-facing words anywhere on
 Monitor or its assignment door: the footer counts `{n} deliveries`, a Journey row prints its route. The rail's proof job is
 **`Upload delivery proof`**, never `Delivered — Proof Required`; its rows name the concrete missing
-evidence as `Upload delivery photo` and/or `Upload signed Delivery Order`. The `DELIVERY STATUS` group is a
+evidence as `Upload delivery photo` and/or `Upload signed DO` (2026-09-25). The `DELIVERY STATUS` group is a
 kit dropdown over the Monitor status words above; it never holds a work queue.
 
 **Monitor's `Actions` and `Edit Delivery` columns are RETIRED — owner ruling 2026-09-12,
@@ -747,6 +749,14 @@ One fact, one first line on every surface, a second line written for the party r
 preparation; `Stop packing` is not a second spelling. The same day the owner ruled `View Sales
 Order` (the brief's first-panel control: the read-only Sales Order document unfolded in place) and
 the `ETA` field in the Logistics Details edit state.
+
+### Delivery Settings and the NETS page — owner ruling 2026-09-26
+
+| Where | The words |
+|---|---|
+| Settings rail row and page | `Logistics` (never `Logistics Partners`; `Partner` is banned) · sections `Company details` · `Coverage` · `Schedule` · `Transit points` · `Drivers and Vehicles` · `Services & charges` · `Portal access` · one `Save changes` per page · `Not configured` |
+| Delivery Rules | `Logistics contacts the customer` (fixed) · `Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number` · `Contact lead days` (reads the shared `chase` setting) · `Evidence required by result` |
+| NETS arrange page | `Delivery dates` · facts `Reference` · `Customer` · `Area` · `Goods` · `Requested delivery` · fields `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Result` · `Note` · `Reply screenshot` · acts `Save delivery date` · `Cannot deliver` (`Confirmed date`, `Time window`, `Save Delivery Arrangement` retired) · `Hold delivery` alone while the gate holds |
 
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
 
@@ -2032,6 +2042,34 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | One saved evidence file that could not be read | `Photo {n} could not be loaded` + `Try again` | A file the record HAS but the viewer could not read. A file the record never had is absent, not failed — the two never render alike |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
+<a id="record-supplier-answer-words"></a>
+### Record supplier answer words — APPROVED (Jess, 2026-09-25) · BUILT 2026-09-26
+
+The PO object page's per-item supplier answer (Purchasing MASTER §5.7, Blueprint segment 1).
+Retired with it: the section heading `Supplier has not confirmed the PO date` and the rail row of
+the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`).
+
+| Where | Exact wording |
+|---|---|
+| Section · button | `SUPPLIER REPLY` · `Record supplier answer` |
+| Supplier DO at the top of the form | `Supplier DO received` · `Supplier DO No` · `DO file` |
+| Per-line answer, four radios | `No change` · `Confirmed` · `New date` · `Split delivery` |
+| Split batches | `{n} pcs · {date}` · `+ Add another date` · `Total {n} of {m}` |
+| Table heads | `Item` · `Qty` · `To deliver` · `Answer` · `Date` · `Reason` · `Supplier Confirmed Delivery Date` · `Last answer` |
+| Bulk answer bar | `{n} selected · Apply to selected` |
+| Delay reasons (the eight, shown only when the date is later than PO Delivery Date) | `Production delay` · `Material unavailable` · `Capacity / scheduling delay` · `Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` · `Partial quantity ready` · `Other` (`Note` required) |
+| Dates and people | `Answered by supplier on` · `Recorded by {name}` |
+| Result lines | `Delayed` · `Earlier` · `Reported` (no original date) · `Supplier changed from {date}` · `All received` · `Received · {GRN No}` |
+| Last answer | `Last answer · {date} · recorded by {name} · Evidence {n}` · `None recorded yet` |
+| Save blockers (the button names the gap) | `Save — answer a line or record the Supplier DO` · `Save — record the Supplier DO number` · `Save — upload the Supplier DO` · `Save — record the supplier delivery date` · `Save — choose why the supplier moved the date` · `Save — write why the supplier moved the date` · `Save — the batches must total {m}` · `Save — add a WhatsApp screenshot` · `Save — name who answered` · `Save — record when the supplier answered` |
+| People and time | `Recipient` · `Answered by` · `Answered by supplier on` · `Channel` |
+| Bulk answer bar | `{n} selected · Apply to selected` · `Choose answer` · `Apply` |
+| Split sub-row | `└ batch {n}` · `{n} pcs` |
+| Read-state absences | `Not confirmed` · `None recorded yet` · `All received` · `Supplier DO · Not recorded` |
+| Receiving Work card, date-derived (Purchasing §9.4, segment 2) | fact `Supplier date passed · nothing received yet` (a submitted Warehouse count keeps `Goods arrived · GRN not posted`) · action `Check in {PO No} from {Supplier}` |
+| Day-before Work card (Purchasing §5.7) | fact `Confirm tomorrow's supplier delivery` · action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` · `Click Email, …` · no channel recorded: `Ask {Supplier} for the Supplier DO for {PO No}` · button `Record supplier answer` |
+| Read failure | `Supplier answers could not be loaded` + `Try again` |
+
 <a id="purchasing-ui-dictionary"></a>
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
@@ -2334,10 +2372,16 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Transfer form fields (owner ruling 2026-09-25) | **`Transfer`** (title) · **`Pickup Location`** · **`Delivery Location`** · **`Pickup By`** · **`Ship Date`** · **`Expected arrival`** · **`Reason`** · **`Units`** · **`Find Unit`** | From / To / Destination (as form labels) · Delivery / repair party · Collection date · `Warehouse · Transfer / Return / Repair` as a title |
 | Warehouse Settings additions (owner ruling 2026-09-25) | section **`Sites`** with **`Add Site`**; kinds **`Carres warehouse` · `Carres showroom` · `Logistics transit point`**; Access rows **`Manage Warehouse Settings`** · **`Receive goods`** (default **`Everyone in Operation`**) | Confirm inbound receipt · Confirm collection from Warehouse · Perform stock count (until built) · Partner warehouse |
 | Unit Detail sections (owner ruling 2026-09-25) | **`Stock Details`** · **`Documents`** · **`Current work`** · **`History`**; header `⋮` actions **`Report a problem`** · **`Make available for sale`** · **`Count again`**; empty work reads **`Nothing to do for this Unit.`** | Where it is now · Connected records · To do (here) · Last verified · Last counted · Edit · Delete |
+| Unit Detail header (owner ruling 2026-09-26) | the Sales Order object header, verbatim: **`← Inventory`** · **`{Unit ID} · {Item}`** · **`⋮`** (`More actions`); an old reference the portal never held reads **`{ref} · not in this portal`** | `← Inventory` as a small in-page link · Unit ID alone · `No SO` for a reference that exists |
+| Report a problem on a Unit (owner-approved design 2026-09-26) | **`What did you see?`** with exactly **`Damaged` · `Not found` · `Wrong item` · `Missing component` · `Label / Unit ID problem` · `Something else`** · **`Photo`** · **`What happened, in one sentence`** · the consequence line **`After you submit, {Unit ID} reads Cannot sell · Waiting inspection until {Site} checks it and records the result.`** / **`{Unit ID} stays reserved for {SO No}. Sales sees this problem on the order until it is checked.`** · submit **`Report a problem`** · success **`Problem recorded as {Issue No}. {Unit ID} now reads Cannot sell · Waiting inspection.`** | Hold · Quarantine · Claim · Write-off · Remedy · Root cause · `Attention` · a status the observer picks |
+| The Work a Unit problem opens (Stock MASTER §6) | **`Check the damage on {Unit ID} and record the result`** · **`Look for {Unit ID} at {Site} and scan it again`** · **`Check {Unit ID} against its PO and record what arrived`** · **`Check which parts of {Unit ID} are missing and record them`** · **`Check the label on {Unit ID} and reprint it if needed`** · **`Check {Unit ID} and record what you find`**; owner **`GRN Duty`**, recipient the Site, due the next working day | `Damaged` · `Not found` · `Review` · `Handle` as an action |
+| Make available for sale dialog (owner ruling 2026-09-25/26) | five checks **`Stock Location is recorded` · `No reported problem is still open` · `Not in repair` · `Not on the road` · `No Sales Order reservation`**, a failing check adds its reason (`{n} reported problem(s) are still open` · `This Unit is in repair` · `This Unit is on the road` · `Reserved for {SO No}` · `No Site is recorded for this Unit`) · **`Confirm`** · the note **`Inventory Status returns to Available. Stock Condition stays {condition}, so Sales sees exactly what it sells.`** | Release · Unblock · Clear hold |
+| Count again dialog (owner ruling 2026-09-25/26) | **`{Site} gets the work again: Look for {Unit ID} at {Site} and scan it again, due the next working day. Finding it closes the work; not finding it becomes a difference for GRN Duty to check.`** · **`Count again`** | Recount · Re-scan · Stock take |
+| Unit Detail `Current work` and `History` (owner ruling 2026-09-25/26) | `Current work` prints the Issue's official English, then **`{action} · {owner} · by {date}`** and the Issue number; empty **`Nothing to do for this Unit.`**; an Issue between actions reads **`Waiting for review`**. `History` has two sub-heads **`Site visits`** and **`Changes`** | To do (here) · Activity · Timeline |
 | Inventory's can-it-be-sold column (owner ruling 2026-09-25) | **`Inventory Status`** with exactly **`Available` · `Reserved` · `Cannot sell`**; the reason for `Cannot sell` lives in the **`Stock Condition`** column (`New` · `Display` · `Old` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection`); a `Damaged`/`Old` Unit may be `Available` again for clearance sale (owner 2026-09-25) | `Stock use` · `Not available` · `Blocked` · `Reserved / sold` · a condition word inside the status |
 | Inventory's three after-OUT columns (owner ruling 2026-09-25) | **`Ship Date`** (the day the goods left the warehouse with the Logistics company — the pair to `Goods Received Date`; owner chose the international word over SAP's `Goods Issue Date`) · **`Pickup By`** (the company whose driver took the goods — owner's short word; `Logistics` stays the transport-company noun elsewhere) · **`Delivery Location`** (where it is going); all three blank while the Unit stands in a Site | Handed over (as a column head) · Goods Out Date · Pickup Date · Dispatch Date · Picked By · Carrier · Shipped by · With NETS Delivery · In transit · On the way · a company inside `Stock Location` |
 | Inventory's place column (owner ruling 2026-09-25) | the existing heading **`Stock Location`** with the existing place words only: **`Carres Klang`** · **`PJ Showroom`** · `AL Sungai Buloh` · `HOUZS Balakong` — the Site the Unit stands in or last stood in. No holder column exists: Carres owns the goods | `Who has it` · `Site` (as a column head) · `Holder` · `Where` · `With NETS Delivery` (Delivery's Items-panel word, not Inventory's) · `In transit` · `On the way to {destination}` · `NETS` as a warehouse |
-| Inventory absence words (owner ruling 2026-09-25) | **`No SO`** (not promised to anyone) · **`Not received`** (no Receiving record) · **`Not recorded`** (fact never captured). `Unit ID` · `Product` · `Stock use` never print an absence word | `—` for an optional fact · a blank cell · N/A |
+| Inventory absence words (owner ruling 2026-09-25) | **`No SO`** (not promised to anyone) · **`Not received`** (no Receiving record — an `Incoming` Unit) · **`Not recorded`** (fact never captured — including a held Unit whose `Goods Received Date` was never captured; it WAS received, so it never reads `Not received`). `Unit ID` · `Product` · `Stock use` never print an absence word | `—` for an optional fact · a blank cell · N/A |
 | Inventory footer's second line when goods are still owed (owner ruling 2026-09-25) | **`{n} still to arrive · see Inbound`** — the same Pending Delivery arithmetic Inbound prints, never a second count; absent when n is 0 | Incoming {n} in the footer · counting not-yet-received goods inside `{n} records` |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
@@ -2659,7 +2703,7 @@ what has not happened yet, in the plainest words available:
 | No company chosen yet | **`Logistics not assigned`** | `No logistics chosen yet` (retired 2026-09-24) · No carrier · Unassigned |
 | Nobody has scheduled a delivery day | **`Not scheduled yet`** | `Date + slot not confirmed` (retired) · Appointment not confirmed · No booking · TBC |
 | Not delivered | **`Not delivered yet`** | Pending · Open · In progress |
-| No photo on file | **`No delivery photo yet`** | No photo · Missing · — |
+| No photo on file | **`No photo yet`** (shortened 2026-09-25) | No photo · Missing · — |
 | The photo is on file | **`Uploaded by {name}`** + **`Uploaded: {date}`** | Done · Complete |
 | A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
 | A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
@@ -3155,10 +3199,10 @@ the document's own lifecycle — registered here and in
 | A fresh document, no run yet | **Created** | New · Open · Pending |
 | Goods received by logistics, not yet resulted (derived from the §4 chain's `Received by logistics` fact, 0363 — never from the calendar) | **Out for delivery** | In transit · Dispatched · On the way |
 | The trip completed | **Delivered** | Done · Complete · Closed |
-| The trip did not complete | **Delivery exception** + its ONE reason from the T4 Reason Library | Failed · Problem · a second word list |
+| The trip did not complete | **`Failed Delivery`** or **`Partially Delivered`** on line 1 + its ONE reason from the T4 Reason Library on line 2 (owner ruling 2026-09-25; the umbrella `Delivery exception` is retired) | Delivery exception · Failed · Problem · a second word list |
 | A voided document | **Cancelled** + `Order cancelled` / `Rescheduled` | Deleted · Void · Removed |
 | No date on the document | **No delivery date yet** | — · TBC · N/A |
-| The register's empty state | **No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.** | No data · No results |
+| The register's empty state | **`No delivery orders yet.`** over **`The system issues one when goods, logistics, date and money are ready.`** (owner ruling 2026-09-25) | No data · No results · the 2026-08-16 long sentence |
 | An order's row before the document exists (drawer / detail) | **No delivery order yet — the system issues it when the goods, logistics and date are ready** | — · Not issued · a button |
 | The reprint promise (Print hover) | **Reprint carries the same number** | Duplicate · Copy |
 
@@ -3216,12 +3260,12 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
 | `{N} selected` · `{N} delivery orders selected` | the Monitor and Delivery Orders selection toolbars respectively | **RULED 2026-09-07** |
 | `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |
-| `Record delivery result` · `Upload delivery photo` · `Upload signed Delivery Order` · `Check delivery proof` | the register's WORK TO DO queues. `Check delivery proof` joined on 2026-09-13 with the §6.1 proof-review record (0489): a delivered or partially delivered result whose newest file no review has judged | **RULED 2026-09-06**, fourth queue **BUILT 2026-09-13** |
+| `Record delivery result` · `Upload delivery photo` · `Upload signed DO` · `Check delivery proof` | the register's WORK TO DO queues. `Check delivery proof` joined on 2026-09-13 with the §6.1 proof-review record (0489): a delivered or partially delivered result whose newest file no review has judged | **RULED 2026-09-06**, fourth queue **BUILT 2026-09-13** |
 | `Proof Accepted` · `More Proof Required` · `Proof Rejected` | Operation's three review acts on the DO object's `Evidence` section (`delivery/MASTER.md` §6.1); the latter two require a `Reason`. The same three words print the review state and its history line (`{word} · {reason} · {date} · {reviewer}`), the Monitor status second line (`Proof Rejected · {reason}`) and the History entry | **RULED 2026-09-13** |
 | `Evidence` | the DO object's §9 section: every file bound to the delivery it proves, the signed paper, the proof review. It replaces the pre-ruling `Delivery photo` and `Signature / proof` panels | **RULED 2026-09-13** |
 | `Proof review` · `Not reviewed yet` · `Save review` · `Reason` | the Evidence section's review block: its heading, its absence, its one save word, its reason field | **RULED 2026-09-13** |
-| `Save signed Delivery Order` · `Signed Delivery Order file` · `Received & signed by` | the in-panel attach form behind `Upload signed Delivery Order` on a delivered or partially delivered document; the file is filed against the latest attempt and re-records nothing | **RULED 2026-09-13** |
-| `No files from this delivery yet` · `No delivery result recorded yet — evidence binds to the delivery it proves.` | the Evidence section's two absences | **RULED 2026-09-13** |
+| `Upload signed DO` (button) · `Save signed DO` · `Signed DO file` · `Received & signed by` | the in-panel attach form on a delivered or partially delivered document; the file is filed against the latest attempt and re-records nothing (`Delivery Order` stays the paper's full name in prose and on the document; owner ruling 2026-09-25 shortens the act) | **RULED 2026-09-13**, shortened **2026-09-25** |
+| `No files from this delivery yet` · `No delivery result yet.` | the Evidence section's two absences (the second shortened 2026-09-25) | **RULED 2026-09-13** |
 | `Proof review saved` · `Signed Delivery Order saved` | the two toasts | **RULED 2026-09-13** |
 | `Route` | the DO object's Delivery details fact on a Journey leg's document — `Klang WH → JB transit`, never a `Leg` word | **RULED 2026-09-13** (Card 14) |
 | `Arrived` · `Record arrival` · `Arrival recorded` | an INTERMEDIATE Journey leg's result chooser word, its one save word and its toast — the goods reached the named warehouse, the customer leg still owes its result | **RULED 2026-09-13** (Card 14) |
@@ -3236,7 +3280,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Warehouse` · `ETA` · `Building type` · `Floor` · `Lift` · `No lift` · `Stairs` · `Access` · `Customer request` · `Instruction for logistics` · `No warehouse recorded` · `None recorded` | section one's site and arrangement facts and their absences (`Not recorded` remains the plain absence) | **RULED 2026-09-13** (Card 16) |
 | `Delivery on {day} · {result}` · `Goods: {location}` | the Delivery history entry and its second line | **RULED 2026-09-13** (Card 16) |
 | `No open problems` · `Hold delivery · Finance hold · {reason}` · `Payment approval requested — {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
-| `Open Payments →` · `Open Unit {Unit ID} →` · `Open Case {Case No} →` · `Open {DO No} →` · `No exact Units recorded on this document` · `Service Cases could not be read` · `No Service Case on this order` · `No other delivery order on this Sales Order` | Related records' doors (beside `Open SO-{n} →` and `Open Order Route →`) and their absences | **RULED 2026-09-13** (Card 16) |
+| `SO-{n}` · `Order Route` · `Payments` · `Unit {Unit ID}` · `Case {Case No}` · `{DO No}` · `No exact Units recorded on this document` · `Service Cases could not be read` · `No Service Case on this order` · `No other delivery order on this Sales Order` | Related records' doors are the record's own number or name — never `Open … →` (owner ruling 2026-09-25) — and their absences | **RULED 2026-09-13**, doors re-worded **2026-09-25** |
 | `Opening SO-{n}` · `Sales Order not found.` · `Back to Sales Orders` | the Sales Order object page opened by its NUMBER (`/operation/orders/so/SO-1362`): the one-moment loading word while the number resolves to the id, the absence when no order carries that number (the existing Unknown-SO word, reused), and its door | **REGISTERED 2026-09-13** (Delivery Card 19 — a number and an id open the same page; the owner may re-word) |
 | `Check the delivery proof` / `Accept it, ask for more, or reject it` · `Delivery proof not reviewed` | the Work sentence (act / required result) and the Work problem word of the `check_delivery_proof` rule, Delivery Duty's | **RULED 2026-09-13** |
 | `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
@@ -3257,17 +3301,16 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Logistics` | the Delivery Orders register's COLUMN HEADING for the partner named on the document. The role word stays `Logistics` everywhere the role itself is named; the heading spends its width on the fact | **RULED 2026-09-11** |
 | A CANCELLED document's `Driver submission` | **nothing at all** when no file was ever sent. The pill already says `Cancelled`; two absences beside it read as two outstanding jobs on a trip that will never happen. Files sent before the void are still shown — a void never erases a recorded fact | **RULED 2026-09-11** |
 
-**ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11.** The
-Delivery Orders register prints the outcome ONCE. Line 1 is the DOCUMENT's own pill word
-(`Created` · `Out for delivery` · `Arrived` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
-`Delivery exception` carries the RESULT that was actually recorded and its reason —
-`Partially Delivered · {reason}` or `Failed Delivery · {reason}` — which is what the retired
-default `Delivery Result` column used to print three columns away. `Cancelled` keeps its void
-reason on line 2; `Arrived` carries the partner warehouse the goods reached (Card 20). **The search, the per-column filter and the Excel export print the same
-spelling as the cell**, so a reader looking for `Partially Delivered` finds the row that recorded
-it even though its pill spells `Delivery exception`. Combining a DISPLAY never changes the status
-arithmetic and never removes a recorded result: the Delivery Order's own page still holds every
-result and its whole history.
+**ONE `Status` COLUMN, AND ITS FIRST LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11, re-ruled
+2026-09-25.** The Delivery Orders register prints the outcome ONCE. Line 1 is the DOCUMENT's own
+word (`Created` · `Out for delivery` · `Arrived` · `Delivered` · `Partially Delivered` · `Failed
+Delivery` · `Cancelled`); line 2 is the ONE reason (`Customer unreachable` · `Sofa not ready` ·
+`Rescheduled`); `Arrived` carries the partner warehouse the goods reached (Card 20). The 2026-09-11
+umbrella `Delivery exception` is retired: `Exception` is a banned word and it made the reader learn
+a word that only pointed at the next line. **The search, the per-column filter and the Excel export
+print the same spelling as the cell.** Combining a DISPLAY never changes the status arithmetic and
+never removes a recorded result: the Delivery Order's own page still holds every result and its
+whole history.
 | `Search deliveries…` | the toolbar search placeholder | kept |
 | `Previous days` · `Next days` | the range arrows' accessible labels | kept |
 
@@ -3275,8 +3318,8 @@ Already governed and merely REUSED (not new words): `No confirmed date` · `Over
 `No delivery order yet` · `Logistics not assigned` · `Hide filters` /
 `Show filters` · `Requested Delivery Date` ·
 `Scheduled delivery` · `Scheduled time` ·
-`Not delivered yet` · `No delivery photo yet` · `Delivery photo saved` ·
-`Signed document on file` / `No signed document yet` (the DO object's own shipped pair).
+`Not delivered yet` · `No photo yet` · `Delivery photo saved` ·
+`Signed DO on file` / `No signed DO yet` (the DO object's pair; shortened 2026-09-25 from `No delivery photo yet`, `Signed document on file`, `No signed document yet`).
 
 **The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the logistics company and
@@ -3461,10 +3504,9 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
 | The clear state | **No open work — every track is clear.** | All done · Empty |
 | Empty My Work while the team has work (owner review 2026-09-25) | header **`0 for you · {n} for the team`** · list door **`See Team Work`** | a bare `0 actions to do` |
-| The cover filter (owner review 2026-09-25 item 16; shortened 2026-09-25 so the toolbar stays one row at 941px) | **Covering** | Covered (alone) · Covering for others |
+| The cover filter — RETIRED (Jess, 2026-09-26): cover is a fact on the row (`Covered for {name}` / `Covered by {name}`), never a toolbar button | — | Covering · Covered (alone) · Covering for others |
 | The page filter (owner review 2026-09-25 item 17) | rail section **Page** · **All pages** | Module · All modules |
-| The Date rail (owner review 2026-09-25 items 19–22) | every row prints its count, `0` included · `Today` beside today's date · `No working date` always listed · two work weeks | a hidden `0` · a blue badge alone as "today" |
-| The header search (owner review 2026-09-25 item 12) | **Search** | Jump to… · a printed ⌘K |
+| The Work rail (Payment Monitor grammar, Jess 2026-09-26, corrected the same day) | header `‹ Week of {d Mon} ›` · one strip of day tiles (weekday · day number · count) · fixed rows `Missed {n}` · `No date {n}` (`0` printed) · `Status` rows `To do` · `Waiting for answer` · `Done today` · `Page` group `All pages` · `Owner` select `All owners` · `Hide filters` / `Show filters`; an empty Status choice reads **`No work for this Status choice.`** | a hidden `0` · `No work` · `Today` in words · `Public holiday ·` · a two-date header · toolbar selects · list tabs · `Covering` |
 
 > **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
 > OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a
@@ -3513,7 +3555,7 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 | Communication | `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Copying or opening WhatsApp confirms nothing. Record the answer when it comes.`; the prepared message leads with the customer's reference, never the SO number, and ends `Answer here: {link}` |
 | History titles | `Logistics assigned` · `Logistics changed` · `Logistics removed` · `Scheduled delivery saved` · `Requested another date` · `Cannot deliver` |
 | External link page | `Delivery for` {company} · `Reference` · `Customer` · `Phone` · `Delivery address` · `Goods` · `Pickup` · `Requested delivery` · `Scheduled delivery`; answers `Scheduled date` · `Another date` · `Cannot deliver`; fields `Scheduled date` · `Scheduled time (optional)` · `Date you can deliver` · `Reason` · `Tell us more (optional)`; buttons `Save scheduled delivery` · `Save another date` · `Cannot deliver` |
-| Link page results and refusals | `Saved. Carres can see your scheduled delivery.` · `Saved. Carres will call the customer about your date.` · `Saved. Carres will decide the next step.` · `This link no longer works. Ask Carres for a new link.` · `The delivery could not be loaded. Try again.` · `Sunday is not a delivery day. Pick another date.` · `This date is a public holiday. Pick another date.` · `This date has passed. Pick another date.` |
+| Link page results and refusals | `Saved. Carres has your delivery date.` · `Saved. Carres will call the customer.` · `Saved. Carres will reply.` (owner ruling 2026-09-26, shortened) · `This link no longer works.` / `Ask Carres for a new link.` · `The delivery could not be loaded.` / `Try again.` · `Sunday is not a delivery day.` / `Pick another date.` · `This date is a public holiday.` / `Pick another date.` · `This date has passed.` / `Pick another date.` · `Hold delivery` (alone, while the gate holds) |
 | `Requested another date` reasons | `The customer asked for another date` · `We are full on that date` · `We do not go to that area on that date` · `The goods are not ready for pickup` |
 | Carres refusals | `Assign logistics before you create a link` · `{company} answers in its own portal.` · `This delivery already has an active link. Revoke it first.` · `This delivery has no active link.` |
 

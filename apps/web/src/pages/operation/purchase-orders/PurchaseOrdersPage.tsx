@@ -11,13 +11,14 @@ import { ArrowLeft, Download, FileCheck2, RotateCcw, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
-  poRecordedReplyOf,
-  poReplyDateOf,
+  myHolidaySet,
+  poExpectedArrivalsOf,
+  poLineSupplierAnswersOf,
+  poSupplierAnswerSummaryOf,
   poSupplierDeliveryDateOf,
-  poSupplierReplyOf,
-  recordSupplierReplyInput,
-  PO_DELAY_REASONS,
   purchaseOrderRegisterFacts,
+  tomorrowDeliveryCallOf,
+  type PoSupplierAnswerSummary,
   purchaseOrderWork,
   purchasingRefusal,
   supplierClaimRequestLabel,
@@ -32,11 +33,10 @@ import {
   type DataGridContextMenuItem,
   type DataGridPersonalLayouts,
 } from "@/components/register/DataGrid";
-import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
+import SupplierReplySection, { batchWord } from "./SupplierReplySection";
 import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
 import Input from "@/components/kit/Input";
-import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
@@ -54,7 +54,6 @@ import {
   useOperationWarehouse,
   usePoReceiving,
   useRecordSend,
-  useRecordSupplierDate,
   useRegisterLayouts,
   useRevisePo,
   useSaveRegisterLayout,
@@ -98,7 +97,10 @@ const RAIL_GROUPS: Array<{ heading: string; icon: IconName; rows: RailRow[] }> =
     heading: "Supplier reply",
     icon: "message",
     rows: [
-      { key: "supplier_date_missing", label: "Supplier has not confirmed the PO date" },
+      /* Purchasing §9.3 (2026-09-24 / Blueprint segment 2): the day-before
+         check, not "has not confirmed" — a sent PO the supplier has not
+         answered is `Waiting for goods from supplier`, never a chase. */
+      { key: "confirm_tomorrows_delivery", label: "Confirm tomorrow's supplier delivery" },
       { key: "supplier_date_changed", label: "Supplier Confirmed Delivery Date changed" },
       { key: "supplier_date_passed", label: "Supplier delivery date passed" },
     ],
@@ -159,6 +161,9 @@ type RegisterRow = {
   po: operationPoListRow;
   supplier: SupplierRow | null;
   supplierName: string;
+  /** 0587 — what the parent prints for `Supplier Confirmed Delivery Date`:
+   *  one date, `{n} dates`, or nothing (`Not confirmed`). */
+  answerSummary: PoSupplierAnswerSummary;
   sourceSearch: string;
   deliverTo: string;
   supplierDate: string | null;
@@ -281,13 +286,48 @@ function supplierDateOf(po: operationPoListRow): string | null {
   return poSupplierDeliveryDateOf(po.promises, po.version ?? 1);
 }
 
-function toRegisterInput(po: operationPoListRow, supplierName: string): PurchaseOrderRegisterInput {
+/** 0587 — the PO's expected arrivals, one per line / batch, and whether any
+ *  of them has an open, unconfirmed day-before check (the ONE call engine,
+ *  `tomorrowDeliveryCallOf`, per arrival — Law D). */
+function arrivalFactsOf(po: operationPoListRow, today: string) {
+  const version = po.version ?? 1;
+  const lines = (po.purchase_order_lines ?? []).map((line, i) => ({
+    id: line.id ?? `${po.id}#${i}`, qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),
+  }));
+  const arrivals = poExpectedArrivalsOf({
+    version, officialDeliveryDate: po.official_delivery_date ?? null, etaDate: po.eta_date ?? null,
+    promises: (po.promises ?? []) as never, lines,
+  });
+  const dates = [...new Set(arrivals.map((a) => a.arrival))];
+  const holidays = myHolidaySet();
+  const arrivalCheckOpen = dates.some((date) => {
+    const confirmed = (po.arrival_confirmations ?? []).some((c) =>
+      c.po_version === version && c.for_date === date && !!po.destination_id && c.destination_id === po.destination_id);
+    const call = tomorrowDeliveryCallOf({
+      poId: po.id, supplierId: po.supplier_id, status: po.status, etaDateIso: date,
+      tomorrowAnswerAboutDateIso: confirmed ? date : null,
+      lines: arrivals.filter((a) => a.arrival === date).map((a, i) => ({
+        id: `${po.id}#${i}`, sku: "", qty: a.qty, receivedQty: 0, shortSinceIso: null, balanceAnswerAboutQty: null,
+      })),
+    }, { todayIso: today, holidays });
+    return !!call;
+  });
+  return { dates, arrivalCheckOpen };
+}
+
+function toRegisterInput(po: operationPoListRow, supplierName: string, today: string): PurchaseOrderRegisterInput {
+  const lineIds = (po.purchase_order_lines ?? []).map((line, i) => line.id ?? `${po.id}#${i}`);
+  const summary = poSupplierAnswerSummaryOf(po.promises, po.version ?? 1, lineIds, po.official_delivery_date ?? null);
+  const arrival = arrivalFactsOf(po, today);
   return {
     id: po.id,
     supplierName,
     status: po.status,
     version: po.version ?? 1,
     supplierDate: supplierDateOf(po),
+    expectedArrivals: summary.answeredLines > 0 || arrival.dates.length > 0 ? arrival.dates : null,
+    changedLines: summary.changed,
+    arrivalCheckOpen: arrival.arrivalCheckOpen,
     originalDate: po.official_delivery_date ?? null,
     expectedReadyDate: po.expected_ready_date ?? null,
     /* A missing line read stays unknown — never zero, never Completed. */
@@ -411,14 +451,16 @@ export default function PurchaseOrdersPage() {
     return (posQ.data?.pos ?? []).map((po) => {
       const supplier = suppliers.get(po.supplier_id) ?? null;
       const supplierName = supplier?.name ?? "Supplier not recorded";
-      const input = toRegisterInput(po, supplierName);
+      const input = toRegisterInput(po, supplierName, today);
       const facts = purchaseOrderRegisterFacts(input, today);
       const sources = sourceRefsOf(po);
+      const lineIds = (po.purchase_order_lines ?? []).map((line, i) => line.id ?? `${po.id}#${i}`);
       return {
         id: po.id,
         po,
         supplier,
         supplierName,
+        answerSummary: poSupplierAnswerSummaryOf(po.promises, po.version ?? 1, lineIds, po.official_delivery_date ?? null),
         sourceSearch: sources.map((source) => source.reference).join(" ") || "Not recorded",
         deliverTo: destinationName(po),
         supplierDate: supplierDateOf(po),
@@ -739,35 +781,36 @@ export default function PurchaseOrdersPage() {
     {
       key: "supplier_delivery",
       chooserGroup: "Goods",
-      /* The supplier's EVIDENCED current-version answer. No answer reads
-         `Not confirmed by supplier` — it is never filled with the PO default,
-         which is the whole reason these are two columns. */
+      /* The supplier's EVIDENCED current-version answers, PER LINE (0587).
+         The parent says ONE thing: one date when every answered line names
+         the same day, `{n} dates` when they differ (the expansion has each
+         line's own), `Not confirmed` when nothing was answered — it is never
+         filled with the PO default, which is the whole reason these are two
+         columns. */
       label: "Supplier Confirmed Delivery Date",
       headerLines: ["Supplier Confirmed", "Delivery Date"],
       width: 180,
       sortable: true,
-      accessor: (row) => (
-        <span className="flex flex-col leading-4" data-testid={`po-supplier-date-${row.id}`}>
-          <span className="tabular-nums">
-            {/* The dictionary's word for THIS column (COPY-STANDARD,
-                Purchasing UI dictionary). `Not confirmed by supplier` was the
-                second line of the retired merged cell, where the column head
-                did not say whose date it was; here the head already does. */}
-            {row.supplierDate ? fmtDate(row.supplierDate) : <Absence>Not confirmed</Absence>}
+      accessor: (row) => {
+        const s = row.answerSummary;
+        const word = s.date ? fmtDate(s.date) : s.distinctDates.length > 1 ? `${s.distinctDates.length} dates` : null;
+        return (
+          <span className="flex flex-col leading-4" data-testid={`po-supplier-date-${row.id}`}>
+            <span className="tabular-nums">{word ?? <Absence>Not confirmed</Absence>}</span>
+            {s.changed === 1 && s.changedFrom ? (
+              <span className={supporting}>Supplier changed from {fmtDate(s.changedFrom)}</span>
+            ) : s.changed > 1 ? (
+              <span className={supporting}>{s.changed} changed</span>
+            ) : null}
           </span>
-          {row.facts.expected.supplier === "changed" ? (
-            <span className={supporting}>
-              Supplier changed from {row.facts.expected.changedFrom ? fmtDate(row.facts.expected.changedFrom) : "Not recorded"}
-            </span>
-          ) : null}
-        </span>
-      ),
-      searchValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"),
-      filterValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"),
-      exportValue: (row) => row.supplierDate ?? "Not confirmed",
-      dateValue: (row) => row.supplierDate,
+        );
+      },
+      searchValue: (row) => (row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"),
+      filterValue: (row) => (row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"),
+      exportValue: (row) => row.answerSummary.date ?? (row.answerSummary.distinctDates.length > 1 ? row.answerSummary.distinctDates.join(" · ") : "Not confirmed"),
+      dateValue: (row) => row.answerSummary.date ?? row.answerSummary.distinctDates[0] ?? null,
       filterType: "date",
-      sortFn: (a, b) => (a.supplierDate ?? "9999").localeCompare(b.supplierDate ?? "9999"),
+      sortFn: (a, b) => (a.answerSummary.distinctDates[0] ?? "9999").localeCompare(b.answerSummary.distinctDates[0] ?? "9999"),
     },
     {
       key: "goods_received",
@@ -1138,7 +1181,11 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
     return map;
   }, [unitsQ.data]);
 
+  /* 0587 — the line's newest supplier answer, from the ONE reader the PO
+     page, the parent cell and the Work Supplier card read (Law D). */
+  const answers = poLineSupplierAnswersOf(row.po.promises, row.facts.version, (row.po.purchase_order_lines ?? []).map((l) => l.id));
   const lines: GoodsMiniLine[] = (row.po.purchase_order_lines ?? []).map((line) => {
+    const answer = answers.get(line.id);
     const destination = line.destination_id
       ? destinations.find((d) => d.id === line.destination_id)?.name ?? null
       : row.deliverTo === "Not recorded" ? null : row.deliverTo;
@@ -1159,6 +1206,11 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
         ? <span className="text-kit-amber-11">Unit IDs missing on this line — do not send this PO</span>
         : undefined,
       unitAbsence: "",
+      supplierConfirmedNode: answer ? (
+        <span className="flex flex-col leading-4" data-testid={`po-goods-supplier-date-${line.id}`}>
+          {answer.batches.map((b) => <span key={`${b.date}:${b.qty}`} className="tabular-nums">{batchWord(b, answer.batches.length)}</span>)}
+        </span>
+      ) : undefined,
       deliverTo: destination ? [destination] : [],
       deliverToAbsence: "Not recorded",
       supplier: row.supplierName,
@@ -1591,14 +1643,35 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Source" value={sourceSummary(row.sources)} />
           <Fact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
           {/* Show the actual evidenced date, even when it matches the PO. */}
-          <Fact label="Supplier Confirmed Delivery Date" value={row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"} />
+          <Fact label="Supplier Confirmed Delivery Date" value={row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"} />
           {/* The CURRENT version and its sent mark, in the register's own words;
               earlier versions' marks stay in Revisions (MASTER §9.3). */}
           <Fact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
         <PoTermsBlock key={`${row.id}:terms:${row.po.terms_days ?? ""}`} poId={row.id} saved={row.po.terms_days ?? null} />
-        <SupplierDateBlock key={`${row.id}:${row.facts.version}`} row={row} onSaved={onSupplierDateSaved} />
+        <SupplierReplySection
+          key={`${row.id}:${row.facts.version}`}
+          poId={row.id}
+          version={row.facts.version}
+          officialDeliveryDate={row.po.official_delivery_date ?? null}
+          supplierName={row.supplierName}
+          lines={(row.po.purchase_order_lines ?? []).map((line) => ({
+            id: line.id,
+            sku: line.sku,
+            item: [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku,
+            itemDetail: lineConfigBits(line.attrs as Record<string, unknown> | null | undefined).join(" · ") || undefined,
+            qty: Number(line.qty ?? 0),
+            receivedQty: Number(line.received_qty ?? 0),
+            unitIds: unitsOf(line).map((u) => u.unit_code).sort((a, b) => a.localeCompare(b)),
+          }))}
+          promises={row.po.promises ?? []}
+          canRecord={!!row.facts.currentSend && row.facts.quantities.open > 0 && row.facts.operationStatus !== "Cancelled"}
+          defaultChannel={row.facts.currentSend?.channel === "email" ? "email" : "whatsapp"}
+          defaultRecipient={row.facts.currentSend?.recipient ?? ""}
+          supplierDo={row.po.do_number || row.po.do_uploaded_at ? { number: row.po.do_number ?? null, uploadedAt: row.po.do_uploaded_at ?? null, file: row.po.do_file_path ?? null } : null}
+          onSaved={onSupplierDateSaved}
+        />
       </Block>
       <Block title="Goods lines">
         {/* Keep horizontal scrolling inside the card's padded content. */}
@@ -1761,219 +1834,6 @@ function PoTermsBlock({ poId, saved }: { poId: string; saved: number | null }) {
   );
 }
 
-function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => void }) {
-  const [date, setDate] = useState("");
-  /* 0430 — NO pre-selected delay reason. "Production Delay" used to ship on
-     every distracted save; a delay now requires the operator to choose. */
-  const [reason, setReason] = useState<string>("");
-  const [remarks, setRemarks] = useState("");
-  const [problem, setProblem] = useState<string | null>(null);
-  const [channel, setChannel] = useState<"whatsapp" | "email" | "phone" | "in_person">("whatsapp");
-  const [recipient, setRecipient] = useState("");
-  const [evidence, setEvidence] = useState("");
-  const [reportedBy, setReportedBy] = useState("");
-  const [reportedAt, setReportedAt] = useState("");
-  const record = useRecordSupplierDate(row.id);
-
-  const canRecord = !!row.facts.currentSend && row.facts.quantities.open > 0 && row.facts.operationStatus !== "Cancelled";
-  const known = row.supplierDate;
-  const savedReply = poSupplierReplyOf(row.po.promises, row.facts.version);
-  /* A reply recorded before the evidence law is a fact, not an absence. */
-  const recordedReply = poRecordedReplyOf(row.po.promises, row.facts.version);
-  const allReplies = [...(row.po.promises ?? [])]
-    .filter((p) => p.kind === "tomorrow_delivery" && poReplyDateOf(p))
-    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
-  /* The block appears whenever there is anything to RECORD or anything to
-     READ. A revision must never hide the previous versions' replies: an
-     unsent V2 still shows V1's answers and evidence as history (item 3 —
-     replies stay readable by version). */
-  if (!row.facts.currentSend && allReplies.length === 0) return null;
-  /* The server owns the classification. These mirrors only decide which
-     fields the form shows: a LATER date asks why, nothing else does. */
-  const official = row.po.official_delivery_date;
-  const later = date !== "" && official != null && date > official;
-  const earlier = date !== "" && official != null && date < official;
-  const replyInput = recordSupplierReplyInput.safeParse({
-    poVersion: row.facts.version,
-    supplierDate: date,
-    ...(later && reason ? { reason } : {}),
-    remarks: remarks.trim() || undefined,
-    channel, recipient, evidence, reportedBy,
-    reportedAt: reportedAt && Number.isFinite(Date.parse(reportedAt)) ? new Date(reportedAt).toISOString() : "",
-  });
-  const ready = date !== "" && (!later || reason !== "") && replyInput.success && !record.isPending;
-
-  function save() {
-    if (!ready) return;
-    setProblem(null);
-    if (!replyInput.success) return;
-    const input = replyInput.data;
-    record.mutate(input, {
-      onSuccess: () => {
-        setDate("");
-        setRemarks("");
-        setEvidence("");
-        setReportedAt("");
-        onSaved();
-      },
-      onError: (e: unknown) => {
-        const body = (e as { body?: { message?: string } }).body;
-        setProblem(body?.message ?? "The supplier date could not be recorded");
-      },
-    });
-  }
-
-  return (
-    <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-date">
-      <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">
-        SUPPLIER REPLY
-      </div>
-      <p className="mt-1 text-meta text-kit-slate-11">
-        {known
-          ? `Supplier Confirmed Delivery Date · ${fmtDate(known)}`
-          : recordedReply
-            ? `Supplier reply recorded without evidence · ${fmtDate(poReplyDateOf(recordedReply)!)}`
-            : "Supplier has not confirmed the PO date"}
-      </p>
-      {savedReply ? (
-        <div className="mt-2 text-meta text-kit-slate-11">
-          <p>{savedReply.channel} · {savedReply.recipient} · Reported by {savedReply.reported_by} · {fmtDate(savedReply.reported_at!, { time: true })}</p>
-          <p>Recorded by {savedReply.recorded_by_name ?? "Not recorded"} · {fmtDate(savedReply.recorded_at, { time: true })}{savedReply.duty_name ? ` · PO Duty ${savedReply.duty_name}` : ""}{savedReply.acting_name ? ` · Covered by ${savedReply.acting_name}` : ""}</p>
-          <button type="button" className="text-kit-blue-11 underline" onClick={async () => {
-            const { data, error } = await supabase.storage.from("delivery-orders").createSignedUrl(savedReply.evidence!, 3600);
-            if (error || !data?.signedUrl) { setProblem("The reply evidence could not be opened"); return; }
-            window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-          }}>Reply evidence</button>
-        </div>
-      ) : null}
-      {/* 0430 — every reply stays readable, BY VERSION. A previous version's
-          answer never confirms the current one (`poSupplierReplyOf` gates
-          that); here it is history the operator can still open and check. */}
-      {allReplies.length > 0 ? (
-        <div className="mt-2" data-testid="po-supplier-reply-history">
-          <div className="text-label text-kit-slate-11">Reply history</div>
-          <ul className="mt-1 flex flex-col gap-0.5">
-            {allReplies.map((p) => (
-              <li key={`${p.recorded_at}:${p.new_date ?? p.about_date}`} className="text-meta text-kit-slate-11">
-                {p.po_version != null ? `PO V${p.po_version}` : "PO version not recorded"}
-                {" · "}{fmtDate(poReplyDateOf(p)!)}
-                {" · "}{replyAnswerWord(p.answer, p.reason)}
-                {p.evidence?.trim() ? (
-                  <>
-                    {" · "}
-                    <button type="button" className="text-kit-blue-11 underline" onClick={async () => {
-                      const { data, error } = await supabase.storage.from("delivery-orders").createSignedUrl(p.evidence!, 3600);
-                      if (error || !data?.signedUrl) { setProblem("The reply evidence could not be opened"); return; }
-                      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-                    }}>Reply evidence</button>
-                  </>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {canRecord ? <div className="mt-2 flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Supplier Confirmed Delivery Date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            data-testid="po-supplier-date-input"
-            className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
-          />
-        </label>
-        {date !== "" && official != null ? (
-          <span className="pb-2 text-meta text-kit-slate-11" data-testid="po-supplier-date-compare">
-            {later ? "Later than the PO date" : earlier ? "Earlier than the PO date" : "Same as PO"}
-          </span>
-        ) : null}
-        {later ? (
-          <label className="flex flex-col gap-1">
-            {/* A LOCKED CATEGORY, never free text (Jess, 2026-08-02) - the
-                ledger has to be countable. The story goes in Remarks.
-                0430 — only a LATER date asks why, and nothing is pre-chosen:
-                an earlier or matching date is not a delay and gets no delay
-                reason, silently or otherwise. */}
-            <span className="text-label text-kit-slate-11">Why has it moved?</span>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              data-testid="po-supplier-date-reason"
-              className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
-            >
-              <option value="">Choose a reason</option>
-              {PO_DELAY_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </label>
-        ) : null}
-        <label className="flex min-w-[200px] flex-1 flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Remarks</span>
-          <input
-            type="text"
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            data-testid="po-supplier-date-remarks"
-            placeholder="What the factory actually said (optional)"
-            className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Channel</span>
-          <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta">
-            <option value="whatsapp">WhatsApp</option><option value="email">Email</option>
-            <option value="phone">Phone</option><option value="in_person">In person</option>
-          </select>
-        </label>
-        {([
-          ["Recipient", recipient, setRecipient],
-          ["Reported by", reportedBy, setReportedBy],
-        ] as const).map(([label, value, setValue]) => (
-          <label key={label} className="flex flex-col gap-1">
-            <span className="text-label text-kit-slate-11">{label}</span>
-            <input value={value} onChange={e => setValue(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
-          </label>
-        ))}
-        <ClaimPhotoUploadField poId={row.id} doNumber={`PO-V${row.facts.version}-reply`}
-          paths={evidence ? [evidence] : []} onChange={paths => setEvidence(paths[paths.length - 1] ?? "")}
-          label="Reply evidence" testId="po-supplier-reply-evidence" />
-        <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Reported at</span>
-          <input type="datetime-local" value={reportedAt} onChange={e => setReportedAt(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
-        </label>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={save}
-          data-testid="po-supplier-date-save"
-          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11"
-        >
-          {record.isPending ? "Recording..." : "Record supplier answer"}
-        </button>
-      </div> : null}
-      {problem ? (
-        <div className="mt-2 text-meta text-kit-red-11" data-testid="po-supplier-date-problem">{problem}</div>
-      ) : null}
-    </div>
-  );
-}
-
-/** The reply vocabulary, one place: legacy `shipping` reads as a confirmation,
- *  0430's answers read as themselves, and a delay names its recorded reason. */
-function replyAnswerWord(answer: string, reason: string | null | undefined): string {
-  switch (answer) {
-    case "confirmed":
-    case "shipping":
-      return "Confirms the PO date";
-    case "earlier":
-      return "Earlier than the PO date";
-    case "delayed":
-      return `Delayed — ${reason ?? "Not recorded"}`;
-    default:
-      return "Date reported";
-  }
-}
 
 function Fact({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-label text-kit-slate-11">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;

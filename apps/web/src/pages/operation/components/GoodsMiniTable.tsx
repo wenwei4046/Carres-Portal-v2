@@ -267,6 +267,20 @@ const EXTRA_QTY_COLUMN = {
   width: REGISTER_FIELD_WIDTH.receiptQty,
 } as const;
 
+/**
+ * ⭐ THE SEVENTH PURCHASE ORDERS COLUMN — owner-approved 2026-09-25 (Purchasing
+ * §9.3, §5.7): the line's NEWEST supplier answer, one date or one row per split
+ * batch, read-only. The page draws the cell because only Purchasing can read
+ * the answer ledger; this box only gives it the column and prints the
+ * dictionary's absence for THIS column when nothing was answered.
+ */
+const SUPPLIER_CONFIRMED_COLUMN = {
+  key: "supplierConfirmedDate",
+  label: "Supplier Confirmed Delivery Date",
+  width: REGISTER_FIELD_WIDTH.supplierConfirmedDeliveryDate,
+} as const;
+const SUPPLIER_CONFIRMED_ABSENCE = "Not confirmed";
+
 const SELECT_WIDTH = 36;
 
 /**
@@ -353,6 +367,12 @@ export interface GoodsMiniLine {
   supplierAbsence?: string;
   poDeliveryDate?: string;
   poDeliveryDateAbsence?: string;
+  /**
+   * The line's newest supplier answer, drawn by the Purchase Orders page
+   * (one date · `{n} pcs · {date}` per batch · `Delayed`). Read only in the
+   * PO layout; absent prints `Not confirmed`.
+   */
+  supplierConfirmedNode?: ReactNode;
   /** The purchase orders THIS row's quantity went onto. Read only when the
    *  table is asked for `PO No`; empty prints the absence below. */
   poNos?: string[];
@@ -778,6 +798,7 @@ export default function GoodsMiniTable({
   if (purchaseOrderLayout) {
     REGISTRY.deliverTo = { ...REGISTRY.deliverTo!, label: SUPPLIER_DELIVER_TO_LABEL };
     REGISTRY.supplier = { key: "supplier", label: "Supplier", width: 136 };
+    REGISTRY.supplierConfirmedDate = { ...SUPPLIER_CONFIRMED_COLUMN };
   }
   const order = receivingLayout
     ? [
@@ -792,7 +813,7 @@ export default function GoodsMiniTable({
         "extraQty",
       ]
     : purchaseOrderLayout
-    ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item"]
+    ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item", "supplierConfirmedDate"]
     /* ⭐ MANUAL PURCHASE IS SO BATCH'S ORDER PLUS THE TWO PO FACTS (Purchasing
        §9.2). It is written as its own line rather than as a flag on SO Batch's,
        because the two lists are owned by two rulings and a shared list would
@@ -809,6 +830,7 @@ export default function GoodsMiniTable({
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
     poUnit: purchaseOrderLayout,
+    supplierConfirmedDate: purchaseOrderLayout,
     unit: showUnitId,
     category: showCategory,
     // The receipt columns exist only in the Receiving layout; the shared
@@ -1106,6 +1128,12 @@ export default function GoodsMiniTable({
                         )}
                       </span>
                     </span>
+                  );
+                case "supplierConfirmedDate":
+                  return line.supplierConfirmedNode != null ? (
+                    line.supplierConfirmedNode
+                  ) : (
+                    <Absence>{SUPPLIER_CONFIRMED_ABSENCE}</Absence>
                   );
                 case "poNo":
                   return line.poNos?.length ? (

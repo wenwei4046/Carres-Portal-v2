@@ -548,6 +548,8 @@ describe("comparePoRisk — the register's default order", () => {
 /* ── PO REVISIONS (0364, Jess 2026-08-18) — the version words + derivations ── */
 import {
   poDocumentNumberOf,
+  poLineSupplierAnswersOf,
+  poSupplierAnswerSummaryOf,
   poReviseSaveGapOf,
   poUnsharedVersionNoticeOf,
   poVersionLabelOf,
@@ -715,5 +717,53 @@ describe("the reply readers after 0430 — one date rule, two truth levels", () 
     expect(poSupplierReplyOf(rows as never, 1)).toBeNull();
     expect(poRecordedReplyOf(rows as never, 1)).not.toBeNull();
     expect(poReplyDateOf(poRecordedReplyOf(rows as never, 1)!)).toBe("2026-09-10");
+  });
+});
+
+describe("0587 · the supplier's answer per goods line", () => {
+  const base = {
+    kind: "tomorrow_delivery", po_version: 1, channel: "whatsapp", recipient: "Factory group",
+    evidence: "PO-1/a.png", reported_by: "Factory", reported_at: "2026-09-25T02:00:00Z",
+    recorded_by: "u1", recorded_by_name: "Shasha", about_date: "2026-10-09", previous_date: null, remarks: null,
+  };
+  const L1 = "line-1"; const L2 = "line-2";
+  it("a line's newest answer group is its batches in date order; a line without one falls back to the PO-level answer", () => {
+    const promises = [
+      { ...base, answer: "delayed", reason: "Production delay", new_date: "2026-10-16", recorded_at: "2026-09-20T00:00:00Z" },
+      { ...base, po_line_id: L1, about_qty: 3, answer: "confirmed", reason: null, new_date: "2026-10-09", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+      { ...base, po_line_id: L1, about_qty: 1, answer: "delayed", reason: "Partial quantity ready", new_date: "2026-10-16", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+      /* an OLDER answer on the same line is history, not the answer */
+      { ...base, po_line_id: L1, about_qty: 4, answer: "delayed", reason: "Other", remarks: "x", new_date: "2026-10-30", answer_group: "g0", recorded_at: "2026-09-21T00:00:00Z" },
+    ];
+    const answers = poLineSupplierAnswersOf(promises, 1, [L1, L2]);
+    expect(answers.get(L1)?.batches).toEqual([
+      { qty: 3, date: "2026-10-09", answer: "confirmed", reason: null, remarks: null },
+      { qty: 1, date: "2026-10-16", answer: "delayed", reason: "Partial quantity ready", remarks: null },
+    ]);
+    expect(answers.get(L2)?.batches).toEqual([{ qty: null, date: "2026-10-16", answer: "delayed", reason: "Production delay", remarks: null }]);
+    expect(answers.get(L2)?.poLineId).toBe(L2);
+  });
+  it("an unevidenced row or another version's row is never an answer", () => {
+    const promises = [
+      { ...base, po_line_id: L1, about_qty: 4, answer: "confirmed", reason: null, new_date: "2026-10-09", evidence: "", recorded_at: "2026-09-25T00:00:00Z" },
+      { ...base, po_line_id: L1, about_qty: 4, answer: "confirmed", reason: null, new_date: "2026-10-09", po_version: 2, recorded_at: "2026-09-26T00:00:00Z" },
+    ];
+    expect(poLineSupplierAnswersOf(promises, 1, [L1]).size).toBe(0);
+  });
+  it("the Register parent prints ONE date, or `{n} dates`, and counts the lines that moved", () => {
+    const promises = [
+      { ...base, po_line_id: L1, about_qty: 4, answer: "confirmed", reason: null, new_date: "2026-10-09", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+      { ...base, po_line_id: L2, about_qty: 2, answer: "delayed", reason: "Transport delay", new_date: "2026-10-12", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+    ];
+    const summary = poSupplierAnswerSummaryOf(promises, 1, [L1, L2], "2026-10-09");
+    expect(summary.date).toBeNull();
+    expect(summary.distinctDates).toEqual(["2026-10-09", "2026-10-12"]);
+    expect(summary.answeredLines).toBe(2);
+    expect(summary.changed).toBe(1);
+    expect(summary.changedFrom).toBe("2026-10-09");
+    const same = poSupplierAnswerSummaryOf(promises.slice(0, 1), 1, [L1, L2], "2026-10-09");
+    expect(same.date).toBe("2026-10-09");
+    expect(same.changed).toBe(0);
+    expect(poSupplierAnswerSummaryOf([], 1, [L1], "2026-10-09").date).toBeNull();
   });
 });

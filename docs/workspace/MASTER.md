@@ -365,7 +365,7 @@ records, people, dates and simulated saves remain fixtures and are not authority
 │ [17 THU] ← solid blue  │ MISSED                      │ {fact or problem}            │
 │ [18 FRI]     {count}   │ {object} · {module}         │                              │
 │ [19 SAT] when admitted │ {fact}                      │ ACTION                       │
-│ ⊘ No working date {n}  │ {action} · {contact} {when} │ {specific action}            │
+│ ⊘ No date {n}          │ {action} · {contact} {when} │ {specific action}            │
 │   (only while n > 0)   │ Blocked by {dependency}     │                              │
 │                        │ THU, {date}                 │ COMMUNICATION (when admitted)│
 │ ▦ Module               │ {object} · {module}         │ [Open WhatsApp group]        │
@@ -397,40 +397,50 @@ the source calendar, while an authorised holiday operation remains on the holida
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
 today.
 
-**Panel 1 — the left rail. OWNER APPROVED UI, Jess 2026-09-24; BUILT 2026-09-24.** Two white
-sections on the light-grey canvas, each headed by a blue icon + blue title over an inset divider; no
-shadow and no decorative colour corner. Every row is a real button with a complete accessible name
-and a visible keyboard focus ring. A zero count is never printed. The sections carry two different
-count scopes:
+**Panel 1 — the left rail. OWNER APPROVED UI, Jess 2026-09-26 (replaces the 2026-09-24 card
+column); BUILT 2026-09-26.** The shared 240px `FilterRail` (`Hide filters` / `Show filters`,
+remembered per browser), running from the page header to the bottom. Every row is a real button with
+a complete accessible name and a visible keyboard focus ring. Top to bottom:
 
-- **`Date`** (calendar icon). The header's right side holds `Previous week` · the week's month and
-  year (`Sep 2026`, the month holding the week's Thursday) · `Next week`; the arrows move the
-  visible week by one work week and change neither the chosen Date, the module nor any filter. The
-  options are `Missed` first, then the governed weekdays of the visible week (Saturday only when an
-  admitted action remains there), then `No working date` only while it has work. Each date is one
-  34 × 34px calendar badge holding the day number over the uppercase weekday, both cut from the one
-  `fmtDate` spelling and moved by whole `YYYY-MM-DD` days — never through `toISOString()` of a local
-  clock. **Today** is the solid-blue badge with white text and is never written on screen (the
-  accessible name carries `· Today`); the **chosen** option is the pale-blue full row. The two
-  states are independent. A public holiday is named beside its badge (`Malaysia Day`) and is a
-  date like any other: it can be chosen and it counts the work dated on it. `Missed`, one date and
-  `No working date` are one mutually exclusive choice. Date counts cover the week's open set after
-  scope, search, the other filters and the chosen module; a missed occurrence counts once, under
-  `Missed`, never again under its past weekday.
-- **`Module`** (modules icon) opens with `All modules`, then each admitted module as a name and a
-  right-aligned count only — no per-row icon. It counts the occurrences of the chosen Date — the
-  Panel 2 list before the module choice — so choosing one module never reduces another module's
-  count; `All modules` equals the Date list and the module rows sum to it. Date and Module choices
-  combine.
+- **The week header — ONE line:** `Previous week` · **`Week of {d Mon}`** (`Week of 28 Sep`, the
+  week's Monday, no weekday, no dash) · `Next week`. The arrows move the visible week by one work
+  week and change neither the chosen Date, the Status, the Page nor any filter. The two-date label
+  (`Mon, 28 Sep – Fri, 2 Oct`) is retired: it wrapped to three lines in 240px.
+- **The week strip — ONE row of day tiles**, 56px tall, 216px shared equally: five tiles Monday to
+  Friday, six when Saturday holds work (a Warehouse rail is fixed at six). A tile is the uppercase
+  weekday over the day number over the count line, all cut from the one `fmtDate` spelling and moved
+  by whole `YYYY-MM-DD` days. The count line prints the number of open actions dated that day and
+  is **empty** when there are none — never `No work`, never `0`. A public holiday (and any
+  non-working day) is the **grey tile**: grey number, empty count line, its name only in the
+  accessible name and tooltip (`Malaysia Day`) — never `Hol`, never `Public holiday ·`. **Today** is
+  the **solid-blue tile** with white text; the word `Today` is never on screen. The **chosen** day is
+  the ringed tile. Today, closed and chosen are independent states. A day can be chosen whether or
+  not it is closed and counts the work dated on it.
+- **The fixed rows** `Missed {n}` and `No date {n}` — `0` printed. `Missed`, one tile and `No date`
+  are one mutually exclusive Date choice. A missed occurrence counts once, under `Missed`, never
+  again under its past weekday.
+- **`Status`** — the three former middle tabs, now rail rows: `To do` · `Waiting for answer` ·
+  `Done today`, each with its count over the chosen Date's rows. **More than one may be on**; a row
+  toggles on its own; the last row on cannot be turned off. The opening list is `To do` alone.
+  `Waiting for answer` holds a row only when the owning module recorded that we wait on the party;
+  `Done today` waits on source-owned closure receipts (§5.2.1) and prints `0` until then.
+- **`Page`** opens with `All pages`, then each admitted page as a name and a right-aligned count —
+  no per-row icon. It counts the occurrences of the chosen Date before the page choice, so choosing
+  one page never reduces another page's count; `All pages` equals the Date list and the page rows
+  sum to it.
+- **`Owner`** (Team Work only): the `All owners` select.
+
+Date, Status, Page and Owner combine. The rail is the only place these facts live: the middle
+column draws **no date heading, no count heading and no tabs** above the list.
 
 The URL carries the visible week (`week`, its Monday), the Date choice (`day` = `missed` ·
 `YYYY-MM-DD` · `no_date`) and the module (`module`); opening that URL restores all three. Without
-`week`, the rail shows the week of the chosen date, else the week of the focus day. The opening
-focus list (no `day`) highlights the focus day's row. `day=all`, reached from the toolbar's timing
+`week`, the rail shows the week of the chosen date, else the week of the focus day. The URL also
+carries the Status choice (`status` = a comma list of `todo` · `waiting` · `done`; absent = `To do`).
+The opening focus list (no `day`) rings the focus day's tile. `day=all`, reached from the toolbar's timing
 filter or a Dashboard link, lists every open action and highlights no Date option.
 
-The Panel 2 heading is `Missed {n} · {weekday, date} {n}` on first open; when a single day is
-selected it is `{weekday, date} {n}`. Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
+Panel 2 draws no heading of its own (the rail names the day). Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
 `MISSED` → the selected day. A broken commitment is shown in the `BROKEN COMMITMENT` group with a red
 group heading and a thin red row edge; the row carries no badge, and its accessible name still says
 `Broken commitment`. It still counts under its own working day in Panel 1 (for example `Missed`) and
@@ -608,15 +618,17 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   the count alone (the toolbar button already names the day). The header speaks only when My Work
   is empty while the team has work: `0 for you · {n} for the team`, and the empty list offers
   `See Team Work`.
-- **Words:** `Covering` (not `Covered`; `Covering for others` wrapped the 941px toolbar) · rail section `Page` / `All pages` (not
-  Module) · header `Search` with no printed shortcut · `Help` and `Settings` beside their icons ·
-  the right rail names each icon.
-- **The Date rail** prints every count, `0` included; `Today` in words beside today's date;
-  `No working date` always listed; two work weeks with a divider before the second Monday; the
-  section heading is slate, not blue.
-- **List tabs** all carry a number (`Completed 0` until the ledger's Completed list is wired).
-- **My Work / Team Work** active segment is kit blue. Search is 240px beside `Covering`
-  at every width above 600px.
+- **Words:** rail section `Page` / `All pages` (not Module) · header `Jump to…` with its keyboard
+  hint (the `Search` rename was reverted by Jess 2026-09-26) · `Help` and `Settings` beside their
+  icons · the right rail names each icon. **`Covering` is retired (Jess, 2026-09-26):** a covered row
+  says so on the row itself; the toolbar carries no cover button.
+- **The Date rail** is the one-line week header and the week strip of tiles in §5.2 Panel 1 (Jess,
+  2026-09-26 — replaces the day cards, `Today` in words, `No work`, `Public holiday · {name}` and
+  the two-week column). `No date` (never `No working date`) is always listed.
+- **List tabs are retired** (Jess, 2026-09-26): `To do` · `Waiting for answer` · `Done today` are
+  the rail's `Status` rows, more than one may be on.
+- **My Work / Team Work** active segment is kit blue. Search is 340px beside it at every width
+  above 600px.
 - **The empty list is one bordered white section** the height of its words.
 - **Sidebar:** names by default from 1280px; below that it starts as icons (a 232px named rail
   would push Work under 768px and into the phone layout — measured on production 2026-09-25);
@@ -625,11 +637,15 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
 - **THE WORK SHELL IS THE §6.0 LISTING SHELL — owner ruling 2026-09-25 ("why you different from
   sales order ui").** Work draws the same shell as the Sales Orders Register: the 50px Destination
   Header (page name + Search · Alerts · Help · Settings, no count), then ONE plain white toolbar
-  row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px · a **Date select**
-  (Missed · the two work weeks with counts and `Today` · No working date) · a **Page select**
-  (`All pages` · each page with its count) · Owner (Team Work) · `Covering`. There is no left
-  rail, no `Filters` button and no compact strip; the list and the detail share the whole width.
-  The 72px header, framed toolbar and rail of the 2026-09-25 morning density ruling are retired.
+  row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px.
+  **The left rail is the rail every page follows — the Payment Monitor's grammar (Jess,
+  2026-09-26) with her same-day correction:** the shared 240px `FilterRail` with `Hide filters`;
+  the one-line header `‹ Week of 28 Sep ›`; the week as one strip of day tiles; the fixed rows
+  `Missed {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
+  its count) and, in Team Work, the `Owner` select — exactly as §5.2 Panel 1 writes it. Hidden, it
+  leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it
+  floats over the list. The three-panel page is rail · list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
+  right column and never spans above the rail (Jess, 2026-09-26).** The 72px header, framed toolbar, compact strip and toolbar selects are retired.
   The card list itself keeps its approved 104px cards until the owner rules on the §6.0 table.
 - **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
   sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
@@ -645,7 +661,7 @@ problem and action. It never broadens permission scope and never searches a sepa
 
 The toolbar `Filters` door is governed for Work. It lives in the toolbar only and is never a Panel 1
 or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
-Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
+Saturday when generated · `No date`), `Status`, `Page`, `Owner` (Team only),
 `Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
 `Missed`. Multiple filters combine and every active filter is
 visible, individually removable and represented in the URL so Dashboard and module doors can open
@@ -802,7 +818,7 @@ order from module truth:
 3. The selected calendar-admitted working day, with `Today` marked explicitly only when today is a
    working day for that action's authoritative calendar.
 4. A later working day in the selected or a later week.
-5. `No working date` — the module explicitly admits an obligation with no lawful clock.
+5. `No date` — the module explicitly admits an obligation with no lawful clock.
 
 Materiality (`Routine` · `Significant` · `Critical`) belongs to the owning module and may raise
 attention within the same timing band; it cannot turn an undated item into late. A blocker is an
@@ -1011,6 +1027,11 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
    arrangement (leg 0) as the booking and is due on the Logistics card's `2 working days before`
    check through the one `logisticsCheckDueIso`.
 7. The Ohana supplier-to-customer route.
+10. Closed 2026-09-26 (owner yes, Delivery segment 3): the Work items `Record the delivery result`,
+   `Upload the delivery photo`, `Upload the signed DO` and `Check the delivery proof` deep-link to
+   the Delivery Orders register with that document's row revealed and its brief open (Delivery
+   §8.7), the way Delivery arrangement items reveal the Monitor row — never to a separate page;
+   the proof-review form Work embeds stays the same component.
 9. Closed 2026-09-25 (owner yes, Delivery segment 1): the Work feed's `logisticsAssigned` reads
    Delivery's arrangement (`ops_delivery_arrangements.partner_id`, leg-aware) — never the `orders`
    columns alone, which stay a fallback until retired; the Logistics card's progress line reads the
@@ -1124,6 +1145,10 @@ decision for a requested date/refusal; or the corrected Sales Order phone number
 WhatsApp never completes anything. Facts remain owned by Sales Orders (customer/requested date,
 delay planning and phone), Delivery (partner contact result, scheduled/delivered and arrangement
 decision), and their source communication evidence.
+
+**Relation to the right rail's Customers door (owner-confirmed 2026-09-26, UI MASTER §5):** this card is
+one mission's customer-facing exception; the rail door starts from the customer and lists all their orders
+and recorded history. Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
 
 #### Supplier card
 
@@ -1370,9 +1395,9 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Purchasing · `purchasing.po_window` | Eligible SO demand is stamped into a daily PO window, or a PO issued from that window has an unsent current version · buy the window's demand and send every PO | PO Duty | The window's own time on its day (PO Days that are Office working days; a supplier's earlier cut-off is its own window) | No eligible demand left in the window and every PO issued from it has its current version marked `PO sent to supplier` · the PO waits for goods |
 | Purchasing · `purchasing.supplier_reply` | **Retired 2026-09-24:** absence of an immediate answer after sending is not work | — | — | Early exception is recorded in Purchasing when reported; otherwise the exact-date day-before rule governs |
 | Purchasing · `purchasing.supplier_date_passed` | Supplier date passed with goods owing · new evidenced arrival answer | PO Duty | Supplier date, closure-adjusted | New governed supplier answer/date exists |
-| Purchasing · `purchasing.confirm_tomorrows_delivery` | Effective arrival is tomorrow · obtain Supplier DO or evidenced confirmation for that exact date and named Warehouse. **One occurrence per PO goods line / split batch** (owner-approved 2026-09-25, Purchasing §5.7 per-item answer): a line split `4 pcs · 26 Sep` + `2 pcs · 6 Oct` derives two dated occurrences | PO Duty | One Office working day before each batch's effective arrival | Matching Supplier DO or evidenced tomorrow-delivery confirmation exists for that batch; a later answer is recorded per line in Purchasing's one `Record supplier answer` form (`No change` · `Confirmed` · `New date` → `Earlier`/`Delayed` · `Split delivery`) and derives new date-specific occurrences. Card action: `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` (email channel: `Click Email, …`). **Recording is open to any active Operation person (owner ruling 2026-09-25, Purchasing §5.7)** — the occurrence routes to PO Duty, but whoever records the supplier's answer closes it; actual recorder is stored beside normal duty/cover, never in place of them |
+| Purchasing · `purchasing.confirm_tomorrows_delivery` | Effective arrival is tomorrow · obtain Supplier DO or evidenced confirmation for that exact date and named Warehouse. **One occurrence per PO goods line / split batch — BUILT 2026-09-26** (owner-approved 2026-09-25, Purchasing §5.7 per-item answer; `poExpectedArrivalsOf`): a line split `4 pcs · 26 Sep` + `2 pcs · 6 Oct` derives two dated occurrences | PO Duty | One Office working day before each batch's effective arrival | Matching Supplier DO or evidenced tomorrow-delivery confirmation exists for that batch; a later answer is recorded per line in Purchasing's one `Record supplier answer` form (`No change` · `Confirmed` · `New date` → `Earlier`/`Delayed` · `Split delivery`) and derives new date-specific occurrences. Card action: `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` (email channel: `Click Email, …`). **Recording is open to any active Operation person (owner ruling 2026-09-25, Purchasing §5.7)** — the occurrence routes to PO Duty, but whoever records the supplier's answer closes it; actual recorder is stored beside normal duty/cover, never in place of them |
 | Purchasing · `purchasing.confirm_balance_delivery_date` | Short receipt left goods owing · balance promise | PO Duty | Opens with short receipt; Calls calendar owns filing | Balance promise for line exists |
-| Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival | GRN Duty owns the card; **any active Operation person may perform the receipt** (owner ruling 2026-09-25, Stock §7) — capability and owner stay separate | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
+| Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival. **Since 2026-09-26 the date trigger fires only for a PO whose current version is marked sent, on the earliest expected arrival; its fact reads `Supplier date passed · nothing received yet`** | GRN Duty owns the card; **any active Operation person may perform the receipt** (owner ruling 2026-09-25, Stock §7) — capability and owner stay separate | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
 | Warehouse · `warehouse.outbound_handover` | **Not admitted:** dated pickup has Units not handed over · exact receiver/proof result | Requires governed personal NETS operator or admitted Site queue; neither is currently built. **PROPOSAL / NOT LAW (Stock §7, 2026-09-25):** until then the card resolves to the current GRN Duty so a Carres person sees `{DO No} · {SO No} / {n} items · pickup by {company} today / Load the goods` | Scheduled Site handover date on Warehouse calendar | Every required Unit has accepted handover evidence · admission waits for governed owner/acceptance |
 | Delivery · `arrange_new_delivery_date` | Approved delay requires a reachable new booking · confirmed date/slot | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Same Office working day as delay decision | Customer-confirmed reachable booking exists |
 | Delivery · `assign_logistics` | Delivery required with no company · company selected | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 3 delivery working days before promise | Delivery company recorded · booking action may open |

@@ -131,10 +131,10 @@ function show(url = "/operation?tab=work") {
   );
 }
 
-/* The §6.0 shell: Date and Page are toolbar selects; the trigger prints the
-   chosen option's label. */
-const dateTrigger = () => document.getElementById("work-date") as HTMLElement;
-const pageTrigger = () => document.getElementById("work-page") as HTMLElement;
+/* The rail every page follows (Payment Monitor's): one card per work day,
+   then the fixed rows and the Page group. */
+const rail = () => screen.getByTestId("work-rail");
+const dayCard = (iso: string) => screen.getByTestId(`work-rail-day-${iso}`);
 
 const savedTz = process.env.TZ;
 const savedWidth = window.innerWidth;
@@ -163,35 +163,65 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(new Date("2026-09-17T00:00:00").getTimezoneOffset()).toBe(-480);
   });
 
-  it("1 · a Thursday's Date select names Thu, 17 Sep · Today through fmtDate", () => {
+  it("1 · a Thursday's rail is one strip Mon 14 … Fri 18 (names through fmtDate), today the solid-blue tile, header `Week of 14 Sep`", () => {
     show();
-    expect(dateTrigger()).toHaveTextContent("Thu, 17 Sep · Today · 0");
+    const strip = screen.getByTestId("work-rail-days");
+    const names = within(strip).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    expect(names.map((n) => n.split(" · ")[0])).toEqual(["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep"]);
+    /* One row of tiles, never a column of cards (Jess, 2026-09-26). */
+    expect(strip.style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
+    expect(dayCard("2026-09-17")).toHaveAttribute("data-today", "yes");
+    expect(dayCard("2026-09-17").className).toContain("bg-kit-blue-9");
+    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17/);
+    expect(dayCard("2026-09-17")).not.toHaveTextContent("Today");
+    expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent("Week of 14 Sep");
+    expect(screen.getByTestId("work-rail-week-label").textContent).not.toMatch(/[–-]/);
   });
 
-  it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep", () => {
+  it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep; a day with nothing prints nothing", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18")]);
-    show("/operation?tab=work&day=2026-09-18");
-    expect(dateTrigger()).toHaveTextContent("Fri, 18 Sep · 1");
+    show();
+    expect(dayCard("2026-09-18")).toHaveTextContent(/^FRI181$/);
+    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17$/);
+    expect(dayCard("2026-09-18")).toHaveAttribute("aria-label", "Fri, 18 Sep · 1 action");
   });
 
-  it("3 · Wed, 16 Sep names Malaysia Day and prints its zero (owner review 2026-09-25 item 19)", () => {
-    show("/operation?tab=work&day=2026-09-16");
-    expect(dateTrigger()).toHaveTextContent("Wed, 16 Sep · Malaysia Day · 0");
+  it("3 · Wed, 16 Sep is the grey tile — no words, Malaysia Day only in its name — and the fixed rows print their zero", () => {
+    show();
+    const holiday = dayCard("2026-09-16");
+    expect(holiday).toHaveAttribute("data-closed", "yes");
+    expect(holiday.className).toContain("bg-kit-slate-3");
+    expect(holiday).toHaveTextContent(/^WED16$/);
+    expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
+    expect(holiday).toHaveAttribute("title", "Malaysia Day");
+    expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("0");
+    expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("No date");
+    expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("0");
+    /* The Status rows (the three middle tabs moved here), To do on alone. */
+    expect(screen.getByTestId("work-rail-status-todo")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("work-rail-status-waiting")).toHaveTextContent("Waiting for answer");
+    expect(screen.getByTestId("work-rail-status-done")).toHaveTextContent("Done today");
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByTestId("work-list-heading")).toBeNull();
   });
 
   it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
     workState.data = feed("2026-09-16", [item("2026-09-17"), item("2026-09-18")]);
     show();
-    expect(dateTrigger()).toHaveTextContent("Thu, 17 Sep");
+    expect(dayCard("2026-09-17")).toHaveAttribute("aria-pressed", "true");
     const list = screen.getByTestId("work-list");
     expect(list).toHaveTextContent(/SO-\d+/);
     expect(within(list).getAllByRole("button", { name: /Ask customer for a delivery date/ })).toHaveLength(1);
   });
 
-  it("5 · Saturday is a Date only when something is due Sat, 19 Sep", () => {
+  it("5 · Saturday is a day card only when something is due Sat, 19 Sep", () => {
+    const first = show();
+    expect(screen.queryByTestId("work-rail-day-2026-09-19")).toBeNull();
+    first.unmount();
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
-    show("/operation?tab=work&day=2026-09-19");
-    expect(dateTrigger()).toHaveTextContent("Sat, 19 Sep · 1");
+    show();
+    expect(dayCard("2026-09-19")).toHaveTextContent(/^SAT191$/);
+    expect(screen.getByTestId("work-rail-days").style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
   });
 
   it("6 · My Work with nothing today and 2 on Friday does not say Nothing assigned to you", () => {
@@ -204,12 +234,14 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
   });
 
-  it("7 · a page filter narrows the list and the Page select names the page with its count", () => {
+  it("7 · a page filter narrows the list; the Page rows keep every page's real count", () => {
     workState.data = feed("2026-09-17", [inModule("delivery", "2026-09-17"), inModule("delivery", "2026-09-17"), inModule("payment", "2026-09-17")]);
     show("/operation?tab=work&module=delivery");
-    expect(pageTrigger()).toHaveTextContent("Delivery · 2");
+    expect(screen.getByTestId("work-rail-page-delivery")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("work-rail-page-delivery")).toHaveTextContent("2");
+    expect(screen.getByTestId("work-rail-page-payment")).toHaveTextContent("1");
+    expect(screen.getByTestId("work-rail-page-all")).toHaveTextContent("3");
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
-    expect(dateTrigger()).toHaveTextContent("Thu, 17 Sep · Today · 2");
   });
 
   it("8 · a failed source says which one and when, and never an empty sentence", () => {
@@ -229,15 +261,21 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
-  it("9 · a 1180px page shows the list beside the detail — no rail (UI MASTER §6.0 shell)", () => {
+  it("9 · a 1180px page shows the rail beside the list; Hide filters leaves the Show filters strip", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       width: 1180, height: 800, top: 0, left: 0, right: 1180, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect);
     show();
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
-    expect(screen.queryByRole("complementary", { name: "Work filters" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("work-filters-toggle")).toBeNull();
-    expect(screen.getByRole("region", { name: "Work actions" })).toBeInTheDocument();
+    expect(rail()).toBeInTheDocument();
+    /* Rail OR detail at this width — never a 140px detail. */
+    expect(screen.queryByRole("region", { name: "Selected work" })).toBeNull();
+    fireEvent.click(within(rail()).getByRole("button", { name: "Hide filters" }));
+    expect(screen.queryByTestId("work-rail")).toBeNull();
+    expect(screen.getByRole("region", { name: "Selected work" })).toBeInTheDocument();
+    expect(screen.getByTestId("work-rail-collapsed")).toHaveTextContent("Show filters");
+    fireEvent.click(screen.getByTestId("work-show-filters-rail"));
+    expect(screen.getByTestId("work-rail")).toBeInTheDocument();
   });
 
   it("10 · a link that opens every open action (`day=all`) still lists them all", () => {

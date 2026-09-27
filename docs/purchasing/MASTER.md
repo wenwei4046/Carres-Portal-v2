@@ -701,7 +701,7 @@ governed transport planning facts or silently rewrite SO safety calculations.
   `purchasing_push_supplier_date` projection is retired. It writes goods-arrival planning only;
   the customer promise is a separate Sales fact it never touches.
 
-**SUPPLIER DELAY EVIDENCE — owner-approved 2026-09-24; target, not built.** Confirmed sending of
+**SUPPLIER DELAY EVIDENCE — owner-approved 2026-09-24; BUILT (0585 storage, 0587 per-line door; Blueprint segments 1–2 build, 2026-09-26).** Confirmed sending of
 the first/current PO version opens `Waiting for goods from supplier`; it does not require an
 immediate reply merely repeating the calculated PO Delivery Date, and that default/planned date is
 never labelled `Confirmed`. If the supplier reports that it cannot meet the effective arrival,
@@ -714,7 +714,7 @@ screenshot refuses the record. Evidence is append-only with supplier, recorder a
 the immutable original PO Delivery Date and earlier answers are never overwritten. The existing
 arrival arithmetic recomputes only the affected open source-line scope and reports customer impact.
 
-**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** One
+**SUPPLIER ANSWER PER ITEM — OWNER-APPROVED (Jess, 2026-09-25) · DEPLOYED 2026-09-26 (PR #1660 `b96f16ba1` + #1666 `51e9eb2a5`; migration 0587 `purchasing_record_supplier_answers` APPLIED 2026-09-26 — see the production record after this block; `POST /pos/:id/tomorrow-delivery` takes the per-line body; the authenticated owner walk is still owed).** One
 `Record supplier answer` form on the PO records the supplier's answer **per PO goods line**. Each
 line chooses `No change` (default) · `Confirmed` · `New date` (the server classifies `Earlier` —
 no reason — or `Delayed` — one governed reason required) · `Split delivery` (any number of
@@ -730,14 +730,119 @@ Deliver To is a PO change (new version), not an answer. Goods that arrive early 
 no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
 Each batch derives its own day-before occurrence.
 
-**Answer evidence — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The answer form accepts
+**PRODUCTION RECORD 2026-09-26 (Blueprint segments 1–2).** Migration
+`0587_a_supplier_answer_is_recorded_per_goods_line` was APPLIED through the governed
+`apply_migration` path after a rolled-back production probe (`probe_0587_rolled_back_do_not_track`:
+the whole file executed, the negative control refused an unsigned caller with `42501`, then
+`PROBE_ROLLBACK` undid everything — no tracker row, nothing persisted, re-read to prove it). The
+apply wrote tracker row `20260926084721`; `md5(statements[1])` = the committed file's md5
+`1f7ef2f3e8050b819a0482f358b517ad`, one statement. Reconciled live afterwards: all seven function
+bodies (`purchasing_supplier_reply_actor` · `purchasing_require_reply_evidence` ·
+`purchasing_po_expected_arrivals` · `purchasing_po_effective_arrival` ·
+`purchasing_project_line_etas` · `purchasing_record_supplier_answers` ·
+`purchasing_record_arrival_confirmation`) carry the same CR-normalised `md5(prosrc)` the replayed
+full-chain database produced from the same file; `po_supplier_promises.answer_group` and its partial
+index exist; `po_promise_scope` admits a line-level `tomorrow_delivery` row; `authenticated` holds
+EXECUTE on the answer door and on `purchasing_po_expected_arrivals`, and NOT on
+`purchasing_project_line_etas`; the six pre-existing PO-level `tomorrow_delivery` rows are untouched
+(0587 rewrites no row). The five canonical web/Worker surfaces reported `b96f16ba1` before the
+apply (bundle `index-CjmMoe4Q.js`, 7,131,619 bytes, read from the apex: `Record supplier answer` 2 ·
+`Split delivery` 1 · `Add another date` 1 · `Apply to selected` 2 · `Answered by supplier on` 2 ·
+`Confirm tomorrow's supplier delivery` 1); the Worker-side Work sentences (`Supplier date passed ·
+nothing received yet`, `Click WhatsApp, ask …`) are proven by the API suite, not by a bundle grep.
+That bundle read also found the ONE leftover — the PO object page's WorkCard still printed the
+retired `Supplier has not confirmed the PO date` for a sent-but-unanswered PO — fixed by #1666
+(`purchaseOrderWork` returns no card for `supplier_date_missing`; the shared reply-work builder emits
+only `purchasing.supplier_date_passed`). After #1666 all five surfaces reported `51e9eb2a5`
+(bundle `index-CKMdXM5f.js`, 7,131,503 bytes): `Supplier has not confirmed the PO date` 0 ·
+`Supplier delivery date passed` 3 · `Record supplier answer` 2; the one surviving `…to confirm the
+PO delivery date` is the `purchasing.supplier_reply` rule DEFINITION in `work-engine.ts` — kept so
+stored occurrence rows still resolve — and no projection emits it. **Owed:** the authenticated owner walk — PO page at
+1440/1180/820/743/390, one real per-line answer saved, the Register summary/expansion, the D-1 and
+receiving Work cards.
+
+**Answer evidence — OWNER-APPROVED (Jess, 2026-09-25) · BUILT 2026-09-26** (`SupplierAnswerEvidenceUploadField` over the ONE shared `EvidenceUploadField`, signing kind `answer` = JPG/PNG/MP4/MOV/WEBM/PDF, bucket `delivery-orders`, the PO's own prefix)**.** The answer form accepts
 photos, videos and PDF, several files per answer, through the shared Receiving uploader
 (`ArrivalEvidenceUploadField`) — never a second PO-only uploader; today's PO reply upload is
 JPEG/PNG only. Required minimum is unchanged: at least one WhatsApp screenshot for a confirmation,
 date change or split, and the Supplier DO file for `Supplier DO received`. Video is always optional.
 Files are append-only and viewed through the shared `Photos {n}` / `Video {n}` controls (UI MASTER).
 
-**Who may record a supplier answer — OWNER RULING (Jess, 2026-09-25) · NOT BUILT.** Any active
+**RECORD SUPPLIER ANSWER — UI COMPOSITION APPROVED (Jess, 2026-09-25, Purchasing Blueprint
+segment 1; compact table revision the same day — "we got width, not tall") · BUILT 2026-09-26 (`purchase-orders/SupplierReplySection.tsx`, one component; the legacy one-date `SupplierDateBlock` is deleted).** The
+per-item answer model above is drawn ONCE, on the PO object page's `SUPPLIER REPLY` section (left
+facts column; the PDF pane stays), never as a second Workspace form. Measured before this ruling:
+production `SupplierDateBlock` records one date and one reason for the whole PO, accepts JPEG/PNG
+only, and heads itself `Supplier has not confirmed the PO date` — all three retire with this build.
+
+**The section is a TABLE, one 40px row per goods line, in both its read and its edit state** —
+the Linear/Shopify-admin grammar (edit in the row, one action bar, sub-rows for a split), never a
+stacked label/value form. Two lines cost ~200px; the retired stacked draft cost ~420px.
+
+Read state:
+
+```text
+SUPPLIER REPLY                    PO 14-Day Delivery Date · Fri, 9 Oct      [Record supplier answer]
+Item            Qty  To deliver  Supplier Confirmed Delivery Date                     Last answer
+Cody · King      4   4           3 pcs · Fri, 9 Oct · 1 pcs · Fri, 16 Oct · Delayed    Fri, 25 Sep · Shasha
+Cody · Queen     2   2           Mon, 12 Oct · Delayed · Production delay              Fri, 25 Sep · Shasha
+                                 Supplier changed from Fri, 9 Oct
+Supplier DO     DO-2251 · Photos 1 · PDF 1
+```
+
+Edit state (`Record supplier answer` turns the same table editable in place; no dialog, no 50/50 —
+an answer is not an outside-readable document, §8.2):
+
+```text
+RECORD SUPPLIER ANSWER   [ ] Supplier DO received  Supplier DO No [      ] [Upload]     Cancel  [Save]
+☐  Item          To deliver  Answer                                    Date           Reason
+☐  Cody · King   4           [Split delivery ▾]
+☐  Cody · Queen  2           [New date ▾]     [Mon, 12 Oct]  [Production delay ▾]
+   └ split       [3] pcs [Fri, 9 Oct]   [1] pcs [Fri, 16 Oct] [Partial quantity ready ▾]   + Add another date   Total 4 of 4
+Evidence [Upload]  ≥1 WhatsApp screenshot · photo · video · PDF        Answered by supplier on [Fri, 25 Sep]
+2 selected · Apply to selected  [Choose answer ▾]                   ← bulk answer, one bar, never per row
+```
+
+- **Every Unit ID prints in full under its item** (owner 2026-09-26, the same rule as the Register
+  expansion, Warehouse Inbound and Repair Orders): never `{n} Units`, never a `…` range; the row
+  grows. The answer itself stays per line and quantity — Receiving verifies which Units arrive.
+- `Answer` is ONE kit Select in the row (owner choice 2026-09-26: a dropdown, not a four-segment
+  control — 140px instead of 330px, and the same control the rails and `Reason` already use). `Date` and
+  `Reason` appear in the row only when the answer needs them (`New date`; `Reason` only when the
+  date is later than PO Delivery Date; `Note` only for `Other`). A `Split delivery` row grows one
+  36px sub-row per batch beneath its line, with `+ Add another date` and the live `Total {n} of {m}`.
+- Ticking rows and `Apply to selected` answer several lines at once (the shared bulk grammar:
+  checkbox column + one action bar, no repeated per-row buttons). Validation is on blur, in the
+  cell; the Save button names the first blocker.
+- The table scrolls sideways inside its own box below 1180; the page never does.
+
+- **Facts and doors.** `Supplier Confirmed Delivery Date` per line/batch = the newest append-only
+  answer row (line, quantity, date, server-classified Earlier/Delayed, reason, evidence, recorder,
+  server time, PO version). Write door: the existing `POST /pos/:id/tomorrow-delivery` and its SQL
+  door extended to line + batch scope in a NEW migration (0432/0585 untouched); no parallel
+  endpoint. `Supplier DO received` writes the PO's existing `do_number` / `do_uploaded_at`;
+  Receiving reads that same DO, never a second copy. `PO Delivery Date` never changes; an answer
+  mints no PO version and needs no resend.
+- **Work.** The D-1 occurrence derives per batch date; a recorded answer or a Supplier DO for that
+  date closes it; a moved date retires the old occurrence and derives the new one.
+- **States, all distinct.** Default `Not confirmed` · `None recorded yet` · Active (Save reads
+  `Save — {what is missing}` until complete) · Waiting (date shown; D-1 card the working day
+  before) · Completed (`Received · {GRN No}`, the line greyed `All received`, no further answer)
+  · Attention (`· Delayed · {reason}` + `Supplier changed from {date}`) · Missed
+  (`Supplier delivery date passed`) · Loading (three-line skeleton, no button) · Empty (PO not
+  sent → the section is absent; `Confirm PO sent to supplier` shows instead) · Error
+  (`Supplier answers could not be loaded` + `Try again`, other sections unaffected) · Permission
+  (non-Operation sees no button, never a grey one) · Missing original (`PO Delivery Date ·
+  Not recorded`; the answer is stored as `Reported`). A timeout re-reads the PO and never prints
+  a refusal it did not receive.
+- **Responsive.** 1440/1180: the table in the left column, every column in one row. 820: PDF
+  stacks below (existing rule); the table keeps its columns and scrolls inside its box. 743: same,
+  `Reason` wraps under `Date` in the cell. 390: one 54px two-line row per goods line (item on line
+  one, segmented control on line two), Date/Reason as a third line only when needed, upload full
+  width, `Cancel` `Save` fixed at the bottom at 40px.
+- **Words** are in [COPY-STANDARD: Record supplier answer words](../COPY-STANDARD.md#record-supplier-answer-words).
+
+**Who may record a supplier answer — OWNER RULING (Jess, 2026-09-25) · BUILT 2026-09-26 (0587 redefines the ONE recording gate `purchasing_supplier_reply_actor()`: any active Operation or Principal person; the answer, balance-date, ready-date and day-before doors all ask it; issue/revise/cancel still ask `purchasing_actor_may_issue()`).** Any active
 Operation person may record what the supplier answered — on a PO (`Record supplier answer`) and on
 a Supplier Claim (`Record supplier reply`, §9.5) — because the holder may be on medical leave or the
 job not yet handed to the buddy. The record stores the actual recorder and server time as its own
@@ -747,15 +852,15 @@ cancelling a PO, and authorising a claim outcome stay with PO Duty, dated cover 
 Superuser (§5.3), because those are Carres commitments to the supplier. The Work occurrence still
 routes to PO Duty; anyone's recorded answer closes it.
 
-**Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The eight reasons
+**Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · BUILT (0585 `purchasing_supplier_delay_reasons()` and the shared `PO_DELAY_REASONS` are the same eight; the per-line form reads the shared list).** The eight reasons
 above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
 Material Shortage · Transport Delay · Waiting Customer Confirmation · Factory Closed · Other).
 `Waiting Customer Confirmation` is removed: it is not a supplier reason; customer waiting belongs to
 Sales `delay_planning`. Historical answers keep the reason they were recorded with; new answers
 cannot choose it.
 
-**Day-before occurrence wording (for Workspace, 2026-09-25):** fact `Confirm tomorrow's supplier
-delivery · {Supplier} · {date}`; action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO
+**Day-before occurrence wording (for Workspace, 2026-09-25) · BUILT 2026-09-26:** fact `Confirm tomorrow's supplier
+delivery` (the card's own date badge and party line carry `{Supplier} · {date}` — the API composes no second date spelling); action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO
 No}` (email channel: `Click Email, …`). Completion: a matching Supplier DO, or an evidenced
 confirmation for that exact date and Warehouse, recorded through `Record supplier answer`.
 
@@ -2859,7 +2964,8 @@ number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**
 grouped listing page; this section neither restates its mechanics nor varies them.
 
 **Rail — owner correction Jess 2026-09-18, BUILT 2026-09-18; missing-confirmation row superseded
-2026-09-24.** `Supplier reply` contains `Confirm tomorrow's supplier delivery` when its exact-date
+2026-09-24 and RETIRED from the screen 2026-09-26 (`Supplier has not confirmed the PO date` is gone; the
+row is `Confirm tomorrow's supplier delivery`, computed by the ONE call engine per expected arrival).** `Supplier reply` contains `Confirm tomorrow's supplier delivery` when its exact-date
 trigger opens, `Supplier Confirmed Delivery Date changed` and
 `Supplier delivery date passed`, using the existing current-version sent/pending predicates.
 `Receiving` contains `Partly received`. `Supplier` and `Supplier Deliver To` keep their facts and
@@ -2876,7 +2982,8 @@ a facet's number describes the whole register, never what another facet happens 
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
 **Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
-owner-approved 2026-09-25 · NOT BUILT.** Read-only ordered goods, exactly in order:
+owner-approved 2026-09-25 · BUILT 2026-09-26 (`GoodsMiniTable` PO layout, page-drawn cell from the ONE
+reader `poLineSupplierAnswersOf`; the parent prints one date or `{n} dates` from `poSupplierAnswerSummaryOf`).** Read-only ordered goods, exactly in order:
 
 ```text
 Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items · Supplier Confirmed Delivery Date
@@ -3421,7 +3528,10 @@ Warehouse submits count                (or Operation enters goods directly)
   NEW session and a NEW GRN — a later arrival is never edited into an earlier one.
 - **Work**: the `Goods to receive` queue projects into My Work / Team Work from two triggers only
   — a submitted Warehouse count, and an arrived supplier date with goods still owed (outstanding
-  quantity alone never makes a row). Owner = the resolved GRN Duty; completion = the posted
+  quantity alone never makes a row). **Blueprint segment 2 (BUILT 2026-09-26):** the date trigger
+  fires only for a PO whose CURRENT version is marked `PO sent to supplier` — an unsent PO cannot
+  arrive — and reads the earliest expected arrival per line/batch; its card says `Supplier date
+  passed · nothing received yet`, never `Goods arrived`, which stays the submitted count's fact. Owner = the resolved GRN Duty; completion = the posted
   session; lateness counts on the Warehouse calendar (Mon–Sat).
 - **`Workspace → Staff & Duties`** is the ONE assignment surface: the resolution today
   (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated

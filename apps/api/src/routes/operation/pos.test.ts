@@ -2907,33 +2907,57 @@ describe("POST day-before arrival confirmation (0585)", () => {
   });
 });
 
-describe("POST evidenced supplier reply", () => {
-  /* 0430 — ONE date on the wire; the server classifies it. `answer` and the
-     firstDate/newDate pair are gone from the schema. */
-  const input = { poVersion: 2, supplierDate: "2026-09-10", channel: "whatsapp", recipient: "Factory group", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T01:00:00Z" };
+describe("POST supplier answer per goods line (0587)", () => {
+  /* Purchasing §5.7 (owner 2026-09-25): the answer is recorded PER LINE —
+     `confirmed` · `new_date` · `split` batches — with an optional Supplier DO
+     and photo/video/PDF evidence; the server classifies every date. */
+  const LINE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const input = {
+    poVersion: 2, channel: "whatsapp", recipient: "Factory group", reportedBy: "Factory staff",
+    reportedAt: "2026-09-01T01:00:00Z", evidence: ["PO-TEST/reply.png"],
+    lines: [
+      { poLineId: LINE, answer: "split", batches: [{ qty: 3, date: "2026-09-10" }, { qty: 1, date: "2026-09-17", reason: "Partial quantity ready" }] },
+    ],
+  };
   async function post(body: unknown, role = "operation") {
     return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/tomorrow-delivery", {
       method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
     }), env as never, { waitUntil() {}, passThroughException() {} } as never);
   }
-  it("submits the exact version and evidence through one caller-authenticated RPC", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { reply_id: "reply" }, error: null });
+  it("submits the exact version, the lines and the evidence through the ONE per-line RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { answer_group: "g", answers: 2 }, error: null });
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     expect((await post(input)).status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_reply", { p_po_id: "PO-TEST", p_reply: input });
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_answers", { p_po_id: "PO-TEST", p: input });
   });
-  it("rejects incomplete evidence before any database call", async () => {
-    for (const key of ["poVersion", "supplierDate", "channel", "recipient", "evidence", "reportedBy", "reportedAt"]) {
+  it("a Supplier DO alone, every line unchanged, is a valid answer", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const body = { ...input, evidence: [], supplierDo: { number: "DO-2251", file: "PO-TEST/do.pdf" },
+      lines: [{ poLineId: LINE, answer: "no_change" }] };
+    expect((await post(body)).status).toBe(200);
+  });
+  it("rejects an incomplete answer before any database call", async () => {
+    for (const key of ["poVersion", "channel", "recipient", "reportedBy", "reportedAt", "evidence", "lines"]) {
       const body = { ...input } as Record<string, unknown>; delete body[key];
       expect((await post(body)).status).toBe(422);
     }
+    /* no evidence and no DO · a new date without the date · a split with no
+       batches · every line `no_change` with no DO · Other without a note */
+    expect((await post({ ...input, evidence: [] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "new_date" }] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "split", batches: [] }] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "no_change" }] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "new_date", date: "2026-09-20", reason: "Other" }] })).status).toBe(422);
     expect(userClient).not.toHaveBeenCalled();
   });
-  it("surfaces a concurrent revision as a named refusal", async () => {
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "stale_po_version", message: "Open the current PO and record the supplier answer." } }) } as any);
-    const response = await post(input);
-    expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ code: "stale_po_version" });
+  it("surfaces the door's named refusals — a stale version, a split that does not add up", async () => {
+    for (const detail of ["stale_po_version", "batch_total_mismatch", "line_all_received"]) {
+      vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: detail, message: detail } }) } as any);
+      const response = await post(input);
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: detail });
+    }
   });
   it("rejects a dealer", async () => {
     expect((await post(input, "dealer")).status).toBe(403);

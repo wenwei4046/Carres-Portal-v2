@@ -13,7 +13,7 @@ import {
   poDeliveryWorkingDays,
   recordBalanceDateInput,
   recordReadyDateInput,
-  recordSupplierReplyInput,
+  recordSupplierAnswersInput,
   recordArrivalConfirmationInput,
   confirmPoSentInput,
   recordSendInput,
@@ -162,7 +162,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at, terms_days",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at, terms_days, do_number, do_file_path, do_uploaded_at",
       );
 
     if (status !== "all") q = q.eq("status", status);
@@ -1397,10 +1397,11 @@ operationPosRouter.get("/for-order/:orderId", requireOperation, async (c) => {
     sb.from("purchasing_destinations").select("id, name"),
     sb
       .from("po_supplier_promises")
-      .select("po_id, kind, answer, new_date, about_date, previous_date, reason, evidence, recorded_at")
+      // 0587 — line-level answers are answers too: the Supplier card reads the
+      // newest one, whichever line it was about.
+      .select("po_id, po_line_id, about_qty, kind, answer, new_date, about_date, previous_date, reason, evidence, recorded_at")
       .eq("kind", "tomorrow_delivery")
-      .in("po_id", poIds)
-      .is("po_line_id", null),
+      .in("po_id", poIds),
     sb.from("warehouse_receipts").select("po_id, goods_received_at, status").in("po_id", poIds),
   ]);
   const e2 = pos.error ?? lines.error ?? destinations.error ?? promises.error ?? receipts.error;
@@ -2206,6 +2207,14 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   evidence_required: "evidence_required",
   evidence_not_found: "evidence_not_found",
   reported_at_invalid: "reported_at_invalid",
+  // 0587 · the per-line answer door's refusals.
+  supplier_do_incomplete: "supplier_do_incomplete",
+  supplier_do_invalid: "supplier_do_invalid",
+  nothing_to_record: "nothing_to_record",
+  line_all_received: "line_all_received",
+  batches_required: "batches_required",
+  batch_total_mismatch: "batch_total_mismatch",
+  batch_qty_invalid: "batch_qty_invalid",
 };
 
 function mapSupplierCallError(
@@ -2237,21 +2246,27 @@ function mapSupplierCallError(
   return c.json(m.body, m.status);
 }
 
-// Record the answer to the exact sent PO version with outside evidence.
-// The transaction preserves the original document date and projects only goods
-// arrival planning to the Sales lines explicitly linked to this PO.
-// 0584 — the evidenced answer to the current PO version completes the PO's
-// supplier-reply Work. It observes only a body this door will accept, so an
-// incomplete answer is still refused before any database call.
-operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, supplierReplyWorkCompletion({
-  when: async (c) => recordSupplierReplyInput.safeParse(await c.req.json().catch(() => null)).success,
-}), async (c) => {
-  const parsed = await parseJsonBody(c, recordSupplierReplyInput);
+// Record what the supplier answered, PER GOODS LINE (0587, Purchasing §5.7,
+// owner 2026-09-25): `confirmed` · `new_date` · `split` batches, an optional
+// `Supplier DO received`, photo/video/PDF evidence, recorded by any active
+// Operation person. The transaction preserves the original PO Delivery Date
+// and projects only goods-arrival planning to the Sales lines linked to this
+// PO. A `confirmed` line and a Supplier DO also record the day-before
+// evidence, so BOTH Work completions are observed here: the passed-date
+// follow-up and the day-before check. Each observes only a body this door
+// will accept, so an incomplete answer is refused before any database call.
+const supplierAnswerBodyIsComplete = async (c: Context<AppEnv>) =>
+  recordSupplierAnswersInput.safeParse(await c.req.json().catch(() => null)).success;
+operationPosRouter.post("/:id/tomorrow-delivery", requireOperation,
+  supplierReplyWorkCompletion({ when: supplierAnswerBodyIsComplete }),
+  arrivalConfirmationWorkCompletion({ when: supplierAnswerBodyIsComplete }),
+  async (c) => {
+  const parsed = await parseJsonBody(c, recordSupplierAnswersInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("purchasing_record_supplier_reply", {
+  const { data, error } = await sb.rpc("purchasing_record_supplier_answers", {
     p_po_id: c.req.param("id"),
-    p_reply: parsed.data,
+    p: parsed.data,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

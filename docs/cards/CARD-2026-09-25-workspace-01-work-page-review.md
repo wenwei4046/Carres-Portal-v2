@@ -21,7 +21,7 @@ Every fix below uses the kit and the governed words. A fix that needs a new word
 | 9 | sidebar | 12 icons, no labels | names by default from 1280px; below that icons, so Work keeps two panels (the named rail pushed a 941px window back into phone mode — measured 2026-09-25) | BUILT — #1639 + follow-up |
 | 10 | sidebar | `OP` avatar, no name | name and role | BUILT — this PR |
 | 11 | header | bell badge 78 never clears | count only today's unread | **needs design** — the bell counts live order alerts, there is no notification record to mark read; a separate card |
-| 12 | header | `Jump to… ⌘K` is a developer shortcut | `Search` | BUILT — this PR |
+| 12 | header | `Jump to… ⌘K` is a developer shortcut | `Search` | **REVERTED** — Jess 2026-09-26: never agreed; `Jump to…` with its ⌘K hint stays |
 | 13 | header | `?` and the gear have no words | label or remove | BUILT — this PR |
 | 14 | right rail | three unlabelled icons | names, or fold into the sidebar | BUILT — this PR |
 | 15 | toolbar | `My Work / Team Work` black segment off the blue system | blue active segment | BUILT — this PR |
@@ -48,6 +48,11 @@ whole width · 27 the header team count wraps instead of truncating · 28 an emp
 first"):** 30 the Work shell is the §6.0 listing shell — 50px Destination Header, one plain
 toolbar row, search 340px, Date and Page as toolbar selects, no rail, no Filters button. The card
 list stays until Jess rules on the §6.0 table for Work. **BUILT.**
+
+**Round 4 (Jess, 2026-09-26 — "this is my left rail", the Payment Monitor rail):** 31 the Work
+rail is the shared `FilterRail` in the Payment Monitor's grammar — ‹ week › header, one card per
+work day, `Missed` and `No working date` rows, the `Page` group, the `Owner` select in Team Work,
+`Hide filters` / `Show filters` remembered — beside the list and the detail. **BUILT.**
 
 **Acceptance for each ticked item:** a rendered walk at 1440×900, 829×900, 743×704 and 390×844
 with the measurement in the PR, and the Workspace MASTER §5 rows overwritten in the same PR.

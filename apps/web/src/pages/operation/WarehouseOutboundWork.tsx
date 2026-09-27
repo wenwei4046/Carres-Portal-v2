@@ -913,7 +913,8 @@ function RecordLoadedModal({
   );
   const [receiver, setReceiver] = useState("");
   const [vehicle, setVehicle] = useState("");
-  const [evidence, setEvidence] = useState<EvidenceEntry[]>([]);
+  /* Outbound proof is photo or video — never a PDF (the field is generic since 0587). */
+  const [evidence, setEvidence] = useState<Array<EvidenceEntry & { kind: "photo" | "video" }>>([]);
 
   /* The server names every object key; the field only carries the file. */
   const signEvidence = useCallback(

@@ -16,7 +16,14 @@ import type { WorkItem } from "./work-engine";
  */
 export type PurchaseOrderRegisterFilter =
   | "pdf_not_sent"
+  /** A sent PO with no evidenced answer yet. Since 2026-09-24 (Purchasing
+   *  §9.3) it is NOT a rail row and NOT Work — `Waiting for goods from
+   *  supplier` is a state, not a chase; Work filters `purchasing.supplier_reply`
+   *  out. The fact is still computed for the readers that name it. */
   | "supplier_date_missing"
+  /** The day-before check is open for one of the PO's expected arrivals
+   *  (Purchasing §5.7 / §9.3 rail, Blueprint segment 2). */
+  | "confirm_tomorrows_delivery"
   | "supplier_date_passed"
   /** The supplier's evidenced date for the CURRENT version differs from the
    *  original PO Delivery Date (Purchasing MASTER §9.3 rail, Jess 2026-09-17). */
@@ -58,6 +65,15 @@ export interface PurchaseOrderRegisterInput {
   status: "open" | "received" | "cancelled";
   version?: number | null;
   supplierDate?: string | null;
+  /** 0587 · every expected arrival across the PO's lines / batches
+   *  (`poExpectedArrivalsOf`); when given, the reply facets read these
+   *  instead of the single PO-level `supplierDate`. */
+  expectedArrivals?: readonly string[] | null;
+  /** 0587 · lines whose newest answer moved away from the original. */
+  changedLines?: number | null;
+  /** 0587 · the page's own `tomorrowDeliveryCallOf` verdict over the expected
+   *  arrivals: an open, unconfirmed day-before check exists. */
+  arrivalCheckOpen?: boolean | null;
   /** The immutable original PO Delivery Date (`official_delivery_date`);
    *  null when the original is genuinely unknown. */
   originalDate?: string | null;
@@ -147,18 +163,27 @@ export function purchaseOrderRegisterFacts(
   /* SUPPLIER REPLY facets: only a current version marked as sent with goods
      pending (MASTER §9.3). */
   const replyOpen = !cancelled && !completed && !!currentSend && pending;
-  if (replyOpen && !input.supplierDate) {
+  const perLine = input.expectedArrivals != null;
+  if (replyOpen && (perLine ? (input.expectedArrivals ?? []).length === 0 && !input.supplierDate : !input.supplierDate)) {
     filters.push("supplier_date_missing");
+  }
+  if (replyOpen && input.arrivalCheckOpen) {
+    filters.push("confirm_tomorrows_delivery");
   }
   if (
     replyOpen &&
-    !!input.supplierDate &&
-    !!input.originalDate &&
-    input.supplierDate !== input.originalDate
+    (perLine
+      ? (input.changedLines ?? 0) > 0
+      : !!input.supplierDate && !!input.originalDate && input.supplierDate !== input.originalDate)
   ) {
     filters.push("supplier_date_changed");
   }
-  if (replyOpen && !!input.supplierDate && input.supplierDate < todayIso) {
+  if (
+    replyOpen &&
+    (perLine
+      ? (input.expectedArrivals ?? []).some((d) => d < todayIso)
+      : !!input.supplierDate && input.supplierDate < todayIso)
+  ) {
     filters.push("supplier_date_passed");
   }
   if (!cancelled && !completed && quantitiesKnown && received > 0 && open > 0) filters.push("partly_received");
@@ -235,12 +260,11 @@ export function purchaseOrderWork(
       action: `Issue the purchase order to ${input.supplierName}`,
     };
   }
-  if (facts.filters.includes("supplier_date_missing")) {
-    return {
-      problem: "Supplier has not confirmed the PO date",
-      action: `Ask ${input.supplierName} to confirm the PO delivery date`,
-    };
-  }
+  /* A sent PO the supplier has not answered is NOT work (owner ruling
+     2026-09-24, Purchasing MASTER §5.7 / §9.3): it is `Waiting for goods from
+     supplier`; the day-before check and the passed-date follow-up are the only
+     supplier-contact Work. `supplier_date_missing` stays a register FACT
+     (`Not confirmed`), never a card. */
   if (facts.filters.includes("supplier_date_passed")) {
     return {
       problem: "Supplier delivery date passed",
@@ -258,23 +282,19 @@ export function purchaseOrderReplyWorkItems(
   holidays: ReadonlySet<string> = myHolidaySet(),
 ): WorkItem[] {
   const facts = purchaseOrderRegisterFacts(input, today);
-  const missing = facts.filters.includes("supplier_date_missing");
-  const passed = facts.filters.includes("supplier_date_passed");
-  if (!missing && !passed) return [];
+  /* Only a PASSED supplier date is supplier-contact Work here; a sent PO
+     without an answer waits for goods (owner ruling 2026-09-24). */
+  if (!facts.filters.includes("supplier_date_passed")) return [];
   const copy = purchaseOrderWork(input, facts)!;
-  const firstSend = input.sends.filter(send => send.kind === "confirmed_sent" && send.poVersion === facts.version)
-    .sort((a, b) => a.sentAt.localeCompare(b.sentAt))[0];
-  // Reply work starts on the sent day; a passed promise starts on that date.
-  // Move only the computed work day to the next Office working day.
-  let due = passed ? input.supplierDate ?? null : firstSend
-    ? new Date(Date.parse(firstSend.sentAt) + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    : null;
+  // A passed promise starts on that date. Move only the computed work day
+  // to the next Office working day.
+  let due = input.supplierDate ?? null;
   const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
   if (due && (PURCHASING_OFFICE_OFF_DAYS.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
     due = addWorkingDays(due, 1, options);
   }
   return [{
-    ruleKey: passed ? "purchasing.supplier_date_passed" : "purchasing.supplier_reply",
+    ruleKey: "purchasing.supplier_date_passed",
     module: "purchasing", soRef: input.id, orderId: input.id,
     action: copy.action,
     ownerRule: "po_duty", ownerDutyKey: "po_duty",
@@ -285,7 +305,7 @@ export function purchaseOrderReplyWorkItems(
     ownerName: owner?.actingPerson?.name ?? null,
     ownerUserId: owner?.actingPerson?.userId ?? null,
     ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
-    tone: passed ? "warning" : "info", locked: false, broken: false,
+    tone: "warning", locked: false, broken: false,
     dueIso: due, workingDaysLate: due && due < today ? countWorkingDays(due, today, options) : 0,
   }];
 }
@@ -326,6 +346,10 @@ export function purchaseOrderArrivalCheckWorkItems(
      *  the call reopens — that rule lives in `tomorrowDeliveryCallOf`. */
     tomorrowAnswerAboutDateIso: string | null;
     lines: readonly { qty: number; receivedQty: number }[];
+    /** 0587 · the card names the PO the Supplier DO is for, by the supplier's
+     *  recorded channel (owner wording 2026-09-25). */
+    poNo?: string | null;
+    channel?: "whatsapp" | "email" | "phone" | "in_person" | null;
   },
   owner: WorkspaceDutyResolution | null,
   today: string,
@@ -365,6 +389,8 @@ export function purchaseOrderArrivalCheckWorkItems(
      * name is missing. */
     action: purchasingActionLine("confirm_tomorrows_delivery", {
       supplier: input.supplierName,
+      poNo: input.poNo ?? input.id,
+      channel: input.channel ?? null,
     }),
     ownerRule: "po_duty",
     ownerDutyKey: "po_duty",

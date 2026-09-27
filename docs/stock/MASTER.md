@@ -720,8 +720,8 @@ remain in Inbound, not current Inventory. Delivered, returned-to-supplier, writt
 ended Units leave the default current list but remain searchable in History with their distinct
 lifecycle outcome.
 
-**THE DEFAULT LIST IS WHAT CARRES PHYSICALLY HOLDS — owner ruling 2026-09-25, APPROVED TARGET /
-NOT BUILT.** `All stock` opens on the Units Carres actually holds: `Available · Reserved / sold ·
+**THE DEFAULT LIST IS WHAT CARRES PHYSICALLY HOLDS — owner ruling 2026-09-25, BUILT 2026-09-26
+(`WarehouseStockRegister`, `inventory-words.ts`; authenticated production walk owed).** `All stock` opens on the Units Carres actually holds: `Available · Reserved / sold ·
 Not available · In transit`. `Incoming` (born with the PO, not yet received) is never in that
 default; it stays reachable as its own `Stock use` rail row, and the footer prints one extra line,
 `{n} still to arrive · see Inbound`, whose number is the same `Pending Delivery` arithmetic Inbound
@@ -731,8 +731,8 @@ reads (`receivingSummaryOf`), never a second count. Measured on production 2026-
 2990 On hand/Incoming) separate the two for the same reason. Falsifier: an operator who needs the
 Incoming rows inside the default list to do a daily Warehouse job.
 
-**ONE ROW IS ONE UNIT, ONE CELL IS ONE FACT — owner ruling 2026-09-25, APPROVED TARGET / NOT
-BUILT.** The Register uses the nine approved columns above as nine separate 40px single-line
+**ONE ROW IS ONE UNIT, ONE CELL IS ONE FACT — owner ruling 2026-09-25, BUILT 2026-09-26
+(authenticated production walk owed).** The Register uses the nine approved columns above as nine separate 40px single-line
 columns under the Listing Template (`../ui/MASTER.md` §6.0): 13px/18 body text, 11px/600 slate
 header at 36px, 8px cell padding, `Unit ID` pinned left as the sticky identity, a long value
 ending in `…` and shown whole on hover/focus, dates and numbers never cut. **There is no row
@@ -745,8 +745,18 @@ row prints `—` for Unit ID with `×{qty}` beside the product. Measured on prod
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
-**THE ELEVEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, APPROVED TARGET / NOT
-BUILT.** The order is the owner's own sequence (2026-09-25, second correction): the two dates first
+**THE ELEVEN DEFAULT COLUMNS AND THEIR WORDS — owner rulings 2026-09-25, BUILT 2026-09-26
+(authenticated production walk owed).** Measured on the rendered harness with the production
+chrome (240px portal navigation + 240px rail) at 1440: the grid canvas is 892px and the eleven
+columns are 1,493px, so six heads (`Goods Received Date` · `Inventory Status` · `Stock Condition`
+· `PO No / Ref No` · `Stock Location` · `Delivery Location`) render on two lines under their
+governed labels, eight columns stand in view at rest, `Unit ID` pins once the sheet scrolls, and
+the rail's collapse control adds 240px. `Goods Received Date`, `Ship Date`, `Pickup By` and
+`Delivery Location` are read from the owning tables (posted `warehouse_receipts` through
+`receiving_unit_results`; the Warehouse-side `handed_over` event through
+`delivery_handover_event_units` → `ops_delivery_orders` → the order's address; a Transfer/Return
+`collected` event through `arrival_sources`), never from the Unit's status; a Unit booked in before
+Receiving existed keeps its recorded date in, and an `Incoming` Unit has none. The order is the owner's own sequence (2026-09-25, second correction): the two dates first
 (in, out), the Sales Order and its saleability, then the source document and the pinned `Unit ID`,
 then the goods and the movement facts; it is not the Sales Orders date-first order. Every head is a word the dictionary already rules; no head may be minted for this
 page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showroom Display`,
@@ -754,7 +764,7 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 
 | Column | Meaning | Absence |
 |---|---|---|
-| `Goods Received Date` | the day it entered Carres control (posted receipt) | `Not received` |
+| `Goods Received Date` | the day it entered Carres control (posted receipt; a Unit booked in before Receiving existed keeps its recorded date in) | `Not received` for an `Incoming` Unit (no Receiving record); `Not recorded` for goods Carres holds whose date was never captured — measured 2026-09-26: 27 opening-stock rows |
 | `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
 | `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
@@ -788,7 +798,28 @@ result `Received` makes a Unit `Available` automatically (SAP unrestricted stock
 receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
 the way back from `Cannot sell`.
 
-**UNIT DETAIL — owner rulings 2026-09-25, APPROVED TARGET / NOT BUILT.** Titled `{Unit ID} ·
+**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT 2026-09-26 (migration 0589;
+authenticated production walk owed).** The page is the Sales Order object page's grammar (owner
+ruling 2026-09-26, Law C: one header, never a lookalike): the header row reads
+`← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are blue-titled blocks, and an old
+reference the portal never held prints `{ref} · not in this portal` instead of `No SO`. The
+`⋮` holds exactly three acts. **`Report a problem`** asks three things — `What did you see?`
+(`Damaged` · `Not found` · `Wrong item` · `Missing component` · `Label / Unit ID problem` ·
+`Something else`), at least one `Photo` (or video) and `What happened, in one sentence` — prints the
+consequence before submit, and writes through the ONE Issue door (`stock_unit_report_problem` →
+`issue_record_issue`) with the derived control in the same transaction: a free Unit enters the
+inspection hold and reads `Cannot sell · Waiting inspection`; a reserved Unit keeps its Sales Order
+(linked on the Issue, `Sales Order {SO No} is at risk`); observed damage is written to
+`Stock Condition`. The first action routes to GRN Duty at the Site, due the next working day, in the
+governed grammar (`Check the damage on {Unit ID} and record the result` · `Look for {Unit ID} at
+{Site} and scan it again` · …), and appears in `Current work` and in Work. **`Make available for
+sale`** (only while `Cannot sell`) prints five checks — Stock Location recorded · no reported
+problem open · not in repair · not on the road · no Sales Order reservation — names the failing
+one, and on Confirm resolves the claimless hold and, for a `Damaged` Unit, records the clearance
+(`sale_cleared_at`) so the availability arithmetic reads `Available` while `Stock Condition` keeps
+saying `Damaged`; a later hold or repair clears it again. **`Count again`** (only while an open
+`Not found` report names the Unit) completes the current look through the Issue Tracker's one
+result door and opens the next dated look. Photos live in the private `issue-evidence` bucket. Titled `{Unit ID} ·
 {Item}`, `← Inventory` returns to the register with its filters and position. Four sections, one
 scroll, these words: **`Stock Details`** (Inventory Status · Stock Condition · Stock Location ·
 Ownership · Goods Received Date — the receipt date is the proof the Unit was seen; there is no
@@ -1923,7 +1954,7 @@ are separate milestones. No Warehouse surface is frozen into the UI Kit by this 
 | Inbound | warehouse-inbound shared projection; actual Receiving Site, formal source, full products and receipt outcomes | Awaiting receipt / Fully received / All arrivals; accepted, physical arrived and pending quantities remain distinct |
 | Receiving | ReceivingWorkspace and existing receipt writer; posted GRN and receiving_unit_results | Same-page work, stable retry identity, source evidence and actual goods receipt date; no second Stock Add |
 | Outbound | 0424 exact DO Unit scope, prep and two-sided handover; explicit Loading workspace | Loading does not confirm for the driver; loaded with zero driver confirmations remains open |
-| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority | Four default fact groups retain independent Unit ID. PO issue dates never stand in for actual receipts |
+| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority; `inventory-words.ts` (shared) is the one arithmetic for `Inventory Status` and `Stock Condition`; `stock-register-context.ts` reads the physical facts | Eleven single-line 40px columns in the owner's order, rail `STOCK · CATEGORY · OWNERSHIP · CONTROL`, footer `{n} still to arrive · see Inbound`; the PGlite contract test executes the physical-fact reads against committed column names. PO issue dates never stand in for actual receipts. Unit Detail `⋮` actions not built |
 | Physical Site visits | Posted receiving_unit_results + warehouse_receipts.actual_site_id / goods_received_at; arrival_source_events.collected with source.from_site_id | Only unambiguous same-Unit, same-Site evidence pairs. Every later receipt opens another visit. Missing or overlapping evidence remains visibly unpaired |
 | Historical DO departures | delivery_handover_event_units warehouse side + handed_over event | These old events have no historical Site field. Preserve the departure independently; do not infer Site from the Unit's current warehouse, rewrite history or fabricate a backfill |
 | Arrival Schedule / Pickup Schedule | WarehouseWorkspace, warehouse-schedule projection and Site operating dates | Separate pages; normal white cards and quiet date provenance badges, overdue work highlighted, undated/delayed work reachable, including older overdue and dated non-working-day entries without changing their dates. Pickup opens exact Loading scope |
