@@ -1173,8 +1173,13 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      `Expected Arrival Mon, 14 Sep · Not received`; `Balance` / `RM 2,284.00 · not paid · by Sat,
      26 Sep`). No bare date appears anywhere ("now you all date every where but i dont know refer to
      what?"). Dates print `fmtDate` (`Mon, 14 Sep`). ✓ done, ○ not yet, red `!` an open act;
-     finished items fold into `✓ {n} done`. Document numbers appear only on group lines and in the
-     header.
+     finished items fold into `✓ {n} done ›`, printed at the right corner of the module name line
+     (Jess, 2026-09-27: "2 done why bottom? move to header same line"). Document numbers appear only
+     on group lines and in the header.
+   - **Tally (Jess, 2026-09-27: "to do how to tally and know where im doing?"):** the open act is lit
+     on BOTH sides at once, the checklist line in the Order Route and its To do item, with the pale-blue
+     wash and the 3px blue edge; pressing a red `!` in the Order Route opens its To do and switches
+     Communication to its party.
    - **To do cell (right, same row):** only that module's open acts, each titled with its checklist
      item's words (`Supplier answer · Ohana`) over the owning form's name; one form opens at a time;
      after Save it shows `✓ … Saved` and the next open act opens.
