@@ -1156,8 +1156,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 
 **B · Decisions (revision 2).**
 - **B1 · AGREED WITH CORRECTIONS** — as A5.
-- **B2 · SIZES (revision 4)** — no Order header (A4); the Route timeline column (≈316px) and the
-  card take the full Mission height, each scrolling alone; one column when narrow.
+- **B2 · SIZES (revision 5)** — no Order header (A4). The action area (the record panel) is
+  340px, the same width as Communication (Jess, 2026-09-27: "record panel same width with
+  communication"); the Route takes the rest (≥316px). At 1440: Inbox 280 · Route 480 · Record 340 ·
+  Communication 340. Each column fills the height and scrolls alone; one column when narrow.
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
   Proposed wording (Jess 2026-09-27):
   `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
