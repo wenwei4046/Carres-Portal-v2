@@ -1190,8 +1190,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      sales order do"; "every module step checklist progress is the same"; PROPOSAL until 定).** The
      stops are the orders MASTER node map in its order, under its bands: `GOODS` (`PURCHASING` ·
      `SUPPLIER` · `RECEIVING` · `STOCK`), `DELIVERY` (`LOGISTICS` · `DELIVERY DATE`), `PAYMENT`, then
-     `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`. The stop label is small grey uppercase (11/500)
-     with `Missed` / `Due` and `{n} of {m} done` on its line; the card title (15/600) is what to do,
+     `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`. No `Order Route · To do {n}` row and no
+     band labels (`GOODS` …) are drawn (Jess 2026-09-28: "remove order route and to do 4 · remove goods
+     word"). The stop label is small grey uppercase (11/500) with `Missed` / `Due` only; the ONE
+     progress count is each card's own `{n} of {m} done`, never a second count on the stop ("confused"); the card title (15/600) is what to do,
      else the node's who + object sentence from the resolver (`Warehouse has not received the goods`);
      the second line says why. Every card carries its checklist: a square box per step, ✓ filled when
      done, empty when not yet, red or amber `!` for the step that is the act now, and `{n} of {m} done`.
