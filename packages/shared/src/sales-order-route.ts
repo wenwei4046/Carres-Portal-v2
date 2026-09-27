@@ -187,6 +187,9 @@ export interface RouteNode {
   /** The fact lines, in reading order. Complete nodes carry their evidence
    *  here; everything else carries its plain-sentence status. */
   lines: string[];
+  /** The same facts BEFORE they were broken into rows — what a screen reader
+   *  speaks. A row break is for the eye; a sentence is read whole. */
+  spoken: string[];
   /** The gate's requirement list. Empty on every other node. */
   requirements: GateRequirement[];
   action: NodeAction | null;
@@ -674,6 +677,7 @@ function sealChain(
             ? "waiting"
             : "future";
     /* The plate prints `text-label` 11px, so its row holds what a context row holds. */
+    const spoken = truthy(draft.lines);
     const lines = truthy(draft.lines).flatMap((line) =>
       draft.kind === "goods-line" ? wrapRouteText(line, ROUTE_TEXT_BUDGET.context) : wrapWords(line),
     );
@@ -689,6 +693,7 @@ function sealChain(
       title: draft.title,
       mark,
       lines,
+      spoken,
       requirements,
       action,
       door: doorway,
@@ -788,7 +793,10 @@ function purchaseChain(
           detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
         },
       },
-      door: open(po.id, poHref(po.id)),
+      /* The PO's door already stands on PURCHASING directly above; a working
+         SUPPLIER node repeats no door (approved mock 2026-09-26). A complete
+         node still names its document. */
+      door: po.expectedReadyDate ? open(po.id, poHref(po.id)) : null,
     },
     {
       id: `${po.id}:receiving`,
@@ -869,7 +877,7 @@ function unreadableDrafts(
     ...station,
     complete: false,
     unreadable: true,
-    lines: index === 0 ? [...wrapWords(words.what), ...wrapWords(words.not)] : wrapWords(words.what),
+    lines: index === 0 ? [words.what, words.not] : [words.what],
     door: index === 0 ? tryAgain(owner) : null,
   }));
 }
@@ -999,7 +1007,7 @@ function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
       return { ...base, complete: false, blocked: true, lines: ["Hold delivery", financeLine], door: payments };
     }
     if (!input.money.known) {
-      return { ...base, complete: false, lines: wrapWords(NO_PRICE), door: payments };
+      return { ...base, complete: false, lines: [NO_PRICE], door: payments };
     }
     return { ...base, complete: true, lines: ["Paid"], door: payments };
   }
@@ -1262,7 +1270,7 @@ function gateDraft(
       title: "DELIVERY ORDER",
       complete: false,
       unreadable: true,
-      lines: wrapWords(UNREADABLE[failed].what),
+      lines: [UNREADABLE[failed].what],
       door: null,
     };
   }
@@ -1621,7 +1629,7 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       ? unreadableDrafts("delivery", [
           { id: "deliver", kind: "deliver", title: "DELIVER" },
           { id: "delivery-photo", kind: "delivery-photo", title: "DELIVERY PHOTO" },
-        ]).map((draft) => ({ ...draft, lines: wrapWords(UNREADABLE.delivery.what), door: null }))
+        ]).map((draft) => ({ ...draft, lines: [UNREADABLE.delivery.what], door: null }))
       : [deliverDraft(input), photoDraft(input)],
     "tail",
     false,

@@ -221,9 +221,11 @@ describe("Order Route — the nodes", () => {
     expect(action).toHaveTextContent("YJ");
     expect(action).toHaveTextContent("Confirm ready date");
     expect(action).toHaveClass("text-label");
+    /* Three rows, broken at the separators — never one row ending in "…". */
     expect(context).toHaveTextContent(
-      "PO-2048 · 3 Units · Carres Warehouse · Customer requested: Thu, 24 Sep",
+      "PO-2048 · 3 Units Carres Warehouse Customer requested: Thu, 24 Sep",
     );
+    expect(context.querySelectorAll("span")).toHaveLength(3);
     expect(context).not.toHaveTextContent(/Due:|No due date|Next Action|Priority/i);
     expect(context).toHaveClass("text-label", "text-base-600");
     expect(fact.parentElement).toBe(supplier);
@@ -267,7 +269,8 @@ describe("Order Route — the gate", () => {
     expect(gate).toHaveTextContent("Goods not ready (0 of 3)");
     expect(gate).toHaveTextContent("Logistics not assigned");
     expect(gate).toHaveTextContent("Scheduled delivery not recorded");
-    expect(gate).toHaveTextContent("Hold delivery · RM 1,249.00 unpaid");
+    /* The row breaks at the separator; the requirement is still one item. */
+    expect(screen.getByTestId("route-requirement-money")).toHaveTextContent("Hold delivery RM 1,249.00 unpaid");
     expect(gate).toHaveTextContent("No Finance hold");
   });
 
@@ -438,7 +441,10 @@ describe("PAYMENT, a failed read and a waiting change on the canvas", () => {
     const payment = nodeEl("money");
     expect(payment).toHaveTextContent("PAYMENT");
     expect(payment).toHaveTextContent("Hold delivery");
-    expect(payment).toHaveTextContent("RM 1,249.00 unpaid · by Tue, 22 Sep");
+    expect(payment).toHaveTextContent("RM 1,249.00 unpaid by Tue, 22 Sep");
+    expect(payment.getAttribute("aria-label")).toContain("RM 1,249.00 unpaid · by Tue, 22 Sep");
+    /* Collect tells the operator what to do; the door is where. */
+    expect(within(payment).getByRole("link", { name: "Open Payments →" })).toBeInTheDocument();
     expect(payment).not.toHaveTextContent("still to collect");
   });
 
@@ -448,6 +454,9 @@ describe("PAYMENT, a failed read and a waiting change on the canvas", () => {
     expect(logistics).toHaveAttribute("data-mark", "unreadable");
     expect(logistics).toHaveAttribute("data-current", "false");
     expect(logistics.getAttribute("aria-label")).toContain(
+      "Could not read Delivery for this order. — This does not mean nothing is arranged.",
+    );
+    expect(logistics).toHaveTextContent(
       "Could not read Delivery for this order. This does not mean nothing is arranged.",
     );
     expect(within(logistics).getByRole("button", { name: "Try again →" })).toBeInTheDocument();

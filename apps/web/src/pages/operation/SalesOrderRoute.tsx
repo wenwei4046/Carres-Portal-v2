@@ -375,7 +375,7 @@ function Node({
         data-testid={`route-node-${node.id}`}
         data-kind={node.kind}
         data-mark={node.mark}
-        aria-label={[node.title, ...node.lines].join(" — ")}
+        aria-label={[node.title, ...node.spoken].join(" — ")}
         aria-expanded={goodsExpanded}
         onClick={() => onToggleGoods?.(node.id)}
         className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 text-left hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
@@ -412,7 +412,8 @@ function Node({
 
   const spoken = [
     node.title,
-    ...node.lines.map(spellDates),
+    /* A row break is for the eye; the sentence is spoken whole. */
+    ...node.spoken.map(spellDates),
     ...node.requirements.map((r) => `${r.met ? "met" : "not met"}: ${spellDates(r.text)}`),
     /* `Unassigned` is in COPY-STANDARD's Do NOT use column for this surface,
        and it was not an edge case: the page supplies only two of the six owner
@@ -491,7 +492,7 @@ function Node({
           }`}
           style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
         >
-          {spellDates(line)}
+          {spellDates(line)}{" "}
         </div>
       ))}
 
@@ -516,7 +517,7 @@ function Node({
             <span className={`min-w-0 ${req.met ? "text-base-600" : "text-base-900"}`}>
               {rows.map((row, i) => (
                 <span key={i} className="block whitespace-nowrap">
-                  {spellDates(row)}
+                  {spellDates(row)}{" "}
                 </span>
               ))}
             </span>
@@ -545,7 +546,7 @@ function Node({
         >
           {wrapRouteText(actionContext, ROUTE_TEXT_BUDGET.context).map((row, i) => (
             <span key={i} className="block whitespace-nowrap" style={{ height: CONTEXT_H }}>
-              {spellDates(row)}
+              {spellDates(row)}{" "}
             </span>
           ))}
         </div>
