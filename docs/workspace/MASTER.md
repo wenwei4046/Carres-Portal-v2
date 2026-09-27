@@ -1155,18 +1155,18 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
-7. **REVISION 7 · MODULE ROWS (Jess, 2026-09-27: "i like the ui and whole page clean and neat now" on
-   the ChatGPT structure wireframe, then "ok").** This overwrites the separate To do column and
-   the stacked Route below. The Mission is ONE list of module rows, in order `Proceed · Purchasing
-   · Receiving · Warehouse · Payment · Delivery`, under a 48px title row `{SO No} {customer} ·
-   Requested delivery {date}` and one heading row `Order Route | To do`. Each row: LEFT (220px) =
-   the module name, its one control date, its status (red Missed · amber Due · grey otherwise) and
-   Proceed's SO document; RIGHT = that module's checklist (marker · what · date · state · document,
-   aligned in one grid down the whole page). An open act carries a red or amber `!` (A6); pressing it opens its owning module's form INLINE under that line
-   in a pale-blue block, and only one form is open at a time. After Save the next open act opens.
-   A row with an open act, a red or amber line, or a single line never folds; any other row folds
-   to its line names with a chevron. Complex acts (receiving, taking money) open their owning page
-   and return to the same order. The Logistics checks (7a-i) are the Delivery row's lines.
+7. **REVISION 8 · TIMELINE ROUTE + TO DO LIST (Jess, 2026-09-27: "order route now why become no
+   checklist … you went stupid and forget what we want and confirmed" and "order route now difficult
+   to read").** Overwrites revision 7's module rows. Under the 48px `{SO No} {customer} ·
+   Requested delivery {date}` row the Mission has two columns. LEFT, `Order Route`: the dated
+   vertical timeline she approved — the step's date in a fixed left column, a dot (dark done, red
+   missed, grey otherwise), the module title with its status on the right, and ITS WHOLE CHECKLIST
+   beneath in compact one-line items `mark · name · state` (✓ done, ○ not yet, red `!` missed);
+   a supplier's group line carries its PO document number on the right, Proceed's line carries the
+   SO. RIGHT, `To do {n}`: only the open acts, each titled with EXACTLY its Route item's words
+   (`Supplier answer · Ohana`) over `{module} · {form name}`; the first missed act opens its owning
+   form in place, one form at a time; after Save it drops to the end as `✓ … · Saved` and the next
+   act opens. Rows are not aligned across the two columns (alignment left dead white space).
 7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
    then expand checklist … we should set format").** Every step is the same title row: date · dot ·
    step name · the step's own document number when it has exactly one (Proceed's `SO No`) · status
