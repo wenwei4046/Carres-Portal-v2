@@ -1204,6 +1204,22 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      until Scheduled delivery" is withdrawn. To do 4: two supplier answers, `Call NETS`,
      `Collect RM 2,284.00 from 12341234` (`Record payment`). UI/UX skill rules applied: stop label
      and card title are two ranks; grey text at least 4.5:1 (slate-11); buttons 36px; only Save blue.
+   - **Review corrections applied 2026-09-28 (Jess "可以", eight items; verified against authority).**
+     (1) A PO whose current version has no send mark shows `Sending not confirmed` and its act is
+     `Send {PO No} to {Supplier}` with Purchasing's `PoIssueEvidence` (`PO sent to supplier` records the
+     send if it already happened; a missing mark never proves no send, Purchasing §5.6); the supplier
+     date-passed act opens only after a send mark (Purchasing §5.7 sent/pending predicates).
+     (2) PAYMENT shows the Route's fact `Customer must pay by {date}` (shared `paymentDeadlineOf`,
+     Scheduled else Requested), but no collection act until Payment's ask rule admits it (ask day =
+     3 working days before Scheduled delivery). (3) A goods line whose `Deliver To` is not a Carres
+     Site gets no Receiving card; its route is not derived, so only the destination fact shows.
+     (4) STOCK reads `Waiting for receiving` once a PO exists (orders MASTER scenario matrix; the
+     resolver on main still prints `Waiting for purchase` — a Sales Orders bug to fix at source).
+     (5) Progress counts only steps with completion evidence; a fact is never a row; the DELIVERY
+     ORDER card shows its requirements without a second count. (6) Each act keeps its own draft.
+     (7) An outside message never carries a missing field; each act uses its own template and
+     deadline. (8) A stop with no current work and no fact change (`RECEIVING`, `STOCK`, `DELIVER`,
+     `DELIVERY PHOTO` on SO-1333) collapses to one line and opens on press. Result on SO-1333: To do 3.
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
