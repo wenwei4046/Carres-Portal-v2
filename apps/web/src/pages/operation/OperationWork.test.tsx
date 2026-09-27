@@ -172,6 +172,16 @@ describe("Operation Work — one server feed", () => {
     expect(row).not.toHaveTextContent("Shasha");
   });
 
+  it("renders the Gmail-style 76px action row without chips or card chrome", () => {
+    show();
+    const row = screen.getByTestId("work-row-SO-1318-ask_delivery_date");
+    expect(row.className).toContain("h-[76px]");
+    expect(row.className).toContain("border-b");
+    expect(row.className).not.toContain("rounded-");
+    expect(screen.queryByTestId("work-row-chips")).toBeNull();
+    expect(screen.getByTestId("work-rail-days").className).toContain("py-1");
+  });
+
   it("routes covered work to the acting person's My Work but groups Team Work under normal owner", () => {
     workState.data!.items = [item({
       owner: {

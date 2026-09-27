@@ -19,11 +19,11 @@ import { fmtDate } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
 import { WORK_MODULE_WORD } from "./module-word";
 
-export function workDueWord(item: Pick<WorkRow, "timingBucket" | "dueIso">): { text: string; missed: boolean } {
-  if (!item.dueIso) return { text: "No date", missed: false };
-  /* A late row is the date in red — no word (Jess, 2026-09-26). */
-  if (item.timingBucket === "overdue") return { text: fmtDate(item.dueIso), missed: true };
-  return { text: fmtDate(item.dueIso), missed: false };
+export function workDueWord(item: Pick<WorkRow, "timingBucket" | "dueIso">): { text: string; missed: boolean; today: boolean } {
+  if (!item.dueIso) return { text: "No date", missed: false, today: false };
+  /* A late row is the date in red, a row due today amber — no word (Jess, 2026-09-26/27). */
+  if (item.timingBucket === "overdue") return { text: fmtDate(item.dueIso), missed: true, today: false };
+  return { text: fmtDate(item.dueIso), missed: false, today: item.timingBucket === "today" };
 }
 
 export default function WorkListRow({
@@ -32,7 +32,7 @@ export default function WorkListRow({
   cover,
   selected,
   onSelect,
-  onOpenRecord,
+  onOpenRecord: _onOpenRecord,
 }: {
   item: WorkRow;
   action: string;
@@ -57,25 +57,21 @@ export default function WorkListRow({
       aria-pressed={selected}
       aria-label={`${item.soRef} · ${action} · ${item.problem} · ${due.text}`}
       data-work-row
+      data-id={item.id}
       data-testid={`work-row-${item.soRef}-${item.ruleKey}`}
       onClick={onSelect}
       onKeyDown={onKey}
       className={[
-        "relative flex h-[76px] w-full cursor-pointer flex-col justify-center border-b border-kit-slate-4 px-3 text-left",
+        "relative flex h-[76px] w-full cursor-pointer flex-col justify-center border-b border-kit-slate-4 px-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9",
         selected ? "bg-kit-blue-3" : "bg-white hover:bg-kit-slate-2",
       ].join(" ")}
     >
       {selected ? <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-kit-blue-9" /> : null}
       <span className="flex min-w-0 items-baseline gap-2">
-        <button
-          type="button"
-          className="shrink-0 text-[12px] font-medium leading-4 text-kit-slate-11 underline-offset-2 hover:underline"
-          onClick={(event) => { event.stopPropagation(); onOpenRecord(); }}
-        >
-          {item.soRef}
-        </button>
+        {/* The whole row chooses the act; `Open order` lives in the middle (Jess, 2026-09-27). */}
+        <span className="shrink-0 text-[12px] font-medium leading-4 text-kit-slate-11">{item.soRef}</span>
         {cover ? <span className="min-w-0 truncate text-[12px] font-medium leading-4 text-kit-amber-11" data-testid="work-row-cover">For {cover}</span> : null}
-        <span className={`ml-auto shrink-0 text-[12px] leading-4 ${due.missed ? "font-semibold text-danger" : "text-kit-slate-11"}`} data-testid="work-row-due">
+        <span className={`ml-auto shrink-0 text-[12px] leading-4 ${due.missed ? "font-semibold text-danger" : due.today ? "font-semibold text-kit-amber-11" : "text-kit-slate-11"}`} data-testid="work-row-due">
           {due.text}
         </span>
       </span>

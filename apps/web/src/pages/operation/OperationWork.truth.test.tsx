@@ -181,7 +181,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-rail-day-2026-09-20")).toBeNull(); // Sunday never drawn
     expect(dayCard("2026-09-17")).toHaveAttribute("data-today", "yes");
     expect(dayCard("2026-09-17")).toHaveAttribute("aria-pressed", "true"); // the focus day is chosen
-    expect(dayCard("2026-09-17").className).toContain("bg-kit-blue-9");
+    expect(dayCard("2026-09-17").className).toContain("bg-kit-blue-3");
     expect(dayCard("2026-09-14").className).not.toContain("bg-kit-blue");
     expect(dayCard("2026-09-17")).not.toHaveTextContent("Today");
     expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent(/^Sep 2026$/);
@@ -239,7 +239,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     const empty = screen.getByTestId("work-empty");
     expect(empty).not.toHaveTextContent("Nothing assigned to you");
-    expect(empty).toHaveTextContent("No work on Thu, 17 Sep");
+    expect(empty).toHaveTextContent("Nothing due on Thu, 17 Sep");
     fireEvent.click(within(empty).getByRole("button", { name: "Open Fri, 18 Sep" }));
     expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
   });

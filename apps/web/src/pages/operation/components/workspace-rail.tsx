@@ -726,11 +726,11 @@ export function FilterRailMonthGrid({
                   compact
                     ? "flex h-[22px] min-w-0 items-center justify-center gap-0.5 rounded-control tabular-nums"
                     : "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
-                  chosen ? "bg-kit-blue-9 text-white" : closed || (compact && d.count === 0) ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
+                  chosen ? (compact ? "bg-kit-blue-3 text-kit-blue-11" : "bg-kit-blue-9 text-white") : closed || (compact && d.count === 0) ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
                 ].join(" ")}
               >
-                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-[12px] ${d.count > 0 && !closed ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12" : ""}`}>{d.dayNumber}</span>
-                <span className={compact ? `min-w-[10px] text-left text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-[12px] ${d.count > 0 && !closed ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? (compact ? "ring-1 ring-kit-blue-9" : chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12") : ""}`}>{d.dayNumber}</span>
+                <span className={compact ? `min-w-[10px] text-left text-[10px] leading-[14px] ${chosen ? "text-kit-blue-11" : "text-kit-slate-11"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
                   {!closed && d.count > 0 ? d.count : ""}
                 </span>
               </button>

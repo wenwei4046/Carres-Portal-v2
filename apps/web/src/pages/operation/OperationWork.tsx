@@ -120,7 +120,14 @@ export default function OperationWork() {
      from its name. */
   const [wide, setWide] = useState(true);
   const [commOpen, setCommOpen] = useState(false);
-  const [monthOpen, setMonthOpen] = useState(true);
+  const [monthOpen, setMonthOpenState] = useState(() => {
+    try { return window.localStorage.getItem("carres.work.month") !== "week"; } catch { return true; }
+  });
+  const setMonthOpen = (next: boolean | ((v: boolean) => boolean)) => setMonthOpenState((before) => {
+    const value = typeof next === "function" ? next(before) : next;
+    try { window.localStorage.setItem("carres.work.month", value ? "month" : "week"); } catch { /* private window */ }
+    return value;
+  });
   const [layout, setLayout] = useState<WorkLayout>(() =>
     typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
   );
@@ -260,8 +267,13 @@ export default function OperationWork() {
   const dueIsos = useMemo(() => beforeDay.map((item) => item.dueIso), [beforeDay]);
   /** MASTER §5.1: today when it is a working day, else the next working day. */
   const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
-  const selectedDay = day === "focus" ? focusDay : day;
-  const inDay = (item: WorkRow) => inWorkDay(item, day, generatedOn, focusDay);
+  /* THE OPENING CHOICE (Jess, 2026-09-27): Missed when anything is missed,
+     else the focus day. Missed, a day and No date are one choice at a time —
+     a day never mixes in the missed work. */
+  const anyMissed = beforeDay.some((item) => item.timingBucket === "overdue");
+  const openDay = day === "focus" ? (anyMissed ? "missed" : focusDay) : day;
+  const selectedDay = openDay;
+  const inDay = (item: WorkRow) => inWorkDay(item, (openDay || "focus") as typeof day, generatedOn, focusDay);
   /* Status (Jess, 2026-09-26: the rail's `Status` rows, more than one may be
      on): one day's open set split by the recorded reply state; the rail's
      date counts keep the whole open set. */
@@ -320,15 +332,25 @@ export default function OperationWork() {
   /* The empty list is one white section that ends where its words end
      (item 24), never a canvas-long blank. */
   const emptyBody = emptyState === "failed" ? null : (
-    <div className="rounded-work border border-work-line bg-white px-4 py-5 text-body text-base-400" data-testid="work-empty">
+    <div className="px-1 py-5 text-body text-kit-slate-11" data-testid="work-empty">
       {emptyState === "no_match" ? (
         <>
-          <p>No work matches these filters</p>
+          {search ? (
+            <>
+              <p className="text-kit-slate-12">No work matches “{search}”</p>
+              <p>Clear search or change Filters.</p>
+            </>
+          ) : <p className="text-kit-slate-12">No work matches these filters</p>}
           <button type="button" onClick={clearFilters} className={emptyButton}>Clear filters</button>
         </>
       ) : emptyState === "day" ? (
         <>
-          {/^\d{4}-\d{2}-\d{2}$/.test(selectedDay) ? <p>No work on {fmtDate(selectedDay)}</p> : null}
+          {/^\d{4}-\d{2}-\d{2}$/.test(selectedDay) ? (
+            <>
+              <p className="text-kit-slate-12">Nothing due on {fmtDate(selectedDay)}</p>
+              <p>Choose another date or review completed work.</p>
+            </>
+          ) : selectedDay === "missed" ? <p className="text-kit-slate-12">No missed work</p> : null}
           {emptyDoor ? (
             <button type="button" onClick={() => updateParam("day", emptyDoor.key)} className={emptyButton}>
               {emptyDoor.label}
@@ -370,6 +392,35 @@ export default function OperationWork() {
   const displayTeamGroups = visibleTeamGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
     .filter((group) => group.items.length > 0);
+  /* THE INBOX KEYS (Jess, 2026-09-27): ↑/↓ and J/K move the choice, Home/End
+     jump to the ends, `/` goes to Search. The middle and the pane follow. */
+  const orderedRows = activeView === "mine" ? myItems : displayTeamGroups.flatMap((g) => g.items);
+  const moveChoice = (to: "next" | "prev" | "first" | "last") => {
+    if (orderedRows.length === 0) return;
+    const at = Math.max(0, orderedRows.findIndex((i) => i.id === selected?.id));
+    const index = to === "first" ? 0 : to === "last" ? orderedRows.length - 1 : to === "next" ? Math.min(orderedRows.length - 1, at + 1) : Math.max(0, at - 1);
+    const row = orderedRows[index]!;
+    openRow(row);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-work-row][data-id="${CSS.escape(row.id)}"]`)?.focus());
+  };
+  const onListKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, [role='combobox']")) return;
+    const key = event.key;
+    if (key === "ArrowDown" || key === "j") { event.preventDefault(); moveChoice("next"); }
+    else if (key === "ArrowUp" || key === "k") { event.preventDefault(); moveChoice("prev"); }
+    else if (key === "Home") { event.preventDefault(); moveChoice("first"); }
+    else if (key === "End") { event.preventDefault(); moveChoice("last"); }
+  };
+  useEffect(() => {
+    const onSlash = (event: KeyboardEvent) => {
+      if (event.key !== "/" || (event.target as HTMLElement)?.closest?.("input, textarea, select, [contenteditable]")) return;
+      event.preventDefault();
+      document.getElementById("work-search")?.focus();
+    };
+    window.addEventListener("keydown", onSlash);
+    return () => window.removeEventListener("keydown", onSlash);
+  }, []);
   const openRow = (i: WorkRow) => {
     updateParam("selected", i.id);
     if (layout === "one") setActivePanel("detail");
@@ -450,6 +501,7 @@ export default function OperationWork() {
     }, { replace: true });
   };
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterCount = (moduleFilter !== "all" ? 1 : 0) + (activeView === "team" && ownerFocus ? 1 : 0) + (statuses.length === 1 && statuses[0] === "todo" ? 0 : 1);
   const filtersPanel = railDates ? (<>
       {filtersOpen ? (<div data-testid="work-filters">
       {/* Status rows: each one is on or off on its own; the last one on stays. */}
@@ -523,7 +575,7 @@ export default function OperationWork() {
     </div>
   ) : activeView === "mine" ? (
     myItems.length === 0 ? emptyBody : (
-      <div className="-mx-3 flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
+      <div className="flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
     )
   ) : displayTeamGroups.length === 0 ? (
     emptyBody
@@ -650,11 +702,11 @@ export default function OperationWork() {
 
               <div className="flex shrink-0 items-center gap-2 pb-1">
                 <div className="min-w-0 flex-1">
-                  <SearchInput id="work-search" toolbar placeholder="Search work…" value={search} onChange={(event) => updateParam("q", event.target.value || null)} data-testid="work-search" />
+                  <SearchInput id="work-search" toolbar placeholder="Search work…" value={search} onChange={(event) => updateParam("q", event.target.value || null)} onKeyDown={(event) => { if (event.key === "Escape") (event.target as HTMLInputElement).blur(); }} data-testid="work-search" />
                 </div>
                 <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-4 px-2.5 text-body text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-filters-toggle">
                   <Icon name="filter" size={14} />
-                  Filters
+                  {filterCount > 0 ? `Filters ${filterCount}` : "Filters"}
                 </button>
               </div>
               {filtersPanel}
@@ -683,7 +735,7 @@ export default function OperationWork() {
                   </button>
                 </div>
               ) : null}
-              <div className="min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll">
+              <div className="-mx-3 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll" onKeyDown={onListKey}>
                 <div key={statuses.join(",")} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
                   {listBody}
                 </div>
