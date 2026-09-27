@@ -147,6 +147,16 @@ which overwrites the 2026-09-21 "remain blue" ruling on this page.
 a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
 longer offers prints an empty box.
 
+**Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
+(`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's
+`EmptyState` and `Button`, centred, at most 480px wide. The Register, the object page, Revisions,
+History and the Order Route all call it, and `SalesOrderAbsence` is the same block. A 403 prints the
+permission words with the way back and no retry (the Register prints no button and its footer no
+count); a 404 or an invalid parameter prints `Sales Order not found.`; anything else keeps the
+surface's own sentence with `Try again`. No transport message reaches the screen.
+**Not built in E:** loading does not yet reserve the final geometry on the object page (two panes)
+or the Route (the 320px canvas skeleton); both still draw the kit `Loading` line.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
