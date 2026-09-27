@@ -38,7 +38,10 @@ const pos = Array.from({ length: 26 }, (_, n) => {
     const received = kind === "completed" ? qty : i % 5 === 0 ? 1 : 0;
     return {
       id: `l${i}-${l}`, sku: `SKU-${i}-${l}`, qty, received_qty: received, model_name: model, size,
-      destination_id: i % 4 ? "d1" : "d2", identity_mode: "quantity",
+      /* Furniture is an exact Unit (Stock MASTER §2): every PO line carries its
+         Unit IDs from the official issue. Measured on production 2026-09-27:
+         103 of 103 live PO lines are `exact_unit` and none is missing a Unit. */
+      destination_id: i % 4 ? "d1" : "d2", identity_mode: "exact_unit",
       attrs: l === 0 && i % 2 ? { color: "Sand", fabric_name: "CG-012" } : null,
       governed_sources: [], sources: [],
     };
@@ -101,6 +104,18 @@ window.fetch = async (input, init) => {
   /* The official paper beside the facts: the same money-free payload the
      server composes (`purchasing_po_document`), built from the fixture PO so
      the object page draws a real PDF instead of an empty half. */
+  /* The PO's own Units, one per ordered piece, bound to their line (0442/0443). */
+  const unitsOf = (po: (typeof pos)[number]) =>
+    po.purchase_order_lines.flatMap((l, n) =>
+      Array.from({ length: l.qty }, (_, u) => ({
+        unit_code: `U1-${String(n + 1).padStart(3, "0")}-${String(u + 1).padStart(3, "0")}`,
+        sku: l.sku, status: "on_order", po_line_id: l.id,
+      })));
+  const unitsReq = /\/api\/operation\/pos\/([^/?]+)\/units/.exec(url);
+  if (unitsReq) {
+    const po = pos.find((p) => p.id === decodeURIComponent(unitsReq[1]!));
+    return json({ units: po ? unitsOf(po) : [] });
+  }
   const print = /\/api\/operation\/pos\/([^/?]+)\/print-data/.exec(url);
   if (print) {
     const po = pos.find((p) => p.id === decodeURIComponent(print[1]!));
