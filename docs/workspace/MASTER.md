@@ -1165,6 +1165,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    (`Ohana … PO-20260903-4316 V1`) above its own lines; ✓ done, ○ not yet, red `!` an open act.
    Pressing an `!` line opens its owning module's form in place under it, one form at a time; after
    Save the line turns ✓ and the next open act opens. Document numbers appear only here.
+   **Jess chose this layout (A · row by row) over B (steps on top, one step shown) and C (sorted by
+   what to do) on the live prototype, 2026-09-27: "i want my previous, i never want on top". Do not
+   change it; never put the steps along the top.**
+   Finished lines without a document fold into one `✓ {n} done` line per module.
 7a. **ONE Route format (Jess, 2026-09-27: "order route now messy and untidy … proceed is title,
    then expand checklist … we should set format").** Every step is the same title row: date · dot ·
    step name · the step's own document number when it has exactly one (Proceed's `SO No`) · status
