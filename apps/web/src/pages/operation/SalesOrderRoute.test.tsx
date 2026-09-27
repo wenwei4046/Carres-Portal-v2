@@ -6,7 +6,7 @@ import {
   type SalesOrderRouteInput,
   type SalesOrderRouteMap,
 } from "@carres/shared";
-import SalesOrderRoute, { type RouteActionOwners } from "./SalesOrderRoute";
+import SalesOrderRoute, { compactOrderRoute, type RouteActionOwners } from "./SalesOrderRoute";
 
 const owners: RouteActionOwners = {
   purchasing: { userId: "u-yj", name: "Yu Jun", email: "yujun@carres.my" },
@@ -631,5 +631,64 @@ describe("DELIVERY lanes on the canvas", () => {
       "href",
       "/operation/delivery-orders/do-2",
     );
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE A3 · found on the rendered goods chain (2026-09-28).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("stacked goods lines", () => {
+  const line = (over: Record<string, unknown>) => ({
+    sku: "B1201S",
+    label: "B1201S · King",
+    qty: 1,
+    sources: [],
+    onOrderQty: 0,
+    readyQty: 0,
+    unitCodes: [],
+    uncoveredQty: 1,
+    shortBecause: "not-ordered",
+    readyStockQty: 0,
+    ...over,
+  });
+  const three = () =>
+    map({
+      goods: [
+        line({
+          lineId: "L1",
+          sources: [
+            {
+              poId: "PO-1", qty: 1, issuedAt: "2026-09-03", poDeliveryDate: "2026-09-18", expectedArrival: null,
+              confirmed: false, dayBeforeCheckOpen: true, receivedQty: 0, pendingQty: 1, damagedOrWrongQty: 0, latestGrn: null,
+            },
+          ],
+          onOrderQty: 1,
+          uncoveredQty: 0,
+          shortBecause: "not-received",
+        }),
+        line({ lineId: "L2", label: "Pillow" }),
+        line({ lineId: "L3", label: "Sofa" }),
+      ] as never,
+      unreadable: { purchasing: ["L3"] },
+    });
+
+  it("a stacked line hangs from the node above it — no line from the Sales Order runs behind a node", () => {
+    const route = compactOrderRoute(three(), "L1:goods-line");
+    const into = (id: string) => route.edges.filter((e) => e.to === id);
+    expect(into("L1:goods-line").map((e) => e.from)).toEqual(["sales-order"]);
+    expect(into("L2:goods-line").map((e) => e.from)).toEqual(["L1:stock"]);
+    expect(into("L3:goods-line").map((e) => e.from)).toEqual(["L2:goods-line"]);
+    for (const e of [...into("L2:goods-line"), ...into("L3:goods-line")]) {
+      expect(new Set(e.points.map((p) => p.x)).size).toBe(1);
+    }
+  });
+
+  it("a collapsed line whose read failed still says so", () => {
+    draw(three());
+    const plate = nodeEl("L3:goods-line");
+    expect(plate).toHaveAttribute("data-mark", "unreadable");
+    expect(plate.getAttribute("aria-label")).toContain("Could not read Purchasing for this line.");
+    expect(nodeEl("L2:goods-line")).not.toHaveAttribute("data-mark", "unreadable");
   });
 });

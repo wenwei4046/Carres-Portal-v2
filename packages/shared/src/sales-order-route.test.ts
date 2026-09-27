@@ -10,6 +10,7 @@ import {
   type SalesOrderRouteMap,
 } from "./sales-order-route";
 import type { AllocationUnit } from "./sales-order-allocation";
+import type { RouteGoodsLine, RouteGoodsSource } from "./sales-order-route-goods";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Fixtures. Every scenario in the owner's card is built from these helpers so a
@@ -1425,5 +1426,243 @@ describe("found on the rendered Journey (2026-09-28)", () => {
       expect(across).toBeLessThan(gate.y);
       expect(across).toBeGreaterThan(node(map, "delivery-date:1:0").y + node(map, "delivery-date:1:0").h);
     }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE A3 · THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK (owner
+ * ruling 2026-09-26), in the who + object + action grammar (2026-09-27).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const goodsSource = (over: Partial<RouteGoodsSource> & { poId: string }): RouteGoodsSource => ({
+  qty: 1,
+  issuedAt: "2026-09-03",
+  poDeliveryDate: "2026-09-18",
+  expectedArrival: null,
+  confirmed: false,
+  dayBeforeCheckOpen: false,
+  receivedQty: 0,
+  pendingQty: 1,
+  damagedOrWrongQty: 0,
+  latestGrn: null,
+  ...over,
+});
+
+const goodsLine = (over: Partial<RouteGoodsLine> & { lineId: string }): RouteGoodsLine => ({
+  sku: "B1201S",
+  label: "B1201S · King",
+  qty: 1,
+  sources: [],
+  onOrderQty: 0,
+  readyQty: 0,
+  unitCodes: [],
+  uncoveredQty: 1,
+  shortBecause: "not-ordered",
+  readyStockQty: 0,
+  ...over,
+});
+
+describe("the goods chain reads its owners (owner ruling 2026-09-26)", () => {
+  it("SO-1319: PO Delivery Date, the delayed arrival with its reason, and 0 of 1 received", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({
+            lineId: "L1",
+            sources: [
+              goodsSource({
+                poId: "PO-20260903-4354",
+                expectedArrival: { date: "2026-09-28", change: "delayed", reason: "Production delay" },
+              }),
+            ],
+            onOrderQty: 1,
+            uncoveredQty: 0,
+            shortBecause: "not-received",
+          }),
+        ],
+      }),
+    );
+    expect(node(map, "L1:goods-line").spoken).toEqual(["Customer ordered 1", "Carres ordered 1 from supplier"]);
+    expect(node(map, "L1:PO-20260903-4354:purchasing").spoken).toEqual(["PO-20260903-4354", "Issued: 2026-09-03"]);
+    expect(node(map, "L1:PO-20260903-4354:supplier").spoken).toEqual([
+      "PO Delivery Date: 2026-09-18",
+      "Expected arrival: 2026-09-28 · Delayed · Production delay",
+    ]);
+    expect(node(map, "L1:PO-20260903-4354:receiving").spoken).toEqual(["Warehouse received 0 of 1"]);
+    expect(node(map, "L1:stock").spoken).toEqual([
+      "Warehouse has 0 of 1 Units ready",
+      "Warehouse has not received the goods",
+    ]);
+    const printed = map.nodes.flatMap((n) => n.spoken).join("\n");
+    for (const retired of ["Estimated ready", "Create the Units", "to buy from factory", "Waiting for purchase"]) {
+      expect(printed).not.toContain(retired);
+    }
+  });
+
+  it("Confirm ready date is owed ONLY while the day-before check is open — never a standing action", () => {
+    const at = (dayBeforeCheckOpen: boolean) =>
+      node(
+        resolveSalesOrderRoute(
+          input({
+            goods: [
+              goodsLine({
+                lineId: "L1",
+                sources: [goodsSource({ poId: "PO-1", dayBeforeCheckOpen })],
+                onOrderQty: 1,
+                uncoveredQty: 0,
+                shortBecause: "not-received",
+              }),
+            ],
+          }),
+        ),
+        "L1:PO-1:supplier",
+      );
+    expect(at(true).action?.label).toBe("Confirm ready date");
+    expect(at(false).action).toBeNull();
+    /* Waiting on the supplier is not Carres' work: the position moves on. */
+    expect(at(false).current).toBe(false);
+  });
+
+  it("partial receiving keeps its count after a receipt is posted, and RECEIVING holds CURRENT", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({
+            lineId: "L1",
+            qty: 5,
+            sources: [
+              goodsSource({
+                poId: "PO-1",
+                qty: 5,
+                confirmed: true,
+                receivedQty: 3,
+                pendingQty: 2,
+                damagedOrWrongQty: 1,
+                latestGrn: { id: "r2", number: "GRN2609-0041", receivedAt: "2026-09-19" },
+              }),
+            ],
+            onOrderQty: 2,
+            readyQty: 3,
+            unitCodes: ["U1", "U2", "U3"],
+            uncoveredQty: 0,
+            shortBecause: "not-received",
+          }),
+        ],
+      }),
+    );
+    const receiving = node(map, "L1:PO-1:receiving");
+    expect(receiving.spoken).toEqual([
+      "Warehouse received 3 of 5",
+      "Latest: GRN2609-0041 · Received: 2026-09-19",
+      "1 damaged or wrong",
+    ]);
+    expect(receiving.current).toBe(true);
+    expect(receiving.action?.label).toBe("Check in");
+    expect(receiving.door).toEqual({
+      label: "Open GRN2609-0041 →",
+      href: "/operation?tab=receiving&receipt=r2",
+    });
+  });
+
+  it("received whole: the GRN and its day, a tick, and the Units by their IDs", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({
+            lineId: "L1",
+            sources: [
+              goodsSource({
+                poId: "PO-1",
+                confirmed: true,
+                receivedQty: 1,
+                pendingQty: 0,
+                latestGrn: { id: "r1", number: "GRN2609-0040", receivedAt: "2026-09-18" },
+              }),
+            ],
+            readyQty: 1,
+            unitCodes: ["U1-000-231"],
+            uncoveredQty: 0,
+            shortBecause: null,
+          }),
+        ],
+      }),
+    );
+    expect(node(map, "L1:PO-1:receiving")).toMatchObject({
+      mark: "complete",
+      spoken: ["GRN2609-0040 · Received: 2026-09-18"],
+    });
+    expect(node(map, "L1:stock")).toMatchObject({
+      mark: "complete",
+      spoken: ["Warehouse has 1 Unit ready", "U1-000-231"],
+    });
+    expect(node(map, "L1:goods-line").spoken).toEqual(["Customer ordered 1"]);
+  });
+
+  it("STOCK offers Choose Ready Unit only when eligible Ready Stock exists; otherwise the wait is not Stock's", () => {
+    const offered = node(
+      resolveSalesOrderRoute(input({ goods: [goodsLine({ lineId: "L1", readyStockQty: 2 })] })),
+      "L1:stock",
+    );
+    expect(offered.action).toMatchObject({ ownerKey: "sales", label: "Choose Ready Unit" });
+    expect(offered.door).toEqual({ label: "Open Ready Stock →", href: "/operation?tab=purchase&so=1319" });
+    expect(offered.spoken).toEqual(["Warehouse has 0 of 1 Units ready", "Carres has not ordered the goods"]);
+    const none = node(
+      resolveSalesOrderRoute(input({ goods: [goodsLine({ lineId: "L1" })] })),
+      "L1:stock",
+    );
+    expect(none.action).toBeNull();
+    expect(none.current).toBe(false);
+  });
+
+  it("from shelf stock the purchase chain is omitted entirely", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [goodsLine({ lineId: "L1", readyQty: 1, unitCodes: ["U9"], uncoveredQty: 0, shortBecause: null })],
+      }),
+    );
+    expect(map.nodes.filter((n) => n.branch === "goods").map((n) => n.kind)).toEqual(["goods-line", "stock"]);
+  });
+
+  it("two lines of one SKU draw two lanes, and each Purchase Order stands in its own", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({ lineId: "L1", sources: [goodsSource({ poId: "PO-1" })], onOrderQty: 1, uncoveredQty: 0, shortBecause: "not-received" }),
+          goodsLine({ lineId: "L2", sources: [goodsSource({ poId: "PO-2" })], onOrderQty: 1, uncoveredQty: 0, shortBecause: "not-received" }),
+        ],
+      }),
+    );
+    expect(kinds(map, "goods-line").map((n) => n.id)).toEqual(["L1:goods-line", "L2:goods-line"]);
+    expect(edge(map, "L1:goods-line", "L1:PO-1:purchasing")).toBeDefined();
+    expect(edge(map, "L2:goods-line", "L2:PO-2:purchasing")).toBeDefined();
+    expect(edge(map, "L1:goods-line", "L2:PO-2:purchasing")).toBeUndefined();
+  });
+
+  it("a failed Purchasing read yellows this line's chain only", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({ lineId: "L1", sources: [goodsSource({ poId: "PO-1" })], onOrderQty: 1, uncoveredQty: 0, shortBecause: "not-received" }),
+          goodsLine({ lineId: "L2", sku: "PILLOW", label: "Pillow", readyQty: 1, unitCodes: ["U2"], uncoveredQty: 0, shortBecause: null }),
+        ],
+        unreadable: { purchasing: ["L1"] },
+      }),
+    );
+    expect(node(map, "L1:unreadable:purchasing").mark).toBe("unreadable");
+    expect(node(map, "L1:stock").spoken).toEqual(["Warehouse has 0 of 1 Units ready"]);
+    expect(node(map, "L2:stock").mark).toBe("complete");
+    expect(map.nodes.filter((n) => n.mark === "unreadable").every((n) => n.id.startsWith("L1:"))).toBe(true);
+  });
+
+  it("the gate counts the Units bound to the lines", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({ lineId: "L1", qty: 2, readyQty: 1, unitCodes: ["U1"], uncoveredQty: 1 }),
+          goodsLine({ lineId: "L2", readyQty: 1, unitCodes: ["U2"], uncoveredQty: 0, shortBecause: null }),
+        ],
+      }),
+    );
+    expect(requirement(map, "goods")).toEqual({ id: "goods", met: false, text: "Warehouse has 2 of 3 Units ready" });
   });
 });

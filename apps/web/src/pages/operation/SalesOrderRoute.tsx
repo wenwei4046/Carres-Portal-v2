@@ -187,7 +187,28 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   const rowTop = bandY + MAP_BAND_HEIGHT + MAP_BAND_DROP;
 
   let goodsY = rowTop;
+  /* The goods lines stack in ONE column, so a line hangs from the node
+     directly above it. A line drawn from the Sales Order to a stacked plate
+     turns half way down and runs behind whatever stands there (measured
+     2026-09-28: behind SUPPLIER). */
+  const hangsFrom = new Map<string, string>();
+  let above: string | null = null;
   for (const group of groupBounds) {
+    if (above) hangsFrom.set(group.plate.id, above);
+    const opened = group.plate.id === expanded?.plate.id;
+    above = opened
+      ? [...group.nodes].sort((a, b) => b.y + b.h - (a.y + a.h))[0]!.id
+      : group.plate.id;
+    /* A collapsed line hides its chain; a failed read inside it must not hide
+       with it. */
+    if (!opened && group.nodes.some((node) => node.mark === "unreadable")) {
+      const failed = group.nodes.find((node) => node.mark === "unreadable")!;
+      group.plate = {
+        ...group.plate,
+        mark: "unreadable",
+        spoken: [...group.plate.spoken, ...failed.spoken],
+      };
+    }
     if (group.plate.id === expanded?.plate.id) {
       for (const node of group.nodes) {
         placed.set(node.id, {
@@ -253,6 +274,11 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   const visible = new Set(placed.keys());
   const edges: RouteEdge[] = route.edges
     .filter((edge) => visible.has(edge.from) && visible.has(edge.to))
+    .map((edge) =>
+      edge.from === originSource.id && hangsFrom.has(edge.to)
+        ? { ...edge, id: `${hangsFrom.get(edge.to)}→${edge.to}`, from: hangsFrom.get(edge.to)!, style: "solid" as const }
+        : edge,
+    )
     .map((edge) => {
       const from = placed.get(edge.from)!;
       const to = placed.get(edge.to)!;
@@ -403,8 +429,11 @@ function Node({
         data-mark={node.mark}
         aria-label={[node.title, ...node.spoken].join(" — ")}
         aria-expanded={goodsExpanded}
+        title={node.mark === "unreadable" ? node.spoken[node.spoken.length - 2] : undefined}
         onClick={() => onToggleGoods?.(node.id)}
-        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 text-left hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        className={`absolute overflow-hidden rounded-card border border-kit-slate-5 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${
+          node.mark === "unreadable" ? "bg-kit-amber-3" : "bg-kit-slate-3 hover:bg-white"
+        }`}
         style={{
           left: node.x,
           top: node.y,
@@ -420,6 +449,10 @@ function Node({
         >
           {goodsExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
           <span className="truncate">{node.title}</span>
+          {/* State is never colour alone: the failed read carries its glyph. */}
+          {node.mark === "unreadable" && (
+            <AlertTriangle size={12} className="ml-auto shrink-0 text-kit-amber-11" aria-hidden="true" />
+          )}
         </div>
         {node.lines.map((line, i) => (
           <div
