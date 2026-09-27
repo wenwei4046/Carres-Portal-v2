@@ -71,6 +71,7 @@ import {
 } from "./delivery-work-status";
 import { fmtMoney } from "./money-format";
 import type { AllocationUnit, SalesOrderAllocation } from "./sales-order-allocation";
+import type { RouteGoodsLine, RouteGoodsSource } from "./sales-order-route-goods";
 import { normalizeSkuKey } from "./sku-code";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -99,7 +100,8 @@ export interface RouteUnreadable {
   delivery?: boolean;
   /** The Finance hold / payment record read failed. */
   payments?: boolean;
-  /** Purchasing's read failed — for every line, or for the named SKUs only. */
+  /** Purchasing's read failed — for every line, or for the named lines only
+   *  (a line id when `goods` is read, a SKU otherwise). */
   purchasing?: boolean | ReadonlyArray<string>;
   /** The change requests read failed (the banner's own read). */
   amendment?: boolean;
@@ -409,6 +411,12 @@ export interface SalesOrderRouteInput {
    *  effective Revision; a cancelled line states its outcome and stops. */
   cancelledLines?: ReadonlyArray<{ sku: string; label?: string | null; qty: number; revision: number }>;
   allocation: SalesOrderAllocation;
+  /** ⭐ THE GOODS LINES, READ FROM THEIR OWNERS (owner ruling 2026-09-26) —
+   *  one entry per Sales Order line, arranged by `routeGoodsLinesOf` from
+   *  `po_line_sources`, the supplier's answers, the posted receipts and the
+   *  Units bound to the line. When present it OVERWRITES `allocation`,
+   *  `purchaseOrders` and `receivingRecords`, which pair by SKU. */
+  goods?: ReadonlyArray<RouteGoodsLine>;
   purchaseOrders: ReadonlyArray<RoutePurchaseOrder>;
   receivingRecords: ReadonlyArray<RouteReceivingRecord>;
   delivery: {
@@ -714,6 +722,9 @@ interface NodeDraft {
   blocked?: boolean;
   /** The owning read failed. Overrides every other state. */
   unreadable?: boolean;
+  /** Nothing is owed HERE today: the step waits on somebody else, so it is
+   *  neither ticked nor the position being worked. */
+  passive?: boolean;
   /** What a screen reader speaks, when it is not simply the lines. */
   spoken?: string[];
   lines: (string | null | undefined)[];
@@ -748,7 +759,7 @@ function sealChain(
   let headTaken = false;
   const nodes = drafts.map((draft) => {
     const failed = draft.unreadable === true;
-    const isHead = (failed || !draft.complete) && !headTaken;
+    const isHead = (failed || (!draft.complete && !draft.passive)) && !headTaken;
     if (isHead) headTaken = true;
     /* A failed read is not a position: it takes the chain's head so nothing
        after it is drawn as walked, and it never becomes CURRENT. */
@@ -804,6 +815,8 @@ function sealChain(
  * ──────────────────────────────────────────────────────────────────────────── */
 
 interface LineFacts {
+  /** The node id stem — the line's id when the owners are read, else its SKU. */
+  key: string;
   sku: string;
   label: string;
   committedQty: number;
@@ -921,7 +934,7 @@ function unassignedChain(
 ): NodeDraft[] {
   return [
     {
-      id: `${line.sku}:unassigned:purchasing`,
+      id: `${line.key}:unassigned:purchasing`,
       kind: "purchasing",
       title: "PURCHASING",
       complete: false,
@@ -937,14 +950,14 @@ function unassignedChain(
       door: open("Purchasing", purchasingHref),
     },
     {
-      id: `${line.sku}:unassigned:supplier`,
+      id: `${line.key}:unassigned:supplier`,
       kind: "supplier",
       title: "SUPPLIER",
       complete: false,
       lines: ["Supplier has not confirmed the ready date"],
     },
     {
-      id: `${line.sku}:unassigned:receiving`,
+      id: `${line.key}:unassigned:receiving`,
       kind: "receiving",
       title: "RECEIVING",
       complete: false,
@@ -972,13 +985,143 @@ function unreadableDrafts(
   }));
 }
 
-const purchasingUnreadable = (input: SalesOrderRouteInput, sku: string): boolean => {
+const purchasingUnreadable = (input: SalesOrderRouteInput, line: LineFacts): boolean => {
   const flag = input.unreadable?.purchasing;
   if (!flag) return false;
   if (flag === true) return true;
-  const key = skuKey(sku);
-  return flag.some((entry) => skuKey(entry) === key);
+  const key = skuKey(line.sku);
+  return flag.some((entry) => entry === line.key || skuKey(entry) === key);
 };
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The goods chain, read from its owners (owner ruling 2026-09-26).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const readyStockHref = (so: number) => `/operation?tab=purchase&so=${so}`;
+
+/** PURCHASING → SUPPLIER → RECEIVING for one Purchase Order of one line. */
+function goodsSourceChain(
+  line: LineFacts,
+  source: RouteGoodsSource,
+  destination: string | null,
+  customerDelivery: string | null,
+): NodeDraft[] {
+  const stem = `${line.key}:${source.poId}`;
+  const arrived = source.pendingQty === 0 && source.qty > 0;
+  const arrival = source.expectedArrival;
+  const grn = source.latestGrn;
+  return [
+    {
+      id: `${stem}:purchasing`,
+      kind: "purchasing",
+      title: "PURCHASING",
+      complete: true,
+      lines: [source.poId, dated("Issued", source.issuedAt)],
+      door: open(source.poId, poHref(source.poId)),
+    },
+    {
+      id: `${stem}:supplier`,
+      kind: "supplier",
+      title: "SUPPLIER",
+      /* The answer is `confirmed`, the arrival was confirmed for its day — or
+         the goods are in, which is the strongest confirmation there is. */
+      complete: source.confirmed || arrived,
+      /* Purchasing §5.8: no immediate reply is owed. Outside the day-before
+         check the step waits on the supplier, and nobody at Carres acts. */
+      passive: !source.dayBeforeCheckOpen,
+      lines: [
+        source.poDeliveryDate
+          ? dated("PO Delivery Date", source.poDeliveryDate)
+          : "Supplier has not confirmed the ready date",
+        arrival
+          ? `Expected arrival: ${arrival.date} · ${arrival.change === "delayed" ? ["Delayed", arrival.reason].filter(Boolean).join(" · ") : "Earlier"}`
+          : null,
+      ],
+      action: source.dayBeforeCheckOpen
+        ? {
+            ownerKey: "purchasing",
+            label: "Confirm ready date",
+            context: {
+              detail: `${source.poId} · ${units(source.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
+            },
+          }
+        : null,
+      door: source.confirmed || arrived ? open(source.poId, poHref(source.poId)) : null,
+    },
+    {
+      id: `${stem}:receiving`,
+      kind: "receiving",
+      title: "RECEIVING",
+      complete: arrived && Boolean(grn),
+      lines:
+        arrived && grn
+          ? [`${grn.number} · ${dated("Received", grn.receivedAt) ?? "Received"}`]
+          : source.receivedQty > 0 || grn
+            ? [
+                `Warehouse received ${source.receivedQty} of ${source.qty}`,
+                grn ? `Latest: ${grn.number} · ${dated("Received", grn.receivedAt) ?? "Received"}` : null,
+                source.damagedOrWrongQty > 0 ? `${source.damagedOrWrongQty} damaged or wrong` : null,
+              ]
+            : [`Warehouse received 0 of ${source.qty}`],
+      action: {
+        ownerKey: "receiving",
+        label: "Check in",
+        context: {
+          detail: `${source.poId} · ${units(source.pendingQty)} · ${destination ?? "Carres Warehouse"} · ${
+            dated(arrival ? "Expected arrival" : "PO Delivery Date", arrival?.date ?? source.poDeliveryDate) ??
+            requested(customerDelivery)
+          }`,
+        },
+      },
+      door: grn ? open(grn.number, receivingHref(grn.id)) : null,
+    },
+  ];
+}
+
+/** The STOCK truth of one line, from the Units bound to it. */
+function goodsStockDraft(
+  line: LineFacts,
+  goods: RouteGoodsLine,
+  input: SalesOrderRouteInput,
+  purchasingFailed: boolean,
+): NodeDraft {
+  const base = { id: `${line.key}:stock`, kind: "stock" as const, title: "STOCK" };
+  const whole = goods.readyQty >= goods.qty && goods.qty > 0;
+  if (whole) {
+    return {
+      ...base,
+      complete: true,
+      lines: [`Warehouse has ${units(goods.qty)} ready`, goods.unitCodes.join(" · ") || null],
+      door: open("Stock", stockHref),
+    };
+  }
+  const count = `Warehouse has ${goods.readyQty} of ${goods.qty} Units ready`;
+  /* WHY the Units are short is Purchasing's answer; when Purchasing could not
+     be read the count stands alone. */
+  const why = purchasingFailed
+    ? null
+    : goods.shortBecause === "not-ordered"
+      ? "Carres has not ordered the goods"
+      : "Warehouse has not received the goods";
+  if (goods.readyStockQty > 0 && !purchasingFailed) {
+    return {
+      ...base,
+      complete: false,
+      lines: [count, why],
+      action: {
+        ownerKey: "sales",
+        label: "Choose Ready Unit",
+        context: {
+          detail: `${units(goods.readyStockQty)} in Ready Stock · ${requested(input.order.deliveryDate)}`,
+        },
+      },
+      door: door("Open Ready Stock →", readyStockHref(input.order.so)),
+    };
+  }
+  /* No eligible Ready Stock: the wait belongs to Purchasing or Receiving, and
+     Stock owes no action. */
+  return { ...base, complete: false, passive: true, lines: [count, why], door: open("Stock", stockHref) };
+}
 
 /** The STOCK truth of one goods line — its own fork off the Sales Order. */
 function stockDraft(
@@ -994,7 +1137,7 @@ function stockDraft(
     /* The count is Stock's own fact and stays. WHY the Units are short is
        Purchasing's answer, and Purchasing could not be read. */
     return {
-      id: `${line.sku}:stock`,
+      id: `${line.key}:stock`,
       kind: "stock",
       title: "STOCK",
       complete: false,
@@ -1003,7 +1146,7 @@ function stockDraft(
     };
   }
   return {
-    id: `${line.sku}:stock`,
+    id: `${line.key}:stock`,
     kind: "stock",
     title: "STOCK",
     complete: allReady,
@@ -1589,7 +1732,21 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
   const laneScopes = scopes.length > 1 ? scopes : [];
   const soleScope = scopes.length === 1 ? scopes[0]! : null;
   const soNumber = `SO-${input.order.so}`;
-  const lines: LineFacts[] = input.allocation.lines.map((line) => ({
+  const goodsById = new Map((input.goods ?? []).map((line) => [line.lineId, line]));
+  const lines: LineFacts[] = input.goods
+    ? input.goods.map((line) => ({
+        key: line.lineId,
+        sku: line.sku,
+        label: line.label,
+        committedQty: line.qty,
+        reservedUnits: [],
+        soldUnits: [],
+        reservedQty: line.readyQty,
+        soldQty: 0,
+        outstandingQty: Math.max(0, line.qty - line.readyQty),
+      }))
+    : input.allocation.lines.map((line) => ({
+    key: line.sku,
     sku: line.sku,
     label: input.lineLabels?.[line.sku]?.trim() || line.sku,
     committedQty: line.committedQty,
@@ -1619,22 +1776,45 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
   for (const line of lines) {
     const destinations = input.lineDestinations?.[line.sku] ?? [];
     const destination = destinations.length === 1 ? destinations[0]!.name : null;
-    const purchasingFailed = purchasingUnreadable(input, line.sku);
+    const purchasingFailed = purchasingUnreadable(input, line);
+    const goods = goodsById.get(line.key) ?? null;
     const { slices, unassignedQty } = purchasingFailed
       ? { slices: [] as PurchaseSlice[], unassignedQty: 0 }
-      : purchaseSlices(line, input.purchaseOrders);
+      : goods
+        ? { slices: [] as PurchaseSlice[], unassignedQty: goods.uncoveredQty }
+        : purchaseSlices(line, input.purchaseOrders);
+
+    /* Short, and eligible Ready Stock exists: the fastest way to make the line
+       whole is a Unit already on the shelf, so STOCK is the position being
+       worked and takes CURRENT before the purchase chain can. */
+    const stockFirst = Boolean(goods && !purchasingFailed && goods.readyStockQty > 0 && goods.readyQty < goods.qty);
+    const sealStock = () =>
+      seal(
+        [
+          goods
+            ? goodsStockDraft(line, goods, input, purchasingFailed)
+            : stockDraft(line, destination, input.order.deliveryDate, purchasingFailed),
+        ],
+        "goods",
+      )[0]!;
+    const stockAhead = stockFirst ? sealStock() : null;
 
     const chains: RouteNode[][] = [];
     if (purchasingFailed && line.outstandingQty > 0) {
       chains.push(
         seal(
           unreadableDrafts("purchasing", [
-            { id: `${line.sku}:unreadable:purchasing`, kind: "purchasing", title: "PURCHASING" },
-            { id: `${line.sku}:unreadable:supplier`, kind: "supplier", title: "SUPPLIER" },
-            { id: `${line.sku}:unreadable:receiving`, kind: "receiving", title: "RECEIVING" },
+            { id: `${line.key}:unreadable:purchasing`, kind: "purchasing", title: "PURCHASING" },
+            { id: `${line.key}:unreadable:supplier`, kind: "supplier", title: "SUPPLIER" },
+            { id: `${line.key}:unreadable:receiving`, kind: "receiving", title: "RECEIVING" },
           ]),
           "goods",
         ),
+      );
+    }
+    for (const source of purchasingFailed ? [] : (goods?.sources ?? [])) {
+      chains.push(
+        seal(goodsSourceChain(line, source, destination, input.order.deliveryDate), "goods"),
       );
     }
     for (const slice of slices) {
@@ -1653,19 +1833,20 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
         ),
       );
     }
-    const stock = seal(
-      [stockDraft(line, destination, input.order.deliveryDate, purchasingFailed)],
-      "goods",
-    )[0]!;
+    const stock = stockAhead ?? sealStock();
 
     /* Owner ruling 2026-09-26: `on order` is covered by an issued PO, `to buy`
        is covered by none. `to buy from factory` said *buy* about goods already
        bought, and is retired. */
-    const onOrderQty = slices.reduce((sum, slice) => sum + slice.qty, 0);
+    const onOrderQty = goods
+      ? purchasingFailed
+        ? 0
+        : goods.onOrderQty
+      : slices.reduce((sum, slice) => sum + slice.qty, 0);
     const { nodes: plateNodes } = sealChain(
       [
         {
-          id: `${line.sku}:goods-line`,
+          id: `${line.key}:goods-line`,
           kind: "goods-line",
           title: line.label,
           complete: true,
@@ -2039,7 +2220,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
     if (lane.chains.length === 0) segment(plate, stock, []);
     /* A goods tail joins the gate of the trip that carries it; on a Journey
        every tail joins leg 1's gate. */
-    const line = lines.find((item) => `${item.sku}:stock` === stock.id);
+    const line = lines.find((item) => `${item.key}:stock` === stock.id);
     if (laned) segment(stock, deliveryLanes[line ? goodsLane(line) : 0]!.gate, [], false, true);
     else segment(stock, gate, []);
   }

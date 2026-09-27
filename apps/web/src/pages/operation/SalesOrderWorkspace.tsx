@@ -70,6 +70,7 @@ import {
   EMERGENCY_RELATIONSHIPS,
   LIFT_OPTIONS,
   lineClass,
+  lineKind,
   MAX_DELIVERY_FLOOR,
   maxLeadDaysFor,
   minDeliveryDateISO,
@@ -79,6 +80,7 @@ import {
   resolveFormTab,
   resolveSalesOrderRoute,
   routeDeliveryScopesOf,
+  routeGoodsLinesOf,
   salesOrderNumberWord,
   salesOrderParamOf,
   supplierClaimStatusLabel,
@@ -126,6 +128,7 @@ import {
   useSalesOrderAmendment,
   useSalesOrderRevisions,
   useSalesOrderExpansion,
+  useCollectionOwner,
   useLogisticsCardFacts,
   useSalesOrderRouteFacts,
   useSalesOrderIdByNumber,
@@ -2410,6 +2413,28 @@ function SalesOrderWorkspaceBody() {
         (goodsTruthQ.data?.lines ?? []).map((line) => [line.sku, line.deliverTo]),
       ),
       cancelledLines,
+      /* ⭐ THE GOODS CHAIN READS ITS OWNERS (owner ruling 2026-09-26): the
+         `po_line_sources` lineage, the supplier's newest evidenced answer, the
+         posted receipts and the Units bound to each line — arranged by the
+         shared `routeGoodsLinesOf`. A service line moves no Unit and draws no
+         goods lane. */
+      goods: facts.goods
+        ? routeGoodsLinesOf({
+            ...facts.goods,
+            todayIso: appTodayIso(),
+            holidays: myHolidaySet(),
+            lines: facts.goods.lines
+              .filter((line) => lineKind(line.sku) !== "service")
+              .map((line) => ({
+                ...line,
+                qty: Number(line.qty),
+                label:
+                  detail.lines.find((row) => row.id === line.id)?.label?.trim() ||
+                  detail.lines.find((row) => row.sku === line.sku)?.label?.trim() ||
+                  line.sku,
+              })),
+          })
+        : undefined,
       allocation: facts.allocation,
       purchaseOrders: detail.pos.map((po) => ({
         id: po.id,
@@ -2545,6 +2570,7 @@ function SalesOrderWorkspaceBody() {
       unreadable: {
         delivery: facts.failed.delivery,
         payments: facts.failed.payments,
+        purchasing: facts.failed.purchasing,
         amendment: amendmentQ.isError,
       },
       /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
@@ -2590,12 +2616,22 @@ function SalesOrderWorkspaceBody() {
   /* The Route hands out the action-engine line; the ROSTER names the person.
      One duty read, the same one the Team board and the PO chips use. */
   const dutyQ = useWorkspaceDuties();
+  const orderOwnerQ = useCollectionOwner(orderId ?? null, showRoute);
+  const routeOrderOwner = useMemo(() => {
+    const owner = orderOwnerQ.data?.owner ?? null;
+    const userId = owner?.acting_user_id ?? owner?.normal_user_id ?? null;
+    const name = owner?.acting_user_name ?? owner?.normal_user_name ?? null;
+    return userId && name ? { userId, name, email: "" } : null;
+  }, [orderOwnerQ.data]);
   const routeOwners = useMemo(
     () => ({
       purchasing: workspaceDutyActor(dutyQ.data, "po_duty"),
       receiving: workspaceDutyActor(dutyQ.data, "grn_duty"),
+      /* `Choose Ready Unit` is the Sales Order PIC's — the person acting for
+         the order today, cover included, from the one owner read. */
+      sales: routeOrderOwner,
     }),
-    [dutyQ.data],
+    [dutyQ.data, routeOrderOwner],
   );
 
   /* The real parties, with no placeholder — the attribution form supplies its

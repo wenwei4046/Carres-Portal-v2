@@ -318,7 +318,7 @@ import {
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema, type LogisticsCardFacts } from "@carres/shared";
+import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -5671,7 +5671,14 @@ export interface SalesOrderRouteFactsResponse {
    *  never blanks the map. Only the owners whose failure words are registered
    *  in COPY-STANDARD fail soft; any other failed read still fails the route
    *  whole, because drawing nothing as if nothing existed is the lie. */
-  failed: { delivery: boolean; payments: boolean };
+  failed: { delivery: boolean; payments: boolean; purchasing: boolean };
+  /** ⭐ A3 — the goods records of this order (owner ruling 2026-09-26): its
+   *  lines, the `po_line_sources` lineage, the Purchase Orders with their
+   *  answers, the receipts, the bound Units and Stock's Ready Stock count.
+   *  Null only when the read itself failed. */
+  goods: (Omit<RouteGoodsFacts, "todayIso" | "holidays" | "lines"> & {
+    lines: Array<{ id: string; sku: string; qty: number }>;
+  }) | null;
   /** ⭐ A2 — Delivery's OWN records for this order (owner ruling 2026-09-26):
    *  every leg's arrangement, every Delivery Order with its attempts and
    *  handover facts. Null only when Delivery could not be read. */
@@ -5682,6 +5689,10 @@ export interface SalesOrderRouteFactsResponse {
     handoverEvents: DeliveryHandoverKindRow[];
   } | null;
 }
+
+type SalesOrderRouteGoodsPayload = NonNullable<SalesOrderRouteFactsResponse["goods"]> & {
+  failed: { purchasing: boolean };
+};
 
 /** One loan-offer record as the API returns it, with the offered Unit's ID. */
 export type LoanOfferView = LoanOfferRow & { unit_id: string | null };
@@ -5709,7 +5720,7 @@ export function useSalesOrderRouteFacts(
         );
       const [
         allocation, loans, refunds, cases, claims, loanOffers, receiving,
-        booking, attempts, financeExceptions, paymentApprovals, arrangements, documents,
+        booking, attempts, financeExceptions, paymentApprovals, arrangements, documents, goods,
       ] = await Promise.all([
         apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
         apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
@@ -5735,6 +5746,8 @@ export function useSalesOrderRouteFacts(
         // A2 — Delivery's own records, narrowed to this order by the door itself.
         soft(apiFetch<DeliveryArrangementsPayload>(`/api/operation/delivery-arrangements?order=${id}`)),
         soft(apiFetch<DeliveryOrdersRegisterPayload>(`/api/operation/delivery-orders?order=${id}`)),
+        // A3 — Purchasing's, Receiving's and Stock's records, one read.
+        soft(apiFetch<SalesOrderRouteGoodsPayload>(`/api/operation/orders/${id}/route-goods`)),
       ]);
       const deliveryFailed = !booking.ok || !attempts.ok || !arrangements.ok || !documents.ok;
       const paymentsFailed = !financeExceptions.ok || !paymentApprovals.ok;
@@ -5750,7 +5763,12 @@ export function useSalesOrderRouteFacts(
         financeExceptions: financeExceptions.ok && !paymentsFailed ? financeExceptions.value : [],
         paymentApprovals: paymentApprovals.ok && !paymentsFailed ? paymentApprovals.value : [],
         loanOffers: loanOffers.offers,
-        failed: { delivery: deliveryFailed, payments: paymentsFailed },
+        failed: {
+          delivery: deliveryFailed,
+          payments: paymentsFailed,
+          purchasing: !goods.ok || goods.value.failed.purchasing,
+        },
+        goods: goods.ok ? goods.value : null,
         delivery:
           !deliveryFailed && arrangements.ok && documents.ok
             ? {

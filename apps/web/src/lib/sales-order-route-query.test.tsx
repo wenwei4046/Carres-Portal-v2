@@ -23,6 +23,18 @@ beforeEach(() => {
     if (url.endsWith("/allocation")) return Promise.resolve({ allocation: { lines: [] } });
     if (url.endsWith("/booking-brief")) return Promise.resolve({ brief: { appointment: null } });
     if (url.endsWith("/delivery-attempts")) return Promise.resolve({ attempts: [] });
+    /* A3 — the goods records, one read. */
+    if (url === "/api/operation/orders/order-1/route-goods") {
+      return Promise.resolve({
+        lines: [{ id: "L1", sku: "B1201S", qty: 1 }],
+        sources: [],
+        purchaseOrders: [],
+        receipts: [],
+        units: [],
+        readyStock: {},
+        failed: { purchasing: false },
+      });
+    }
     /* A2 — Delivery's own records for this order. */
     if (url === "/api/operation/delivery-arrangements?order=order-1") {
       return Promise.resolve({ arrangements: [{ order_id: "order-1", leg: 1, partner_name: "NETS" }], contacts: [] });
@@ -93,7 +105,7 @@ describe("useSalesOrderRouteFacts", () => {
     );
     const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, ["PO-1"]), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.failed).toEqual({ delivery: true, payments: false });
+    expect(result.current.data?.failed).toEqual({ delivery: true, payments: false, purchasing: false });
     expect(result.current.data?.brief).toBeNull();
     expect(result.current.data?.receiving.map((row) => row.id)).toEqual(["r1"]);
   });
@@ -105,7 +117,7 @@ describe("useSalesOrderRouteFacts", () => {
     );
     const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.failed).toEqual({ delivery: false, payments: true });
+    expect(result.current.data?.failed).toEqual({ delivery: false, payments: true, purchasing: false });
     expect(result.current.data?.financeExceptions).toEqual([]);
   });
 
@@ -151,5 +163,38 @@ describe("useSalesOrderRouteFacts", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.failed.delivery).toBe(true);
     expect(result.current.data?.delivery).toBeNull();
+  });
+
+  /* ⭐ A3 — the GOODS chain reads its owners (owner ruling 2026-09-26). */
+  it("reads the goods records in one read", async () => {
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.goods?.lines).toEqual([{ id: "L1", sku: "B1201S", qty: 1 }]);
+    expect(result.current.data?.failed.purchasing).toBe(false);
+  });
+
+  it("a failed goods read is Purchasing unreadable, and the rest of the route still answers", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.endsWith("/route-goods") ? Promise.reject(new Error("boom")) : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.goods).toBeNull();
+    expect(result.current.data?.failed.purchasing).toBe(true);
+    expect(result.current.data?.failed.delivery).toBe(false);
+  });
+
+  it("the door's own report that Purchasing could not be read is carried through", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string) =>
+      url.endsWith("/route-goods")
+        ? Promise.resolve({ lines: [], sources: [], purchaseOrders: [], receipts: [], units: [], readyStock: {}, failed: { purchasing: true } })
+        : base(url),
+    );
+    const { result } = renderHook(() => useSalesOrderRouteFacts("order-1", true, []), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.failed.purchasing).toBe(true);
+    expect(result.current.data?.goods).not.toBeNull();
   });
 });

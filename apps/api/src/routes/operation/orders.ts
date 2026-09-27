@@ -41,7 +41,9 @@ import {
   classifySalesOrderChange,
   SALES_ORDER_EDIT_HEADER_KEYS,
   type SalesOrderChangeSide,
+  stockMatchKey,
 } from "@carres/shared";
+import { readFreeStock } from "../../lib/purchase-demand-read";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { loadBookingContext } from "../../lib/booking-context";
@@ -1336,6 +1338,101 @@ operationOrdersRouter.get("/:id/allocation", requireOperation, async (c) => {
 // `holder_party_id` is NULL on every Unit today (measured 2026-08-21), so
 // `holderName` comes back null and the screen prints its governed absence. That
 // is an honest fact about a door nobody has built yet, never a missing one.
+/**
+ * ⭐ THE ORDER ROUTE'S GOODS RECORDS — owner ruling 2026-09-26 (Orders MASTER
+ * § THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK).
+ *
+ * One read for one order: its lines, the `po_line_sources` lineage, the
+ * Purchase Orders that lineage names with their lines, supplier answers and
+ * arrival confirmations, the receipts of those Purchase Orders, the Units
+ * reserved to or sold against the order, and Stock's count of eligible Ready
+ * Stock. It ARRANGES nothing and judges nothing — `routeGoodsLinesOf`
+ * (packages/shared) does, in the browser, with the owners' own functions.
+ *
+ * A failed Purchasing read does not fail the route: the lines and their Units
+ * still answer and `failed.purchasing` says what could not be read, so the
+ * Route can print `Could not read Purchasing` instead of `Carres has not
+ * issued a Purchase Order`.
+ */
+operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [{ data: order, error: orderErr }, { data: lines, error: linesErr }] = await Promise.all([
+    sb.from("orders").select("so").eq("id", id).maybeSingle(),
+    sb.from("order_lines").select("id, sku, qty").eq("order_id", id),
+  ]);
+  const ownError = orderErr ?? linesErr;
+  if (ownError) { const m = mapPgError(ownError); return c.json(m.body, m.status); }
+  if (!order) return c.json({ error: "Order not found" }, 404);
+
+  const { data: units, error: unitsErr } = await sb
+    .from("ops_stock_items")
+    .select("unit_code, status, reserved_order_line_id, sku")
+    .or(`and(status.eq.reserved,reserved_ref.eq.SO-${(order as { so: number }).so}),and(status.eq.sold,sold_order_id.eq.${id})`);
+  if (unitsErr) { const m = mapPgError(unitsErr); return c.json(m.body, m.status); }
+
+  /* ── Purchasing and Receiving: soft as ONE owner ───────────────────────── */
+  const purchasing = await (async () => {
+    const sources = await sb.from("po_line_sources")
+      .select("order_line_id, po_id, po_line_id, qty").eq("order_id", id).order("created_at", { ascending: true });
+    if (sources.error) return null;
+    const sourceRows = (sources.data ?? []) as Array<{ po_id: string }>;
+    const poIds = [...new Set(sourceRows.map((row) => row.po_id).filter(Boolean))];
+    if (poIds.length === 0) return { sources: [], purchaseOrders: [], receipts: [] };
+    const [pos, poLines, promises, confirmations, receipts] = await Promise.all([
+      sb.from("purchase_orders")
+        .select("id, status, supplier_id, destination_id, placed_at, official_delivery_date, eta_date, version").in("id", poIds),
+      sb.from("purchase_order_lines")
+        .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty").in("po_id", poIds),
+      sb.from("po_supplier_promises")
+        .select("id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by, answer_group")
+        .in("po_id", poIds).order("recorded_at", { ascending: false }),
+      sb.from("po_arrival_confirmations")
+        .select("po_id, po_version, for_date, destination_id").in("po_id", poIds),
+      sb.from("warehouse_receipts")
+        .select("id, po_id, grn_no, goods_received_at, status, lines").in("po_id", poIds),
+    ]);
+    if (pos.error || poLines.error || promises.error || confirmations.error || receipts.error) return null;
+    const ofPo = <T extends { po_id?: unknown }>(list: T[] | null, poId: string) =>
+      (list ?? []).filter((row) => row.po_id === poId);
+    return {
+      sources: sources.data ?? [],
+      purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string }>).map((po) => ({
+        ...po,
+        lines: ofPo(poLines.data as Array<Record<string, unknown>>, po.id).map(({ po_id: _po, ...line }) => line),
+        promises: ofPo(promises.data as Array<Record<string, unknown>>, po.id),
+        arrival_confirmations: ofPo(confirmations.data as Array<Record<string, unknown>>, po.id),
+      })),
+      receipts: ((receipts.data ?? []) as Array<Record<string, unknown>>).map(({ lines: counted, ...receipt }) => ({
+        ...receipt,
+        goods_received_at: typeof receipt.goods_received_at === "string" ? receipt.goods_received_at.slice(0, 10) : null,
+        line_ids: Array.isArray(counted)
+          ? (counted as Array<{ id?: unknown }>).map((line) => line.id).filter((v): v is string => typeof v === "string")
+          : [],
+      })),
+    };
+  })();
+
+  /* ── Stock's own count of eligible Ready Stock: exact Units, by its match ─ */
+  const readyStock: Record<string, number> = {};
+  const free = await readFreeStock(sb);
+  for (const line of (lines ?? []) as Array<{ sku: string }>) {
+    const eligible = (free.freeUnitsByKey.get(stockMatchKey(line.sku)) ?? [])
+      .filter((unit) => unit.identityScope === "unit").length;
+    if (eligible > 0) readyStock[line.sku] = eligible;
+  }
+
+  return c.json({
+    lines: lines ?? [],
+    sources: purchasing?.sources ?? [],
+    purchaseOrders: purchasing?.purchaseOrders ?? [],
+    receipts: purchasing?.receipts ?? [],
+    units: units ?? [],
+    readyStock,
+    failed: { purchasing: purchasing === null },
+  });
+});
+
 operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);

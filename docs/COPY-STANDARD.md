@@ -2673,6 +2673,10 @@ ruling OVERWRITES every earlier spelling of the rows below, wherever this sectio
 | DELIVERY PHOTO, none | **`Logistics has not uploaded the delivery photo`** | `No delivery photo yet` |
 | PAYMENT, owing | **`Hold delivery`** over **`Customer has not paid RM {amount}`** over **`Customer must pay by {weekday, date}`** | `RM {amount} unpaid · by {date}` |
 | PAYMENT, paid | **`Customer paid in full`** | `Paid` |
+| RECEIVING, counting (BUILT 2026-09-28) | **`Warehouse received {n} of {m}`** · **`Latest: {GRN No} · Received: {date}`** · **`{k} damaged or wrong`** (only when k > 0) · complete **`{GRN No} · Received: {date}`** | `{n} of {m} received` · `Not received yet` |
+| STOCK (BUILT 2026-09-28) | **`Warehouse has {n} of {m} Units ready`** over **`Carres has not ordered the goods`** (no Purchase Order covers it) or **`Warehouse has not received the goods`** (issued, not received) · whole **`Warehouse has {n} Units ready`** over the Unit IDs | `{n} of {m} Units ready` · `Waiting for purchase` · `Waiting for receiving` |
+| STOCK action, only when eligible Ready Stock exists | **`Choose Ready Unit`** · context **`{n} Units in Ready Stock`** · door **`Open Ready Stock →`** | `Create the Units` |
+| SUPPLIER dates (BUILT 2026-09-28) | **`PO Delivery Date: {date}`** · **`Expected arrival: {date} · Delayed · {governed reason}`** · **`Expected arrival: {date} · Earlier`** | `Estimated ready: {date}` |
 | Gate, goods | **`Warehouse has {n} of {m} Units ready`** · met **`Warehouse has {n} Units ready`** · scoped **`Warehouse has {n} Units ready for this delivery · {m} Units still open`** · **`Customer ordered no goods`** | `Goods not ready ({n} of {m})` · `Goods ready ({n} Units)` · `No goods on this order` |
 | Gate, scheduled day | **`Logistics scheduled the delivery`** · **`Logistics has not scheduled the delivery`** | `Scheduled delivery recorded` · `Scheduled delivery not recorded` |
 | Gate, money | **`Customer has not paid RM {amount}`** · met **`Customer paid in full`** | `Hold delivery · RM {amount} unpaid` · `Paid` |
