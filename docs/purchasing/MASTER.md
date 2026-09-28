@@ -1270,6 +1270,19 @@ The user-facing gate uses two lines:
   move custody. Exact-Unit scan/count, actual collector, time and handover proof create the Stock
   consequence. Partial collection leaves the remaining Units open.
 
+### 7.4a Who owns what is on display — owner facts, Jess 2026-09-28
+
+- **Showrooms are Carres's own.** PJ showroom today; a 2nd and 3rd Carres-run showroom are coming.
+  Each must be a governed Stock Site (Stock §12.9) before display Units can be placed or repaired
+  there.
+- **Hookka and Ohana display goods are BOUGHT by Carres** (Manual Purchase / PO) — §7.5.
+- **Every other supplier places its display goods in Carres showrooms on consignment** — the
+  goods stay the supplier's until sold — §7.6. Consignment is live business today (production holds one PO flagged `is_consignment`, measured
+  by the Warehouse chat 2026-09-28): the four Showroom documents are needed, not deferred.
+- **A dealer (e.g. Big Mattress) BUYS from Carres.** Its price is fixed by Sales Development, not
+  Operation. A dealer's display is the dealer's own purchase — a Sales matter, never a Purchasing
+  consignment or a Carres display.
+
 ### 7.5 Purchased showroom display
 
 Hooka/Ohana display goods are Carres purchases, not consignment. A Display Request resolves to Manual
@@ -4071,7 +4084,7 @@ windows remain visible and require a decision; they never auto-reject the custom
 | The supplier claim is not issued | Share the claim with Hooka and record the actual message sent | PO Duty; exact request version/recipient/channel/time/proof |
 | Hooka has not replied | Ask Hooka to confirm the claim result | PO Duty; actual evidenced answer for this request/scope |
 | The supplier refused the claim | Decide how Carres will resolve the item problem | Relevant approver; scoped authorised remedy/cost decision |
-| The repair return date has passed | Ask Hooka when the same Unit will return | PO Duty; evidenced new date or authorised changed outcome |
+| The repair return date has passed | Ask Hooka when the same Unit will return | PO Duty; the Unit received back (GRN) or an authorised changed outcome — a new supplier date is recorded but never closes the action (§9.7, 2026-09-28) |
 | One Unit is still waiting for collection | Ask Hooka to confirm collection of the remaining Unit | PO Duty; exact quantity/date agreement; handover itself stays Warehouse work |
 | The returned Unit has not been checked | Check the Unit and record its condition | Stock/inspection duty; accepted inspection result |
 | Supplier credit evidence is missing | Ask Hooka for the credit note for this claim | PO Duty; external document received; Finance acceptance is a separate action |
@@ -5011,6 +5024,76 @@ remaining quantities and dates visible. Failed repair, new damage, refusal, canc
 to repair needs its owning authorised outcome. Closure does not erase stock obligations or restore
 availability. A supplier saying the work is finished is not receipt or inspection evidence.
 
+#### RO object page — owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.
+
+References mined: Odoo Repairs (progress header Draft → Confirmed → Under Repair → Repaired; a
+per-line warranty/cost flag), SAP S/4 repair order (return, repair and inspection as separate
+steps) and Carres's own PO object page (§9.3, owner-approved 2026-09-25). Kept: the route header
+and per-Unit inspection. Rejected: Odoo's parts/quotation table (price is never a column or gate,
+2026-09-19 ruling).
+
+```text
+Repair Orders / {RO No}                                   [Open PDF]
+{document state} · {Supplier}
+ROUTE  Issue ── Supplier received RO ── Picked up ── Returned ── Inspected
+       Carres return target: {date} | Awaiting Supplier receipt of RO
+CURRENT ACTION   line one · line two · ONE primary button
+Repair order     Supplier · Supplier Claim No · Cost Responsibility ·
+                 Supplier Pickup Location · Supplier Return Location · Price
+Goods            PO No / Unit ID · Items · Problem · Evidence   (one row per Unit)
+Supplier reply   [Record Supplier reply] · Supplier date not reported | Supplier Expected Return Date
+Owner consent    only for non-Carres-owned Units · [Record owner consent]
+History          Today · Yesterday · Earlier
+```
+
+Shared `Block` + `Fact` card grammar (§8.2, ONE KIT LAW); full-width; only Issue/revision uses the
+governed 50/50 preview. The CURRENT ACTION block walks the route, one primary button at a time:
+
+| Stop | Line one | Line two | Door |
+|---|---|---|---|
+| Not issued | `Send {RO No} to {Supplier}` | `The 14 working days start when {Supplier} receives it.` | `Issue repair order` |
+| Issued, receipt not recorded | `Ask {Supplier} to confirm they received {RO No}` | `Target starts when they confirm.` | `Record Supplier receipt` |
+| Waiting for pickup | `Hand {n} Units to {Supplier}` | `Warehouse records who collected them.` | opens Outbound |
+| Out for repair | `Waiting for {Supplier} to return {n} Units` | `Carres return target {date}` | `Record Supplier reply` |
+| Returned, not inspected | `Inspect {n} returned Units` | `Available again only after inspection.` | opens Receiving |
+
+Workspace path: each stop is the same fact projected as a Work card for the RO follow-up Duty;
+the card opens this page; completion is the owning fact (evidenced Supplier receipt, Outbound
+handover, Receiving GRN, recorded inspection) — never a manual tick and never a Supplier reply.
+The photo/video viewer is still a kit request (UI MASTER §6.8) and must join the kit first.
+
+#### Create Repair Order — owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.
+
+References mined: Shopify Returns (select items → reason per item → confirm), Odoo Repairs (pick the
+serial-tracked product, then supplier and who pays) and Carres's own Warehouse `Report a problem`
+(shipped: `What did you see?` choice grid, photo, one sentence). Kept: per-Unit reason after
+selection, and the SAME problem choices as `unitProblemChoices` (`Damaged` · `Missing component` ·
+`Something else`) — no second vocabulary. Rejected: Odoo's parts/quotation table.
+
+```text
+Create Repair Order                                   [Cancel] [Save repair order]
+1 Goods      Choose where the goods are now: Carres Klang | Showroom | Dealer
+             [Add Units] → Tick the Unit ID on each item to send for repair
+             per Unit: What did you see? · Photo · What happened, in one sentence ·
+                       Repair Requirement
+2 Repair     Supplier · Cost Responsibility (Not decided | Carres pays | Supplier pays) ·
+             Price (optional) · Repair Quotation (optional file)
+3 Locations  Supplier Pickup Location (from the Unit) · Supplier Return Location
+```
+
+- Only real Units are selectable. A reserved, sold, held, out or already-in-repair Unit cannot be
+  ticked and says why on the row (`Reserved for {SO No}` · `Already on {RO No}` · the Stock word).
+- A Claim-origin RO arrives with Units, problem and evidence prefilled by reference; nothing is
+  re-entered or re-uploaded.
+- `RO Doc Date` is set by the system. `Save repair order` mints `RO No` (the commission owns the
+  number; the return leg references it — §9.7 conflict 1) and opens the RO object page, where
+  `Issue repair order` sends it.
+- Missing price saves and issues; it prints `Not recorded`, never RM0.
+- PJ Showroom is already a governed Site (`warehouses` kind own, measured 2026-09-28), so Showroom
+  selection opens now. A Dealer is not a Carres Site (§7.4a: dealers buy their display), so
+  `Dealer` is drawn disabled with `Not available yet`; moving a display Unit out still waits for
+  Stock's `Transfer` form (Stock §12.9).
+
 #### Register, detail and shared UI
 
 **OWNER-CONFIRMED REGISTER UI — Jess, 2026-09-20. APPROVED TARGET / NOT BUILT.** This closes the
@@ -5353,7 +5436,7 @@ invoice/settlement.
 | Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
-| Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |
+| Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | The Units are received back (GRN) or an authorised outcome closes the repair; a Supplier reply or date never closes it (§9.7, corrected 2026-09-28) |
 | Consignment Unit sold | Current PO Duty | `Issue the sale notice to Dorsettloft` | Current notice version sent |
 | Supplier invoice missing | Finance/AP Duty | `Ask Dorsettloft to send the invoice` | Supplier invoice fact exists |
 
