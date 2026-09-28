@@ -134,7 +134,7 @@ export function SupplierOffersStrip({
                     : `RM ${o.price.toFixed(2)}`}
               </span>
               <span className="text-base-500">
-                {o.pwpPrice == null ? "PWP —" : `PWP RM ${o.pwpPrice.toFixed(2)}`}
+                {o.pwpPrice == null ? "No PWP price" : `PWP RM ${o.pwpPrice.toFixed(2)}`}
               </span>
               {isPrincipal && (
                 <button

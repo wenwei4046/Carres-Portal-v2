@@ -60,7 +60,7 @@ export default function FabricTierDeltasCard({
       <p className="text-meta text-base-500 mb-3">
         Global RM premium added to the base sofa price for P2 (mid) and P3 (premium) fabrics.
         P1 fabrics always carry zero delta. Per-model overrides in the Modular tab take precedence.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
       <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-5 items-end">
         <label className="block">

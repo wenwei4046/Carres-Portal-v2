@@ -235,7 +235,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
         {overflow > 0 && (
           <span className="text-base-400">
             {" "}
-            · showing first {VISIBLE_CAP} — refine the search or category to see the rest
+            · showing first {VISIBLE_CAP}. Refine the search or category to see the rest
           </span>
         )}
         <span className="text-base-400">
@@ -577,7 +577,7 @@ const CostRowView = memo(function CostRowView({
         ) : (
           <span
             className={`t-num text-meta ${margin.amount < 0 ? "text-danger" : "text-base-600"}`}
-            title={category === "sofa" ? "Base margin — the sofa fabric surcharge is not counted" : undefined}
+            title={category === "sofa" ? "Base margin: the sofa fabric surcharge is not counted" : undefined}
           >
             {Math.round(margin.pct * 100)}%
           </span>

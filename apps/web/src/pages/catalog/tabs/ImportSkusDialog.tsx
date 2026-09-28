@@ -200,7 +200,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
 
           {skipped.length > 0 && (
             <details className="text-meta text-base-600">
-              <summary className="cursor-pointer text-amber-700">{skipped.length} skipped row(s) — why</summary>
+              <summary className="cursor-pointer text-amber-700">{skipped.length} skipped row(s): why</summary>
               <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
                 {skipped.slice(0, 50).map((s) => (
                   <li key={s.line}>
