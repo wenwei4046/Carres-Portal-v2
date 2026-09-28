@@ -5,6 +5,9 @@ import {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoOfferSentence,
+  soBatchPoReservedSentences,
+  soBatchLineReservedWhy,
   soBatchPoDocumentState,
   soBatchToBuyState,
   soBatchRailFacts,
@@ -1336,5 +1339,28 @@ describe("soBatchOrderSafetyDays — the tightest measured margin, or a stated a
     expect(soBatchOrderPlanning(o, leaves).group).toBe("to-buy");
     expect(soBatchOrderStatusWord(soBatchOrderPlanning(o, leaves).group)).toBe("Need PO");
     expect(soBatchOrderSafetyDays(o, leaves).kind).toBe("days");
+  });
+});
+
+/* ⭐ RESERVE GOODS ALREADY ON A PO — owner ruling 2026-09-28 (Purchasing §9.1). */
+describe("goods reserved on a PO", () => {
+  const line = {
+    orderLineId: "l1", sku: "FEN-K", qty: 2, stockTaken: 0, item: "Ohana Fenrir",
+    variant: "King", category: null, pos: [],
+  };
+
+  it("a Unit reserved on a PO covers the line exactly like Ready Stock (one arithmetic)", () => {
+    expect(soBatchOrderLineOutstandingQty(line)).toBe(2);
+    expect(soBatchOrderLineOutstandingQty({ ...line, poReserved: [{ poId: "PO1", qty: 1 }] })).toBe(1);
+    expect(soBatchOrderLineOutstandingQty({ ...line, stockTaken: 1, poReserved: [{ poId: "PO1", qty: 1 }] })).toBe(0);
+  });
+
+  it("speaks the COPY sentences with the real PO number, count and goods", () => {
+    expect(soBatchPoOfferSentence(line, { poId: "PO260924-4827", qty: 3 }))
+      .toBe("PO260924-4827 has 3 Ohana Fenrir King available.");
+    expect(soBatchPoReservedSentences({ ...line, poReserved: [{ poId: "PO260924-4827", qty: 1 }] }))
+      .toEqual(["1 Ohana Fenrir King on PO260924-4827 is reserved for this order."]);
+    expect(soBatchLineReservedWhy(line)).toBeNull();
+    expect(W.statusUseThisPo).toBe("Use this PO");
   });
 });

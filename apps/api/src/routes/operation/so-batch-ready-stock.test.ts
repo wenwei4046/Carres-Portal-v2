@@ -513,3 +513,78 @@ describe("POST …/ready-stock/save", () => {
     expect(c.rpcCalls).toHaveLength(0);
   });
 });
+
+/**
+ * ⭐ `Use this PO` — owner ruling 2026-09-28 (Purchasing §9.1). The browser
+ * names the item line and the PO; the door (0600 `so_batch_use_po_units`)
+ * picks the incoming Unit IDs and re-derives every quantity.
+ */
+describe("POST …/ready-stock/use-po", () => {
+  async function usePo(body: unknown, tables = fixture(), role = "operation") {
+    const c = client(tables);
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/demands/ready-stock/use-po", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt(role)}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    return { res, c };
+  }
+
+  it("hands the ONE door the order's own reference, the line and the PO", async () => {
+    const { res, c } = await usePo({ orderId: ORDER, orderLineId: LINE_KING, poId: "PO260924-4827" });
+    expect(res.status).toBe(200);
+    expect(c.rpcCalls.map((r) => r.fn)).toEqual(["so_batch_use_po_units"]);
+    expect(c.rpcCalls[0]!.args).toMatchObject({
+      p_ref: "SO-1251",
+      p_reason: "used_instead_of_ordering",
+      p_order_id: ORDER,
+      p_line: LINE_KING,
+      p_po_id: "PO260924-4827",
+    });
+  });
+
+  it("passes the door's own refusal word through", async () => {
+    const c = client(fixture());
+    c.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "po_has_no_free_units", details: "that purchase order has no goods for this line that no order holds" },
+    } as never);
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/demands/ready-stock/use-po", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "content-type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER, orderLineId: LINE_KING, poId: "PO260924-4827" }),
+      }),
+      env,
+    );
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(res.status).toBe(422);
+    expect(body.code).toBe("po_has_no_free_units");
+  });
+
+  it("refuses a body that names no PO, and an order with no customer number", async () => {
+    const noPo = await usePo({ orderId: ORDER, orderLineId: LINE_KING });
+    expect(noPo.res.status).toBe(400);
+    expect(noPo.c.rpcCalls).toHaveLength(0);
+    const noSo = await usePo(
+      { orderId: ORDER, orderLineId: LINE_KING, poId: "PO260924-4827" },
+      fixture({ orders: { data: [{ id: ORDER, so: null }], error: null } }),
+    );
+    expect(noSo.res.status).toBe(422);
+    expect(noSo.c.rpcCalls).toHaveLength(0);
+  });
+
+  it("refuses a caller who is not Operation", async () => {
+    const { res, c } = await usePo({ orderId: ORDER, orderLineId: LINE_KING, poId: "PO260924-4827" }, fixture(), "sales");
+    expect(res.status).toBe(401);
+    expect(c.rpcCalls).toHaveLength(0);
+  });
+});

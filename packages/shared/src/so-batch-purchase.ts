@@ -159,6 +159,8 @@ export const SO_BATCH_PURCHASE_WORDS = {
    */
   statusFixInCatalog: "Fix in Catalog",
   statusOpenSettings: "Open Settings",
+  /** RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28) — the door. */
+  statusUseThisPo: "Use this PO",
 
   /**
    * The deterministic compact summaries a parent cell prints when one Sales
@@ -456,9 +458,12 @@ export function soBatchOrderSupplierNames(o: SoBatchOrderRow): (string | null)[]
  * particular Sales Order was ordered when no `po_line_sources` row says so.
  */
 export function soBatchOrderLineOutstandingQty(
-  line: Pick<SoBatchOrderLineFact, "qty" | "stockTaken" | "pos">,
+  line: Pick<SoBatchOrderLineFact, "qty" | "stockTaken" | "pos" | "poReserved">,
 ): number {
-  const required = Math.max(0, line.qty - line.stockTaken);
+  /* 0600 — Unit IDs reserved on a PO by `Use this PO` cover the line exactly
+     like Ready Stock (the SQL twin is `so_line_remaining_requirement`). */
+  const onPoReserved = (line.poReserved ?? []).reduce((sum, r) => sum + Math.max(0, r.qty), 0);
+  const required = Math.max(0, line.qty - line.stockTaken - onPoReserved);
   const linked = line.pos.reduce((sum, po) => sum + Math.max(0, po.qty), 0);
   return Math.max(0, required - linked);
 }
@@ -770,6 +775,21 @@ export interface SoBatchOrderLineFact {
     * `poLineId` is optional so an older Worker's payload still parses.
     */
   pos: Array<{ poId: string; poLineId?: string | null; qty: number; destinationId?: string | null }>;
+  /**
+   * ⭐ RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28, §9.1). Unit IDs
+   * still `incoming` on an open PO that `Use this PO` bound to THIS item line,
+   * per PO. They cover the line exactly like Ready Stock (0600
+   * `so_line_remaining_requirement`). Optional so an older Worker parses.
+   */
+  poReserved?: Array<{ poId: string; qty: number }>;
+  /**
+   * The open PO whose incoming Unit IDs no order holds for these goods
+   * (0600 `purchasing_po_free_units`) — the `Use this PO` offer. `null` or
+   * absent: none.
+   */
+  poOffer?: { poId: string; qty: number } | null;
+  /** TRUE when the free PO balance could not be read: never a number. */
+  poOfferUnread?: boolean;
 }
 
 /** One right-Register row: one proceeded physical-goods Sales Order. */
@@ -833,6 +853,9 @@ export const soBatchOrderRowSchema = z.object({
           destinationId: z.string().nullable().optional(),
         }),
       ),
+      poReserved: z.array(z.object({ poId: z.string(), qty: z.number() })).optional(),
+      poOffer: z.object({ poId: z.string(), qty: z.number() }).nullable().optional(),
+      poOfferUnread: z.boolean().optional(),
     }),
   ),
   outstandingSuppliers: z.array(z.string()),
@@ -1720,7 +1743,7 @@ export function compareSoBatchPlanning(
  * Purchasing Settings owns production days and collection
  * (`PURCHASE_DEMAND_OWNER_DUTY`).
  */
-export type SoBatchStatusDoor = "catalog" | "settings";
+export type SoBatchStatusDoor = "catalog" | "settings" | "use_po";
 
 export const SO_BATCH_STATUS_DOOR: Partial<Record<PurchaseDemandState, SoBatchStatusDoor>> = {
   no_sku: "catalog",
@@ -1730,7 +1753,16 @@ export const SO_BATCH_STATUS_DOOR: Partial<Record<PurchaseDemandState, SoBatchSt
   no_pickup_partner: "settings",
 };
 
-export type SoBatchStatusWhy = { text: string; door: SoBatchStatusDoor | null };
+/**
+ * `usePo` names the exact act `Use this PO` performs — which item line, which
+ * purchase order — so the button never has to guess. Present only with the
+ * `use_po` door.
+ */
+export type SoBatchStatusWhy = {
+  text: string;
+  door: SoBatchStatusDoor | null;
+  usePo?: { orderLineId: string; poId: string };
+};
 
 /** Catalog first: an unknown SKU or supplier makes every later setting moot. */
 function doorOf(states: readonly PurchaseDemandState[]): SoBatchStatusDoor | null {
@@ -1740,33 +1772,102 @@ function doorOf(states: readonly PurchaseDemandState[]): SoBatchStatusDoor | nul
   return null;
 }
 
+/** The goods' words in the sentence: `Ohana Fenrir King`. */
+function goodsWordsOf(line: Pick<SoBatchOrderLineFact, "item" | "variant">): string {
+  return [line.item, line.variant].filter((w): w is string => Boolean(w)).join(" ");
+}
+
+/** `{PO No} has {n} {Item} available.` — COPY-STANDARD, owner ruling 2026-09-28. */
+export function soBatchPoOfferSentence(
+  line: Pick<SoBatchOrderLineFact, "item" | "variant">,
+  offer: { poId: string; qty: number },
+): string {
+  return `${offer.poId} has ${offer.qty} ${goodsWordsOf(line)} available.`;
+}
+
+/** `{n} {Item} on {PO No} is reserved for this order.` — one sentence per PO. */
+export function soBatchPoReservedSentences(
+  line: Pick<SoBatchOrderLineFact, "item" | "variant" | "poReserved">,
+): string[] {
+  return (line.poReserved ?? [])
+    .filter((r) => r.qty > 0)
+    .map((r) => `${r.qty} ${goodsWordsOf(line)} on ${r.poId} is reserved for this order.`);
+}
+
+/**
+ * Line two for a line whose remaining need only the anonymous open-PO pool
+ * covers: the offer when a PO has goods no order holds, `Coverage not
+ * checked` when that balance could not be read, otherwise null (the caller
+ * keeps its existing answer).
+ */
+function poOfferWhy(line: SoBatchOrderLineFact): SoBatchStatusWhy | null {
+  if (line.poOffer && line.poOffer.qty > 0) {
+    return {
+      text: soBatchPoOfferSentence(line, line.poOffer),
+      door: "use_po",
+      usePo: { orderLineId: line.orderLineId, poId: line.poOffer.poId },
+    };
+  }
+  if (line.poOfferUnread) {
+    return { text: soBatchOrderByAbsenceWord("coverage_not_checked"), door: null };
+  }
+  return null;
+}
+
 /** Line two of the parent row's Status, or null when the row can be ticked. */
 export function soBatchOrderStatusWhy(
   order: SoBatchOrderRow,
   leaves: readonly PurchaseDemandRow[],
   stateWords: Readonly<Record<PurchaseDemandState, string>>,
 ): SoBatchStatusWhy | null {
-  if (soBatchOrderPlanning(order, leaves).group !== "to-buy") return null;
+  const plan = soBatchOrderPlanning(order, leaves);
+  if (plan.group !== "to-buy") {
+    /* Covered by goods reserved on a PO: say whose they are (owner ruling
+       2026-09-28). */
+    const reserved = order.lines.flatMap((l) => soBatchPoReservedSentences(l));
+    return reserved.length > 0 ? { text: reserved.join(" "), door: null } : null;
+  }
   const text = soBatchOrderUnselectableReason(order, leaves, stateWords);
   if (!text) return null;
+  if (plan.absence === "already_on_po") {
+    for (const line of order.lines) {
+      if (soBatchOrderLineOutstandingQty(line) <= 0) continue;
+      const offer = poOfferWhy(line);
+      if (offer) return offer;
+    }
+  }
   return {
     text,
     door: doorOf(leaves.filter((r) => !isPurchaseDemandTimingState(r.state)).map((r) => r.state)),
   };
 }
 
-/** Line two of one item line's Status, or null when the line can be ticked. */
+/**
+ * Line two of one item line's Status, or null when the line can be ticked.
+ * `line` is the item line's own facts; with it a pool-covered line reads the
+ * `Use this PO` offer instead of the retired `Already on a PO`.
+ */
 export function soBatchLeafStatusWhy(
   leaf: PurchaseDemandRow,
   orderStatus: SoBatchOrderStatus,
   stateWords: Readonly<Record<PurchaseDemandState, string>>,
+  line?: SoBatchOrderLineFact,
 ): SoBatchStatusWhy | null {
   if (orderStatus === "ordered" || isSelectableForOrder(leaf, orderStatus)) return null;
   if (!isPurchaseDemandTimingState(leaf.state)) {
     return { text: stateWords[leaf.state], door: doorOf([leaf.state]) };
   }
   const state = soBatchToBuyState(leaf, orderStatus);
-  if (state.kind === "covered") return { text: soBatchOrderByAbsenceWord("already_on_po"), door: null };
+  if (state.kind === "covered") {
+    return (line ? poOfferWhy(line) : null) ??
+      { text: soBatchOrderByAbsenceWord("already_on_po"), door: null };
+  }
   if (state.kind === "unchecked") return { text: soBatchOrderByAbsenceWord("coverage_not_checked"), door: null };
   return null;
+}
+
+/** Line two of an item line nothing is left to buy for, or null. */
+export function soBatchLineReservedWhy(line: SoBatchOrderLineFact): SoBatchStatusWhy | null {
+  const reserved = soBatchPoReservedSentences(line);
+  return reserved.length > 0 ? { text: reserved.join(" "), door: null } : null;
 }
