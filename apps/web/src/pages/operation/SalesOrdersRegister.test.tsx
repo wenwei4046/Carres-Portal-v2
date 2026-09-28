@@ -53,6 +53,11 @@ const useCatalogSpy = vi.fn((..._args: unknown[]) => catalogHookState);
  * nothing, so a register that went back to it would fail twice — here on the
  * call, and below on the DO number that vanished. */
 /* Monthly demand's facts — only read while that view is chosen. */
+/* The Order list's server facts (obligations, cases), per order id. */
+let registerFactsState: { data?: unknown; isError?: boolean } = {
+  data: { facts: {}, failed: { obligations: false, cases: false } },
+};
+const useSalesOrderRegisterFactsSpy = vi.fn((..._args: unknown[]) => registerFactsState);
 const useMonthlyDemandFactsSpy = vi.fn((..._args: unknown[]) => ({
   data: {
     orders: [
@@ -92,6 +97,7 @@ vi.mock("@/lib/queries", async () => {
     useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
     useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
     useMonthlyDemandFacts: (...args: unknown[]) => useMonthlyDemandFactsSpy(...args),
+    useSalesOrderRegisterFacts: (...args: unknown[]) => useSalesOrderRegisterFactsSpy(...args),
   };
 });
 
@@ -683,7 +689,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("SO Date")).not.toBeInTheDocument();
     /* Flat: no status groups, no Service Case column. */
     expect(document.querySelector("[data-testid^='grid-group-']")).toBeNull();
-    expect(screen.queryByText(/Service Case/)).not.toBeInTheDocument();
+    /* `Service Cases` is a rail FACT filter, never a column (owner approved 2026-09-22). */
+    expect(
+      screen.queryAllByText(/Service Case/).filter((el) => !el.closest('[data-testid="sales-orders-rail"]')),
+    ).toHaveLength(0);
   });
 
   /* ⭐ THE ONE-LINE LISTING ROW IS 40px ON THIS PAGE ONLY (ui MASTER §6.0 rule 5,
@@ -1441,5 +1450,67 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
     expect(at).not.toContain("dealer=");
     expect(at).not.toContain("delivery=");
     expect(at).not.toContain("range=");
+  });
+});
+
+describe("the Order list rail: Obligations and Service Cases are the server's facts", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [order({ id: "a", so: 1601 }), order({ id: "b", so: 1602 }), order({ id: "c", so: 1603 })],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    registerFactsState = {
+      data: {
+        facts: {
+          a: { obligations: "outstanding", cases: "open" },
+          b: { obligations: "none", cases: "none" },
+          c: { obligations: null, cases: "closed" },
+        },
+        failed: { obligations: false, cases: false },
+      },
+    };
+  });
+  afterEach(() => {
+    registerFactsState = { data: { facts: {}, failed: { obligations: false, cases: false } } };
+  });
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1601, 1602, 1603].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+
+  it("Obligations narrows by the completion fact; an unknown fact matches neither value", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-rail-obligations-outstanding"));
+    expect(shown()).toEqual([1601]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-obligations-none"));
+    expect(shown()).toEqual([1602]);
+    expect(screen.getByTestId("register-column")).toHaveTextContent("No action required");
+  });
+
+  it("Service Cases narrows to open, closed only, or none", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-open"));
+    expect(shown()).toEqual([1601]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-closed"));
+    expect(shown()).toEqual([1603]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-none"));
+    expect(shown()).toEqual([1602]);
+  });
+
+  it("a read the server could not make says so instead of pretending none", () => {
+    registerFactsState = {
+      data: { facts: {}, failed: { obligations: true, cases: true } },
+    };
+    mount("/operation/orders?cases=none");
+    expect(screen.getByTestId("sales-orders-rail-obligations-unread")).toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-rail-cases-unread")).toBeInTheDocument();
+    expect(shown()).toEqual([]);
   });
 });
