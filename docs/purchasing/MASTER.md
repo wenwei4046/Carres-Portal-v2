@@ -5372,15 +5372,17 @@ One display arrangement must retain all three movement scopes:
   A later supplier delivery can coordinate collection on the same visit; incoming receipt and
   outgoing return remain distinct physical facts. Never create another set of outgoing Units.
 
-**CURRENT PJ DISPLAY CAPACITY — OWNER RULING; Jess, 2026-09-28.** PJ Showroom currently has
-space to display at most 11 sofa sets. This is display capacity, not a statement of current
-occupancy or an 11-Unit stock limit: a set may consist of multiple tracked Units. It does not
-change the 36 imported Unit records or establish their verified ownership. No production data
-change is authorised by this ruling.
+**SHOWROOM DISPLAY CAPACITY CONNECTION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Stock MASTER §7 owns per-showroom Sofa, Mattress and Bedframe display capacities in Warehouse
+Settings → Sites, including PJ's current 11 sofa sets. Read those settings in the display
+arrangement; do not maintain a second capacity list in Purchasing. Capacity is not actual occupancy
+or a limit on stock Unit IDs. Unset capacities remain unknown. This does not change the 36 imported
+PJ Unit records or establish their verified ownership; no production backfill is authorised.
 
 **CAPACITY-AWARE COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
 Show current occupied sofa sets, planned incoming sets and planned outgoing sets together against
-PJ Showroom's current 11-set display capacity. When full, prompt Operation to coordinate removal
+the Site's configured Sofa display capacity. Apply the same category-specific guidance to Mattress
+and Bedframe, using their own capacities and quantities. When full, prompt Operation to coordinate removal
 timing and actual space before the incoming placement. Preserve the approved either-movement-first
 rule; this is a planning prompt, not an unconditional receipt block. Do not assume two new sofas
 equal two outgoing sets or that current occupancy is 11. Confirm relevant set composition and
