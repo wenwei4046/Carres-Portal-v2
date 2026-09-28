@@ -228,6 +228,7 @@ import {
   type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
+  type PurchasingSetPoWindowsInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
@@ -5395,6 +5396,10 @@ export function useSetPurchasingNumber() {
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
+}
+/** 0585 · `First PO window` · `Second PO window` + its switch (MASTER §5.6.1). */
+export function useSetPurchasingPoWindows() {
+  return usePurchasingSettingsMutation<PurchasingSetPoWindowsInput>("/po-windows");
 }
 export function useSetProductionDays() {
   return usePurchasingSettingsMutation<PurchasingSetProductionDaysInput>("/production-days");

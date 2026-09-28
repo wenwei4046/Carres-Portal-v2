@@ -21,6 +21,7 @@ const setWorkWeek = vi.fn();
 const createDestination = vi.fn();
 const updateDestination = vi.fn();
 const setSupplierCollection = vi.fn();
+const setPoWindows = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -38,6 +39,7 @@ vi.mock("@/lib/queries", async () => {
     useCreatePurchasingDestination: () => mutation(createDestination),
     useUpdatePurchasingDestination: () => mutation(updateDestination),
     useSetPurchasingSupplierCollection: () => mutation(setSupplierCollection),
+    useSetPurchasingPoWindows: () => mutation(setPoWindows),
   };
 });
 
@@ -61,6 +63,7 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     earliestSellDays: 21,
     logisticsCallWorkingDays: 1,
     poDays: [1, 3, 5],
+    poWindows: { first: "11:30", second: "16:00", secondEnabled: true },
     manualPurchaseMinDeliveryDays: 0,
     suppliers: [
       { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
@@ -343,7 +346,10 @@ describe("Purchasing → Settings", () => {
     // And the words that MUST be there, spelt as the standards spell them.
     expect(text).toContain("Production working days");
     expect(text).toContain("Safety days");
-    expect(text).toContain("PO days");
+    /* COPY: the Settings words are `PO Days` · `First PO window` · `Second PO window`. */
+    expect(text).toContain("PO Days");
+    expect(text).toContain("First PO window");
+    expect(text).toContain("Second PO window");
     expect(text).toContain("Supplier work week");
     expect(text).toContain("Earliest date a store may sell");
   });
@@ -427,5 +433,81 @@ describe("P20.4 · a work week reads as days", () => {
     render(wrap(<OperationPurchasingSettings />));
     const row = screen.getByTestId("production-row-sofa");
     expect(within(row).getByTestId("setting-change-line").textContent).toContain("was 10");
+  });
+});
+
+/**
+ * ⭐ PO WINDOWS (Purchasing MASTER §5.6.1; storage + audited door 0585). The
+ * window times had no screen, so changing 11:30 meant editing the database.
+ */
+describe("PO windows in Settings", () => {
+  beforeEach(() => {
+    setPoWindows.mockReset().mockResolvedValue(undefined);
+    settingsQuery.mockReturnValue({ data: settings(), isLoading: false, error: null });
+  });
+
+  it("shows PO Days and both window times in ONE card", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const card = screen.getByTestId("po-windows-settings");
+    expect(within(card).getByText("PO Days")).toBeTruthy();
+    expect((document.getElementById("po-window-first") as HTMLInputElement).value).toBe("11:30");
+    expect((document.getElementById("po-window-second") as HTMLInputElement).value).toBe("16:00");
+    /* PO Days left `The other numbers`: one home per fact. */
+    expect(within(card).getByTestId("po-days")).toBeTruthy();
+    expect(screen.getAllByTestId("po-days")).toHaveLength(1);
+  });
+
+  it("saves a moved first window through the one door", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const save = screen.getByTestId("po-windows-save");
+    expect(save).toBeDisabled();
+    fireEvent.change(document.getElementById("po-window-first")!, { target: { value: "11:00" } });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(setPoWindows).toHaveBeenCalledWith({ first: "11:00", second: "16:00", secondEnabled: true }),
+    );
+  });
+
+  it("switches the second window off and sends that", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use a second PO window" }));
+    expect(document.getElementById("po-window-second")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("po-windows-save"));
+    await waitFor(() =>
+      expect(setPoWindows).toHaveBeenCalledWith({ first: "11:30", second: "16:00", secondEnabled: false }),
+    );
+  });
+
+  it("names the problem and does not save a second window earlier than the first", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    fireEvent.change(document.getElementById("po-window-second")!, { target: { value: "10:00" } });
+    expect(screen.getByTestId("po-windows-problem")).toHaveTextContent(
+      "The second PO window must be later than the first.",
+    );
+    expect(screen.getByTestId("po-windows-save")).toBeDisabled();
+  });
+
+  it("reads the recorded change in clock words", () => {
+    settingsQuery.mockReturnValue({
+      data: settings({
+        lastChanges: [
+          {
+            settingKey: "po_windows",
+            supplierId: null,
+            category: null,
+            oldValue: "11:30:00 · 16:00:00 · on",
+            newValue: "11:00:00 · 16:00:00 · on",
+            changedBy: "Jess",
+            changedAt: "2026-09-28T03:00:00Z",
+          },
+        ],
+      }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    const card = screen.getByTestId("po-windows");
+    expect(card.textContent).toContain("was 11:30 AM and 4:00 PM");
   });
 });

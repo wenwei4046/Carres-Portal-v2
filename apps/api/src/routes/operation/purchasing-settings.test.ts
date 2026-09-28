@@ -5,10 +5,10 @@ import type { AppEnv } from "../../types";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 vi.mock("../../lib/duties", () => ({ myDuties: vi.fn().mockResolvedValue([]) }));
-vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn() }));
+vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn(), loadPoWindows: vi.fn() }));
 
 import { userClient } from "../../lib/supabase";
-import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPoWindows, loadPurchasingSettings } from "../../lib/purchasing-settings";
 import purchasingSettingsRouter from "./purchasing-settings";
 
 const DESTINATION_ID = "33333333-0000-0000-0000-000000000003";
@@ -59,6 +59,49 @@ function testApp() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(loadPurchasingSettings).mockResolvedValue(response);
+  vi.mocked(loadPoWindows).mockResolvedValue({
+    settings: { first: "11:30", second: "16:00", secondEnabled: true },
+    poDays: [1, 3, 5],
+    cutoffBySupplier: new Map(),
+  });
+});
+
+describe("Purchasing Settings — PO windows (0585, MASTER §5.6.1)", () => {
+  it("reads the windows through the ONE window reader", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const res = await testApp().request("/settings");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as PurchasingSettingsResponse;
+    expect(body.poWindows).toEqual({ first: "11:30", second: "16:00", secondEnabled: true });
+  });
+
+  it("saves both windows through the audited SQL door", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/po-windows", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ first: "11:00", second: null, secondEnabled: false }),
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_po_windows", {
+      p_first: "11:00",
+      p_second: null,
+      p_second_enabled: false,
+    });
+  });
+
+  it("refuses a second window that is not later than the first before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/po-windows", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ first: "16:00", second: "11:30", secondEnabled: true }),
+    });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("Purchasing Settings — Deliver To", () => {
