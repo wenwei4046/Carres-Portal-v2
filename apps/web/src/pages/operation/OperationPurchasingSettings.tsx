@@ -28,11 +28,14 @@ import {
   useSetSupplierTermsDays,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
+  useSetPurchasingPoWindows,
   useSetSupplierWorkWeek,
   useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
 import Input from "@/components/kit/Input";
+import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
 import { fmtDate } from "@/lib/fmt-date";
 import { INPUT_CLS } from "./components/Modal";
 import PurchasingTabs from "./PurchasingTabs";
@@ -364,6 +367,24 @@ export default function OperationPurchasingSettings({
           The settings the ordering engine reads. Change one here and SO Batch Purchase uses it
           the same day.
           {!canEdit && " Manager only. Read-only for your role."}
+        </div>
+
+        {/* ⭐ PO WINDOWS (Purchasing MASTER §5.6.1, owner 2026-09-24/25): the
+            days a window opens and its two times, in ONE card. Work and SO
+            Batch read these through the same window reader. */}
+        <div className="mb-8 max-w-[860px]" data-testid="po-windows-settings">
+          <PoWindowsSection
+            settings={data}
+            canEdit={canEdit}
+            poDays={poDays}
+            poDirty={poDirty}
+            onPoDays={setPoDraft}
+            savingPoDays={setPoDays.isPending}
+            onSavePoDays={() =>
+              setPoDays.mutateAsync({ days: poDays }).then(() => setPoDraft(null))
+            }
+            onFail={fail}
+          />
         </div>
 
         <div className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
@@ -1040,49 +1061,6 @@ export default function OperationPurchasingSettings({
               <ChangeLine settings={data} settingKey="logistics_call_working_days" />
             </NumberRow>
 
-            <div className="py-3 border-b border-base-100 last:border-b-0">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="min-w-[240px]">
-                  <div className="text-body text-base-900">PO days</div>
-                  <div className="text-meta text-base-500 mt-0.5">
-                    The days POs are sent. A late line never waits for one.
-                  </div>
-                  <ChangeLine settings={data} settingKey="po_days" />
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <DayPicker
-                    selected={poDays}
-                    canEdit={canEdit}
-                    onChange={setPoDraft}
-                    testId="po-days"
-                    /* Jess, 2026-08-01: the Carres OFFICE does not work
-                     * Saturday, and a PO run nobody is in the office to run
-                     * is a checkbox that lies. Supplier work weeks keep
-                     * their Saturday — Ohana works it. */
-                    days={WEEKDAYS.filter((w) => w.day <= 5)}
-                  />
-                  {canEdit && (
-                    <button
-                      type="button"
-                      disabled={!poDirty || poDays.length === 0 || setPoDays.isPending}
-                      onClick={() =>
-                        setPoDays
-                          .mutateAsync({ days: poDays })
-                          .then(() => {
-                            setPoDraft(null);
-                            toast.success("Saved");
-                          })
-                          .catch(fail)
-                      }
-                      className="btn-primary text-meta disabled:opacity-40"
-                      data-testid="po-days-save"
-                    >
-                      Save
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
           </Block>
         </div>
@@ -1116,4 +1094,160 @@ export default function OperationPurchasingSettings({
       })
       .catch(fail);
   }
+}
+
+/**
+ * ⭐ PO WINDOWS — `PO Days` · `First PO window` · `Second PO window` with its
+ * switch (MASTER §5.6.1; storage and audited door 0585). A change never
+ * rewrites an issued PO; the SQL door records the old and new value, and the
+ * history line reads it in clock words.
+ */
+function PoWindowsSection({
+  settings,
+  canEdit,
+  poDays,
+  poDirty,
+  onPoDays,
+  savingPoDays,
+  onSavePoDays,
+  onFail,
+}: {
+  settings: PurchasingSettingsResponse;
+  canEdit: boolean;
+  poDays: number[];
+  poDirty: boolean;
+  onPoDays: (days: number[]) => void;
+  savingPoDays: boolean;
+  onSavePoDays: () => Promise<unknown>;
+  onFail: (e: unknown) => void;
+}) {
+  const saved = settings.poWindows;
+  const setWindows = useSetPurchasingPoWindows();
+  const [draft, setDraft] = useState<{ first: string; second: string; secondEnabled: boolean } | null>(null);
+  const current = draft ?? {
+    first: saved?.first ?? "",
+    second: saved?.second ?? "",
+    secondEnabled: saved?.secondEnabled ?? false,
+  };
+  const dirty =
+    draft !== null &&
+    (draft.first !== (saved?.first ?? "") ||
+      draft.second !== (saved?.second ?? "") ||
+      draft.secondEnabled !== (saved?.secondEnabled ?? false));
+  /* The same two rules the SQL door enforces, said before the round trip. */
+  const problem =
+    current.first === ""
+      ? "The first PO window needs a time."
+      : current.secondEnabled && current.second === ""
+        ? "The second PO window needs a time."
+        : current.second !== "" && current.second <= current.first
+          ? "The second PO window must be later than the first."
+          : null;
+  const patch = (next: Partial<typeof current>) => setDraft({ ...current, ...next });
+
+  return (
+    <Block title="PO windows" subtitle="When POs are bought each day. Lines added before a window are bought in it.">
+      <div className="bg-white">
+        <div className="py-3 border-b border-base-100">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-[240px]">
+              <div className="text-body text-base-900">PO Days</div>
+              <div className="text-meta text-base-500 mt-0.5">The days a PO window opens.</div>
+              <ChangeLine settings={settings} settingKey="po_days" />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <DayPicker
+                selected={poDays}
+                canEdit={canEdit}
+                onChange={onPoDays}
+                testId="po-days"
+                /* Jess, 2026-08-01: the Carres OFFICE does not work Saturday. */
+                days={WEEKDAYS.filter((w) => w.day <= 5)}
+              />
+
+            </div>
+          </div>
+        </div>
+
+        {saved == null ? (
+          <p className="py-3 text-meta text-kit-slate-11" data-testid="po-windows-unread">
+            Could not be loaded
+          </p>
+        ) : (
+          <div className="py-3" data-testid="po-windows">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                id="po-window-first"
+                type="time"
+                label="First PO window"
+                hint="Lines added before this time are bought in this window."
+                value={current.first}
+                disabled={!canEdit}
+                onChange={(e) => patch({ first: e.target.value })}
+              />
+              <div className="flex flex-col gap-2">
+                {/* The switch sits on the second window it governs, above its
+                    time: decide whether there IS one, then give it a time. */}
+                <Checkbox
+                  id="po-window-second-on"
+                  label="Use a second PO window"
+                  checked={current.secondEnabled}
+                  disabled={!canEdit}
+                  onCheckedChange={(on) => patch({ secondEnabled: on, second: current.second || (saved.second ?? "16:00") })}
+                />
+                <Input
+                  id="po-window-second"
+                  type="time"
+                  label="Second PO window"
+                  hint="Lines added after the first window are bought here."
+                  value={current.second}
+                  disabled={!canEdit || !current.secondEnabled}
+                  onChange={(e) => patch({ second: e.target.value })}
+                />
+              </div>
+            </div>
+            <ChangeLine settings={settings} settingKey="po_windows" />
+            {canEdit && (
+              <div className="mt-3 flex items-center gap-3">
+                {/* ONE Save for the card: it stores whichever of the two facts
+                    moved, PO Days first, each through its own audited door. */}
+                <Button
+                  size="sm"
+                  disabled={
+                    (!dirty && !poDirty) ||
+                    (dirty && problem != null) ||
+                    (poDirty && poDays.length === 0) ||
+                    setWindows.isPending ||
+                    savingPoDays
+                  }
+                  onClick={async () => {
+                    try {
+                      if (poDirty) await onSavePoDays();
+                      if (dirty) {
+                        await setWindows.mutateAsync({
+                          first: current.first,
+                          second: current.second === "" ? null : current.second,
+                          secondEnabled: current.secondEnabled,
+                        });
+                        setDraft(null);
+                      }
+                      toast.success("Saved");
+                    } catch (e) {
+                      onFail(e);
+                    }
+                  }}
+                  data-testid="po-windows-save"
+                >
+                  Save
+                </Button>
+                {dirty && problem ? (
+                  <span className="text-meta text-kit-red-11" data-testid="po-windows-problem">{problem}</span>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Block>
+  );
 }

@@ -620,3 +620,23 @@ describe("poDeliveryWorkingDays — the n of `PO {n}-Day Delivery Date` (owner 2
     expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-10-09", deliveryDateIso: "2026-10-09" })).toBeNull();
   });
 });
+
+describe("PO windows in Settings (0585, MASTER §5.6.1)", () => {
+  it("reads the recorded change in clock words, never the database's spelling or a dash", async () => {
+    const { poWindowsHistoryLabel, settingValueLabel } = await import("./purchasing-settings");
+    expect(poWindowsHistoryLabel("11:30:00 · 16:00:00 · on")).toBe("11:30 AM and 4:00 PM");
+    expect(poWindowsHistoryLabel("11:30:00 · 16:00:00 · off")).toBe("11:30 AM, second window off");
+    expect(poWindowsHistoryLabel("09:00:00 · - · off")).toBe("9:00 AM, second window off");
+    expect(poWindowsHistoryLabel("12:15:00 · 00:30:00 · on")).toBe("12:15 PM and 12:30 AM");
+    expect(settingValueLabel("po_windows", "11:30:00 · 16:00:00 · on")).not.toContain("-");
+  });
+
+  it("accepts two ordered times and refuses a missing or earlier second window", async () => {
+    const { purchasingSetPoWindowsInput } = await import("./purchasing-settings");
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "11:30", second: "16:00", secondEnabled: true }).success).toBe(true);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "11:30", second: null, secondEnabled: false }).success).toBe(true);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "11:30", second: null, secondEnabled: true }).success).toBe(false);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "16:00", second: "11:30", secondEnabled: true }).success).toBe(false);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "25:00", second: null, secondEnabled: false }).success).toBe(false);
+  });
+});

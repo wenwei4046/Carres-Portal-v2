@@ -4,6 +4,7 @@ import {
   purchasingCreateDestinationInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
+  purchasingSetPoWindowsInput,
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
@@ -15,7 +16,7 @@ import {
 import { z } from "zod";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
-import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPoWindows, loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -26,6 +27,7 @@ import type { AppEnv } from "../../types";
  *   GET  /                  every number, who last changed it, and what it was
  *   PUT  /number            one of the single numbers
  *   PUT  /po-days           the weekdays POs are sent on
+ *   PUT  /po-windows        the first and optional second daily PO window (0585)
  *   PUT  /production-days   one supplier × category (null clears it)
  *   PUT  /work-week         one supplier's working week
  *   POST /destinations      one future Deliver To
@@ -38,6 +40,16 @@ import type { AppEnv } from "../../types";
  */
 const purchasingSettingsRouter = new Hono<AppEnv>();
 
+/**
+ * Every number PLUS the daily PO windows. The windows ride through the ONE
+ * window reader (`loadPoWindows`, the same read Work and SO Batch use), so
+ * Settings can never show a window the engine does not use.
+ */
+async function loadSettingsWithWindows(sb: ReturnType<typeof userClient>) {
+  const [settings, windows] = await Promise.all([loadPurchasingSettings(sb), loadPoWindows(sb)]);
+  return { ...settings, poWindows: windows.settings };
+}
+
 /** Settings is manager-only (§1 of the working flow). The card names the key:
  *  the existing `ops_manager` duty — NO new duty key. */
 async function canEditSettings(c: Context<AppEnv>): Promise<boolean> {
@@ -48,7 +60,7 @@ async function canEditSettings(c: Context<AppEnv>): Promise<boolean> {
 purchasingSettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   try {
-    const settings = await loadPurchasingSettings(sb);
+    const settings = await loadSettingsWithWindows(sb);
     return c.json(
       purchasingSettingsResponseSchema.parse({
         ...settings,
@@ -71,7 +83,7 @@ purchasingSettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
  *  from the server's answer rather than from what it hoped it wrote. */
 async function respondWithSettings(c: Context<AppEnv>) {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const settings = await loadPurchasingSettings(sb);
+  const settings = await loadSettingsWithWindows(sb);
   return c.json(
     purchasingSettingsResponseSchema.parse({
       ...settings,
@@ -97,6 +109,22 @@ purchasingSettingsRouter.put("/po-days", requireOperationOrPrincipal, async (c) 
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.rpc("purchasing_set_po_days", { p_days: parsed.data.days });
+  if (error) return fail(c, error);
+  return respondWithSettings(c);
+});
+
+/** 0585 · `First PO window` · `Second PO window` + its switch. The SECURITY
+ *  DEFINER door re-gates the manager and re-checks the order of the times,
+ *  and records the old and new value in the Settings history. */
+purchasingSettingsRouter.put("/po-windows", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetPoWindowsInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_po_windows", {
+    p_first: parsed.data.first,
+    p_second: parsed.data.second,
+    p_second_enabled: parsed.data.secondEnabled,
+  });
   if (error) return fail(c, error);
   return respondWithSettings(c);
 });

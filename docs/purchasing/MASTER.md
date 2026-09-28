@@ -565,7 +565,11 @@ facts, the one send area and the completion fact below.
 - **Settings.** `Settings → Purchasing → PO windows` carries `PO Days` (day ticks), `First PO
   window` (default `11:30 AM`), `Second PO window` with an on/off switch (default `4:00 PM`).
   Every change records actor, time, old value, new value and effective date; it never rewrites an
-  issued PO. The window times are **not built today** — only `PO Days` exists.
+  issued PO. **BUILT 2026-09-28:** one `PO windows` card at the top of Purchasing Settings holds
+  `PO Days`, `First PO window` and `Second PO window` with its switch. It reads through the same
+  window reader Work and SO Batch use (`loadPoWindows`) and writes through 0585's audited door
+  `purchasing_set_po_windows`; the history line reads the change in clock words. A supplier's own
+  earlier cut-off (`purchasing_set_supplier_po_cutoff`, 0585) still has no screen.
 - **One occurrence per window.** Eligible demand admitted before a window belongs to it; a supplier
   with an earlier governed cut-off gets its own occurrence at its real time. Blocked lines (for
   example `Production days not set`) are named with their owning setup door and never counted as
