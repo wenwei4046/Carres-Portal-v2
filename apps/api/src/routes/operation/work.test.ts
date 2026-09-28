@@ -684,7 +684,10 @@ describe("operation Work response composition", () => {
       eta_date: "2026-09-11",
       tomorrow_answer_about_date: null,
       promises: [],
-      sends: [],
+      /* The current version was SENT (printed and handed over — a channel
+         that records no supplier chat, so the act still says `Ask`). An unsent
+         PO has no day-before check at all; see the test below. */
+      sends: [{ kind: "confirmed_sent" as const, channel: "print", po_version: 1, sent_at: "2026-09-03T02:00:00Z" }],
       purchase_order_lines: [{ qty: 4, received_qty: 0 }],
       ...over,
     });
@@ -714,6 +717,20 @@ describe("operation Work response composition", () => {
       expect(item?.timing).toMatchObject({ actionOn: "2026-09-10", placement: "on_day", missedAge: { state: "not_calculable" } });
       /* The owner is a resolved person, never spelled into the sentence. */
       expect(item?.action).not.toContain("Khor Yee");
+    });
+
+    /* Workspace BUILD finding 2026-09-28 (PO-20260903-4316 / -7907, issued
+       3 Sep, never sent): the check asked for a Supplier DO on a PO the
+       supplier never received, and opened a form that cannot record it —
+       Purchasing §5.7 draws the supplier answer only after the send mark.
+       An unsent PO acts through the PO window's send line alone. */
+    it("derives no day-before check until the PO's CURRENT version is marked sent", () => {
+      expect(project({ sends: [] })).toHaveLength(0);
+      /* Opening the chat is communication history, not the send mark. */
+      expect(project({ sends: [{ kind: "external_open", channel: "whatsapp", po_version: 1, sent_at: "2026-09-03T02:00:00Z" }] })).toHaveLength(0);
+      /* A send of an OLDER version does not cover the revised PO. */
+      expect(project({ version: 2, sends: [{ kind: "confirmed_sent", channel: "print", po_version: 1, sent_at: "2026-09-03T02:00:00Z" }] })).toHaveLength(0);
+      expect(project()).toHaveLength(1);
     });
 
     it("skips a public holiday when stepping back to the check day", () => {
@@ -752,7 +769,13 @@ describe("operation Work response composition", () => {
       /* Another Warehouse, another date or an older version proves nothing. */
       expect(project({ ...base, arrival_confirmations: [confirmation({ destination_id: "other" })] })).toHaveLength(1);
       expect(project({ ...base, arrival_confirmations: [confirmation({ for_date: "2026-09-10" })] })).toHaveLength(1);
-      expect(project({ ...base, version: 2, arrival_confirmations: [confirmation()] })).toHaveLength(1);
+      /* Version 2 was sent too — otherwise it would have no check at all. */
+      expect(project({
+        ...base,
+        version: 2,
+        sends: [{ kind: "confirmed_sent", channel: "print", po_version: 2, sent_at: "2026-09-04T02:00:00Z" }],
+        arrival_confirmations: [confirmation()],
+      })).toHaveLength(1);
     });
 
     it("an evidenced delay moves the effective arrival: the old date's check retires and a new one opens for the new date", () => {

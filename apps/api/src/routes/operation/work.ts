@@ -510,7 +510,13 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
     const dates = [...new Set(arrivals.map((a) => a.arrival))].sort();
     /* The supplier's recorded channel: the one the current version was sent on. */
     const currentSend = (po.sends ?? []).find((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === version);
-    const channel = currentSend?.channel === "whatsapp" || currentSend?.channel === "email" ? currentSend.channel : null;
+    /* ⛔ NO SEND MARK, NO DAY-BEFORE CHECK (Purchasing §§5.6.1, 5.7). The
+       supplier cannot confirm a delivery for a PO it never received, and the
+       supplier-answer form is drawn only after the current version is marked
+       `PO sent to supplier`. Until then the PO acts through the PO window's
+       send line alone (Workspace BUILD finding 2026-09-28). */
+    if (!currentSend) return [];
+    const channel = currentSend.channel === "whatsapp" || currentSend.channel === "email" ? currentSend.channel : null;
     return dates.flatMap((date) => {
       const confirmedFor = (po.arrival_confirmations ?? []).some((c) =>
         c.po_version === version && c.for_date === date && !!po.destination_id && c.destination_id === po.destination_id)
