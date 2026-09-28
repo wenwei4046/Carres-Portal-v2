@@ -1316,7 +1316,7 @@ describe("the Sales Orders rail and its two views", () => {
     expect(screen.queryByTestId("register-column")).not.toBeInTheDocument();
     expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(true);
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Period", "Dealer / Sales Location", "Customer Delivery Location", "Product category"]) {
+    for (const group of ["Period", "Sales Location", "Customer Delivery Location", "Product category"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
   });
@@ -1386,21 +1386,24 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
     return [1501, 1502, 1503].filter((n) => within(grid).queryByText(`SO-${n}`));
   };
 
-  it("the Order list carries the Dealer, State / City, Date and Delivery groups, and no Clear filters", () => {
+  it("the Order list carries Sales Location, Customer Delivery Location and Delivery, no Date group and no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Dealer / Sales Location", "Customer Delivery Location", "Date", "Delivery"]) {
+    for (const group of ["Sales Location", "Customer Delivery Location", "Delivery"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
+    /* A date is narrowed on its own column's ▽ (Jess, 2026-09-28). */
+    expect(within(rail).queryByText("Date")).not.toBeInTheDocument();
+    expect(within(rail).queryByText("Proceed Date")).not.toBeInTheDocument();
     expect(within(rail).queryByText(/Clear/i)).not.toBeInTheDocument();
     expect(shown()).toEqual([1501, 1502, 1503]);
   });
 
-  it("Dealer / Sales Location narrows to where the order was sold", () => {
+  it("Sales Location narrows to where the order was sold", () => {
     mount();
     fireEvent.change(screen.getByTestId("sales-orders-rail-dealer"), { target: { value: "{dealer 2}" } });
     expect(shown()).toEqual([1502, 1503]);
-    expect(screen.getByTestId("register-column")).toHaveTextContent("Dealer / Sales Location: {dealer 2}");
+    expect(screen.getByTestId("register-column")).toHaveTextContent("Sales Location: {dealer 2}");
   });
 
   it("State narrows, City narrows within it, and a new State clears the City", () => {
@@ -1431,26 +1434,23 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
     expect(screen.getByTestId("location").textContent).not.toContain("delivery=");
   });
 
-  it("Date reads the chosen date field; Proceed Date is the default", () => {
+  it("an old date link no longer narrows the list: no filter the rail cannot show", () => {
     const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
     listHookState.data!.orders = [
-      order({ id: "a", so: 1501, proceeded_at: `${today}T01:00:00Z`, placed_at: "2020-01-01T00:00:00Z" }),
-      order({ id: "b", so: 1502, proceeded_at: "2020-01-02T01:00:00Z", placed_at: `${today}T01:00:00Z` }),
+      order({ id: "a", so: 1501, proceeded_at: `${today}T01:00:00Z` }),
+      order({ id: "b", so: 1502, proceeded_at: "2020-01-02T01:00:00Z" }),
     ];
-    mount("/operation/orders?range=today");
-    expect(shown()).toEqual([1501]);
-    fireEvent.change(screen.getByTestId("sales-orders-rail-date-field"), { target: { value: "doc" } });
-    expect(shown()).toEqual([1502]);
-    expect(screen.getByTestId("register-column")).toHaveTextContent("SO Doc Date: Today");
+    mount("/operation/orders?date=doc&range=today");
+    expect(shown()).toEqual([1501, 1502]);
+    expect(screen.getByTestId("register-column")).not.toHaveTextContent("Today");
   });
 
   it("the Order list's filters never carry into Monthly demand", () => {
-    mount("/operation/orders?dealer=%7Bdealer%201%7D&delivery=not_delivered&range=today");
+    mount("/operation/orders?dealer=%7Bdealer%201%7D&delivery=not_delivered");
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
     const at = screen.getByTestId("location").textContent ?? "";
     expect(at).not.toContain("dealer=");
     expect(at).not.toContain("delivery=");
-    expect(at).not.toContain("range=");
   });
 });
 

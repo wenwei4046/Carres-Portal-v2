@@ -192,8 +192,8 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
 | Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Authorised inventory repair or Claim outcome creates RO (§9.7); same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Authorised inventory repair or stock-claim outcome; Stock custody; Goods Receipt/inspection on return |
 | Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Sales hands over the negotiated display arrangement; Operation documents the governed purchase, consignment or movement path | Select existing Stock Units where applicable; Sales supplies new goods and agreed terms; resolve missing Catalog facts before formal issue | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
-| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
-| Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
+| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Notes` Register; incoming role and source-linked supplier preview (§9.9) | Display Request; Stock Unit; Goods Receipt; Consignment Return |
+| Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap shares one Consignment Note PDF (§9.9) | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Notes` Register; linked internal return role (§9.10) | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
 | Consignment sale notice | Staff may forget to tell supplier after a sale | Mature ERP creates consumption advice after actual consumption | **ADAPT + IMPROVE** | Successful delivery of exact supplier-owned Unit auto-creates one notice per supplier × attempt | Current PO Duty checks and sends; Finance later matches invoice | `Consignment Sale Notices` Register; no `+ New`; 50/50 while issuing/correcting | Delivery success; Stock ownership; source CO; Finance/AP continuation |
 
 ---
@@ -214,8 +214,7 @@ Purchasing ▾
 │  └─ Repair Orders
 └─ SHOWROOM ▾
    ├─ Display Requests
-   ├─ Consignment Orders
-   ├─ Consignment Returns
+   ├─ Consignment Notes
    └─ Consignment Sale Notices
 ```
 
@@ -1113,8 +1112,9 @@ for {sku} in Catalog before issuing a PO` — and nothing chooses for it.
 number, its lines (each snapshotting the Catalog mode as `purchase_order_lines.identity_mode`) and
 every exact-unit line's Unit IDs are born **in the same transaction**: exactly one permanent
 `U1-000-001` per ordered piece, bound to the line's immutable id (`ops_stock_items.po_line_id`),
-for EVERY governed destination — a showroom or external delivery gets its IDs too, because the
-supplier writes them on the package wherever it goes. A quantity line is born with zero Unit IDs.
+for EVERY governed destination — a showroom or external delivery gets its IDs too. The receiver
+applies/verifies labels under Stock §3; supplier labelling is not a prerequisite. A quantity line
+is born with zero Unit IDs.
 Two lines of one SKU are two lines with disjoint IDs. If classification, allocation, line binding
 or the ledger check fails, the whole issue rolls back: no PO, no consumed number, no partial line,
 no demand movement, no orphan Unit. Both governed entrances — SO Batch Purchase and Manual
@@ -1296,7 +1296,8 @@ The user-facing gate uses two lines:
 - **Hookka and Ohana display goods are BOUGHT by Carres** (Manual Purchase / PO) — §7.5.
 - **Every other supplier places its display goods in Carres showrooms on consignment** — the
   goods stay the supplier's until sold — §7.6. Consignment is live business today (production holds one PO flagged `is_consignment`, measured
-  by the Warehouse chat 2026-09-28): the four Showroom documents are needed, not deferred.
+  by the Warehouse chat 2026-09-28): the Showroom placement, return and sale-notification capabilities are needed, not deferred;
+  placement/return share Consignment Notes under §9.9.
 - **A dealer (e.g. Big Mattress) BUYS from Carres.** Its price is fixed by Sales Development, not
   Operation. A dealer's display is the dealer's own purchase — a Sales matter, never a Purchasing
   consignment or a Carres display.
@@ -1315,7 +1316,7 @@ Other sofa suppliers such as Dorsettloft may own display stock.
 ```text
 Display Request approved for consignment
 → CO lists exact incoming Units and supplier ownership
-→ supplier writes each Carres Unit ID on the package label
+→ receiver applies/verifies each Carres Unit ID label under Stock §3
 → Goods Receipt accepts without payable
 → Stock places supplier-owned Unit at selected showroom
 → display swap/removal creates Consignment Return path
@@ -1324,7 +1325,8 @@ Display Request approved for consignment
 → Finance matches supplier invoice and settles
 ```
 
-A model swap uses one CO external instruction with `COMING IN` and `GOING BACK`. The outgoing return
+A model swap uses one Consignment Note external instruction with `COMING IN` and `GOING BACK`,
+backed by the internal incoming Consignment Order and linked return record (§§9.9–9.10). The outgoing return
 record is auto-linked; no duplicate supplier message. Document issue alone does not move either Unit.
 
 ### 7.7 Consignment sale notice trigger
@@ -3456,7 +3458,7 @@ carries UI MASTER §6.8's parent-scope numbers plus the four Receiving fields it
 | **PRODUCTION-VERIFIED** | **NOT YET**, and a converged SHA is not it: that proves the bundle shipped, not what the register draws. **The earlier claim that no walk could be run here was wrong and is withdrawn** — Chromium does start in the build environment (the full binary hangs; `headless_shell` does not), and the rendered walk above is what found the pinning defect. What genuinely cannot be reached from here is PRODUCTION: the network policy refuses `erp.carresofficial.com` and `api.carresofficial.com` at the proxy (403 on CONNECT), so no authenticated session against real data is possible. **What therefore still owes, and only this:** the sixteen columns against REAL GRN rows rather than a fixture · the rail's six counts matching the footer total on a real dataset · a real cancelled GRN · the expansion on a real receipt carrying both an exact-unit line and a counted line, the second reading `Counted stock` · a real receipt with genuine SO and MPR references beside one with none · and the widths re-measured signed in, where JetBrains Mono renders document numbers wider than the fixture font. Layout, pinning, expansion order, rail behaviour and keyboard reach are now MEASURED, not owed. |
 **🟡 `CO No` HAS NO DOCUMENT TO NAME TODAY — measured 2026-09-18.** A consignment order is a FLAG
 on the purchase order (`purchase_orders.is_consignment`), not a separately numbered document, and
-§9.9 Consignment Orders is not built. The source column therefore prints the SO and MPR references
+§9.9 Consignment Notes is not built. The source column therefore prints the SO and MPR references
 a receipt genuinely carries, an arrival source's own number (`RO-…` for a repair return) where
 there is one, and stays blank where a CO number does not exist. **No word and no other document
 stands in for it.** When §9.9 mints CO numbers they join the same server-side reference list and
@@ -5470,7 +5472,7 @@ never RM0. Retain previous quotations and the history of revisions; neither a re
 nor a later Catalog price overwrites the historical arrangement. Reuse the recorded product facts
 for governed Catalog entry rather than asking staff to retype them, without bypassing Catalog's
 write authority. Existing commercial and Manual Purchase approval remains in force.
-The supplier-facing CO PDF follows §9.9: no prices; commercial evidence and confirmation remain
+The supplier-facing Consignment Note PDF follows §9.9: no prices; commercial evidence and confirmation remain
 in the linked arrangement. CO operational progression follows the price-nonblocking ruling below.
 No screen labels, new approval role, automatic quotation extraction or application build is
 approved by this ruling.
@@ -5486,7 +5488,7 @@ unknown, never RM0. Issuing/sending the CO, receiving the goods or handing back 
 neither accepts an unconfirmed quotation nor creates a payable or price approval. The original
 negotiating Sales person retains the outstanding commercial follow-up until attributable
 confirmation resolves it; operational progress cannot silently mark that follow-up complete.
-The CO PDF contains no price, confirmed or unconfirmed (§9.9); commercial evidence stays in the
+The Consignment Note PDF contains no price, confirmed or unconfirmed (§9.9); commercial evidence stays in the
 linked quotation and Sales confirmation. Existing Carres-purchase MPR/PO approvals
 are unchanged; this ruling is scoped to the consignment arrangement, not a portal-wide bypass.
 
@@ -5532,68 +5534,87 @@ duplicate arrangement, incomplete negotiated terms, and partial incoming/outgoin
 **Connections:** Sales/Showroom, Catalog, Manual Purchase, CO/CRTN, Stock Unit/transfer, Receiving,
 Workspace. Existing approvals, custody evidence, permissions and supplier-document controls remain.
 
-### 9.9 Consignment Orders
+### 9.9 Consignment Notes
 
-**Commercial evidence and Issue:** use the quotation-recording, Sales-confirmation and
-price-nonblocking consignment rules in §9.8. Missing or unconfirmed price does not block
-issuing the CO or arranging its agreed goods movements; commercial follow-up remains separate.
-**CO PDF — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** The supplier-facing CO is a goods
-movement instruction and contains no prices, customer selling prices, price totals or settlement
-amounts. Keep the supplier quotation/version and attributable Sales confirmation in linked records
-under §9.8; do not discard them or substitute Catalog's later cost for the historical agreement.
-The PDF carries CO number/date, supplier and showroom; incoming model/specification, quantity,
-issued Unit IDs, destination and confirmed date; outgoing exact Unit IDs/model/quantity, collection
-location and confirmed date where applicable; and confirmed operational instructions. Pure new
-placement omits the outgoing section. Incoming and outgoing dates are separate, with no implied
-same-trip requirement. Unconfirmed dates must not be presented as confirmed. A price-only
-confirmation or quotation revision does not require a new goods instruction when its operational
-content is unchanged. Operational changes still follow governed document revision/sending rules.
-For swaps, the single combined CO remains the external instruction and links the internal CRTN;
-do not automatically attach a second return instruction or an unconfirmed quotation as accepted
-terms. This is the approved document-content boundary, not a completed PDF implementation.
+**UNIFIED STAFF AND SUPPLIER DOCUMENT — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Use Consignment Note as the staff-facing object/PDF name for supplier-owned display placement,
+return and same-supplier swap. Staff create the Display Request once, choose goods and actual
+pickup/destination facts, and review the note derived from that source. The system selects the
+incoming and/or return record roles; staff do not choose Consignment Order versus Consignment
+Return or retype the arrangement. The Consignment Notes register replaces those two separate
+staff-facing registers in the approved target. Keep Consignment Sale Notices separate: they report
+actual successful customer delivery, not stock movement between supplier and showroom.
 
-**Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
-no blank `+ New`.
-**Left rail:** `PDF not sent`, `Supplier date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
-**Columns:** CO No, Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
-Date, Received, Return Handover, Work.
-**Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
-send one PDF → record promise → receive through Receiving → prove outgoing handover.
-**Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
-**Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
-swap, supplier changes model/date.
-**Connections:** Display Request, Stock ownership/location, Goods Receipt, linked Consignment Return.
+**Source and identity:** existing Display Request/authorised Claim or governed return source;
+no independent blank commitment that bypasses that source. Manual arrangement entry remains
+permitted under §9.8. Incoming/placement uses the internal Consignment Order role; outgoing uses
+the internal Consignment Return role (§9.10). These are linked facts, not deleted capabilities.
+Preserve existing official numbering families, historical titles/versions and source IDs; do not
+invent a new CN allocator, renumber records or rewrite old PDFs. A paired swap's note uses the
+incoming instruction identity and links its return identity; a standalone return uses its own
+existing return identity. Note is the human-facing name, not an additional duplicate document.
+New exact incoming Unit IDs are allocated at official issue under §6.2; existing outgoing Units
+retain their identity. A draft never mints official Units or changes physical stock.
 
-### 9.10 Consignment Returns
+**Commercial evidence:** use §9.8 quotation recording and Sales confirmation rules. Missing or
+unconfirmed price does not block agreed consignment movement. Keep supplier quotations, accepted
+versions and the responsible Sales follow-up internally; issue/receipt never accepts an unconfirmed
+price or creates a payable. Neither Catalog's later cost nor RM0 replaces historical terms.
 
-**Purpose / source:** return an unsold supplier-owned Unit after approved removal, paired swap,
-supplier collection, overdelivery or claim outcome; no blank `+ New`.
-**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No, Supplier, Source, Exact Units, Collect From, Collection Date, Handover,
-Paired CO, Work.
-**Journey:** system creates source-linked return → standalone return sends PDF; paired swap uses the
-combined CO PDF → scan exact Unit and prove collection.
-**Object/placement — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Full-width view;
-50/50 only for standalone issue/revision. The operator reads three areas: exact goods to hand back
-(existing Unit IDs/model, supplier and current Site from Stock, never retyped); confirmed collection
-arrangement (actual collecting party and date, unresolved facts kept explicit); actual handover
-(exact Units, recipient, time and evidence). Planned quantity is not handed-over quantity.
-Partial collection leaves the uncollected Units at their evidenced location and retains the
-remaining collection work. No manual stock removal or whole-return completion is inferred from
-issuing/sending the document.
+**One price-free PDF family:** placement uses COMING IN, return uses GOING BACK, a same-supplier
+swap uses both. Omit the unused direction. Print the official source-owned number/date, supplier,
+source arrangement/showroom, goods/specification and quantity, exact Unit IDs where governed,
+actual pickup and destination for each direction, independently confirmed dates and operational
+instructions. No customer selling price, supplier cost, price totals or settlement amounts.
+Unconfirmed dates stay explicit. A price-only change does not force a new goods instruction.
+A supplier sees only its own goods; cross-supplier changes cannot share one supplier instruction.
+A paired swap sends one combined note, not a second notification for its linked internal return.
 
-A paired swap's CO shows the linked CRTN progress and opens the same owning handover action,
-including through Workspace; staff need not find another record to repeat the work. The CRTN
-Register remains the cross-record view of outstanding supplier collections. A swap uses the one
-combined CO supplier instruction; only a standalone return sends its own CRTN document.
-Supplier return retains its CRTN source and the shared physical-handover contract; it is not a
-Carres Site-to-Site Transfer. Stock owns custody, Purchasing owns the supplier instruction, and
-actual receiving/recipient evidence determines the physical result. This admits the information
-and interaction direction, not a new kit component or completed application implementation.
-**Exceptions:** supplier collects wrong/partial Unit, Unit condition disputed, date changed,
-unidentified legacy Unit.
-**Connections:** CO/Display/Claim, Stock custody, supplier. Unsold return creates no refund, credit or
-value posting.
+**Instruction and actual result are different facts:** issuance/printing/sending never moves stock.
+Record exact send version/recipient/channel/actor/time. Receiving and handover retain their own
+actual quantities, dates, recipient and evidence for each leg. Different days and partial results
+are allowed; a signature for one leg does not finish the other. Preserve each issued version and
+later proof; no overwritten signed copy or one manual Done flag. Changed instructions follow
+§9.8 amendment/cancellation and sending rules. Supplier acceptance is not implied by a send record.
+
+**Journey / placement:** Display Request → sourced Consignment Note → review/issue/send → owning
+receipt and/or handover action → exact outstanding scope. The same action opens from Workspace
+and the module. Read view is full width; issue/revision uses the shared supplier-document preview
+composition. The register supports lookup of incoming, return and swap notes and outstanding
+supplier collections. Recommended facts are date/number, supplier/source/showroom, incoming and
+outgoing goods, planned and actual dates, receipt and collection evidence; exact column order,
+filters and responsive composition still require the governed design closure, not the retired
+separate Orders/Returns lists. No generic Work column or duplicate showroom stock ledger.
+
+**Dorsettloft acceptance example:** COMING IN records pickup at the actual 2990 location for PJ;
+GOING BACK records old goods for Dorsettloft collection from Carres warehouse. The intervening
+PJ-to-warehouse Stock Transfer stays linked to the same Display Request and does not complete
+supplier return. The future supplier visit is not confirmed until its collection arrangement is
+recorded. Current space is coordinated with the receiving showroom, not a fixed capacity limit.
+
+**Exceptions/connections:** missing Catalog identity, unclear ownership/provenance, unreadable or
+mismatched label, changed goods/date, reserved or damaged outgoing Unit, partial receipt/collection
+and disputed result use their owning controls. Receiving remains one engine; the receiver applies
+or verifies labels under Stock §3. Finance, customer Sales Invoice and supplier sale notification
+remain separate from the note's movement instruction and physical evidence.
+
+### 9.10 Internal consignment return record
+
+**APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Consignment Return remains the source-linked
+outgoing record for an unsold supplier-owned Unit after authorised removal, swap, supplier
+collection, overdelivery or Claim outcome. Its internal identity and existing numbering remain;
+it has no separate staff create choice/register/PDF title. Staff find and execute it through
+Consignment Notes (§9.9), including the paired swap's linked return progress. Standalone returns
+use the same Consignment Note presentation with GOING BACK only.
+
+Read exact goods and current location from Stock, never retype them. Keep confirmed collection
+party/date separate from actual handover Units, recipient/time/proof. Partial collection leaves
+uncollected Units at their evidenced location and retains collection work. Physical handover uses
+the same owning form in the arrangement and Workspace. It is not a Site-to-Site Transfer; Stock
+owns custody, Purchasing owns the supplier instruction, and physical evidence determines result.
+An unsold supplier-consignment return creates no refund, credit or value posting. A post-sale
+customer return instead follows §9.11 and its supplier/Finance outcome rules. Wrong/partial Unit,
+disputed condition, changed date and missing legacy provenance remain explicit exceptions.
 
 ### 9.11 Consignment Sale Notices
 
@@ -5625,11 +5646,37 @@ Operation settlement table or payable writer is created. Outstanding Finance wor
 a correctly completed supplier-send action open. Later customer return never deletes the original
 notice; authoritative corrections retain document lineage and any required correction-send work.
 
-**Naming — owner instruction 2026-09-28.** Explain the four Showroom surfaces using their full
-names: Display Request, Consignment Order, Consignment Return and Consignment Sale Notice.
-Do not use bare DR/CO/CRTN/CSN as conversational or human-facing action names. Existing official
-document-number prefixes, stored identifiers and contracts are unchanged. Owner discussions may
-pair the full English name with a Chinese explanation; Portal language remains governed by COPY.
+**Naming — owner ruling 2026-09-28.** Staff-facing names are Display Request, Consignment
+Note and Consignment Sale Notice, in full. Internal incoming/return roles retain their existing
+identifiers and numbering; they are not extra documents staff must choose. Owner discussion may
+pair English names with Chinese explanations; Portal wording follows COPY. Historical names and
+PDFs remain as issued.
+**CUSTOMER RETURN AND SUPPLIER LIABILITY — APPROVED TARGET / NOT BUILT;
+Jess, 2026-09-28.** Customer remedy, physical return and supplier settlement are separate facts.
+Service's authorised customer remedy does not wait for supplier recovery. Delivery/Stock record
+actual customer collection, receipt and inspection; a returned Unit does not automatically become
+available display stock. Purchasing records the supplier recovery/return outcome through existing
+source and permission controls; Finance owns supplier invoice and credit consequences. A customer
+refund, exchange or physical return neither cancels a supplier invoice nor proves supplier
+acceptance of return or reduction. Preserve the original sale notice and link any authoritative
+correction. Do not automatically restore supplier-consignment ownership.
+
+**SUPPLIER OUTCOME JOURNEY — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Guide staff
+through actual return and inspection → application of evidenced, already-confirmed supplier terms
+or obtaining the missing commercial confirmation → the corresponding goods arrangement and
+Finance treatment. Existing confirmed terms may resolve the case without asking for the same
+agreement again. Where terms do not resolve it, retain the outstanding commercial confirmation;
+Operation records evidence but cannot invent acceptance, negotiate price or decide liability.
+Supplier agreement to return, replace or reduce the bill is recorded with its exact goods/scope
+and evidence, subject to existing outcome permissions. Goods execution follows its owning return,
+replacement or receipt flow; Finance handles the actual invoice/credit consequence. A supplier
+agreement is not itself physical collection or a posted credit. Preserve the original sale,
+delivery, notice and invoice history and link the resulting correction/outcome. This is a
+case-specific confirmed-terms workflow, not a uniform promise that all suppliers accept customer
+returns. Unresolved terms remain visible. Detailed Finance matching and any legal ownership
+transition still need their owning authority; this approval does not claim those integrations
+are built or authorise automatic ownership reversal.
+
 **Object/placement:** full-width view; 50/50 check/preview during issue/correction.
 **Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
 disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
@@ -5653,7 +5700,7 @@ snapshot, so these are separate observations. This audit is not responsive/visua
 #### Authority resolution and measured boundaries
 
 - **RESOLVED FROM AUTHORITY:** §§9.8–9.11 handoff, proxy entry, Sales price responsibility,
-  Operation quotation transcription, nonblocking consignment price, price-free CO PDF, exact
+  Operation quotation transcription, nonblocking consignment price, price-free supplier note, exact
   outgoing Units, one combined swap instruction, independent physical/commercial completion,
   successful-delivery-only sale notice and privacy. Do not re-ask these.
 - **APPROVED TARGET / NOT BUILT:** source-linked Display Request and formal consignment objects;
@@ -5668,8 +5715,7 @@ snapshot, so these are separate observations. This audit is not responsive/visua
   36 imported records: the broad display filter is not an exact PJ selector. Stock §12.9 owns
   the 36-row test-import/incorrect ownership caveat. No new count or ownership backfill approved.
 - **REAL GAP / CONTRADICTION:** detailed document amendment controls and post-sale commercial reversal;
-  commercial successor routing when the original Sales person is inactive; no-Sales-Order movement
-  coordination admission; opening-stock provenance and display-set/individual-Unit reconciliation;
+  admission of approved Sales-successor and no-Sales-Order Delivery Duty action rules (§9.13); opening-stock provenance and display-set/individual-Unit reconciliation;
   exact Showroom UI/copy and Work rules. Existing generic controls resolve many mechanics but not
   all domain consequences below.
 
@@ -5709,9 +5755,9 @@ The Oracle distinction is a research lesson, not financial advice or adopted pos
 | Direct showroom receipt / label / wrong or short goods | Stock/Receiving target; delivery proof incomplete | One Receiving engine, exact issued identities, receiver label rule, observable outcomes/claim evidence. Source page must not require supplier-applied labels; physical rollout needs receiving-side identity proof |
 | Goods already arrive without formal instruction | Real exception gap | Record physical observation and source-resolution work, not invented prior sending/arrival dates or freely available stock. Formal acceptance must use existing controlled Receiving authority |
 | Old/new goods either direction first | Approved independent facts | Separate collection and arrival dates/parties; one side never implicitly completes the other; partial quantity keeps remaining work |
-| No Sales Order transport coordinator | Work admission gap | Recommend existing operational duty-backed responsibility for the arrangement, exact logistics party/contact for execution; do not fabricate customer Sales Order or inherit unrelated customer PIC. Confirm compatible existing Duty scope before naming a new one |
+| No Sales Order transport coordinator | Owner rule approved §9.13; Work admission not built | Delivery Duty coordinates transport; PO Duty retains supplier work. Exact logistics party/contact and physical evidence remain distinct; no fabricated Sales Order or unrelated PIC |
 | Quotation, cost change, transport charge | Price/recording resolved; liability unresolved | Preserve evidence and accepted version; no automatic Catalog overwrite. Missing price does not stop agreed consignments. Who pays exceptional transport/damage and approval for any resulting expense must follow Finance/commercial authority, not guessed defaults |
-| Sales absence / departure | Workspace active-person/cover rule; successor gap | Preserve original negotiator in history; route today's work through governed cover/reassignment. No inactive recipient or generic WhatsApp hunt; no self-appointed replacement |
+| Sales absence / departure | Successor rule approved §9.13; assignment action admission remains | Preserve original negotiator; authorised management designates active Sales successor on permanent departure. Temporary absence uses cover. No inactive recipient, automatic Operation takeover or self-appointed replacement |
 | Sending, revision, missing contact | Shared communication authority | Record exact version/channel/recipient/actor; mark is sending declaration, not supplier acceptance. Check external conversation before resending a missing mark; no duplicate send block |
 | Customer sale / partial failure / retry | Resolved §§7.7,9.11; Delivery MASTER §6 | Auto-notice only successful exact supplier-owned Units per supplier/delivery visit; retry deduplicates; pending/failed Units excluded |
 | Customer returns after sale notice | Real cross-module policy gap | Service owns customer remedy, Stock actual return/inspection, Purchasing corrected supplier communication, Finance invoice/credit consequence. Preserve original notice; do not assume return automatically restores consignment ownership or cancels supplier liability |
@@ -5776,6 +5822,48 @@ composition, not permission to build a new wizard, dashboard, stepper or task le
 any missing kit capability require their governed review. Unknown facts and read/save failures
 remain explicit; a submitted supplier message or printed paper never substitutes for receipt.
 
+#### AutoCount reference and Carres adaptation — checked 2026-09-28
+
+**FACT / RESEARCH, version-limited.** AutoCount's official classic help describes one Consignment
+function for consigning and returning goods, separate invoicing and an outstanding balance report.
+Its supplier-side menu reverses the parties' roles. The sales example also uses Return Qty for
+an invoice-generated reduction: it does not always mean physical goods came back. Stock Transfer
+handles location changes separately. This is documentation evidence, not a walkthrough of the
+user's installed version or proof of one combined bidirectional supplier PDF.
+
+**ADAPT:** one staff-facing Consignment Note family; preserve separate physical incoming/outgoing,
+internal transfer and actual sale/settlement facts. Carres's combined swap PDF is its own approved
+presentation, not an asserted AutoCount feature. Never label sold/billed goods as physically returned.
+Sources: [AutoCount Consignment](https://www.autocountsoft.com/products/ac_accounting/helpfile/consignment2.htm)
+and [Stock Transfer](https://www.autocountsoft.com/products/ac_accounting/helpfile/stock_transfer.htm).
+
+#### Opening-stock and current-note evidence check — 2026-09-28
+
+**FACT / RESOLVED FROM AUTHORITY, bounded.** §6.2 already permits legacy showroom Unit identity
+at opening count, with supplier, ownership, model, location, existing serial/label and photographs.
+It says an unlabelled physical Unit remains usable with concrete label work. This resolves the
+need to invent a historical Consignment Order merely to give existing goods an identity; it does
+not prove every sale/return/claim source contract accepts opening stock. §9.5 separately requires
+verified purchase provenance for formal Supplier Claim; until verified, source-search/enquiry
+retains evidence and customer remedy does not wait. Do not infer a blanket Claim exception.
+
+Stock §12.9 and the checked Claude Warehouse conversation (`fe1a3f38-d950-4607-9beb-999ee2dff2ca`)
+corroborate that the 36 PJ imported Units were test rows marked Carres Owned, including goods
+subsequently ruled supplier-consigned. The conversation also contains an earlier 31-row import
+preview; it is not the current 36-row authority or proof of sofa-set occupancy. No new stock read,
+production correction or completed physical set reconciliation is claimed by this check.
+
+**FACT — document meaning, local 2990 source.** `docs/SUPPLY-CHAIN-DOCUMENTS.md` distinguishes
+outbound Consignment Order/Note/Return addressed to the consignee from inbound Purchase
+Consignment Order/Receive/Return. `apps/api/src/routes/consignment-notes.ts:1–23` confirms its note
+is an outbound delivery-like record, not the supplier sale-advice event. Its document-state-driven
+inventory behaviour remains rejected for Carres. This source explains 2990's name only. No Carres
+current Consignment Note form/template was found in the scoped records/available attachments
+checked; the user's note cannot be conclusively mapped by the shared title. The owner subsequently could not identify a fixed issuance stage and suggested recording both
+incoming and outgoing goods. Historical usage remains unverified; the future-facing recommendation
+below resolves the proposed purpose without asking the owner to classify ERP documents. Canonical
+names are not renamed or deleted by this research finding.
+
 #### Exception resolution from existing authority
 
 **RESOLVED FROM AUTHORITY — Stock MASTER §5 and Purchasing §9.9, checked 2026-09-28.**
@@ -5786,26 +5874,198 @@ confirmed holder, including partial collection/arrival. Consignment instructions
 incoming/outgoing dates and follow governed document revision/sending rules. These existing
 constraints need no fresh owner approval.
 
-#### Recommended whole solution and remaining owner boundary
+### 9.13 Showroom Blueprint — approved operating model and remaining design closure
 
-**PROPOSAL / NOT LAW:** morning Work shows admitted physical/document actions and commercial
-follow-up separately. Staff open the existing arrangement or exact Unit, resolve only the current
-missing fact, use the owning action in place, and see source completion refresh that occurrence.
-Registers support lookup/history/export; no Showroom dashboard, stock ledger or settlement ledger.
-One Display Request connects supplier-specific formal instructions, actual incoming/outgoing
-movements, evidence and commercial versions. Formal objects keep historic versions and source
-lineage. Existing approved normal flow is retained; the recommendations above add its exception
-and dependency closure, not a wholesale redesign.
+**OPERATING MODEL APPROVED / TARGET NOT BUILT; Jess, 2026-09-28.** Owner approved the
+integrated operating journey presented for review and the two assignment rulings below: Delivery
+Duty coordinates display transport without a Sales Order, and authorised management designates a
+Sales successor for a departed negotiator. §§9.8–9.11 remain the detailed business authority.
+Register/object copy and exact composition, verified
+opening/set identity and Finance matching/ownership details remain closure items, not implicitly
+approved by this operating-model acceptance. Section 3's detailed UI and section 6's detailed
+Finance recommendations remain PROPOSAL / NOT LAW where not already governed. The preceding
+research matrix is evidence. No Card, application build, cutover or PLAN MISSION COMPLETE is authorised.
 
-Before final Blueprint approval, resolve only genuinely absent business consequences after further
-authority checking: customer return after supplier notification/invoicing (ownership and liability),
-exceptional charges where no existing approval rule resolves them, and permanent successor for
-Sales-owned commercial work. Opening-stock provenance and no-Sales-Order transport must be closed
-with their owning modules rather than delegated back to Jess as database or component questions.
-The recommendations are falsified if current owner authority already supplies a different result;
-replace the gap with that authority instead of asking again. Existing migration/kit/bug work is
-engineering-owned, not an owner decision. Whole-domain planning is not complete and no build
-scope/Card is handed off from this audit.
+**Current → problem → recommendation → trade-off.** Current Stock has Site/Unit/ownership facts,
+and source inspection still finds the four Showroom destinations marked `soon: true`. Staff's
+supplier messages do not provide one traceable arrangement for all movement legs. Present one
+Display Request as the staff's arrangement and connect the existing owning documents/actions.
+Keep document registers for lookup and control. This removes repeated input and document-type
+selection, at the cost of requiring each connected module to provide trustworthy source facts and
+next actions. Falsifier: if a connected action needs staff to re-enter goods, dates or addresses
+already recorded, or completing it leaves a second inconsistent status, the composition fails.
+
+**1. Entry, responsibilities and normal operating day**
+
+- At the start of the day, My Work shows the signed-in person's admitted due/overdue actions;
+  Team Work exposes owner/cover gaps. Open the same owning form in place under Workspace §5.10.
+  The arrangement's own identity supplies context when there is no customer Sales Order; never
+  invent a customer Order Route. Planned dates use the existing calendars, and unknown collection
+  dates remain unknown. Day-end review identifies remaining goods, missing appointments/evidence
+  and commercial confirmations, rather than asking someone to mark an entire arrangement done.
+- For new work, Sales or Operation creates the same Display Request, recording new placement,
+  swap, removal or relocation intent, Sales's agreement/evidence and actual negotiating person.
+  Existing exact Units come from Inventory; new goods come from Catalog. Retain incomplete model
+  evidence as a draft and return to that draft after Catalog resolution. Price is not a physical
+  consignment gate. Check active overlapping arrangements before creating a second commitment.
+- Operation checks the actual pickup, destination, contact, transport party, dates and space for
+  each leg. The system derives the governed execution path from intent, ownership and source;
+  staff review it rather than choosing an unfamiliar document family. Third-party pickup addresses
+  are not automatically Carres Sites. Real custody/provenance determines the appropriate source.
+- On arrival or collection, authorised receiving/handover people use Receiving/Stock/Delivery's
+  own action and record exact goods, condition and evidence. Sender and receiver evidence stay
+  distinguishable. A price follow-up never disappears because the lorry trip finished.
+
+**2. Goods and documents, with no duplicate entry**
+
+| Operating case | Connected records and staff journey |
+|---|---|
+| Supplier-owned new display | Display Request → Consignment Order with new goods/destination → one Receiving flow at actual receipt → supplier-owned stock at that Site; no payable from receipt |
+| Carres purchases a display | Display Request → existing Manual Purchase Request approval → Purchase Order → Receiving; keep those existing approval and ownership rules |
+| Same-supplier swap | One Display Request connects incoming and outgoing scopes; one combined price-free Consignment Note PDF instructs the supplier; linked Consignment Return retains exact old Units and collection progress without a duplicate supplier notification |
+| Move between Carres Sites | Source-linked Stock Transfer, separate pickup/arrival evidence, same ownership and permanent Units; no supplier return merely because goods leave the showroom |
+| Return via warehouse later | First the Site-to-Site Transfer, then supplier return from the actual warehouse. Keep supplier collection outstanding after warehouse arrival; coordinate a future supplier delivery only once the collection appointment is confirmed |
+| Return without new goods | Source-linked internal Consignment Return, presented as Consignment Note, exact supplier-owned Units, supplier instruction and real handover; no fictitious incoming order or payable |
+| Sell a displayed Unit | Existing Sales Order/Invoice and eligible exact-Unit reservation; successful customer delivery creates the supplier sale-notification obligation. Failed/pending delivery does not. Operation sends the source-linked notice, Finance handles the supplier invoice separately |
+| Customer later returns it | Service-approved remedy → actual return/inspection → confirmed supplier terms/outcome → owning goods/Finance actions under §9.11; preserve original notice and invoice; no automatic ownership or payable reversal |
+
+The Dorsettloft example is the acceptance story: pickup new sofas from the recorded 2990 location
+for PJ, move exact old PJ sets to Carres warehouse, then later hand those same old Units to
+Dorsettloft. All three legs remain visible in one arrangement; no leg implies another is complete.
+A set's component identities follow Catalog, not a transport quantity or a count of imported rows.
+PJ's roughly 11 sofa sets remains a layout reference only; no fixed category-capacity settings.
+
+**3. Pages, object composition and lookup**
+
+The approved SHOWROOM target has three destinations: Display Requests, Consignment Notes and
+Consignment Sale Notices. They are record views, not compulsory repeated creation steps:
+
+| Surface | Staff's reason to open it | Recommended content / primary action boundary |
+|---|---|---|
+| Display Requests | Start or find the complete arrangement | Date/number, showroom, supplier scope, negotiating Sales, incoming/outgoing goods and concrete unresolved facts; create here or from selected Stock Units |
+| Consignment Notes | Find incoming, return or combined supplier instruction and remaining goods | Source-prefilled note, both directions where applicable, actual locations, independent dates and receipt/collection evidence; no separate Order/Return choice |
+| Consignment Sale Notices | Find actual sales requiring supplier notification | Date/number, supplier, successfully delivered Units, source delivery/reference, current version/send evidence and read-only Finance link; no manual sale-event creation |
+| Inventory filtered to a showroom | See goods actually held and their condition/ownership | Existing Stock register, exact Units and source/history; select eligible outgoing Units here; no second showroom inventory |
+
+These content descriptions are review intent, not newly approved literal column headings. Final
+register wording/order must replace stale §9.8–§9.11 lists and enter COPY in the same approval;
+no generic Work column or duplicated action queue. Use shared Register search, sortable/filterable
+headers, permitted Columns and scoped export. Search should reach record number, source, supplier,
+model/SKU and Unit ID. Row expansion has only the goods-disclosure job. Identity opens the full
+object; other document links open their owning record. Preserve filters and return context.
+
+The Display Request object follows the shared Object Detail grammar: identity/source → current
+owning action → incoming/outgoing goods and each movement's arrangement/actual evidence → supplier
+communication and linked commercial evidence → connected records and History. Concurrent legs
+must remain visible; the route is not a rigid wizard that forces old-out before new-in. Use existing
+Block and admitted Work components, with one primary action for the active owning form. An
+internal request has no PDF split. Supplier document issue/revision uses the governed preview
+composition; read-only document detail returns to full width. No local component or second form.
+
+Quick Rail reads source/contact/document/Unit facts and links to the owning object. Calendar reads
+confirmed/arranged dates from the owning schedules; an unknown date is not invented to place a row
+on a calendar. Customer information and selling prices stay out of supplier consignment PDFs.
+**CONSIGNMENT NOTE PRESENTATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+§9.9 is the one current staff/supplier presentation rule; §9.10 preserves its internal outgoing
+facts. Do not restore separate Consignment Orders/Consignment Returns navigation, add a second
+manual note or confuse actual supplier return with billed/sold quantity. Detailed UI composition
+remains subject to the shared kit; naming approval is not rendered-screen acceptance.
+
+**4. Exceptions and record lifecycle**
+
+- Draft editing preserves creator/history and consumes no official new Unit IDs. Repeated saves
+  or issue attempts cannot duplicate commitments. Another person's intervening change is shown
+  before an action is accepted; keep unsaved input on a failed save.
+- Issued documents retain their number and historical versions. Changes affect only outstanding
+  scope and require revised supplier communication where instructions changed. A send record
+  names version, actual recipient/channel/actor/time and never proves supplier acceptance. Check
+  an existing external send before resending; missing evidence is not proof it was never sent.
+- Amend, cancel, partial pickup/receipt and redirection follow §9.8 and Stock §5. Never delete a
+  physical event, restore a location by cancellation, retire a received Unit or conceal a leftover
+  Unit with whole-document completion. Reopen only the obligation affected by an evidenced change.
+- Wrong/short/damaged goods remain observable receipt facts and controlled Stock states. Supplier
+  recovery uses Supplier Claim; customer remedy uses Service. Reservations cannot be silently
+  released to satisfy a display move. A substitute physical item keeps its own identity.
+- Existing display stock without a historical order uses verified opening-stock provenance where
+  permitted by §6.2; never fabricate an old Consignment Order or receipt. Verification must establish
+  physical identity, supplier, ownership and current location. If evidence is missing, expose the
+  source gap and owning resolution before a source-dependent return/claim/settlement. This proposal
+  does not bypass a formal Claim's purchase-source requirement or authorise a production backfill.
+- Do not add copy-live-document or bulk physical completion. Later copying, if justified, can only
+  seed an uncommitted draft without received/sent/accepted-price facts or blindly reused Units.
+  Safe scoped read/export remains available. Archived/completed records retain linked History.
+- Loading, failure, empty and filtered-empty are distinct. A failed read is never zero stock or
+  completion. Disallowed actions explain the specific missing source, permission or affected Unit.
+
+**5. Ownership, Settings and unresolved assignment recommendation**
+
+Approved assignments remain: Sales negotiates commercial terms, Operation records/executes permitted
+arrangements, PO Duty owns supplier-document/follow-up actions, GRN Duty/eligible receiving people
+own receipt actions, physical handlers own their evidence, and Finance owns invoice/credit/payment.
+Workspace resolves active people and dated covers. No arrangement gains one universal owner.
+
+**NO-SALES-ORDER DISPLAY TRANSPORT — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Existing Delivery Duty coordinates carrier/date/contact arrangements for display transport that
+has no Sales Order, through the Shared Duty Resolver and governed cover. PO Duty retains supplier
+commitments and documents. Routine customer transport remains with its Sales Order PIC. Do not
+create a fake Sales Order, new roster or automatic assignment to the request recorder. This
+coordination role does not grant Stock/Receiving/physical-handover write permissions. Warehouse,
+Delivery and Workspace retain their owning action and admission contracts; unknown dates and
+missing eligible holders stay visible. Delivery MASTER §13.1 and Workspace MASTER §4 carry the
+same assignment boundary. This is an approved role rule, not proof of implemented Work admission.
+
+**DEPARTED SALES NEGOTIATOR — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Authorised
+management designates an active Sales successor for unresolved commercial follow-up when the
+original negotiating Sales person leaves permanently, recording reason/effective date and actual
+assigner. Retain the original negotiator and historical actors as separate facts. Temporary
+absence follows governed cover, and a missing successor remains an explicit assignment gap;
+Operation never inherits negotiation or acceptance authority. Workspace owns the person-assignment
+contract; no Showroom-local rota, invented manager role or self-assignment bypass. This ruling
+does not grant additional price, Catalog or approval permissions.
+
+Settings remains distributed by ownership: Warehouse Sites/addresses, Catalog products/suppliers
+and identity mode, supplier contacts/terms in their existing authority, Workspace Staff & Duties,
+and existing purchasing numbering/permissions. There is no new showroom Settings page, fixed
+capacity setup, supplier portal or duplicate contact list.
+
+**6. Finance connection, reporting and external boundary**
+
+Recommend matching the actual supplier invoice to successful sold Units and their sale notices,
+confirmed commercial evidence and prior invoice/credit allocations; never bill initial consignment
+receipt. An absent or conflicting cost leaves Finance reconciliation unresolved, not RM0. Retain
+partial invoices, corrections and the remaining unmatched scope; prevent the same sale from being
+matched twice. Existing confirmed supplier terms drive authorised returns/reductions under §9.11.
+Actual credit and payment remain Finance facts, not Purchasing completion ticks. The inspected
+Finance Bills page and consignment-receipt guard do not prove this matching is built. Detailed
+posting/ownership-transition rules require the owning Finance authority before implementation;
+this proposal does not create automatic entries or uniform liability terms.
+
+Central Reports/scoped exports read Site × supplier × exact Unit movement, current display goods,
+outstanding supplier collection, unsent-current-version notices and unresolved commercial facts.
+Finance settlement data is linked according to permission, not duplicated in an Operation ledger.
+Dates, scope and authoritative source remain clear; unavailable data is not a zero total.
+
+Supplier/carrier conversations can stay on existing channels, with relevant evidence recorded on
+the arrangement. No external invitations, account creation, live cutover or old-channel shutdown
+is approved. Opening data needs verified identity/provenance; the PJ36 test import is not a
+production migration plan. The 2990 pickup location must be verified as an operating address and
+holder, not assumed to be the reference software repository or a Carres-controlled warehouse.
+
+**7. Review and completion boundary**
+
+Reuse shared Shell/Register/Object Detail and current Workspace kit. At 1440, 1180, 820, 743 and
+390 pixels, and keyboard/200% zoom, the intended action and record identity must remain reachable;
+tables scroll within their surface, phone forms stack, and no facts/actions disappear just to fit.
+This is acceptance intent only: no rendered Showroom mockup or responsive validation was performed
+for this proposal, so no visual score or production readiness is claimed. New words/components
+need their existing governance; do not implement a local substitute.
+
+The integrated operating journey and the two assignment rules have owner approval. Exact
+register/object copy/composition, Finance matching/ownership
+consequences and verified opening/set identity remain explicit closure items. The planner owns
+further authority/design checking; these are not permission to hand incomplete truth to build.
+Persist the remaining reviewed result before PLAN MISSION COMPLETE. No rendered UI, complete
+Finance integration or production migration is certified by this approval.
 
 ---
 
@@ -5821,7 +6081,7 @@ scope/Card is handed off from this audit.
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
 | Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
 | Partial receipt leaves balance | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists on the exact open PO line |
-| Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
+| Showroom display change | Negotiating Sales for commercial facts; authorised Operation proxy retains that Sales person (§9.8). Execution uses each owning action's Duty/cover | `Record the current Unit and requested model` | Required request facts exist; physical and commercial obligations close separately |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
 | Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | The Units are received back (GRN) or an authorised outcome closes the repair; a Supplier reply or date never closes it (§9.7, corrected 2026-09-28) |
