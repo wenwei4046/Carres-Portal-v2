@@ -1544,13 +1544,13 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
 
     const save = screen.getByTestId("amend-save");
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Save — add a correction reason");
+    expect(save).toHaveTextContent("Save: add a correction reason");
 
     fireEvent.change(screen.getByTestId("amend-reason"), {
       target: { value: "Miscount fixed" },
     });
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Save — nothing changed yet");
+    expect(save).toHaveTextContent("Save: nothing changed yet");
 
     fireEvent.change(screen.getByTestId("amend-line-lr1"), {
       target: { value: "3" },
@@ -1607,7 +1607,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     );
     const save = screen.getByTestId("void-save");
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Void — add a reason");
+    expect(save).toHaveTextContent("Void: add a reason");
     fireEvent.change(screen.getByTestId("void-reason"), {
       target: { value: "Wrong PO entirely" },
     });

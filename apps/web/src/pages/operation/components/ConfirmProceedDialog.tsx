@@ -140,11 +140,11 @@ export default function ConfirmProceedDialog({
         if (body.code === "partner_required") {
           toast.error("Pick a delivery partner first");
         } else if (body.code === "partner_not_found") {
-          toast.error("That delivery partner no longer exists — pick another");
+          toast.error("That delivery partner no longer exists. Pick another");
         } else if (body.code === "wrong_stage") {
-          toast.error("Order has already been triaged — refresh and retry");
+          toast.error("Order has already been triaged. Refresh and retry");
         } else if (body.code === "insufficient_stock_for_reserve") {
-          toast.error("Stock changed under us — re-check and retry");
+          toast.error("Stock changed under us. Re-check and retry");
         } else {
           toast.error(e.message || "Confirm proceed failed");
         }
@@ -159,8 +159,8 @@ export default function ConfirmProceedDialog({
       <div className="text-meta text-base-600 mb-3.5 font-body">
         Pick the customer-leg delivery partner. They&rsquo;ll receive this
         order in their <strong>Incoming</strong> queue to accept or reject.
-        The system auto-picks the source warehouse based on stock coverage —
-        order goes to <strong>Ready to dispatch</strong> if covered, otherwise
+        The system auto-picks the source warehouse based on stock coverage.
+        The order goes to <strong>Ready to dispatch</strong> if covered, otherwise
         to <strong>In Production</strong> for PO issuance.
       </div>
 
@@ -181,7 +181,7 @@ export default function ConfirmProceedDialog({
         </div>
       ) : partnersQ.isError ? (
         <div className="text-meta text-destructive mb-3.5">
-          Couldn&rsquo;t load partners — try again later.
+          Couldn&rsquo;t load partners. Try again later.
         </div>
       ) : logisticPartners.length === 0 ? (
         <div className="text-meta text-warning mb-3.5">
@@ -208,7 +208,7 @@ export default function ConfirmProceedDialog({
           className="text-meta px-3 py-2.5 rounded-[4px] mb-3.5 font-body text-destructive border border-destructive/30 bg-destructive/5"
         >
           <div>
-            <strong>Procuring too early?</strong> — delivery is{" "}
+            <strong>Procuring too early?</strong> Delivery is{" "}
             <strong>{leadGap.days} days</strong> from today, but production
             lead-time for this category is only{" "}
             <strong>{leadGap.leadDays} days</strong>. Proceeding now means
