@@ -1544,6 +1544,31 @@ describe("the goods chain reads its owners (owner ruling 2026-09-26)", () => {
     expect(node(map, "L1:PO-1:supplier").current).toBe(false);
   });
 
+  it("a long instruction wraps under the owner chip and the node grows for it — never an ellipsis", () => {
+    const at = (supplierName: string) =>
+      node(
+        resolveSalesOrderRoute(
+          input({
+            goods: [
+              goodsLine({
+                lineId: "L1",
+                sources: [goodsSource({ poId: "PO-20260903-4354", supplierName, dayBeforeCheckOpen: true })],
+                onOrderQty: 1,
+                uncoveredQty: 0,
+                shortBecause: "not-received",
+              }),
+            ],
+          }),
+        ),
+        "L1:PO-20260903-4354:supplier",
+      );
+    const long = at("Nice Future Furniture Sdn Bhd");
+    const rows = wrapRouteText(long.action!.label, ROUTE_TEXT_BUDGET.action);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.every((row) => row.length <= ROUTE_TEXT_BUDGET.action || !row.includes(" "))).toBe(true);
+    expect(long.h).toBeGreaterThan(at("Oh").h);
+  });
+
   it("a sent PO completes PURCHASING and owes no send", () => {
     const map = resolveSalesOrderRoute(
       input({

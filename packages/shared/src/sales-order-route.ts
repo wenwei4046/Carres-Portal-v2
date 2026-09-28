@@ -550,7 +550,11 @@ const truthy = (list: ReadonlyArray<string | null | undefined>): string[] =>
  * 184px of text: `text-body` 13px fact lines, `text-label` 11px context rows,
  * and requirement rows that give 12px to their tick.
  */
-export const ROUTE_TEXT_BUDGET = { line: 26, requirement: 30, context: 32 } as const;
+export const ROUTE_TEXT_BUDGET = { line: 26, requirement: 30, context: 32, action: 27 } as const;
+/* `action`: the instruction shares its row with the 20px owner chip and a 6px
+   gap, leaving 158px of 11px text. A supplier's name makes the instruction
+   long (`Ask {Supplier} for the Supplier DO for {PO No}`), so it wraps under
+   the chip — it never ends in "…". */
 
 /** A date travels as ISO and is SPELLED by the page (`Thu, 24 Sep`), one
  *  character longer. The row is measured at the length the operator reads. */
@@ -666,6 +670,7 @@ function nodeHeight(node: {
     ) * REQ_H +
     (node.action
       ? ACTION_H +
+        (wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).length - 1) * CONTEXT_H +
         wrapRouteText(node.action.context.detail, ROUTE_TEXT_BUDGET.context).length * CONTEXT_H
       : 0) +
     /* A node that acts still shows its door: `Collect` tells the operator what
