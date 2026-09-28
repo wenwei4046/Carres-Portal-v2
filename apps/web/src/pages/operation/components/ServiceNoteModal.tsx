@@ -265,13 +265,13 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
             <div className="grid grid-cols-2 gap-3">
               <Field label="Category">
                 <select className={inp} value={category} onChange={e => setCategory(e.target.value)}>
-                  <option value="">— Select —</option>
+                  <option value="">Select</option>
                   {SN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
               <Field label="Type">
                 <select className={inp} value={type} onChange={e => setType(e.target.value)}>
-                  <option value="">— Select —</option>
+                  <option value="">Select</option>
                   {SN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </Field>
@@ -305,7 +305,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
             <section className="rounded border border-base-200 bg-base-50 p-3">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-meta font-semibold uppercase tracking-wider text-base-500">
-                  Products in this order — tick to add to Items
+                  Products in this order. Tick to add to Items
                 </h3>
                 <button
                   type="button"
@@ -422,7 +422,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
 
           {/* ── Section A — Logistics ────────────────────────────────────────── */}
           <SectionToggle
-            label="Section A — Logistics"
+            label="Section A: Logistics"
             color="blue"
             enabled={useA}
             onToggle={() => { setUseA(!useA); if (!useA) setSectionA(EMPTY_SECTION_A); }}
@@ -442,7 +442,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                 </div>
                 <Field label="Logistic Company">
                   <select className={inp} value={sectionA.logisticCompany ?? ""} onChange={e => setSectionA({ ...sectionA, logisticCompany: e.target.value || null })}>
-                    <option value="">— Select —</option>
+                    <option value="">Select</option>
                     {SN_LOGISTICS.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </Field>
@@ -460,7 +460,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
 
           {/* ── Section B — Supplier ─────────────────────────────────────────── */}
           <SectionToggle
-            label="Section B — Supplier"
+            label="Section B: Supplier"
             color="orange"
             enabled={useB}
             onToggle={() => { setUseB(!useB); if (!useB) setSectionB(EMPTY_SECTION_B); }}
@@ -490,7 +490,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
 
           {/* ── Section C — Warehouse ────────────────────────────────────────── */}
           <SectionToggle
-            label="Section C — Warehouse"
+            label="Section C: Warehouse"
             color="gray"
             enabled={useC}
             onToggle={() => { setUseC(!useC); if (!useC) setSectionC(EMPTY_SECTION_C); }}

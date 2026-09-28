@@ -138,7 +138,7 @@ export default function ImportStockDialog({
             Upload your <span className="font-semibold">Klg Warehouse</span>{" "}
             sheet (.xlsx). Each row is one physical unit; we book them in at{" "}
             <span className="font-semibold">Carres Klang</span>. You&rsquo;ll see
-            the counts — new vs already-in — before anything saves.
+            the counts (new vs already-in) before anything saves.
           </p>
           <p className="text-meta text-base-500">
             Add-only + idempotent: lines already in the pool are matched on a
@@ -188,11 +188,11 @@ export default function ImportStockDialog({
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
               <div className="text-strong text-green-700">{fresh.length}</div>
-              <div className="text-label uppercase tracking-[0.05em] text-base-500">new lines — will add</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">new lines, will add</div>
             </div>
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
               <div className="text-strong text-base-900">{alreadyIn}</div>
-              <div className="text-label uppercase tracking-[0.05em] text-base-500">already in — skipped</div>
+              <div className="text-label uppercase tracking-[0.05em] text-base-500">already in, skipped</div>
             </div>
           </div>
 

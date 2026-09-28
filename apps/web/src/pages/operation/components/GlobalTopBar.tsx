@@ -199,7 +199,7 @@ export function TopBarIcons() {
                 empty="Nothing overdue"
               />
               <AlertGroup
-                title="Confirm delivery date — no date yet"
+                title="Confirm delivery date: no date yet"
                 tone="text-warning"
                 rows={alerts.chase}
                 onOpen={goOrders}
@@ -264,7 +264,7 @@ export function TopBarIcons() {
               <span className="min-w-0">
                 <span className="text-body text-base-800 block">Training · SOP</span>
                 <span className="text-meta text-base-400 block">
-                  Standard operating procedures — coming soon
+                  Standard operating procedures. Coming soon
                 </span>
               </span>
             </button>

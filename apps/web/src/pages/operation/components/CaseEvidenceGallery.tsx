@@ -132,7 +132,7 @@ export default function CaseEvidenceGallery({
             aria-label="What kind of photo to add"
             className="rounded border border-base-300 bg-white px-2 py-1 text-body"
           >
-            <option value="">— add a photo —</option>
+            <option value="">Add a photo</option>
             {slots.map((s) => (
               <option key={s} value={s}>
                 {caseEvidenceSlotLabel(s)}

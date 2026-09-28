@@ -129,9 +129,9 @@ export function deriveRelatedCases(input: {
       kind: "guarantee_claim",
       ref: g.displayId ?? "Guarantee",
       title: g.coversLabel
-        ? `Guarantee claim — ${g.coversLabel}`
+        ? `Guarantee claim: ${g.coversLabel}`
         : g.guaranteeLabel
-          ? `Guarantee claim — ${g.guaranteeLabel}`
+          ? `Guarantee claim: ${g.guaranteeLabel}`
           : "Guarantee claim",
       // A claim is one-shot and terminal (0267 retires the ID on use), so a
       // claimed guarantee is always a settled record.

@@ -102,7 +102,7 @@ export default function PaymentLedger({ orderId, saved }: {
     return <>{capture}
       <p className="text-meta text-base-500" data-testid="so-payments-unreadable">
         {forbidden
-          ? "Payments are not available to your role — open the order in Payments."
+          ? "Payments are not available to your role. Open the order in Payments."
           : "The payments could not be opened."}
       </p>
     </>;

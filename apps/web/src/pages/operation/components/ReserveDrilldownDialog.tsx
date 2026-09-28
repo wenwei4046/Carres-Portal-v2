@@ -59,7 +59,7 @@ export default function ReserveDrilldownDialog({
       await navigator.clipboard.writeText(text);
       toast.success(`Copied ${text}`);
     } catch {
-      toast.error("Couldn't copy — clipboard blocked");
+      toast.error("Couldn't copy: clipboard blocked");
     }
   }
 

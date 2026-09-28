@@ -77,9 +77,9 @@ export default function ChaseSupplierReview({
   async function copyMsg(msg: string, supplierName: string) {
     try {
       await navigator.clipboard.writeText(msg);
-      toast.success(`Message copied — ${supplierName}`);
+      toast.success(`Message copied: ${supplierName}`);
     } catch {
-      toast.error("Couldn't copy — select the text and copy manually");
+      toast.error("Couldn't copy. Select the text and copy manually");
     }
   }
 
@@ -100,7 +100,7 @@ export default function ChaseSupplierReview({
         {/* Header */}
         <div className="flex items-center gap-2 px-5 h-12 border-b border-base-200">
           <MessageCircle size={16} className="text-base-500" strokeWidth={2} />
-          <span className="text-body font-semibold">Confirm ready date — one message per supplier</span>
+          <span className="text-body font-semibold">Confirm ready date: one message per supplier</span>
           <span className="text-meta text-base-500 tabular-nums">
             {orders.length} order{orders.length === 1 ? "" : "s"} · {totalUnits} unit
             {totalUnits === 1 ? "" : "s"}
@@ -133,21 +133,21 @@ export default function ChaseSupplierReview({
           </div>
           <span className="text-meta text-base-500">
             {mode === "remind"
-              ? "Gentle — before the deadline."
-              : "Firmer — the stock is already late."}
+              ? "Gentle: before the deadline."
+              : "Firmer: the stock is already late."}
           </span>
         </div>
 
         {plan.unresolved > 0 && (
           <div className="px-5 py-2 text-meta text-base-500 border-b border-base-100">
             {plan.unresolved} line{plan.unresolved === 1 ? "" : "s"} couldn&rsquo;t be matched to a
-            supplier — skipped.
+            supplier. Skipped.
           </div>
         )}
 
         {plan.cards.length === 0 && (
           <div className="px-5 py-8 text-body text-base-500">
-            No calls to make — no core supplier line in the selection.
+            No calls to make. No core supplier line in the selection.
           </div>
         )}
 
