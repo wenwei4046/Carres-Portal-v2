@@ -62,7 +62,7 @@ export default function PickupBatchDialog({
           </p>
           <p className="text-label text-base-500 mt-2">
             Carres will auto-generate the DO number for this pickup. Click
-            Pickup to confirm — no need to enter a number.
+            Pickup to confirm. No need to enter a number.
           </p>
         </div>
 

@@ -58,6 +58,6 @@ describe("PartnerRequestForDeliveryDialog", () => {
 
   it("title falls back to threadId slice when poLabel omitted", () => {
     render(wrap(<PartnerRequestForDeliveryDialog threadId={THREAD_ID} onClose={() => {}} />));
-    expect(screen.getByText(/Request for Delivery — 00000000/)).toBeInTheDocument();
+    expect(screen.getByText(/Request for Delivery: 00000000/)).toBeInTheDocument();
   });
 });

@@ -97,7 +97,7 @@ describe("PartnerPickupsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /view rfd/i }));
     // Dialog title uses poLabel — confirms threadId + poLabel were both passed.
     await waitFor(() =>
-      expect(screen.getByText(/Request for Delivery — PO-007/)).toBeInTheDocument(),
+      expect(screen.getByText(/Request for Delivery: PO-007/)).toBeInTheDocument(),
     );
     // Dialog has Accept + Reject buttons (poLabel header confirms it's the one
     // we just opened, not stale state).
@@ -125,11 +125,11 @@ describe("PartnerPickupsPage", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /view rfd/i }));
     await waitFor(() =>
-      expect(screen.getByText(/Request for Delivery — PO-007/)).toBeInTheDocument(),
+      expect(screen.getByText(/Request for Delivery: PO-007/)).toBeInTheDocument(),
     );
     fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
     await waitFor(() =>
-      expect(screen.queryByText(/Request for Delivery — PO-007/)).toBeNull(),
+      expect(screen.queryByText(/Request for Delivery: PO-007/)).toBeNull(),
     );
   });
 });
