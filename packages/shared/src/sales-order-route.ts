@@ -1159,8 +1159,8 @@ function stockDraft(
   }
   /* The count is Stock's own fact. WHY the Units are short is Purchasing's
      answer (none when Purchasing could not be read), and the wait belongs to
-     Purchasing or Receiving: Stock owes no action — the retired
-     `Create the Units` and `Waiting for purchase` are not revived. */
+     Purchasing or Receiving: Stock owes no action, and the retired
+     `Create the Units` is not revived. */
   return {
     id: `${line.key}:stock`,
     kind: "stock",

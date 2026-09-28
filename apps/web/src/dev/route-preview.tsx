@@ -201,6 +201,8 @@ const journey: SalesOrderRouteInput = {
  * a partly received one, a line Ready Stock can fill, and a line whose
  * Purchasing read failed. `{braces}` stand where a real record would print. */
 const source = {
+  supplierName: "{Supplier}",
+  sent: true,
   qty: 1,
   issuedAt: "2026-09-03",
   poDeliveryDate: "2026-09-18",
@@ -292,12 +294,23 @@ const goods: SalesOrderRouteInput = {
   unreadable: { purchasing: ["L4"] },
 };
 
+/* `?s=unsent` — the goods scenario with its first Purchase Order issued but not
+ * yet marked sent: PURCHASING owes the send, and the supplier is not asked. */
+const unsent: SalesOrderRouteInput = {
+  ...goods,
+  goods: goods.goods!.map((line, i) =>
+    i === 0 ? { ...line, sources: line.sources.map((src) => ({ ...src, sent: false })) } : line,
+  ),
+};
+
 const scenario = new URLSearchParams(window.location.search).get("s");
 const seeded: SalesOrderRouteInput =
   scenario === "journey"
     ? journey
     : scenario === "goods"
       ? goods
+    : scenario === "unsent"
+      ? unsent
     : scenario === "waiting"
     ? { ...input, amendment: {
         status: "submitted",
