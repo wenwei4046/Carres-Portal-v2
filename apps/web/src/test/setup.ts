@@ -24,6 +24,8 @@ configure({ asyncUtilTimeout: 5000 });
  * responsive tests can opt into a matching query explicitly.
  */
 export function mockMatchMedia(matches = false) {
+  if (typeof window === "undefined") return;
+
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     writable: true,
