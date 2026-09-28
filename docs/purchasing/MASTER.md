@@ -1277,9 +1277,8 @@ The user-facing gate uses two lines:
   there.
 - **Hookka and Ohana display goods are BOUGHT by Carres** (Manual Purchase / PO) — §7.5.
 - **Every other supplier places its display goods in Carres showrooms on consignment** — the
-  goods stay the supplier's until sold — §7.6. Consignment is live business today even though no
-  PO has yet been flagged `is_consignment` (measured 2026-09-28): the four Showroom documents are
-  needed, not deferred.
+  goods stay the supplier's until sold — §7.6. Consignment is live business today (production holds one PO flagged `is_consignment`, measured
+  by the Warehouse chat 2026-09-28): the four Showroom documents are needed, not deferred.
 - **A dealer (e.g. Big Mattress) BUYS from Carres.** Its price is fixed by Sales Development, not
   Operation. A dealer's display is the dealer's own purchase — a Sales matter, never a Purchasing
   consignment or a Carres display.
@@ -5090,8 +5089,10 @@ Create Repair Order                                   [Cancel] [Save repair orde
   number; the return leg references it — §9.7 conflict 1) and opens the RO object page, where
   `Issue repair order` sends it.
 - Missing price saves and issues; it prints `Not recorded`, never RM0.
-- Showroom and Dealer are drawn but disabled with `Not available yet` until Stock §12.9 governs
-  those Sites (falsifier: a governed Showroom/Dealer row in `warehouses`).
+- PJ Showroom is already a governed Site (`warehouses` kind own, measured 2026-09-28), so Showroom
+  selection opens now. A Dealer is not a Carres Site (§7.4a: dealers buy their display), so
+  `Dealer` is drawn disabled with `Not available yet`; moving a display Unit out still waits for
+  Stock's `Transfer` form (Stock §12.9).
 
 #### Register, detail and shared UI
 
