@@ -22,9 +22,12 @@ import { cents, num } from "./payables/payables-words";
 
 export type CustomerOwingRow = ReturnType<typeof customerBalanceRows>[number];
 
-/** Every order a customer still owes money on, largest first. */
+/** Every order a customer still owes money on, largest first. Outstanding is
+ *  rounded to the sen first, so a paid order's float crumb (5.6e-17) never owes. */
 export function customerOwingRows(rows: readonly InvoiceRegisterRow[]): CustomerOwingRow[] {
-  return customerBalanceRows(rows).filter((r) => r.outstanding > 0);
+  return customerBalanceRows(rows)
+    .map((r) => ({ ...r, outstanding: cents(r.outstanding) }))
+    .filter((r) => r.outstanding > 0);
 }
 
 /** What customers owe in total, over the rows `customerOwingRows` returns. */
