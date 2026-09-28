@@ -3304,3 +3304,5 @@ export * from "./logistics-card";
 export * from "./customer-card";
 export * from "./supplier-card";
 export * from "./mission-route";
+
+export * from "./sales-order-register-filters";

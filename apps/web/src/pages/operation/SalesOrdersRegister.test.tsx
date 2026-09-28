@@ -127,6 +127,11 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     ...over,
   }) as operationOrderListRow;
 
+/** A word printed by the page itself, not by the rail's choices (the rail
+ *  lists every dealer, state and date range as a filter). */
+const outsideRail = (text: string) =>
+  screen.getAllByText(text).filter((el) => !el.closest('[data-testid="sales-orders-rail"]'));
+
 function mount(at = "/operation/orders") {
   /* The register's own list hook is the mocked spy; the provider serves the
    * OTHER live hooks on the page chrome (ModuleHeader's top-bar badges). */
@@ -273,7 +278,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       outlets: { name: "Carres Maluri Cheras" },
     })] };
     mount();
-    expect(screen.getByText("Carres Maluri Cheras")).toBeInTheDocument();
+    expect(outsideRail("Carres Maluri Cheras")).toHaveLength(1);
   });
 
   it("keeps one work toolbar with discoverable Search, Export and Columns", () => {
@@ -290,7 +295,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByTestId("new-sales-order")).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+    /* `Not delivered` is a rail FACT filter (owner approved 2026-09-22), never a
+       toolbar status. */
+    expect(within(screen.getByTestId("work-toolbar")).queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
   it("labels Export and its menu offers Excel, PDF and Print", () => {
@@ -386,7 +393,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       customer_address_state: "Kuala Lumpur",
     })] };
     mount();
-    expect(screen.getByText("Kuala Lumpur")).toBeInTheDocument();
+    expect(outsideRail("Kuala Lumpur")).toHaveLength(1);
     expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
     expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
   });
@@ -670,7 +677,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "PO No",
       "DO No",
     ]);
-    expect(screen.getByText("Carres Kelana Jaya")).toBeInTheDocument();
+    expect(outsideRail("Carres Kelana Jaya")).toHaveLength(1);
     expect(screen.getByText("Khoo Aik Yean")).toBeInTheDocument();
     /* The retired word never prints (COPY-STANDARD, SO Doc Date). */
     expect(screen.queryByText("SO Date")).not.toBeInTheDocument();
@@ -1079,7 +1086,7 @@ describe("Sales Orders table correction", () => {
     fireEvent.click(sort);
     expect(screen.getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Filter Customer Requested Delivery Date" }));
-    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(outsideRail("Today")).toHaveLength(1);
   });
 
   it("preserves saved widths and optional columns, but a saved order cannot move Proceed Date · SO Doc Date · SO No off the front", () => {
@@ -1327,5 +1334,112 @@ describe("the Sales Orders rail and its two views", () => {
     expect(at).not.toContain("view=");
     expect(at).not.toContain("dealer=");
     expect(at).not.toContain("months=");
+  });
+});
+
+describe("the Order list rail: read-only fact filters (owner approved 2026-09-22)", () => {
+  const sold = (sku: string, qty = 1) => ({ sku, status: "sold" as const, qty });
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [
+          order({
+            id: "a", so: 1501, dealers: { name: "{dealer 1}" },
+            customer_address_state: "{state 1}", customer_address_city: "{city 1}",
+            order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 100 }],
+            allocated_units: [],
+          }),
+          order({
+            id: "b", so: 1502, dealers: { name: "{dealer 2}" },
+            customer_address_state: "{state 2}", customer_address_city: "{city 2}",
+            order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 100 }],
+            allocated_units: [sold("B1201S-K")],
+          }),
+          order({
+            id: "c", so: 1503, dealers: { name: "{dealer 2}" },
+            customer_address_state: "{state 2}", customer_address_city: "{city 3}",
+            order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100 }],
+            allocated_units: [sold("B1201S-K")],
+          }),
+        ],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1501, 1502, 1503].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+
+  it("the Order list carries the Dealer, State / City, Date and Delivery groups, and no Clear filters", () => {
+    mount();
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const group of ["Dealer / Sales Location", "Delivery State / City", "Date", "Delivery"]) {
+      expect(within(rail).getByText(group)).toBeInTheDocument();
+    }
+    expect(within(rail).queryByText(/Clear/i)).not.toBeInTheDocument();
+    expect(shown()).toEqual([1501, 1502, 1503]);
+  });
+
+  it("Dealer / Sales Location narrows to where the order was sold", () => {
+    mount();
+    fireEvent.change(screen.getByTestId("sales-orders-rail-dealer"), { target: { value: "{dealer 2}" } });
+    expect(shown()).toEqual([1502, 1503]);
+    expect(screen.getByTestId("register-column")).toHaveTextContent("Dealer / Sales Location: {dealer 2}");
+  });
+
+  it("State narrows, City narrows within it, and a new State clears the City", () => {
+    mount("/operation/orders?state=%7Bstate%202%7D&city=%7Bcity%203%7D");
+    expect(shown()).toEqual([1503]);
+    fireEvent.change(screen.getByTestId("sales-orders-rail-state"), { target: { value: "{state 1}" } });
+    expect(screen.getByTestId("location").textContent).not.toContain("city=");
+    expect(shown()).toEqual([1501]);
+  });
+
+  it("Delivery reads the one goods arithmetic: nothing sold, some sold, all sold", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-not_delivered"));
+    expect(shown()).toEqual([1501]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-partially_delivered"));
+    expect(shown()).toEqual([1502]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-fully_delivered"));
+    expect(shown()).toEqual([1503]);
+  });
+
+  it("a chosen row clicked again is deselected: no chosen value means All", () => {
+    mount();
+    const row = screen.getByTestId("sales-orders-rail-delivery-fully_delivered");
+    fireEvent.click(row);
+    expect(shown()).toEqual([1503]);
+    fireEvent.click(row);
+    expect(shown()).toEqual([1501, 1502, 1503]);
+    expect(screen.getByTestId("location").textContent).not.toContain("delivery=");
+  });
+
+  it("Date reads the chosen date field; Proceed Date is the default", () => {
+    const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, proceeded_at: `${today}T01:00:00Z`, placed_at: "2020-01-01T00:00:00Z" }),
+      order({ id: "b", so: 1502, proceeded_at: "2020-01-02T01:00:00Z", placed_at: `${today}T01:00:00Z` }),
+    ];
+    mount("/operation/orders?range=today");
+    expect(shown()).toEqual([1501]);
+    fireEvent.change(screen.getByTestId("sales-orders-rail-date-field"), { target: { value: "doc" } });
+    expect(shown()).toEqual([1502]);
+    expect(screen.getByTestId("register-column")).toHaveTextContent("SO Doc Date: Today");
+  });
+
+  it("the Order list's filters never carry into Monthly demand", () => {
+    mount("/operation/orders?dealer=%7Bdealer%201%7D&delivery=not_delivered&range=today");
+    fireEvent.click(screen.getByTestId("sales-orders-view-monthly"));
+    const at = screen.getByTestId("location").textContent ?? "";
+    expect(at).not.toContain("dealer=");
+    expect(at).not.toContain("delivery=");
+    expect(at).not.toContain("range=");
   });
 });
