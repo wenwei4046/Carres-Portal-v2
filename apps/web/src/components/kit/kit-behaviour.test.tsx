@@ -229,6 +229,13 @@ describe("Select", () => {
     expect(screen.getByText("NETS")).toBeInTheDocument();
   });
 
+  it("a value the list no longer offers still prints as itself, never an empty box", () => {
+    render(
+      <Select id="state" label="State" value="Pulau Pinang" options={[{ value: "Penang", label: "Penang" }]} onValueChange={() => {}} />,
+    );
+    expect(screen.getByRole("combobox")).toHaveTextContent("Pulau Pinang");
+  });
+
   it("carries the SAME error contract as Input — the message replaces the hint", () => {
     render(
       <Select
