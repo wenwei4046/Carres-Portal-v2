@@ -230,6 +230,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |
 | Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
 | Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
+| Staff & Duties detail and history (owner ruling 2026-09-28; workspace/MASTER.md §4.2) | fact `Next holder` → `{name} from {date}` · gap `Nobody holds {Duty} from {date}.` · section `Planned` → `{n} assignments until {date}` · `Show` · catalogue `Ends {date}` only when nobody follows | Upcoming · Coming up · Future · `Ends {date}` on a continuous rota |
 | Duty no match | `No duties match this search` · `Clear search` | No duties |
 | Duty read failure | `Staff & Duties could not be opened` · `Try again` | No duties · Error |
 | Duty unassigned | `Not assigned` · `Nobody holds {Duty}.` | Unowned · Available · — |

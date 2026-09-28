@@ -207,36 +207,67 @@ combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
 
-Desktop uses one catalogue and one selected-duty detail. It does not repeat two large forms and a
-full history beneath every Duty.
+**APPROVED / LOCKED, owner ruling (Jess) 2026-09-28 — APPROVED TARGET / NOT BUILT** (the
+catalogue + selected-duty split is BUILT, #1388; the history split, `Next holder` and the `Ends`
+rule below are not). The page sits in the Settings content area (§1) under the Settings section
+header. One catalogue and one selected-duty detail; never two large forms and a full history
+beneath every Duty.
 
 ```text
-┌ Staff & Duties ──────────────────────────────────────────────────────────────┐
-│ Who holds each company duty today and who covers an absence.   Search duties│
-├ DUTIES ──────────────────────────┬ SELECTED DUTY ────────────────────────────┤
-│ PO Duty                          │ PO Duty                                   │
-│ [YJ] Yu Jun                      │ Normal owner  [YJ] Yu Jun                 │
-│                                  │ Acting today [SH] Shasha                  │
-│ GRN Duty                         │ Cover         15–17 Sep · Annual leave    │
-│ [SH] Shasha                      │                                            │
-│                                  │ [Assign holder] [Add cover]               │
-│ Delivery Duty                    ├ ASSIGNMENT & COVER HISTORY ───────────────┤
-│ Not assigned                     │ 15 Sep · Shasha covering for Yu Jun       │
-│                                  │ 01 Sep · Yu Jun assigned by Jess          │
-│ …                                │                                            │
-└──────────────────────────────────┴────────────────────────────────────────────┘
+Workspace
+Staff & Duties
+Who holds each company duty today and who covers an absence.
+[Search duties        ]  [State  All duties ˅]
+┌ DUTIES ───────────────────┬ {Duty} ────────────────────────────────────────┐
+│▌{Duty}                    │ Normal owner   [AB] {name}                      │
+│ {holder name}             │ Acting today   [CD] {name}      (cover only)    │
+│ {Duty}                    │ Effective      {date} to {date}                 │
+│ Not assigned              │ Next holder    [EF] {name} from {date}          │
+│ {Duty}                    │ Cover          {date} to {date} · {reason}      │
+│ Covered today             │                                                  │
+│ …                         │ [Assign holder]  [Add cover]    (manager only)  │
+│                           ├ PLANNED ────────────────────────────────────────┤
+│                           │ {n} assignments until {date}             Show ˅ │
+│                           ├ ASSIGNMENT & COVER HISTORY ─────────────────────┤
+│                           │ {name} holds {Duty}                              │
+│                           │ {date} to {date} · Assigned by {name}            │
+│                           │ {note}                                           │
+└───────────────────────────┴──────────────────────────────────────────────────┘
 ```
 
-The left catalogue follows the shared Duty catalogue order and shows Duty label, current normal
-holder and exceptional state: `Covered today`, `Starts {date}`, `Ends {date}` or `Not assigned`.
-It never shows workload, performance, a recommended person or a copied module roster. Search matches
-Duty label and authorised current/historical person names; `State` may narrow to `All duties`,
-`Covered today`, `Cover scheduled` and `Not assigned`.
+**Catalogue.** Follows the shared Duty catalogue order. Each row is the Duty label plus ONE
+supporting line: the current normal holder's name, replaced by the exceptional state when one
+applies, in this precedence: `Not assigned` → `Covered today` → `Starts {date}` (a scheduled
+cover) → `Ends {date}`. **`Ends {date}` appears only when no assignment begins the day after the
+current one ends** — a continuous monthly rota is not an ending and prints the holder's name. The
+row never shows workload, performance, a recommended person or a copied module roster. The
+selected row uses the governed rail active treatment (`blue-3` wash, 2px `blue-9` line inset
+left). Search matches Duty label and authorised current/historical person names; `State` narrows
+to `All duties` · `Covered today` · `Cover scheduled` · `Not assigned`.
 
-The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
-`Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
-carry a full-name accessible label and never replace the printed name. Selecting a Work
+**Selected detail — separate labelled facts, each printed only when it has a value:**
+
+| Fact | Source | When shown |
+|---|---|---|
+| `Normal owner` | Shared Duty Resolver | Always when held |
+| `Acting today` | covers + resolver | Only while a cover acts today; the same person is never repeated as acting |
+| `Effective` | current assignment | Always when held · `{date} to {date}`, or `From {date}` with no end |
+| `Next holder` | the next future assignment | Only when one exists · `{name} from {date}` |
+| `Cover` | the active or next scheduled cover | Only when one exists · dates and reason |
+| gap sentence | resolver + assignments | Replaces `Next holder` when the current term ends with nobody after it: `Nobody holds {Duty} from {date}.` |
+
+Avatar initials carry a full-name accessible label and never replace the printed name. A Work
 configuration failure may deep-link directly to the required Duty while preserving this layout.
+
+**Planned.** Future assignments (starting after today) leave the history and sit in one
+`PLANNED` section between the actions and the history, collapsed by default to
+`{n} assignments until {date}` with `Show`; expanded, they list nearest first in the history row
+format. With no future assignment the section does not render.
+
+**Assignment & cover history.** Only assignments and covers that have started on or before today,
+newest first, append-only. Each row: `{name} holds {Duty}` or the cover sentence, then
+`{date} to {date} · Assigned by {name}`, then the factual note when present. Dates follow the
+governed year rule (`Fri, 15 Jan 27` outside the current year).
 
 ### 4.3 · Change-holder contract
 
@@ -311,10 +342,15 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
+| Planned empty | The `PLANNED` section does not render |
+| Term ends with nobody after | Catalogue `Ends {date}` · detail `Nobody holds {Duty} from {date}.` in place of `Next holder` |
+| Refresh failed | Keep the last good catalogue and detail on screen with `Staff & Duties could not be opened` · `Try again` above them; never blank a good read |
 
-At 1440px and above use the catalogue/detail split. At 1024–1439px retain the split with a narrower
-catalogue. Below 1024px show the catalogue first and open the selected Duty as a full-width detail
-with an explicit Back door; forms are single-column and dates/names never truncate. Keyboard order is
+The split follows the CONTENT width inside Settings, never the viewport, because the Settings rail
+(240px, hideable) sits beside it. Content ≥ 720px: catalogue/detail split, catalogue 280px (240px
+when the content is under 960px). Content < 720px: the catalogue alone; selecting a Duty opens the
+detail full width with an explicit `Back`; forms are single-column. Names and dates wrap and never
+truncate. Acceptance measures 1440 · 1180 · 820 · 743 · 390px. Keyboard order is
 search/filter → Duty list → selected facts → authorised actions → history. Focus returns to the
 originating Duty after a modal closes.
 
