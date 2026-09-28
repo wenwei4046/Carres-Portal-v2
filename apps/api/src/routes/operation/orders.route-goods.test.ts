@@ -62,13 +62,17 @@ const rows = {
   ],
   po_line_sources: [{ order_line_id: "L1", po_id: "PO-1", po_line_id: "pl1", qty: 1 }],
   purchase_orders: [
-    { id: "PO-1", status: "open", supplier_id: "s1", destination_id: "d1", placed_at: "2026-09-03T03:00:00Z", official_delivery_date: "2026-09-18", eta_date: "2026-09-18", version: 2 },
+    { id: "PO-1", status: "open", supplier_id: "s1", destination_id: "d1", placed_at: "2026-09-03T03:00:00Z", official_delivery_date: "2026-09-18", eta_date: "2026-09-18", version: 2, suppliers: { name: "Ohana" } },
   ],
   purchase_order_lines: [{ id: "pl1", po_id: "PO-1", sku: "B1201S", qty: 1, received_qty: 0, damaged_qty: 0, wrong_item_qty: 0 }],
   po_supplier_promises: [{ id: "p1", po_id: "PO-1", po_line_id: "pl1", kind: "tomorrow_delivery", new_date: "2026-09-28", recorded_at: "2026-09-10T00:00:00Z" }],
   po_arrival_confirmations: [{ po_id: "PO-1", po_version: 2, for_date: "2026-09-28", destination_id: "d1" }],
   warehouse_receipts: [
     { id: "r1", po_id: "PO-1", grn_no: "GRN2609-0040", goods_received_at: "2026-09-18", status: "posted", lines: [{ id: "pl1", received_now: 1 }] },
+  ],
+  po_sends: [
+    { po_id: "PO-1", po_version: 1, kind: "confirmed_sent" },
+    { po_id: "PO-1", po_version: 2, kind: "external_open" },
   ],
   ops_stock_items: [{ unit_code: "U1-000-231", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S" }],
 };
@@ -101,7 +105,10 @@ describe("GET /api/operation/orders/:id/route-goods", () => {
     expect(body.sources).toEqual(rows.po_line_sources);
     expect(body.purchaseOrders).toEqual([
       {
-        ...rows.purchase_orders[0],
+        ...(({ suppliers: _s, ...po }) => po)(rows.purchase_orders[0]!),
+        supplier_name: "Ohana",
+        /* Purchasing §5.6 reads the send marks; the route decides which counts. */
+        sends: rows.po_sends.map(({ po_id: _po, ...send }) => send),
         lines: rows.purchase_order_lines.map(({ po_id: _po, ...line }) => line),
         promises: rows.po_supplier_promises,
         arrival_confirmations: rows.po_arrival_confirmations,

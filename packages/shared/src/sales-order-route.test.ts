@@ -241,11 +241,12 @@ describe("CURRENT", () => {
   it("puts goods CURRENT on the first unfinished step and leaves the other fork waiting", () => {
     const map = resolveSalesOrderRoute(input());
     expect(node(map, "PO-2048:purchasing").mark).toBe("complete");
-    expect(node(map, "PO-2048:supplier").current).toBe(true);
-    expect(node(map, "PO-2048:supplier").mark).toBe("current");
-    expect(node(map, "PO-2048:receiving").mark).toBe("future");
+    /* Waiting on the supplier is not Carres' work (Purchasing §5.8): the
+       position moves on to the step Carres will act on. */
+    expect(node(map, "PO-2048:supplier").current).toBe(false);
+    expect(node(map, "PO-2048:receiving").current).toBe(true);
+    expect(node(map, "PO-2048:receiving").mark).toBe("current");
     expect(node(map, "B1201S:stock").current).toBe(false);
-    expect(node(map, "B1201S:stock").mark).toBe("waiting");
   });
 
   it("never lets a fourth route take a CURRENT — a loan is an obligation, not a position", () => {
@@ -258,15 +259,11 @@ describe("CURRENT", () => {
 
   it("gives the action only to the position being worked", () => {
     const map = resolveSalesOrderRoute(input());
-    expect(node(map, "PO-2048:supplier").action).toEqual({
-      ownerKey: "purchasing",
-      label: "Confirm ready date",
-      context: {
-        detail: "PO-2048 · 2 Units · Carres Warehouse · Customer requested: 2026-09-24",
-      },
-    });
-    /* A node nobody has reached carries no instruction. */
-    expect(node(map, "PO-2048:receiving").action).toBeNull();
+    expect(node(map, "PO-2048:receiving").action?.label).toBe("Check in");
+    /* The retired `Confirm ready date` is owed by nobody; Stock owes nothing
+       while the wait belongs to Receiving. */
+    expect(node(map, "PO-2048:supplier").action).toBeNull();
+    expect(node(map, "B1201S:stock").action).toBeNull();
   });
 });
 
@@ -1435,6 +1432,8 @@ describe("found on the rendered Journey (2026-09-28)", () => {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 const goodsSource = (over: Partial<RouteGoodsSource> & { poId: string }): RouteGoodsSource => ({
+  supplierName: "Ohana",
+  sent: true,
   qty: 1,
   issuedAt: "2026-09-03",
   poDeliveryDate: "2026-09-18",
@@ -1499,7 +1498,7 @@ describe("the goods chain reads its owners (owner ruling 2026-09-26)", () => {
     }
   });
 
-  it("Confirm ready date is owed ONLY while the day-before check is open — never a standing action", () => {
+  it("the supplier is asked for the Supplier DO ONLY while the day-before check is open, never a standing action", () => {
     const at = (dayBeforeCheckOpen: boolean) =>
       node(
         resolveSalesOrderRoute(
@@ -1517,10 +1516,84 @@ describe("the goods chain reads its owners (owner ruling 2026-09-26)", () => {
         ),
         "L1:PO-1:supplier",
       );
-    expect(at(true).action?.label).toBe("Confirm ready date");
+    expect(at(true).action?.label).toBe("Ask Ohana for the Supplier DO for PO-1");
     expect(at(false).action).toBeNull();
     /* Waiting on the supplier is not Carres' work: the position moves on. */
     expect(at(false).current).toBe(false);
+  });
+
+  it("an issued PO nobody has sent: PURCHASING owes `Send {PO No} to {Supplier}` and holds CURRENT", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({
+            lineId: "L1",
+            sources: [goodsSource({ poId: "PO-1", sent: false, dayBeforeCheckOpen: true })],
+            onOrderQty: 1,
+            uncoveredQty: 0,
+            shortBecause: "not-received",
+          }),
+        ],
+      }),
+    );
+    const purchasing = node(map, "L1:PO-1:purchasing");
+    expect(purchasing.mark).toBe("current");
+    expect(purchasing.action?.label).toBe("Send PO-1 to Ohana");
+    /* The supplier cannot be asked for a PO it was never sent. */
+    expect(node(map, "L1:PO-1:supplier").action).toBeNull();
+    expect(node(map, "L1:PO-1:supplier").current).toBe(false);
+  });
+
+  it("a long instruction wraps under the owner chip and the node grows for it — never an ellipsis", () => {
+    const at = (supplierName: string) =>
+      node(
+        resolveSalesOrderRoute(
+          input({
+            goods: [
+              goodsLine({
+                lineId: "L1",
+                sources: [goodsSource({ poId: "PO-20260903-4354", supplierName, dayBeforeCheckOpen: true })],
+                onOrderQty: 1,
+                uncoveredQty: 0,
+                shortBecause: "not-received",
+              }),
+            ],
+          }),
+        ),
+        "L1:PO-20260903-4354:supplier",
+      );
+    const long = at("Nice Future Furniture Sdn Bhd");
+    const rows = wrapRouteText(long.action!.label, ROUTE_TEXT_BUDGET.action);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.every((row) => row.length <= ROUTE_TEXT_BUDGET.action || !row.includes(" "))).toBe(true);
+    expect(long.h).toBeGreaterThan(at("Oh").h);
+  });
+
+  it("a sent PO completes PURCHASING and owes no send", () => {
+    const map = resolveSalesOrderRoute(
+      input({
+        goods: [
+          goodsLine({
+            lineId: "L1",
+            sources: [goodsSource({ poId: "PO-1", sent: true })],
+            onOrderQty: 1,
+            uncoveredQty: 0,
+            shortBecause: "not-received",
+          }),
+        ],
+      }),
+    );
+    expect(node(map, "L1:PO-1:purchasing").mark).toBe("complete");
+    expect(node(map, "L1:PO-1:purchasing").action).toBeNull();
+  });
+
+  it("without goods facts STOCK never revives `Waiting for purchase` or `Create the Units`", () => {
+    const map = resolveSalesOrderRoute(input());
+    const words = map.nodes.flatMap((n) => [...n.lines, n.action?.label ?? ""]).join(" | ");
+    for (const retired of ["Waiting for purchase", "Create the Units", "Confirm ready date"]) {
+      expect(words).not.toContain(retired);
+    }
+    expect(node(map, "B1201S:stock").lines).toContain("Warehouse has not received");
   });
 
   it("partial receiving keeps its count after a receipt is posted, and RECEIVING holds CURRENT", () => {

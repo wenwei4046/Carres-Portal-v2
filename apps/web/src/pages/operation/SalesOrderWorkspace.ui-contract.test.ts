@@ -1101,7 +1101,7 @@ describe("Sales Order object page — one form grammar", () => {
     /* The rendered STRING is gone; the governance comment recording WHY it
        went stays, which is why this pins the quoted literal. */
     expect(workspace).not.toContain('"Not allocated"');
-    expect(route).toContain("unitsShortWords(readyQty, line.committedQty)");
+    expect(route).toContain("`Warehouse has ${readyQty} of ${line.committedQty} Units ready`");
     expect(route).not.toContain("Waiting for purchase");
     /* A LOAD IS NOT A SHORTAGE — the Deliver To cell has always guarded this;
        the Unit ID cell printed a shortage while the read was still in flight. */

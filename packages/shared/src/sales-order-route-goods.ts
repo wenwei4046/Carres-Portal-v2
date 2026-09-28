@@ -40,6 +40,11 @@ export interface RouteGoodsFacts {
     official_delivery_date: string | null;
     eta_date: string | null;
     version?: number | null;
+    /** The supplier's name, for the Purchasing and Supplier sentences. */
+    supplier_name?: string | null;
+    /** `po_sends` rows (0377): only `confirmed_sent` for the CURRENT version
+     *  says the PDF reached the supplier; an opened app proves nothing. */
+    sends?: ReadonlyArray<{ kind?: string | null; po_version?: number | null }>;
     lines: ReadonlyArray<{
       id: string;
       sku: string;
@@ -78,6 +83,9 @@ export interface RouteGoodsFacts {
 
 export interface RouteGoodsSource {
   poId: string;
+  supplierName: string | null;
+  /** The CURRENT version is marked `PO sent to supplier` (Purchasing §5.6). */
+  sent: boolean;
   /** This line's share of the Purchase Order. */
   qty: number;
   issuedAt: string | null;
@@ -87,7 +95,7 @@ export interface RouteGoodsSource {
   expectedArrival: { date: string; change: "delayed" | "earlier"; reason: string | null } | null;
   /** The answer is `confirmed`, or the arrival was confirmed for its day. */
   confirmed: boolean;
-  /** The day-before check is open — the only time `Confirm ready date` is owed. */
+  /** The day-before check is open — the only time Carres asks the supplier (Purchasing §5.7). */
   dayBeforeCheckOpen: boolean;
   receivedQty: number;
   pendingQty: number;
@@ -242,6 +250,11 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
 
       sources.push({
         poId: po.id,
+        supplierName: po.supplier_name?.trim() || null,
+        /* A reader that did not bring the send marks invents no work. */
+        sent:
+          po.sends === undefined ||
+          po.sends.some((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === version),
         qty: share,
         issuedAt: day(po.placed_at),
         poDeliveryDate: original,
