@@ -205,10 +205,12 @@ describe("one row is one Unit, one cell is one fact", () => {
     expect(within(row).getByText("Available")).toBeInTheDocument();
   });
 
-  it("a counted row prints — for Unit ID and ×{qty} on the item, and no arrow to expand", async () => {
+  it("a counted row prints nothing for Unit ID and ×{qty} on the item, and no arrow to expand", async () => {
     await renderLoaded();
     const row = screen.getByText(/Mattress Protector · Q · MATTRESS-PROTECTOR-Q ×319/).closest("tr")!;
-    expect(within(row).getByText("—")).toBeInTheDocument();
+    // No dash stands in for the missing identity (owner ruling 2026-09-26).
+    expect(within(row).queryByText("—")).toBeNull();
+    expect(within(row).queryByText(/QTY-/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Show every product/ })).not.toBeInTheDocument();
   });
 
