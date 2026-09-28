@@ -75,6 +75,8 @@ const h = vi.hoisted(() => ({
   review: [] as Array<[string, Record<string, unknown>]>,
   /** 0601 — the server's refusal the next amendment save answers with. */
   amendError: null as null | { message: string; body: unknown },
+  /** 0601 — may amend / void (GRN Duty authority), apart from posting. */
+  mayAmend: true,
   /** 0601 — who the form's grey automatic `Received by` names. */
   receiver: null as null | { kind: "company" | "staff"; name: string | null },
 }));
@@ -87,7 +89,7 @@ vi.mock("@/lib/queries", async () => {
   return {
     ...actual,
     useReceivingDuty: () => ({
-      data: { allowed: h.dutyAllowed },
+      data: { allowed: h.dutyAllowed, may_amend: h.mayAmend },
       isLoading: false,
       isError: false,
     }),
@@ -577,6 +579,7 @@ beforeEach(() => {
   h.officeReceive.length = 0;
   h.amend.length = 0;
   h.amendError = null;
+  h.mayAmend = true;
   h.receiver = null;
   h.voided.length = 0;
   h.review.length = 0;
@@ -1646,6 +1649,23 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     const [, body] = h.amend[0];
     expect(body.actualSiteId).toBe("wh-setia");
     expect(body.doFilePath).toBe("dos/PO-2001/do.pdf");
+  });
+
+  it("an Operation staff member who may post but is not GRN Duty sees no Amend or Void (0601)", () => {
+    h.dutyAllowed = true;
+    h.mayAmend = false;
+    h.sessionDetail = postedDetail();
+    renderRecord();
+    expect(screen.queryByTestId("amend-receiving-door")).toBeNull();
+    expect(screen.queryByTestId("grn-more-menu")).toBeNull();
+  });
+
+  it("while the same person may still save a submitted count (0601)", () => {
+    h.dutyAllowed = true;
+    h.mayAmend = false;
+    h.sessionDetail = postedDetail({ receipt: { status: "submitted", grn_no: null, posted_at: null } });
+    renderRecord();
+    expect(screen.getByTestId("save-receiving-review")).toBeInTheDocument();
   });
 
   it("prints the arrival clock in Kuala Lumpur and names who received it (0601)", () => {

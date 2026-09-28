@@ -48,6 +48,9 @@ const U3 = uid("d1");
 const CODE_NO: Record<string, string> = { [U[0]!]: "101", [U[1]!]: "102", [U[2]!]: "103", [U2]: "201", [U3]: "301" };
 const code = (id: string) => `U9${RUN}-${CODE_NO[id]}-001`;
 const SKU = `IT-GRN-${HEX}`;
+const ORDER = uid("81");
+const ORDER_LINE = uid("91");
+const SO = 910000 + RUN;
 const NETS_NAME = `IT NETS ${HEX}`;
 const OP_NAME = `IT op ${HEX}`;
 const rowOf = <T,>(r: unknown) => (r as { row: { r: T } }).row.r;
@@ -109,6 +112,10 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
     await q("insert into warehouses (id, name) values ($1, $2), ($3, $4)", [WH, `IT Klang ${HEX}`, SHOWROOM, `IT Showroom ${HEX}`]);
     await q("insert into stock_operating_parties (id, code, name, kind) values ($1, $2, $3, 'warehouse_operator')", [NETS, `it_nets_${HEX}`, NETS_NAME]);
     await q("insert into warehouse_site_profiles (site_id, operating_party_id) values ($1, $2)", [WH, NETS]);
+    // OP holds GRN Duty today; OP2 is an ordinary Operation staff member.
+    await q("insert into workspace_duty_assignments (duty_key, holder_id, effective_from) values ('grn_duty', $1, (now() at time zone 'Asia/Kuala_Lumpur')::date - 1)", [OP]);
+    await q("insert into orders (id, so, dealer_id, customer_name, customer_phone, status, source_system) values ($1, $2, $3, 'IT customer', '0120000000', 'proceed_order', 'autocount')", [ORDER, SO, uid("f1")]);
+    await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, $3, 1, 1000)", [ORDER_LINE, ORDER, SKU]);
     for (const [po, line, wh] of [[PO, LINE, WH], [PO2, LINE2, SHOWROOM], [PO3, LINE3, WH]] as const) {
       await q("insert into purchase_orders (id, supplier_id, warehouse_id, status, placed_at) values ($1, $2, $3, 'open', now() - interval '3 days')", [po, SUPPLIER, wh]);
       await q("insert into purchase_order_lines (id, po_id, sku, qty, received_qty, identity_mode) values ($1, $2, $3, $4, 0, 'exact_unit')", [line, po, SKU, po === PO ? 3 : 1]);
@@ -132,7 +139,7 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
   });
 
   it("any active Operation staff member posts an Office receipt; its arrival time and the partner company are recorded", async () => {
-    await as(OP);
+    await as(OP2);
     const arrived = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const r = await officeReceive(
       PO, LINE,
@@ -253,8 +260,20 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
     expect(ev.after.units).toHaveLength(2);
   });
 
-  it("a save based on an older version is refused whole: first save wins", async () => {
+  it("an ordinary Operation staff member may post but may not amend or void (owner 2026-09-25 widened posting only)", async () => {
     await as(OP2);
+    const amended = await amend(grn1, { based_on_revision: 1, do_number: `DO-OP2-${HEX}` });
+    expect(amended.ok).toBe(false);
+    expect((amended as { detail: string }).detail).toBe("not_grn_duty");
+    const voided = await attempt("select public.receiving_void($1::uuid, 'never existed') as r", [grn1]);
+    expect(voided.ok).toBe(false);
+    expect((voided as { detail: string }).detail).toBe("not_grn_duty");
+    await owner();
+    expect((await receipt(grn1)).status).toBe("posted");
+  });
+
+  it("a save based on an older version is refused whole: first save wins", async () => {
+    await as(OP);
     const r = await amend(grn1, { based_on_revision: 0, do_number: `DO-LATE-${HEX}` });
     expect(r.ok).toBe(false);
     expect((r as { why: string }).why).toBe("Someone changed this GRN. Check it again.");
@@ -317,4 +336,18 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
     await owner();
     expect(new Date((await receipt(grn1)).goods_received_time as string).toISOString()).toBe(at);
   });
+
+  it("a Unit bound on its PO by Use this PO is a normal arrival: Not received → Received is allowed and arrives reserved", async () => {
+    await owner();
+    await q("update ops_stock_items set reserved_order_line_id = $2, reserved_ref = $3 where id = $1", [U[1], ORDER_LINE, `SO-${SO}`]);
+    expect((await unitRow(U[1]!)).status).toBe("incoming");
+    await as(OP);
+    const r = await amend(grn1, { based_on_revision: 3, units: [{ stock_item_id: U[1], outcome: "received" }] });
+    expect(r.ok, r.ok ? "" : r.why).toBe(true);
+    await owner();
+    expect((await unitRow(U[1]!)).status).toBe("reserved");
+    const bound = (await q("select reserved_order_line_id from ops_stock_items where id = $1", [U[1]])).rows[0]!;
+    expect(bound.reserved_order_line_id).toBe(ORDER_LINE);
+  });
 });
+

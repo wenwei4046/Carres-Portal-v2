@@ -39,8 +39,12 @@
 --      (office, check-in, arrival source). Five copied door bodies would
 --      drift; one trigger cannot.
 --   4  Posting authority: every active Operation staff member (and the
---      principal) may post. `receiving_actor_context().allowed` now answers
---      exactly that; the duty trio is still returned and stored as evidence.
+--      principal) may post. AMEND and VOID keep the 0425 authority (GRN Duty,
+--      dated cover, Operations Superuser) through
+--      `receiving_require_amend_authority()`, reading `may_amend` from the
+--      same context; receiving_void and receiving_arrival_void change only
+--      that gate call. For posting, `receiving_actor_context().allowed` answers
+--      the widened rule; the duty trio is still returned and stored as evidence.
 --      `posted_authority` gains `operation_staff`. The Warehouse role stays
 --      refused (it is not Operation).
 --   5  `office_receive_post` and `warehouse_submit_receipt` take
@@ -232,14 +236,19 @@ declare
   v_duty jsonb := public.workspace_resolve_duty('grn_duty', null);
   v_super boolean := public.is_operations_superuser(v_uid);
   v_staff boolean := public.is_operation();
+  v_actor uuid := nullif(v_duty->>'actor_user_id', '')::uuid;
 begin
   -- GRN Duty still OWNS the Work card; the duty trio is returned as evidence.
-  -- Posting is open to every active Operation staff member and the principal.
+  -- POSTING (`allowed`) is open to every active Operation staff member and
+  -- the principal (owner 2026-09-25). AMEND and VOID (`may_amend`) keep the
+  -- 0425 authority unchanged: GRN Duty, its dated cover, or an Operations
+  -- Superuser. One resolver, one context.
   return v_duty || jsonb_build_object(
     'uid', v_uid,
     'is_superuser', v_super,
     'is_operation_staff', v_staff,
-    'allowed', v_uid is not null and v_staff);
+    'allowed', v_uid is not null and v_staff,
+    'may_amend', v_uid is not null and (v_super or v_actor = v_uid));
 end;
 $function$;
 
@@ -259,6 +268,30 @@ begin
   return v_ctx;
 end;
 $function$;
+
+-- The amend / void gate — the 0426 body and refusals, unchanged in meaning,
+-- now reading `may_amend` from the same context.
+create or replace function public.receiving_require_amend_authority()
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $function$
+declare
+  v_ctx jsonb := public.receiving_actor_context();
+begin
+  if not coalesce((v_ctx->>'may_amend')::boolean, false) then
+    if v_ctx->>'source' = 'not_assigned' and not coalesce((v_ctx->>'is_superuser')::boolean, false) then
+      raise exception 'nobody holds GRN duty' using errcode = '42501', detail = 'no_grn_duty_holder';
+    end if;
+    raise exception 'only GRN duty may amend or void a receiving'
+      using errcode = '42501', detail = 'not_grn_duty';
+  end if;
+  return v_ctx;
+end;
+$function$;
+
+revoke execute on function public.receiving_require_amend_authority() from public, anon, authenticated;
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 5a · office direct receiving — starts from the 0560 body on production
@@ -625,9 +658,9 @@ begin
   if v_do is not null then
     return jsonb_build_object('reason', 'on_delivery_order', 'words', format('On %s', v_do));
   end if;
-  if p_item.status = 'reserved' or p_item.reserved_ref is not null
-     or p_item.reserved_order_line_id is not null
-     or p_item.reserved_purchase_demand_id is not null then
+  -- A Unit bound on its PO by `Use this PO` (still `incoming`) is a
+  -- normal arrival, never a lock: only a Unit already `reserved` refuses.
+  if p_item.status = 'reserved' then
     return jsonb_build_object('reason', 'reserved',
       'words', case when p_item.reserved_ref is not null
                     then format('Reserved for %s', p_item.reserved_ref) else 'Reserved' end);
@@ -689,7 +722,7 @@ declare
   v_line_key text;
   v_receiver jsonb;
 begin
-  v_ctx := public.receiving_require_post_authority();
+  v_ctx := public.receiving_require_amend_authority();
   if coalesce(p_reason, '') !~ '[^[:space:]]' then
     raise exception 'a correction reason is required'
       using errcode = '22023', detail = 'amend_reason_required';
@@ -1237,6 +1270,194 @@ end;
 $function$;
 
 -- ───────────────────────────────────────────────────────────────────────────
+-- 6b · Void Receiving keeps the duty authority — the production bodies of
+--      receiving_void (0560) and receiving_arrival_void, with only the gate
+--      call changed to receiving_require_amend_authority().
+-- ───────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.receiving_void(p_receipt_id uuid, p_reason text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_uid uuid := auth.uid();
+  v_ctx jsonb;
+  v_receipt warehouse_receipts;
+  v_po purchase_orders;
+  v_line jsonb; v_pol purchase_order_lines;
+  v_recv int; v_dmg int; v_wrong int;
+  v_posts_stock boolean; v_site uuid; v_moved int;
+  v_claims int;
+begin
+  v_ctx := public.receiving_require_amend_authority();
+  if coalesce(p_reason, '') !~ '[^[:space:]]' then
+    raise exception 'a void reason is required'
+      using errcode = '22023', detail = 'void_reason_required';
+  end if;
+  select * into v_receipt from warehouse_receipts where id = p_receipt_id for update;
+  if not found then
+    raise exception 'receipt not found' using errcode = '42P01', detail = 'receipt_not_found';
+  end if;
+  if v_receipt.status = 'voided' then
+    return jsonb_build_object('receipt_id', p_receipt_id, 'status', 'voided',
+                              'already_saved', true);
+  end if;
+  if v_receipt.status <> 'posted' then
+    raise exception 'only a posted receiving can be voided'
+      using errcode = '22023', detail = 'receipt_not_posted';
+  end if;
+
+  select * into v_po from purchase_orders where id = v_receipt.po_id for update;
+  v_site := coalesce(v_receipt.actual_site_id, v_po.warehouse_id);
+  select (pd.warehouse_id is not null and pd.warehouse_id = v_po.warehouse_id)
+    into v_posts_stock
+    from purchasing_destinations pd
+   where pd.id = v_po.destination_id;
+  v_posts_stock := coalesce(v_posts_stock, false) or v_receipt.actual_site_id is not null;
+
+  -- ── named downstream blockers, never a partial void ──────────────────────
+  select count(*) into v_claims from supplier_claims
+   where warehouse_receipt_id = p_receipt_id;
+  if v_claims > 0 then
+    raise exception '% supplier claim(s) were opened from this receiving — settle them first', v_claims
+      using errcode = 'P0001', detail = 'claims_block_void';
+  end if;
+  if exists (
+    select 1 from order_supplier_threads
+     where po_id = v_receipt.po_id
+       and operation_stage in ('ready_to_dispatch','dispatched','delivered')
+  ) then
+    raise exception 'goods from % already moved to dispatch — this receiving cannot be voided', v_receipt.po_id
+      using errcode = 'P0001', detail = 'threads_block_void';
+  end if;
+  if v_po.status = 'received' and v_receipt.po_status_before is null then
+    raise exception 'this receiving completed the PO before state snapshots existed'
+      using errcode = 'P0001', detail = 'legacy_completion_block_void';
+  end if;
+
+  -- ── reverse every line exactly ───────────────────────────────────────────
+  for v_line in select * from jsonb_array_elements(coalesce(v_receipt.lines, '[]'::jsonb)) loop
+    v_recv  := coalesce((v_line->>'received_now')::int, 0);
+    v_dmg   := coalesce((v_line->>'damaged_qty')::int, 0);
+    v_wrong := coalesce((v_line->>'wrong_item_qty')::int, 0);
+    if v_recv + v_dmg + v_wrong = 0 then continue; end if;
+    select * into v_pol from purchase_order_lines
+     where id = (v_line->>'id')::uuid and po_id = v_receipt.po_id for update;
+    if not found then
+      raise exception 'PO line % is gone — this receiving cannot be voided automatically', v_line->>'sku'
+        using errcode = 'P0001', detail = 'lines_block_void';
+    end if;
+    if v_pol.received_qty < v_recv or v_pol.damaged_qty < v_dmg or v_pol.wrong_item_qty < v_wrong then
+      raise exception 'line % no longer carries this receiving''s quantities', v_pol.sku
+        using errcode = 'P0001', detail = 'lines_block_void';
+    end if;
+
+    if v_recv > 0 and v_posts_stock then
+      -- Exact units first; a legacy quantity session reverses newest-first.
+      with take as (
+        select r.stock_item_id from receiving_unit_results r
+          join ops_stock_items i on i.id = r.stock_item_id
+         where r.receipt_id = p_receipt_id and r.outcome = 'received'
+           and i.sku = v_pol.sku and i.status = 'free'
+         order by r.created_at desc limit v_recv
+      ), back as (
+        update ops_stock_items set status = 'incoming',
+               warehouse_id = v_po.warehouse_id, updated_at = now()
+         where id in (select stock_item_id from take)
+        returning id)
+      select count(*) into v_moved from back;
+      if v_moved < v_recv then
+        with take as (
+          select id from ops_stock_items
+           where po_no = v_receipt.po_id and sku = v_pol.sku and status = 'free'
+           order by created_at desc limit (v_recv - v_moved)
+        ), back as (
+          update ops_stock_items set status = 'incoming',
+                 warehouse_id = v_po.warehouse_id, updated_at = now()
+           where id in (select id from take)
+          returning id)
+        select v_moved + count(*) into v_moved from back;
+      end if;
+      if v_moved < v_recv then
+        raise exception 'units on % are reserved or moved — this receiving cannot be voided', v_pol.sku
+          using errcode = 'P0001', detail = 'units_block_void';
+      end if;
+      -- The rollup triggers lower the derived `stock_balances` as the Units
+      -- return to incoming (0366).
+    end if;
+
+    update purchase_order_lines
+       set received_qty   = received_qty - v_recv,
+           damaged_qty    = damaged_qty - v_dmg,
+           wrong_item_qty = wrong_item_qty - v_wrong
+     where id = v_pol.id;
+  end loop;
+
+  if v_po.status = 'received' then
+    update purchase_orders
+       set status = v_receipt.po_status_before::po_status,
+           sup_status = v_receipt.sup_status_before::po_sup_status,
+           updated_at = now()
+     where id = v_receipt.po_id;
+  end if;
+
+  update warehouse_receipts
+     set status = 'voided', void_at = now(), void_by = v_uid,
+         void_reason = btrim(p_reason), updated_at = now()
+   where id = p_receipt_id;
+
+  insert into receiving_events (receipt_id, event, actor_id, payload)
+  values (p_receipt_id, 'voided', v_uid,
+          jsonb_build_object('reason', btrim(p_reason),
+                             'grn_no', v_receipt.grn_no,
+                             'normal_user_id', v_ctx->>'normal_user_id',
+                             'acting_user_id', v_ctx->>'acting_user_id'));
+  insert into po_history (po_id, text, by_role, by_user_id)
+  values (v_receipt.po_id,
+          format('Receiving %s voided — %s',
+                 coalesce(v_receipt.grn_no, 'record'), btrim(p_reason)),
+          public.app_role(), v_uid);
+  insert into audit_log (role, actor_text, action, ref)
+  values (public.app_role(),
+          coalesce((select name from app_users where id = v_uid), 'Operations'),
+          format('Voided %s — %s', coalesce(v_receipt.grn_no, p_receipt_id::text), btrim(p_reason)),
+          v_receipt.po_id);
+
+  return jsonb_build_object('receipt_id', p_receipt_id, 'status', 'voided',
+                            'grn_no', v_receipt.grn_no);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.receiving_arrival_void(p_receipt_id uuid, p_reason text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare r warehouse_receipts; p jsonb; old_u ops_stock_items; now_u ops_stock_items; ur receiving_unit_results;
+begin
+ perform arrival_source_gate(); perform receiving_require_amend_authority();
+ select * into r from warehouse_receipts where id=p_receipt_id for update;
+ if not found or r.arrival_source_id is null then raise exception 'arrival Receiving not found' using errcode='P0002'; end if;
+ perform 1 from arrival_sources where id=r.arrival_source_id for update;
+ if r.status='voided' then return to_jsonb(r); end if;
+ if r.status<>'posted' or coalesce(p_reason, '') !~ '[^[:space:]]' then raise exception 'valid Receiving and reason required' using errcode='22023'; end if;
+ select payload into p from receiving_events where receipt_id=r.id and event='posted';
+ for ur in select * from receiving_unit_results where receipt_id=r.id and outcome<>'not_received' order by stock_item_id loop
+  select * into now_u from ops_stock_items where id=ur.stock_item_id for update;
+  if p->'after_units'->ur.stock_item_id::text is distinct from to_jsonb(now_u) then raise exception 'Unit % changed after Receiving; correct its later record first',ur.unit_code using errcode='40001'; end if;
+ end loop;
+ insert into receiving_events(receipt_id,event,actor_id,payload) values(r.id,'voided',auth.uid(),jsonb_build_object('reason',btrim(p_reason),'before_units',p->'before_units','voided_at',now()));
+ for ur in select * from receiving_unit_results where receipt_id=r.id and outcome<>'not_received' order by stock_item_id loop
+  select * into old_u from jsonb_populate_record(null::ops_stock_items,p->'before_units'->ur.stock_item_id::text);
+  update ops_stock_items set warehouse_id=old_u.warehouse_id,holder_party_id=old_u.holder_party_id,status=old_u.status,needs_repair=old_u.needs_repair,hold_reason=old_u.hold_reason,held_at=old_u.held_at,last_verified_at=old_u.last_verified_at,updated_at=now() where id=ur.stock_item_id;
+ end loop;
+ update warehouse_receipts set status='voided',void_at=now(),void_by=auth.uid(),void_reason=btrim(p_reason) where id=r.id returning * into r;
+ return to_jsonb(r);
+end $function$;
+
+-- ───────────────────────────────────────────────────────────────────────────
 -- 7 · sanity — the SHAPE, never the data
 -- ───────────────────────────────────────────────────────────────────────────
 do $sanity$
@@ -1267,6 +1488,12 @@ begin
   if position('no_grn_duty_holder' in (select prosrc from pg_proc
        where oid = 'public.receiving_require_post_authority()'::regprocedure)) > 0 then
     raise exception '0601 sanity: posting is still refused for a missing GRN Duty holder';
+  end if;
+  if position('receiving_require_amend_authority' in (select prosrc from pg_proc
+       where oid = 'public.receiving_void(uuid, text)'::regprocedure)) = 0
+     or position('receiving_require_amend_authority' in (select prosrc from pg_proc
+       where oid = 'public.receiving_amend(uuid, text, jsonb, uuid)'::regprocedure)) = 0 then
+    raise exception '0601 sanity: amend and void must keep the GRN Duty authority';
   end if;
 end
 $sanity$;

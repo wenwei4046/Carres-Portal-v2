@@ -643,8 +643,8 @@ and capability are different facts). `Not your duty today` is retired as a refus
 only refusals left are `No Site linked` and a Site that is not a Carres or transit Site. Warehouse
 Settings → `Access` shows this as `Receive goods · Everyone in Operation` by default, with the option
 to narrow it later. The database gate `receiving_require_post_authority` (GRN Duty · cover ·
-Operations Superuser) is overwritten by this ruling; 0601 widens it to active Operation staff and
-the principal.
+Operations Superuser) is overwritten by this ruling for posting; 0601 widens it to active Operation
+staff and the principal. Amend and Void Receiving keep the GRN Duty authority.
 
 **SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
 BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres

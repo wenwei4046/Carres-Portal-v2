@@ -157,6 +157,9 @@ export default function ReceivingRecord({
   const extraQty = receivingExtraQty(r.extra_lines);
   const cumulative = po ? receivingSummaryOf(po.purchase_order_lines) : null;
   const dutyAllowed = dutyQ.data?.allowed ?? false;
+  /** Amend and Void keep the GRN Duty authority (0601): the widened posting
+   *  rule of 2026-09-25 does not reach them. */
+  const mayAmend = dutyQ.data?.may_amend ?? dutyQ.data?.allowed ?? false;
   const displayNo = receivingDisplayNo(r);
   const hasIssue = totals.issue > 0;
 
@@ -489,7 +492,7 @@ export default function ReceivingRecord({
 
           {/* ── The governed doors — Amend is primary; Void hides in
                  More ▾ (owner correction §5: not a normal action). ──────── */}
-          {r.po_id && r.status === "posted" && dutyAllowed && !voiding && (
+          {r.po_id && r.status === "posted" && mayAmend && !voiding && (
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"

@@ -4114,7 +4114,13 @@ export interface ReceivingDutyContext {
   /** The cover row the resolver is acting through today (0425), when any. */
   cover_id?: string | null;
   is_superuser: boolean;
+  /** 0601 — may POST or check in a receipt: every active Operation staff
+   *  member and the principal (owner ruling 2026-09-25). */
   allowed: boolean;
+  /** 0601 — may AMEND or VOID a GRN: GRN Duty, its dated cover or an
+   *  Operations Superuser (unchanged 0425 authority). Absent before 0601,
+   *  when `allowed` still meant exactly this. */
+  may_amend?: boolean;
   source: "assignment" | "not_assigned";
 }
 

@@ -1607,3 +1607,26 @@ describe("GET /receiver — who the GRN will name, before saving (0601)", () => 
   });
 });
 
+describe("GET /duty — posting and amend/void are two answers (0601)", () => {
+  it("passes may_amend through beside allowed", async () => {
+    const sb = makeSb({ app_users: { list: { data: [], error: null } } }, {
+      data: { allowed: true, may_amend: false, source: "assignment" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/warehouse-receipts/duty", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ allowed: true, may_amend: false });
+  });
+
+  it("a void by someone who is not GRN Duty comes back as 403 with the duty refusal", async () => {
+    const sb = makeSb(opsTables(), {
+      error: { code: "42501", message: "only GRN duty may amend or void a receiving", details: "not_grn_duty" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}/void`, "POST", await makeJwt("operation"), { reason: "never existed" });
+    expect(res.status).toBe(403);
+  });
+});
+

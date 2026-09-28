@@ -3570,10 +3570,12 @@ Warehouse submits count                (or Operation enters goods directly)
   and `operation_receive_po_with_do`. **Who may post (owner ruling 2026-09-25, recorded in §7.3):** every
   active Operation staff member may post a receipt; receiving is never blocked because the GRN
   Duty holder is absent. GRN Duty keeps the Work card; the GRN records the actual actor. The
-  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten. BUILT ON BRANCH (0601, not applied):
-  `allowed` means an active Operation staff member or the principal; `no_grn_duty_holder` and
-  `not_grn_duty` are retired; a non-duty saver is labelled `Operation staff`. The Warehouse role
-  still cannot post, amend or void. The posting stores the duty-evidence trio (normal holder · dated cover ·
+  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten for POSTING only. BUILT ON BRANCH (0601, not
+  applied): `allowed` means an active Operation staff member or the principal; a non-duty saver is
+  labelled `Operation staff`. **Amend Receiving and Void Receiving authority is unchanged:** GRN
+  Duty, its dated cover or an Operations Superuser (`may_amend`, `receiving_require_amend_authority`,
+  refusals `no_grn_duty_holder` / `not_grn_duty`), in page, API and SQL. The Warehouse role still
+  cannot post, amend or void. The posting stores the duty-evidence trio (normal holder · dated cover ·
   actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
   Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
@@ -3629,7 +3631,8 @@ Warehouse submits count                (or Operation enters goods directly)
     keep quantity edits.
   - Checks follow what changes. A change to a Unit outcome or to `Goods arrived at` is refused per
     affected Unit that is reserved, on a DO, delivered or on a Supplier Claim (the Claim check is
-    added), naming the reason on that Unit. Corrections to Supplier DO No and evidence are not
+    added), naming the reason on that Unit. A Unit bound by `Use this PO` while still incoming is a
+    normal arrival, not a lock: marking it Received makes it reserved for its line (0600 trigger). Corrections to Supplier DO No and evidence are not
     blocked by other locked Units, but still pass permission and audit. A changed `Goods arrived
     at` moves this GRN's arrived Units and counted stock to the new Site.
   - Concurrency: the first save wins; a later save based on an older version is refused as a whole
