@@ -54,7 +54,6 @@
  * (`Issued: 2026-08-13`); the page spells them through the one date format.
  */
 
-import { unitsShortWords } from "./line-readiness";
 import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
 /* ⭐ LAW D — the canvas ASKS these, it does not re-decide them. Both predicates
    were re-implemented inline here while this file's own comment claimed it
@@ -889,13 +888,11 @@ function purchaseChain(
       title: "SUPPLIER",
       complete: Boolean(po.expectedReadyDate),
       lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Supplier has not confirmed the ready date"],
-      action: {
-        ownerKey: "purchasing",
-        label: "Confirm ready date",
-        context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
-        },
-      },
+      /* Purchasing §5.8: no immediate reply is owed, and without the goods
+         facts the day-before check cannot be known, so nobody at Carres acts
+         here (the retired `confirm_ready_date` is not revived). */
+      passive: true,
+      action: null,
       /* The PO's door already stands on PURCHASING directly above; a working
          SUPPLIER node repeats no door (approved mock 2026-09-26). A complete
          node still names its document. */
@@ -1010,13 +1007,27 @@ function goodsSourceChain(
   const arrived = source.pendingQty === 0 && source.qty > 0;
   const arrival = source.expectedArrival;
   const grn = source.latestGrn;
+  const supplier = source.supplierName ?? "the supplier";
+  /* Purchasing §5.6: an issued PO is not a sent PO. Until its CURRENT version
+     is marked `PO sent to supplier`, Purchasing owes the send; goods already
+     received prove the supplier had it. */
+  const sent = source.sent || source.receivedQty > 0;
   return [
     {
       id: `${stem}:purchasing`,
       kind: "purchasing",
       title: "PURCHASING",
-      complete: true,
+      complete: sent,
       lines: [source.poId, dated("Issued", source.issuedAt)],
+      action: sent
+        ? null
+        : {
+            ownerKey: "purchasing",
+            label: `Send ${source.poId} to ${supplier}`,
+            context: {
+              detail: `${source.poId} · ${units(source.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
+            },
+          },
       door: open(source.poId, poHref(source.poId)),
     },
     {
@@ -1028,7 +1039,7 @@ function goodsSourceChain(
       complete: source.confirmed || arrived,
       /* Purchasing §5.8: no immediate reply is owed. Outside the day-before
          check the step waits on the supplier, and nobody at Carres acts. */
-      passive: !source.dayBeforeCheckOpen,
+      passive: !sent || !source.dayBeforeCheckOpen,
       lines: [
         source.poDeliveryDate
           ? dated("PO Delivery Date", source.poDeliveryDate)
@@ -1037,10 +1048,12 @@ function goodsSourceChain(
           ? `Expected arrival: ${arrival.date} · ${arrival.change === "delayed" ? ["Delayed", arrival.reason].filter(Boolean).join(" · ") : "Earlier"}`
           : null,
       ],
-      action: source.dayBeforeCheckOpen
+      /* The day-before check (Purchasing §5.7) asks for the Supplier DO; the
+         retired `confirm_ready_date` asked for nothing the supplier owes. */
+      action: sent && source.dayBeforeCheckOpen
         ? {
             ownerKey: "purchasing",
-            label: "Confirm ready date",
+            label: `Ask ${supplier} for the Supplier DO for ${source.poId}`,
             context: {
               detail: `${source.poId} · ${units(source.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
             },
@@ -1127,39 +1140,41 @@ function goodsStockDraft(
 function stockDraft(
   line: LineFacts,
   destination: string | null,
-  customerDelivery: string | null,
+  _customerDelivery: string | null,
   purchasingFailed = false,
+  notOrdered = false,
 ): NodeDraft {
   const readyQty = line.reservedQty + line.soldQty;
   const allReady = readyQty >= line.committedQty && line.committedQty > 0;
   const codes = unitNames([...line.reservedUnits, ...line.soldUnits]);
-  if (purchasingFailed && !allReady) {
-    /* The count is Stock's own fact and stays. WHY the Units are short is
-       Purchasing's answer, and Purchasing could not be read. */
+  if (allReady) {
     return {
       id: `${line.key}:stock`,
       kind: "stock",
       title: "STOCK",
-      complete: false,
-      lines: [`${readyQty} of ${line.committedQty} Units ready`],
+      complete: true,
+      lines: [`Warehouse has ${units(line.committedQty)} ready`, codes || null, destination],
       door: open("Stock", stockHref),
     };
   }
+  /* The count is Stock's own fact. WHY the Units are short is Purchasing's
+     answer (none when Purchasing could not be read), and the wait belongs to
+     Purchasing or Receiving: Stock owes no action — the retired
+     `Create the Units` and `Waiting for purchase` are not revived. */
   return {
     id: `${line.key}:stock`,
     kind: "stock",
     title: "STOCK",
-    complete: allReady,
-    lines: allReady
-      ? [`${units(line.committedQty)} ready`, codes || null, destination]
-      : unitsShortWords(readyQty, line.committedQty),
-    action: {
-      ownerKey: "stock",
-      label: "Create the Units",
-      context: {
-        detail: `${line.label} · ${units(Math.max(0, line.committedQty - readyQty))} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
-      },
-    },
+    complete: false,
+    passive: true,
+    lines: [
+      `Warehouse has ${readyQty} of ${line.committedQty} Units ready`,
+      purchasingFailed
+        ? null
+        : notOrdered
+          ? "Carres has not ordered the goods"
+          : "Warehouse has not received the goods",
+    ],
     door: open("Stock", stockHref),
   };
 }
@@ -1793,7 +1808,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
         [
           goods
             ? goodsStockDraft(line, goods, input, purchasingFailed)
-            : stockDraft(line, destination, input.order.deliveryDate, purchasingFailed),
+            : stockDraft(line, destination, input.order.deliveryDate, purchasingFailed, unassignedQty > 0),
         ],
         "goods",
       )[0]!;
