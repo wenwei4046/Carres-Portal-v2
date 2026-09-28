@@ -126,7 +126,8 @@ import {
   ReadyStockCell,
   useManualPurchaseStock,
 } from "./ManualPurchaseStock";
-import ManualPurchaseDraftPreview from "./ManualPurchaseDraftPreview";
+import ManualPurchasePdfPreview from "./ManualPurchasePdfPreview";
+import { manualPurchaseDraftPos } from "./manual-purchase-draft-po";
 import {
   manualPurchaseReviewDocuments,
   manualPurchaseSelectedWalls,
@@ -1495,6 +1496,7 @@ export default function OperationManualPurchase() {
           destinations={q.data?.destinations ?? []}
           defaultDestinationId={q.data?.defaultDestinationId ?? null}
           supplierCollections={q.data?.supplierCollections ?? []}
+          suppliers={q.data?.suppliers ?? []}
           staff={q.data?.users ?? []}
           minDeliveryDays={q.data?.minDeliveryDays ?? 0}
           todayIso={q.data?.todayIso ?? null}
@@ -2285,6 +2287,7 @@ function CreateRequestWorkspace({
   destinations,
   defaultDestinationId,
   supplierCollections,
+  suppliers,
   staff,
   minDeliveryDays,
   todayIso,
@@ -2293,9 +2296,11 @@ function CreateRequestWorkspace({
   /** R4 · `Edit and send again` — the SAME request, prefilled once from its
    *  object read. Null for a new request. */
   editId: string | null;
-  destinations: Array<{ id: string; name: string }>;
+  destinations: Array<{ id: string; name: string; address?: string | null }>;
   defaultDestinationId: string | null;
   supplierCollections: PurchasingSupplierCollectionSetting[];
+  /** The suppliers with the ADDRESS the draft PO paper prints. */
+  suppliers: ReadonlyArray<{ name: string; address?: string | null }>;
   staff: Array<{ id: string; name: string | null }>;
   /** 0422 — Purchasing Settings' calendar days after the Proceed Date, as
    *  the Register read it. 0 means no floor. */
@@ -2737,72 +2742,29 @@ function CreateRequestWorkspace({
     namedStaff.find((s) => s.id === authUserId)?.name?.trim() ||
     MW.staffIdentityNotRecorded;
 
-  /* ── THE LIVE PREVIEW READS THE FORM, NEVER A SECOND COPY ────────────────
-     Same facts, same order, same words. A fact the requester has not filled
-     in yet prints nothing: a draft is unfinished, which is not the same as a
-     record that failed to store something. */
-  const previewRequestDetails = [
-    { label: MW.createPurpose, value: purposeLabelOf(purpose) },
-    ...(purpose === "service_case"
-      ? [
-          {
-            label: MW.serviceCase,
-            value:
-              (casesQ.data?.items ?? []).find((sc) => sc.id === serviceCaseId)?.caseNo ??
-              (casesQ.data?.items ?? []).find((sc) => sc.id === serviceCaseId)?.case_no ??
-              null,
-          },
-        ]
-      : []),
-    ...(purpose === "internal_staff_purchase"
-      ? [
-          {
-            label: MW.staffMember,
-            value: namedStaff.find((s) => s.id === staffUserId)?.name ?? null,
-          },
-        ]
-      : []),
-    ...(purpose === "subsidiary_purchase"
-      ? [{ label: MW.subsidiary, value: subsidiaryName.trim() || null }]
-      : []),
-    ...(purpose === "other_purchase"
-      ? [{ label: MW.whatIsThisFor, value: why.trim() || null }]
-      : []),
-    {
-      label: MW.canStockAnswer,
-      value:
-        stockAnswer === "concrete_need"
-          ? MW.canStockAnswerYes
-          : stockAnswer === "additional_stock"
-            ? MW.canStockAnswerNo
-            : null,
-    },
-    { label: MW.createRequestedBy, value: requesterName },
-    {
-      label: MW.proceedDate,
-      value: plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null,
-    },
-  ];
-  const previewDelivery = [
-    {
-      label: MW.createDeliverTo,
-      value: destinations.find((d) => d.id === chosenDest)?.name ?? null,
-    },
-    { label: MW.deliveryDate, value: deliveryDate ? fmtDate(deliveryDate) : null },
-  ];
-  const previewLines = lines
-    .map((l) => ({ line: l, picked: items.find((it) => it.sku === l.sku) ?? null }))
-    .filter((p): p is { line: LineDraft; picked: DemandPickItem } => p.picked != null)
-    .map(({ line, picked }) => ({
-      key: line.id,
-      sku: picked.sku,
-      item: picked.label,
-      /* Catalog's supplier, never a typed one — the request may carry several,
-         and the PO grouping at Issue PO is what splits them. */
-      supplier: picked.supplier ?? null,
-      qty: Number(line.qty) || 0,
-      configuration: configWords(line.attrs) || null,
-    }));
+  /* ⭐ THE RIGHT HALF IS THE PAPER (owner 2026-09-28, "it should pdf preview …
+     it same with so batch"): one DRAFT Purchase Order per supplier, from the
+     SAME draft the form holds — never a second copy of the facts. */
+  const draftPos = manualPurchaseDraftPos({
+    lines: lines
+      .map((l) => ({ line: l, picked: items.find((it) => it.sku === l.sku) ?? null }))
+      .filter((p): p is { line: LineDraft; picked: DemandPickItem } => p.picked != null)
+      .map(({ line, picked }) => ({
+        key: line.id,
+        sku: picked.sku,
+        item: picked.label,
+        supplierName: picked.supplier ?? null,
+        qty: Number(line.qty) || 0,
+        attrs: line.attrs,
+      })),
+    purposeLabel: purposeLabelOf(purpose),
+    destination: (() => {
+      const d = destinations.find((x) => x.id === chosenDest);
+      return d ? { name: d.name, address: d.address ?? null } : null;
+    })(),
+    suppliers,
+    collectedSupplierNames: new Set(supplierCollections.map((c) => c.supplierName)),
+  });
 
   /* ⭐ D1 · SEND STAYS ON SCREEN (measured 2026-09-17: at 390px the header's
      action pair sat past the right edge and the goods input shrank to ~42px).
@@ -3210,14 +3172,7 @@ function CreateRequestWorkspace({
           {/* The preview reads the SAME draft the form holds — never a second
               copy of the facts, and never a supplier document. */}
           <aside className="mp-create-preview-pane" aria-label={MW.page}>
-            <ManualPurchaseDraftPreview
-              requestDetails={previewRequestDetails}
-              delivery={previewDelivery}
-              lines={previewLines}
-              itemWord={W.itemLabel}
-              qtyWord={W.itemsColQty}
-              supplierWord={W.supplierLabel}
-            />
+            <ManualPurchasePdfPreview drafts={draftPos} />
           </aside>
         </div>
       </div>

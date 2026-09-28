@@ -83,7 +83,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * rename is not a licence to respell another's stored history.
    */
   secCreateRequestDetails: "Request Details",
-  secCreateDelivery: "Delivery",
+  secCreateDelivery: "Supplier Delivery",
   secCreateItems: "Items",
   /** The create form's word for the purpose — the Register's own column word,
    *  so the operator meets ONE name for one fact on the two surfaces they use
@@ -91,7 +91,7 @@ export const MANUAL_PURCHASE_WORDS = {
   createPurpose: "Purpose",
   /** The create form's Deliver To, capitalised as the dictionary spells the
    *  fact (`Deliver To`); the listings say `Supplier Deliver To`. */
-  createDeliverTo: "Deliver To",
+  createDeliverTo: "Supplier Deliver To",
   /** The requester, named on the create form the way the Register names them.
    *  It is a FACT the server stamps, never a control. */
   createRequestedBy: "Requested By",
@@ -121,7 +121,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * retired from every surface.
    */
   proceedDate: "Proceed Date",
-  deliveryDate: "Delivery Date",
+  deliveryDate: "Supplier Delivery Date",
   deliverTo: "Deliver to",
   raisedBy: "Raised by",
   /** Card 04 — ONLY `Other Purchase` asks this; routine purposes stopped
@@ -224,9 +224,9 @@ export const MANUAL_PURCHASE_WORDS = {
    *  `Supplier Deliver To` (Purchasing UI dictionary, 2026-09-18) — the
    *  destination instructed to the supplier, which is not the customer's
    *  address and not the site the goods actually reach. */
-  colDeliverTo: "Deliver To",
+  colDeliverTo: "Supplier Deliver To",
   colSupplierDeliverTo: "Supplier Deliver To",
-  colDeliveryDate: "Delivery Date",
+  colDeliveryDate: "Supplier Delivery Date",
   /**
    * ── THE COLUMNS THE 2026-09-18 RULING ADDED ──────────────────────────────
    *
@@ -309,7 +309,7 @@ export const MANUAL_PURCHASE_WORDS = {
   expOrderedQty: "Ordered Qty",
   expStillToOrder: "Still To Order",
   expSupplier: "Supplier",
-  expDeliverTo: "Deliver To",
+  expDeliverTo: "Supplier Deliver To",
   expPoNo: "PO No",
   /** The goods row that is not on any purchase order yet. */
   goodsToPurchase: "To purchase",
