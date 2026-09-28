@@ -15,6 +15,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import type { SoBatchPurchaseResponse } from "@carres/shared";
+import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 
 const CUSTOMERS = [
@@ -78,12 +80,73 @@ const orders = Array.from({ length: 24 }, (_, n) => {
   };
 });
 
+/* ── MONTHLY DEMAND (Scope F) — `?view=monthly`. Placeholders in braces stand
+   where a real record would print; nothing here is a real customer or dealer. */
+
+const monthOf = (offset: number) => {
+  const now = appTodayIso();
+  const at = Number(now.slice(0, 4)) * 12 + Number(now.slice(5, 7)) - 1 + offset;
+  return `${Math.floor(at / 12)}-${String((at % 12) + 1).padStart(2, "0")}`;
+};
+const DEMAND_SKUS: Array<[string, string]> = [
+  ["MS12 Firmcare 10inch Queen", "mattress"],
+  ["BF07 Hilton Divan King", "bedframe"],
+  ["SF03 Muro 2 Seater", "sofa"],
+  ["Memory Pillow", "accessory"],
+];
+const DEMAND_PLACES: Array<[string, string]> = [
+  ["Petaling Jaya", "Selangor"], ["Johor Bahru", "Johor"], ["Kuala Lumpur", "Kuala Lumpur"],
+];
+const demandOrders = Array.from({ length: 40 }, (_, i) => {
+  /* -1 = before the window · 0..5 = the six months · 6 = after · 7 = no date */
+  const slot = i % 9 === 8 ? 7 : (i % 8) - 1;
+  const [sku, category] = DEMAND_SKUS[i % DEMAND_SKUS.length]!;
+  const [city, state] = DEMAND_PLACES[i % DEMAND_PLACES.length]!;
+  const qty = 1 + (i % 3);
+  return {
+    id: `md-${i}`,
+    so: 1500 + i,
+    deliveryDate: slot === 7 ? null : `${monthOf(slot)}-${String(3 + (i % 25)).padStart(2, "0")}`,
+    deliveryDateTbd: slot === 7 && i % 2 === 0,
+    salesLocation: `{dealer ${1 + (i % 3)}}`,
+    state,
+    city,
+    lines: [
+      { id: `md-${i}-l1`, sku, qty, category },
+      ...(i === 5 ? [{ id: "md-5-l2", sku: "{not in catalog}", qty: 1, category: null }] : []),
+    ],
+    delivered: i % 4 === 0 ? [{ orderLineId: `md-${i}-l1`, sku, qty: 1 }] : [],
+  };
+});
+const demandPurchase: SoBatchPurchaseResponse = {
+  today: appTodayIso(),
+  rows: [],
+  registerRows: demandOrders.filter((_, i) => i % 3 !== 0).map((o) => ({
+    orderId: o.id, so: o.so, customer: "{customer}", status: "blank" as const,
+    proceededAt: `${appTodayIso()}T09:00:00+08:00`, requestedDeliveryDate: o.deliveryDate,
+    deliveryCity: o.city, deliveryState: o.state, pos: [],
+    lines: [{ orderLineId: o.lines[0]!.id, sku: o.lines[0]!.sku, qty: o.lines[0]!.qty, stockTaken: 0,
+      item: "{item}", variant: "{size}", category: "mattress" as const, pos: [] }],
+    outstandingSuppliers: [],
+  })),
+  destinations: [], defaultDestinationId: null,
+  currentPoDuty: null, actingPoDuty: null,
+  poDutyNameUnavailable: false, poDutyUnavailable: false, mayIssue: false,
+  procurementPartners: [], safetyDays: 14,
+} as unknown as SoBatchPurchaseResponse;
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!url.includes("127.0.0.1:88") && !url.includes("localhost:88")) return realFetch(input, init);
   const expansion = /\/api\/operation\/orders\/([^/]+)\/expansion/.exec(url);
   const order = expansion ? orders.find((o) => o.id === expansion[1]) : undefined;
+  if (/\/api\/operation\/orders\/monthly-demand/.test(url)) {
+    return new Response(JSON.stringify({ orders: demandOrders }), { status: 200, headers: { "content-type": "application/json" } });
+  }
+  if (/\/api\/operation\/purchase\/demands/.test(url)) {
+    return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
+  }
   const body = /\/api\/operation\/orders(\?|$)/.test(url)
     ? { orders, salesOrderTotal: orders.length }
     : order
@@ -114,7 +177,7 @@ const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/operation/orders"]}>
+      <MemoryRouter initialEntries={[`/operation/orders${window.location.search}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>
