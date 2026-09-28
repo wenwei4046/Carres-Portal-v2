@@ -231,6 +231,7 @@ NOT BUILT; Workspace MASTER §4). The one global
 | Right Rail refresh failure — **retires with the rail My Work slot** | `My Work could not be refreshed` | No work due now · No open work |
 | Duty destination (owner-approved 2026-09-28; NOT BUILT) | `Settings → Staff & Duties` · page `Staff & Duties`, reached via `All System Settings`; contextual links open the exact Duty | Workspace main-menu Duty row · Duty roster |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |
+| Duty catalogue (owner-approved 2026-09-28; NOT BUILT) | Duty label + current holder name, `{acting person} covering for {normal owner}`, or `Not assigned`; future dates appear in detail | `Starts {date}` / `Ends {date}` in catalogue rows · a future cover shown as today's actor |
 | Duty next primary assignment (owner-approved 2026-09-28; NOT BUILT) | `Next assignment` — person and effective dates; omit when none exists; does not change today's normal owner | Upcoming owner · a future person shown as current |
 | Duty record disclosure (owner-approved 2026-09-28; NOT BUILT) | `Assignment & cover history` — collapsed by default, all authorised records remain reachable; distinguish record time from effective dates | future terms described as already completed |
 | Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |

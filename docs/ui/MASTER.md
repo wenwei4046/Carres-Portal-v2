@@ -1188,7 +1188,9 @@ read-only visibility and manager-only writes. Workspace MASTER §4 owns the capa
 placement's acceptance boundary. Its §4.2 structure is separately owner-approved 2026-09-28 / NOT
 BUILT: current facts → next assignment → collapsed history, with existing authorised actions near
 the current facts. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
-Settings navigation opens on demand; never force a third narrow-screen column. Remaining interaction
+Settings navigation opens on demand; never force a third narrow-screen column. The separately approved
+2026-09-28 catalogue shows today's holder/active cover/unassigned answer; future dates belong in
+detail (Workspace §4.2), with no token change. Remaining interaction
 review is still open. This ruling changes no
 colour, spacing, typography, icon or other token value.
 

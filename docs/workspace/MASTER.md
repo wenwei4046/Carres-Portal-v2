@@ -236,11 +236,20 @@ future arrangements remain reachable in the expanded records, with their future 
 explicit. History distinguishes the recorded event time from the assignment/cover effective dates
 and retains the shared event → who/when → detail grammar. Opening history changes no business fact.
 
-The left catalogue follows the shared Duty catalogue order and shows Duty label, current normal
-holder and exceptional state: `Covered today`, `Starts {date}`, `Ends {date}` or `Not assigned`.
-It never shows workload, performance, a recommended person or a copied module roster. Search matches
-Duty label and authorised current/historical person names; `State` may narrow to `All duties`,
-`Covered today`, `Cover scheduled` and `Not assigned`.
+**CATALOGUE — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** The left catalogue
+follows the shared Duty catalogue order and answers who is responsible today. Each row shows the
+Duty label and today's normal holder, `{acting person} covering for {normal owner}` when cover is
+active, or `Not assigned`. Future appointments never replace today's answer early. `Starts {date}`
+and `Ends {date}` do not appear in catalogue rows; effective periods and future arrangements belong
+in the selected detail's assignment/cover facts and `Next assignment`.
+
+The catalogue never shows workload, performance, a recommended person or a copied module roster.
+Search matches Duty label and authorised current/historical person names; `State` may narrow to
+`All duties`, `Covered today`, `Cover scheduled` and `Not assigned`. Filtering by scheduled cover
+does not make that cover today's actor. Selecting the whole row opens detail, changes no assignment
+and completes no Work. Long names wrap; rows support keyboard selection. Returning from narrow-screen
+detail restores the catalogue's search/filter and position. Existing read-only users can navigate
+and inspect the same authorised facts.
 
 The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
 `Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
@@ -254,7 +263,7 @@ full-width selected detail with `Back to duties`. Settings navigation is availab
 must not force a third simultaneous narrow-screen column. §4.5 owns the retained loading, no-match,
 read-failure, unassigned and read-only states; no task-level Waiting/Completed/Missed state is added.
 Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
-or production completion; the remaining list/action/exception details continue in PLAN review.
+or production completion; the remaining action/exception details continue in PLAN review.
 
 ### 4.3 · Change-holder contract
 
@@ -326,7 +335,7 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Assign holder`; Work remains visible under Duty word |
 | Cover active | Normal and acting person shown separately with effective dates/reason |
 | Cover scheduled | Normal owner remains today's actor; future cover and start date are visible in detail |
-| Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder |
+| Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
 
