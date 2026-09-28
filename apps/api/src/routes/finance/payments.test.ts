@@ -365,6 +365,42 @@ describe("POST /api/finance/payments/order-receipt", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 
+  it("a reused key on a different amount answers in plain words, not the database's", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: {
+      code: "22023", details: "idempotency_conflict",
+      message: "idempotency key was already used for a different payment" } }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 100, method: "cash",
+          idempotencyKey: "00000000-0000-4000-8000-000000000052" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: "idempotency_conflict",
+      message: "This receipt is already recorded with another amount. Cancel, then check Payment history.",
+    });
+  });
+
+  it("refuses a third decimal before SQL, never rounds it", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 12.345, method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
   it.each(["bank_transfer", "probe_wallet"])(
     "passes the method key %s through untouched — the SQL writer folds and checks it (0476)",
     async (method) => {
