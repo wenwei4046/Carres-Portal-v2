@@ -42,9 +42,10 @@ vi.mock("@/lib/pdf/render", () => ({
 const previewState = vi.hoisted(() => ({ ready: true }));
 vi.mock("@/components/kit/PdfPreview", () => ({
   default: ({ src, title, onReady, "data-testid": testId }: {
-    src: string; title: string; onReady: (ready: boolean) => void; "data-testid": string;
+    src: string; title: string; onReady?: (ready: boolean) => void; "data-testid": string;
   }) => {
-    useEffect(() => { onReady(previewState.ready); }, [src]);
+    /* `onReady` is optional on the real kit component too. */
+    useEffect(() => { onReady?.(previewState.ready); }, [src]);
     return <section aria-label={title} data-testid={testId} data-src={src} />;
   },
 }));
@@ -1162,9 +1163,9 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-raised-by").textContent).not.toContain("(you)");
     expect(screen.getByTestId("mp-raised-by").textContent).not.toContain("@");
     expect(screen.getByTestId("mp-raised-by").querySelector("input")).toBeNull();
-    /* The fact is named on BOTH halves — the form asks it, the preview reads
-       it back — so the query is the plural one on purpose. */
-    expect(screen.getAllByText(MW.createRequestedBy).length).toBe(2);
+    /* The right half is the draft PO paper now (owner 2026-09-28), which
+       names no requester — the form states the fact once. */
+    expect(screen.getAllByText(MW.createRequestedBy).length).toBe(1);
   });
 
   it("WHAT WE ALREADY HAVE renders per line, and `still needed` is PRINTED", async () => {
@@ -1196,7 +1197,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
        1130px through the form's own container query (CSS, not JS). */
     const panes = screen.getByTestId("object-two-panes");
     expect(panes).toBeTruthy();
-    expect(screen.getByTestId("mp-create-preview")).toBeTruthy();
+    expect(screen.getByTestId("mp-create-pdf-preview")).toBeTruthy();
 
     /* ONE reading order, and it is the ruling's: Request Details → Delivery →
        Items. Blocks are the shared Sales Order `Block`, so the band, the
@@ -1209,20 +1210,14 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       MW.secCreateDelivery,
       MW.secCreateItems,
     ]);
-    /* The preview repeats the SAME sequence — a second order would make the
-       operator re-find every fact they just typed. */
-    const previewSections = [
-      ...screen.getByTestId("mp-create-preview").querySelectorAll("[data-preview-section]"),
-    ].map((el) => el.getAttribute("data-preview-section"));
-    expect(previewSections).toEqual([
-      MW.secCreateRequestDetails,
-      MW.secCreateDelivery,
-      MW.secCreateItems,
-    ]);
-    /* It is a DRAFT and says so — never an MPR number, never a PO number. */
-    expect(screen.getByTestId("mp-preview-draft").textContent).toBe(MW.draft);
-    expect(screen.getByTestId("mp-create-preview").textContent).not.toMatch(/MPR-\d/);
-    expect(screen.getByTestId("mp-create-preview").textContent).not.toMatch(/PO-\d/);
+    /* ⭐ THE RIGHT HALF IS THE PAPER (owner 2026-09-28, "it should pdf
+       preview … it same with so batch"): SO Batch's own not-sendable sentence
+       over a DRAFT purchase order — never an MPR or PO number. */
+    const pane = screen.getByTestId("mp-create-pdf-preview");
+    expect(pane.textContent).toContain("This is a preview. Issue PO creates the number.");
+    expect(await within(pane).findByTestId("mp-draft-po-pdf-0")).toBeTruthy();
+    expect(pane.textContent).not.toMatch(/MPR-\d/);
+    expect(pane.textContent).not.toMatch(/PO-\d/);
   });
 
   it("the create form says `Purpose`, and the retired `Need for` is gone from it", async () => {
@@ -1236,17 +1231,25 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(label.textContent).toBe(MW.createPurpose);
   });
 
-  it("the live preview follows the form — the picked item, its supplier and the total", async () => {
+  it("the draft PO paper follows the form — the picked item, its supplier, the quantity and the purpose", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
     await openWorkspace();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     fireEvent.change(document.getElementById("mp-qty-0")!, { target: { value: "3" } });
-    const preview = screen.getByTestId("mp-create-preview");
-    await waitFor(() => expect(preview.textContent).toContain("5539-2NA"));
-    /* Catalog's supplier rides along — the operator never types one, and the
-       preview is where they see WHICH factory this line will go to. */
-    expect(preview.textContent).toContain("Ohana");
-    expect(screen.getByTestId("mp-preview-total").textContent).toBe("3");
+    /* The SAME template SO Batch renders, handed a DRAFT: no number, no PO
+       dates, the Catalog supplier, and the line as the supplier will read it. */
+    await waitFor(() =>
+      expect(renderPoPdf).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          draft: true,
+          po_number: "DRAFT",
+          eta_date: null,
+          supplier: expect.objectContaining({ name: "Ohana" }),
+          lines: [expect.objectContaining({ sku: "5539-2NA", qty: 3 })],
+        }),
+      ),
+    );
   });
 
   it("NO FREE TEXT (owner, 2026-09-26): no Purchase requirement, no Note — a line rides its configuration", async () => {

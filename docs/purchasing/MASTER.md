@@ -2179,10 +2179,16 @@ The three sections, in the SAME reading order on the form and preview, are:
    silently reserve or subtract stock. Existing concrete-need versus extra-stock
    rules continue to apply.
 
-The right pane is a live **internal MPR preview**, using the same draft facts and
-section sequence, with total requested goods quantity. Before submission it is
-clearly a draft; it never invents an MPR/PO number, claims approval, or represents
-an issued supplier PO. Supplier-facing documents appear at Issue PO, one preview
+The right pane is the **DRAFT Purchase Order paper** (owner 2026-09-28: "it should pdf
+preview … it same with so batch"; BUILT 2026-09-28): one paper per Catalog supplier of the
+picked lines, rendered from the same draft the form holds by the PO template SO Batch's
+review uses, under that review's own sentence. It prints the supplier and Warehouse
+addresses, each line's item with the request's purpose word, its quantity and its
+`Configure` choice. It is a draft: no MPR or PO number, no PO Doc Date, no PO Delivery
+Date (Settings set it at issue; the request's `Supplier Delivery Date` is never copied into
+it), no Unit IDs, and no claim of approval. Before any item is chosen it is still one
+empty paper. The create card is `Supplier Delivery` with `Supplier Deliver To` and
+`Supplier Delivery Date` (owner 2026-09-28). Supplier-facing documents appear at Issue PO, one preview
 per actual grouped PO, using PO-PDF-STANDARD. Never combine several suppliers on
 one PO. No Payment / Paid to date / Balance due / financial-progress section.
 Use the existing top action placement and governed submission action; typing,
