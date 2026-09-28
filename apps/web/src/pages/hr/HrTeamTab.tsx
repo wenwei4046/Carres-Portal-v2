@@ -388,7 +388,7 @@ function AddUserModal({
                 className={`${fieldCls} mt-1 font-normal`}
                 data-testid="hr-team-warehouse-picker"
               >
-                <option value="">Pick one</option>
+                <option value="">Warehouse</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}

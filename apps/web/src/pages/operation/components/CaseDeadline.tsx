@@ -281,7 +281,7 @@ function RecordDeadlineForm({
           className="mt-1 block w-full rounded border border-base-300 bg-white px-2 py-1 text-body"
         >
           {/* No default — a silent default records a reason nobody chose. */}
-          <option value="">Pick one</option>
+          <option value=""></option>
           {CASE_DELAY_REASONS.map((r) => (
             <option key={r} value={r}>
               {CASE_DELAY_REASON_LABEL[r]}

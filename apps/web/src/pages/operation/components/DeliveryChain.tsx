@@ -457,7 +457,7 @@ function AddLegForm({
         value={partnerId}
         onChange={(e) => setPartnerId(e.target.value)}
       >
-        <option value="">Pick partner</option>
+        <option value="">Logistics</option>
         {partners.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}

@@ -113,7 +113,7 @@ export function MattressConfigurator({
           onChange={(e) => setSkuId(e.target.value)}
           className={selectClass()}
         >
-          <option value="">Pick {variantLabel.toLowerCase()}</option>
+          <option value="">{variantLabel}</option>
           {skus.map((s) => (
             <option key={s.id} value={s.id}>
               {s.variant} · RM {s.price.toLocaleString()}
@@ -268,7 +268,7 @@ export function SofaConfigurator({
             disabled={skusForMode.length === 0}
             className={selectClass({ disabled: skusForMode.length === 0 })}
           >
-            <option value="">Pick {mode === "preset" ? "preset" : "part"}</option>
+            <option value="">{mode === "preset" ? "Preset" : "Part"}</option>
             {skusForMode.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.variant} · RM {s.price.toLocaleString()}

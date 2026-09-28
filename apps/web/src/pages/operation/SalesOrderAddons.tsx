@@ -256,7 +256,7 @@ export default function SalesOrderAddons({
               }}
               className="rounded-control border border-kit-slate-5 px-2 py-1 text-body"
             >
-              <option value="">Pick a service</option>
+              <option value="">Service</option>
               {offerable.map((a) => (
                 <option key={a.key} value={a.key}>
                   {a.name} · {rm(a.price)}
@@ -274,7 +274,7 @@ export default function SalesOrderAddons({
                 onChange={(e) => setPickSize(e.target.value)}
                 className="rounded-control border border-kit-slate-5 px-2 py-1 text-body"
               >
-                <option value="">Pick a size</option>
+                <option value="">Size</option>
                 {(chosen ? sizesFor(chosen) : []).map((s) => (
                   <option key={s} value={s}>
                     {s}

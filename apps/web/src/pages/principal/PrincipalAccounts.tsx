@@ -951,7 +951,7 @@ function CreateAccountModal({
                   data-testid="acct-existing-store"
                   className="w-full px-3 py-2.5 border border-base-200 rounded text-body bg-white cursor-pointer"
                 >
-                  <option value="">Pick a store</option>
+                  <option value="">Store</option>
                   {/* Grouped so our own showrooms never read as dealerships
                       (Loo 2026-07-19). Partitioned with the shared helper, not
                       `=== 'showroom'` per group, so an unexpected channel value

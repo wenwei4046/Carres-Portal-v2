@@ -410,7 +410,7 @@ export function RoutingFields({
             }
             className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
           >
-            <option value="">Pick logistics</option>
+            <option value="">Logistics</option>
             {partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}

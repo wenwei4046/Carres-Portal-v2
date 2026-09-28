@@ -178,7 +178,7 @@ export default function OperationInbox() {
                         });
                       }}
                     >
-                      <option value="">Pick</option>
+                      <option value="">Logistics</option>
                       {logisticPartners.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
