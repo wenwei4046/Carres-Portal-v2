@@ -240,7 +240,7 @@ export default function DeliveryOrderPage() {
         <p className="text-body text-base-700">
           {notFound
             ? "This delivery order could not be found"
-            : "The delivery order could not be loaded — try again"}
+            : "The delivery order could not be loaded. Try again"}
         </p>
         {(error as Error | undefined)?.message ? (
           <p className="text-meta text-base-500">{(error as Error).message}</p>
@@ -326,20 +326,20 @@ export default function DeliveryOrderPage() {
   /* HISTORY — every append-only record, in the order it happened: the issue,
      the handover chain, the attempts, the order's own History lines, the void. */
   const historyEntries = [
-    { at: d.issued_at, text: `Delivery order issued — ${d.do_number}`, meta: "issued by the system when every requirement was met" },
+    { at: d.issued_at, text: `Delivery order issued: ${d.do_number}`, meta: "issued by the system when every requirement was met" },
     ...(data?.handoverEvents ?? []).map((e) => ({
       at: e.recorded_at,
-      text: `${HANDOVER_LABEL[e.kind] ?? e.kind}${e.kind === "handed_over" && e.receiver_name ? ` — received by ${e.receiver_name}` : ""}`,
+      text: `${HANDOVER_LABEL[e.kind] ?? e.kind}${e.kind === "handed_over" && e.receiver_name ? ` · received by ${e.receiver_name}` : ""}`,
       meta: [e.recorded_by_name, DUTY_LABEL[e.duty] ?? e.duty, e.company].filter(Boolean).join(" · "),
     })),
     ...attempts.map((a) => ({
       at: a.recorded_at,
-      text: `${resultWord(a.result)}${a.reason_key ? ` — ${deliveryReasonLabel(a.reason_key)}` : ""}`,
+      text: `${resultWord(a.result)}${a.reason_key ? `: ${deliveryReasonLabel(a.reason_key)}` : ""}`,
       meta: a.note ?? "",
     })),
     ...(data?.history ?? []).map((h) => ({ at: h.occurred_at, text: h.text, meta: h.by_role ?? "" })),
     ...(d.voided_at
-      ? [{ at: d.voided_at, text: `Cancelled — ${d.void_reason === "order_cancelled" ? "order cancelled" : "rescheduled"}`, meta: "" }]
+      ? [{ at: d.voided_at, text: `Cancelled: ${d.void_reason === "order_cancelled" ? "order cancelled" : "rescheduled"}`, meta: "" }]
       : []),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
@@ -350,7 +350,7 @@ export default function DeliveryOrderPage() {
         customer={`SO-${order.so} · ${customer}`}
         backTo="/operation/delivery-orders"
         backLabel="Delivery Orders"
-        docTitle={`${d.do_number} — Carres`}
+        docTitle={`${d.do_number} · Carres`}
         status={<StatusPill tone={statusTone}>{status.label}</StatusPill>}
         right={
           <>
@@ -373,7 +373,7 @@ export default function DeliveryOrderPage() {
               data-testid="do-print"
               onClick={() => void openPdf()}
               className="inline-flex h-7 items-center gap-1.5 rounded-md border border-base-300 bg-white px-2.5 text-meta font-medium text-base-700 hover:bg-base-50"
-              title="Reprint carries the same number — the paper the customer signed stays reproducible"
+              title="Reprint carries the same number. The paper the customer signed stays reproducible"
             >
               <Printer size={14} /> Print
             </button>
@@ -390,16 +390,16 @@ export default function DeliveryOrderPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="do-section-order">
               <Fact label="Name">{customer}</Fact>
               <Fact label="Phone">
-                {order.customer_phone || <Absence>No phone recorded — check the Sales Order</Absence>}
+                {order.customer_phone || <Absence>No phone recorded. Check the Sales Order</Absence>}
               </Fact>
               <Fact label="Emergency contact">
                 {order.customer_emergency || (
-                  <Absence>No emergency contact — used only if the customer cannot be reached</Absence>
+                  <Absence>No emergency contact. Used only if the customer cannot be reached</Absence>
                 )}
               </Fact>
               <Fact label="Delivery address">
                 {order.customer_address || (
-                  <Absence>No address recorded — record it on the Sales Order before the trip</Absence>
+                  <Absence>No address recorded. Record it on the Sales Order before the trip</Absence>
                 )}
               </Fact>
               {/* A Journey leg's document leaves from ITS OWN source stop — leg 1
@@ -431,12 +431,12 @@ export default function DeliveryOrderPage() {
               </Fact>
               <Fact label="Driver">
                 {arrangement?.driver_name || (
-                  <Absence>Driver not recorded — the logistics partner assigns the driver on the day</Absence>
+                  <Absence>Driver not recorded. The logistics partner assigns the driver on the day</Absence>
                 )}
               </Fact>
               <Fact label="Vehicle">
                 {arrangement?.vehicle || (
-                  <Absence>Vehicle not recorded — the logistics partner assigns the vehicle on the day</Absence>
+                  <Absence>Vehicle not recorded. The logistics partner assigns the vehicle on the day</Absence>
                 )}
               </Fact>
               {legRoute ? <Fact label="Route">{legRoute}</Fact> : null}
@@ -464,7 +464,7 @@ export default function DeliveryOrderPage() {
               <span className="text-label font-semibold uppercase tracking-wide text-base-500">Goods on this trip</span>
               {tripLines.length === 0 ? (
                 <p className="mt-1">
-                  <Absence>No goods lines on this trip — the Sales Order carries the order's goods.</Absence>
+                  <Absence>No goods lines on this trip. The Sales Order carries the order's goods.</Absence>
                 </p>
               ) : (
                 <ul className="mt-1 flex flex-col gap-2">
@@ -494,7 +494,7 @@ export default function DeliveryOrderPage() {
                 />
               ) : documentBlob.failed ? (
                 <p className="mt-1">
-                  <Absence>The document could not be rendered here — Print opens the same document.</Absence>
+                  <Absence>The document could not be rendered here. Print opens the same document.</Absence>
                 </p>
               ) : (
                 <p className="mt-1 text-body text-base-600">Rendering the document…</p>
@@ -506,7 +506,7 @@ export default function DeliveryOrderPage() {
           <Panel title="Delivery history">
             {attempts.length === 0 ? (
               <Absence>
-                No delivery run recorded yet — the Delivery page records the result on the day.
+                No delivery run recorded yet. The Delivery page records the result on the day.
               </Absence>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="do-delivery-history">
@@ -514,7 +514,7 @@ export default function DeliveryOrderPage() {
                   <li key={a.id ?? i} className="flex flex-col">
                     <span className="text-body text-base-900">
                       Delivery on {fmtDate(a.recorded_at)} · {resultWord(a.result)}
-                      {a.reason_key ? ` — ${deliveryReasonLabel(a.reason_key)}` : ""}
+                      {a.reason_key ? `: ${deliveryReasonLabel(a.reason_key)}` : ""}
                     </span>
                     <span className="text-label text-base-600">
                       {a.where_goods ? `Goods: ${whereWord[a.where_goods] ?? a.where_goods}` : "Recorded"}
@@ -530,7 +530,7 @@ export default function DeliveryOrderPage() {
           <Panel title="Warehouse handover">
             {(data?.handoverEvents ?? []).length === 0 ? (
               <Absence>
-                No handover recorded yet — the warehouse records it on the Delivery page.
+                No handover recorded yet. The warehouse records it on the Delivery page.
               </Absence>
             ) : (
               <ul className="flex flex-col gap-3" data-testid="do-handover-facts">
@@ -538,7 +538,7 @@ export default function DeliveryOrderPage() {
                   <li key={e.id} className="flex flex-col gap-0.5">
                     <span className="text-body font-medium text-base-900">
                       {HANDOVER_LABEL[e.kind] ?? e.kind}
-                      {e.kind === "handed_over" && e.counterparty ? ` — to ${e.counterparty}` : ""}
+                      {e.kind === "handed_over" && e.counterparty ? ` to ${e.counterparty}` : ""}
                       {e.kind === "handed_over" && e.receiver_name ? ` · received by ${e.receiver_name}` : ""}
                     </span>
                     <span className="text-label text-base-600">
@@ -619,7 +619,7 @@ export default function DeliveryOrderPage() {
                   <li key={a.id ?? `attempt-${i}`} className="flex flex-col">
                     <span className="text-body text-base-900">
                       {resultWord(a.result)}
-                      {a.reason_key ? ` — ${deliveryReasonLabel(a.reason_key)}` : ""}
+                      {a.reason_key ? `: ${deliveryReasonLabel(a.reason_key)}` : ""}
                     </span>
                     <span className="text-label text-base-600">
                       {fmtDate(a.recorded_at)}
@@ -629,20 +629,20 @@ export default function DeliveryOrderPage() {
                 ))}
                 {openFinance.map((e) => (
                   <li key={e.id} className="flex flex-col">
-                    <span className="text-body text-base-900">Finance is holding this delivery — {e.reason}</span>
+                    <span className="text-body text-base-900">Finance is holding this delivery: {e.reason}</span>
                     <span className="text-label text-base-600">{e.opened_at ? fmtDate(e.opened_at) : "Open"}</span>
                   </li>
                 ))}
                 {pendingApprovals.map((a) => (
                   <li key={a.id} className="flex flex-col">
-                    <span className="text-body text-base-900">Payment approval requested — {a.request_reason}</span>
+                    <span className="text-body text-base-900">Payment approval requested: {a.request_reason}</span>
                     <span className="text-label text-base-600">{a.requested_at ? fmtDate(a.requested_at) : "Requested"}</span>
                   </li>
                 ))}
                 {d.voided_at ? (
                   <li className="flex flex-col">
                     <span className="text-body text-base-900">
-                      Cancelled —{" "}
+                      Cancelled:{" "}
                       {d.void_reason === "order_cancelled"
                         ? "the order was cancelled"
                         : "the trip was rescheduled; a new delivery order carries the new date"}
@@ -672,7 +672,7 @@ export default function DeliveryOrderPage() {
                         className={`block truncate text-label font-normal ${i.workingDaysLate > 0 ? "text-danger" : "text-base-600"}`}
                       >
                         {i.workingDaysLate > 0 && i.dueIso
-                          ? `Late — was due ${fmtDate(i.dueIso)}`
+                          ? `Late: was due ${fmtDate(i.dueIso)}`
                           : i.dueIso
                             ? `due ${fmtDate(i.dueIso)}`
                             : i.soRef}

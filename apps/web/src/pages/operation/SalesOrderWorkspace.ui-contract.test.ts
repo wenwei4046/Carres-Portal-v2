@@ -163,7 +163,7 @@ describe("Sales Order object template contract", () => {
       "mode === \"oldrev\" && viewedRevision ? templateData : base",
     );
     expect(workspace).toContain(
-      'toast.message("You have unsaved changes — printing the saved version")',
+      'toast.message("You have unsaved changes. Printing the saved version")',
     );
     /* The draft's own blob is never handed to Print. */
     expect(workspace).not.toContain("window.open(pdfUrl,");
@@ -538,7 +538,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("needDealer && !draft.proceed_date");
     /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
        ended up with two of them. */
-    expect(workspace).toContain("Proceed date — pick the day production should start");
+    expect(workspace).toContain("Proceed date: pick the day production should start");
   });
 
   it("puts no toolbar on or above the paper", () => {
@@ -700,7 +700,7 @@ describe("Sales Order object template contract", () => {
     for (const column of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
       expect(workspace, `${column} left the draft table`).toContain(column);
     expect(workspace).toContain("const protectedLine = (l: DraftLine) =>");
-    expect(workspace).toContain("Free item — it follows the item it came with");
+    expect(workspace).toContain("Free item. It follows the item it came with");
     expect(workspace).toContain("Free item: check it is still allowed without the cancelled item");
   });
 
@@ -752,7 +752,7 @@ describe("Sales Order object template contract", () => {
 
   it("carries the approved reconstruction notice ONLY on a version with no stored file", () => {
     expect(workspace).toContain('data-testid="oldrev-rebuilt"');
-    expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
+    expect(workspace).toContain("Reconstructed copy. The original issued document is unavailable.");
     /* Every one of the three notices is gated on the legacy case. A version
        that kept its document must not be told it is a reconstruction. */
     expect(workspace).toContain("{isReconstruction && (");
@@ -770,7 +770,7 @@ describe("Sales Order object template contract", () => {
        prints the same sentence the document prints, so a reader on screen and a
        customer holding the PDF are told the same thing. */
     expect(workspace).toContain("Signature version not recorded.");
-    expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
+    expect(workspace).toContain("Reconstructed copy. The original issued document is unavailable.");
     expect(workspace).toContain("{isReconstruction && base?.signature_url && (");
     /* ...and the document is told by the SAME condition the page notice uses,
        so the two cannot drift apart. */

@@ -31,8 +31,8 @@ describe("catalogPriceHint — the catalog is shown, never enforced", () => {
     // An order may legitimately sell at another figure — a discount, a bundle,
     // goodwill. `product_skus.price` is the CATALOG's number (0175 makes it
     // principal-only); `order_lines.unit_price` is the ORDER's number.
-    expect(catalogPriceHint(SOFA, 1800)).toBe("Catalog RM 1950.00 — this line differs");
-    expect(catalogPriceHint(SOFA, 0)).toBe("Catalog RM 1950.00 — this line differs");
+    expect(catalogPriceHint(SOFA, 1800)).toBe("Catalog RM 1950.00, this line differs");
+    expect(catalogPriceHint(SOFA, 0)).toBe("Catalog RM 1950.00, this line differs");
   });
 
   it("is a HINT and never an error string — red has one job", () => {

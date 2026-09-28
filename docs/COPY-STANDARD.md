@@ -1399,7 +1399,7 @@ These stock-picker words do not rename every Warehouse screen.
 | Manual Purchase groups (BUILT) | `Need approval` · `Need PO` · `No PO needed`. Hide an empty historical group, retain/count nonempty history. To buy / No purchase needed are retired on this page only. Hiding an empty group is the ENGINE's rule, not the page's — a group declared conditionally is absent on the first render and its `initiallyCollapsed` never reaches the engine, so the history arrives expanded. |
 | Manual Purchase goods heads (BUILT) | `Status` · `Category` · `Qty` · `Item` · `Ready Stock` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Delivery Date`; checkbox leads. |
 | The create form's recorded-intent question (BUILT 2026-09-20, migration 0549) | `Can stock answer this?` with exactly two answers and **no default**: `Yes — existing stock can answer this` (`concrete_need`) · `No — this buys extra stock` (`additional_stock`). The disabled Send names the gap in the form's own grammar: `Send — say whether stock can answer this`. It sits beside `Need for`, in the same kit `Select`, because it is the same breath. **A pre-selected answer is banned**: the 2026-09-18 ruling forbids inferring the intent from the SKU, the shelf count or the purpose, and a default is that inference with the operator's name on it. An edit of a request that recorded none must answer before it is sent again; NULL is never guessed. The words deliberately reuse the read-only reasons' own vocabulary (`buys extra stock`, `whether stock can answer it`) so the question and its later consequence read as one sentence. *Composed under ui MASTER §1.1 — asynchronous owner review; a correction replaces these words in the next commit.* |
-| Manual Purchase stock actions/feedback (BUILT) | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel` · `{n} available` · `{n} reserved` · `{n} selected` · `Not saved` · `Stock selection saved.` · `Save or cancel your stock selection before issuing a PO.` A disabled first save names its gap: `Choose Ready Unit — tick a Unit first`. Every refusal states its outcome ONCE — `Nothing was saved.` — because the door is atomic. These are allocation actions, never automatic additional replenishment. |
+| Manual Purchase stock actions/feedback (BUILT) | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel` · `{n} available` · `{n} reserved` · `{n} selected` · `Not saved` · `Stock selection saved.` · `Save or cancel your stock selection before issuing a PO.` A disabled first save names its gap: `Choose Ready Unit: tick a Unit first`. Every refusal states its outcome ONCE — `Nothing was saved.` — because the door is atomic. These are allocation actions, never automatic additional replenishment. |
 
 **Manual Purchase — APPROVED (Jess, 2026-09-16), BUILT in Round 2 (migration 0522).** Every
 request requires approval, regardless of purpose or amount; the exemption state and per-purpose
@@ -2547,8 +2547,8 @@ new Sales Order always carries a real `Requested Delivery Date`.
 |---|---|---|
 | Step 3's standing note under the date picker | **`Ask the customer for the date before you save the order. An order without a delivery date cannot be filed.`** | Confirm later · TBD · For Further Notice · Optional |
 | The wizard refuses a dateless step | **`Delivery date — ask the customer for the date, then pick it`** | `Delivery — pick a date, or tick 'Confirm later'` |
-| **Any door** refuses a missing production start — the wizard, the POS schema, the office create door | **`Proceed date — pick the day production should start`** | …`or tick 'Confirm later'` · `Proceed date is required. Choose the day production should start.` — a second spelling that lived at `packages/shared/src/schemas/orders.ts:326` until 2026-08-28, so the POS wizard and its own schema refused the same thing in two different sentences. **One refusal, one wording, every door** (YH, 2026-08-28) |
-| The office object page offers a proceed date that was never recorded | **`Never recorded — fill it in once, then it locks`** | Optional · Add a date · Editable · Missing — the hint states the CONSEQUENCE of typing, because this control appears exactly once in an order's life and the operator has no way to learn that from the field |
+| **Any door** refuses a missing production start — the wizard, the POS schema, the office create door | **`Proceed date: pick the day production should start`** | …`or tick 'Confirm later'` · `Proceed date is required. Choose the day production should start.` — a second spelling that lived at `packages/shared/src/schemas/orders.ts:326` until 2026-08-28, so the POS wizard and its own schema refused the same thing in two different sentences. **One refusal, one wording, every door** (YH, 2026-08-28) |
+| The office object page offers a proceed date that was never recorded | **`Never recorded. Fill it in once, then it locks`** | Optional · Add a date · Editable · Missing — the hint states the CONSEQUENCE of typing, because this control appears exactly once in an order's life and the operator has no way to learn that from the field |
 | The save door refuses moving a proceed date that IS recorded | **`The proceed date is already recorded and cannot be changed here`** | Locked · Read-only · Not editable · Forbidden — the refusal names WHERE it cannot be changed (`here`), because moving a production start is a real act with a real door; it is simply not this one |
 | The create door refuses a dateless order | **`Delivery date is required. Ask the customer for the date before you save the order.`** | `delivery date is required unless marked TBD` |
 | The cart refuses a service-only order | **`This order has no product — add the product this service belongs to`** | Invalid cart · Nothing to sell · Add an item |
@@ -2653,7 +2653,7 @@ Portal's own words and are printed unchanged on the object page — one fact, on
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Printing while the form is dirty | **`You have unsaved changes — printing the saved version`** | Save first · Unsaved · Print anyway |
+| Printing while the form is dirty | **`You have unsaved changes. Printing the saved version`** | Save first · Unsaved · Print anyway |
 
 ### The Order Route words (owner ruling 2026-08-16 — OVERWRITES the 2026-08-15 version)
 
@@ -2876,7 +2876,7 @@ automatically become a Sales Order state. These words are approved target copy, 
 `Add disposal` as its action would name the lorry's take-away job more exactly than `Services` /
 `Add service`. Recorded here for owner review; until approved, the screen uses the two approved/existing
 words above. Falsifier: the owner approves or rejects them.
-| A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| A draft line the promotion protects | **Free item. It follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
 | Unknown promised date — History translation of a legacy `delivery_date_tbd` event only (owner ruling 2026-09-26: the Edit checkbox is retired; a date changes only into another date) | **Delivery date to be confirmed** |
 | A locked goods line's discount cell (owner ruling 2026-09-26) | **`RM 0.00`** — never `—` |
@@ -3232,7 +3232,7 @@ whether the row is an import, and the answer is that all 40 are.
 Fixed phrasings — reuse, never invent a variant:
 
 - The fact: `Half-day delivery · condominium` · `Full-day delivery`
-- The refusal: `Fill in the building type first — a condominium can only take a
+- The refusal: `Fill in the building type first. A condominium can only take a
   half-day delivery.`
 
 **Never** write "access restrictions", "site constraints", "delivery window policy" or
@@ -4498,7 +4498,7 @@ a customer.
 
 | Meaning | Approved wording | Status |
 |---|---|---|
-| The sheet is reconstructed, not the file issued at the time | **`Reconstructed copy — original issued document unavailable.`** | **APPROVED 2026-09-23 · document + page** |
+| The sheet is reconstructed, not the file issued at the time | **`Reconstructed copy. The original issued document is unavailable.`** | **APPROVED 2026-09-23 · document + page** |
 | A signature exists but its version is not recorded | **`Signature version not recorded.`** | **APPROVED 2026-09-23 · document + page** |
 | A capture that cannot be placed in time | `One payment has no date, so it is not counted in this version.` | PROPOSAL · page only |
 
