@@ -53,7 +53,7 @@ export default function StairCarryFields({
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="kicker">Delivery access</h3>
         <p className="text-[11px] text-base-500">
-          1F–{cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
+          1F to {cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
           {cfg.freeUpToFloor + 1}F · max {MAX_DELIVERY_FLOOR}F
         </p>
       </div>

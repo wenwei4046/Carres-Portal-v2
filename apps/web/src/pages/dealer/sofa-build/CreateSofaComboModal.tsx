@@ -90,7 +90,7 @@ export default function CreateSofaComboModal({
     };
     try {
       await create.mutateAsync(input);
-      toast.success(isQuickPick ? "Quick pick created" : "Combo created — synced to Maintenance");
+      toast.success(isQuickPick ? "Quick pick created" : "Combo created. Synced to Maintenance");
       onClose();
     } catch {
       toast.error(
@@ -187,7 +187,7 @@ export default function CreateSofaComboModal({
               data-testid="create-quickpick-note"
             >
               This layout appears in the <strong>Quick pick</strong> tab for salespeople. It has
-              no fixed price — picking it drops the layout on the canvas and prices live.
+              no fixed price. Picking it drops the layout on the canvas and prices live.
             </div>
           ) : (
             <div>
