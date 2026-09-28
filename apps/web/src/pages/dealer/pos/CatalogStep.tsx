@@ -1,4 +1,18 @@
-import { Search, Sofa } from "lucide-react";
+import {
+  Bed,
+  BedDouble,
+  Lamp,
+  LayoutGrid,
+  Lock,
+  Package,
+  Repeat,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Sofa,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
@@ -40,6 +54,7 @@ import CartDrawer from "./CartDrawer";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 import GuaranteePickerModal from "./GuaranteePickerModal";
+import Drawer from "@/components/kit/Drawer";
 
 /** The families that render as cards on the wall. Narrower than
  *  `ProductCategory` (which also carries `service`, whose models back the
@@ -59,6 +74,28 @@ const CARD_ORDER: CardCategory[] = [
   "guarantee",
 ];
 
+const MOBILE_CHIP_KEYS = new Set<RailKey>([
+  "all",
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+]);
+
+/** Drawer-only presentation map. Entry labels, counts, visibility and locks
+ * continue to come exclusively from `railEntries`. */
+const MOBILE_CATEGORY_ICON: Record<RailKey, LucideIcon> = {
+  all: LayoutGrid,
+  mattress: BedDouble,
+  bedframe: Bed,
+  sofa: Sofa,
+  accessory: Lamp,
+  guarantee: ShieldCheck,
+  rental: Repeat,
+  bundles: Package,
+  addons: Lamp,
+};
+
 /**
  * Step 01 — POS catalog. 2990s-parity layout: sectioned left sidebar
  * (categories / quick / principal-only MAINTAIN / pricing footer), searchable
@@ -77,6 +114,8 @@ export default function CatalogStep({
   onProceed,
   cartOpen,
   onCartOpenChange,
+  categoryOpen = false,
+  onCategoryOpenChange = () => {},
   pwpReservedCodes,
   pwpClaimGroup,
   customerPhone,
@@ -91,6 +130,9 @@ export default function CatalogStep({
   onProceed: () => void;
   cartOpen: boolean;
   onCartOpenChange: (open: boolean) => void;
+  /** Phone top-bar category drawer, controlled by DealerPos. */
+  categoryOpen?: boolean;
+  onCategoryOpenChange?: (open: boolean) => void;
   /** Loo 2026-07-26 — the topbar's `POS · {store}` label; presence turns on
    *  the configure pages' brand strip (logo = back to catalog). */
   topbarContext?: string;
@@ -121,6 +163,8 @@ export default function CatalogStep({
   const activeAddons = useMemo(() => offerableAddons(catalog.addons), [catalog.addons]);
 
   const [activeRail, setActiveRail] = useState<RailKey>("all");
+  const activeChipRef = useRef<HTMLButtonElement | null>(null);
+  const previousActiveRailRef = useRef<RailKey>(activeRail);
   const [rawSearch, setRawSearch] = useState("");
   const search = useDebouncedValue(rawSearch.trim().toLowerCase(), 180);
   const [configureModelId, setConfigureModelId] = useState<string | null>(null);
@@ -190,6 +234,18 @@ export default function CatalogStep({
     }
     if (lockedCats.has(activeRail)) setActiveRail("all");
   }, [activeRail, lockedCats, rentalRailLocked, outrightRailsLocked]);
+
+  useEffect(() => {
+    if (previousActiveRailRef.current === activeRail) return;
+    previousActiveRailRef.current = activeRail;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+
+    activeChipRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [activeRail]);
 
   const countByCat = useMemo(() => {
     const m = new Map<ProductCategory, number>();
@@ -408,6 +464,21 @@ export default function CatalogStep({
     setActiveRail("all");
   }
 
+  function selectCategoryFromDrawer(key: RailKey) {
+    setActiveRail(key);
+    onCategoryOpenChange(false);
+  }
+
+  function selectBestsellersFromDrawer() {
+    setActiveRail("mattress");
+    onCategoryOpenChange(false);
+  }
+
+  function resetFiltersFromDrawer() {
+    resetFilters();
+    onCategoryOpenChange(false);
+  }
+
   /**
    * The no-mixing law (Loo 2026-07-26, LOCKED): a cart is either all rental or
    * all outright. Enforced HERE, at the single funnel every add passes through
@@ -602,6 +673,30 @@ export default function CatalogStep({
           </span>
         </div>
 
+        <nav
+          className="pos-mobile-category-chips hidden"
+          aria-label="Popular product categories"
+          data-testid="pos-mobile-category-chips"
+        >
+          {railEntries
+            .filter((entry) => MOBILE_CHIP_KEYS.has(entry.key))
+            .map((entry) => (
+              <button
+                key={entry.key}
+                ref={entry.key === activeRail ? activeChipRef : null}
+                type="button"
+                className={`pos-mobile-category-chip${entry.key === activeRail ? " is-active" : ""}`}
+                disabled={entry.locked}
+                aria-pressed={entry.key === activeRail}
+                onClick={() => setActiveRail(entry.key)}
+                data-testid={`pos-mobile-chip-${entry.key}`}
+              >
+                <span>{entry.label}</span>
+                <span className="pos-mobile-category-chip__count">{entry.count}</span>
+              </button>
+            ))}
+        </nav>
+
         <div className="cat-grid-wrap">
           {/* Sofa-exclusivity notice — functional mutex feedback. */}
           {activeRail !== "addons" && (cartHasSofa || cartHasMainNonSofa) && (
@@ -723,6 +818,56 @@ export default function CatalogStep({
           )}
         </div>
       </main>
+
+      <Drawer open={categoryOpen} onOpenChange={onCategoryOpenChange} title="Categories">
+        <nav className="pos-proto pos-category-drawer" aria-label="All product categories">
+          <div className="pos-category-drawer__list">
+            {railEntries.map((entry) => {
+              const Icon = MOBILE_CATEGORY_ICON[entry.key];
+              return (
+                <button
+                  key={entry.key}
+                  type="button"
+                  className={`pos-category-drawer__item${entry.key === activeRail ? " is-active" : ""}`}
+                  disabled={entry.locked}
+                  aria-pressed={entry.key === activeRail}
+                  onClick={() => selectCategoryFromDrawer(entry.key)}
+                  data-testid={`pos-category-drawer-${entry.key}`}
+                >
+                  {entry.locked ? (
+                    <Lock size={16} strokeWidth={1.75} aria-hidden="true" />
+                  ) : (
+                    <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+                  )}
+                  <span>{entry.label}</span>
+                  <span className="pos-category-drawer__count">{entry.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pos-category-drawer__quick" aria-label="Category shortcuts">
+            <button
+              type="button"
+              className="pos-category-drawer__item"
+              onClick={selectBestsellersFromDrawer}
+              data-testid="pos-category-drawer-bestsellers"
+            >
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>Bestsellers</span>
+            </button>
+            <button
+              type="button"
+              className="pos-category-drawer__item"
+              onClick={resetFiltersFromDrawer}
+              data-testid="pos-category-drawer-reset"
+            >
+              <RotateCcw size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>Reset filters</span>
+            </button>
+          </div>
+        </nav>
+      </Drawer>
 
       <FloatingCartButton
         itemCount={itemCount}

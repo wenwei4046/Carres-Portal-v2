@@ -6,6 +6,24 @@ import CatalogStep from "./CatalogStep";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn() } }));
 
+const scrollIntoView = vi.fn();
+
+function setPhoneViewport(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
 function catalog(): CatalogResponse {
   return {
     models: [
@@ -37,7 +55,14 @@ function catalogWithAccessory(): CatalogResponse {
 }
 
 describe("CatalogStep", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setPhoneViewport(true);
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+  });
 
   it("a single-sku accessory adds STRAIGHT to the cart (no configurator drawer)", () => {
     const onChange = vi.fn();
@@ -111,6 +136,157 @@ describe("CatalogStep", () => {
     fireEvent.change(screen.getByLabelText("Search catalog"), { target: { value: "zzzznope" } });
     // search is debounced ~180ms; findByText polls until the filter applies.
     expect(await screen.findByText(/No pieces match/)).toBeTruthy();
+  });
+
+  it("shows only the five popular phone chips while the drawer keeps every available entry", () => {
+    const onCategoryOpenChange = vi.fn();
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        catalog={catalogWithAccessory()}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+        categoryOpen
+        onCategoryOpenChange={onCategoryOpenChange}
+      />,
+    );
+
+    for (const key of ["all", "mattress", "bedframe", "sofa", "accessory"]) {
+      expect(screen.getByTestId(`pos-mobile-chip-${key}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId("pos-mobile-chip-addons")).toBeNull();
+    expect(screen.getByTestId("pos-category-drawer-addons")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("pos-category-drawer-addons"));
+    expect(screen.getByText("0 add-ons")).toBeTruthy();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(onCategoryOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("centers a newly active popular chip on phone without scrolling on initial render", () => {
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        catalog={catalogWithAccessory()}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+      />,
+    );
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("pos-mobile-chip-accessory"));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  });
+
+  it("does not auto-scroll chips outside the phone breakpoint", () => {
+    setPhoneViewport(false);
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        catalog={catalogWithAccessory()}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("pos-mobile-chip-accessory"));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("drawer shortcuts reuse the existing category and reset behavior, then close", () => {
+    const onCategoryOpenChange = vi.fn();
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        catalog={catalog()}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+        categoryOpen
+        onCategoryOpenChange={onCategoryOpenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("pos-category-drawer-bestsellers"));
+    expect(screen.getByTestId("pos-mobile-chip-mattress")).toHaveAttribute("aria-pressed", "true");
+    expect(onCategoryOpenChange).toHaveBeenLastCalledWith(false);
+
+    fireEvent.change(screen.getByLabelText("Search catalog"), { target: { value: "cloud" } });
+    fireEvent.click(screen.getByTestId("pos-category-drawer-reset"));
+    expect(screen.getByLabelText("Search catalog")).toHaveValue("");
+    expect(screen.getByTestId("pos-mobile-chip-all")).toHaveAttribute("aria-pressed", "true");
+    expect(onCategoryOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("disables locked categories in both the phone chips and drawer", () => {
+    const cat = catalogWithAccessory();
+    cat.models = [
+      ...cat.models,
+      {
+        id: "m-sofa",
+        category: "sofa",
+        modelKey: "sofa",
+        name: "Carres Sofa",
+        blurb: null,
+        colors: null,
+        gaps: null,
+        sofaMode: null,
+      },
+    ];
+    cat.skus = [
+      ...cat.skus,
+      {
+        id: "s-sofa",
+        modelId: "m-sofa",
+        sku: "SOFA-1",
+        variant: "Standard",
+        variantKind: "preset",
+        price: 2990,
+        cost: null,
+        supplierId: null,
+      },
+    ];
+    const draft = emptyDraft();
+    draft.lines = [
+      {
+        localId: "line-sofa",
+        sku: "SOFA-1",
+        qty: 1,
+        unitPrice: 2990,
+        label: "Carres Sofa",
+        attrs: null,
+      },
+    ];
+
+    render(
+      <CatalogStep
+        draft={draft}
+        onChange={() => {}}
+        catalog={cat}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+        categoryOpen
+        onCategoryOpenChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("pos-mobile-chip-mattress")).toBeDisabled();
+    expect(screen.getByTestId("pos-mobile-chip-bedframe")).toBeDisabled();
+    expect(screen.getByTestId("pos-category-drawer-mattress")).toBeDisabled();
+    expect(screen.getByTestId("pos-category-drawer-bedframe")).toBeDisabled();
   });
 });
 
