@@ -738,7 +738,7 @@ describe("cartGoodsIssue — a service never sells alone", () => {
     d.lines = [line("SVC-DISPOSE-MATTRESS")];
     expect(
       cartGoodsIssue(d, catalogOf([["SVC-DISPOSE-MATTRESS", "service"]])),
-    ).toContain("add the product this service belongs to");
+    ).toContain("Add the product this service belongs to");
   });
 
   it("refuses a guarantee sold on its own — the attachment law, generalised", () => {
