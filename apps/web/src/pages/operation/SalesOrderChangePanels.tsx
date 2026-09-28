@@ -140,7 +140,7 @@ export function WaitingRequest(props: {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-strong text-kit-slate-12">
-          {a.stale ? "Out of date — propose again" : "Waiting for management"}
+          {a.stale ? "Out of date. Propose again" : "Waiting for management"}
         </h2>
         <span className="text-meta text-kit-slate-11">
           Submitted {fmtDate(a.submitted_at)} · on Rev {a.base_revision}

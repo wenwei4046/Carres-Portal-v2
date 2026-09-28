@@ -445,6 +445,6 @@ export function dateHeadingPartsOf(iso: string): DateHeadingParts {
  */
 export function undatedSummaryWordOf(count: number): string {
   return count === 1
-    ? "1 with no date yet — not shown on any column"
-    : `${count} with no date yet — not shown on any column`;
+    ? "1 with no date yet. Not shown on any column"
+    : `${count} with no date yet. Not shown on any column`;
 }

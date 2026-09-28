@@ -401,7 +401,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
       { paymentMethods, formFields },
       {
         onSuccess: (res) => {
-          toast.success("Order entry config saved — the POS updates on next load");
+          toast.success("Order entry config saved. The POS updates on next load");
           setDraft(initDraft(res.entryConfig));
         },
         onError: (e) => toast.error(e.message ?? "Save failed"),
@@ -504,7 +504,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
           </Drawer>
 
           {/* --------------------------------------------------- form fields */}
-          <div className="label mb-1.5">Form fields — POS Customer step</div>
+          <div className="label mb-1.5">Form fields: POS Customer step</div>
           {!editingFields ? (
             <div className="mb-6 grid items-start gap-3 rounded-[4px] border border-base-200 px-3 py-3 sm:grid-cols-[1fr_auto]">
               <p className="text-meta text-base-600">Customer, address, emergency and target-date fields · {ORDER_ENTRY_TABS.reduce((count, tab) => count + draft.tabs[tab].custom.length, 0)} custom fields</p>

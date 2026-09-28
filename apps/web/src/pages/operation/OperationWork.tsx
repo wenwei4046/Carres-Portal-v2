@@ -340,7 +340,7 @@ export default function OperationWork() {
         </>
       ) : (
         <>
-          <p>{activeView === "mine" ? "Nothing assigned to you" : "No open work — every track is clear."}</p>
+          <p>{activeView === "mine" ? "Nothing assigned to you" : "No open work. Every track is clear."}</p>
           {activeView === "mine" && teamTotal > 0 ? (
             /* The door out of an empty My Work (item 6 of the review). */
             <button type="button" onClick={() => updateParam("scope", "team")} className={emptyButton} data-testid="work-empty-team-door">
@@ -598,7 +598,7 @@ export default function OperationWork() {
       {/* The 50px Destination Header every listing carries (UI MASTER §6.0,
           owner ruling 2026-09-25: Work follows the Sales Orders shell). It
           embeds the global utilities; the page prints no count up here. */}
-      <ModuleHeader destinationHeader testId="work-destination-header" word="Work" docTitle="Work — Carres" />
+      <ModuleHeader destinationHeader testId="work-destination-header" word="Work" docTitle="Work · Carres" />
       <ListPageShell register testId="operation-work">
       {/* The rail runs from the page header to the bottom (Jess, 2026-09-26:
           the toolbar is the right column's, never a bar across the rail). */}

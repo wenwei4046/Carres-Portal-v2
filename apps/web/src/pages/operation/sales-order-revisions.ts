@@ -78,7 +78,7 @@ export function describeRevisionChanges(
   prev: SalesOrderSnapshot | null,
   next: SalesOrderSnapshot,
 ): string[] {
-  if (!prev) return ["Original — the agreement as first recorded"];
+  if (!prev) return ["Original: the agreement as first recorded"];
   const out: string[] = [];
 
   for (const [key, label, isDate, suffix] of HEADER_LABELS) {

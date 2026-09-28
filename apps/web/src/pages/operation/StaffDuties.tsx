@@ -78,7 +78,7 @@ export default function StaffDuties() {
       <ModuleHeader
         testId="staff-duties-destination-header"
         word="Staff & Duties"
-        docTitle="Staff & Duties · Workspace — Carres"
+        docTitle="Staff & Duties · Workspace · Carres"
         destinationHeader
       />
       <div className="min-h-0 flex-1 bg-white" data-testid="staff-duties">

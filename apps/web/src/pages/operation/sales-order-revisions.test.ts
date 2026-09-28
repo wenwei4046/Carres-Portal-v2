@@ -19,7 +19,7 @@ const snap = (over: Partial<SalesOrderSnapshot>): SalesOrderSnapshot => ({
 describe("describeRevisionChanges — + added · − removed · old → new", () => {
   it("Rev 1 is the original, one sentence", () => {
     expect(describeRevisionChanges(null, snap({}))).toEqual([
-      "Original — the agreement as first recorded",
+      "Original: the agreement as first recorded",
     ]);
   });
 

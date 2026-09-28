@@ -27,7 +27,7 @@ import { buildSupplierItems, missingSupplierCodeCount, type SupplierItemRow } fr
 const W = {
   page: "Supplier items",
   search: "Search supplier, code or item",
-  empty: "No supplier items yet — a SKU appears here once it names a supplier.",
+  empty: "No supplier items yet. A SKU appears here once it names a supplier.",
   colSupplier: "Supplier",
   colTheirCode: "Their code",
   colDescription: "Description",
@@ -144,7 +144,7 @@ export default function OperationSupplierItems() {
       <ModuleHeader
         testId="supplier-items-header"
         word={W.page}
-        docTitle={`${W.page} · Suppliers — Carres`}
+        docTitle={`${W.page} · Suppliers · Carres`}
         destinationHeader
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-9 py-6">

@@ -2076,7 +2076,7 @@ function RequestExpansion({
       itemDetail: [
         g.sku,
         g.cancelled
-          ? `${MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}${g.cancelReason ? ` — ${g.cancelReason}` : ""}`
+          ? `${MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}${g.cancelReason ? `: ${g.cancelReason}` : ""}`
           : null,
       ]
         .filter(Boolean)
@@ -3946,7 +3946,7 @@ function ManualPurchaseObject({
         event.preventDefault();
         onBack();
       }}
-      docTitle={`${MW.page} — Carres`}
+      docTitle={`${MW.page} · Carres`}
       right={
         position ? (
           <span className="flex shrink-0 items-center gap-0.5" data-testid="mp-object-position">
@@ -4285,7 +4285,7 @@ function ManualPurchaseObject({
                     {l.cancelled_at ? (
                       <span className="block text-label text-kit-slate-11">
                         {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
-                        {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
+                        {l.cancel_reason ? `: ${l.cancel_reason}` : ""}
                       </span>
                     ) : null}
                   </td>

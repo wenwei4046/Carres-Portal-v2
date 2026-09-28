@@ -454,7 +454,7 @@ export default function WarehouseOutboundWork() {
       <ModuleHeader
         testId="warehouse-outbound-header"
         word="Outbound"
-        docTitle="Outbound · Warehouse — Carres"
+        docTitle="Outbound · Warehouse · Carres"
         destinationHeader
       />
       {workId && <div className="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="outbound-loading-workspace">
@@ -679,7 +679,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
 
   function recordPrep(fact: WarehousePrepFact, unitCodes: string[], done: string) {
     if (!doId) {
-      setPrepError("This delivery order cannot be addressed — reload the page.");
+      setPrepError("This delivery order cannot be addressed. Reload the page.");
       return;
     }
     setPrepError(null);
@@ -940,7 +940,7 @@ function RecordLoadedModal({
   );
 
   return (
-    <Modal title={`Record Units loaded — ${card.doNumber}`} onClose={onClose}>
+    <Modal title={`Record Units loaded: ${card.doNumber}`} onClose={onClose}>
       <div className="space-y-3 text-[13px]">
         <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
           <Field label="Logistics Partner" value={card.logisticsPartner} />
@@ -999,7 +999,7 @@ function RecordLoadedModal({
         </label>
         <div>
           <span className="text-label uppercase tracking-wide text-base-500">
-            Proof — photos and videos of the loaded goods
+            Proof: photos and videos of the loaded goods
           </span>
           <div className="mt-0.5" data-testid="wo-proof">
             <EvidenceUploadField

@@ -108,7 +108,7 @@ export default function OperationStock() {
             {!isLoading && list.length === 0 && (
               <tr>
                 <td colSpan={warehouses.length + 4} className="p-10 text-center text-meta text-base-500">
-                  {view === "low" ? "Everything is healthy — no low-stock SKUs." : "No SKUs."}
+                  {view === "low" ? "Everything is healthy. No low-stock SKUs." : "No SKUs."}
                 </td>
               </tr>
             )}
