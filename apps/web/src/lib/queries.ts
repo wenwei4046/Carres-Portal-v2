@@ -4769,6 +4769,10 @@ export interface PurchaseRequestLineRow {
   stock_reserved_qty?: number;
   required_by: string | null;
   remark: string | null;
+  /** 0591 — the line's configuration, chosen like a Sales portal line
+   *  (colour · fabric · size · options); the shape of `order_lines.attrs`.
+   *  Absent on a payload from a Worker before 0591. */
+  attrs?: Record<string, unknown> | null;
   po_id: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
@@ -5089,13 +5093,15 @@ export function useResubmitManualPurchase() {
       destinationId: string;
       requiredBy: string;
       why: string | null;
-      /** 0562 — the round REPLACES the requirement, so clearing it is a real
-       *  edit rather than a fact that can never be taken back. */
-      purchaseRequirement: string | null;
+      /** Retired from the screen 2026-09-26 (owner: no free text). The door
+       *  still accepts it, so an omitted value clears it. */
+      purchaseRequirement?: string | null;
       serviceCaseId: string | null;
       staffUserId: string | null;
       subsidiaryName: string | null;
-      lines: Array<{ id: string | null; sku: string; qty: number; note: string | null }>;
+      /** A line is configured like a Sales line (0591): `attrs` replaces the
+       *  retired free-text `note`. */
+      lines: Array<{ id: string | null; sku: string; qty: number; attrs: Record<string, unknown> | null; note?: string | null }>;
     }) => {
       const { id, ...body } = input;
       return apiFetch<{ id: string; round: number }>(

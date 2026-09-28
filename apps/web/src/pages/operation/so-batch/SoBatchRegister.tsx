@@ -37,6 +37,7 @@ import {
   type SoBatchRailFilter,
   type SoBatchSafetyDaysCell,
   type SoBatchSelection,
+  GOODS_ABSENCE_WORDS,
 } from "@carres/shared";
 import {
   DataGrid,
@@ -1649,7 +1650,7 @@ function SoBatchOrderExpansion({
       testId: `so-batch-part-${l.sku}`,
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: [],
-      unitAbsence: "",
+      unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
       /* The four numbers that used to hide inside `Covered by`: what the
          customer ordered, what the shelf already answered, how much documents
          have ORDERED for this line, and what is left.
@@ -1692,9 +1693,9 @@ function SoBatchOrderExpansion({
         return { toBuy: null };
       })(),
       orderBy: eligible ? leaf.orderBy ?? null : null,
-      orderByAbsence: leaf && !isPurchaseDemandTimingState(leaf.state) && order.status !== "ordered" ? "Not planned" : "",
+      orderByAbsence: leaf && !isPurchaseDemandTimingState(leaf.state) && order.status !== "ordered" ? "Not planned" : GOODS_ABSENCE_WORDS.alreadyOrdered,
       orderedQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
-      orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "" : "Not ordered yet",
+      orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? GOODS_ABSENCE_WORDS.fromReadyStock : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
          line states the destination the issued document carries. */
       ...(drawEditor
@@ -1723,9 +1724,9 @@ function SoBatchOrderExpansion({
             : issuedDest.kind === "one"
               ? [issuedDest.value]
               : [W.multiple],
-      deliverToAbsence: eligible ? "Not chosen" : "",
+      deliverToAbsence: eligible ? "Not chosen" : GOODS_ABSENCE_WORDS.noPurchaseNeeded,
       supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? undefined,
-      supplierAbsence: "",
+      supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
       sku: l.sku,
       qty: l.qty,
       item: l.item,
@@ -1759,11 +1760,11 @@ function SoBatchOrderExpansion({
         testId: `so-batch-part-${part.sku}`,
         category: leaf.category ? categoryWord(leaf.category) : "Other goods",
         unitIds: [],
-        unitAbsence: "",
+        unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
         orderedQtyAbsence: "Not ordered yet",
         deliverTo: [],
-        deliverToAbsence: "",
-        supplierAbsence: "",
+        deliverToAbsence: GOODS_ABSENCE_WORDS.noPurchaseNeeded,
+        supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
         supplier: leaf.supplier ?? undefined,
         sku: part.sku,
         qty: part.qty,

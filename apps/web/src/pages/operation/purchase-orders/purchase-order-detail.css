@@ -8,33 +8,6 @@
   font-family: Inter, "SF Pro Text", Roboto, system-ui, sans-serif;
 }
 
-/* ⭐ THE SALES ORDER PAGE LEFT THIS BAND — OWNER RULING (Jess, 2026-09-21,
-   re-affirmed 2026-09-22 "remain blue"): its card title is 15px/600 sentence
-   case in `kit-blue-11` on a WHITE card over a 1px rule. The band survives for
-   Purchase Orders and the Manual Purchase create workspace, which are governed
-   by their own module and did not change.
-   ⛔ AND IT IS THIS RULE, NOT THE MARKUP, THAT DECIDED THE OLD LOOK. The `<h2>`
-   already carried `text-kit-blue-11`; a page-scoped stylesheet overrode it with
-   raw hex, so a reviewer read the ruling as unbuilt while the class was in the
-   DOM all along. Changing the component alone would have shipped nothing. */
-:is(.po-detail-style, .mp-create-style) [data-block] > div:first-child {
-  margin: -0.75rem -1rem 0;
-  padding: 0.75rem 1rem;
-  border-left: 0;
-  border-radius: inherit;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  background-color: #b9c9d8;
-  color: #26384a;
-}
-
-:is(.po-detail-style, .mp-create-style) [data-block] > div:first-child > h2 {
-  font-family: inherit;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #26384a;
-}
-
 .po-detail-style h1 > .font-mono,
 .po-detail-style [data-block] .font-mono {
   font-family: inherit;
@@ -51,19 +24,13 @@
   color: #334155;
 }
 
-/* ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (Jess, 2026-09-10) — the
-   same approved light slate blue-grey as the SO Batch Purchase / Manual
-   Purchase / Purchase Orders table header, so one colour means "section header"
-   everywhere in Operations. */
-.po-detail-style [data-block] > div:first-child {
-  background-color: #b9c9d8;
-  color: #26384a;
-}
-
-.po-detail-style [data-block] > div:first-child > h2 {
-  color: #26384a;
-}
-
+/* ⭐ THE BAND IS GONE EVERYWHERE — owner instruction (Jess, 2026-09-26):
+   "follow sales order ui kit … every page of purchasing". The shared `Block`
+   draws the card title 15px/600 sentence case in `kit-blue-11` on a WHITE card
+   over a 1px rule; this stylesheet no longer paints a grey band over it for
+   Purchase Orders or the Manual Purchase create workspace. ⛔ LESSON KEPT: it
+   was a rule here, not the markup, that decided the old look. Nothing here may
+   style `[data-block] > div:first-child` again. */
 .po-detail-style :is(label, .text-base-400, .text-base-500, .text-base-600, .text-kit-slate-11),
 .po-detail-style [data-block] > div:first-child :is(span, p) {
   color: #667085;
@@ -108,17 +75,6 @@
   background-color: #eaf4ff;
 }
 
-.po-detail-style [data-block] > div:first-child :is(a, button),
-.po-detail-style [data-block] > div:first-child :is(a, button) * {
-  @apply text-kit-blue-11;
-}
-
-/* ⭐ DENSITY PASS (Jess, 2026-09-10) — a stricter, more scannable ERP read.
-   PO-scoped only: section headers and input heights tightened. */
-.po-detail-style [data-block] > div:first-child {
-  padding: 0.5rem 1rem;
-}
-
-.po-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]) {
+.po-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"]) {
   height: 1.75rem;
 }

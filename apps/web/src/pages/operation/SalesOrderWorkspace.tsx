@@ -806,12 +806,13 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
  */
 export function Block({
   title,
-  /** ⭐ THE BLUE TITLE IS THE SALES ORDER PAGE'S, NOT EVERY PAGE'S. `Block` is
-   *  shared — `PurchaseOrdersPage` draws its object with the same card — and the
-   *  owner ruling that made the title blue (Jess, 2026-09-21/22) is a SALES
-   *  ORDER ruling. So the blue is opt-in and the shared default is unchanged;
-   *  no other page moves. */
-  titleTone = "shared",
+  /* ⭐ ONE CHROME FOR EVERY OBJECT / DETAIL / REVIEW CARD — owner instruction
+     (Jess, 2026-09-26): "follow sales order ui kit … every page of
+     purchasing". The blue title over a 1px rule (owner ruling 2026-09-21/22)
+     is no longer the Sales Order page's opt-in; the former `shared` tone — a
+     mono UPPERCASE title beside a left band — is RETIRED. Purchase Orders,
+     Manual Purchase, the Review Purchase Orders pane, Supplier Claims and
+     Purchasing Settings draw this same card. */
   note,
   headerSlot,
   subtitle,
@@ -820,7 +821,6 @@ export function Block({
   children,
 }: {
   title: string;
-  titleTone?: "shared" | "sales-order";
   note?: string;
   /** ⭐ A STANDING FACT ABOUT THE WHOLE CARD BELONGS BESIDE ITS NAME
    *  (Jess, 2026-08-26). `note` is prose; this slot takes a rendered chip, so a
@@ -867,36 +867,19 @@ export function Block({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
-      {/* ⭐ THE CARD TITLE IS BLUE, SENTENCE CASE, OVER A 1px RULE — OWNER
-          RULING (Jess, 2026-09-21), re-affirmed 2026-09-22: **"remain blue"**,
-          kept after the challenge that blue elsewhere means clickable
-          (`docs/orders/MASTER.md` § "Order view — one page, foreign facts
-          read-only" → CARD ORDER AND NAMES).
-
-          Two ranks only: card title `text-strong` 15px/600 sentence case in
-          `kit-blue-11`, on a WHITE card with a 1px rule; the in-card label is
-          13px/600 slate-11.
-
-          ⛔ WHAT THIS RETIRES: the mono UPPERCASE `text-signature-700` heading
-          and the `border-l-2` blue-grey band beside it. Both were this page's
-          own 2026-08-24/28 answers to "a section must read as a section"; the
-          owner has since ruled the answer, so the older reasoning is removed
-          rather than left beside it to be re-argued. */}
-      <div
-        className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 ${
-          titleTone === "sales-order" ? "border-b border-kit-slate-5 pb-2" : "border-l-2 border-base-300 pl-2"
-        }`}
-      >
-        <h2
-          id={headingId}
-          className={
-            titleTone === "sales-order"
-              ? /* ONE KIT LAW (owner ruling 2026-09-27): a card title is black bold,
-                   never blue. It overwrites the 2026-09-21 "remain blue" ruling. */
-                "text-strong text-kit-slate-12"
-              : "font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
-          }
-        >
+      {/* ⭐ ONE CARD, ONE CHROME — every page draws its cards from here.
+          A white card with a 1px rule under the title; the title is
+          `text-strong` slate-12 BLACK bold, sentence case (ONE KIT LAW, Jess
+          2026-09-27, which overwrote the 2026-09-21 "remain blue" ruling).
+          Blue stays for the primary button, links and selection only. There
+          is no second tone and no band: the grey band and the mono uppercase
+          heading are retired. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-kit-slate-5 pb-2">
+        {/* ONE KIT LAW (Jess, 2026-09-27): the card title is BLACK bold
+            `text-strong` slate-12 — never blue (blue is the primary button,
+            links and selection only), never a band. Overwrites the
+            2026-09-21 "remain blue" ruling in the one place every page draws from. */}
+        <h2 id={headingId} className="text-strong text-kit-slate-12">
           {title}
         </h2>
         {headerSlot}
@@ -946,10 +929,7 @@ export function Block({
               margin of their own. Opt-in with the SO tone because Purchase
               Orders and Manual Purchase share this component and space their
               own bodies. */}
-          <div
-            id={bodyId}
-            className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}
-          >
+          <div id={bodyId} className="mt-3 flex flex-col gap-3 [&>*:empty]:hidden">
             {children}
           </div>
         </>
@@ -1065,10 +1045,34 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
  * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
  * as changeable as the phone number beside it (reviewer finding 16).
  */
-function Fact({ label, value, own = true, framed = own }: { label: string; value: React.ReactNode; own?: boolean; framed?: boolean }) {
-  const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
-  return (
-    <FieldFrame id={id} label={label}>
+export function Fact({
+  label,
+  value,
+  own = true,
+  framed = own,
+  idPrefix = "so-fact",
+  testId,
+  hint,
+  wide = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  own?: boolean;
+  framed?: boolean;
+  /** The id/testid family — `so-fact` here, `po-fact` / `mp-fact` on the
+   *  Purchasing pages that share this ONE fact grammar (owner, 2026-09-26). */
+  idPrefix?: string;
+  /** A page that already pins its own test id keeps it. */
+  testId?: string;
+  /** One quiet line under the value (`Provisional. The date is recorded when
+   *  issued.`) through FieldFrame's own hint slot — never a second markup. */
+  hint?: string;
+  /** Spans the whole fact grid row — a free-text reason or requirement. */
+  wide?: boolean;
+}) {
+  const id = `${idPrefix}-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  const field = (
+    <FieldFrame id={id} label={label} hint={hint}>
       <div
         id={id}
         role="textbox"
@@ -1076,7 +1080,7 @@ function Fact({ label, value, own = true, framed = own }: { label: string; value
         aria-label={label}
         data-kit={framed ? "readonly-field" : "plain-fact"}
         data-editable={own ? "yes" : "no"}
-        data-testid={id}
+        data-testid={testId ?? id}
         className={
           framed
             ? `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
@@ -1087,6 +1091,9 @@ function Fact({ label, value, own = true, framed = own }: { label: string; value
       </div>
     </FieldFrame>
   );
+  /* The kit owns one field and takes no className; the grid span is the
+     caller's layout, drawn here around it. */
+  return wide ? <div className="col-span-full">{field}</div> : field;
 }
 
 /** The 0219 custom fields of one tab, rendered from the SAME contract the POS
@@ -3154,7 +3161,7 @@ function SalesOrderWorkspaceBody() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="SO info">
+      <Block title="SO info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact own={false} label="SO Doc Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
           {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
@@ -3370,7 +3377,6 @@ function SalesOrderWorkspaceBody() {
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
       <Block
-        titleTone="sales-order"
         title="Customer"
         headerSlot={
           !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
@@ -3525,7 +3531,7 @@ function SalesOrderWorkspaceBody() {
           a working line and charged once in GOODS. */}
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="Delivery">
+      <Block title="Delivery">
           {/* Merged from the retired `Delivery address` card (Jess,
               2026-08-26). Same fields, same ids, same one-address fact — it
               simply stopped being a separate card two sections away from the
@@ -3846,7 +3852,7 @@ function SalesOrderWorkspaceBody() {
           other cards use is what keeps that promise; without it the boxes on a
           locked order accepted keystrokes. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="Items">
+      <Block title="Items">
         {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
             `data-pos-field` the POS-parity contract test string-matches, with
             no control behind it — so the page passed a completeness test it
@@ -3960,7 +3966,6 @@ function SalesOrderWorkspaceBody() {
           navigates to the desk that owns collection, already scoped to this
           order, which is the one thing Law C lets a summary add. */}
       <Block
-        titleTone="sales-order"
         title="Payment"
         headerSlot={
           !isNew && order ? (
@@ -4054,7 +4059,7 @@ function SalesOrderWorkspaceBody() {
           work: a section that says "nothing" on every order is a section the
           operator learns to skip. */}
       {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
-        <Block titleTone="sales-order" title="What this change started elsewhere">
+        <Block title="What this change started elsewhere">
           <CorrectionWorkList
             work={correctionWorkQ.data?.work ?? []}
             canClose={false}
@@ -4188,7 +4193,7 @@ function SalesOrderWorkspaceBody() {
               is a 15px blue title over a 1px rule. It is now that same `Block`,
               so padding, title and gap come from one place. */}
           <div className="mx-auto max-w-5xl">
-          <Block titleTone="sales-order" title={objectView}>
+          <Block title={objectView}>
             {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
                 guards a 403 or a 500 falls straight through to the ledger's
                 governed EMPTY sentences (`No revisions recorded` / `No history

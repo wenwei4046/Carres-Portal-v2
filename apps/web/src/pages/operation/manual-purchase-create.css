@@ -122,13 +122,12 @@
    readable pair (`docs/purchasing/MASTER.md` §8.2). It is a CONTAINER query,
    like every other rule in this file, so the split answers to the width the
    form actually has (rail open or closed), never to the device's. */
+/* The page's own name in the kit's card-title voice: sentence/Title case as
+   written, black bold, never uppercase (ONE KIT LAW, owner 2026-09-27). */
 .mp-create-heading {
   padding: 0 0 0.75rem;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: #26384a;
 }
 .mp-create-split {
   display: flex;

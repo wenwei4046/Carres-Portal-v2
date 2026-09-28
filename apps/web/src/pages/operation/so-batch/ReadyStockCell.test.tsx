@@ -323,7 +323,10 @@ describe("the stock table", () => {
     const row = screen.getByTestId(`ready-stock-unit-${UNIT_COUNTED}`);
     expect(within(row).queryByRole("checkbox")).toBeNull();
     expect(within(row).queryByText("QTY-000000001")).toBeNull();
-    expect(within(row).getByText("Counted stock")).toBeInTheDocument();
+    /* The reason is printed in the row and announced in the tick cell. */
+    expect(within(row).getAllByText("Counted stock").length).toBeGreaterThan(0);
+    /* Owner ruling 2026-09-27: no dash — the Unit ID cell carries the reason. */
+    expect(within(row).queryByText("—")).toBeNull();
   });
 
   /** The item line is structural now: there is nothing left to choose. */
