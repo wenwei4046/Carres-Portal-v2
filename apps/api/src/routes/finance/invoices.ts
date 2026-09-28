@@ -864,7 +864,8 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
   }
   const orderPaid = Number(ord.paid ?? 0);
   const invoiceAmt = Number(inv.amount ?? 0);
-  if (orderPaid + 0.01 < invoiceAmt) {
+  // In whole sen: one sen short is not paid.
+  if (Math.round(orderPaid * 100) < Math.round(invoiceAmt * 100)) {
     return c.json(
       {
         error: "rule_violation",

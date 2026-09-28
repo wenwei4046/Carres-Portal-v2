@@ -374,6 +374,26 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     expect(body.code).toBe("not_fully_paid");
   });
 
+  it("returns 422 when the order is one sen short", async () => {
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
+      { id: ORDER_ID, so: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: "5969.99", dealers: null },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_fully_paid");
+  });
+
   it("returns 422 when invoice voided", async () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: "2026-05-01" },
