@@ -141,6 +141,16 @@ not approval to make manual assignment the normal operating journey. Its final a
 follow the automatic-assignment/exception review. Do not treat the prior form approval as a complete
 Blueprint or permission to Build.
 
+**JOINER / LEAVER TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+A new employee joins routine monthly Duty rotation on the first day of the month following the
+month in which they acquire the required People-owned rotation eligibility, using the company
+calendar/timezone. Creating an account or starting employment alone is not rotation eligibility.
+The current month's allocation is not reshuffled merely because a new eligible person joins.
+Departure removes a person immediately when departure becomes effective; do not wait for the next
+month. Re-resolve the affected current/future routine allocation through the one shared Duty model,
+preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
+change source-owned task completion or decide the remaining multi-person rotation/cover details.
+
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,
 current/future eligible pickers and Duty routing; preserve historical names, acts and records.

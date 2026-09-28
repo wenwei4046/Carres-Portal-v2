@@ -352,6 +352,12 @@ PO/GRN assignment rows. Workspace §4 owns the one authoritative assignment mode
 rows are not proof of a general joiner/leaver automation. Approval capability, source-owned
 completion and historical actual-actor evidence remain separate.
 
+**JOINER / LEAVER TIMING — OWNER-APPROVED 2026-09-28 / NOT BUILT:** new eligible staff join
+monthly PO/GRN rotation from the first day of the following month; eligibility does not reshuffle
+the current month. Departure excludes the person on its effective date and immediately re-resolves
+affected current/future allocation. Workspace §4 owns this shared rule; it does not grant approval
+capability or rewrite completed Purchasing/Receiving evidence.
+
 ### 5.4 Deliver To
 
 The destination comes from the source PO/CO `Supplier Deliver To`. When a new buy needs a default, use the

@@ -79,6 +79,10 @@ against a real session.
   a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
   `../purchasing/MASTER.md` §5.3 and its one edit door is Settings → Staff & Duties
   (approved placement / NOT BUILT; Workspace §4).
+- **Rotation entry timing — owner-approved 2026-09-28 / APPROVED TARGET / NOT BUILT:** a newcomer
+  enters routine monthly Duty rotation on the first day of the next month after acquiring the
+  required People-owned eligibility. Account creation alone does not enrol them. Departure exclusion
+  takes effect immediately on its effective date, not the next month (Workspace §4).
 - **Checklists are a shared constant, not a config table.**
 - **Departure visibility — owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT:** after
   departure is effective, omit the person from default active staff views and current/future Duty

@@ -199,7 +199,9 @@ Owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT: routine operational D
 PO Duty and GRN Duty follow governed automatic allocation over eligible active staff; the owner
 does not manually enter each routine assignment. The authoritative assignment remains in the one
 Workspace Duty model, never independent page-level rotation. This does not auto-grant approver
-permissions or change object PIC ownership. A
+permissions or change object PIC ownership. Owner-approved joiner/leaver timing (2026-09-28 /
+NOT BUILT, Workspace §4): newly eligible staff enter monthly rotation on the first day of the next
+month; departure exclusion takes effect immediately on its effective date. A
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and
