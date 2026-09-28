@@ -518,7 +518,7 @@ export default function CatalogStep({
   function addBundle(bundle: ProductBundleDto) {
     const r = explodeBundle(bundle.components, bundle.price, (sku) => skuPrice.get(sku) ?? null);
     if (!r.ok) {
-      toast.error("This bundle isn't available right now — an item in it is off sale.");
+      toast.error("This bundle isn't available right now. An item in it is off sale.");
       return;
     }
     const group = newLocalId();
@@ -563,7 +563,7 @@ export default function CatalogStep({
   function completeBundle(bundle: ProductBundleDto, picks: BundleSlotPick[]) {
     const assembled = assembleBundleLines(bundle, picks, newLocalId());
     if (!assembled) {
-      toast.error("This bundle isn't available right now — an item in it is off sale.");
+      toast.error("This bundle isn't available right now. An item in it is off sale.");
       return;
     }
     const newLines: DraftLine[] = assembled.map((l) => ({ ...l, localId: newLocalId() }));
@@ -594,7 +594,7 @@ export default function CatalogStep({
     const hasClaim = Boolean(nextAttrs?.pwp || nextAttrs?.free_item);
     if (hadClaim && !hasClaim) {
       toast.info(
-        "The voucher / free claim on this item was reset — re-apply it from the cart if it still applies.",
+        "The voucher / free claim on this item was reset. Re-apply it from the cart if it still applies.",
       );
     }
   }
@@ -613,7 +613,7 @@ export default function CatalogStep({
       if (s && term) {
         setGuaranteePick({ term, sku: s });
       } else {
-        toast.error("This guarantee isn't set up yet — ask the principal to add its terms.");
+        toast.error("This guarantee isn't set up yet. Ask the principal to add its terms.");
       }
       return;
     }
@@ -724,8 +724,8 @@ export default function CatalogStep({
               <Sofa size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} />
               <span>
                 {cartHasSofa
-                  ? "Sofa order — sofas don't share an order with mattresses or bed frames. Check out or clear the cart to switch categories."
-                  : "This order has a mattress or bed frame. Sofas are placed separately — check out or clear the cart to start a sofa order."}
+                  ? "Sofa order. Sofas don't share an order with mattresses or bed frames. Check out or clear the cart to switch categories."
+                  : "This order has a mattress or bed frame. Sofas are placed separately. Check out or clear the cart to start a sofa order."}
               </span>
             </div>
           )}
@@ -769,7 +769,7 @@ export default function CatalogStep({
                         lockedReason={
                           missing
                             ? "An item in this bundle is off sale right now"
-                            : "Locked — this order already has a conflicting product family"
+                            : "Locked. This order already has a conflicting product family"
                         }
                         inCart={draft.lines.some(
                           (l) =>

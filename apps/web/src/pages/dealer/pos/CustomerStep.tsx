@@ -341,7 +341,7 @@ export default function CustomerStep({
         </div>
         <p className="handover__sub">
           Hand the tablet to the customer to fill in their details. Quote items have been carried
-          over — no re-entry needed.
+          over. No re-entry needed.
         </p>
 
         <div className="steps">
@@ -420,7 +420,7 @@ export default function CustomerStep({
 
         {dealerPending ? (
           <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            Pick a store to continue — the lists below follow it.
+            Pick a store to continue. The lists below follow it.
           </p>
         ) : (
           <>
@@ -438,8 +438,8 @@ export default function CustomerStep({
                     >
                       <option value="">
                         {branchesEmpty
-                          ? `— no ${branchLabel.toLowerCase()} yet —`
-                          : `— pick ${branchLabel.toLowerCase()} —`}
+                          ? `No ${branchLabel.toLowerCase()} yet`
+                          : `Pick ${branchLabel.toLowerCase()}`}
                       </option>
                       {outlets.map((o) => (
                         <option key={o.id} value={o.id}>
@@ -455,7 +455,7 @@ export default function CustomerStep({
                         in their own POS Staff overlay. */}
                     {branchesEmpty && !outletLockedByStaff && (
                       <span className="field__hint" data-testid="pos-outlet-empty">
-                        This store has no {branchLabel.toLowerCase()} yet — add one under{" "}
+                        This store has no {branchLabel.toLowerCase()} yet. Add one under{" "}
                         {dealerPick ? "Admin → Accounts" : "Staff → Outlets"} before placing an
                         order for it.
                       </span>
@@ -473,8 +473,8 @@ export default function CustomerStep({
                     >
                       <option value="">
                         {spOptions.length === 0
-                          ? `— none in this ${branchLabel.toLowerCase()} —`
-                          : "— pick salesperson —"}
+                          ? `None in this ${branchLabel.toLowerCase()}`
+                          : "Pick salesperson"}
                       </option>
                       {spOptions.map((sp) => (
                         <option key={sp.id} value={sp.id}>
@@ -547,7 +547,7 @@ export default function CustomerStep({
                       <input
                         type="email"
                         value={c.email}
-                        placeholder="customer@example.com — for receipt & order updates"
+                        placeholder="customer@example.com (for receipt & order updates)"
                         onChange={(e) => setC({ email: e.target.value })}
                       />
                     </div>
@@ -577,7 +577,7 @@ export default function CustomerStep({
                         onChange={(e) => setC({ race: e.target.value })}
                         data-testid="pos-customer-race"
                       >
-                        <option value="">— select —</option>
+                        <option value="">Select</option>
                         {RACE_OPTIONS.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -594,7 +594,7 @@ export default function CustomerStep({
                         onChange={(e) => setC({ gender: e.target.value })}
                         data-testid="pos-customer-gender"
                       >
-                        <option value="">— select —</option>
+                        <option value="">Select</option>
                         {GENDER_OPTIONS.map((g) => (
                           <option key={g} value={g}>
                             {g}
@@ -669,7 +669,7 @@ export default function CustomerStep({
                         data-testid="pos-building-type"
                         className="w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary max-w-[260px]"
                       >
-                        <option value="">— select —</option>
+                        <option value="">Select</option>
                         {BUILDING_TYPES.map((b) => (
                           <option key={b} value={b}>
                             {b}
@@ -763,7 +763,7 @@ export default function CustomerStep({
             {stepIdx === 2 && !emergencyBlock?.enabled && (
               <div className="fade-in">
                 <p style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 16 }}>
-                  Emergency contact is switched off in the order-entry config — nothing to
+                  Emergency contact is switched off in the order-entry config. Nothing to
                   fill here.
                 </p>
                 {emgTab.custom.length > 0 && (
@@ -805,7 +805,7 @@ export default function CustomerStep({
                         })
                       }
                     >
-                      <option value="">— Relationship —</option>
+                      <option value="">Relationship</option>
                       {RELATIONSHIPS.map((r) => (
                         <option key={r} value={r}>
                           {r}
@@ -866,7 +866,7 @@ export default function CustomerStep({
                     <div className="flex items-baseline justify-between mb-3">
                       <h3 className="kicker">Order add-ons</h3>
                       <p className="text-[11px] text-base-500">
-                        Optional services charged on this order — e.g. dispose old mattress
+                        Optional services charged on this order, e.g. dispose old mattress
                       </p>
                     </div>
                     <AddonsPanel
@@ -960,7 +960,7 @@ function CustomFieldsInputs({
           </span>
           {f.type === "select" ? (
             <select value={values[f.key] ?? ""} onChange={(e) => onSet(f.key, e.target.value)}>
-              <option value="">— select —</option>
+              <option value="">Select</option>
               {f.options.map((o) => (
                 <option key={o} value={o}>
                   {o}

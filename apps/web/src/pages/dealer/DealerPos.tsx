@@ -640,7 +640,7 @@ export default function DealerPos({
       // happened, or the store re-submits and double-signs the customer.
       setSubmitError(
         done.length > 0
-          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart — check Admin → Rental first.`
+          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart. Check Admin → Rental first.`
           : msg,
       );
     } finally {
@@ -862,7 +862,7 @@ export default function DealerPos({
     setStripeAutoFire(false);
     if (stripePending || uploading || createOrder.isPending) return;
     if (draft.paid <= 0) {
-      toast.info("Pick the amount to collect first — 50% / Full / Custom above.");
+      toast.info("Pick the amount to collect first: 50% / Full / Custom above.");
       return;
     }
     if (!draft.signature || !draft.signature.startsWith("data:image/")) {
@@ -908,13 +908,13 @@ export default function DealerPos({
     if (!sp) return;
     if (
       !window.confirm(
-        `Void order CO-${sp.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+        `Void order CO-${sp.so}? The customer hasn't paid. The order is cancelled and you return to editing.`,
       )
     )
       return;
     try {
       await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at handover" });
-      toast.info(`Order CO-${sp.so} voided — nothing was charged.`);
+      toast.info(`Order CO-${sp.so} voided. Nothing was charged.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not void the order");
       return;
@@ -927,7 +927,7 @@ export default function DealerPos({
     if (stripePaidPending > 0) return stripeFinalize("paid");
     if (
       window.confirm(
-        "Customer hasn't paid yet.\n\nOK — keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel — stay on the QR.",
+        "Customer hasn't paid yet.\n\nOK: keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel: stay on the QR.",
       )
     ) {
       stripeFinalize("keep");

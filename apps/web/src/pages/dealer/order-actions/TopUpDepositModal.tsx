@@ -100,7 +100,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
           return;
         }
         if (code === "wrong_status") {
-          toast.error("Order is no longer in Place — refresh and retry");
+          toast.error("Order is no longer in Place. Refresh and retry");
           return;
         }
       }
@@ -259,7 +259,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
           </div>
           {amount > 0 && willCross50 && (
             <div className="mt-2.5 px-3 py-2 rounded border border-success bg-success-soft text-xs text-base-800">
-              ✓ This payment will bring the order to ≥ 50% — eligible to{" "}
+              ✓ This payment will bring the order to ≥ 50%. Eligible to{" "}
               <strong>Proceed</strong> after submit.
             </div>
           )}
