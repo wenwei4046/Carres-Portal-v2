@@ -4273,6 +4273,11 @@ Finance sidebar entry `Dealers` (opens the same dealer list as Admin > Dealers; 
 placeholder `e.g. JB1`, and `State` with the first option `Not set`. A dealer's code, when set,
 shows before its name in the list and replaces the id at the top of the drawer.
 
+Dealer bank account (0598, proposal awaiting approval). Dealer drawer fields, for principal and
+finance, where a commission payment goes: `Bank` · `Account number` with the hint
+`Digits only, 6 to 20.` · `Account holder`. Refusal when the account number is wrong:
+`Account number must be 6 to 20 digits.` An empty field clears it.
+
 ## PROPOSAL — PENDING APPROVAL (receipt-data)
 
 NOT LAW until approved. Words added by the receipt-data slice (0535, 2026-09-18).

@@ -2068,6 +2068,10 @@ export interface PrincipalDealerDetailDealer {
   /** 0543 — dealer code and optional state. */
   code: string | null;
   state: string | null;
+  /** 0598 — where a commission payment goes. */
+  bank_name: string | null;
+  bank_account_no: string | null;
+  bank_account_holder: string | null;
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
@@ -2309,6 +2313,9 @@ export function useUpdateDealer(
         contactPhone?: string;
         code?: string;
         state?: string;
+        bankName?: string;
+        bankAccountNo?: string;
+        bankAccountHolder?: string;
       }
     >
   >,

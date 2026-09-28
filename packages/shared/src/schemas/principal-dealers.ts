@@ -49,5 +49,11 @@ export const updateDealerInput = z.object({
   code:         z.string().trim().toUpperCase().regex(/^[A-Z0-9]{0,12}$/).optional(),
   // 0543 — optional state; empty string clears it.
   state:        z.string().trim().max(40).optional(),
+  // 0598 — where a commission payment goes. Empty string clears each one.
+  // The account number is digits only, 6 to 20; the database checks the same.
+  bankName:          z.string().trim().max(80).optional(),
+  bankAccountNo:     z.string().trim()
+    .regex(/^(\d{6,20})?$/, 'Account number must be 6 to 20 digits.').optional(),
+  bankAccountHolder: z.string().trim().max(120).optional(),
 });
 export type UpdateDealerInput = z.infer<typeof updateDealerInput>;
