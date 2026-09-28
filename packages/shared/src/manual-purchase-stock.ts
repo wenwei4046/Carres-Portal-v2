@@ -86,7 +86,7 @@ export const MANUAL_PURCHASE_STOCK_BLOCK_WORDS: Record<ManualPurchaseStockBlock,
   additional_stock:
     "This purchase buys extra stock. What is on the shelf does not reduce it.",
   intent_not_recorded:
-    "This purchase did not record whether stock can answer it, so stock cannot be chosen.",
+    "This purchase did not record whether to use our stock, so stock cannot be chosen.",
   nothing_left_to_buy: "Nothing is left to buy on this line.",
   line_not_going_ahead: "This line is not going ahead.",
   request_has_no_number: "This purchase has no MPR No, so stock cannot be saved against it.",
