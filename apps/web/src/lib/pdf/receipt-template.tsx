@@ -101,7 +101,7 @@ export function ReceiptTemplate(data: ReceiptTemplateData) {
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Received From</Text>
-          <Text style={styles.partyName}>{displayCustomerName(customer.name) || "—"}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(customer.name) || " "}</Text>
         </View>
 
         <View style={styles.detailBlock}>

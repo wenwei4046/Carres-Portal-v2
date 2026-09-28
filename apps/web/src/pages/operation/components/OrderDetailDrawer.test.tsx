@@ -188,7 +188,7 @@ describe("OrderDetailDrawer — C7 → Slice 2, the delivery order", () => {
   });
 
   it("the hint line names the step that actually refuses", () => {
-    expect(SRC).toContain("the delivery order cannot");
+    expect(SRC).toContain("The delivery order cannot");
     // The old sentence pointed at a refusal that no longer happens.
     expect(SRC).not.toMatch(/system refuses to\s*\n?\s*confirm/);
   });
@@ -202,7 +202,7 @@ describe("OrderDetailDrawer — C7 → Slice 2, the delivery order", () => {
     expect(SRC).not.toMatch(/gateHints\.push\(`RM /);
     // …it has its own sentence, in the server warning's own voice…
     expect(SRC).toContain(
-      "collection is still open; it does not block the delivery order",
+      "Collection is still open; it does not block the delivery order",
     );
     // …and the blocking sentence survives for the thing that DOES refuse.
     expect(SRC).toContain("be issued until these are cleared");

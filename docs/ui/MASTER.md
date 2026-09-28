@@ -69,6 +69,32 @@ STILL GATED    a NEW business rule · a change to an approved workflow or
 conversation deciding between options, sketch before code (Constitution §10). The gate that
 is gone is the one that parked autonomous production execution on a synchronous approval.
 
+## §1.1.1 · THE PRE-SHOW GATE — owner ruling, Jess 2026-09-26 · APPROVED / LOCKED
+
+**"How can I avoid having to look and check every time before you design my UI?"** The answer
+is a gate the chat runs on its own screenshot BEFORE the owner sees it. A page that fails any line
+is not shown; it is fixed first. The chat states the six results in one line with the screenshot.
+
+```
+1  WORDS      every visible word is in COPY-STANDARD, with its row named; none invented
+2  ONE BLUE   the page has ONE washed/filled blue = the chosen record/row; rail choices are
+              bold + left line; tabs are grey; no blue words; links grey underlined
+3  WIDTH      a card wider than 480px with more than three facts lays them in columns;
+              nothing is a single column of six lines with an empty right half
+4  ICONS      a record door is the kit's `open` icon with its accessible name, not the word
+              `Open …` beside a title (Gmail's reading pane, not a form)
+5  REFERENCE  the surface was put beside its reference (Gmail reading pane · Linear issue ·
+              the Sales Orders Register) and the difference is named or removed
+6  SELF-RATE  the chat rates its own screenshot out of 10 with the 🔴/🟡 list; under 8 it
+              is not shown
+```
+
+**Why:** the owner rated the first Work rebuild 3/10 after ten review rounds she had to lead
+herself ("i need always ask you check, copy who, how how how, rate rate rate"). Every one of the
+faults — invented column words, five blue rows, a six-line card with an empty right half, the word
+`Open` beside a title, a dashed date range — was visible in the chat's own screenshot before she saw
+it. **The owner reviews design; she does not run the checklist.**
+
 ## §1.2 · Plan / Design Research Law — APPROVED / LOCKED, owner ruling 2026-08-11
 
 Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED decisions are not
@@ -530,6 +556,27 @@ below; a Sales Order keeps its tabs and a PO its 50/50 edit split. Sales facts i
 the first panel's control `View Sales Order` unfolds the governed Sales Order document in place
 (owner ruling 2026-09-25 — INSPECT stays INSPECT, no fourth surface), and the row's `SO No` is the
 door to change them. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
+
+### ONE CARD GRAMMAR FOR EVERY OBJECT, DETAIL AND REVIEW SURFACE — OWNER INSTRUCTION 2026-09-26, BUILT
+Jess, on the Review Purchase Orders pane: *"pls follow sales order ui kit … make sure every page of
+purchasing fix this problem yourself."* The Sales Order object card is therefore the portal's ONE
+section chrome for facts: a white card (`rounded-card`, `kit-slate-5` hairline, `px-4 py-3`), a
+**black bold sentence-case `text-strong` (slate-12) title over a 1px `kit-slate-5` rule** (ONE KIT LAW,
+owner ruling 2026-09-27 — it overwrites the 2026-09-21/22 "remain blue": blue is the primary button,
+links and selection only), one 12px body gap, and inside it the Sales Order fact
+grammar — `text-label` label over a 13px value, three to a row on a full-width page, two in a
+half-width pane, one on a phone. **The shared `Block` (`SalesOrderWorkspace.tsx`) has exactly this
+chrome and no second tone:** the former "shared" tone — a mono UPPERCASE title beside a left band —
+is retired; the cream `SectionBand` stays the Orders LIST / drawer chrome only. **The box travels with the
+grammar (owner, same day, pointing at the SO page: "got box … I want follow"):** on Purchasing pages
+every fact prints in the Sales Order's bordered box, whether or not that page can change it; the SO
+page's own three plain exceptions (`../orders/MASTER.md`, field standard 2026-09-22) remain the SO
+page's. Drawn 2026-09-26 on: the Purchase Order object (`Purchase order` · `Goods lines` ·
+`Receiving` · `Claims and returns` · `Revisions` · `History` · `Order Route`), the `Supplier reply` and
+`Record supplier answer` in-card headings (label rank, sentence case), the Manual Purchase saved-request
+detail, the Review Purchase Orders work pane (`Purchase order` facts + `Goods lines`), the Supplier
+Claim panel and the seven Purchasing Settings sections. Table heads keep their uppercase `text-label`
+row; a document's own heading (GRN, PO paper) keeps its document face.
 
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
@@ -1604,8 +1651,14 @@ detailed record and lose to this page wherever they disagree. The reference page
 Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is not proof of build.
 
 ```
+0  KIT      ONE kit, every page (owner ruling 2026-09-27). A card / panel / block
+            title is `text-strong` 15/600 slate-12 — BLACK BOLD, never blue, never a
+            band; blue is the primary button, links and selection only. No dash as a
+            value anywhere. A page that differs is a defect, not a style.
 1  PAGE     Header 50px: page name + Jump to · alerts · help · settings only
-            Toolbar: one blue create button · Search · Export · Columns
+            Toolbar: the module's create button ONLY where the module is the
+            record's birthplace (Sales Orders has none — orders are born in the
+            Sales Portal) · Search · Export · Columns
             Table · 32px footer. Nothing above the table (no KPI cards)
 2  COLUMNS  Order = the module MASTER's owner-approved list, never guessed
             Record date(s) first, then the document number
@@ -1613,6 +1666,7 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             Another document's number opens that document
 3  WORDS    Only words in COPY-STANDARD
             A required fact prints no absence word (empty = system error)
+            An empty cell draws NO glyph — never `—` (owner ruling 2026-09-26)
             A document not made yet: No PO yet · No DO yet
             Loading · Could not be loaded + Try again · empty — never mixed
 4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
@@ -1626,7 +1680,8 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             never cut. The row never grows
             Own approved designs, not this rule: SO Batch Purchase ·
             Manual Purchase · Payment Monitor · Delivery Monitor
-6  HEADER   11px/600 grey band · the same simple filter icon on every column
+6  HEADER   11px/600 grey band · the filter icon shows on hover, focus, or while
+            that column is filtered — never on every column at rest (owner 2026-09-27)
             Sort = a 12px arrow icon (ArrowUp / ArrowDown) in the header ink,
             never a letter; its direction is spoken to a screen reader
 7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
@@ -1638,6 +1693,35 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             scrolls itself; the page never scrolls sideways
 12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard
 ```
+
+**TABLE RECIPES — owner ruling 2026-09-27 (Jess: "every chat doesn't know how to draw this UI").**
+The portal has exactly FOUR tables. Each is a kit component with a live `/ui` example; a page
+IMPORTS one and never draws a `<table>` of its own — `check-design-standard.mjs` refuses page-local
+table styling. A fifth table does not exist until it joins the kit.
+
+| # | Where | Component | Recipe (locked numbers) |
+|---|---|---|---|
+| 1 | a Register / listing | `DataGrid` (kit) | header 36px slate-3 11/600 · 40px one-line rows · 8px insets · column separators by column count (tokens §5.1) · hover slate-3, selection blue-3 · 32px footer |
+| 2 | a row's goods expansion | `GoodsMiniTable` (kit) | header 27px · 51px two-line rows · four-sided frame · §6.9 connector |
+| 3 | a document table inside a card (SO `Items`, `Payment` rows, PO lines) | `DocumentTable` — **admit to the kit** (today `components/so-document-table.ts`, page-local) | header 11/500 slate-11 over a 1px slate-5 line · 13px rows, 8px cell insets, 1px slate-5 line beneath each · NO vertical lines · amounts right, tabular · only the closing total 600 |
+| 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
+
+
+**THE WORK ROUTE KIT — admitted by Jess 2026-09-28 ("kit ok"; Workspace MASTER §5.10) · BUILT 2026-09-28.**
+Four pieces joined the kit with the Work page; each has its `/ui` example (section `route`) and a
+page imports it, never draws it:
+
+| Piece | File | Locked values |
+|---|---|---|
+| `Block` — the ONE card | `components/kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
+| `RouteStop` | `components/kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
+| `ChecklistRow` | `components/kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
+| `QuietRouteRow` | `components/kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
+
+Two opt-in props came with them, and no other page moves: `Tabs fill` (tabs share a narrow bar by
+their own length with no gap, so Work's four Communication tabs stay on one row at 280px) and
+`FilterRailRow tone="workspace"` (14/400 rows with the count on the right; the chosen row is the
+`blue-3` wash with the 3px blue edge; `indent` for a record row under its module row).
 
 **Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
 PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
@@ -1764,14 +1848,19 @@ This is the shared default for ALL Portal listings, not a PO visual pilot. It su
 listing typography, rail appearance and blue-grey surface prescriptions in this document.
 Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
 
-- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, collapsible groups with remembered
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles — and, from 2026-09-27
+  (owner ruling, after the flat data-table dashboard reference), ONE 11px slate-11 supporting line under
+  the title saying what the group narrows (`Dealer / Sales Location` · `Where the order was sold`) through
+  the existing `supportingText` slot, no new component; collapsible groups with remembered
   expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
   leave that space empty. Icons supplement labels and come from the existing kit. Each group
   remains single-choice; no new multi-select. Preserve each page's filter content and control type:
   an existing dropdown remains a dropdown inside its group. Collapse does not clear a filter.
 - **Special rails:** Payment Monitor weekly plans and Warehouse schedule day lists use the same
   heading, divider and text treatment; preserve their content, date meaning and behavior.
-  Sales Orders has no local filter rail; do not add one for visual consistency.
+  Sales Orders gains the owner-approved rail of 2026-09-22 / 2026-09-26 (Orders MASTER § Monthly
+  demand): the view selector in the fixed region and six single-choice groups in the shared style C —
+  no new kit component (the multi-select admitted earlier on 2026-09-26 was withdrawn the same day).
 - **Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11;
   form/button helper 12px slate-11; input error/save failure 13px error color with text and icon;
   cannot-act reason 13px dark grey or warning color according to meaning. Never use slate-9 for
@@ -2061,17 +2150,15 @@ and keeps stock/issue lifecycle verification separate.
   picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
   was in the shared destination header and is fixed there — see §6.7 below.
 
-**THE SHARED TWO-LINE LISTING ROW IS 54px — owner ruling 2026-09-18, APPROVED / NOT BUILT.** A
-listing whose cells carry two-line identity or two-line goods uses one shared 54px row with
-vertically centred checkbox, disclosure and quantity. It is the goods-row geometry, NOT a
-portal-wide replacement: the engine's 38px single-line row (`--grid-row-h`) stays correct for
-single-line registers, and existing per-page exceptions keep their own approved heights
-(SO Batch 40px, Payment Monitor 72px). Short content fits 54px; long content and accessibility
-needs may grow the row — **a required party, number, document or date is never ellipsised to
-protect the height.** No page-local row or header height. *Falsifier: the DOM measurement owed at
-build. 54px is the owner's reviewed number from the 2026-09-18 mockups; no shipped surface states
-it yet, so the build measures it in the rendered shell at 1440/1180/820/390 and reports back
-rather than hard-coding a number nobody checked.*
+**THE SHARED TWO-LINE LISTING ROW IS 51px — owner ruling 2026-09-26 (Jess: *"I like the current row
+height"*), overwriting the 2026-09-18 mockup number 54px.** A one-line listing row stays 40px (§6.0
+rule 5). A row whose Item cell carries two lines — product name 13px/18 over configuration 11px/14,
+the configuration on ONE line ending in `…` — is 8 + 18 + 2 + 14 + 8 = 50px plus its 1px rule:
+**51px, measured on the Sales Orders goods expansion at 1440 (PR #1518) and kept.** Every row of a
+two-line goods table is that height, a line with no configuration keeping the empty 14px second
+line, so rows never differ. It is the goods-row geometry, not a portal-wide replacement: single-line
+registers keep 40px, and the per-page exceptions keep their own approved heights (Payment Monitor
+72px). A required party, number, document or date is never ellipsised to protect the height.
 
 **ONE CELL MAY CARRY A DOCUMENT AND THE EXACT GOODS IT NAMES — NEVER TWO DOCUMENTS.** The stock
 picker's `PO No / Ref No` with the Unit ID on line two (§9.1) is the approved shape, and Supplier
@@ -2223,7 +2310,7 @@ behaviour, not Purchasing business fields or page-specific colours.
 | Dividers / connector | 1px |
 | Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
 | Single-line parent row | 38px minimum, existing density law |
-| Two-line goods / Unit rows | 54px minimum, shared across the same table; grow together if content requires |
+| Two-line goods / Unit rows | 51px, shared across the same table (owner 2026-09-26); grow together only if content requires |
 | Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
 | Standard control | 32px minimum; checkbox 16px, vertically centred |
 | Toolbar / footer | 45px / 32px minimum |

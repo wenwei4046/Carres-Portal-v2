@@ -86,7 +86,7 @@ export default function AddCoverForm({
             actingUserId;
           const normal = row.normal_user_name ?? normalOwner;
           onDone(
-            `${acting} covers ${normal} for ${duty.label}, ${fmtDate(startsOn)}–${fmtDate(endsOn)}`,
+            `${acting} covers ${normal} for ${duty.label}, ${fmtDate(startsOn)} to ${fmtDate(endsOn)}`,
           );
           onClose();
         },
@@ -157,7 +157,7 @@ export default function AddCoverForm({
             Cover period
           </span>
           <span className="text-body text-kit-slate-12">
-            {`${fmtDate(startsOn)} – ${fmtDate(endsOn)}`}
+            {`${fmtDate(startsOn)} to ${fmtDate(endsOn)}`}
           </span>
         </div>
       ) : null}

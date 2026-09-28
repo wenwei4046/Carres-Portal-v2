@@ -55,3 +55,71 @@ export async function resolveActorNames(sb: any, ids: ReadonlyArray<string | nul
   }
   return byId;
 }
+
+
+/**
+ * ⭐ WHO ACTED IS DECIDED ONCE, ON THE SERVER, AND A SHARED LOGIN IS NOT A
+ * PERSON — owner ruling 2026-09-26 (Orders MASTER §0.1).
+ *
+ * `actor_identities` (0592) adds the two facts a name alone cannot carry: the
+ * account's role and its governed person marker (`app_users.is_person`, 0533).
+ * An account with `is_person = false` is a shared role login, a robot or a
+ * test account: it carries a name and is nobody.
+ *
+ * `isPerson` is `null` when the fact is not known — an actor the sales side
+ * names, or a Worker deployed a moment before the migration applied. Unknown
+ * is never read as `false`: nobody is called a shared login on a guess.
+ */
+export interface ActorIdentity {
+  name: string;
+  role: string | null;
+  isPerson: boolean | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function resolveActorIdentities(sb: any, ids: ReadonlyArray<string | null | undefined>): Promise<Map<string, ActorIdentity>> {
+  const distinct = [...new Set(ids.filter((v): v is string => !!v))];
+  const byId = new Map<string, ActorIdentity>();
+  if (distinct.length === 0) return byId;
+  const [names, identities] = await Promise.all([
+    resolveActorNames(sb, distinct),
+    sb.rpc("actor_identities", { p_ids: distinct }),
+  ]);
+  for (const [id, name] of names) byId.set(id, { name, role: null, isPerson: null });
+  if (!identities.error) {
+    for (const row of (identities.data ?? []) as Array<{ id: string; name: string | null; role: string | null; is_person: boolean | null }>) {
+      if (!row.name) continue;
+      byId.set(row.id, { name: row.name, role: row.role ?? null, isPerson: row.is_person ?? null });
+    }
+  }
+  return byId;
+}
+
+/**
+ * Classifies WHO acted, truthfully:
+ *   human    a real person acted — an id that resolves to a name and is not
+ *            known to be a shared login.
+ *   system   ONLY when the writer itself recorded that an automated job acted
+ *            (`metadata.actor === "system"`). A missing id is NEVER promoted.
+ *   missing  the actor was not recorded, cannot be named, or is a shared role
+ *            login — the screen says `Staff identity not recorded`.
+ */
+export function actorKindOf(
+  byUserId: string | null | undefined,
+  identity: ActorIdentity | null | undefined,
+  metadata?: unknown,
+): "human" | "system" | "missing" {
+  if (byUserId) return identity?.name && identity.isPerson !== false ? "human" : "missing";
+  const meta = metadata as Record<string, unknown> | null | undefined;
+  if (meta && typeof meta === "object" && meta.actor === "system") return "system";
+  return "missing";
+}
+
+/** The governed role word — a role is a hat, never a name. */
+export function actorRoleWord(identity: ActorIdentity | null | undefined): string | null {
+  const role = identity?.role?.trim();
+  if (!role) return null;
+  if (role === "bd") return "BD";
+  if (role === "hr") return "HR";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}

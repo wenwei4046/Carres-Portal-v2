@@ -170,7 +170,7 @@ export default function SalesOrderAmendment({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-label font-semibold tracking-wide text-base-700 uppercase">
-              {amendment.stale ? "Out of date — propose again" : "Waiting for management"}
+              {amendment.stale ? "Out of date. Propose again" : "Waiting for management"}
             </span>
             <span className="text-meta text-base-500">
               From Rev {amendment.base_revision} · {fmtDate(amendment.submitted_at, { time: true })}
@@ -178,12 +178,12 @@ export default function SalesOrderAmendment({
           </div>
 
           {amendment.reason && (
-            <p className="text-meta text-base-700 mt-1.5 break-words">Reason — {amendment.reason}</p>
+            <p className="text-meta text-base-700 mt-1.5 break-words">Reason: {amendment.reason}</p>
           )}
 
           <p className="text-body text-base-900 mt-2">
             {amendment.stale
-              ? "The order's items, price or promised date changed after this was written. The customer would be agreeing to something that is no longer true — write a new proposal from the order as it stands now."
+              ? "The order's items, price or promised date changed after this was written. The customer would be agreeing to something that is no longer true. Write a new proposal from the order as it stands now."
               : "The proposal has not been approved, so the Sales Order has not changed. Contact and address corrections are still free to save."}
           </p>
 

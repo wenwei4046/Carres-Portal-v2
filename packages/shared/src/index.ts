@@ -17,6 +17,12 @@ export {
 export {
   resolveSalesOrderRoute,
   NODE_W as ROUTE_NODE_W,
+  ROUTE_TEXT_BUDGET,
+  lateElbow as routeLateElbow,
+  wrapRouteText,
+  type RouteDeliveryScope,
+  type RouteProposedChange,
+  type RouteUnreadable,
   type GateRequirement,
   type GateRequirementId,
   type LinkedProblem,
@@ -39,6 +45,19 @@ export {
   type SalesOrderRouteMap,
   type StationOwnerKey,
 } from "./sales-order-route";
+export {
+  MONTHLY_DEMAND_CATEGORIES,
+  monthlyDemandOf,
+  monthlyDemandWindowOf,
+  type MonthlyDemandCategory,
+  type MonthlyDemandFilters,
+  type MonthlyDemandOrder,
+  type MonthlyDemandRow,
+  type MonthlyDemandView,
+} from "./monthly-demand";
+export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
+export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
+export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
   INSTALMENT_MONTHS,
@@ -2324,6 +2343,7 @@ export {
   type ToOrderRow,
   type ToOrderSortKey,
   type ToOrderSupplier,
+  GOODS_ABSENCE_WORDS,
 } from "./to-order";
 export {
   MANUAL_PURCHASE_WORDS,

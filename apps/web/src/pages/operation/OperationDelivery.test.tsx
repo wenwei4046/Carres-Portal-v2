@@ -258,7 +258,7 @@ function seedTwoScopes() {
   };
   docsState.data = {
     deliveryOrders: [
-      doc({ id: "do-row-1", do_number: "DO-040926-0001", delivery_date: "2026-09-04", time_slot: "11:00–13:00" }),
+      doc({ id: "do-row-1", do_number: "DO-040926-0001", delivery_date: "2026-09-04", time_slot: "11:00 to 13:00" }),
     ],
     attempts: [],
     handoverEvents: [],
@@ -270,7 +270,7 @@ function seedTwoScopes() {
         partner_id: "p-nets",
         partner_name: "NETS",
         confirmed_date: "2026-09-05",
-        confirmed_time: "14:00–16:00",
+        confirmed_time: "14:00 to 16:00",
         expected_arrival: "15:00",
       }),
     ],
@@ -303,7 +303,7 @@ describe("the shape", () => {
     expect(within(control).getByRole("tab", { name: "Day" })).toBeTruthy();
     expect(within(control).getByRole("tab", { name: "Month" })).toBeTruthy();
     // The toolbar states the range in the governed date spelling.
-    expect(screen.getByText(/Mon, 31 Aug\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+    expect(screen.getByText(/Mon, 31 Aug\s*to\s*Sat, 5 Sep/)).toBeTruthy();
   });
 
   it("draws one 50px Destination Header saying Monitor, with no page-owned control in it", () => {
@@ -514,12 +514,12 @@ describe("Day · Week · Month (owner correction 2026-09-07)", () => {
     expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
     const fourth = screen.getByTestId("delivery-monitor-month-day-2026-09-04");
     expect(fourth.getAttribute("aria-label")).toBe(
-      "Fri, 4 Sep — 2 deliveries · 1 exception · 2 Logistics not assigned",
+      "Fri, 4 Sep: 2 deliveries · 1 exception · 2 Logistics not assigned",
     );
     expect(within(fourth).getByText("Deliveries")).toBeTruthy();
     expect(within(fourth).getByText("Exceptions")).toBeTruthy();
     const fifth = screen.getByTestId("delivery-monitor-month-day-2026-09-05");
-    expect(fifth.getAttribute("aria-label")).toBe("Fri, 5 Sep — 1 delivery".replace("Fri", "Sat"));
+    expect(fifth.getAttribute("aria-label")).toBe("Sat, 5 Sep: 1 delivery");
     expect(within(fifth).queryByText("Exceptions")).toBeNull();
     expect(within(fifth).queryByText("Logistics not assigned")).toBeNull();
     /* Sunday visible, not a choice. */
@@ -628,7 +628,7 @@ describe("one card", () => {
     expect(within(card).getByText("DO-040926-0001")).toBeTruthy();
     expect(within(card).queryByText("Kong Chai Yin")).toBeNull();
     expect(within(card).getByText("Klang, Selangor")).toBeTruthy();
-    expect(within(card).getByText("11:00–13:00")).toBeTruthy();
+    expect(within(card).getByText("11:00 to 13:00")).toBeTruthy();
     expect(within(card).getByRole("link").getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
 
@@ -820,7 +820,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
   it("a fully booked card keeps its window and its confirmed pill", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=week");
     const card = screen.getByTestId("delivery-monitor-card-a");
-    expect(within(card).getByText("11:00–13:00")).toBeTruthy();
+    expect(within(card).getByText("11:00 to 13:00")).toBeTruthy();
     expect(within(card).queryByText("No time agreed")).toBeNull();
     expect(within(card).queryByTestId("delivery-monitor-card-act-a")).toBeNull();
   });
@@ -1344,7 +1344,7 @@ describe("tablet Week is a fixed three-day window", () => {
       expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
     }
     expect(screen.queryByTestId("delivery-monitor-day-2026-08-31")).toBeNull();
-    expect(screen.getByText(/Thu, 3 Sep\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+    expect(screen.getByText(/Thu, 3 Sep\s*to\s*Sat, 5 Sep/)).toBeTruthy();
   });
 
   it("previous/next replaces the visible three-day window", () => {
@@ -1499,7 +1499,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
     const save = screen.getByTestId("delivery-brief-save-dates");
     /* The button names its gap while disabled — the governed sentence. */
-    expect(save.textContent).toBe("Save scheduled delivery — upload the WhatsApp reply");
+    expect(save.textContent).toBe("Save scheduled delivery: upload the WhatsApp reply");
     expect(save).toBeDisabled();
     /* `Information received from` offers the partner, the customer, and
        Operation on behalf of the partner — nothing else. */
@@ -1553,7 +1553,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
           confirmed_date: "2026-09-04",
           /* BOTH halves — a day AND a window. A day alone keeps the row in the
              contact queue (owner ruling 2026-09-11). */
-          confirmed_time: "09:00–11:00",
+          confirmed_time: "09:00 to 11:00",
         }),
       ],
     };
@@ -1704,7 +1704,7 @@ describe("Call customer — the contact week", () => {
     seedContacts();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&date=2026-09-08");
     const strip = screen.getByTestId("delivery-monitor-contact-week");
-    expect(within(strip).getByText("Contact deadlines — not supplier or delivery dates")).toBeTruthy();
+    expect(within(strip).getByText("Contact deadlines, not supplier or delivery dates")).toBeTruthy();
 
     cleanup();
     seedContacts();

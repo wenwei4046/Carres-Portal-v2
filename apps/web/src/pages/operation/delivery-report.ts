@@ -59,7 +59,7 @@ export const RATE_MIN_RECORDS = 5;
 export const DR = {
   page: "Delivery",
   eyebrow: "Reports · Delivery",
-  docTitle: "Reports · Delivery — Carres",
+  docTitle: "Reports · Delivery · Carres",
   month: "Month",
   noMonth: "No month yet",
   exportExcel: "Export Excel",

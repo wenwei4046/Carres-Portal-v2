@@ -313,7 +313,7 @@ describe("the headline", () => {
       aCase({ id: "1", issueType: "damaged", supplierName: "Ohana" }),
       aCase({ id: "2", issueType: "damaged", supplierName: "Ohana" }),
     ]);
-    expect(r.headline).toContain("Damaged is the most common problem — 2 of 2.");
+    expect(r.headline).toContain("Damaged is the most common problem: 2 of 2.");
     expect(r.headline).toContain("Ohana carries the most: 2.");
   });
 

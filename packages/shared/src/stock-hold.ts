@@ -66,7 +66,7 @@ export const OPS_STOCK_STATUS_LABEL: Record<string, string> = {
 };
 
 export function opsStockStatusLabel(status: string | null | undefined): string {
-  if (!status) return "—";
+  if (!status) return "";
   return OPS_STOCK_STATUS_LABEL[status] ?? status;
 }
 
@@ -132,7 +132,7 @@ export const STOCK_HOLD_REASON_KEYS = STOCK_HOLD_REASONS.map((r) => r.key) as [
 ];
 
 export function stockHoldReasonLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return STOCK_HOLD_REASONS.find((r) => r.key === key)?.label ?? key;
 }
 
@@ -162,7 +162,7 @@ export const STOCK_HOLD_OUTCOME_KEYS = STOCK_HOLD_OUTCOMES.map((o) => o.key) as 
 ];
 
 export function stockHoldOutcomeLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return STOCK_HOLD_OUTCOMES.find((o) => o.key === key)?.label ?? key;
 }
 
@@ -232,8 +232,8 @@ export const STOCK_HOLD_RESOLVE_PROBLEM_TEXT: Record<
  * so it is said out loud rather than left to be inferred from a status word.
  */
 export function heldUnitsLine(heldUnits: number, reason?: string | null): string {
-  if (heldUnits <= 0) return "Nothing on hold — these units are not in the register.";
+  if (heldUnits <= 0) return "Nothing on hold. These units are not in the register.";
   const units = `${heldUnits} unit${heldUnits === 1 ? "" : "s"}`;
   const why = reason ? ` · ${stockHoldReasonLabel(reason)}` : "";
-  return `${units} on hold${why} — cannot be sold, reserved or delivered.`;
+  return `${units} on hold${why}. Cannot be sold, reserved or delivered.`;
 }

@@ -50,7 +50,7 @@ export default function BdAccountsPage({ onClose }: { onClose: () => void }) {
                 Dealer accounts
               </h1>
               <p style={{ margin: 0, fontSize: 13, color: "var(--fg-muted)" }}>
-                Open a new dealership, and manage each store&apos;s staff &amp; PINs — the same
+                Open a new dealership, and manage each store&apos;s staff &amp; PINs, the same
                 doors the HQ portal has.
               </p>
             </div>
@@ -132,7 +132,7 @@ export default function BdAccountsPage({ onClose }: { onClose: () => void }) {
                       </span>
                     </div>
                     <div style={{ fontSize: 11.5, color: "var(--fg-muted)", marginTop: 1 }}>
-                      {[d.region, d.contact].filter(Boolean).join(" · ") || "—"}
+                      {[d.region, d.contact].filter(Boolean).join(" · ") || ""}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -156,7 +156,7 @@ export default function BdAccountsPage({ onClose }: { onClose: () => void }) {
               ))}
               {!dealersQ.isLoading && dealers.length === 0 && (
                 <p style={{ fontSize: 13, color: "var(--fg-muted)", fontStyle: "italic" }}>
-                  No dealers yet — open the first one.
+                  No dealers yet. Open the first one.
                 </p>
               )}
             </div>

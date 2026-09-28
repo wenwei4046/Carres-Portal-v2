@@ -53,7 +53,7 @@ export default function StairCarryFields({
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="kicker">Delivery access</h3>
         <p className="text-[11px] text-base-500">
-          1F–{cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
+          1F to {cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
           {cfg.freeUpToFloor + 1}F · max {MAX_DELIVERY_FLOOR}F
         </p>
       </div>
@@ -109,7 +109,7 @@ export default function StairCarryFields({
                 setDelivery({ stairItems: safe });
               }}
               disabled={itemsTotal === 0}
-              placeholder={itemsTotal === 0 ? "—" : ""}
+              placeholder={itemsTotal === 0 ? "" : ""}
               className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
             />
             <button

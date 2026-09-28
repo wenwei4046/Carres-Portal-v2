@@ -218,7 +218,7 @@ export default function ReceivingRecord({
       {r.status === "voided" && (
         <div className="mt-2 rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 py-2 text-body text-kit-slate-12" data-testid="void-banner">
           Cancelled {r.void_at ? fmtDate(r.void_at.slice(0, 10)) : ""}
-          {r.void_by_name ? ` by ${r.void_by_name}` : ""} —{" "}
+          {r.void_by_name ? ` by ${r.void_by_name}` : ""}:{" "}
           {r.void_reason ?? ""}. The record and its evidence are preserved;
           its stock consequences were reversed.
         </div>
@@ -414,7 +414,7 @@ export default function ReceivingRecord({
                   {x.sku}
                 </span>
                 <span className="w-40 text-right tabular-nums text-kit-amber-11">
-                  {x.qty} extra — not Inventory
+                  {x.qty} extra, not Inventory
                 </span>
               </div>
             ))}
@@ -623,7 +623,7 @@ export default function ReceivingRecord({
           <div ref={setPane} data-testid="grn-pdf-pane" />
           {pdfError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-12">
-              The GRN preview could not be drawn — {pdfError}{" "}
+              The GRN preview could not be drawn: {pdfError}{" "}
               <button
                 type="button"
                 onClick={retry}
@@ -887,7 +887,7 @@ function AmendPanel({
       <p className="text-label text-kit-slate-9">
         The original record is preserved; the correction and its reason join
         History, and the preview beside this form shows the corrected GRN with
-        its amendment marked — the number never changes. The GRN number, the
+        its amendment marked. The number never changes. The GRN number, the
         source PO/CO and the supplier cannot be amended: if those identities
         are wrong, use Void Receiving and start Receiving from the correct
         source. Damaged and wrong quantities are corrected through their
@@ -912,7 +912,7 @@ function AmendPanel({
           Goods Received Date
         </span>
         <span className="tabular-nums text-kit-slate-9">
-          {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : "—"}
+          {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : ""}
         </span>
         <span className="text-kit-slate-9">→</span>
         <input
@@ -980,7 +980,7 @@ function AmendPanel({
         />
         {draft.doFilePath ? (
           <p className="text-label text-kit-slate-11" data-testid="amend-do-file-ready">
-            Corrected DO ready — it replaces the paper on record when the
+            Corrected DO ready. It replaces the paper on record when the
             amendment is saved.
           </p>
         ) : null}
@@ -1077,9 +1077,9 @@ function AmendPanel({
           {amend.isPending
             ? "Saving…"
             : draft.reason.trim().length < 3
-              ? "Save — add a correction reason"
+              ? "Save: add a correction reason"
               : nothingChanged
-                ? "Save — nothing changed yet"
+                ? "Save: nothing changed yet"
                 : "Save Amendment"}
         </button>
       </div>
@@ -1151,7 +1151,7 @@ function VoidPanel({
           {voidM.isPending
             ? "Voiding…"
             : reason.trim().length < 3
-              ? "Void — add a reason"
+              ? "Void: add a reason"
               : "Void Receiving"}
         </button>
       </div>

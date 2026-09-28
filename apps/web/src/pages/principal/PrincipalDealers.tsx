@@ -129,8 +129,13 @@ export default function PrincipalDealers({
           </div>
           <div className="text-meta text-base-500 mt-1">{t.blurb}</div>
         </div>
-        {/* A dealer is invited (pending → approval); a showroom is ours, so it
-            is born straight out of Accounts with its login + first staff PIN. */}
+      </div>
+
+      {/* UI MASTER §6.0 rule 1: the one create button leads the toolbar,
+          beside Search, not off in the header corner.
+          A dealer is invited (pending → approval); a showroom is ours, so it
+          is born straight out of Accounts with its login + first staff PIN. */}
+      <div className="flex gap-2 mb-3.5 items-center">
         {!financeView && (
           <button
             type="button"
@@ -144,9 +149,6 @@ export default function PrincipalDealers({
             {t.cta}
           </button>
         )}
-      </div>
-
-      <div className="flex gap-2 mb-3.5 items-center">
         <input
           type="search"
           placeholder={t.searchPlaceholder}
@@ -178,7 +180,6 @@ export default function PrincipalDealers({
 
       {filtered.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500">
-          <div className="text-page mb-2 text-base-300">—</div>
           <div className="font-display text-strong">{t.empty}</div>
           <div className="text-meta mt-1">{t.emptyHint}</div>
         </div>

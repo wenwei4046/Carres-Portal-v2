@@ -55,7 +55,7 @@ export default function ReorderStockCard() {
             <span className="text-strong text-base-900">Reorder</span>
           </div>
           <div className="text-meta text-base-600 mt-0.5">
-            Pillow and protector come from China — about 2 months. Order before
+            Pillow and protector come from China, about 2 months. Order before
             the shelf runs down.
           </div>
         </div>
@@ -149,7 +149,7 @@ function ReorderRow({
         {row.incoming}
       </span>
       <span className="text-right font-mono text-body text-base-700">
-        {row.reorderPoint == null ? "—" : row.reorderPoint}
+        {row.reorderPoint == null ? "" : row.reorderPoint}
       </span>
 
       <div className="min-w-0">

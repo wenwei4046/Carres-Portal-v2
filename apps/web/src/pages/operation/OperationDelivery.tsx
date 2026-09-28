@@ -238,7 +238,7 @@ function goodsLinesText(lines: readonly { name: string; qty: number; shortQty: n
   return lines
     .map(
       (l) =>
-        `${l.name} × ${l.qty}${l.shortQty > 0 ? ` — ${ARRIVAL_COPY.short(l.shortQty)}` : ""}`,
+        `${l.name} × ${l.qty}${l.shortQty > 0 ? `, ${ARRIVAL_COPY.short(l.shortQty)}` : ""}`,
     )
     .join(" · ");
 }
@@ -1561,7 +1561,7 @@ export default function OperationDelivery() {
       ? fmtDate(selectedDate)
       : calendarView === "month"
         ? fmtMonth(selectedDate.slice(0, 7))
-        : `${fmtDate(visibleDays[0]!)} – ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
+        : `${fmtDate(visibleDays[0]!)} to ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
 
   /* Previous/next REPLACES the whole displayed window: one operating day in
      Day, the three-day half-week on a tablet, the whole operating week on the

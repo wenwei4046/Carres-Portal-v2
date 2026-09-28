@@ -229,7 +229,7 @@ export async function checkPromoEntitlementAfterEdit(
       return {
         status: "blocked",
         message:
-          "This item backs a promo or printed voucher on this order — the new " +
+          "This item backs a promo or printed voucher on this order. The new " +
           "configuration would no longer qualify for it. Cancel the promo with HQ " +
           "first, or keep a configuration that still qualifies.",
       };

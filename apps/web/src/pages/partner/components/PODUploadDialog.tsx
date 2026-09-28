@@ -216,7 +216,7 @@ export default function PODUploadDialog({
             <span>{row.customer_address}</span>
           </>
         )}
-        . Record the DO + capture the customer&rsquo;s signature — the thread
+        . Record the DO + capture the customer&rsquo;s signature. The thread
         flips straight to <strong>delivered</strong> when you submit.
       </div>
 

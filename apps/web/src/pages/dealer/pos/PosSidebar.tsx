@@ -100,7 +100,7 @@ export default function PosSidebar({
             aria-disabled={e.locked}
             title={
               e.locked
-                ? "Locked — this order already has a conflicting product family"
+                ? "Locked. This order already has a conflicting product family"
                 : undefined
             }
             data-testid={`pos-rail-${e.key}`}
@@ -133,7 +133,7 @@ export default function PosSidebar({
           className="cat-side__item cat-side__item--tbc"
           disabled
           aria-disabled="true"
-          title="This range is being finalised — opening soon."
+          title="This range is being finalised. Opening soon."
         >
           <Icon size={16} strokeWidth={1.75} />
           <span>{label}</span>
@@ -203,7 +203,7 @@ export default function PosSidebar({
 
       <div className="cat-side__footer">
         <div className="cat-side__footer-title">Honest pricing</div>
-        Every model is priced on its own — no markups, no surprises. What you see is the floor
+        Every model is priced on its own. No markups, no surprises. What you see is the floor
         price.
       </div>
     </aside>

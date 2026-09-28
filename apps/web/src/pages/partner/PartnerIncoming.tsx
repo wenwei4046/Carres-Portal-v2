@@ -114,9 +114,9 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
       if (e instanceof ApiError) {
         const body = readErrorBody(e);
         if (body.code === "already_accepted") {
-          toast.error("Already accepted — refresh");
+          toast.error("Already accepted. Refresh");
         } else if (body.code === "order_rejected") {
-          toast.error("Order is rejected state — refresh");
+          toast.error("Order is rejected state. Refresh");
         } else {
           toast.error(e.message || "Accept failed");
         }
@@ -128,7 +128,7 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
 
   const requestedAt = order.request_for_delivery_at
     ? fmtDate(order.request_for_delivery_at)
-    : "—";
+    : "";
   const deliveryDate = order.delivery_date ? fmtDate(order.delivery_date) : "Date TBD";
 
   return (

@@ -281,7 +281,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             type="button"
             onClick={() => setEditAll((v) => !v)}
             className={`${editAll ? "btn-primary" : "btn-secondary"} text-meta`}
-            title="Edit every visible SKU inline — changes commit on blur"
+            title="Edit every visible SKU inline. Changes commit on blur"
             data-testid="sku-edit-all"
           >
             {editAll ? "Done" : "Edit"}
@@ -342,13 +342,13 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         {overflow > 0 && (
           <span className="text-base-400">
             {" "}
-            · showing first {VISIBLE_CAP} — refine the search or category to see the rest
+            · showing first {VISIBLE_CAP}. Refine the search or category to see the rest
           </span>
         )}
         {sofaSizeMode && (
           <span className="text-base-400" data-testid="sofa-size-mode-hint">
             {" "}
-            · per-size prices (RM) — a blank cell inherits the base price shown in grey
+            · per-size prices (RM): a blank cell inherits the base price shown in grey
             (base price: row Edit); sizes follow Special Add-ons → Sizes
           </span>
         )}
@@ -585,7 +585,7 @@ const SkuRowView = memo(function SkuRowView({
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
       }}
       aria-label={`${sku.sku} code`}
-      title="Edit the full SKU code — new orders/POs use the new code; history keeps the old string"
+      title="Edit the full SKU code. New orders/POs use the new code; history keeps the old string"
       className={`${INPUT_CLS} t-num text-meta w-full min-w-0`}
     />
   ) : (
@@ -609,7 +609,7 @@ const SkuRowView = memo(function SkuRowView({
   const descriptionCell = inlineEdit ? (
     <input
       defaultValue={sku.description ?? ""}
-      placeholder="—"
+      placeholder=""
       onBlur={(e) => commitDescription(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -619,7 +619,7 @@ const SkuRowView = memo(function SkuRowView({
     />
   ) : (
     <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
-      {sku.description || <span className="text-base-400">—</span>}
+      {sku.description || null}
     </div>
   );
 
@@ -755,7 +755,7 @@ const SkuRowView = memo(function SkuRowView({
             defaultValue={model.category}
             onChange={(e) => commitCategory(e.target.value)}
             aria-label={`${sku.sku} category`}
-            title="Category lives on the product — changing it moves ALL of this product's SKUs"
+            title="Category lives on the product. Changing it moves ALL of this product's SKUs"
             className={`${INPUT_CLS} text-meta`}
             data-testid={`sku-category-select-${sku.sku}`}
           >
@@ -767,7 +767,7 @@ const SkuRowView = memo(function SkuRowView({
           </select>
         ) : (
           <div className="text-meta text-base-600">
-            {category ? CATEGORY_LABEL[category] : "—"}
+            {category ? CATEGORY_LABEL[category] : ""}
           </div>
         )}
         {inlineEdit ? (
@@ -775,7 +775,7 @@ const SkuRowView = memo(function SkuRowView({
             defaultValue={sku.stockIdentityMode ?? ""}
             onChange={(e) => commitIdentityMode(e.target.value)}
             aria-label={`${sku.sku} stock identity`}
-            title="How Stock identifies this SKU — Unit ID: one permanent ID per piece, born with the official PO · Quantity: counted, no Unit ID"
+            title="How Stock identifies this SKU. Unit ID: one permanent ID per piece, born with the official PO. Quantity: counted, no Unit ID"
             className={`${INPUT_CLS} text-meta mt-1`}
             data-testid={`sku-identity-select-${sku.sku}`}
           >
@@ -804,13 +804,13 @@ const SkuRowView = memo(function SkuRowView({
             aria-label={`${sku.sku} size`}
             title={
               noVariantAxis
-                ? "Optional — accessories/services carry no size"
-                : "The SIZE label — editing it never changes the code"
+                ? "Optional. Accessories/services carry no size"
+                : "The SIZE label. Editing it never changes the code"
             }
             className={`${INPUT_CLS} text-body text-meta w-full min-w-0`}
           />
         ) : (
-          <div className="text-body text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
+          <div className="text-body text-base-700">{sizeless ? "" : sku.variant || ""}</div>
         ))}
 
       {/* Price */}
@@ -843,7 +843,7 @@ const SkuRowView = memo(function SkuRowView({
             min={0.01}
             step="0.01"
             defaultValue={sku.pwpPrice ? String(sku.pwpPrice) : ""}
-            placeholder="—"
+            placeholder=""
             onBlur={(e) => commitPwpPrice(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -856,8 +856,8 @@ const SkuRowView = memo(function SkuRowView({
           // one cell over renders 0 as "price not set" — it is data that predates
           // the input guard, and showing it as "RM 0.00" claims an offer the
           // server will refuse.
-          <span className="text-meta text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
-            —
+          <span className="text-meta text-base-400 italic" title="No PWP price. This SKU cannot be a PWP reward">
+            not set
           </span>
         ) : (
           <span className="t-num text-meta text-base-800">{fmtRm(sku.pwpPrice)}</span>
@@ -867,7 +867,7 @@ const SkuRowView = memo(function SkuRowView({
       {/* Margin */}
       <div className="text-right" data-testid={`sku-margin-${sku.sku}`}>
         {margin === null ? (
-          <span className="text-meta text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
+          null
         ) : (
           <span
             className={`t-num text-meta ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
@@ -961,7 +961,7 @@ function CompartmentSizeCells({
                 min={0}
                 step="0.01"
                 value={draft[s] ?? ""}
-                placeholder={sku.price > 0 ? String(sku.price) : "—"}
+                placeholder={sku.price > 0 ? String(sku.price) : ""}
                 onChange={(e) => setDraft((d) => ({ ...d, [s]: e.target.value }))}
                 onBlur={commit}
                 onKeyDown={(e) => {
@@ -975,12 +975,12 @@ function CompartmentSizeCells({
             ) : sku.price > 0 ? (
               <span
                 className="text-meta text-base-400"
-                title={`Inherits the base price ${fmtRm(sku.price)} — set a price for ${s} to override`}
+                title={`Inherits the base price ${fmtRm(sku.price)}. Set a price for ${s} to override`}
               >
                 ({fmtRm(sku.price)})
               </span>
             ) : (
-              <span className="text-meta text-base-400 italic">—</span>
+              null
             )}
           </div>
         );

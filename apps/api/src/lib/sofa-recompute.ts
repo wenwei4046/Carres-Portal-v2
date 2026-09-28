@@ -205,8 +205,8 @@ export async function recomputeAndExplodeSofaBuildLines(
       return {
         status: "bad_request",
         message:
-          `Remark adjustment (RM ${remarkAdj.toFixed(2)}) puts the sofa below RM 0 — ` +
-          `reduce the discount.`,
+          `Remark adjustment (RM ${remarkAdj.toFixed(2)}) puts the sofa below RM 0. ` +
+          `Reduce the discount.`,
       };
     }
 

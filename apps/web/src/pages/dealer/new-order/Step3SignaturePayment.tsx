@@ -197,7 +197,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       <Section title="Customer">
         <div className="rounded border border-base-200 bg-white p-4">
           <div className="font-display text-lg font-semibold leading-tight">
-            {draft.customer.name || <em className="text-base-400">—</em>}
+            {draft.customer.name || null}
           </div>
           <div className="font-mono text-xs text-base-500 mt-0.5">
             {draft.customer.phone}
@@ -366,7 +366,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           The block below is preserved verbatim so restoring it is a delete of
           two lines, not a rebuild. */}
       {false && (
-      <Section title="Delivery fee" hint="Head office sets the rate — you can add to it here">
+      <Section title="Delivery fee" hint="Head office sets the rate. You can add to it here">
         <div className="rounded border border-base-200 bg-white p-4 flex flex-col gap-3.5">
           <FieldLabel label="Add to the delivery fee (optional)">
             <div className="flex items-center gap-2.5">
@@ -389,7 +389,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
               />
             </div>
             <div className="text-[11px] text-base-500 mt-1.5">
-              A fee you agreed with the customer — a remote area, for example.
+              A fee you agreed with the customer, for example a remote area.
               It is added on top of the delivery fee above.
             </div>
           </FieldLabel>
@@ -472,7 +472,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
         {draft.paid > 0 && isStripe && (
           <div className="mt-2.5 px-3 py-2.5 rounded text-xs leading-relaxed text-base-800 border border-success bg-success-soft">
             ✓ After you complete the order, a <strong>QR / payment link</strong> for RM{" "}
-            {draft.paid.toLocaleString()} opens — the customer pays there and the payment
+            {draft.paid.toLocaleString()} opens. The customer pays there and the payment
             records itself.{" "}
             {/* A RENTAL leaves Place when FINANCE APPROVES it, not when money
                 lands (0275 replaced the deposit gate with the credit-approval
@@ -581,7 +581,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
             </div>
             The customer pays by FPX / card on Stripe&rsquo;s secure page (QR at the counter, or
             a WhatsApp link). The payment records itself with a <strong>payment code</strong> and
-            an official <strong>Stripe receipt</strong> attached for finance — nothing to key in
+            an official <strong>Stripe receipt</strong> attached for finance. Nothing to key in
             or photograph.
           </div>
         )}
@@ -630,7 +630,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                   className="w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
                   data-testid={`pay-followup-${fu.key}`}
                 >
-                  <option value="">— select {fu.label.toLowerCase()} —</option>
+                  <option value="">{fu.label}</option>
                   {fu.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -754,7 +754,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
         {label}
       </div>
       <div className="text-[13px] text-base-800">
-        {value || <em className="text-base-400">—</em>}
+        {value || null}
       </div>
     </div>
   );

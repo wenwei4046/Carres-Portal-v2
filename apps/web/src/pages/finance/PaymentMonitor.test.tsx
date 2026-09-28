@@ -450,7 +450,7 @@ describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (ow
     state.work.data = { items: [] };
     show("/finance/monitor");
     expect(days()).toEqual(["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"]);
-    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 14 Sep – Fri, 18 Sep");
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 14 Sep to Fri, 18 Sep");
     expect(screen.getAllByTestId("payment-monitor-today")).toHaveLength(1);
     expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveAttribute("data-today", "yes");
     expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveAttribute("aria-pressed", "true");
@@ -502,14 +502,14 @@ describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (ow
     state.work.data = { items: [workItem("i2", "2026-09-22"), workItem("i3", "2026-09-10")] };
     show("/finance/monitor");
     fireEvent.click(screen.getByTestId("payment-monitor-next-week"));
-    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 21 Sep – Fri, 25 Sep");
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 21 Sep to Fri, 25 Sep");
     expect(screen.queryByTestId("payment-monitor-today")).not.toBeInTheDocument();
     expect(screen.getByTestId("payment-monitor-day-2026-09-22")).toHaveTextContent("Ask 1 customer to pay");
     fireEvent.click(screen.getByTestId("payment-monitor-day-2026-09-22"));
     expect(listed()).toEqual(["SO-1301"]);
     fireEvent.click(screen.getByTestId("payment-monitor-previous-week"));
     fireEvent.click(screen.getByTestId("payment-monitor-previous-week"));
-    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 7 Sep – Fri, 11 Sep");
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 7 Sep to Fri, 11 Sep");
     // The late item is counted on today, not a second time on its own day.
     expect(screen.getByTestId("payment-monitor-day-2026-09-10")).toHaveTextContent("1 not done · counted under Today");
     fireEvent.click(screen.getByTestId("payment-monitor-this-week"));
@@ -532,7 +532,7 @@ describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (ow
     vi.setSystemTime(new Date("2026-09-19T02:00:00Z"));
     state.work.data = { items: [] };
     show("/finance/monitor");
-    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 21 Sep – Fri, 25 Sep");
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 21 Sep to Fri, 25 Sep");
     expect(screen.queryByTestId("payment-monitor-today")).not.toBeInTheDocument();
     expect(screen.getByTestId("payment-monitor-day-2026-09-21")).toHaveAttribute("aria-pressed", "true");
   });

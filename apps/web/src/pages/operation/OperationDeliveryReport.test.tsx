@@ -160,7 +160,7 @@ describe("Reports → Delivery", () => {
     expect(within(screen.getByTestId("report-returns")).getAllByText(new RegExp(DR.inboundNotAvailable)).length).toBeGreaterThanOrEqual(2);
     expect(within(screen.getByTestId("report-partners")).getByText(new RegExp(`Cannot Deliver ${DR.notAvailable}`))).toBeInTheDocument();
     expect(within(screen.getByTestId("report-failed")).getByText(/reviewed root cause is a Service Case matter/)).toBeInTheDocument();
-    expect(within(screen.getByTestId("report-ageing")).getByText(/an exception has no month/)).toBeInTheDocument();
+    expect(within(screen.getByTestId("report-ageing")).getByText(/An exception has no month/)).toBeInTheDocument();
   });
 
   it("the month filter moves every dated listing together", () => {

@@ -103,7 +103,7 @@ function sellerOnly(c: { var: { auth: { role: string } } }) {
 function requireStripeConfigured(c: { env: AppEnv["Bindings"] }) {
   if (!stripeConfigured(c.env)) {
     throw new HTTPException(503, {
-      message: "Stripe is not set up yet — ask the principal to add the Stripe keys.",
+      message: "Stripe is not set up yet. Ask the principal to add the Stripe keys.",
     });
   }
 }
@@ -271,7 +271,7 @@ async function ensureServiceSku(
   if (!model) {
     return {
       ok: false,
-      message: "no service-category model in the catalog — create one in Modular before authoring service plans",
+      message: "no service-category model in the catalog. Create one in Modular before authoring service plans",
     };
   }
   const { error: insErr } = await sb.from(PRODUCT_SKUS).insert({
@@ -409,7 +409,7 @@ rentalRouter.delete("/service-packages/:id", async (c) => {
   if (error) {
     if (error.code === "23503") {
       return c.json(
-        { error: "conflict", code: "package_in_use", message: "service package has entitlements minted against it — deactivate it instead" },
+        { error: "conflict", code: "package_in_use", message: "service package has entitlements minted against it. Deactivate it instead" },
         409,
       );
     }
@@ -572,7 +572,7 @@ rentalRouter.delete("/plans/:id", async (c) => {
   if (error) {
     if (error.code === "23503") {
       return c.json(
-        { error: "conflict", code: "plan_in_use", message: "rental plan has agreements signed against it — deactivate it instead" },
+        { error: "conflict", code: "plan_in_use", message: "rental plan has agreements signed against it. Deactivate it instead" },
         409,
       );
     }
@@ -618,7 +618,7 @@ rentalRouter.post("/offers", async (c) => {
   if (error) {
     if (error.code === "23505") {
       return c.json(
-        { error: "conflict", code: "duplicate_offer", message: "this model already has an offer — edit that one" },
+        { error: "conflict", code: "duplicate_offer", message: "this model already has an offer. Edit that one" },
         409,
       );
     }
@@ -689,7 +689,7 @@ rentalRouter.delete("/offers/:id", async (c) => {
         {
           error: "conflict",
           code: "offer_in_use",
-          message: "this offer has agreements signed against it — switch it off instead",
+          message: "this offer has agreements signed against it. Switch it off instead",
         },
         409,
       );
@@ -925,7 +925,7 @@ rentalRouter.post("/agreement-templates", async (c) => {
   if (error) {
     if (error.code === "23505") {
       return c.json(
-        { error: "conflict", code: "duplicate_version", message: "that version already exists — reload and try again" },
+        { error: "conflict", code: "duplicate_version", message: "that version already exists. Reload and try again" },
         409,
       );
     }
@@ -1828,7 +1828,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
         error: "rental_checkout_blocked",
         code: pending ? "pending_approval" : "wrong_status",
         message: pending
-          ? "Waiting for finance to approve this rental — you can collect once it is approved."
+          ? "Waiting for finance to approve this rental. You can collect once it is approved."
           : ag.status === "rejected"
             ? "This rental application was rejected."
             : "Agreement is not active.",
@@ -1850,7 +1850,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   }
   if (!ag.plan_id) {
     return c.json(
-      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Agreement has no plan link — collect manually." },
+      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Agreement has no plan link. Collect manually." },
       422,
     );
   }
@@ -1865,7 +1865,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   const plan = planData as { stripe_price_id: string | null; monthly_fee: number | string } | null;
   if (!plan?.stripe_price_id) {
     return c.json(
-      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Plan is not synced to Stripe yet — ask the principal to open Catalog → Rental and press Sync." },
+      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Plan is not synced to Stripe yet. Ask the principal to open Catalog → Rental and press Sync." },
       422,
     );
   }
@@ -1874,7 +1874,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   // silently charging a different figure (guardrail #4: no silent money).
   if (Number(plan.monthly_fee) !== Number(ag.monthly_fee)) {
     return c.json(
-      { error: "rental_checkout_blocked", code: "plan_repriced", message: "The plan's fee changed after signup — re-sign the agreement on the current plan." },
+      { error: "rental_checkout_blocked", code: "plan_repriced", message: "The plan's fee changed after signup. Re-sign the agreement on the current plan." },
       422,
     );
   }
@@ -1951,7 +1951,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
           currency: "myr",
           unit_amount: Math.round(Number(ag.monthly_fee) * 100),
           product_data: {
-            name: `Rental ${ag.agreement_no} — first month`,
+            name: `Rental ${ag.agreement_no}: first month`,
           },
         },
         quantity: 1,

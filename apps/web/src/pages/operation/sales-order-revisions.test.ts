@@ -19,7 +19,7 @@ const snap = (over: Partial<SalesOrderSnapshot>): SalesOrderSnapshot => ({
 describe("describeRevisionChanges — + added · − removed · old → new", () => {
   it("Rev 1 is the original, one sentence", () => {
     expect(describeRevisionChanges(null, snap({}))).toEqual([
-      "Original — the agreement as first recorded",
+      "Original: the agreement as first recorded",
     ]);
   });
 
@@ -49,12 +49,12 @@ describe("describeRevisionChanges — + added · − removed · old → new", ()
     expect(removed).toEqual(["− removed B1201S (King) ×1"]);
   });
 
-  it("a cleared field prints the em-dash, not a blank", () => {
+  it("a cleared field prints its word, never a dash or a blank (owner ruling 2026-09-26)", () => {
     const out = describeRevisionChanges(
       snap({ header: { customer_name: "Kimmy", customer_phone: "019-1", delivery_date: "2026-08-30", delivery_floor: 1 } }),
       snap({ header: { customer_name: "Kimmy", customer_phone: null, delivery_date: "2026-08-30", delivery_floor: 1 } }),
     );
-    expect(out).toEqual(["Phone: 019-1 → —"]);
+    expect(out).toEqual(["Phone: 019-1 → No phone"]);
   });
 
   it("keeps the instalment plan in complete historical versions", () => {

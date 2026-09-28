@@ -100,7 +100,7 @@ describe("financeExceptionReason — a refusal names what closes it", () => {
 
   it("names the reason and who clears it", () => {
     expect(financeExceptionReason([open()])).toBe(
-      "Finance is holding this delivery: Chargeback under investigation — Finance clears it.",
+      "Finance is holding this delivery: Chargeback under investigation. Finance clears it.",
     );
   });
 

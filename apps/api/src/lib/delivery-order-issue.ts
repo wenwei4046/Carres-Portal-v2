@@ -201,8 +201,8 @@ export async function attemptDeliveryOrderIssue(
       p_order_id: orderId,
       p_content:
         opts?.waitBookingConfirm === false
-          ? `${orderActionDone("issue_delivery_order")} — ${doNumber} — on Request Delivery Order`
-          : `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
+          ? `${orderActionDone("issue_delivery_order")}: ${doNumber}, on Request Delivery Order`
+          : `${orderActionDone("issue_delivery_order")}: ${doNumber}`,
       p_tag: null,
     });
   } catch {

@@ -805,7 +805,7 @@ the way back from `Cannot sell`.
 GRN Duty card `Check the damage on U1-000-282 and record the result · by Mon, 28 Sep` stands in Work,
 and `Make available for sale` refuses with `1 reported problem is still open`).** The page is the Sales Order object page's grammar (owner
 ruling 2026-09-26, Law C: one header, never a lookalike): the header row reads
-`← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are blue-titled blocks, and an old
+`← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are the kit's `Block` cards (black titles, ONE KIT LAW 2026-09-27), and an old
 reference the portal never held prints `{ref} · not in this portal` instead of `No SO`. The
 `⋮` holds exactly three acts. **`Report a problem`** asks three things — `What did you see?`
 (`Damaged` · `Not found` · `Wrong item` · `Missing component` · `Label / Unit ID problem` ·

@@ -113,7 +113,7 @@ export default function ServiceNotePrintPage() {
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>What Happened</div>
           <div style={{ border: "1px solid #d1d5db", borderRadius: 3, padding: "4px 6px", minHeight: 28, fontSize: 11 }}>
-            {sn.whatHappened || "—"}
+            {sn.whatHappened || ""}
           </div>
         </div>
 
@@ -135,9 +135,9 @@ export default function ServiceNotePrintPage() {
                   <tr key={it.no}>
                     <td style={{ textAlign: "center" }}>{it.no}</td>
                     <td>{it.item}</td>
-                    <td style={{ fontFamily: "monospace" }}>{it.poNo ?? "—"}</td>
+                    <td style={{ fontFamily: "monospace" }}>{it.poNo ?? ""}</td>
                     <td style={{ textAlign: "center" }}>{it.qty}</td>
-                    <td>{it.remark ?? "—"}</td>
+                    <td>{it.remark ?? ""}</td>
                   </tr>
                 ))}
               </tbody>
@@ -206,7 +206,7 @@ function InfoRow({ label, value, multiline }: { label: string; value?: string | 
     <div style={{ marginBottom: 4 }}>
       <span style={{ fontSize: 9, color: "#6b7280", marginRight: 4 }}>{label}:</span>
       <span style={{ fontSize: 11, whiteSpace: multiline ? "pre-wrap" : undefined }}>
-        {value || "—"}
+        {value || ""}
       </span>
     </div>
   );

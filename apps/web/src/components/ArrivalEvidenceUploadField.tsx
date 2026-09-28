@@ -67,7 +67,7 @@ export default function ArrivalEvidenceUploadField({
       />
       {notReady && (
         <p className="text-label text-base-500 mt-1 font-body">
-          Enter the supplier DO number first — the files are named after it.
+          Enter the supplier DO number first. The files are named after it.
         </p>
       )}
     </div>

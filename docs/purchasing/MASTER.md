@@ -913,6 +913,11 @@ PO Delivery Date or the customer promise. An absent immediate answer after confi
 not create work. Date-specific confirmation opens only one Office working day before the effective
 arrival while Pending Delivery Qty remains above zero; an earlier evidenced exception may revise
 that effective date and therefore the future occurrence.
+It opens only for a PO whose CURRENT version carries the `PO sent to supplier` mark: a supplier
+cannot confirm delivery of a PO it never received, and until the mark the PO acts through the PO
+window's send line alone. **Fixed 2026-09-28** — the Work projection had derived the check for
+unsent POs (PO-20260903-4316 / -7907, found by the Workspace Work BUILD chat); the PO Register
+facet and the Order Route already required the send mark.
 
 ---
 
@@ -1164,6 +1169,16 @@ remains usable but carries concrete label work.
 
 ### 7.1 SO purchase
 
+**OPERATION NEVER CREATES A SALES ORDER — cross-module notice, owner ruling 2026-09-27 (Jess).** A
+customer Sales Order is the dealer's / showroom's act in the Sales Portal; Operation never opens the
+Sales Portal and never mints one. The Operation create door (`/operation/orders/so/new`, `POST
+/api/operation/orders`) and the Register's `New Sales Order` button are **retired — APPROVED
+TARGET, still mounted today until Sales Orders scope C/D removes them**. **The only order Operation
+places is `Manual Purchase`.** A Purchasing chat that needs customer orders to test SO Batch
+Purchase or a preview uses the Sales Orders dealers already handed over (test data) or the committed
+fixture harnesses (`apps/web/src/dev/so-batch-listing-preview.tsx`, `so-batch-preview.tsx`,
+`so-workspace-shell-preview.tsx`) — it never creates a Sales Order by any door.
+
 ```text
 Sales Order line
 → Stock reads available/reserved/incoming quantity
@@ -1322,6 +1337,7 @@ summary. Action ownership uses structured avatar metadata.
   The selected document is visible before Issue PO, using the PO template and its
   explicit draft treatment in `docs/pdf/PO-PDF-STANDARD.md`. Navigating documents
   changes the draft. Previewing creates nothing; Issue PO remains the creation action.
+- **Review Purchase Orders work pane and every Purchasing object surface wear the Sales Order card — owner instruction 2026-09-26 ("pls follow sales order ui kit … every page of purchasing"), BUILT 2026-09-26.** The work pane is two Sales Order cards: `Purchase order` (Supplier · Supplier Deliver To · Delivery Method · PO Doc Date with its `Provisional…` hint · `PO {n}-Day Delivery Date`, label over plain value, two to a row in the half-width pane) then `Goods lines` (the Item · Source · Qty · Goods must arrive table). The same one chrome — black bold sentence-case title over a rule (ONE KIT LAW, owner 2026-09-27: never blue), the shared `Block` + `Fact` of `SalesOrderWorkspace.tsx` — now draws the PO object page (its facts three to a row; `Supplier reply` / `Record supplier answer` become in-card labels), the Manual Purchase saved-request detail, the Supplier Claim panel and Purchasing Settings; the retired mono-uppercase tone and the cream band no longer appear on any Purchasing page. Every fact prints in the Sales Order's bordered box (owner, 2026-09-26: "got box … I want follow"), whether or not that surface can change it. **No dash, the cell says why (owner, 2026-09-27):** every `—` on a Purchasing goods table is replaced by its reason from `GOODS_ABSENCE_WORDS` (COPY "A goods cell with nothing in it says why"); furniture always carries its Unit IDs from the official PO (measured 2026-09-27: 103 of 103 live PO lines), so `Counted by quantity` appears only on accessory lines. A table wider than its card scrolls inside it and says so (`TableScroller` — the Sales Order Items fade and step button) on the PO object's `Goods lines` and `Supplier reply`. **Owner corrections the same day:** the PO object's `Purchase order` card drops `Source` (retired word; the sales-order lineage stays on the `Order Route` tab) and the page-level `Terms (days)` door (payment terms are read from the supplier's Settings; a PO-level override is no longer set on the object page). The Manual Purchase request detail keeps ONE TITLE, ONE BOX: `Delivery Date` · `Order By` · `Order timing` (`Can order early` / `Order date reached` / `Order date passed`) are three facts, never stacked; `Approval Status` is a fact on the `Request` card (the international pattern — Odoo, NetSuite, SAP release — keeps approval state as a field and the decision as an action), `Withdraw request` rides the Request card's header, and the `Approval` card appears only for the approver's decision or a decision record.
 - **Review Purchase Orders desktop composition — owner approved 2026-09-24; BUILT + DEPLOYED (#1573); SO read-only production walk verified, MPR issue walk still owed.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
 - **Approved review sequence and scope.** Header: total PO count, goods quantity and an explicit whole-batch issue action. Work pane: current document selection → Supplier → Supplier Deliver To/address and Delivery Method → provisional PO Date and Settings-derived PO Delivery Date → source/items/quantity → actionable missing facts. Preview uses the same selected document and approved PO template. Switching documents updates its paper. Returning preserves selection; issuance is not sending.
 - **A complete draft before commitment.** Both lanes must carry server-resolved supplier/destination addresses, provisional dates and delivery method. The draft reserves no official number or Unit ID; successful issuance records the actual PO Date and revalidates the dates. Goods must arrive is an internal deadline, not a substitute for PO Delivery Date. Missing required document facts identify their owning Settings destination instead of silently disappearing. Unrendered/failed preview is not completed review. Do not invent addresses, prices, dates or identifiers.
@@ -2140,11 +2156,16 @@ composition merely because Sales Order uses its separate blue-title opt-in.
 
 The three sections, in the SAME reading order on the form and preview, are:
 
-1. **Request Details** — `Purpose`; its structured Service Case / Staff member /
-   Subsidiary / `What is this for?` field where applicable; optional
-   `Purchase requirement`; the existing explicit `Can stock answer this?` choice
-   (no inferred/default answer); automatic `Requested By` and `Proceed Date`.
-   The requirement stays here, never a separate section or a bottom-of-form question.
+1. **Request Details** — drawn in the Sales Order fact grammar, one title one box,
+   three to a row, in this reading order (owner ruling 2026-09-26 — "yes" to the
+   sketch): **row 1** automatic `Requested By` · automatic `Proceed Date` · `Purpose`;
+   **row 2** the purpose's own second box, whose title changes with the purpose —
+   `Service Case` (Service Case) · `Staff member` (Internal Staff Purchase) ·
+   `Subsidiary` (Subsidiary Purchase) · `What is this for?` (Other Purchase, required
+   before Send) — and NO second box for Ready Stock / Showroom Display, so `Can stock
+   answer this?` (explicit choice, no inferred/default answer) moves left; **row 3** the
+   optional `Purchase requirement` as one full-width box. The requirement stays here,
+   never a separate section or a bottom-of-form question.
    Proceed Date previews server time and records the actual successful hand-off;
    it is not a manually backdated document date. Requester is the real individual.
 2. **Delivery** — `Deliver To` from governed destinations, then `Delivery Date`.
@@ -2158,10 +2179,16 @@ The three sections, in the SAME reading order on the form and preview, are:
    silently reserve or subtract stock. Existing concrete-need versus extra-stock
    rules continue to apply.
 
-The right pane is a live **internal MPR preview**, using the same draft facts and
-section sequence, with total requested goods quantity. Before submission it is
-clearly a draft; it never invents an MPR/PO number, claims approval, or represents
-an issued supplier PO. Supplier-facing documents appear at Issue PO, one preview
+The right pane is the **DRAFT Purchase Order paper** (owner 2026-09-28: "it should pdf
+preview … it same with so batch"; BUILT 2026-09-28): one paper per Catalog supplier of the
+picked lines, rendered from the same draft the form holds by the PO template SO Batch's
+review uses, under that review's own sentence. It prints the supplier and Warehouse
+addresses, each line's item with the request's purpose word, its quantity and its
+`Configure` choice. It is a draft: no MPR or PO number, no PO Doc Date, no PO Delivery
+Date (Settings set it at issue; the request's `Supplier Delivery Date` is never copied into
+it), no Unit IDs, and no claim of approval. Before any item is chosen it is still one
+empty paper. The create card is `Supplier Delivery` with `Supplier Deliver To` and
+`Supplier Delivery Date` (owner 2026-09-28). Supplier-facing documents appear at Issue PO, one preview
 per actual grouped PO, using PO-PDF-STANDARD. Never combine several suppliers on
 one PO. No Payment / Paid to date / Balance due / financial-progress section.
 Use the existing top action placement and governed submission action; typing,
@@ -2204,12 +2231,26 @@ verification or approval of unreviewed visual details.
 - Issued is not sent. Keep the one communication/evidence area, recording the
   actual version, recipient, channel, actor and time. Leaving an issued document
   does not delete it or reopen its covered demand. Download/print are not sending.
-- `Purchase requirement` is optional for every purpose and persists on create
-  and returned-request edit. It is distinct from the required Other Purchase
-  `What is this for?`. **BUILT (Card 13, migrations 0562–0563):** the create and
-  resubmit APIs carry `purchaseRequirement` separately from `why`; the form,
-  internal preview and saved detail read that same fact. Its authenticated saved
-  round trip remains owed; no request was submitted for the read-only walk.
+- **OWNER CORRECTION 2026-09-26 — NO FREE TEXT; THE LINE IS CONFIGURED LIKE THE SALES PORTAL.**
+  `Purchase requirement` (0562, Card 13) was NOT the owner's blueprint: Jess — "I order what, got
+  colour to choose, what I want more to write, no free text". Measured: a Sales portal line is
+  configured through `Configure` (Size · Mattress gap · Fabric · Colour · Options · Leg height ·
+  Special add-ons, all Catalog choices) and the choice lives in the line's `attrs`; a PO born from a
+  Sales Order prints that configuration under the item on the PO PDF (`Sand · Fabric CG-012`); a
+  Manual Purchase line carried only SKU · Qty · free-text `Note`, so its PO printed nothing.
+  **Ruling (Jess, 2026-09-26, "yes"):** every Manual Purchase goods line gets the SAME `Configure`
+  as the Sales portal — the same configurator components over the same Catalog option pools — and
+  its configuration travels MPR → PO line `attrs` → PO PDF exactly as a Sales-Order line does.
+  `Purchase requirement` (request level) and the per-line free-text `Note` are RETIRED from the
+  form, the internal MPR preview, PO review and the saved detail; the configurator's own small
+  remark slot (✎, the one Sales already has) is the only free note. The database columns stay
+  (never dropped); the doors stop writing them. `What is this for?` (Other Purchase) is unchanged.
+  **BUILT 2026-09-26 (PR #1672); migration `0591` APPLIED 2026-09-28** through the governed path:
+  a full-file rolled-back production probe, then the exact file. Tracker row `20260928041419`,
+  `md5(statements[1])` = file md5 `7e161e96e157fe09463408342e382272`; both door bodies match the
+  replayed full-chain database (`purchasing_create_request_with_lines` `40a8b4e1…`,
+  `purchasing_resubmit_request` `7f198296…`). The authenticated owner walk (configure a line →
+  issue → PO PDF prints it) is still owed.
 
 **Approval boundary — owner selected A, 2026-09-22; APPROVED.**
 Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,

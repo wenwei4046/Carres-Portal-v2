@@ -186,7 +186,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
                     <span className="truncate" title={r.model}>{r.model}</span>
                     <span className="text-base-500">{CATEGORY_LABEL[r.category]}</span>
                     <span className="font-mono">{r.variant}</span>
-                    <span className="text-right tabular-nums">{r.price !== undefined ? r.price.toLocaleString("en-MY") : "—"}</span>
+                    <span className="text-right tabular-nums">{r.price !== undefined ? r.price.toLocaleString("en-MY") : ""}</span>
                   </div>
                 ))}
               </div>
@@ -200,7 +200,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
 
           {skipped.length > 0 && (
             <details className="text-meta text-base-600">
-              <summary className="cursor-pointer text-amber-700">{skipped.length} skipped row(s) — why</summary>
+              <summary className="cursor-pointer text-amber-700">{skipped.length} skipped row(s): why</summary>
               <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
                 {skipped.slice(0, 50).map((s) => (
                   <li key={s.line}>

@@ -129,7 +129,7 @@ function StaffCodeCell({
           : "border-dashed border-base-300 text-base-400"
       } hover:border-base-700`}
     >
-      {code ?? "—"}
+      {code ?? ""}
     </button>
   );
 }
@@ -178,7 +178,7 @@ function TeamRow({
         className={`${fieldCls} !h-7 !w-[168px] shrink-0 text-meta`}
         aria-label={`Position of ${account.name}`}
       >
-        <option value="">— no position —</option>
+        <option value="">No position</option>
         {POSITION_BAND_ORDER.map((band) => (
           <optgroup key={band} label={POSITION_BAND_LABEL[band]}>
             {positions
@@ -205,7 +205,7 @@ function TeamRow({
         className={`${fieldCls} !h-7 !w-[168px] shrink-0 text-meta`}
         aria-label={`${account.name} reports to`}
       >
-        <option value="">— reports to —</option>
+        <option value="">Reports to</option>
         {managers.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name}
@@ -340,7 +340,7 @@ function AddUserModal({
             Add user
           </h2>
           <div className="text-meta text-base-600 mt-1 leading-relaxed">
-            Every new user is added here — except dealers, which live on the
+            Every new user is added here, except dealers, which live on the
             Dealers side. Carres staff get a CR staff code automatically.
           </div>
         </div>
@@ -388,7 +388,7 @@ function AddUserModal({
                 className={`${fieldCls} mt-1 font-normal`}
                 data-testid="hr-team-warehouse-picker"
               >
-                <option value="">— pick one —</option>
+                <option value="">Warehouse</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}
@@ -408,7 +408,7 @@ function AddUserModal({
                   onChange={(e) => setPositionId(e.target.value)}
                   className={`${fieldCls} mt-1 font-normal`}
                 >
-                  <option value="">— none yet —</option>
+                  <option value="">None yet</option>
                   {POSITION_BAND_ORDER.map((band) => (
                     <optgroup key={band} label={POSITION_BAND_LABEL[band]}>
                       {positions
@@ -429,7 +429,7 @@ function AddUserModal({
                   onChange={(e) => setReportsTo(e.target.value)}
                   className={`${fieldCls} mt-1 font-normal`}
                 >
-                  <option value="">— nobody —</option>
+                  <option value="">Nobody</option>
                   {internalAccounts.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
@@ -507,7 +507,7 @@ function AddShowroomStaffModal({
       { dealerId, name: name.trim(), staffRole: tier },
       {
         onSuccess: (res) => {
-          toast.success(`${name.trim()} added · ${res.staffCode} — set the PIN in the POS Staff page`);
+          toast.success(`${name.trim()} added · ${res.staffCode}. Set the PIN in the POS Staff page`);
           onClose();
         },
         onError: (e) => toast.error(e.message || "Create failed"),
@@ -846,7 +846,7 @@ function DepartmentsCard({ departments }: { departments: OrgDepartment[] }) {
           </div>
           <div className="text-label text-base-400 px-1 pb-1">
             A position joins a department in the Positions card below; the chart
-            follows automatically. C-level seats stay department-less — they top
+            follows automatically. C-level seats stay department-less. They top
             the chart.
           </div>
         </div>
@@ -911,7 +911,7 @@ function DutiesCard({
       {!collapsed && (
         <div className="p-2">
           <p className="text-meta text-base-500 px-1 mb-2">
-            Access follows the position, not the person — promote someone and
+            Access follows the position, not the person. Promote someone and
             their access moves with them. The Chairman passes every check by
             role, which is why that row stays empty.
           </p>
@@ -925,7 +925,7 @@ function DutiesCard({
                   {duties.map((d) => (
                     <th
                       key={d.key}
-                      title={`${d.name} — ${d.description}`}
+                      title={`${d.name}: ${d.description}`}
                       className="text-label uppercase tracking-[0.05em] text-base-500 font-medium px-1 pb-1.5 w-[92px] text-center"
                     >
                       {DUTY_SHORT[d.key] ?? d.name}
@@ -1062,7 +1062,7 @@ function PositionsCard({
                           className={`${fieldCls} !h-7 !w-[190px] shrink-0 text-meta`}
                           aria-label={`Department of ${p.name}`}
                         >
-                          <option value="">— no department —</option>
+                          <option value="">No department</option>
                           {activeDepts.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.name}
@@ -1119,7 +1119,7 @@ function PositionsCard({
               className={`${fieldCls} !w-[170px]`}
               aria-label="Department of the new position"
             >
-              <option value="">— no department —</option>
+              <option value="">No department</option>
               {activeDepts.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -1273,7 +1273,7 @@ export default function HrTeamTab() {
               </div>
             ))}
             <div className="text-label text-base-400 px-2 pb-1">
-              Dealer-side staff are not Carres staff — they are managed by each
+              Dealer-side staff are not Carres staff. They are managed by each
               dealer and never appear here.
             </div>
           </div>
@@ -1346,7 +1346,7 @@ export default function HrTeamTab() {
                 </span>
                 <span className="font-semibold text-base-900 truncate">{h.subjectName}</span>
                 <span className="text-base-600 truncate">
-                  {h.prevPosition ?? "—"} → {h.newPosition ?? "—"}
+                  {h.prevPosition ?? "No position"} → {h.newPosition ?? "No position"}
                 </span>
                 {h.changedBy && (
                   <span className="ml-auto text-base-400 shrink-0">by {h.changedBy}</span>

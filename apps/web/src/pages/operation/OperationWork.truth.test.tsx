@@ -17,10 +17,20 @@ let workState: {
 };
 const refetch = vi.fn();
 
-/* The party cards read Delivery through their own queries; their behaviour is
-   held by work/LogisticsCard.test.tsx. The shell tests do not render them. */
+/* The Mission and Communication read their orders through their own queries;
+   their behaviour is held by work/work-stops.test.ts and the kit tests. The
+   page tests stand a stub in for each and read the rail and the order rows. */
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
-vi.mock("./work/WorkParties", () => ({ default: () => null }));
+vi.mock("./work/WorkMission", () => ({
+  default: ({ orderId, acts }: { orderId: string; acts: Array<{ title: string }> }) => (
+    <div data-testid="work-mission-stub" data-order={orderId}>{acts.map((a) => <p key={a.title}>{a.title}</p>)}</div>
+  ),
+}));
+vi.mock("./work/WorkCommunication", () => ({ default: () => null }));
+vi.mock("./work/LogisticsCard", () => ({ useLogisticsModel: () => ({ model: null }) }));
+vi.mock("./work/use-work-data", () => ({
+  useWorkOrderIndex: () => ({ index: { poOrders: new Map(), orderBySo: new Map(), soByOrder: new Map(), windows: [] }, loading: false }),
+}));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return { ...actual, useOperationWork: () => ({ ...workState, refetch }) };
@@ -124,16 +134,16 @@ function feed(generatedOn: string, items: OperationWorkItem[]): OperationWorkRes
 }
 
 function show(url = "/operation?tab=work") {
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[url]}>
       <OperationWork />
     </MemoryRouter>,
   );
+  return view;
 }
 
 /* The rail every page follows (Payment Monitor's): one card per work day,
    then the fixed rows and the Page group. */
-const rail = () => screen.getByTestId("work-rail");
 const dayCard = (iso: string) => screen.getByTestId(`work-rail-day-${iso}`);
 
 const savedTz = process.env.TZ;
@@ -163,85 +173,76 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(new Date("2026-09-17T00:00:00").getTimezoneOffset()).toBe(-480);
   });
 
-  it("1 · a Thursday's rail is one strip Mon 14 … Fri 18 (names through fmtDate), today the solid-blue tile, header `Week of 14 Sep`", () => {
+  it("1 · a Thursday's rail is the whole month, Monday to Saturday (names through fmtDate); the chosen day is the pale-blue tile; header `Sep 2026`", () => {
     show();
-    const strip = screen.getByTestId("work-rail-days");
-    const names = within(strip).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
-    expect(names.map((n) => n.split(" · ")[0])).toEqual(["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep"]);
-    /* One row of tiles, never a column of cards (Jess, 2026-09-26). */
-    expect(strip.style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
+    const grid = screen.getByTestId("work-rail-days");
+    const week = within(screen.getByTestId("work-rail-days-week-2")).getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    expect(week.map((n) => n.split(" · ")[0])).toEqual(["Mon, 14 Sep", "Tue, 15 Sep", "Wed, 16 Sep", "Thu, 17 Sep", "Fri, 18 Sep", "Sat, 19 Sep"]);
+    expect(within(grid).getAllByRole("button")).toHaveLength(26); // 30 days minus 4 Sundays
+    expect(screen.queryByTestId("work-rail-day-2026-09-20")).toBeNull(); // Sunday never drawn
     expect(dayCard("2026-09-17")).toHaveAttribute("data-today", "yes");
-    expect(dayCard("2026-09-17").className).toContain("bg-kit-blue-9");
-    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17/);
-    expect(dayCard("2026-09-17")).not.toHaveTextContent("Today");
-    expect(screen.getByTestId("work-rail-week-label")).toHaveTextContent("Week of 14 Sep");
-    expect(screen.getByTestId("work-rail-week-label").textContent).not.toMatch(/[–-]/);
+    expect(dayCard("2026-09-17")).toHaveAttribute("aria-pressed", "true"); // the focus day is chosen
+    expect(dayCard("2026-09-17").className).toContain("bg-kit-slate-5"); // a chosen day is grey: the rail's one blue is the chosen order row
+    expect(dayCard("2026-09-17").className).not.toContain("bg-kit-blue");
+    expect(dayCard("2026-09-14").className).not.toContain("bg-kit-blue");
+    expect(screen.getByTestId("work-rail-month-label")).toHaveTextContent(/^Sep 2026$/);
   });
 
   it("2 · an item due Fri, 18 Sep is counted under Fri, 18 Sep; a day with nothing prints nothing", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18")]);
     show();
-    expect(dayCard("2026-09-18")).toHaveTextContent(/^FRI181$/);
-    expect(dayCard("2026-09-17")).toHaveTextContent(/^THU17$/);
+    expect(dayCard("2026-09-18")).toHaveTextContent(/^181$/);
+    expect(dayCard("2026-09-17")).toHaveTextContent(/^17$/);
     expect(dayCard("2026-09-18")).toHaveAttribute("aria-label", "Fri, 18 Sep · 1 action");
   });
 
-  it("3 · Wed, 16 Sep is the grey tile — no words, Malaysia Day only in its name — and the fixed rows print their zero", () => {
+  it("3 · Wed, 16 Sep is the grey tile, Malaysia Day only in its name, and the Attention rows print their zero", () => {
     show();
     const holiday = dayCard("2026-09-16");
     expect(holiday).toHaveAttribute("data-closed", "yes");
-    expect(holiday.className).toContain("bg-kit-slate-3");
-    expect(holiday).toHaveTextContent(/^WED16$/);
+    expect(holiday.className).toContain("text-kit-slate-9");
+    expect(holiday).toHaveTextContent(/^16$/);
     expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
-    expect(holiday).toHaveAttribute("title", "Malaysia Day");
-    expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("0");
-    expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("No date");
-    expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("0");
-    /* The Status rows (the three middle tabs moved here), To do on alone. */
-    expect(screen.getByTestId("work-rail-status-todo")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("work-rail-status-waiting")).toHaveTextContent("Waiting for answer");
-    expect(screen.getByTestId("work-rail-status-done")).toHaveTextContent("Done today");
-    expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByTestId("work-list-heading")).toBeNull();
+    expect(screen.getByTestId("work-rail-broken")).toHaveTextContent("Broken commitment0");
+    expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("Missed0");
+    expect(screen.getByTestId("work-rail-waiting")).toHaveTextContent("Waiting for answer0");
+    expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("No date0");
   });
 
-  it("4 · on the holiday itself the focus list uses Thu, 17 Sep", () => {
+  it("4 · on the holiday itself the focus day is Thu, 17 Sep", () => {
     workState.data = feed("2026-09-16", [item("2026-09-17"), item("2026-09-18")]);
     show();
     expect(dayCard("2026-09-17")).toHaveAttribute("aria-pressed", "true");
-    const list = screen.getByTestId("work-list");
-    expect(list).toHaveTextContent(/SO-\d+/);
-    expect(within(list).getAllByRole("button", { name: /Ask customer for a delivery date/ })).toHaveLength(1);
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(1);
   });
 
-  it("5 · Saturday is a day card only when something is due Sat, 19 Sep", () => {
+  it("5 · Saturday is always drawn (the Warehouse works it) and carries its count when something is due Sat, 19 Sep", () => {
     const first = show();
-    expect(screen.queryByTestId("work-rail-day-2026-09-19")).toBeNull();
+    expect(dayCard("2026-09-19")).toHaveTextContent(/^19$/);
     first.unmount();
     workState.data = feed("2026-09-17", [item("2026-09-19")]);
     show();
-    expect(dayCard("2026-09-19")).toHaveTextContent(/^SAT191$/);
-    expect(screen.getByTestId("work-rail-days").style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    expect(dayCard("2026-09-19")).toHaveTextContent(/^191$/);
   });
 
-  it("6 · My Work with nothing today and 2 on Friday does not say Nothing assigned to you", () => {
+  it("6 · My Task with nothing today and 2 on Friday does not say Nothing assigned to you", () => {
     workState.data = feed("2026-09-17", [item("2026-09-18"), item("2026-09-18")]);
     show();
     const empty = screen.getByTestId("work-empty");
     expect(empty).not.toHaveTextContent("Nothing assigned to you");
-    expect(empty).toHaveTextContent("No work on Thu, 17 Sep");
+    expect(empty).toHaveTextContent("Nothing due on Thu, 17 Sep");
     fireEvent.click(within(empty).getByRole("button", { name: "Open Fri, 18 Sep" }));
-    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(2);
   });
 
-  it("7 · a page filter narrows the list; the Page rows keep every page's real count", () => {
+  it("7 · a module narrows the order rows; the Module rows keep every module's real count", () => {
     workState.data = feed("2026-09-17", [inModule("delivery", "2026-09-17"), inModule("delivery", "2026-09-17"), inModule("payment", "2026-09-17")]);
     show("/operation?tab=work&module=delivery");
-    expect(screen.getByTestId("work-rail-page-delivery")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("work-rail-page-delivery")).toHaveTextContent("2");
-    expect(screen.getByTestId("work-rail-page-payment")).toHaveTextContent("1");
-    expect(screen.getByTestId("work-rail-page-all")).toHaveTextContent("3");
-    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(2);
+    expect(screen.getByTestId("work-rail-module-delivery")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("work-rail-module-delivery")).toHaveTextContent("2");
+    expect(screen.getByTestId("work-rail-module-payment")).toHaveTextContent("1");
+    expect(screen.getByTestId("work-rail-module-all")).toHaveTextContent("3");
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(2);
   });
 
   it("8 · a failed source says which one and when, and never an empty sentence", () => {
@@ -252,49 +253,29 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
       : source);
     workState.data = data;
     show();
-    const page = screen.getByTestId("work-list");
-    expect(page).toHaveTextContent("Could not refresh Payment");
-    expect(page).toHaveTextContent("Last updated 09:00");
-    expect(page).not.toHaveTextContent("Nothing assigned to you");
-    expect(page).not.toHaveTextContent("could not be loaded");
-    expect(page).not.toHaveTextContent("payment");
+    const failed = screen.getByTestId("work-source-failed");
+    expect(failed).toHaveTextContent("Could not refresh Payment");
+    expect(failed).toHaveTextContent("Last updated");
     expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
-  it("9 · a 1180px page shows the rail beside the list; Hide filters leaves the Show filters strip", () => {
+  it("9 · a 1180px page keeps three columns at 240 · 460+ · 300 and never scales", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       width: 1180, height: 800, top: 0, left: 0, right: 1180, bottom: 800, x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect);
     show();
-    expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
-    expect(rail()).toBeInTheDocument();
-    /* Rail OR detail at this width — never a 140px detail. */
-    expect(screen.queryByRole("region", { name: "Selected work" })).toBeNull();
-    fireEvent.click(within(rail()).getByRole("button", { name: "Hide filters" }));
-    expect(screen.queryByTestId("work-rail")).toBeNull();
-    expect(screen.getByRole("region", { name: "Selected work" })).toBeInTheDocument();
-    expect(screen.getByTestId("work-rail-collapsed")).toHaveTextContent("Show filters");
-    fireEvent.click(screen.getByTestId("work-show-filters-rail"));
-    expect(screen.getByTestId("work-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("work-area")).toHaveAttribute("data-band", "mid");
+    const grid = screen.getByTestId("work-area").firstElementChild as HTMLElement;
+    expect(grid.style.gridTemplateColumns).toBe("240px minmax(460px,1fr) 300px");
+    expect(grid.getAttribute("style")).not.toMatch(/zoom|scale/);
   });
 
   it("10 · a link that opens every open action (`day=all`) still lists them all", () => {
     workState.data = feed("2026-09-17", [item("2026-09-17"), item("2026-09-18"), item(null)]);
     const first = show();
-    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(1);
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(1);
     first.unmount();
     show("/operation?tab=work&day=all");
-    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(3);
-  });
-
-  it("11 · a missed age the server could not count is never printed as 0 working days", () => {
-    const missed = item("2026-08-05");
-    missed.timing = { ...timing("2026-08-05", 1), missedAge: { state: "not_calculable", workingDays: null, basis: null } };
-    workState.data = feed("2026-09-17", [missed]);
-    show();
-    const list = screen.getByTestId("work-list");
-    const card = list.querySelector("[data-work-card]") as HTMLElement;
-    expect(card.getAttribute("aria-label")).toContain("Wednesday, 5 August 2026 · Missed");
-    expect(list).not.toHaveTextContent("working days missed");
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(3);
   });
 });

@@ -172,7 +172,7 @@ function AddonRow({
         className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-body outline-none bg-transparent"
       />
       {description === null ? (
-        <span className="text-meta text-base-400">—</span>
+        null
       ) : (
         <input
           key={`${addon.key}-desc-${description}`}
@@ -201,7 +201,7 @@ function AddonRow({
       <input
         key={`${addon.key}-sizes-${(addon.sizeOptions ?? []).join(",")}`}
         defaultValue={(addon.sizeOptions ?? []).join(", ")}
-        placeholder="e.g. King, Queen — blank = no size"
+        placeholder="e.g. King, Queen (blank = no size)"
         onBlur={(e) => commitSizes(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -211,7 +211,7 @@ function AddonRow({
         className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-meta text-base-600 outline-none bg-transparent"
         data-testid={`addon-sizes-${addon.key}`}
       />
-      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="text-meta text-base-400">—</span>}</div>
+      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : null}</div>
       <div className="text-right">
         <button
           type="button"
@@ -342,7 +342,7 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
         <input
           value={sizes}
           onChange={(e) => setSizes(e.target.value)}
-          placeholder="King, Queen — blank = no size pick"
+          placeholder="King, Queen (blank = no size pick)"
           title="Comma-separated. If filled, the POS requires one size per item at checkout."
           className={`${INPUT_CLS} w-64`}
           data-testid="addon-sizes"
@@ -359,11 +359,11 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
       <p className="text-meta text-base-400 basis-full" data-testid="addon-auto-preview">
         {name.trim().length >= 2 && keyValid ? (
           <>
-            Auto-generated — key: <span className="font-mono">{key}</span> · Service SKU:{" "}
+            Auto-generated. Key: <span className="font-mono">{key}</span> · Service SKU:{" "}
             <span className="font-mono">{serviceSku}</span> (created in the SKU master on Add).
           </>
         ) : name.trim().length >= 2 ? (
-          <>Name needs some letters or numbers — they build the key and Service SKU.</>
+          <>Name needs some letters or numbers. They build the key and Service SKU.</>
         ) : (
           <>Key + Service SKU are auto-generated from the name. Re-adding a disabled add-on's name restores it.</>
         )}

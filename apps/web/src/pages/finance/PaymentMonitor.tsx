@@ -520,7 +520,7 @@ export default function PaymentMonitor() {
   );
 
   const weekStart = plan.weekStartIso;
-  const weekLabel = `${fmtDate(weekStart)} – ${fmtDate(addDays(weekStart, 4))}`;
+  const weekLabel = `${fmtDate(weekStart)} to ${fmtDate(addDays(weekStart, 4))}`;
   const onPlanWeek = mondayOf(planDay) === weekStart;
   const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
 
@@ -539,7 +539,7 @@ export default function PaymentMonitor() {
               data-testid="payment-monitor-week-label" aria-label={weekLabel}>
               {/* Each date stays whole: the break falls between the two days,
                   never inside `Fri, 18 Sep`. */}
-              <span className="whitespace-nowrap">{fmtDate(weekStart)} –</span>{" "}
+              <span className="whitespace-nowrap">{fmtDate(weekStart)} to</span>{" "}
               <span className="whitespace-nowrap">{fmtDate(addDays(weekStart, 4))}</span>
             </span>
             <button type="button" aria-label="Next week" title="Next week" className={weekArrow}
@@ -573,7 +573,7 @@ export default function PaymentMonitor() {
       ? <PaymentCollectionWorkspace invoice={invoice} rows={invoices} timingRules={timingRules}
           backLabel="Monitor" onClose={close} />
       : <>
-        <ModuleHeader destinationHeader testId="payment-monitor-destination-header" word="Monitor" docTitle="Monitor — Payments — Carres" />
+        <ModuleHeader destinationHeader testId="payment-monitor-destination-header" word="Monitor" docTitle="Monitor · Payments · Carres" />
         {isError ? <div role="alert" className="p-6 text-body">
           <p>The collection desk could not be loaded. Try again.</p>
           <button className="btn-secondary mt-3" onClick={() => {

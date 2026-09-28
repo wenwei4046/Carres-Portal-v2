@@ -121,8 +121,8 @@ export function SupplierOffersStrip({
               key={o.supplierId}
               className="flex flex-wrap items-center gap-2 text-meta text-base-700"
             >
-              <span className="font-medium">{o.supplierName ?? "—"}</span>
-              <span className="font-mono text-base-500">{o.supplierCode ?? "—"}</span>
+              <span className="font-medium">{o.supplierName ?? ""}</span>
+              <span className="font-mono text-base-500">{o.supplierCode ?? ""}</span>
               <span>
                 {o.pricesBySize && Object.keys(o.pricesBySize).length > 0
                   ? heights
@@ -130,11 +130,11 @@ export function SupplierOffersStrip({
                       .map((h) => `${h}″ RM ${(o.pricesBySize as Record<string, number>)[h].toFixed(2)}`)
                       .join(" · ")
                   : o.price == null
-                    ? "—"
+                    ? ""
                     : `RM ${o.price.toFixed(2)}`}
               </span>
               <span className="text-base-500">
-                {o.pwpPrice == null ? "PWP —" : `PWP RM ${o.pwpPrice.toFixed(2)}`}
+                {o.pwpPrice == null ? "No PWP price" : `PWP RM ${o.pwpPrice.toFixed(2)}`}
               </span>
               {isPrincipal && (
                 <button

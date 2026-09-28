@@ -23,10 +23,10 @@ export default function FinanceSubscriptionMonth() {
   const rows = q.data?.unpaid ?? [];
 
   const columns = useMemo<DataGridColumn<UnpaidRow>[]>(() => [
-    { key: "customer", label: "Customer", width: 200, accessor: (r) => r.customerName ?? "—",
+    { key: "customer", label: "Customer", width: 200, accessor: (r) => r.customerName ?? "",
       searchValue: (r) => `${r.customerName ?? ""} ${r.customerPhone ?? ""}` },
-    { key: "phone", label: "Phone", width: 130, accessor: (r) => r.customerPhone ?? "—" },
-    { key: "so", label: "Sales Order", width: 120, accessor: (r) => (r.orderSo ? `SO-${r.orderSo}` : "—") },
+    { key: "phone", label: "Phone", width: 130, accessor: (r) => r.customerPhone ?? "" },
+    { key: "so", label: "Sales Order", width: 120, accessor: (r) => (r.orderSo ? `SO-${r.orderSo}` : "") },
     { key: "agreement", label: "Agreement", width: 130, accessor: (r) => r.agreementNo },
     { key: "amount", label: "Amount", width: 120, align: "right", accessor: (r) => rm(r.amountDue),
       numberValue: (r) => r.amountDue, filterType: "number", exportValue: (r) => r.amountDue },
@@ -35,7 +35,7 @@ export default function FinanceSubscriptionMonth() {
     { key: "late", label: "Days Late", width: 100, align: "right",
       accessor: (r) => (r.daysLate > 0 ? String(r.daysLate) : "Not late"),
       numberValue: (r) => r.daysLate, filterType: "number" },
-    { key: "salesperson", label: "Salesperson", width: 160, accessor: (r) => r.salespersonName ?? "—", filterType: "enum" },
+    { key: "salesperson", label: "Salesperson", width: 160, accessor: (r) => r.salespersonName ?? "", filterType: "enum" },
   ], []);
 
   const figure = (n: number | undefined) => (q.isSuccess && n != null ? rm(n) : null);
@@ -43,11 +43,11 @@ export default function FinanceSubscriptionMonth() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="subscription-month-destination-header" word="Subscriptions"
-        docTitle="Subscriptions — Carres" />
+        docTitle="Subscriptions · Carres" />
       <div className="grid grid-cols-3 gap-3.5 px-4 pt-4" data-testid="subscription-month-summary">
-        <FinanceKpi label="Due" value={figure(q.data?.due)} noValue="—" />
-        <FinanceKpi label="Collected" value={figure(q.data?.collected)} noValue="—" />
-        <FinanceKpi label="Outstanding" value={figure(q.data?.outstanding)} noValue="—" accent />
+        <FinanceKpi label="Due" value={figure(q.data?.due)} noValue="" />
+        <FinanceKpi label="Collected" value={figure(q.data?.collected)} noValue="" />
+        <FinanceKpi label="Outstanding" value={figure(q.data?.outstanding)} noValue="" accent />
       </div>
       {q.isError ? (
         <p role="alert" className="p-4 text-body">The subscription months could not be loaded. Try again.</p>

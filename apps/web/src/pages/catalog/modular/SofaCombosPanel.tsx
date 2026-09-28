@@ -41,9 +41,9 @@ import { skuMargin } from "../margin";
  */
 
 const TIER_LABELS: Record<FabricTierValue, string> = {
-  PRICE_1: "P1 – Base",
-  PRICE_2: "P2 – Mid",
-  PRICE_3: "P3 – Premium",
+  PRICE_1: "P1 Base",
+  PRICE_2: "P2 Mid",
+  PRICE_3: "P3 Premium",
 };
 
 function fmtRM(n: number): string {
@@ -301,7 +301,7 @@ function SofaComboCard({
                   {fmtRM(price as number)}
                 </span>
               ) : (
-                <span className="text-meta text-base-300">—</span>
+                null
               )}
             </div>
           );
@@ -382,9 +382,9 @@ function SofaComboHistoryModal({
   onClose: () => void;
 }) {
   const rows: { label: string; value: string }[] = [
-    { label: "Created", value: combo.createdAt ? fmtDateTime(combo.createdAt) : "—" },
+    { label: "Created", value: combo.createdAt ? fmtDateTime(combo.createdAt) : "" },
     { label: "Effective from", value: fmtDate(combo.effectiveFrom) },
-    { label: "Last updated", value: combo.updatedAt ? fmtDateTime(combo.updatedAt) : "—" },
+    { label: "Last updated", value: combo.updatedAt ? fmtDateTime(combo.updatedAt) : "" },
     { label: "Status", value: combo.active ? "Active" : "Inactive" },
   ];
   return (
@@ -404,7 +404,7 @@ function SofaComboHistoryModal({
           ))}
         </div>
         <p className="text-meta text-base-400">
-          A full price-change log (every edit versioned) isn&apos;t tracked yet — this shows the
+          A full price-change log (every edit versioned) isn&apos;t tracked yet. This shows the
           current version&apos;s key dates.
         </p>
       </div>
@@ -676,7 +676,7 @@ function SofaComboEditor({
           </div>
           {offeredCodes.length === 0 && (
             <p className="text-meta text-base-400 mb-2">
-              This model offers no compartments yet — tick some in Offered compartments above first.
+              This model offers no compartments yet. Tick some in Offered compartments above first.
             </p>
           )}
           <div className="flex flex-col gap-2">
@@ -839,7 +839,7 @@ function SofaComboEditor({
                     className={`block text-meta mt-0.5 text-right t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
                     data-testid={`sofa-combo-margin-${h}`}
                   >
-                    {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
+                    {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : ""}
                   </span>
                 </label>
               );
@@ -901,7 +901,7 @@ function SlotCodePicker({
       {/* Selected chips */}
       <div className="flex flex-wrap gap-1.5 mb-1.5" data-testid={`${testId}-selected`}>
         {selected.length === 0 ? (
-          <span className="text-meta text-base-400">No codes — tick one or more below.</span>
+          <span className="text-meta text-base-400">No codes. Tick one or more below.</span>
         ) : (
           selected.map((code) => (
             <span

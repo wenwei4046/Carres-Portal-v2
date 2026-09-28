@@ -76,28 +76,28 @@ export function LoanNoteTemplate(data: LoanNoteTemplateData) {
     <Document>
       <Page size="A4" style={styles.page}>
         <DocHeader
-          docTitle="LOAN NOTE — TEMPORARY, NOT A SALE"
+          docTitle="LOAN NOTE: TEMPORARY, NOT A SALE"
           docMetaRows={[`Loan note: ${ln_no}`, orderRow, `Date: ${issue_date}`]}
         />
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Customer</Text>
-          <Text style={styles.partyName}>{displayCustomerName(customer.name) || "—"}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(customer.name) || " "}</Text>
           {customer.phone ? <Text style={styles.partySub}>{customer.phone}</Text> : null}
         </View>
 
         <View style={styles.detailBlock}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Loaned item</Text>
-            <Text style={styles.detailValue}>{item || "—"}</Text>
+            <Text style={styles.detailValue}>{item || " "}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Condition at hand-over</Text>
-            <Text style={styles.detailValue}>{condition || "—"}</Text>
+            <Text style={styles.detailValue}>{condition || " "}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Source</Text>
-            <Text style={styles.detailValue}>{source || "—"}</Text>
+            <Text style={styles.detailValue}>{source || " "}</Text>
           </View>
           <View style={styles.detailRowLast}>
             <Text style={styles.detailLabel}>Return</Text>
@@ -111,7 +111,7 @@ export function LoanNoteTemplate(data: LoanNoteTemplateData) {
             your order is being prepared.
           </Text>
           <Text style={styles.termsLine}>
-            • It will be COLLECTED BACK when your order is delivered — nothing to arrange separately.
+            • It will be COLLECTED BACK when your order is delivered. Nothing to arrange separately.
           </Text>
           <Text style={styles.termsLine}>
             • Please keep it in good condition. Loss or damage while in your care may be chargeable.

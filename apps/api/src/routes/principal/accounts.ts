@@ -279,7 +279,7 @@ principalAccountsRouter.post("/email-change-requests/:id/approve", async (c) => 
     .maybeSingle();
   if (takenErr) throw new HTTPException(500, { message: takenErr.message });
   if (taken) {
-    return c.json({ error: "email_in_use", message: "Email already in use — reject with a note instead" }, 422);
+    return c.json({ error: "email_in_use", message: "Email already in use. Reject with a note instead" }, 422);
   }
 
   // The REAL swap: auth.users first (the login), then the app_users mirror.

@@ -122,7 +122,7 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
     <ModuleHeader
       testId="purchasing-tabs"
       word={activeLabel}
-      docTitle={`${activeLabel} · Purchasing — Carres`}
+      docTitle={`${activeLabel} · Purchasing · Carres`}
       destinationHeader
       right={right}
     />

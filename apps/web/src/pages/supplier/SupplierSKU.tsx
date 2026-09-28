@@ -162,7 +162,7 @@ export default function SupplierSKU() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-body font-semibold truncate">
-                        {r.model?.name ?? "—"}
+                        {r.model?.name ?? ""}
                       </div>
                       {r.model?.blurb && (
                         <div className="text-label text-muted-foreground mt-0.5 truncate">
@@ -180,7 +180,7 @@ export default function SupplierSKU() {
                         </span>
                       ) : (
                         <span className="font-mono text-meta text-muted-foreground">
-                          —
+                          0
                         </span>
                       )}
                     </div>

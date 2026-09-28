@@ -115,7 +115,7 @@ export default function ClaimPhotoUploadField({
       </div>
       {doNumber.trim().length < 3 && (
         <p className="text-label text-base-500 mt-1 font-body">
-          Enter the supplier DO number first — the photo files are named after it.
+          Enter the supplier DO number first. The photo files are named after it.
         </p>
       )}
       {paths.length > 0 && (

@@ -530,3 +530,55 @@ describe("Sales Order Revisions and History are different records", () => {
  it("attaches the revision to the saved reference without a space", () => {
    expect(revisionRecordWords({ revision: 2, created_at: "2026-09-24", actor_kind: "missing" } as SalesOrderRevisionRow, 2, "SO2609-4827").identity).toBe("SO2609-4827(2) · Current");
  });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SCOPE B · HISTORY TRANSLATES AT THE READ BOUNDARY AND NEVER LEAKS A STORED
+ * PHRASE (owner ruling 2026-09-26).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("History never leaks a stored phrase", () => {
+  const at = { occurred_at: "2026-09-23T01:33:00Z", by_role: "principal", actor: "Jess", actor_kind: "human" as const };
+
+  it("a proceed event keeps `Order proceeded` and omits the V1 pipeline phrase", () => {
+    const words = historyRecordWords({ ...at, text: "Order proceeded · awaiting logistics triage" }, []);
+    expect(words.title).toBe("Order proceeded");
+    expect(words.detail).toEqual([]);
+    expect(JSON.stringify(words)).not.toContain("awaiting logistics triage");
+  });
+
+  it("a stored enum the table does not know prints `Activity`, never itself", () => {
+    const words = historyRecordWords({ ...at, text: "Stage changed · awaiting_stock" }, []);
+    expect(words.detail).toEqual(["Activity"]);
+    expect(JSON.stringify(words)).not.toContain("awaiting_stock");
+  });
+
+  it("a governed value is still translated, and a plain written value still prints", () => {
+    expect(historyRecordWords({ ...at, text: "Order created · 0% deposit · online" }, []).detail).toEqual([
+      "No deposit · Online order",
+    ]);
+    expect(historyRecordWords({ ...at, text: "Logistics assigned · NETS" }, []).detail).toEqual(["NETS"]);
+  });
+
+  it("a shared login prints `Staff identity not recorded` with its role word, on History and on Revisions", () => {
+    expect(
+      historyActorWords({ text: "x", occurred_at: "2026-09-23T01:33:00Z", by_role: "principal", actor: null, actor_kind: "missing" }),
+    ).toMatch(/^Staff identity not recorded · Principal · /);
+    const revision = revisionRecordWords(
+      {
+        revision: 2,
+        snapshot: { header: {}, lines: [], addons: [] },
+        created_at: "2026-09-23T01:33:00Z",
+        created_by: "u",
+        created_by_name: null,
+        actor_kind: "missing",
+        actor_role: "Principal",
+        change_type: null,
+        note: null,
+      } as never,
+      2,
+      "SO-1365",
+    );
+    expect(revision.detail[0]).toMatch(/^Staff identity not recorded · Principal · /);
+    expect(JSON.stringify(revision)).not.toContain("Recorded by principal");
+  });
+});

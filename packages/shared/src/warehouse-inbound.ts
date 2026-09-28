@@ -493,7 +493,7 @@ function destinationName(
   destination: { name?: string | null } | undefined,
 ): string {
   return destination?.name
-    ? `${destination.name} — no Site linked`
+    ? `${destination.name}: no Site linked`
     : "Destination not linked to a Site";
 }
 

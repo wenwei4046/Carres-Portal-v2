@@ -191,7 +191,7 @@ function PerModelTierOverride({
     upsert.mutate(
       { modelId: mid, tier2Delta: null, tier3Delta: null },
       {
-        onSuccess: () => toast.success("Override removed — back to global"),
+        onSuccess: () => toast.success("Override removed. Back to global"),
         onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Remove failed"),
       },
     );
@@ -203,9 +203,9 @@ function PerModelTierOverride({
     <section data-testid="per-model-tier-override">
       <div className="text-strong font-display text-base-900 mb-1">Per-model tier override</div>
       <p className="text-meta text-base-500 mb-3 max-w-[560px]">
-        Model-specific premium for P2 / P3 fabrics — overrides the global deltas above.
+        Model-specific premium for P2 / P3 fabrics. Overrides the global deltas above.
         Blank = use global.
-        {!isPrincipal && " Master Admin only — read-only for your role."}
+        {!isPrincipal && " Master Admin only. Read-only for your role."}
       </p>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5 items-start">
         {/* Editor */}
@@ -283,7 +283,7 @@ function PerModelTierOverride({
             </div>
             {saved.length === 0 && (
               <div className="text-body text-base-500 px-3 py-4" data-testid="tier-override-empty">
-                No overrides — every model uses the global deltas.
+                No overrides. Every model uses the global deltas.
               </div>
             )}
             {saved.map((o) => (
@@ -408,11 +408,11 @@ function PerCompartmentSpecialPrice({
         When any sofa build uses this compartment, its P2 / P3 fabric premium
         replaces the per-model / global deltas above for the whole sofa (highest
         wins if a build spans several). Blank = no special.
-        {!isPrincipal && " Master Admin only — read-only for your role."}
+        {!isPrincipal && " Master Admin only. Read-only for your role."}
       </p>
       {compartments.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-[4px] p-4 text-body text-base-500">
-          No compartments yet — add them in the Maintenance tab first.
+          No compartments yet. Add them in the Maintenance tab first.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5 items-start">
@@ -429,7 +429,7 @@ function PerCompartmentSpecialPrice({
                 {compartments.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code}
-                    {c.description ? ` — ${c.description}` : ""}
+                    {c.description ? `: ${c.description}` : ""}
                     {c.active ? "" : " (off)"}
                   </option>
                 ))}
@@ -663,7 +663,7 @@ function FabricsPanel({
           <div className="text-strong font-display text-base-900">Fabrics</div>
           <p className="text-meta text-base-500 mt-0.5 max-w-[520px]">
             Procurement fabric tiers (cost side, read-only reference).
-            {!isPrincipal && " Principal only — read-only for your role."}
+            {!isPrincipal && " Principal only. Read-only for your role."}
           </p>
           {effectiveFrom && (
             <p className="text-meta text-base-400 mt-1" data-testid="fabrics-effective">
@@ -745,7 +745,7 @@ function FabricsPanel({
           {visible.length === 0 && (
             <div className="text-body text-base-500 px-3 py-6 text-center">
               {fabrics.length === 0
-                ? "No fabrics yet — press Edit to add some."
+                ? "No fabrics yet. Press Edit to add some."
                 : "No fabrics match the search."}
             </div>
           )}
@@ -760,13 +760,13 @@ function FabricsPanel({
                 <CodeChip>{f.fabricCode}</CodeChip>
               </div>
               <div className="text-body text-base-700 truncate">
-                {f.series || <span className="text-base-300">—</span>}
+                {f.series || null}
               </div>
               <div className="text-body text-base-800 truncate" title={f.description ?? ""}>
-                {f.description || <span className="text-base-300">—</span>}
+                {f.description || null}
               </div>
               <div className="text-body text-base-700 truncate">
-                {f.supplierCode || <span className="text-base-300">—</span>}
+                {f.supplierCode || null}
               </div>
               <div data-testid={`fabric-sofa-tier-${f.fabricCode}`}>
                 {isPrincipal ? (
@@ -843,7 +843,7 @@ function FabricsPanel({
               <input
                 value={r.description}
                 onChange={(e) => patchRow(i, { description: e.target.value })}
-                placeholder="—"
+                placeholder=""
                 className={INPUT_CLS}
                 aria-label={`row ${i + 1} description`}
               />
@@ -900,7 +900,7 @@ function FabricsPanel({
           </button>
           {hasDuplicates && (
             <p className="text-meta text-danger">
-              Duplicate fabric codes — each code must be unique.
+              Duplicate fabric codes. Each code must be unique.
             </p>
           )}
         </div>
@@ -908,11 +908,11 @@ function FabricsPanel({
 
       {/* history dialog */}
       {showHistory && (
-        <Modal title="History — Fabrics" onClose={() => setShowHistory(false)}>
+        <Modal title="History: Fabrics" onClose={() => setShowHistory(false)}>
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
             {historyQ.isLoading && <p className="text-body text-base-500">Loading history…</p>}
             {!historyQ.isLoading && history.length === 0 && (
-              <p className="text-body text-base-500">No history yet — the first Edit save writes one.</p>
+              <p className="text-body text-base-500">No history yet. The first Edit save writes one.</p>
             )}
             {history.map((h) => (
               <div key={h.id} className="border border-base-200 rounded-[4px] p-3 bg-base-50">

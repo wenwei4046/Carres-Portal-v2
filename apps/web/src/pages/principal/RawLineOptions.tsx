@@ -233,7 +233,7 @@ export default function RawLineOptions({
     >
       <p className="text-label uppercase tracking-[0.05em] text-base-400 mb-1.5">
         {isSofa ? "Sofa variants" : isBed ? "Bed frame variants" : "Options"}
-        <span className="normal-case tracking-normal"> · optional — KIV if not confirmed</span>
+        <span className="normal-case tracking-normal"> · optional, KIV if not confirmed</span>
       </p>
       {selects && (
         <div className="grid gap-2 sm:grid-cols-3">
@@ -426,7 +426,7 @@ function RawSpecialsPicker({
                     className={SEL_CLS}
                     data-testid={`raw-special-choice-${def.code}-${gi}`}
                   >
-                    <option value="">— select —</option>
+                    <option value="">{g.label}</option>
                     {g.choices.map((c) => (
                       <option key={c.label} value={c.label}>
                         {c.label}

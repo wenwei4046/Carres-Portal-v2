@@ -1,3 +1,4 @@
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -127,8 +128,8 @@ function weekLabel(from: string, to: string): string {
   const right = fmtDateShort(to);
   const sameTail = left.slice(left.indexOf(" ")) === right.slice(right.indexOf(" "));
   return sameTail
-    ? `${left.slice(0, left.indexOf(" "))} – ${right}`
-    : `${left} – ${right}`;
+    ? `${left.slice(0, left.indexOf(" "))} to ${right}`
+    : `${left} to ${right}`;
 }
 
 export default function OperationReceiving() {
@@ -773,7 +774,7 @@ export default function OperationReceiving() {
         category: words?.category ?? "",
         unitIds: [],
         /* Extra goods never enter Inventory, so they never become a Unit. */
-        unitAbsence: "—",
+        unitAbsence: GOODS_ABSENCE_WORDS.countedByQuantity,
         deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
         deliverToAbsence: "Not recorded",
         supplier: r.supplier_name ?? undefined,
@@ -1121,7 +1122,7 @@ export default function OperationReceiving() {
                 return (
                   <span className="flex items-center gap-3">
                     <span data-testid="grn-page-range" className="truncate">
-                      Showing {from}–{to} of {page.total}
+                      Showing {from} to {to} of {page.total}
                     </span>
                     <button
                       type="button"
@@ -1216,7 +1217,7 @@ function FindPoView({
           <p className="py-3 text-meta text-base-500" data-testid="receiving-find-empty">
             {q.trim() === ""
               ? "No supplier delivery is ready to receive."
-              : "No open purchase order matches. Check the number with Purchasing — an unknown delivery never invents a source."}
+              : "No open purchase order matches. Check the number with Purchasing. An unknown delivery never invents a source."}
           </p>
         ) : (
           candidates.map((p) => {

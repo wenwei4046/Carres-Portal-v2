@@ -119,7 +119,7 @@ export default function OtherReceiptsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="other-receipts-destination-header" word="Other receipts" docTitle="Other receipts — Carres" />
+      <ModuleHeader destinationHeader testId="other-receipts-destination-header" word="Other receipts" docTitle="Other receipts · Carres" />
       {body}
     </div>
   );
@@ -332,7 +332,7 @@ function ReceiptForm({
   const lineAccounts = useMemo(() => (accounts.data ?? []).filter((a) => a.for_receipt_line), [accounts.data]);
   const partyOptions = useMemo(
     () => [
-      { value: NO_PARTY, label: "No party — type who paid" },
+      { value: NO_PARTY, label: "No party: type who paid" },
       ...(parties.data ?? []).filter((p) => p.is_active).map((p) => ({ value: p.party_id, label: p.name })),
     ],
     [parties.data],
@@ -601,7 +601,7 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
       const { renderReceiptPdf } = await import("@/lib/pdf/render");
       window.open(URL.createObjectURL(await renderReceiptPdf(otherReceiptDoc(detail))), "_blank", "noopener");
     } catch (e) {
-      toast.error(`The receipt could not be opened — ${(e as Error).message}`);
+      toast.error(`The receipt could not be opened: ${(e as Error).message}`);
     } finally {
       setPrinting(false);
     }
@@ -658,7 +658,7 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
             <p key={l.line_no} className="flex flex-wrap justify-between gap-2">
               <span>
                 {accountLabel({ code: l.account_code, name: l.account_name })}
-                {" — "}
+                {" · "}
                 {l.description ?? "No description"}
                 {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
               </span>

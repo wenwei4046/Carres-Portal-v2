@@ -45,7 +45,7 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
           {d.code && <span className="font-mono text-base-500 mr-1.5">{d.code}</span>}
           {d.name}
         </div>
-        <div className="text-label text-base-500 mt-0.5">{d.contact ?? "—"}</div>
+        <div className="text-label text-base-500 mt-0.5">{d.contact ?? ""}</div>
       </td>
       <td className="px-4 py-3 text-base-700">{d.region}</td>
       {showOutlets && (
@@ -55,12 +55,12 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
           }`}
           // 0 outlets is worth flagging: the store cannot take an order until
           // one exists (the POS outlet picker would sit empty).
-          title={d.outletCount === 0 ? "No outlet yet — this dealer cannot take an order" : undefined}
+          title={d.outletCount === 0 ? "No outlet yet. This dealer cannot take an order" : undefined}
         >
           {d.outletCount}
         </td>
       )}
-      <td className="px-4 py-3 text-base-700">{d.joinedDate ?? "—"}</td>
+      <td className="px-4 py-3 text-base-700">{d.joinedDate ?? ""}</td>
       <td className="px-4 py-3 text-right font-mono">{d.orderCount}</td>
       <td className="px-4 py-3 text-right font-semibold font-mono">
         RM {(Number(d.gmv) / 1000).toFixed(1)}k
@@ -70,7 +70,7 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
           hasOutstanding ? "text-primary" : "text-base-500"
         }`}
       >
-        {hasOutstanding ? `RM ${Number(d.outstanding).toLocaleString()}` : "—"}
+        {hasOutstanding ? `RM ${Number(d.outstanding).toLocaleString()}` : ""}
       </td>
       <td className="px-4 py-3">
         <DealerStatusPill status={d.status} />

@@ -114,7 +114,7 @@ export default function ServiceCaseNumbersPanel() {
                     .map(
                       (cat) => `${caseCategoryBucketLabel(cat)} ${m.byCategory[cat]}`,
                     )
-                    .join(" · ") || "—"}
+                    .join(" · ") || ""}
                 </span>
               </button>
             );
@@ -251,7 +251,7 @@ export default function ServiceCaseNumbersPanel() {
               this needs no second tagging pass. Silent until one is recorded. */}
           {d.delayReasonsRecorded > 0 && (
             <span data-testid="numbers-responsibility">
-              Why they ran long — factory{" "}
+              Why they ran long: factory{" "}
               <span className="font-mono tabular-nums text-base-900">
                 {d.byResponsibility.supplier}
               </span>
@@ -293,7 +293,7 @@ function Figure({
           value === null ? "text-strong text-base-400" : "text-page text-base-900"
         }`}
       >
-        {value ?? "—"}
+        {value ?? ""}
       </div>
       {note && <div className="text-meta text-base-500 mt-1">{note}</div>}
     </div>

@@ -802,7 +802,7 @@ function DeliveryNotesLog({
           if (e.key === "Enter") add();
         }}
         onBlur={add}
-        placeholder="+ add note — date stamps itself"
+        placeholder="+ add note. Date stamps itself"
         aria-label="Add a customer note (auto-dated)"
         className="mt-1 w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-body outline-none hover:border-base-400 focus:border-primary placeholder:text-base-300"
       />
@@ -951,8 +951,8 @@ function CallsPanel({
         className="kpi-box grid place-items-center py-2 shrink-0"
         title={
           rows.length === 0
-            ? "Calls — 0 calls to make"
-            : `Calls — ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
+            ? "Calls: 0 calls to make"
+            : `Calls: ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
         }
       >
         <span className="relative">
@@ -1107,7 +1107,7 @@ function CurrentIssuesPanel({
     return (
       <div
         className="kpi-box grid place-items-center py-2 shrink-0"
-        title={`Current issues — ${rows.map((r) => r.text).join(" / ")}`}
+        title={`Current issues: ${rows.map((r) => r.text).join(" / ")}`}
       >
         <span className="relative">
           <AlertCircle
@@ -1155,7 +1155,7 @@ function CurrentIssuesPanel({
             }`}
             onClick={r.onOpen}
             role={r.onOpen ? "button" : undefined}
-            title={r.onOpen ? `${label} — open where this is worked` : label}
+            title={r.onOpen ? `${label}. Open where this is worked` : label}
           >
             {/* The track icon labels the group; only the FIRST row of a track
                 carries it, so three issues on one track read as one group. */}
@@ -1187,7 +1187,7 @@ function CurrentIssuesPanel({
  *  → em-dash, never the lowercase normalize slug. */
 function skuCode(sku: string): string {
   const m = sku.trim().match(/([A-Za-z]{0,3}\d{3,}[A-Za-z]{0,2}(?:-[A-Za-z])?)\s*$/);
-  return m ? m[1].toUpperCase() : "—";
+  return m ? m[1].toUpperCase() : "";
 }
 
 /** Site SHORT name for the Items LOCATION column (§9 — "Klang/NETS", never
@@ -1374,14 +1374,14 @@ function DrawerBody({
         body: JSON.stringify({ itemId }),
       }),
     onSuccess: () => {
-      toast.success("Unreserved — the unit is back in free stock");
+      toast.success("Unreserved. The unit is back in free stock");
       setUnreserveSku(null);
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
       void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
     },
     onError: (e: Error) => {
       setUnreserveSku(null);
-      toast.error(`Couldn't unreserve — ${e.message}`);
+      toast.error(`Couldn't unreserve: ${e.message}`);
     },
   });
   const reservedUnitIdFor = (sku: string): string | null =>
@@ -1839,7 +1839,7 @@ function DrawerBody({
   // stays unaffected.
   const quickSave = useSaveOrderControl(order.id, {
     onSuccess: () => toast.success("Saved"),
-    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't save: ${e.message}`),
   });
   // Follow-up stamp (0221, deploy-gated) — SILENT on error so a not-yet-
   // deployed API never blocks the message itself (the copy already happened).
@@ -1859,7 +1859,7 @@ function DrawerBody({
     ? "TBD"
     : order.delivery_date
       ? fmtDate(order.delivery_date).split(", ")[0]
-      : "—";
+      : "";
   // Full canonical date (date law §A0: weekday ALWAYS on a displayed date) —
   // the Delivery card shows this; deadlineLabel (weekday stripped) stays for
   // the short message-template strings only.
@@ -1867,7 +1867,7 @@ function DrawerBody({
     ? "TBD"
     : order.delivery_date
       ? fmtDate(order.delivery_date)
-      : "—";
+      : "";
   // Optional preferred-name/title for customer messages — never auto Mr/Ms.
   // Local-only for now (an ops_order_control column is deploy-gated), keyed by
   // order so it sticks across sessions on this machine.
@@ -1930,11 +1930,11 @@ function DrawerBody({
     const customerWa = aud === "customer" ? waLink(order.customer_phone) : null;
     if (customerWa) {
       window.open(`${customerWa}?text=${encodeURIComponent(text)}`, "_blank");
-      toast.success(`${toneWord} — opening WhatsApp to the customer, hit send`);
+      toast.success(`${toneWord}. Opening WhatsApp to the customer, hit send`);
     } else if (aud === "customer") {
-      toast.success(`${toneWord} copied — no customer number on file, paste into WhatsApp`);
+      toast.success(`${toneWord} copied. No customer number on file, paste into WhatsApp`);
     } else {
-      toast.success(`${toneWord} copied — paste into the WhatsApp group`);
+      toast.success(`${toneWord} copied. Paste into the WhatsApp group`);
     }
     // The logged follow-up event — a manual send stamps it; the future portal
     // auto-fire writes the SAME event.
@@ -2147,7 +2147,7 @@ function DrawerBody({
         return;
       case "delivery_photo":
         if (row.photoUrl) window.open(row.photoUrl, "_blank", "noopener");
-        else toast.error("That photo's link expired — reopen the order");
+        else toast.error("That photo's link expired. Reopen the order");
         return;
     }
   };
@@ -2258,7 +2258,7 @@ function DrawerBody({
     });
     void navigator.clipboard.writeText(text);
     toast.success(
-      `${tone === "reminder" ? "Reminder" : "Call text"} copied — ${g.label}`,
+      `${tone === "reminder" ? "Reminder" : "Call text"} copied: ${g.label}`,
     );
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
@@ -2497,7 +2497,7 @@ function DrawerBody({
           ? `${RM(collectedAll)} in`
           : totalSet
             ? "nothing received yet"
-            : "—",
+            : "",
     },
     {
       panel: "Items",
@@ -2544,7 +2544,7 @@ function DrawerBody({
               : storageIncurred && storageCleared
                 ? "collected"
                 : supplierLate
-                  ? "waiting supplier — not counting"
+                  ? "waiting supplier, not counting"
                   : "not counting",
           },
         ]
@@ -2849,7 +2849,7 @@ function DrawerBody({
               type="button"
               onClick={() => setTab(t.key)}
               aria-selected={tab === t.key}
-              title={t.label + (t.v ? ` — ${t.v}` : "") + (t.w ? ` ${t.w}` : "")}
+              title={t.label + (t.v ? `: ${t.v}` : "") + (t.w ? ` ${t.w}` : "")}
               className={`h-10 rounded-lg flex items-center gap-2 shrink-0 ${
                 railCollapsed ? "justify-center px-0" : "px-2.5"
               } text-body font-semibold transition-colors ${
@@ -3081,21 +3081,21 @@ function DrawerBody({
                                 t: "Ready",
                                 c: "pill-confirmed",
                                 hint: isAcc
-                                  ? "Accessory — always in the Klang warehouse"
+                                  ? "Accessory. Always in the Klang warehouse"
                                   : "A unit is locked to this order",
                               }
                             : rd === "to_reserve"
                               ? {
                                   t: `Need ${Math.max(1, l.qty - received)}`,
                                   c: "pill-warning",
-                                  hint: "Matching free stock exists — reserve it to this SO",
+                                  hint: "Matching free stock exists. Reserve it to this SO",
                                 }
                               : rd === "on_po"
                                 ? etaPassed
                                   ? {
                                       t: "Delayed",
                                       c: "pill-overdue",
-                                      hint: "The PO's ETA has passed — call the supplier for a new ready date",
+                                      hint: "The PO's ETA has passed. Call the supplier for a new ready date",
                                     }
                                   : {
                                       t: "On PO",
@@ -3159,7 +3159,7 @@ function DrawerBody({
                                           behavior: "smooth",
                                         });
                                     }}
-                                    title="Matching stock is free — click to reserve a unit to this order"
+                                    title="Matching stock is free. Click to reserve a unit to this order"
                                     className={`inline-flex items-center gap-1 text-meta font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-90`}
                                   >
                                     {pill.t}
@@ -3194,7 +3194,7 @@ function DrawerBody({
                                         e.stopPropagation();
                                         setUnreserveSku(l.sku);
                                       }}
-                                      title="A unit is locked to this order — click to unreserve it"
+                                      title="A unit is locked to this order. Click to unreserve it"
                                       className={`inline-flex items-center gap-1 text-meta font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-95`}
                                     >
                                       <Check size={14} strokeWidth={2.5} aria-hidden="true" />
@@ -3213,7 +3213,7 @@ function DrawerBody({
                                   </span>
                                 )
                               ) : (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               )}
                             </td>
                             {/* STOCK ETA — red alert when late / missing;
@@ -3221,7 +3221,7 @@ function DrawerBody({
                                 no longer repeats it). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService || isAcc || rd === "reserved" ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : etaEditSku === l.sku ? (
                                 <input
                                   type="date"
@@ -3246,7 +3246,7 @@ function DrawerBody({
                                   }`}
                                   title={
                                     etaPassed
-                                      ? "ETA has passed — goods not in"
+                                      ? "ETA has passed. Goods not in"
                                       : !order.delivery_date_tbd &&
                                           !!order.delivery_date &&
                                           etaValue > order.delivery_date
@@ -3274,7 +3274,7 @@ function DrawerBody({
                               ) : (
                                 <span
                                   className="inline-flex items-center gap-1 text-meta font-medium text-danger cursor-pointer"
-                                  title="No stock ETA — click to set it, or call the supplier for the ready date"
+                                  title="No stock ETA. Click to set it, or call the supplier for the ready date"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEtaEditSku(l.sku);
@@ -3322,7 +3322,7 @@ function DrawerBody({
                                   >
                                     {l.sku}
                                   </span>
-                                  {(lineSize(l.sku) || skuCode(l.sku) !== "—") && (
+                                  {(lineSize(l.sku) || skuCode(l.sku) !== "") && (
                                     <span className="block text-meta text-base-500 leading-tight truncate">
                                       {lineSize(l.sku) === "K"
                                         ? "King"
@@ -3331,10 +3331,10 @@ function DrawerBody({
                                           : lineSize(l.sku) === "S"
                                             ? "Single"
                                             : null}
-                                      {lineSize(l.sku) && skuCode(l.sku) !== "—"
+                                      {lineSize(l.sku) && skuCode(l.sku) !== ""
                                         ? " · "
                                         : null}
-                                      {skuCode(l.sku) !== "—" ? (
+                                      {skuCode(l.sku) !== "" ? (
                                         <span className="font-mono text-label">
                                           {skuCode(l.sku)}
                                         </span>
@@ -3355,7 +3355,7 @@ function DrawerBody({
                             {/* PO — In stock / PO#### */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : poNo ? (
                                 <span className="font-mono text-meta text-base-700 truncate block max-w-[110px]" title={poNo}>
                                   {poNo}
@@ -3369,7 +3369,7 @@ function DrawerBody({
                                 quiet fact; [+ Arrived] records an arrival. */}
                             <td className="border-b border-base-100 px-1.5 py-1 align-middle">
                               {isService || isAcc || !poNo ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : (
                                 <span className="inline-flex items-center gap-1.5">
                                   <span
@@ -3605,7 +3605,6 @@ function DrawerBody({
             <Panel
               title="Warehouse stock"
               grow
-              summary={<MiniBadge tone="muted">—</MiniBadge>}
               actions={warehouseMenu}
             >
               <div className="flex-1 grid place-items-center text-meta text-base-400 p-6">
@@ -3794,7 +3793,7 @@ function DrawerBody({
                 <span
                   title={
                     balanceGate === "hold"
-                      ? "Delivery on hold — collect before dispatch"
+                      ? "Delivery on hold. Collect before dispatch"
                       : `Collected ${RM(collectedAll)} of ${RM(invoiceTotal)}`
                   }
                   className={`inline-flex items-center gap-1.5 text-meta font-semibold whitespace-nowrap ${payToneCls}`}
@@ -3912,7 +3911,7 @@ function DrawerBody({
                   <span
                     title={
                       storageGate === "hold"
-                        ? "Delivery on hold — clear storage before dispatch"
+                        ? "Delivery on hold. Clear storage before dispatch"
                         : storageGate === "warn"
                           ? "Collect storage before delivery"
                           : "Storage fee running"
@@ -4075,7 +4074,7 @@ function DrawerBody({
                   if (balanceGate === "hold" || storageGate === "hold")
                     return (
                       <span
-                        title="Delivery on hold — collect the balance / storage fee before dispatch"
+                        title="Delivery on hold. Collect the balance / storage fee before dispatch"
                         className="inline-flex items-center gap-1 text-meta font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]"
                       >
                         <AlertCircle size={14} strokeWidth={2.5} />
@@ -4209,7 +4208,7 @@ function DrawerBody({
                           <button
                             type="button"
                             onClick={() => void openDoPdf(order.id)}
-                            title="Print the Delivery Order (DO) — the driver's what-to-do sheet: items, address, RM to collect"
+                            title="Print the Delivery Order (DO). The driver's what-to-do sheet: items, address, RM to collect"
                             className="inline-flex items-center gap-1 text-label text-primary"
                           >
                             <Printer size={14} /> DO
@@ -4302,7 +4301,7 @@ function DrawerBody({
                                 {c.allReady ? (
                                   " ✓"
                                 ) : (
-                                  <span className="text-warning"> — {c.status}</span>
+                                  <span className="text-warning">, {c.status}</span>
                                 )}
                               </span>
                             ))}
@@ -4446,7 +4445,7 @@ function DrawerBody({
                                   <button
                                     type="button"
                                     onClick={() => setEditingChaseDays(true)}
-                                    title="Automatic — a task is created by itself this many days before the deadline. Click to change."
+                                    title="Automatic. A task is created by itself this many days before the deadline. Click to change."
                                     className="text-base-400 hover:text-base-600 whitespace-nowrap shrink-0"
                                   >
                                     · −{contactByDays}d auto
@@ -4461,7 +4460,7 @@ function DrawerBody({
                           (pre-golive guardrail #2). */}
                       {deliveredDone && (
                         <div className="px-3 py-2.5 text-center text-meta font-semibold text-base-500">
-                          Delivered — nothing to do
+                          Delivered. Nothing to do
                         </div>
                       )}
                     </div>
@@ -4572,7 +4571,7 @@ function LoanSofaModal({
           );
           onClose();
         },
-        onError: (e) => toast.error(`Couldn't loan — ${e.message}`),
+        onError: (e) => toast.error(`Couldn't loan: ${e.message}`),
       },
     );
   }
@@ -4689,7 +4688,7 @@ function CustomerIdentityCard({
     return (
       <div
         className="kpi-box grid place-items-center py-2"
-        title={`${order.customer_name ? displayCustomerName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+        title={`${order.customer_name ? displayCustomerName(order.customer_name) : ""} · #${order.so} · ${statusWord}`}
       >
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -4708,7 +4707,7 @@ function CustomerIdentityCard({
             className={`block text-body font-semibold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ? displayCustomerName(order.customer_name) : "—"}
+            {order.customer_name ? displayCustomerName(order.customer_name) : ""}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}
@@ -4840,7 +4839,7 @@ function CustomerIdentityCard({
           {/* Data-honest (no customer master table exists — each order keeps
               its own copy): this edit changes THIS ORDER ONLY. */}
           <div className="text-meta text-base-500 leading-snug">
-            Updates this order only — other orders keep their own copy.
+            Updates this order only. Other orders keep their own copy.
           </div>
           {err && <div className="text-meta text-danger">{err}</div>}
           <div className="flex items-center gap-1.5">
@@ -4922,7 +4921,7 @@ function DeliveryOrderRow({
       void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
       void qc.invalidateQueries({ queryKey: qk.operation.orders() });
       if (res.order.do_number) {
-        toast.success(`Delivery order issued — ${res.order.do_number}`);
+        toast.success(`Delivery order issued: ${res.order.do_number}`);
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -4946,7 +4945,7 @@ function DeliveryOrderRow({
               2026-08-15) — and the words say who acts: the system, or this
               one governed request door. */}
           <span className="text-meta text-base-500">
-            No delivery order yet — the system issues it when the goods, money
+            No delivery order yet. The system issues it when the goods, money
             and date are ready
           </span>
           <Btn
@@ -5025,7 +5024,7 @@ function BookingBlock({
     : [];
   const confirm = useConfirmBooking(orderId, {
     onSuccess: (res) => {
-      toast.success("Booking confirmed — the customer's date + slot are recorded");
+      toast.success("Booking confirmed. The customer's date + slot are recorded");
       // T9 — the booking is SAVED either way; if the company's own rules bend
       // on that date, say so once so the operator knows to ring them.
       const first = res.partnerWarnings?.[0];
@@ -5063,7 +5062,7 @@ function BookingBlock({
   // open, and the paper issues regardless. Same voice as the server's own
   // warning ("collection is still open").
   const moneyHint = balanceOwingHint
-    ? `RM ${outstandingHint.toFixed(2)} outstanding — collection is still open; it does not block the delivery order`
+    ? `RM ${outstandingHint.toFixed(2)} outstanding. Collection is still open; it does not block the delivery order`
     : null;
   const FIELD =
     "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
@@ -5186,7 +5185,7 @@ function BookingBlock({
                   variant={tripGroups === null ? "box" : "ghost"}
                   size="sm"
                   onClick={() => setTripGroups(null)}
-                  title="Nothing is delivered until every item is in — one trip"
+                  title="Nothing is delivered until every item is in. One trip"
                 >
                   Wait for everything
                 </Btn>
@@ -5215,7 +5214,7 @@ function BookingBlock({
               aria-label="Customer-confirmed time slot"
               className={`${FIELD} w-[190px]`}
             >
-              <option value="">— time slot —</option>
+              <option value="">Time slot</option>
               {DELIVERY_TIME_SLOTS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -5232,7 +5231,7 @@ function BookingBlock({
               disabled={!date || !slot || sunday || confirm.isPending}
               title={
                 !date || !slot
-                  ? "Date AND time slot both needed — a date alone is not a confirmation"
+                  ? "Date AND time slot both needed. A date alone is not a confirmation"
                   : undefined
               }
               onClick={() =>
@@ -5254,7 +5253,7 @@ function BookingBlock({
           </div>
           {sunday && (
             <div className="text-right text-meta text-danger py-0.5">
-              Sunday is not a delivery working day — pick another date
+              Sunday is not a delivery working day. Pick another date
             </div>
           )}
           {/* T9 (0283) — the company's own rules against THIS date. Amber, not
@@ -5284,7 +5283,7 @@ function BookingBlock({
           )}
           {gateHints.length > 0 && (
             <div className="text-right text-meta text-warning py-0.5">
-              Not ready yet: {gateHints.join(" · ")} — the delivery order cannot
+              Not ready yet: {gateHints.join(" · ")}. The delivery order cannot
               be issued until these are cleared
             </div>
           )}
@@ -5464,7 +5463,7 @@ async function openReceipt(
     });
     window.open(URL.createObjectURL(blob), "_blank");
   } catch (e) {
-    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+    toast.error(`Couldn't open receipt: ${(e as Error).message}`);
   }
 }
 
@@ -5482,7 +5481,7 @@ async function openInvoicePdf(orderId: string, so: number) {
     toast.success(`Invoice INV-${String(so).padStart(6, "0")} opened`);
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`No invoice yet (issued at dispatch) — ${msg}`);
+    toast.error(`No invoice yet (issued at dispatch): ${msg}`);
   }
 }
 
@@ -5506,7 +5505,7 @@ async function openDoPdf(orderId: string) {
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Print delivery order failed — ${msg}`);
+    toast.error(`Print delivery order failed: ${msg}`);
   }
 }
 
@@ -5526,7 +5525,7 @@ async function openSalesOrderPdf(orderId: string, so: number) {
     toast.success(`Sales Order SO-${String(so).padStart(6, "0")} opened`);
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Open sales order failed — ${msg}`);
+    toast.error(`Open sales order failed: ${msg}`);
   }
 }
 
@@ -5541,7 +5540,7 @@ async function openPoPdf(poId: string) {
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Open purchase order failed — ${msg}`);
+    toast.error(`Open purchase order failed: ${msg}`);
   }
 }
 
@@ -5554,7 +5553,7 @@ async function openSupplierDo(path: string) {
     .from("delivery-orders")
     .createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) {
-    toast.error(`Couldn't open the supplier DO — ${error?.message ?? "no URL"}`);
+    toast.error(`Couldn't open the supplier DO: ${error?.message ?? "no URL"}`);
     return;
   }
   window.open(data.signedUrl, "_blank", "noopener");
@@ -5611,7 +5610,7 @@ function PaymentForm({
   const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
   const record = useRecordPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't record payment: ${e.message}`),
   });
   const amt = Number(amount);
   // §16 (0535) — a cheque needs its number, a card its approval code.
@@ -5627,7 +5626,7 @@ function PaymentForm({
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error("Receipt too large — max 10 MB");
+      toast.error("Receipt too large. Max 10 MB");
       return;
     }
     setFile(f);
@@ -5651,7 +5650,7 @@ function PaymentForm({
         });
       if (error) {
         setSaving(false);
-        toast.error(`Slip upload failed — ${error.message}`);
+        toast.error(`Slip upload failed: ${error.message}`);
         return;
       }
       receiptUrl = `${ATTACHMENTS_BUCKET}/${path}`;
@@ -5730,7 +5729,7 @@ function PaymentForm({
               aria-label="Receiving bank"
               className={cell}
             >
-              <option value="">—</option>
+              <option value="">Bank</option>
               {MY_BANKS.map((b) => (
                 <option key={b} value={b}>
                   {b}
@@ -5945,7 +5944,7 @@ function JourneyCard({
             type="button"
             onClick={() => onGo(st.tab, i)}
             aria-selected={active}
-            title={`${st.title} — ${st.sub}`}
+            title={`${st.title}: ${st.sub}`}
             className={`relative w-full flex items-start text-left group rounded-lg ${
               collapsed
                 ? "justify-center px-0 py-1.5"
@@ -6193,7 +6192,7 @@ function StorageCard({
             )}
           </span>
         ) : (
-          <span className={soft}>—</span>
+          null
         )}
           </DRow>
 
@@ -6460,7 +6459,7 @@ function MoneyCard({
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const voidPay = useVoidPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't void: ${e.message}`),
     onSuccess: () => {
       setVoidingId(null);
       setVoidReason("");
@@ -6513,7 +6512,7 @@ function MoneyCard({
       <button
         type="button"
         onClick={() => setEditingTotal(true)}
-        title="Keyed total — click to edit"
+        title="Keyed total. Click to edit"
         className="underline decoration-dotted decoration-base-300 underline-offset-2"
       >
         <Money value={orderTotal} tone="row" className="text-base-900" />
@@ -6763,7 +6762,7 @@ function MoneyCard({
                         setVoidReason("");
                       }}
                       disabled={voidPay.isPending}
-                      title="Void this payment (reversible — payments are never deleted)"
+                      title="Void this payment (reversible: payments are never deleted)"
                       aria-label={`Void payment ${p.receipt_no ?? p.id}`}
                       className="text-base-500 hover:text-danger shrink-0"
                     >
@@ -6833,7 +6832,7 @@ function MoneyCard({
               }`}
             >
               Collect by {collectByLabel}
-              {collectByPast ? " — passed" : ""}
+              {collectByPast ? " (passed)" : ""}
             </div>
           )}
         </div>
@@ -7075,7 +7074,7 @@ function ActionsMenu({
               icon={<AlertCircle className="w-4 h-4" />}
               label="Issue"
               disabled
-              title="Issues module coming — needs the ops_issues table"
+              title="Issues module coming. Needs the ops_issues table"
             />
             <div className="border-t border-base-100 my-0.5" />
             {/* Download ▶ flyout (Google-Sheets style): one parent row that
@@ -7185,7 +7184,7 @@ function PoRow({ po, divider }: { po: operationOrderDetailPo; divider: boolean }
           </div>
         ))}
         <div className="text-meta text-base-500 mt-0.5">
-          ETA {po.eta_date ?? "—"} · Σ {got}/{totalQty}
+          ETA {po.eta_date ?? ""} · Σ {got}/{totalQty}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1.5">

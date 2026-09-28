@@ -142,7 +142,7 @@ export default function PoolPanel({
           <div className="text-strong font-display text-base-900">{title}</div>
           <p className="text-meta text-base-500 mt-0.5 max-w-[520px]">
             {description}
-            {!isPrincipal && " Principal only — read-only for your role."}
+            {!isPrincipal && " Principal only. Read-only for your role."}
           </p>
           {effectiveFrom && (
             <p className="text-meta text-base-400 mt-1" data-testid={`pool-effective-${pool}`}>
@@ -194,7 +194,7 @@ export default function PoolPanel({
         <div className="flex flex-col gap-2.5">
           {rows.length === 0 && (
             <div className="text-body text-base-500 bg-white border border-base-200 rounded-[4px] px-4 py-5">
-              No entries configured{isPrincipal ? " — press Edit to add some." : "."}
+              No entries configured{isPrincipal ? ". Press Edit to add some." : "."}
             </div>
           )}
           {rows.map((e, i) => (
@@ -222,7 +222,7 @@ export default function PoolPanel({
                       {fmtRm(e.surcharge)}
                     </>
                   ) : (
-                    <span className="text-base-300">—</span>
+                    null
                   )}
                 </span>
               )}
@@ -282,7 +282,7 @@ export default function PoolPanel({
                   step="0.01"
                   value={r.surcharge}
                   onChange={(e) => patchRow(i, { surcharge: e.target.value })}
-                  placeholder="—"
+                  placeholder=""
                   className={`${INPUT_CLS} text-right t-num text-meta`}
                   aria-label={`row ${i + 1} surcharge`}
                 />
@@ -335,7 +335,7 @@ export default function PoolPanel({
             <Plus size={13} strokeWidth={2} /> Add row
           </button>
           {hasDuplicates && (
-            <p className="text-meta text-danger">Duplicate values — each value must be unique.</p>
+            <p className="text-meta text-danger">Duplicate values. Each value must be unique.</p>
           )}
           {!surchargesValid && (
             <p className="text-meta text-danger">Surcharge must be a number (or left empty).</p>
@@ -345,11 +345,11 @@ export default function PoolPanel({
 
       {/* history dialog */}
       {showHistory && (
-        <Modal title={`History — ${title}`} onClose={() => setShowHistory(false)}>
+        <Modal title={`History: ${title}`} onClose={() => setShowHistory(false)}>
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
             {historyQ.isLoading && <p className="text-body text-base-500">Loading history…</p>}
             {!historyQ.isLoading && history.length === 0 && (
-              <p className="text-body text-base-500">No history yet — the first Edit save writes one.</p>
+              <p className="text-body text-base-500">No history yet. The first Edit save writes one.</p>
             )}
             {history.map((h) => (
               <div key={h.id} className="border border-base-200 rounded-[4px] p-3 bg-base-50">

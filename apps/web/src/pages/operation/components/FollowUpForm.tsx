@@ -22,13 +22,13 @@ import { TASKS_KEY } from "./rail/TasksPanel";
  *  party + measurable object. "Chase" is banned; the party is the role word here
  *  because a preset cannot know a name. */
 const PRESET_FOLLOWUPS = [
-  "Call customer — book delivery date",
-  "Call logistics — confirm delivery date",
+  "Call customer to book delivery date",
+  "Call logistics to confirm delivery date",
   "Customer wants to change address",
   "Customer wants to postpone",
   "Check stock availability",
   "Collect balance before delivery",
-  "Customer complaint — follow up",
+  "Customer complaint: follow up",
 ];
 
 const DUE_PRESETS = [
@@ -211,7 +211,7 @@ export default function FollowUpForm({
 
           {createMut.isError && (
             <div className="flex items-center gap-1.5 text-meta text-danger">
-              <AlertTriangle size={13} /> Couldn’t save — try again.
+              <AlertTriangle size={13} /> Couldn’t save. Try again.
             </div>
           )}
         </div>

@@ -96,6 +96,6 @@ export function deliveryReasonByKey(key: string | null | undefined): DeliveryRea
 /** Stored value → display label. Legacy rows (pre-T4: "Renovation",
  *  "Traveling", "Others") are not keys — they display as-is. */
 export function deliveryReasonLabel(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "";
   return deliveryReasonByKey(value)?.label ?? value;
 }

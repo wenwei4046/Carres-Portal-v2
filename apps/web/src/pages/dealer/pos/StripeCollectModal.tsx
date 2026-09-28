@@ -134,7 +134,7 @@ export default function StripeCollectModal({
       setSession(res.session);
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) {
-        setErr("Stripe is not set up yet — ask the principal to add the Stripe keys.");
+        setErr("Stripe is not set up yet. Ask the principal to add the Stripe keys.");
       } else if (e instanceof ApiError) {
         const body = e.body as { message?: string; maxAmount?: number } | null;
         if (body?.maxAmount != null) setAmount(body.maxAmount);
@@ -217,7 +217,7 @@ export default function StripeCollectModal({
             <h3 className="os-stripe__title">How much to collect?</h3>
             <p className="os-stripe__sub">
               The customer pays by online banking (FPX) or card on Stripe&rsquo;s secure page.
-              The payment records itself — no slip needed.
+              The payment records itself. No slip needed.
             </p>
             <label className="os-field">
               <span>Amount (RM) · outstanding RM {rm2(outstanding)}</span>
@@ -281,7 +281,7 @@ export default function StripeCollectModal({
             </div>
             <p className="os-stripe__sub os-stripe__waiting">
               <RefreshCw size={13} strokeWidth={2} className="os-stripe__spin" />
-              Waiting for payment — this updates by itself.
+              Waiting for payment. This updates by itself.
             </p>
             <div className="os-stripe__actions">
               <button type="button" className="btn btn--ghost" onClick={handleCopy} data-testid="pos-stripe-copy">
@@ -296,7 +296,7 @@ export default function StripeCollectModal({
               )}
             </div>
             <p className="os-stripe__hint">
-              Link stays valid for 24 hours — you can close this and the payment still records
+              Link stays valid for 24 hours. You can close this and the payment still records
               automatically.
             </p>
             {onVoidOrder && (
@@ -306,7 +306,7 @@ export default function StripeCollectModal({
                 onClick={onVoidOrder}
                 data-testid="pos-stripe-void"
               >
-                Customer isn&rsquo;t paying — void this order
+                Customer isn&rsquo;t paying: void this order
               </button>
             )}
           </>

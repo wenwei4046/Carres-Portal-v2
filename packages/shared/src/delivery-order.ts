@@ -118,7 +118,7 @@ export function deliveryOrderIssueGate({
   if (!bookingConfirmed || !confirmedDateIso) {
     if (waitBookingConfirm) {
       reasons.push(
-        "The delivery has no scheduled date yet — record the scheduled delivery first.",
+        "The delivery has no scheduled date yet. Record the scheduled delivery first.",
       );
     }
     // The manual door does not wait for the confirmation — but a date that
@@ -126,10 +126,10 @@ export function deliveryOrderIssueGate({
   }
   if (confirmedDateIso) {
     if (isSundayIso(confirmedDateIso)) {
-      reasons.push("Sunday is not a delivery working day — pick another date");
+      reasons.push("Sunday is not a delivery working day. Pick another date");
     } else if (has(holidays, confirmedDateIso)) {
       reasons.push(
-        "The confirmed date is a public holiday — pick another date with the customer.",
+        "The confirmed date is a public holiday. Pick another date with the customer.",
       );
     }
   }
@@ -137,8 +137,8 @@ export function deliveryOrderIssueGate({
   if (!gate.goodsReady) {
     reasons.push(
       gate.notReadySkus.length > 0
-        ? `Goods not reserved to this order yet: ${gate.notReadySkus.join(", ")} — reserve them, or book a second trip.`
-        : "Goods not reserved to this order yet — reserve them, or book a second trip.",
+        ? `Goods not reserved to this order yet: ${gate.notReadySkus.join(", ")}. Reserve them, or book a second trip.`
+        : "Goods not reserved to this order yet. Reserve them, or book a second trip.",
     );
   }
 

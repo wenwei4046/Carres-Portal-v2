@@ -487,7 +487,7 @@ export default function PartnerFactoryPickupsPage() {
                                 <span className="font-mono font-semibold">
                                   SO-{t.orders?.so ?? "?"}
                                 </span>{" "}
-                                · {t.orders?.customer_name ?? "—"}
+                                · {t.orders?.customer_name ?? ""}
                               </span>
                             </label>
                           ))}
@@ -775,7 +775,7 @@ function PipelineColumn({
       </div>
       <div className="p-2.5 min-h-[220px] flex flex-col gap-2">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-label py-6">—</div>
+          null
         ) : (
           items.map((p) => (
             <PipelineCard
@@ -815,10 +815,10 @@ function PipelineCard({
         {summary}
       </div>
       <div className="font-body text-label text-base-600 leading-[1.5]">
-        🏭 {po.suppliers?.name ?? "—"}
+        🏭 {po.suppliers?.name ?? ""}
       </div>
       <div className="font-body text-label text-base-600 leading-[1.5]">
-        🏢 → {po.warehouses?.name ?? "—"}
+        🏢 → {po.warehouses?.name ?? ""}
       </div>
       {!hideCalendarLine && (
         <div className="font-mono text-label text-base-500 mt-1">
@@ -896,7 +896,7 @@ function DeliveredRow({
       <div>
         <div className="font-body text-meta">{summary}</div>
         <div className="font-body text-label text-base-500 mt-0.5">
-          {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"} · ×{totalQty}
+          {po.suppliers?.name ?? ""} → {po.warehouses?.name ?? ""} · ×{totalQty}
         </div>
       </div>
       <span className="font-mono text-label text-success uppercase tracking-[0.1em] font-semibold">
@@ -1035,7 +1035,7 @@ function PickupDrawer({
                 <ThreadGroup
                   title="Producing"
                   count={producingThreads.length}
-                  hint="Supplier still making — not ready to collect"
+                  hint="Supplier still making. Not ready to collect"
                   testId={`drawer-producing-threads-${po.id}`}
                 >
                   {producingThreads.map((t) => (
@@ -1075,7 +1075,7 @@ function PickupDrawer({
                           <span className="font-mono font-semibold">
                             SO-{t.orders?.so ?? "?"}
                           </span>{" "}
-                          · {t.orders?.customer_name ?? "—"}
+                          · {t.orders?.customer_name ?? ""}
                         </span>
                         {t.orders?.delivery_date && (
                           <span className="font-mono text-label text-base-500 shrink-0">
@@ -1255,7 +1255,7 @@ function ThreadRow({
         <span className="font-mono font-semibold">
           SO-{thread.orders?.so ?? "?"}
         </span>{" "}
-        · {thread.orders?.customer_name ?? "—"}
+        · {thread.orders?.customer_name ?? ""}
       </span>
       {doNumber && (
         <span

@@ -996,7 +996,7 @@ function HandoverArrival({
         <option value="carrier_received">Delivery party received</option>
         {detail.source.case_approval?.condition_required && (
           <option value="collection_refused">
-            Do not collect — condition failed
+            Do not collect: condition failed
           </option>
         )}
       </select>

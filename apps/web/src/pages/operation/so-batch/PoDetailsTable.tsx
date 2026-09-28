@@ -73,6 +73,7 @@
  * own numbers would stop adding up. Its quantity stays inside the remainder
  * row, where it is honestly described as not yet allocated.
  */
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import {
   soBatchPoDocumentState,
   unitIdOf,
@@ -341,7 +342,7 @@ const COLUMNS = [
   { key: "unitId", label: "Unit ID", width: 168 },
   { key: "sku", label: "SKU", width: 152 },
   { key: "item", label: "Item", width: null },
-  { key: "qty", label: "Qty", width: 64 },
+  { key: "qty", label: "Qty", width: 104 },
   { key: "deliverTo", label: "Deliver To", width: 150 },
   { key: "supplier", label: "Supplier", width: 140 },
   { key: "poStatus", label: "PO Status", width: 160 },
@@ -440,7 +441,7 @@ export default function PoDetailsTable({
                 {r.itemDetail ? <div className="mt-0.5 text-base-600">{r.itemDetail}</div> : null}
               </td>
               <td className="px-2 py-2 tabular-nums">
-                {r.qty == null ? <Absence>—</Absence> : r.qty}
+                {r.qty == null ? <Absence>{GOODS_ABSENCE_WORDS.notCounted}</Absence> : r.qty}
               </td>
               <td className="px-2 py-2">
                 {r.deliverTo ? r.deliverTo : <Absence>Not recorded</Absence>}

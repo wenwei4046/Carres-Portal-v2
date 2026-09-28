@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { ROUTE_NODE_W } from "@carres/shared";
+import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, routeLateElbow, wrapRouteText } from "@carres/shared";
 import type {
   NodeMark,
   RouteEdge,
@@ -159,7 +159,18 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   });
   const expanded = groupBounds.find((group) => group.plate.id === expandedPlateId) ?? groupBounds[0] ?? null;
   const goodsWidth = Math.max(ROUTE_NODE_W, expanded?.width ?? ROUTE_NODE_W);
-  const deliveryWidth = ROUTE_NODE_W;
+  /* ⭐ ONE DELIVERY SCOPE IS ONE LANE (owner ruling 2026-09-26). With lanes,
+     every lane carries its own gate and tail, so the resolver's own geometry
+     for the DELIVERY group is kept whole and only moved into place. */
+  const laneNodes = route.nodes.some((node) => node.kind === "delivery-lane")
+    ? route.nodes.filter((node) => node.branch === "delivery" || node.branch === "gate")
+    : [];
+  const laned = laneNodes.length > 0;
+  const laneMinX = laned ? Math.min(...laneNodes.map((node) => node.x)) : 0;
+  const laneMinY = laned ? Math.min(...laneNodes.map((node) => node.y)) : 0;
+  const deliveryWidth = laned
+    ? Math.max(...laneNodes.map((node) => node.x + node.w)) - laneMinX
+    : ROUTE_NODE_W;
   const moneyWidth = ROUTE_NODE_W;
   const loanNodes = route.nodes.filter((node) => node.branch === "loan");
   const loanWidth = loanNodes.length > 0
@@ -176,7 +187,28 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   const rowTop = bandY + MAP_BAND_HEIGHT + MAP_BAND_DROP;
 
   let goodsY = rowTop;
+  /* The goods lines stack in ONE column, so a line hangs from the node
+     directly above it. A line drawn from the Sales Order to a stacked plate
+     turns half way down and runs behind whatever stands there (measured
+     2026-09-28: behind SUPPLIER). */
+  const hangsFrom = new Map<string, string>();
+  let above: string | null = null;
   for (const group of groupBounds) {
+    if (above) hangsFrom.set(group.plate.id, above);
+    const opened = group.plate.id === expanded?.plate.id;
+    above = opened
+      ? [...group.nodes].sort((a, b) => b.y + b.h - (a.y + a.h))[0]!.id
+      : group.plate.id;
+    /* A collapsed line hides its chain; a failed read inside it must not hide
+       with it. */
+    if (!opened && group.nodes.some((node) => node.mark === "unreadable")) {
+      const failed = group.nodes.find((node) => node.mark === "unreadable")!;
+      group.plate = {
+        ...group.plate,
+        mark: "unreadable",
+        spoken: [...group.plate.spoken, ...failed.spoken],
+      };
+    }
     if (group.plate.id === expanded?.plate.id) {
       for (const node of group.nodes) {
         placed.set(node.id, {
@@ -211,15 +243,28 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
     });
     return bottom;
   };
-  const deliveryBottom = placeChain("delivery", deliveryX);
+  let deliveryBottom = rowTop;
+  if (laned) {
+    for (const node of laneNodes) {
+      const next = { ...node, x: deliveryX + node.x - laneMinX, y: rowTop + node.y - laneMinY };
+      placed.set(node.id, next);
+      deliveryBottom = Math.max(deliveryBottom, next.y + next.h);
+    }
+  } else {
+    deliveryBottom = placeChain("delivery", deliveryX);
+  }
   const moneyBottom = placeChain("money", moneyX);
   const loanBottom = placeChain("loan", loanX);
   const deepest = Math.max(goodsY - MAP_ROW_GAP, deliveryBottom, moneyBottom, loanBottom);
 
   const gateSource = route.nodes.find((node) => node.kind === "delivery-order")!;
-  const gate = { ...gateSource, x: centreX - gateSource.w / 2, y: deepest + MAP_GATE_GAP };
+  /* With lanes the gates already stand in their lanes; a collapsed goods
+     line points at the first lane's gate. */
+  const gate = laned
+    ? placed.get(gateSource.id)!
+    : { ...gateSource, x: centreX - gateSource.w / 2, y: deepest + MAP_GATE_GAP };
   placed.set(gate.id, gate);
-  let tailY = gate.y + gate.h + MAP_ROW_GAP;
+  let tailY = laned ? deepest + MAP_ROW_GAP : gate.y + gate.h + MAP_ROW_GAP;
   for (const node of route.nodes.filter((item) => item.branch === "tail")) {
     const next = { ...node, x: centreX - node.w / 2, y: tailY };
     placed.set(node.id, next);
@@ -229,10 +274,15 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
   const visible = new Set(placed.keys());
   const edges: RouteEdge[] = route.edges
     .filter((edge) => visible.has(edge.from) && visible.has(edge.to))
+    .map((edge) =>
+      edge.from === originSource.id && hangsFrom.has(edge.to)
+        ? { ...edge, id: `${hangsFrom.get(edge.to)}→${edge.to}`, from: hangsFrom.get(edge.to)!, style: "solid" as const }
+        : edge,
+    )
     .map((edge) => {
       const from = placed.get(edge.from)!;
       const to = placed.get(edge.to)!;
-      return { ...edge, points: routeElbow(from, to), labelAt: null };
+      return { ...edge, points: edge.late ? routeLateElbow(from, to) : routeElbow(from, to), labelAt: null };
     });
   for (const group of groupBounds) {
     if (group.plate.id === expanded?.plate.id) continue;
@@ -242,15 +292,17 @@ export function compactOrderRoute(route: RouteMap, expandedPlateId: string | nul
       to: gate.id,
       style: "dashed",
       labelLines: [],
-      points: routeElbow(placed.get(group.plate.id)!, gate),
+      points: laned
+        ? routeLateElbow(placed.get(group.plate.id)!, gate)
+        : routeElbow(placed.get(group.plate.id)!, gate),
       labelAt: null,
     });
   }
 
   const bands = [
     { id: "goods" as const, label: "GOODS", x: MAP_PAD, y: bandY, w: goodsWidth, h: MAP_BAND_HEIGHT },
-    { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
-    { id: "money" as const, label: "MONEY", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
+    { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: deliveryWidth, h: MAP_BAND_HEIGHT },
+    { id: "money" as const, label: "PAYMENT", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
     ...(loanNodes.length > 0
       ? [{ id: "loan" as const, label: "LOAN", x: loanX, y: bandY, w: loanWidth, h: MAP_BAND_HEIGHT }]
       : []),
@@ -272,6 +324,8 @@ const MARK_GLYPH: Record<NodeMark, typeof Check> = {
   waiting: Circle,
   blocked: AlertTriangle,
   future: Circle,
+  /* Amber like `blocked`: it IS an exception, just not a business one. */
+  unreadable: AlertTriangle,
 };
 
 const MARK_BADGE: Record<NodeMark, string> = {
@@ -280,6 +334,7 @@ const MARK_BADGE: Record<NodeMark, string> = {
   waiting: "bg-kit-slate-3 text-kit-slate-9",
   blocked: "bg-kit-amber-3 text-kit-amber-11",
   future: "bg-kit-slate-3 text-kit-slate-9",
+  unreadable: "bg-kit-amber-3 text-kit-amber-11",
 };
 
 /**
@@ -294,6 +349,14 @@ const MARK_BOX: Record<NodeMark, string> = {
   waiting: "border-kit-slate-5 bg-white",
   blocked: "border-kit-slate-5 bg-kit-amber-3",
   future: "border-dashed border-kit-slate-5 bg-white",
+  unreadable: "border-kit-slate-5 bg-kit-amber-3",
+};
+
+/** The owners whose failed read the operator can ask for again. */
+export type RouteRetryOwner = "delivery" | "payments" | "purchasing" | "amendment";
+const retryOwnerOf = (href: string): RouteRetryOwner | null => {
+  const match = /^#retry-(delivery|payments|purchasing|amendment)$/.exec(href);
+  return match ? (match[1] as RouteRetryOwner) : null;
 };
 
 function ownerOf(owners: RouteActionOwners, key: StationOwnerKey): RoutePerson | null {
@@ -340,9 +403,11 @@ function Node({
   onReveal,
   goodsExpanded,
   onToggleGoods,
+  onRetry,
 }: {
   node: RouteNode;
   owners: RouteActionOwners;
+  onRetry?: (owner: RouteRetryOwner) => void;
   /** Slice 4 — the page pans the transformed surface so a focused node is
    *  visible; the browser cannot do it for a CSS-transformed canvas. */
   onReveal?: (node: RouteNode) => void;
@@ -362,10 +427,13 @@ function Node({
         data-testid={`route-node-${node.id}`}
         data-kind={node.kind}
         data-mark={node.mark}
-        aria-label={[node.title, ...node.lines].join(" — ")}
+        aria-label={[node.title, ...node.spoken].join(" — ")}
         aria-expanded={goodsExpanded}
+        title={node.mark === "unreadable" ? node.spoken[node.spoken.length - 2] : undefined}
         onClick={() => onToggleGoods?.(node.id)}
-        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 text-left hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        className={`absolute overflow-hidden rounded-card border border-kit-slate-5 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${
+          node.mark === "unreadable" ? "bg-kit-amber-3" : "bg-kit-slate-3 hover:bg-white"
+        }`}
         style={{
           left: node.x,
           top: node.y,
@@ -381,6 +449,10 @@ function Node({
         >
           {goodsExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
           <span className="truncate">{node.title}</span>
+          {/* State is never colour alone: the failed read carries its glyph. */}
+          {node.mark === "unreadable" && (
+            <AlertTriangle size={12} className="ml-auto shrink-0 text-kit-amber-11" aria-hidden="true" />
+          )}
         </div>
         {node.lines.map((line, i) => (
           <div
@@ -394,12 +466,53 @@ function Node({
       </button>
     );
   }
+  /* A delivery lane's plate — the same grey header grammar, and not a station:
+     no glyph, no state word, no action, no door, nothing to press. */
+  if (node.kind === "delivery-lane") {
+    return (
+      <div
+        data-testid={`route-node-${node.id}`}
+        data-kind={node.kind}
+        data-mark={node.mark}
+        role="group"
+        tabIndex={0}
+        aria-label={node.spoken.join(" — ")}
+        onFocus={() => onReveal?.(node)}
+        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        style={{
+          left: node.x,
+          top: node.y,
+          width: node.w,
+          height: node.h,
+          paddingTop: BOX_PAD_Y,
+          paddingBottom: BOX_PAD_Y,
+        }}
+      >
+        <div
+          className="text-label font-semibold text-base-900"
+          style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
+        >
+          {node.title}{" "}
+        </div>
+        {node.lines.map((line, i) => (
+          <div
+            key={`${node.id}-line-${i}`}
+            className="whitespace-nowrap text-label text-base-600"
+            style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+          >
+            {line}{" "}
+          </div>
+        ))}
+      </div>
+    );
+  }
   const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
   const actionContext = node.action?.context.detail ?? null;
 
   const spoken = [
     node.title,
-    ...node.lines.map(spellDates),
+    /* A row break is for the eye; the sentence is spoken whole. */
+    ...node.spoken.map(spellDates),
     ...node.requirements.map((r) => `${r.met ? "met" : "not met"}: ${spellDates(r.text)}`),
     /* `Unassigned` is in COPY-STANDARD's Do NOT use column for this surface,
        and it was not an edge case: the page supplies only two of the six owner
@@ -414,8 +527,12 @@ function Node({
     .filter(Boolean)
     .join(" — ");
 
+  /* `Try again →` is not a place: it asks the page to read that owner again. */
+  const retryOwner = node.door ? retryOwnerOf(node.door.href) : null;
   const go = () => {
-    if (node.door) navigate(node.door.href);
+    if (!node.door) return;
+    if (retryOwner) onRetry?.(retryOwner);
+    else navigate(node.door.href);
   };
 
   return (
@@ -424,13 +541,13 @@ function Node({
       data-kind={node.kind}
       data-mark={node.mark}
       data-current={node.current ? "true" : "false"}
-      role={node.door ? "link" : "group"}
+      role={node.door && !retryOwner ? "link" : "group"}
       tabIndex={0}
       aria-label={spoken}
       aria-current={node.current ? "step" : undefined}
       onFocus={() => onReveal?.(node)}
       onKeyDown={(e) => {
-        if (node.door && (e.key === "Enter" || e.key === " ")) {
+        if (node.door && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           go();
         }
@@ -441,10 +558,13 @@ function Node({
         top: node.y,
         width: node.w,
         height: node.h,
-        paddingTop: BOX_PAD_Y,
-        paddingBottom: BOX_PAD_Y,
-        paddingLeft: 12,
-        paddingRight: 12,
+        /* The CURRENT border is 2px. It takes its extra pixel from the padding,
+           never from the rows: measured 2026-09-27, the last row of every
+           CURRENT node sat 2px under the box's edge. */
+        paddingTop: BOX_PAD_Y - (node.mark === "current" ? 1 : 0),
+        paddingBottom: BOX_PAD_Y - (node.mark === "current" ? 1 : 0),
+        paddingLeft: node.mark === "current" ? 11 : 12,
+        paddingRight: node.mark === "current" ? 11 : 12,
         borderWidth: node.mark === "current" ? 2 : 1,
       }}
     >
@@ -455,11 +575,16 @@ function Node({
         >
           <Glyph size={14} />
         </span>
-        <span className="truncate text-label font-semibold uppercase tracking-wide text-base-600">
+        {/* The station's name is never cut to make room for `Current`
+            (measured 2026-09-28: `DELIVERY PHO…`). The word gives up its
+            letter spacing first. */}
+        <span
+          className={`whitespace-nowrap text-label font-semibold uppercase text-base-600 ${node.current ? "" : "tracking-wide"}`}
+        >
           {node.title}
         </span>
         {node.current && (
-          <span className="ml-auto shrink-0 text-label font-semibold uppercase tracking-wide text-kit-blue-11">
+          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-kit-blue-11">
             Current
           </span>
         )}
@@ -474,54 +599,93 @@ function Node({
           }`}
           style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
         >
-          {spellDates(line)}
+          {spellDates(line)}{" "}
         </div>
       ))}
 
-      {node.requirements.map((req) => (
-        <div
-          key={req.id}
-          data-testid={`route-requirement-${req.id}`}
-          data-met={req.met ? "true" : "false"}
-          className="flex items-center gap-1 truncate text-label"
-          style={{ height: REQ_H, lineHeight: `${REQ_H}px` }}
-        >
-          <span
-            className={req.met ? "text-kit-green-11" : "text-kit-slate-9"}
-            aria-hidden="true"
+      {/* One requirement, as many rows as the shared wrap gives it — the
+          geometry counted the same rows, so nothing is cut (measured 2026-09-27). */}
+      {node.requirements.map((req) => {
+        const rows = wrapRouteText(req.text, ROUTE_TEXT_BUDGET.requirement);
+        return (
+          <div
+            key={req.id}
+            data-testid={`route-requirement-${req.id}`}
+            data-met={req.met ? "true" : "false"}
+            className="flex items-start gap-1 text-label"
+            style={{ height: REQ_H * rows.length, lineHeight: `${REQ_H}px` }}
           >
-            {req.met ? "✓" : "·"}
-          </span>
-          <span className={`truncate ${req.met ? "text-base-600" : "text-base-900"}`}>
-            {spellDates(req.text)}
-          </span>
-        </div>
-      ))}
+            <span
+              className={`w-3 shrink-0 ${req.met ? "text-kit-green-11" : "text-kit-slate-9"}`}
+              aria-hidden="true"
+            >
+              {req.met ? "✓" : "·"}
+            </span>
+            <span className={`min-w-0 ${req.met ? "text-base-600" : "text-base-900"}`}>
+              {rows.map((row, i) => (
+                <span key={i} className="block whitespace-nowrap">
+                  {spellDates(row)}{" "}
+                </span>
+              ))}
+            </span>
+          </div>
+        );
+      })}
 
       {node.action && (
         /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
            with the owner as a chip rather than a name inside the sentence. */
         <div
-          className="flex items-center gap-1.5 text-label"
-          style={{ height: ACTION_H }}
+          className="flex items-start gap-1.5 text-label"
           data-testid={`route-action-${node.id}`}
         >
-          {person && <OwnerChip person={person} />}
-          <span className="truncate text-label text-base-600">{node.action.label}</span>
+          {person && (
+            <span className="grid shrink-0 place-items-center" style={{ height: ACTION_H }}>
+              <OwnerChip person={person} />
+            </span>
+          )}
+          {/* A long instruction wraps under the chip; it never ends in "…". */}
+          <span className="text-label text-base-600">
+            {wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).map((row, i) => (
+              <span
+                key={i}
+                className="block whitespace-nowrap"
+                style={{ height: i === 0 ? ACTION_H : CONTEXT_H, lineHeight: `${i === 0 ? ACTION_H : CONTEXT_H}px` }}
+              >
+                {row}{" "}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 
       {node.action && actionContext && (
         <div
           data-testid={`route-context-${node.id}`}
-          className="truncate text-label text-base-600"
-          style={{ height: CONTEXT_H, lineHeight: `${CONTEXT_H}px` }}
+          className="text-label text-base-600"
+          style={{ lineHeight: `${CONTEXT_H}px` }}
         >
-          {spellDates(actionContext)}
+          {wrapRouteText(actionContext, ROUTE_TEXT_BUDGET.context).map((row, i) => (
+            <span key={i} className="block whitespace-nowrap" style={{ height: CONTEXT_H }}>
+              {spellDates(row)}{" "}
+            </span>
+          ))}
         </div>
       )}
 
-      {!node.action && node.door && (
+      {node.door && retryOwner && (
+        <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
+          <button
+            type="button"
+            onClick={go}
+            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          >
+            {node.door.label}
+          </button>
+        </div>
+      )}
+
+      {node.door && !retryOwner && (
         <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
           <Link
             to={node.door.href}
@@ -584,10 +748,13 @@ export default function SalesOrderRoute({
   route,
   owners = { purchasing: null, receiving: null },
   loading = false,
+  onRetry,
 }: {
   route: RouteMap;
   owners?: RouteActionOwners;
   loading?: boolean;
+  /** A node's or the banner's `Try again →` — the page reads that owner again. */
+  onRetry?: (owner: RouteRetryOwner) => void;
 }) {
   const frame = useRef<HTMLDivElement | null>(null);
   const initialExpanded = useMemo(() => defaultExpandedGoods(route), [route]);
@@ -685,6 +852,44 @@ export default function SalesOrderRoute({
 
   return (
     <div className="flex flex-col gap-3" data-testid="sales-order-route">
+      {/* ⭐ `PROPOSED CHANGE` — owner ruling 2026-09-25. ABOVE the canvas, never
+          inside it: the map keeps meaning what is true now. The same amber
+          `warning` band every Register draws; nothing is rendered while no
+          request waits. */}
+      {route.proposedChange && (
+        <div
+          role="alert"
+          data-testid="route-proposed-change"
+          data-kind={route.proposedChange.kind}
+          className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-card border border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+        >
+          <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+          <span>{spellDates(route.proposedChange.fact)}</span>
+          {retryOwnerOf(route.proposedChange.door.href) ? (
+            <button
+              type="button"
+              onClick={() => onRetry?.("amendment")}
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+            >
+              {route.proposedChange.door.label}
+            </button>
+          ) : (
+            <Link
+              to={route.proposedChange.door.href}
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            >
+              {route.proposedChange.door.label}
+            </Link>
+          )}
+          {route.proposedChange.changes.map((row, i) => (
+            <span key={i} className="basis-full font-semibold">{spellDates(row)}</span>
+          ))}
+          {route.proposedChange.more > 0 && (
+            <span className="basis-full">and {route.proposedChange.more} more</span>
+          )}
+          {route.proposedChange.rule && <span className="basis-full">{route.proposedChange.rule}</span>}
+        </div>
+      )}
       {/* A linked exception is NOT a node: a node is a stage every Sales Order
           passes through, and Service is not one. It stays a conditional strip
           beside the map, rendered only when one is open. */}
@@ -742,7 +947,7 @@ export default function SalesOrderRoute({
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
           }}
         >
-          {/* The route names live on these bands — GOODS · DELIVERY · MONEY —
+          {/* The route names live on these bands — GOODS · DELIVERY · PAYMENT —
               never on the connectors (owner ruling 2026-08-17). */}
           {map.bands.map((band) => (
             <div
@@ -767,6 +972,7 @@ export default function SalesOrderRoute({
               node={node}
               owners={owners}
               onReveal={revealNode}
+              onRetry={onRetry}
               goodsExpanded={node.kind === "goods-line" ? node.id === expandedGoods : undefined}
               onToggleGoods={(id) => setExpandedGoods((current) => current === id ? current : id)}
             />

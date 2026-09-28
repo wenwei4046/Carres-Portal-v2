@@ -126,7 +126,7 @@ describe("OperationSkuCostTab — costing view", () => {
     expect(screen.getByTestId("opcost-price-CLOUD-KING").textContent).toContain("3,500.00");
     // Null cost → muted "not set", and margin cannot be computed from it.
     expect(screen.getByTestId("opcost-cost-LUNA-3S").textContent).toContain("not set");
-    expect(screen.getByTestId("opcost-margin-LUNA-3S").textContent).toContain("—");
+    expect(screen.getByTestId("opcost-margin-LUNA-3S").textContent).not.toMatch(/[—–]/);
     // 3500 − 2100 = 1400 → 40%. Derived, never stored (Law D).
     expect(screen.getByTestId("opcost-margin-CLOUD-KING").textContent).toContain("40%");
   });

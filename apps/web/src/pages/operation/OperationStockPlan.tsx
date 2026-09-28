@@ -182,7 +182,7 @@ function NoPlanYet({
       </div>
       <div className="text-body text-base-600 mt-1 max-w-md mx-auto">
         Open the month and the team can start asking for what they want on the
-        floor. One plan per month — opening it twice lands on the same one.
+        floor. One plan per month. Opening it twice lands on the same one.
       </div>
       <button
         type="button"
@@ -226,7 +226,7 @@ function PlanTrail({
         <div key={s.label} className="text-meta">
           <span className="text-base-500">{s.label}: </span>
           <span className={s.who ? "text-base-900" : "text-base-400"}>
-            {s.who ?? "—"}
+            {s.who ?? ""}
           </span>
         </div>
       ))}
@@ -261,9 +261,9 @@ function CoverageNote({
       ) : (
         <>
           <span className="text-base-900 font-semibold">
-            Not enough sales history to suggest quantities yet
+            Not enough sales history to suggest quantities yet.
           </span>{" "}
-          — {coverage.days} {coverage.days === 1 ? "day" : "days"} on record. The
+          {coverage.days} {coverage.days === 1 ? "day" : "days"} on record. The
           suggestion appears by itself once there is enough.{" "}
         </>
       )}
@@ -377,10 +377,10 @@ function PlanRow({
         <Num v={row.sold30} dim={row.sold30 === 0} />
         <Num v={row.sold90} dim={row.sold90 === 0} />
         <span className="text-right font-mono text-body text-base-500">
-          {row.weekendShare == null ? "—" : `${Math.round(row.weekendShare * 100)}%`}
+          {row.weekendShare == null ? "" : `${Math.round(row.weekendShare * 100)}%`}
         </span>
         <span className="text-right font-mono text-body text-base-700">
-          {row.suggestedQty == null ? "—" : row.suggestedQty}
+          {row.suggestedQty == null ? "" : row.suggestedQty}
         </span>
         <Num v={row.proposedQty} strong />
 
@@ -408,7 +408,7 @@ function PlanRow({
         <div className="px-4 pb-2.5 -mt-1" data-testid={`plan-asks-${row.sku}`}>
           {row.proposals.length === 0 ? (
             <div className="text-meta text-base-500">
-              No individual asks — this line was added at consolidation.
+              No individual asks. This line was added at consolidation.
             </div>
           ) : (
             row.proposals.map((p) => (
@@ -468,7 +468,7 @@ function QtyCell({
         className="text-right font-mono text-body text-base-700"
         data-testid={`plan-${kind}-${sku}`}
       >
-        {value == null ? "—" : value}
+        {value == null ? "" : value}
       </span>
     );
   }
@@ -718,7 +718,7 @@ function PoList({ rows }: { rows: { sku: string; qty: number }[] }) {
       </header>
       {rows.length === 0 ? (
         <div className="px-4 py-6 text-center text-body text-base-500">
-          Every line was cut to zero — nothing to order.
+          Every line was cut to zero. Nothing to order.
         </div>
       ) : (
         rows.map((r) => (

@@ -118,7 +118,7 @@ export default function OperationGuarantees() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["guarantees"] });
       setClaiming(null);
-      toast.success("Guarantee claimed — the swap is on the order's history.");
+      toast.success("Guarantee claimed. The swap is on the order's history.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -133,7 +133,7 @@ export default function OperationGuarantees() {
         <h1 className="text-page text-base-900">Guarantees</h1>
         <p className="text-body text-base-600 mt-2">
           Every guarantee sold, newest first. Narrow by ID, Sales Order, customer name, phone or
-          customer ID — then swap the item and record the claim.
+          customer ID. Then swap the item and record the claim.
         </p>
       </div>
 
@@ -173,7 +173,7 @@ export default function OperationGuarantees() {
 
       {listQ.isPending && <p className="text-body text-base-600">Loading…</p>}
       {listQ.isError && (
-        <p className="text-body text-danger">Couldn't load guarantees — {listQ.error.message}</p>
+        <p className="text-body text-danger">Couldn't load guarantees: {listQ.error.message}</p>
       )}
       {!listQ.isPending && !listQ.isError && rows.length === 0 && (
         <div className="rounded border border-dashed border-base-300 bg-white p-10 text-center">
@@ -231,20 +231,20 @@ export default function OperationGuarantees() {
                           g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
                         }`}
                       >
-                        {displayGuaranteeId(g) ?? "—"}
+                        {displayGuaranteeId(g) ?? ""}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`pill ${d.pill}`}>{d.label}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-base-900">{g.customerName || "—"}</div>
+                      <div className="text-base-900">{g.customerName || ""}</div>
                       {g.customerPhone && (
                         <div className="font-mono text-label text-base-500">{g.customerPhone}</div>
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-meta text-base-700">
-                      {g.so != null ? `SO-${g.so}` : "—"}
+                      {g.so != null ? `SO-${g.so}` : ""}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-base-900">
@@ -275,7 +275,7 @@ export default function OperationGuarantees() {
                           {g.claimCaseNo ? ` · ${g.claimCaseNo}` : ""}
                         </span>
                       ) : (
-                        <span className="text-meta text-base-500">—</span>
+                        null
                       )}
                     </td>
                   </tr>
@@ -288,7 +288,7 @@ export default function OperationGuarantees() {
 
       {listQ.data?.truncated && (
         <p className="text-body text-base-500 mt-3">
-          Showing the first 100 matches — narrow the search to see the rest.
+          Showing the first 100 matches. Narrow the search to see the rest.
         </p>
       )}
 

@@ -87,7 +87,7 @@ export default function DeliveryLinkPage() {
   }, [state, base]);
 
   useEffect(() => {
-    document.title = "Delivery — Carres";
+    document.title = "Delivery · Carres";
   }, []);
 
   const submit = async () => {

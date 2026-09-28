@@ -636,7 +636,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // The listing is complete before any rail choice (owner ruling
     // 2026-09-18): the page never opens on an empty date-picker.
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–2 of 2",
+      "Showing 1 to 2 of 2",
     );
     const first = h.registerAsks[0]!;
     expect(first.from).toBeNull();
@@ -760,13 +760,13 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("the GRN Doc Date group lists weeks, months and Choose dates — and a week's arrow only OPENS it", async () => {
     renderPage();
     const rail = within(screen.getByTestId("receiving-rail"));
-    // Two weeks, each counting the GRNs CREATED in it — 31 Aug – 6 Sep holds
-    // the Tuesday record, 24 – 30 Aug holds the SUNDAY one.
+    // Two weeks, each counting the GRNs CREATED in it — 31 Aug to 6 Sep holds
+    // the Tuesday record, 24 to 30 Aug holds the SUNDAY one.
     const week = rail.getByTestId("rail-grn-week-2026-08-31");
-    expect(week).toHaveTextContent("31 Aug – 6 Sep");
+    expect(week).toHaveTextContent("31 Aug to 6 Sep");
     expect(week).toHaveTextContent("1");
     expect(rail.getByTestId("rail-grn-week-2026-08-24")).toHaveTextContent(
-      "24 – 30 Aug",
+      "24 to 30 Aug",
     );
     // Months and Choose dates… are the coarser and the free choice.
     expect(rail.getByTestId("rail-grn-month-2026-09")).toHaveTextContent("Sep 2026");
@@ -995,7 +995,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     renderPage();
     // Two GRNs (Valid + Cancelled); the submitted count is Work, not a record.
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–2 of 2",
+      "Showing 1 to 2 of 2",
     );
   });
 
@@ -1069,7 +1069,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // says what it does — not a decorative caret.
     expect(arrow.tagName).toBe("BUTTON");
     expect(arrow).toHaveAttribute("aria-expanded", "false");
-    expect(arrow).toHaveAccessibleName("Show the days in 24 – 30 Aug");
+    expect(arrow).toHaveAccessibleName("Show the days in 24 to 30 Aug");
     arrow.focus();
     expect(document.activeElement).toBe(arrow);
     fireEvent.keyDown(arrow, { key: "Enter" });
@@ -1077,7 +1077,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     await waitFor(() => expect(arrow).toHaveAttribute("aria-expanded", "true"));
     // Opening it narrowed nothing — both GRNs are still listed.
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–2 of 2",
+      "Showing 1 to 2 of 2",
     );
     const ask = h.registerAsks[h.registerAsks.length - 1]!;
     expect(ask.from).toBeNull();
@@ -1123,7 +1123,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
     h.pageLimit = 1;
     renderPage();
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–1 of 2",
+      "Showing 1 to 1 of 2",
     );
     // Page 1 holds only the newest record; the second is NOT rendered.
     expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
@@ -1133,7 +1133,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
     fireEvent.click(screen.getByTestId("grn-page-next"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 2–2 of 2",
+        "Showing 2 to 2 of 2",
       ),
     );
     expect(
@@ -1146,7 +1146,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
     fireEvent.click(screen.getByTestId("grn-page-previous"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 1–1 of 2",
+        "Showing 1 to 1 of 2",
       ),
     );
   });
@@ -1157,13 +1157,13 @@ describe("OperationReceiving — one destination and the paged register", () => 
     fireEvent.click(screen.getByTestId("grn-page-next"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 2–2 of 2",
+        "Showing 2 to 2 of 2",
       ),
     );
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 1–1 of 1",
+        "Showing 1 to 1 of 1",
       ),
     );
   });
@@ -1253,12 +1253,12 @@ describe("ReceivingWorkspace — the active Session", () => {
     expect(screen.getByTestId("do-number")).toHaveValue("");
     const save = screen.getByTestId("receiving-save");
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Save — add a DO number");
+    expect(save).toHaveTextContent("Save: add a DO number");
 
     fireEvent.change(screen.getByTestId("do-number"), {
       target: { value: "DO-5512" },
     });
-    expect(save).toHaveTextContent("Save — upload signed DO");
+    expect(save).toHaveTextContent("Save: upload signed DO");
     expect(save).toBeDisabled();
   });
 
@@ -1544,13 +1544,13 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
 
     const save = screen.getByTestId("amend-save");
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Save — add a correction reason");
+    expect(save).toHaveTextContent("Save: add a correction reason");
 
     fireEvent.change(screen.getByTestId("amend-reason"), {
       target: { value: "Miscount fixed" },
     });
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Save — nothing changed yet");
+    expect(save).toHaveTextContent("Save: nothing changed yet");
 
     fireEvent.change(screen.getByTestId("amend-line-lr1"), {
       target: { value: "3" },
@@ -1607,7 +1607,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     );
     const save = screen.getByTestId("void-save");
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Void — add a reason");
+    expect(save).toHaveTextContent("Void: add a reason");
     fireEvent.change(screen.getByTestId("void-reason"), {
       target: { value: "Wrong PO entirely" },
     });

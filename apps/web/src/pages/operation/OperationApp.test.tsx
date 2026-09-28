@@ -233,9 +233,16 @@ describe("OperationApp — the Sales Order cutover's two doors", () => {
   });
 
   it("the workspace route is unshadowed by the old door", () => {
-    renderApp("/operation/orders/so/new");
+    renderApp("/operation/orders/so/00000000-0000-0000-0000-0000000000a1");
     expect(screen.getByTestId("workspace-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("sales-orders-work-surface")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ OWNER RULING 2026-09-27 (Jess): Operation never creates a Sales Order by
+     any door. A saved or pasted link to the retired create door opens no form. */
+  it("the retired office create door opens no workspace", () => {
+    renderApp("/operation/orders/so/new");
+    expect(screen.queryByTestId("workspace-stub")).not.toBeInTheDocument();
   });
 });
 

@@ -106,8 +106,8 @@ export default function FinanceRefunds() {
           approved target work and is never done destructively. */}
       <div className="mb-6 px-4 py-3 rounded-md border border-border bg-muted/30 text-meta text-muted-foreground">
         Carres has a no-refund policy. An exceptional refund runs through a Service Case and
-        a Management decision; Finance transfers externally. This page is history only —
-        nothing new is created here.
+        a Management decision; Finance transfers externally. This page is history only.
+        Nothing new is created here.
       </div>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
@@ -186,7 +186,7 @@ function RefundRow({ r }: { r: RefundDisplayRow }) {
         {r.kind === "credit" ? "Credit" : "Refund"}
       </span>
       <span className="text-muted-foreground text-label truncate" title={r.reason ?? ""}>
-        {r.reason ?? "—"}
+        {r.reason ?? ""}
       </span>
       <span className="text-label text-muted-foreground truncate">{detail}</span>
       <span className="font-mono text-right font-semibold text-primary">{rm(r.amount)}</span>

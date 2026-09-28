@@ -473,7 +473,7 @@ describe("OperationOrdersControl · Stock column", () => {
     // have = 3 ; need = 5 → partial arrival = waiting. C rebuild (§14): the
     // word "Waiting" is gone — the cell shows the grey ETA sub-line ("ETA —"
     // here, nothing imported) and the 货 dot carries the amber.
-    expect(within(row).getByText("ETA —")).toBeInTheDocument();
+    expect(within(row).getByText("No confirmed date")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="need_po"]')).toBeTruthy();
   });
 
@@ -1481,7 +1481,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // purchasing act's, and the second no longer says a retired verb either.
     const verbTitles = [
       "Nothing ordered and no purchase order covers these goods — issue one, which mints the PO number and the document the supplier receives",
-      "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
+      "PO issued but goods not in yet. Call the supplier for the ready date (red once inside the stock window)",
     ];
     const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);
     expect(row).toBeTruthy();
@@ -1525,7 +1525,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // C8 — the tooltip used to end "call the customer now", which is the one
     // thing Law 4 rung 2 forbids. The queue is the DECISION now.
     const row = screen.getByTitle(
-      "Supplier date lands after the promised date — decide before anyone calls (Delay planning)",
+      "Supplier date lands after the promised date. Decide before anyone calls (Delay planning)",
     );
     expect(Number((row.textContent ?? "").replace(/[^0-9]/g, ""))).toBe(1);
     fireEvent.click(row);
@@ -1572,7 +1572,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     };
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
-    const row = screen.getByTitle(/decide before anyone calls/);
+    const row = screen.getByTitle(/Decide before anyone calls/);
     expect(row.textContent).toContain("2 · 1 late");
     expect(row.getAttribute("title")).toContain("1 of 2 already past that deadline");
   });
@@ -1591,7 +1591,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     };
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*1/ }));
-    const row = screen.getByTitle(/decide before anyone calls/);
+    const row = screen.getByTitle(/Decide before anyone calls/);
     expect(row.textContent).not.toContain("late");
   });
 
@@ -1613,7 +1613,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     };
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*2/ }));
-    const row = screen.getByTitle(/logistics arranges the new date/);
+    const row = screen.getByTitle(/Logistics arranges the new date/);
     expect(row.textContent).toContain("2 · 1 late");
   });
 
@@ -1627,7 +1627,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     };
     wrap(<OperationOrdersControl />);
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*1/ }));
-    const row = screen.getByTitle(/decide before anyone calls/);
+    const row = screen.getByTitle(/Decide before anyone calls/);
     expect(row.textContent).not.toContain("late");
   });
 
@@ -1999,7 +1999,7 @@ describe("orders export", () => {
     // Option B: counterparty menus, not verb buttons — open Logistics ⋮ first.
     fireEvent.click(screen.getByRole("button", { name: "Logistics" }));
     fireEvent.click(
-      screen.getByRole("menuitem", { name: /Call logistics — confirm delivery date/ }),
+      screen.getByRole("menuitem", { name: /Call logistics: confirm delivery date/ }),
     );
     expect(screen.getByTestId("chase-partner-review")).toBeInTheDocument();
   });
@@ -2009,7 +2009,7 @@ describe("orders export", () => {
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
     fireEvent.click(
-      screen.getByRole("menuitem", { name: /Call suppliers — confirm ready date/ }),
+      screen.getByRole("menuitem", { name: /Call suppliers: confirm ready date/ }),
     );
     expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
   });
@@ -2020,7 +2020,7 @@ describe("orders export", () => {
     fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
     expect(screen.queryByRole("menuitem", { name: /Raise PO|Issue PO/i })).toBeNull();
     expect(
-      screen.getByRole("menuitem", { name: /Call suppliers — confirm ready date/ }),
+      screen.getByRole("menuitem", { name: /Call suppliers: confirm ready date/ }),
     ).toBeInTheDocument();
   });
 
@@ -3035,7 +3035,7 @@ describe("Delivery column (T1 booking truth)", () => {
     // rows, and BOTH cells truncated carrying it.
     const cell = within(row(2003));
     expect(cell.getByText("NETS")).toBeInTheDocument();
-    expect(cell.queryByText("NETS — confirm delivery date")).toBeNull();
+    expect(cell.queryByText("NETS: confirm delivery date")).toBeNull();
   });
 
   it("C14 · the sentence is gone from the whole LIST, not just from one fixture row", () => {
@@ -3045,7 +3045,7 @@ describe("Delivery column (T1 booking truth)", () => {
     // The verb-LESS form is the duplicate; an exact-string query, because
     // `Call NETS — confirm delivery date` legitimately ends the same way and a
     // loose regex would match the very line this card is protecting.
-    expect(screen.queryByText("NETS — confirm delivery date")).toBeNull();
+    expect(screen.queryByText("NETS: confirm delivery date")).toBeNull();
     // ...and that protected line is still there, as the two structured lines
     // of the 2026-09-13 ruling (`Call NETS` over the 2026-09-24 result words).
     expect(screen.getAllByText(/^Call NETS$/).length).toBeGreaterThan(0);
@@ -3117,9 +3117,9 @@ describe("The three dots (C10 · Law 6 · ORDERS-WORKING-FLOW §7)", () => {
     // had ever rendered these dots, no screen changed when this flipped.)
     const o = makeRow({ id: "x", so: 1, ...owing });
     const [goods, delivery, money] = rowDotsOf(o, NO_PO, NO_ETA, NO_LOGI);
-    expect(goods.title).toMatch(/^Stock —/);
-    expect(delivery.title).toMatch(/^Delivery —/);
-    expect(money.title).toMatch(/^Money —/);
+    expect(goods.title).toMatch(/^Stock: /);
+    expect(delivery.title).toMatch(/^Delivery: /);
+    expect(money.title).toMatch(/^Money: /);
   });
 
   it("goods: all in → green · no PO → red · supplier ETA late → red · otherwise waiting → amber", () => {
@@ -3153,7 +3153,7 @@ describe("The three dots (C10 · Law 6 · ORDERS-WORKING-FLOW §7)", () => {
     // C11 — to the cent. This read `RM 4,000` until 2026-08-05, which was the
     // rounding half of the bug: the dot's own tooltip built its money string by
     // hand, beside the label rather than through it.
-    expect(red.title).toBe("Money — RM 4,000.00 outstanding");
+    expect(red.title).toBe("Money: RM 4,000.00 outstanding");
     // An order nobody has priced: 37 live rows look like this. A number nobody
     // knows may not paint an alarm (ORDERS-WORKING-FLOW §2).
     const unpriced = makeRow({
@@ -3224,8 +3224,8 @@ describe("The three dots on the row (C10)", () => {
     );
     expect(rendered).toEqual(["row-dot-goods", "row-dot-delivery", "row-dot-money"]);
     // Each dot says what it is — a colour on its own names nothing.
-    expect(r.getByTestId("row-dot-money").getAttribute("title")).toMatch(/^Money —/);
-    expect(r.getByTestId("row-dot-goods").getAttribute("title")).toMatch(/^Stock —/);
+    expect(r.getByTestId("row-dot-money").getAttribute("title")).toMatch(/^Money: /);
+    expect(r.getByTestId("row-dot-goods").getAttribute("title")).toMatch(/^Stock: /);
   });
 
   it("the dots sit BESIDE the stage pill — neither replaces the other (Jess 2026-07-27)", () => {

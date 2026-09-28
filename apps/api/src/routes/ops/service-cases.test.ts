@@ -183,7 +183,7 @@ const FULL_EVIDENCE = [
 
 const WIZARD_BODY = {
   customerName: "Ryan Chong",
-  whatHappened: "Colour uneven — Sofa · SF2201. Found by Customer. Still usable: No.",
+  whatHappened: "Colour uneven: Sofa · SF2201. Found by Customer. Still usable: No.",
   reportedBy: "customer",
   orderLineId: "11111111-1111-1111-1111-111111111111",
   productSku: "SF2201 3 Seater",
@@ -704,8 +704,8 @@ describe("S3 — the case drives the follow-ups", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string; message: string };
     expect(body.code).toBe("case_steps_open");
-    expect(body.message).toContain("Call Ohana — confirm the repair date");
-    expect(body.message).toContain("Call Ryan Chong — confirm the problem is solved");
+    expect(body.message).toContain("Call Ohana to confirm the repair date");
+    expect(body.message).toContain("Call Ryan Chong to confirm the problem is solved");
     // Nothing reached the database.
     expect(updates).toHaveLength(0);
   });

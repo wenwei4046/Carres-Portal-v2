@@ -43,8 +43,9 @@ export const QUANTITY_KEY_PATTERN = /^QTY-\d{9}$/;
  */
 export const LEGACY_UNIT_ID_PATTERN = /^id-[a-z]{3}\d{6}$/;
 
-/** What the operator sees where a Unit has no ID to show. */
-export const NO_UNIT_ID = "—";
+/** What the operator sees where a Unit has no ID to show: nothing — an empty
+ *  cell draws no glyph (no dash anywhere, owner ruling 2026-09-26). */
+export const NO_UNIT_ID = "";
 
 /** The least a row must carry for its identity to be resolved. */
 export interface UnitIdentityRow {

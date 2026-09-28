@@ -283,8 +283,8 @@ export default function NewSkuModal({
         data-testid="new-sku-stock-identity"
         className={INPUT_CLS}
       >
-        <option value="exact_unit">Unit ID — one permanent ID per piece</option>
-        <option value="quantity">Quantity — counted, no Unit ID</option>
+        <option value="exact_unit">Unit ID: one permanent ID per piece</option>
+        <option value="quantity">Quantity: counted, no Unit ID</option>
       </select>
     </label>
   );
@@ -457,7 +457,7 @@ export default function NewSkuModal({
                   setSupplierId(supplier.id);
                   setNewSupplierOpen(false);
                   setNewSupplierName("");
-                  toast.success(`${supplier.name} added — selected for this SKU`);
+                  toast.success(`${supplier.name} added and selected for this SKU`);
                 } catch (e) {
                   toast.error(e instanceof ApiError ? e.message : "Could not add the supplier");
                 }
@@ -495,7 +495,7 @@ export default function NewSkuModal({
         <input
           value={supplierCode}
           onChange={(e) => setSupplierCode(e.target.value)}
-          placeholder="One code for the whole batch — override any piece below"
+          placeholder="One code for the whole batch. Override any piece below"
           data-testid="new-sku-supplier-code"
           className={INPUT_CLS}
         />
@@ -755,7 +755,7 @@ export default function NewSkuModal({
           price: priceNum,
           description: description.trim() || null,
         });
-        toast.success(`${res.sku} created — covers ${res.covers}`);
+        toast.success(`${res.sku} created. Covers ${res.covers}`);
         onClose();
       } catch (e) {
         toast.error(e instanceof ApiError ? e.message : "Could not create the guarantee");
@@ -805,7 +805,7 @@ export default function NewSkuModal({
           // clicking create again retries just those (the offer is idempotent).
           setSelectedComps(new Set(failed.map((f) => f.compartmentId)));
           toast.error(
-            `${ids.length - failed.length} of ${ids.length} compartment SKUs created — ${failed.length} failed: ${failed[0].message}`,
+            `${ids.length - failed.length} of ${ids.length} compartment SKUs created. ${failed.length} failed: ${failed[0].message}`,
           );
           return;
         }
@@ -965,7 +965,7 @@ export default function NewSkuModal({
           >
             <div className="text-body font-semibold text-amber-800">Model created</div>
             <div className="text-meta text-amber-700 mt-0.5">
-              The model exists — click create again to retry the remaining SKUs only.
+              The model exists. Click create again to retry the remaining SKUs only.
             </div>
           </div>
         )}
@@ -1182,12 +1182,12 @@ export default function NewSkuModal({
             </div>
             {compPool.length === 0 ? (
               <div className="text-meta text-base-500">
-                No compartments in the pool yet — add them in Maintenance → Sofa
+                No compartments in the pool yet. Add them in Maintenance → Sofa
                 Compartments, or use the size field below for a flat sofa SKU.
               </div>
             ) : compChoices.length === 0 ? (
               <div className="text-meta text-base-500" data-testid="new-sku-comps-none-left">
-                This model already offers every pool compartment — nothing left to add.
+                This model already offers every pool compartment. Nothing left to add.
               </div>
             ) : (
               <>
@@ -1223,7 +1223,7 @@ export default function NewSkuModal({
                 <div className="text-meta text-base-500 mt-1.5">
                   {selectedComps.size > 0 ? (
                     <>
-                      Every sofa is a combination of compartments — auto-generates{" "}
+                      Every sofa is a combination of compartments. Auto-generates{" "}
                       <span className="text-base-700 font-medium">{selectedComps.size}</span>{" "}
                       SKU{selectedComps.size === 1 ? "" : "s"}, e.g.{" "}
                       <span className="font-mono text-base-700">
@@ -1235,9 +1235,9 @@ export default function NewSkuModal({
                         : "Untick what this model doesn't offer; prices are set per SKU in SKU Master."}
                     </>
                   ) : mode === "existing" ? (
-                    <>Tick the compartments to add — each mints its real SKU.</>
+                    <>Tick the compartments to add. Each mints its real SKU.</>
                   ) : (
-                    <>None selected — creates a single flat sofa SKU from the size field below.</>
+                    <>None selected. Creates a single flat sofa SKU from the size field below.</>
                   )}
                 </div>
               </>
@@ -1278,7 +1278,7 @@ export default function NewSkuModal({
             </div>
             {sizeChoices.length === 0 ? (
               <div className="text-meta text-base-500" data-testid="new-sku-sizes-none-left">
-                This model already has a SKU for every pool size — nothing left to add.
+                This model already has a SKU for every pool size. Nothing left to add.
               </div>
             ) : (
               <>
@@ -1328,13 +1328,13 @@ export default function NewSkuModal({
                       )}
                       .{" "}
                       {mode === "existing"
-                        ? "Only sizes this model doesn't have yet are shown — the list follows Special Add-ons → Sizes."
-                        : "Untick the sizes this product doesn't come in — the list follows Special Add-ons → Sizes."}
+                        ? "Only sizes this model doesn't have yet are shown. The list follows Special Add-ons → Sizes."
+                        : "Untick the sizes this product doesn't come in. The list follows Special Add-ons → Sizes."}
                     </>
                   ) : mode === "existing" ? (
-                    <>Tick the sizes to add — one SKU per size.</>
+                    <>Tick the sizes to add. One SKU per size.</>
                   ) : (
-                    <>None selected — creates a single SKU from the size field below.</>
+                    <>None selected. Creates a single SKU from the size field below.</>
                   )}
                 </div>
               </>
@@ -1365,13 +1365,13 @@ export default function NewSkuModal({
             >
               <div className="text-body text-base-600">Price</div>
               <div className="text-meta text-base-400 mt-0.5">
-                Generated SKUs are created unpriced — the principal (Master Admin) prices them.
+                Generated SKUs are created unpriced. The principal (Master Admin) prices them.
               </div>
             </div>
           ))}
         {sizeFlow && isPrincipal && selectedSizes.size > 0 && (
           <div className="block" data-testid="new-sku-size-prices">
-            <span className="label block mb-1">Price per size — overrides the price above</span>
+            <span className="label block mb-1">Price per size (overrides the price above)</span>
             <div className="flex flex-col gap-1.5">
               {sizePool
                 .filter((po) => selectedSizes.has(po.value))
@@ -1400,7 +1400,7 @@ export default function NewSkuModal({
                         step="0.01"
                         value={sizePwp[nm] ?? ""}
                         onChange={(e) => setSizePwp((prev) => ({ ...prev, [nm]: e.target.value }))}
-                        placeholder="PWP —"
+                        placeholder="PWP"
                         title="PWP price at this size (blank = no PWP)"
                         data-testid={`new-sku-size-pwp-${nm}`}
                         className={INPUT_CLS}
@@ -1508,8 +1508,8 @@ export default function NewSkuModal({
               >
                 <div className="text-body text-base-600">Selling price</div>
                 <div className="text-meta text-base-400 mt-0.5">
-                  Set by the principal (Master Admin). This SKU is created unpriced —
-                  the principal will price it
+                  Set by the principal (Master Admin). This SKU is created unpriced.
+                  The principal will price it
                   {canSetCost ? ". The cost above is yours to record." : "."}
                 </div>
               </div>

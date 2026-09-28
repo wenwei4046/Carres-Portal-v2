@@ -103,7 +103,7 @@ function bucketOf(p: DashboardPickupRow): Bucket | null {
 export function lineSummary(lines: DashboardPickupLine[]): { head: string; rest: number; totalQty: number } {
   const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0);
   const head = lines[0];
-  if (!head) return { head: "—", rest: 0, totalQty };
+  if (!head) return { head: "", rest: 0, totalQty };
   const a = head.attrs as { color?: string; gap?: string; fabric_name?: string } | null;
   let label = head.sku;
   if (a?.color || a?.gap) {
@@ -279,11 +279,11 @@ export default function PartnerDashboard() {
           accent="info"
           count={deliveryBuckets.scheduled.length}
           rows={deliveryBuckets.scheduled.map((r) => ({
-            poId: r.po_id ?? "—",
+            poId: r.po_id ?? "",
             customer: r.customer_name,
             dateLine: r.confirm_delivery_date
               ? `Delivery on ${r.confirm_delivery_date}`
-              : "—",
+              : "",
           }))}
         />
         <DeliveryPreviewColumn
@@ -292,7 +292,7 @@ export default function PartnerDashboard() {
           accent="info"
           count={deliveryBuckets.out_for_delivery.length}
           rows={deliveryBuckets.out_for_delivery.map((r) => ({
-            poId: r.po_id ?? "—",
+            poId: r.po_id ?? "",
             customer: r.customer_name,
             dateLine: r.confirm_delivery_date
               ? `Today · ${r.confirm_delivery_date}`
@@ -309,7 +309,7 @@ export default function PartnerDashboard() {
         >
           {(fleet.data ?? []).length === 0 ? (
             <div className="text-meta text-base-500 py-4 text-center">
-              No vehicles yet — add via Fleet.
+              No vehicles yet. Add via Fleet.
             </div>
           ) : (
             (fleet.data ?? []).map((f) => (
@@ -322,10 +322,10 @@ export default function PartnerDashboard() {
                 </span>
                 <div className="min-w-0">
                   <div className="font-body text-meta font-medium">
-                    {f.driver_name ?? "—"}
+                    {f.driver_name ?? ""}
                   </div>
                   <div className="font-body text-label text-base-500">
-                    {f.vehicle_type ?? "—"}
+                    {f.vehicle_type ?? ""}
                     {f.capacity ? ` · ${f.capacity}` : ""}
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export default function PartnerDashboard() {
                   <div className="min-w-0">
                     <div className="font-body text-meta">{summary}</div>
                     <div className="font-body text-label text-base-500">
-                      {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"}
+                      {po.suppliers?.name ?? ""} → {po.warehouses?.name ?? ""}
                     </div>
                   </div>
                   <span className="font-mono text-label text-success uppercase tracking-[0.1em] font-semibold">
@@ -440,7 +440,7 @@ function PreviewColumn({
       </div>
       <div className="p-2 min-h-[140px]">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-label py-6">—</div>
+          null
         ) : (
           items.slice(0, 4).map((po) => {
             const { head, rest, totalQty } = lineSummary(po.lines);
@@ -459,7 +459,7 @@ function PreviewColumn({
                   {summary}
                 </div>
                 <div className="font-body text-label text-base-500 mt-1">
-                  {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"}
+                  {po.suppliers?.name ?? ""} → {po.warehouses?.name ?? ""}
                   {po.eta_date ? ` · ${po.eta_date}` : ""}
                 </div>
               </Link>
@@ -501,7 +501,7 @@ function DeliveryPreviewColumn({
       </div>
       <div className="p-2 min-h-[140px]">
         {rows.length === 0 ? (
-          <div className="text-center text-base-400 text-label py-6">—</div>
+          null
         ) : (
           rows.slice(0, 4).map((r, i) => (
             <Link

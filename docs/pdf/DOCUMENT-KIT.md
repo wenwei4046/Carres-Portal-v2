@@ -44,9 +44,11 @@ therefore a page that owns a paper:
   object with **no PDF preview**. Showroom asks, Purchasing decides; the CO, the
   Manual Purchase or the transfer that follows is the paper.
 - **Manual Purchase (`MPR-`)** — an internal request that produces demand and,
-  once approved, a Purchase Order. The MPR preview is the create workspace's
-  read-back half and says so in its own source; `PO No` remains the only
-  purchasing number a supplier ever sees. **But its REASON is not internal** —
+  once approved, a Purchase Order. It has no paper of its own. Since the owner
+  ruling of 2026-09-28 the create workspace's right half shows the DRAFT
+  **Purchase Order** it will become (one per supplier, `draft: true`, no number,
+  no PO dates, no Unit IDs), rendered by the PO template exactly as SO Batch's
+  review does; `PO No` remains the only purchasing number a supplier ever sees. **But its REASON is not internal** —
   it prints on the Purchase Order that request becomes (§3 rule 11).
 - **Purchase demand** — `purchasing/MASTER.md` §3.3: staff never create or send
   a demand document.

@@ -291,7 +291,7 @@ export function GrnTemplate(data: GrnTemplateData) {
               <Text style={styles.descSku}>{l.sku}</Text>
               {outcomeRuns(l.unit_results ?? []).map((u) => (
                 <Text key={`${u.first}-${u.outcome}`} style={styles.unitLine}>
-                  <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
+                  <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null}: {u.outcome}
                 </Text>
               ))}
             </View>
@@ -329,7 +329,7 @@ export function GrnTemplate(data: GrnTemplateData) {
             <Text style={styles.blockLabel}>Unit results</Text>
             {outcomeRuns(unit_results ?? []).map((u) => (
               <Text key={`${u.first}-${u.outcome}`} style={[styles.unitLine, { paddingLeft: 0 }]}>
-                · <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
+                · <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null}: {u.outcome}
               </Text>
             ))}
           </View>
@@ -342,7 +342,7 @@ export function GrnTemplate(data: GrnTemplateData) {
             {(extra_lines ?? []).map((x, i) => (
               <Text key={`x-${i}`} style={[styles.noteText, { marginTop: mm(0.8) }]}>
                 · {x.sku} × {x.qty}
-                {x.note ? ` — ${x.note}` : ""} (recorded separately; not Inventory)
+                {x.note ? `: ${x.note}` : ""} (recorded separately; not Inventory)
               </Text>
             ))}
           </View>

@@ -257,9 +257,8 @@ describe("OperationDashboard", () => {
     );
     render(wrap(<OperationDashboard setTab={() => {}} />));
 
-    // Pipeline v2 (C3): five columns × five em-dashes.
-    const dashes = screen.getAllByText("—");
-    expect(dashes.length).toBeGreaterThanOrEqual(5);
+    // Pipeline v2 (C3): an empty column draws nothing — never a dash.
+    expect(screen.queryAllByText(/^[—–]$/)).toHaveLength(0);
   });
 
   it("loading state renders the skeleton placeholder", () => {

@@ -124,7 +124,7 @@ export default function MoneyMovesPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="money-moves-destination-header" word="Money moves" docTitle="Money moves — Carres" />
+      <ModuleHeader destinationHeader testId="money-moves-destination-header" word="Money moves" docTitle="Money moves · Carres" />
       {query.isError ? (
         <LoadFailed what="Money moves" onRetry={() => void query.refetch()} />
       ) : (

@@ -1,3 +1,4 @@
+import type { PartyTone } from "@carres/shared";
 /**
  * THE CUSTOMER PARTY CARD — Workspace MASTER §5.10 (owner approval 2026-09-25,
  * OWNER CORRECTION 2026-09-25).
@@ -34,6 +35,7 @@ import { displayCustomerName } from "@/lib/customer-name";
 import { useDeliveryArrangements, useOperationStaff, useOperationWork } from "@/lib/queries";
 import { useLogisticsModel } from "./LogisticsCard";
 import { Fact, PartyCardShell, SectionTitle, ToneLine } from "./PartyCardShell";
+import type { CardFact } from "./PartyCardShell";
 
 /* A date never splits over two lines (§5.10). */
 const spell = (iso: string) => fmtDateShort(iso).replace(" ", " ");
@@ -105,8 +107,18 @@ export default function CustomerCard({
   open,
   onToggle,
   primary,
+  heading: headingProp,
+  trailing,
+  pill,
+  facts,
+  active,
 }: {
   orderId: string;
+  active?: boolean;
+  heading?: string;
+  trailing?: React.ReactNode;
+  pill?: { text: string; tone: PartyTone } | null;
+  facts?: CardFact[];
   leg?: number;
   open: boolean;
   onToggle: (open: boolean) => void;
@@ -130,6 +142,10 @@ export default function CustomerCard({
         testId="party-customer"
         anchorId={`party-customer-${orderId}`}
         party={C.heading}
+        trailing={trailing}
+      pill={pill}
+      facts={facts}
+      active={active}
         heading={C.heading}
         status={<ToneLine tone={failed ? "attention" : "future"}>{C.unavailable}</ToneLine>}
         open={open}
@@ -155,7 +171,11 @@ export default function CustomerCard({
       testId="party-customer"
       anchorId={`party-customer-${orderId}`}
       party={C.heading}
-      heading={`${C.heading} · ${name ?? "Name not recorded"}`}
+      heading={headingProp ?? `${C.heading} · ${name ?? "Name not recorded"}`}
+      trailing={trailing}
+      pill={pill}
+      facts={facts}
+      active={active}
       status={<ToneLine tone={model.status.tone} testId="party-customer-line">{model.status.text}</ToneLine>}
       open={open}
       onToggle={onToggle}
@@ -240,7 +260,7 @@ export default function CustomerCard({
 
 function DoorLink({ to, children }: { to: string; children: string }) {
   return (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to={to}>
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={to}>
       {children}
       <Icon name="open" size={14} />
     </Link>

@@ -91,8 +91,8 @@ export default function CustomerStatement({ orderId, onClose }: {
         <p>{s.customer.phone ?? "Phone not recorded"}</p>
         <p className="text-label font-normal">
           {s.matched_on === "phone" ? "Every Sales Order with this phone number."
-            : s.matched_on === "name" ? "Every Sales Order under this name — no phone number is recorded."
-            : "This Sales Order only — neither a phone number nor a name is recorded."}
+            : s.matched_on === "name" ? "Every Sales Order under this name. No phone number is recorded."
+            : "This Sales Order only. Neither a phone number nor a name is recorded."}
         </p>
         <button className="btn-secondary mt-3" onClick={onClose}>Back</button>
       </div></SectionCard>

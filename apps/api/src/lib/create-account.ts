@@ -103,7 +103,7 @@ export async function handleCreateAccount(
         // Approvals tab" pointed at an empty tab, and the store never showed
         // in the on-behalf order picker (which lists active stores only).
         status: "active",
-        region: body.region?.trim() || "—",
+        region: body.region?.trim() || null,
         // Legacy single-text `contact` column auto-built from the new
         // structured contact_name + contact_phone fields so existing reads
         // (DealerRow tooltip, DealerDrawer header) keep working.

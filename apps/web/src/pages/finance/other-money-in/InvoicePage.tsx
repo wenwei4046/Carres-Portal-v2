@@ -231,7 +231,7 @@ function InvoiceForm({
               value={partyId}
               onValueChange={setPartyId}
               options={partyOptions}
-              placeholder={parties.isLoading ? "Loading parties…" : partyOptions.length ? "Choose a party" : "No party yet — add one on Parties"}
+              placeholder={parties.isLoading ? "Loading parties…" : partyOptions.length ? "Choose a party" : "No party yet. Add one on Parties"}
               error={fieldErrors.party}
             />
             <Input
@@ -370,7 +370,7 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
       const { renderOtherDebtorInvoicePdf } = await import("@/lib/pdf/render");
       window.open(URL.createObjectURL(await renderOtherDebtorInvoicePdf(doc)), "_blank", "noopener");
     } catch (e) {
-      toast.error(`The invoice could not be opened — ${(e as Error).message}`);
+      toast.error(`The invoice could not be opened: ${(e as Error).message}`);
     } finally {
       setPrinting(false);
     }
@@ -428,7 +428,7 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
             <p key={l.line_no} className="flex flex-wrap justify-between gap-2">
               <span>
                 {l.account_code} · {l.account_name}
-                {" — "}
+                {" · "}
                 {l.description ?? "No description"}
                 {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
               </span>

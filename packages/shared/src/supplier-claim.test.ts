@@ -71,7 +71,7 @@ describe("supplier claim vocabulary — S1's words plus exactly one", () => {
   it("labels a key, and falls back to the key itself", () => {
     expect(supplierClaimTypeLabel("colour_uneven")).toBe("Colour uneven");
     expect(supplierClaimTypeLabel(SUPPLIER_CLAIM_LATE)).toBe("Late delivery");
-    expect(supplierClaimTypeLabel(null)).toBe("—");
+    expect(supplierClaimTypeLabel(null)).toBe("");
     expect(supplierClaimTypeLabel("something_new")).toBe("something_new");
   });
 
@@ -82,7 +82,7 @@ describe("supplier claim vocabulary — S1's words plus exactly one", () => {
   it("labels a status", () => {
     expect(supplierClaimStatusLabel("open")).toBe("Open");
     expect(supplierClaimStatusLabel("closed")).toBe("Closed");
-    expect(supplierClaimStatusLabel(undefined)).toBe("—");
+    expect(supplierClaimStatusLabel(undefined)).toBe("");
   });
 });
 
@@ -298,8 +298,8 @@ describe("the ask and the answer are two separate closed lists", () => {
     expect(isRequestedActionFor("damaged", "please_fix_it")).toBe(false);
     expect(isRequestedActionFor("damaged", null)).toBe(false);
     expect(isRequestedActionFor(null, "replace")).toBe(false);
-    expect(supplierClaimRequestLabel(null)).toBe("—");
-    expect(supplierClaimResponseLabel(null)).toBe("—");
+    expect(supplierClaimRequestLabel(null)).toBe("");
+    expect(supplierClaimResponseLabel(null)).toBe("");
   });
 
   it("keeps the supplier's answer list wide — they may offer anything, or refuse", () => {
@@ -334,7 +334,7 @@ describe("claimNextMove — who owes the next move", () => {
     expect(claimNextMove(move())).toEqual({
       key: "ask",
       owner: "carres",
-      label: "Call Ohana — agree the fix",
+      label: "Call Ohana to agree the fix",
     });
   });
 
@@ -344,7 +344,7 @@ describe("claimNextMove — who owes the next move", () => {
     expect(claimNextMove(move({ requested_action: "replace" }))).toEqual({
       key: "answer",
       owner: "supplier",
-      label: "Call Ohana — confirm what happens next",
+      label: "Call Ohana to confirm what happens next",
     });
   });
 
@@ -361,7 +361,7 @@ describe("claimNextMove — who owes the next move", () => {
       owner: "supplier",
       // R8 — this branch used to read `confirm the new delivery date`. One
       // action has ONE row line; the specificity loss is reported in the PR.
-      label: "Call Ohana — confirm what happens next",
+      label: "Call Ohana to confirm what happens next",
     });
   });
 
@@ -379,7 +379,7 @@ describe("claimNextMove — who owes the next move", () => {
     ).toEqual({
       key: "close",
       owner: "carres",
-      label: "Close SC-1001 — Ohana delivered the rest",
+      label: "Close SC-1001. Ohana delivered the rest",
     });
   });
 
@@ -411,7 +411,7 @@ describe("claimNextMove — who owes the next move", () => {
     ).toEqual({
       key: "close",
       owner: "carres",
-      label: "Close SC-1001 — Ohana agreed: Replacement",
+      label: "Close SC-1001. Ohana agreed: Replacement",
     });
   });
 
@@ -420,7 +420,7 @@ describe("claimNextMove — who owes the next move", () => {
       claimNextMove(
         move({ requested_action: "replace", supplier_response: "reject" }),
       ).label,
-    ).toBe("Close SC-1001 — Ohana refused");
+    ).toBe("Close SC-1001. Ohana refused");
   });
 
   it("a closed claim owes nobody anything and shows no action", () => {
@@ -438,7 +438,7 @@ describe("claimNextMove — who owes the next move", () => {
   it("falls back to the role word when the supplier has no name on file", () => {
     for (const n of [null, "", "   "]) {
       expect(claimNextMove(move({ supplier_name: n })).label).toBe(
-        "Call supplier — agree the fix",
+        "Call supplier to agree the fix",
       );
     }
   });
@@ -475,7 +475,7 @@ describe("claimNextMove — who owes the next move", () => {
     expect(claimMoveOwnerLabel("carres")).toBe("Carres");
     expect(claimMoveOwnerLabel("supplier", "Ohana")).toBe("Ohana");
     expect(claimMoveOwnerLabel("supplier", null)).toBe("supplier");
-    expect(claimMoveOwnerLabel(null)).toBe("—");
+    expect(claimMoveOwnerLabel(null)).toBe("");
   });
 });
 
@@ -613,8 +613,8 @@ describe("Customer Resolution — what are we doing for the CUSTOMER?", () => {
       expect(customerResolutionLabel(r.key)).toBe(r.label);
       expect(r.label).not.toMatch(/_/);
     }
-    expect(customerResolutionLabel(null)).toBe("—");
-    expect(customerResolutionLabel(undefined)).toBe("—");
+    expect(customerResolutionLabel(null)).toBe("");
+    expect(customerResolutionLabel(undefined)).toBe("");
   });
 
   it("explains each option in one plain line — a DEFINITION, never a consequence", () => {
@@ -749,8 +749,8 @@ describe("Carres Execution — in what ORDER do the goods move?", () => {
       expect(carresExecutionLabel(e.key)).toBe(e.label);
       expect(e.label).not.toMatch(/_/);
     }
-    expect(carresExecutionLabel(null)).toBe("—");
-    expect(carresExecutionLabel(undefined)).toBe("—");
+    expect(carresExecutionLabel(null)).toBe("");
+    expect(carresExecutionLabel(undefined)).toBe("");
   });
 
   it("explains each option in one plain line — a DEFINITION, never a consequence", () => {

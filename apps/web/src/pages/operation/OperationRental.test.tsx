@@ -130,12 +130,12 @@ describe("OperationRental", () => {
     expect(screen.getByText("Rental")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "No rental agreements yet — the POS rental lane ships next.",
+        "No rental agreements yet. The POS rental lane ships next.",
       ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /No rental units yet — units are registered here when the first agreement deploys\./,
+        /No rental units yet\. Units are registered here when the first agreement deploys\./,
       ),
     ).toBeInTheDocument();
   });
@@ -251,9 +251,8 @@ describe("OperationRental", () => {
     expect(
       within(screen.getByTestId("rental-tile-Units in rental")).getByText("1"),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("rental-tile-Visits due")).getByText("—"),
-    ).toBeInTheDocument();
+    // No tile for a figure the portal does not compute (no dash, owner ruling 2026-09-26).
+    expect(screen.queryByTestId("rental-tile-Visits due")).not.toBeInTheDocument();
   });
 
   it("shows the skeleton while either hook is pending", () => {

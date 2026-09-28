@@ -38,7 +38,10 @@ const pos = Array.from({ length: 26 }, (_, n) => {
     const received = kind === "completed" ? qty : i % 5 === 0 ? 1 : 0;
     return {
       id: `l${i}-${l}`, sku: `SKU-${i}-${l}`, qty, received_qty: received, model_name: model, size,
-      destination_id: i % 4 ? "d1" : "d2", identity_mode: "quantity",
+      /* Furniture is an exact Unit (Stock MASTER §2): every PO line carries its
+         Unit IDs from the official issue. Measured on production 2026-09-27:
+         103 of 103 live PO lines are `exact_unit` and none is missing a Unit. */
+      destination_id: i % 4 ? "d1" : "d2", identity_mode: "exact_unit",
       attrs: l === 0 && i % 2 ? { color: "Sand", fabric_name: "CG-012" } : null,
       governed_sources: [], sources: [],
     };
@@ -96,6 +99,41 @@ window.fetch = async (input, init) => {
       destinations: [{ id: "d1", name: "Carres Klang", is_default: true }, { id: "d2", name: "AL Sungai Buloh", is_default: false }],
       referencedDestinations: [{ id: "d1", name: "Carres Klang", is_default: true }, { id: "d2", name: "AL Sungai Buloh", is_default: false }],
       messageTemplate: "Please build this purchase order.",
+    });
+  }
+  /* The official paper beside the facts: the same money-free payload the
+     server composes (`purchasing_po_document`), built from the fixture PO so
+     the object page draws a real PDF instead of an empty half. */
+  /* The PO's own Units, one per ordered piece, bound to their line (0442/0443). */
+  const unitsOf = (po: (typeof pos)[number]) =>
+    po.purchase_order_lines.flatMap((l, n) =>
+      Array.from({ length: l.qty }, (_, u) => ({
+        unit_code: `U1-${String(n + 1).padStart(3, "0")}-${String(u + 1).padStart(3, "0")}`,
+        sku: l.sku, status: "on_order", po_line_id: l.id,
+      })));
+  const unitsReq = /\/api\/operation\/pos\/([^/?]+)\/units/.exec(url);
+  if (unitsReq) {
+    const po = pos.find((p) => p.id === decodeURIComponent(unitsReq[1]!));
+    return json({ units: po ? unitsOf(po) : [] });
+  }
+  const print = /\/api\/operation\/pos\/([^/?]+)\/print-data/.exec(url);
+  if (print) {
+    const po = pos.find((p) => p.id === decodeURIComponent(print[1]!));
+    if (!po) return json({ code: "po_not_found", message: "Purchase Order not found." }, 404);
+    const supplier = SUPPLIERS.find((s) => s.id === po.supplier_id)!;
+    const dest = po.destination_id === "d2" ? { name: "AL Sungai Buloh", address: "Lot 2, Jalan Sungai Buloh, 47000 Sungai Buloh, Selangor." } : { name: "Carres Klang", address: "Lot 6515, Batu 5 1/2, Jalan Kapar, 42100 Klang, Selangor." };
+    return json({
+      po_number: po.id, po_id: po.id, version: po.version, issue_date: po.placed_at.slice(0, 10),
+      supplier: { name: supplier.name, address: "No. 8, Jalan Perusahaan 3, Kawasan Perindustrian, 43300 Seri Kembangan, Selangor.", contact: supplier.contact },
+      destination: dest, delivery_instructions: null, eta_date: po.official_delivery_date, delivery_working_days: 7,
+      delivery_method: po.supplier_id === "s3" ? "we_collect" : "supplier_delivers", terms: null, issued_by: "Yu Jun",
+      so_refs: po.sources.flatMap((src) => src.kind === "sales_order" ? [Number(src.reference.replace("SO-", ""))] : []),
+      lines: po.purchase_order_lines.map((l, n) => ({
+        sku: l.sku, description: [l.model_name, l.size].filter(Boolean).join(" · "), qty: l.qty, unit: "unit",
+        destination: dest, attrs: l.attrs, identity_mode: "exact_unit",
+        unit_codes: Array.from({ length: l.qty }, (_, u) => `U1-${String(n + 1).padStart(3, "0")}-${String(u + 1).padStart(3, "0")}`),
+        sources: [{ so: po.sources[0]?.kind === "sales_order" ? Number(po.sources[0].reference.replace("SO-", "")) : null, qty: l.qty }],
+      })),
     });
   }
   if (url.includes("/api/operation/suppliers")) return json({ suppliers: SUPPLIERS.map((s) => ({ ...s, kind: "own_logistics", cat_covered: [], lead_time: null })) });

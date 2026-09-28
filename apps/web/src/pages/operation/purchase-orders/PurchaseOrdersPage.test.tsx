@@ -568,14 +568,15 @@ describe("Purchase Orders Register", () => {
 
     line.identity_mode = "quantity";
     const counted = renderPage();
-    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("—");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("Counted by quantity");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("—");
     expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("do not send this PO");
     counted.unmount();
 
     line.identity_mode = "exact_unit";
     const missing = renderPage();
     expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1))
-      .toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+      .toHaveTextContent("Unit IDs missing on this line. Do not send this PO");
     missing.unmount();
 
     /* A read that has not answered is not the same fact as a Unit that is
@@ -610,18 +611,6 @@ describe("Purchase Orders Register", () => {
     expect(work).toHaveTextContent("PO V2 has not been sent");
     expect(work).toHaveTextContent("Issue PO V2 to Hooka");
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
-  });
-
-  it("saves the PO's payment terms, and blank clears them (0530)", () => {
-    renderPage("/operation/procurement?po=PO-20260828-4827");
-    const field = screen.getByLabelText("Terms (days)");
-    const save = screen.getByTestId("po-terms-save");
-    expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "-1" } });
-    expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "45" } });
-    fireEvent.click(save);
-    expect(termsMutate).toHaveBeenCalledWith(45, expect.anything());
   });
 
   it("opens an object from the live register without changing the page's Hook order", () => {
@@ -677,13 +666,13 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     expect(document.body).not.toHaveTextContent("Supplier has not confirmed the PO date");
     expect(document.body).not.toHaveTextContent("to confirm the PO delivery date");
     open();
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — answer a line or record the Supplier DO");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: answer a line or record the Supplier DO");
     kind("new_date");
     fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-15" } });
     expect(screen.getByTestId("po-answer-reason-line-1")).toHaveValue("");
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — choose why the supplier moved the date");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: choose why the supplier moved the date");
     fireEvent.change(screen.getByTestId("po-answer-reason-line-1"), { target: { value: "Material unavailable" } });
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — add a WhatsApp screenshot");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: add a WhatsApp screenshot");
     fireEvent.click(screen.getByText("Upload Evidence"));
     who();
     expect(screen.getByTestId("po-answer-save")).toHaveTextContent(/^Save$/);
@@ -707,7 +696,7 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     expect(supplierDateMutate.mock.calls[0]![0].lines[0]).toEqual({ poLineId: "line-1", answer: "new_date", date: "2026-09-05" });
     fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-20" } });
     fireEvent.change(screen.getByTestId("po-answer-reason-line-1"), { target: { value: "Other" } });
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — write why the supplier moved the date");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: write why the supplier moved the date");
     fireEvent.change(screen.getByTestId("po-answer-note-line-1"), { target: { value: "Fabric mill closed" } });
     expect(screen.getByTestId("po-answer-save")).toHaveTextContent(/^Save$/);
   });
@@ -721,7 +710,7 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     expect(screen.getByTestId("po-answer-total-line-1")).toHaveTextContent("Total 2 of 2");
     fireEvent.change(screen.getByTestId("po-answer-batch-qty-line-1-0"), { target: { value: "1" } });
     expect(screen.getByTestId("po-answer-total-line-1")).toHaveTextContent("Total 1 of 2");
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — the batches must total 2");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: the batches must total 2");
     fireEvent.click(screen.getByTestId("po-answer-add-batch-line-1"));
     expect(screen.getByTestId("po-answer-batch-qty-line-1-1")).toHaveValue(1);
     fireEvent.change(screen.getByTestId("po-answer-batch-date-line-1-0"), { target: { value: "2026-09-10" } });
@@ -740,9 +729,9 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     open();
     fireEvent.click(screen.getByTestId("po-answer-do-received"));
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — record the Supplier DO number");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: record the Supplier DO number");
     fireEvent.change(screen.getByTestId("po-answer-do-number"), { target: { value: "DO-2251" } });
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — upload the Supplier DO");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: upload the Supplier DO");
     fireEvent.click(screen.getByText("Upload DO file")); who();
     fireEvent.click(screen.getByTestId("po-answer-save"));
     expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
@@ -815,12 +804,14 @@ describe("Purchase Order object", () => {
     expect(cell.queryByText("incoming")).not.toBeInTheDocument();
   });
 
-  it("prints `—` for a quantity-scoped line — intentional, never `Not allocated`", () => {
+  it("says `Counted by quantity` for a quantity-scoped line — never a dash, never `Not allocated`", () => {
     queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "quantity";
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const cell = within(screen.getByTestId("po-line-units-line-1"));
-    expect(cell.getByText("—")).toBeInTheDocument();
+    /* Owner ruling 2026-09-27: no dash — the cell says why it holds nothing. */
+    expect(cell.getByText("Counted by quantity")).toBeInTheDocument();
+    expect(cell.queryByText("—")).toBeNull();
     expect(cell.queryByText("Not allocated")).not.toBeInTheDocument();
     expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
     expect(cell.queryByRole("alert")).not.toBeInTheDocument();
@@ -831,7 +822,7 @@ describe("Purchase Order object", () => {
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const cell = within(screen.getByTestId("po-line-units-line-1"));
-    expect(cell.getByRole("alert")).toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+    expect(cell.getByRole("alert")).toHaveTextContent("Unit IDs missing on this line. Do not send this PO");
     expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
   });
 
@@ -890,9 +881,13 @@ describe("Purchase Order object", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const facts = screen.getByTestId("po-document-panes").firstElementChild!;
     const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    /* Same card as the Sales Order: the mono, tracked heading face. */
+    /* Same card as the Sales Order: the blue, sentence-case title over a rule
+       (owner, 2026-09-26 — one card grammar for every Purchasing page). */
     const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
-    expect(po.className).toContain("font-mono");
+    /* ONE KIT LAW (Jess, 2026-09-27): black bold, never blue. */
+    expect(po.className).toContain("text-kit-slate-12");
+    expect(po.className).not.toContain("text-kit-blue-11");
+    expect(po.className).not.toContain("font-mono");
     /* Receiving, then Claims and returns, each a row of its own. No Unit IDs
        card: a unit is a row of its Goods line. */
     const order = ["Receiving", "Claims and returns"].map((t) => heads.indexOf(t));

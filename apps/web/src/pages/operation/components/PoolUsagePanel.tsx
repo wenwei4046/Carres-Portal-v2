@@ -45,8 +45,8 @@ export default function PoolUsagePanel({ period }: { period: string }) {
           ) : null}
         </div>
         <div className="text-body text-base-600 mt-1">
-          Every unit taken off the shelf says why. Set how low each item may go
-          — the screen reminds whoever takes the next one, and never stops them.
+          Every unit taken off the shelf says why. Set how low each item may go.
+          The screen reminds whoever takes the next one, and never stops them.
         </div>
       </header>
 

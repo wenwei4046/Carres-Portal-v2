@@ -132,7 +132,7 @@ export default function CaseEvidenceGallery({
             aria-label="What kind of photo to add"
             className="rounded border border-base-300 bg-white px-2 py-1 text-body"
           >
-            <option value="">— add a photo —</option>
+            <option value="">Add a photo</option>
             {slots.map((s) => (
               <option key={s} value={s}>
                 {caseEvidenceSlotLabel(s)}
@@ -169,7 +169,7 @@ export default function CaseEvidenceGallery({
  *  the same fault on the same day is the normal case. */
 function stamp(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso || "—";
+  if (Number.isNaN(d.getTime())) return iso || "";
   return `${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })} · ${d.toLocaleTimeString(
     "en-GB",
     { hour: "2-digit", minute: "2-digit" },

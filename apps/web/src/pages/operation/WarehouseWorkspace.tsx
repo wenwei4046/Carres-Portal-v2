@@ -164,7 +164,7 @@ export default function WarehouseWorkspace({
       <ModuleHeader
         testId={`warehouse-${direction}-schedule-header`}
         word={word}
-        docTitle={`${word} · Warehouse — Carres`}
+        docTitle={`${word} · Warehouse · Carres`}
         destinationHeader
       />
 
@@ -508,6 +508,6 @@ function headingSentence(iso: string): string {
 }
 
 function rangeSentence(dates: string[]): string {
-  if (dates.length === 0) return "—";
-  return `${headingSentence(dates[0]!)} — ${headingSentence(dates[dates.length - 1]!)}`;
+  if (dates.length === 0) return "";
+  return `${headingSentence(dates[0]!)} to ${headingSentence(dates[dates.length - 1]!)}`;
 }

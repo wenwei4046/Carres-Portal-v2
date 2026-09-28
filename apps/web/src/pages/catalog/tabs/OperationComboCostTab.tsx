@@ -59,7 +59,7 @@ export default function OperationComboCostTab({ catalog }: { catalog: CatalogRes
       .filter((c) => (modelFilter ? c.modelId === modelFilter : true))
       .map((c) => ({
         combo: c,
-        modelName: modelById.get(c.modelId)?.name ?? "—",
+        modelName: modelById.get(c.modelId)?.name ?? "",
         parts: slotsSummary(c.slots),
       }))
       .filter((r) =>
@@ -145,7 +145,7 @@ export default function OperationComboCostTab({ catalog }: { catalog: CatalogRes
               data-testid={`opcombo-row-${combo.id}`}
             >
               <div className="text-meta text-base-800">{modelName}</div>
-              <div className="text-meta text-base-800">{combo.label ?? "—"}</div>
+              <div className="text-meta text-base-800">{combo.label ?? ""}</div>
               <div className="text-meta font-mono text-base-600" title={parts}>
                 {parts}
               </div>

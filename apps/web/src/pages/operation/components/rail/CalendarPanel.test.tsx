@@ -196,7 +196,7 @@ describe("CalendarPanel — the carrier's day (T9 rules)", () => {
     expect(within(today).getByText("2 of 2")).toBeTruthy();
     expect(
       within(today).getByText(
-        "NETS is at its limit of 2 deliveries a day — call them before promising more",
+        "NETS is at its limit of 2 deliveries a day. Call them before promising more",
       ),
     ).toBeTruthy();
   });
@@ -216,7 +216,7 @@ describe("CalendarPanel — the carrier's day (T9 rules)", () => {
     render(<CalendarPanel />);
     expect(
       within(day(TODAY)!).getByText(
-        "NETS is not running on this day — call them or move these",
+        "NETS is not running on this day. Call them or move these",
       ),
     ).toBeTruthy();
   });
@@ -260,7 +260,7 @@ describe("CalendarPanel — NO RELATIVE DATE WORDS (owner ruling 2026-08-15)", (
 
   it("a SPAN chip keeps its hover — `This week` names no date", () => {
     render(<CalendarPanel />);
-    expect(screen.getByTestId("calendar-range-week").getAttribute("title")).toMatch(/ – /);
+    expect(screen.getByTestId("calendar-range-week").getAttribute("title")).toMatch(/ to /);
   });
 
   it("the day heading prints the weekday + date, never `TODAY ·`", () => {

@@ -91,7 +91,7 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
 export function warehouseReceiptStatusLabel(
   key: string | null | undefined,
 ): string {
-  if (!key) return "—";
+  if (!key) return "";
   return (
     WAREHOUSE_RECEIPT_STATUS_LABEL[key as WarehouseReceiptStatus] ?? key
   );
@@ -415,7 +415,7 @@ export function receivingRecordNo(
   revision = 0,
 ): string {
   const date = r.goods_received_at ?? (r.submitted_at ?? "").slice(0, 10);
-  if (!date) return "—";
+  if (!date) return "";
   return docNumber({ prefix: "GRN", date, seed: r.id, revision });
 }
 
@@ -554,13 +554,13 @@ export function receivingSaveBlocker(d: {
   claimProblems: readonly ReceiveLineClaimProblem[];
 }): string | null {
   if (d.doNumber.trim().length < WAREHOUSE_DO_NUMBER_MIN)
-    return "Save — add a DO number";
-  if (!d.doFilePath) return "Save — upload signed DO";
-  if (d.counted === 0) return "Save — count at least one unit";
+    return "Save: add a DO number";
+  if (!d.doFilePath) return "Save: upload signed DO";
+  if (d.counted === 0) return "Save: count at least one unit";
   if (d.overCounted)
-    return "Save — lower Receive now, the line counts more than is owed";
+    return "Save: lower Receive now, the line counts more than is owed";
   if (d.claimProblems.length > 0)
-    return `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[d.claimProblems[0]].toLowerCase()}`;
+    return `Save: ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[d.claimProblems[0]].toLowerCase()}`;
   return null;
 }
 

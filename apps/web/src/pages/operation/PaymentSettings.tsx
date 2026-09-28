@@ -235,7 +235,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       <p><span className="font-semibold">Payment must be complete</span><br />
         {current ? `${current.deadline_days_before} working days before Scheduled delivery` : "2 working days before Scheduled delivery (the ruled default)"}</p>
       {current && <p className="text-label font-normal text-kit-slate-11">
-        In effect from {fmtDate(current.effective_from)}{current.reason ? ` · ${current.reason}` : ""}. An action that lands on a Saturday, Sunday or public holiday moves to the previous working day — Operation does not work on Saturday.
+        In effect from {fmtDate(current.effective_from)}{current.reason ? ` · ${current.reason}` : ""}. An action that lands on a Saturday, Sunday or public holiday moves to the previous working day. Operation does not work on Saturday.
       </p>}
       {step === "view" && <Button variant="neutral" onClick={() => {
         setAsk(String(current?.ask_days_before ?? 3));
@@ -264,7 +264,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       <div className="col-span-2 flex gap-2">
         {step === "edit"
           ? <Button variant="primary" disabled={gap !== null} onClick={() => setStep("review")}>
-              {gap ? `Review changes — ${gap}` : "Review changes"}</Button>
+              {gap ? `Review changes: ${gap}` : "Review changes"}</Button>
           : <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>Save changes</Button>}
         <Button variant="neutral" onClick={() => step === "review" ? setStep("edit") : setStep("view")}>
           {step === "review" ? "Back" : "Cancel"}</Button>
@@ -355,14 +355,14 @@ function StorageRuleCard({ group, rule, onSaved }: {
         onChange={(e) => set("reason", e.target.value)} disabled={step === "review"} />
       {step === "review" && <div className="col-span-2" data-testid={`storage-rule-review-${group}`}>
         <p className="font-semibold">Review changes</p>
-        <p>Free storage {rule?.free_days ?? "—"} → {free} calendar days · Charge {rule ? rm(Number(rule.charge_amount)) : "—"} → {rm(charge ?? 0)} every {cycle} days</p>
+        <p>Free storage {rule?.free_days ?? ""} → {free} calendar days · Charge {rule ? rm(Number(rule.charge_amount)) : ""} → {rm(charge ?? 0)} every {cycle} days</p>
         <p>Effective from {fmtDate(draft.effectiveFrom)} · {draft.reason.trim()}</p>
         <p className="text-label font-normal text-kit-slate-11">Existing storage cases keep the rule they started under.</p>
       </div>}
       <div className="col-span-2 flex gap-2">
         {step === "edit"
           ? <Button variant="primary" disabled={gap !== null} onClick={() => setStep("review")}>
-              {gap ? `Review changes — ${gap}` : "Review changes"}</Button>
+              {gap ? `Review changes: ${gap}` : "Review changes"}</Button>
           : <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>Save changes</Button>}
         <Button variant="neutral" onClick={() => step === "review" ? setStep("edit") : setStep("view")}>
           {step === "review" ? "Back" : "Cancel"}</Button>
@@ -509,7 +509,7 @@ function PaymentMethodsCard() {
     <div className="col-span-2 flex gap-2">
       <Button variant="primary" loading={save.isPending} disabled={gap !== null}
         onClick={() => save.mutate(draft)}>
-        {gap ? `Save method — ${gap}` : "Save method"}
+        {gap ? `Save method: ${gap}` : "Save method"}
       </Button>
       <Button variant="neutral" onClick={() => setDraft(null)}>Cancel</Button>
     </div>
@@ -536,7 +536,7 @@ function PaymentMethodsCard() {
                 onChange={(e) => toggle.mutate({ method: m.method, active: e.target.checked })}
                 aria-label={`${m.label} — ${spec.evidence}`} />
               <span>
-                <span className="font-semibold">{m.label}</span> — {spec.evidence}
+                <span className="font-semibold">{m.label}</span>: {spec.evidence}
                 {!m.active && <span className="ml-2 text-label">Inactive</span>}
                 <span className="block text-label font-normal">
                   Money account: {m.account_code ? `${m.account_code} · ${m.account_name ?? ""}` : "Not configured"}

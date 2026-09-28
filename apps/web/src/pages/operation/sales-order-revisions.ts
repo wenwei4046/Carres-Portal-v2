@@ -38,8 +38,16 @@ const HEADER_LABELS: ReadonlyArray<[key: string, label: string, isDate?: boolean
   ["outlet_name", "Showroom"],
 ];
 
-function word(v: unknown, isDate?: boolean, key?: string): string {
-  if (v == null || v === "") return "—";
+/**
+ * ⭐ A MISSING VALUE READS AS WORDS (owner ruling 2026-09-26). A `—` on either
+ * side of a change arrow is a dash pretending to be a value: the reader cannot
+ * tell an empty field from one that failed to load. A missing value prints
+ * `No {field word}`; beside a Yes / No answer it prints `Not recorded`.
+ */
+const ABSENT = Symbol("absent");
+
+function word(v: unknown, isDate?: boolean, key?: string): string | typeof ABSENT {
+  if (v == null || v === "") return ABSENT;
   if (typeof v === "boolean") {
     /* ⭐ THE LIFT ANSWER HAS TWO NAMED WORDS (COPY-STANDARD:1516). `Yes/No` is
        banned for this fact BY NAME, because a boolean cannot say the difference
@@ -70,7 +78,7 @@ export function describeRevisionChanges(
   prev: SalesOrderSnapshot | null,
   next: SalesOrderSnapshot,
 ): string[] {
-  if (!prev) return ["Original — the agreement as first recorded"];
+  if (!prev) return ["Original: the agreement as first recorded"];
   const out: string[] = [];
 
   for (const [key, label, isDate, suffix] of HEADER_LABELS) {
@@ -78,9 +86,11 @@ export function describeRevisionChanges(
     const b = next.header?.[key];
     if ((a ?? null) === (b ?? null)) continue;
     /* ids move together with their names; the name row already speaks. */
-    const before = word(a, isDate, key);
-    const after = word(b, isDate, key);
-    out.push(`${label}: ${before}${before === "—" ? "" : (suffix ?? "")} → ${after}${after === "—" ? "" : (suffix ?? "")}`);
+    const yesNo = typeof a === "boolean" || typeof b === "boolean";
+    const absent = yesNo ? "Not recorded" : `No ${label.replace(/\?$/, "").toLowerCase()}`;
+    const side = (value: string | typeof ABSENT) =>
+      value === ABSENT ? absent : `${value}${suffix ?? ""}`;
+    out.push(`${label}: ${side(word(a, isDate, key))} → ${side(word(b, isDate, key))}`);
   }
 
   const prevById = new Map((prev.lines ?? []).map((l) => [l.id ?? l.sku, l]));

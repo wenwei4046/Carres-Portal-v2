@@ -359,7 +359,7 @@ export default function WarehouseSettings() {
 
   const canEdit = data.canEdit;
   const dirty = changes.length > 0;
-  const saveLabel = !dirty ? "Save changes" : gap ? `Save changes — ${gap}` : "Save changes";
+  const saveLabel = !dirty ? "Save changes" : gap ? `Save changes: ${gap}` : "Save changes";
   const set = (next: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...next } : d));
 
   return (
@@ -645,7 +645,7 @@ function DetailsSection({
       <h2 className="text-section">Warehouse Details</h2>
       <p className="mt-1 text-body text-kit-slate-11">
         Who runs this site, where it is, and who to call. Operated by is an organisation. Key
-        contact is a person from People — this page never creates one.
+        contact is a person from People. This page never creates one.
       </p>
 
       <div className="mt-4 grid gap-1">
@@ -827,7 +827,7 @@ function HoursSection({
                         ? NOT_CONFIGURED
                         : cell.closed
                           ? "Closed"
-                          : `${cell.opensAt}–${cell.closesAt}`}
+                          : `${cell.opensAt} to ${cell.closesAt}`}
                     </td>
                   );
                 }
@@ -870,7 +870,7 @@ function HoursSection({
                               aria-label={`${cellLabel} opens at`}
                               onChange={(e) => patch(weekday, activity, { opensAt: e.target.value })}
                             />
-                            <span aria-hidden>–</span>
+                            <span>to</span>
                             <Input
                               id={`${id}-closes`}
                               type="time"
@@ -1022,7 +1022,7 @@ function HolidaysSection({
                 aria-label="Public-holiday opens at"
                 onChange={(e) => patch({ opensAt: e.target.value })}
               />
-              <span aria-hidden>–</span>
+              <span>to</span>
               <Input
                 id="holiday-closes"
                 type="time"
@@ -1155,7 +1155,7 @@ function SpecialDatesSection({
           {upcoming.map((r) => (
             <li key={r.id} className="text-body">
               <span className="font-semibold">{r.onDate}</span> · {SPECIAL_DATE_WORD[r.kind]}
-              {r.opensAt && r.closesAt ? ` · ${hhmm(r.opensAt)}–${hhmm(r.closesAt)}` : ""} · {r.reason}
+              {r.opensAt && r.closesAt ? ` · ${hhmm(r.opensAt)} to ${hhmm(r.closesAt)}` : ""} · {r.reason}
               <div className="text-meta text-kit-slate-11">
                 {r.updatedByName ?? r.createdByName ?? "Not recorded"} · {fmtDate(r.updatedAt)}
               </div>

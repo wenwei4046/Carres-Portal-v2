@@ -376,7 +376,7 @@ export const createOrderInputSchema = z.object({
     // refusal `draft.ts:611` already made in the ruled words, so the POS said
     // one thing and its own schema said another. COPY-STANDARD:1447 governs it;
     // the office door (0391) uses the same sentence, so all three agree.
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date — pick the day production should start" });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date: pick the day production should start" });
   }
   if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });

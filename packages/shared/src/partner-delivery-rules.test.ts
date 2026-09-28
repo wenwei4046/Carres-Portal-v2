@@ -156,7 +156,7 @@ describe("partnerBookingWarnings — the four rules", () => {
     });
     expect(w.map((x) => x.key)).toEqual(["capacity"]);
     expect(w[0]!.message).toContain("already has 8 deliveries");
-    expect(w[0]!.message).toContain("its limit is 8 a day");
+    expect(w[0]!.message).toContain("Its limit is 8 a day");
   });
 
   it("does not warn one drop below the limit", () => {

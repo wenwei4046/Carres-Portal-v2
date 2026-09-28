@@ -254,7 +254,7 @@ export default function OperationWarehouse({
           <div className="font-body text-body text-base-600 mt-1 max-w-[680px]">
             Auto-deducted on delivery, auto-incremented when supplier DO is
             received. Use <strong>Adjust</strong> for damage / loss / one-off
-            corrections — every change writes to the movement log.
+            corrections. Every change writes to the movement log.
           </div>
         </div>
         <div className="flex gap-2 items-center flex-shrink-0">
@@ -315,7 +315,7 @@ export default function OperationWarehouse({
                 {t.warehouse.name}
               </div>
               <div className="font-body text-label text-base-500 mt-0.5">
-                {t.warehouse.address ?? "—"}
+                {t.warehouse.address ?? ""}
               </div>
               <div className="flex gap-[22px] mt-3">
                 <div>
@@ -538,7 +538,7 @@ export default function OperationWarehouse({
               {activeCat === "alerts"
                 ? search
                   ? `No low-stock alerts match "${search}" at ${activeWarehouse.name}.`
-                  : `No low-stock alerts at ${activeWarehouse.name} — everything's healthy.`
+                  : `No low-stock alerts at ${activeWarehouse.name}. Everything's healthy.`
                 : search
                   ? `No SKUs match "${search}" in ${activeCat}.`
                   : `No ${activeCat} stock at ${activeWarehouse.name} yet.`}
@@ -624,8 +624,8 @@ export default function OperationWarehouse({
                       data-testid={`warehouse-threshold-${row.sku}`}
                       title={
                         row.low_threshold === null && row.high_threshold === null
-                          ? "No threshold set — click to configure"
-                          : `Low ${row.low_threshold ?? "—"} / High ${row.high_threshold ?? "—"}`
+                          ? "No threshold set. Click to configure"
+                          : `Low ${row.low_threshold ?? ""} / High ${row.high_threshold ?? ""}`
                       }
                     >
                       <Settings2 size={13} strokeWidth={2} className="mr-1" /> Threshold

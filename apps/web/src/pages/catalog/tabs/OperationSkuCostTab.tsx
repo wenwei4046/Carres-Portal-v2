@@ -235,7 +235,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
         {overflow > 0 && (
           <span className="text-base-400">
             {" "}
-            · showing first {VISIBLE_CAP} — refine the search or category to see the rest
+            · showing first {VISIBLE_CAP}. Refine the search or category to see the rest
           </span>
         )}
         <span className="text-base-400">
@@ -455,13 +455,13 @@ const CostRowView = memo(function CostRowView({
         </button>
       </div>
       <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
-        {sku.description || <span className="text-base-400">—</span>}
+        {sku.description || null}
       </div>
       <div className="text-body text-base-800 truncate" title={productName}>
         {productName}
       </div>
-      <div className="text-meta text-base-600">{category ? CATEGORY_LABEL[category] : "—"}</div>
-      <div className="text-body text-base-700">{sku.variant || "—"}</div>
+      <div className="text-meta text-base-600">{category ? CATEGORY_LABEL[category] : ""}</div>
+      <div className="text-body text-base-700">{sku.variant || ""}</div>
       <div data-testid={`opcost-supplier-${sku.sku}`}>
         {editMode ? (
           <div className="flex flex-col gap-1">
@@ -493,7 +493,7 @@ const CostRowView = memo(function CostRowView({
           </div>
         ) : (
           <div className="text-meta text-base-600 truncate" title={supplierName ?? ""}>
-            {supplierName || <span className="text-base-400">—</span>}
+            {supplierName || null}
             {sku.supplierCode ? (
               <span className="text-base-400 font-mono"> · {sku.supplierCode}</span>
             ) : null}
@@ -507,7 +507,7 @@ const CostRowView = memo(function CostRowView({
             min={0}
             step="0.01"
             defaultValue={sku.cost ?? ""}
-            placeholder="—"
+            placeholder=""
             onBlur={(e) => commitCost(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -532,7 +532,7 @@ const CostRowView = memo(function CostRowView({
             min={0}
             step="0.01"
             defaultValue={sku.price || ""}
-            placeholder="—"
+            placeholder=""
             onBlur={(e) => commitPrice(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -554,7 +554,7 @@ const CostRowView = memo(function CostRowView({
             min={0}
             step="0.01"
             defaultValue={sku.pwpPrice ?? ""}
-            placeholder="—"
+            placeholder=""
             onBlur={(e) => commitPwp(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -573,11 +573,11 @@ const CostRowView = memo(function CostRowView({
           not the same fact as a zero margin. */}
       <div className="text-right" data-testid={`opcost-margin-${sku.sku}`}>
         {margin == null ? (
-          <span className="text-meta text-base-400">—</span>
+          null
         ) : (
           <span
             className={`t-num text-meta ${margin.amount < 0 ? "text-danger" : "text-base-600"}`}
-            title={category === "sofa" ? "Base margin — the sofa fabric surcharge is not counted" : undefined}
+            title={category === "sofa" ? "Base margin: the sofa fabric surcharge is not counted" : undefined}
           >
             {Math.round(margin.pct * 100)}%
           </span>

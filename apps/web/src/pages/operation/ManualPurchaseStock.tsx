@@ -379,7 +379,7 @@ export function ManualPurchaseStockFrame({
             >
               {/* A disabled control NAMES ITS GAP rather than sitting there
                   grey and silent (`03-page-patterns.md:219`). */}
-              {`${MW.chooseReadyUnit} — tick a Unit first`}
+              {`${MW.chooseReadyUnit}: tick a Unit first`}
             </Button>
           ) : null}
           {editing ? (

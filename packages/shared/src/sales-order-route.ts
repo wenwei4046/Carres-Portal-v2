@@ -54,16 +54,23 @@
  * (`Issued: 2026-08-13`); the page spells them through the one date format.
  */
 
-import { unitsShortWords } from "./line-readiness";
 import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
 /* ⭐ LAW D — the canvas ASKS these, it does not re-decide them. Both predicates
    were re-implemented inline here while this file's own comment claimed it
    asked the shared one. They agreed, which is the condition Law D names: two
    implementations that merely happen to match. */
-import { paymentApprovalOpensGate, pendingPaymentApproval } from "./delivery-payment-approval";
+import { paymentApprovalOpensGate } from "./delivery-payment-approval";
 import { openFinanceExceptions } from "./finance-exception";
+import { paymentDeadlineOf } from "./logistics-card";
+import type { DeliveryHandoverKind, DeliveryOrderAttemptFact } from "./delivery-order-status";
+import {
+  deliveryJourneyProgressFromStatus,
+  deliveryWorkStatusOf,
+  type DeliveryStatusSpell,
+} from "./delivery-work-status";
 import { fmtMoney } from "./money-format";
 import type { AllocationUnit, SalesOrderAllocation } from "./sales-order-allocation";
+import type { RouteGoodsLine, RouteGoodsSource } from "./sales-order-route-goods";
 import { normalizeSkuKey } from "./sku-code";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +85,39 @@ import { normalizeSkuKey } from "./sku-code";
  * also carries its chip, future also carries the dashed border, blocked also
  * carries `⚠` and says why in words.
  */
-export type NodeMark = "complete" | "current" | "waiting" | "blocked" | "future";
+export type NodeMark = "complete" | "current" | "waiting" | "blocked" | "future" | "unreadable";
+
+/**
+ * ⭐ A READ THAT FAILED IS NOT A POSITION — owner ruling 2026-09-26. The owning
+ * module could not be read, so its nodes say exactly that and what it does NOT
+ * mean. Never a tick, never CURRENT, never a business sentence: `No Purchase
+ * Order yet` printed from a thrown read is a false claim. Not `unknown` — that
+ * word already means an unknown MONEY VALUE in this file.
+ */
+export interface RouteUnreadable {
+  /** Delivery's arrangement / attempts read failed. */
+  delivery?: boolean;
+  /** The Finance hold / payment record read failed. */
+  payments?: boolean;
+  /** Purchasing's read failed — for every line, or for the named lines only
+   *  (a line id when `goods` is read, a SKU otherwise). */
+  purchasing?: boolean | ReadonlyArray<string>;
+  /** The change requests read failed (the banner's own read). */
+  amendment?: boolean;
+}
+
+/** The `PROPOSED CHANGE` band above the canvas — never a node, never a lane. */
+export interface RouteProposedChange {
+  kind: "waiting" | "out-of-date" | "unreadable";
+  fact: string;
+  /** WHAT changes — `Delivery date: Thu, 24 Sep → Mon, 28 Sep`. At most three
+   *  rows; `more` counts the rest, which the request itself lists. */
+  changes: string[];
+  more: number;
+  door: RouteDoor;
+  /** The sentence that stops the wrong reading. Null only on a failed read. */
+  rule: string | null;
+}
 
 /** Which of the routes leaving the Sales Order this node belongs to. */
 export type RouteBranchKey = "root" | "goods" | "delivery" | "money" | "loan" | "gate" | "tail";
@@ -97,6 +136,10 @@ export type RouteNodeKind =
   | "delivery-photo"
   | "loan"
   | "cancelled"
+  /** A delivery lane's caption plate — `Leg 1 · Carres Klang → JB transit
+   *  warehouse` · `Trip 2 · Sofa, 2 items`. Like the goods plate, it is not a
+   *  station: no state, no action, no door. */
+  | "delivery-lane"
   /** The goods line's caption plate — the product name and quantity, drawn as
    *  a small grey header ABOVE the lane so it never sits on a connector. It is
    *  not a station: no action, no door, no state of its own. */
@@ -147,7 +190,9 @@ export type GateRequirementId =
   | "appointment"
   | "money"
   | "finance-exception"
-  | "refused-day";
+  | "refused-day"
+  /** Leg 2 and later: the leg before it must have arrived at its stop. */
+  | "previous-leg";
 
 export interface RouteNode {
   id: string;
@@ -159,6 +204,9 @@ export interface RouteNode {
   /** The fact lines, in reading order. Complete nodes carry their evidence
    *  here; everything else carries its plain-sentence status. */
   lines: string[];
+  /** The same facts BEFORE they were broken into rows — what a screen reader
+   *  speaks. A row break is for the eye; a sentence is read whole. */
+  spoken: string[];
   /** The gate's requirement list. Empty on every other node. */
   requirements: GateRequirement[];
   action: NodeAction | null;
@@ -187,6 +235,11 @@ export interface RouteEdge {
   labelLines: string[];
   /** The orthogonal elbow, ready for one `<polyline>`. */
   points: RoutePoint[];
+  /** The line turns in the gap just above its target instead of half way
+   *  down — a line into a lane's gate would otherwise run behind the nodes
+   *  standing above that gate. The page keeps the same turn when it re-lays
+   *  the map. */
+  late?: boolean;
   labelAt: RoutePoint | null;
 }
 
@@ -221,6 +274,9 @@ export interface SalesOrderRouteMap {
   edges: RouteEdge[];
   bands: RouteBand[];
   linkedProblems: LinkedProblem[];
+  /** Owner ruling 2026-09-25: a waiting amendment is announced ABOVE the map.
+   *  The map itself keeps meaning what is true now. */
+  proposedChange: RouteProposedChange | null;
   /** The drawn bounding box — the page fits THIS to the viewport on load. */
   width: number;
   height: number;
@@ -303,12 +359,43 @@ export interface RouteLinkedClaim {
   closed: boolean;
 }
 
+/**
+ * ⭐ ONE DELIVERY SCOPE — one `(leg, trip)` of `ops_delivery_orders` (owner
+ * ruling 2026-09-26). Every field is Delivery's own record for that scope: the
+ * arrangement, the live Delivery Order, its attempts, its handover facts and
+ * the photos bound to its number. The Route reads them; it never infers one
+ * from the Sales Order.
+ */
+export interface RouteDeliveryScope {
+  /** 0 = the whole order; 1.. = a leg of a Delivery Journey. */
+  leg: number;
+  /** 0 = unsplit; 1..3 = a trip of a split delivery. */
+  trip: number;
+  /** The lane's caption, already in the dictionary's words. Null on an
+   *  ordinary order, which has one scope and no plate. */
+  plate: string | null;
+  /** A Journey leg before the last: it arrives at a stop, not at the customer,
+   *  and owes no delivery photo. */
+  transfer: boolean;
+  legStop: string | null;
+  partnerName: string | null;
+  confirmedDate: string | null;
+  confirmedTime: string | null;
+  /** The live (non-void) document. The door opens it by its row id. */
+  deliveryOrder: { id: string; number: string } | null;
+  /** The delivery groups this trip carries. Null = everything. */
+  tripGroups: ReadonlyArray<DeliveryGroupKey> | null;
+  attempts: ReadonlyArray<DeliveryOrderAttemptFact & { reason?: string | null }>;
+  handoverEvents: ReadonlyArray<{ kind: DeliveryHandoverKind; recordedAt?: string | null }>;
+  photos: ReadonlyArray<RouteDeliveryPhoto>;
+}
+
 export interface SalesOrderRouteInput {
   order: {
     id: string;
     so: number;
     customerName: string | null;
-    /** `orders.placed_at` — printed as `SO Date:`. */
+    /** `orders.placed_at` — printed as `SO Doc Date:`. */
     placedAt: string | null;
     /** The customer's promise — printed as `Customer requested:`. */
     deliveryDate: string | null;
@@ -323,6 +410,12 @@ export interface SalesOrderRouteInput {
    *  effective Revision; a cancelled line states its outcome and stops. */
   cancelledLines?: ReadonlyArray<{ sku: string; label?: string | null; qty: number; revision: number }>;
   allocation: SalesOrderAllocation;
+  /** ⭐ THE GOODS LINES, READ FROM THEIR OWNERS (owner ruling 2026-09-26) —
+   *  one entry per Sales Order line, arranged by `routeGoodsLinesOf` from
+   *  `po_line_sources`, the supplier's answers, the posted receipts and the
+   *  Units bound to the line. When present it OVERWRITES `allocation`,
+   *  `purchaseOrders` and `receivingRecords`, which pair by SKU. */
+  goods?: ReadonlyArray<RouteGoodsLine>;
   purchaseOrders: ReadonlyArray<RoutePurchaseOrder>;
   receivingRecords: ReadonlyArray<RouteReceivingRecord>;
   delivery: {
@@ -344,6 +437,13 @@ export interface SalesOrderRouteInput {
     doNumber?: string | null;
     /** `ops_order_control.delivery_photos` (0280). */
     photos?: ReadonlyArray<RouteDeliveryPhoto>;
+    /** Delivery's own records, one entry per scope, in lane order. When
+     *  present they OVERWRITE `logistics`, `booking`, `doNumber`, `photos` and
+     *  `attempts`, which read the V1 booking fields. */
+    scopes?: ReadonlyArray<RouteDeliveryScope>;
+    /** The assigned company is not a Klang Valley default — payment must be
+     *  complete 3 working days before the delivery instead of 2. */
+    outstation?: boolean;
   };
   /** Straight from `orderMoney` — this module never recomputes the number.
    *  Decision A removed `holds`: money cannot hold a delivery any more, so a
@@ -378,6 +478,18 @@ export interface SalesOrderRouteInput {
   /** Malaysian public holidays as `YYYY-MM-DD`. A confirmed date landing on one
    *  — or on a Sunday — is a refused delivery day (§8). */
   publicHolidays?: ReadonlyArray<string>;
+  /** Which owning reads FAILED. A failed read yellows its own group only. */
+  unreadable?: RouteUnreadable;
+  /** `sales_order_amendment_live` — only a `submitted` or out of date request
+   *  is announced; a rejected or applied one renders nothing. */
+  amendment?: {
+    status: "submitted" | "stale";
+    submittedAt: string | null;
+    submittedBy: string | null;
+    /** Who decides it, named by Staff & Duties — never hard-coded. */
+    approver?: string | null;
+    changes?: ReadonlyArray<{ what: string; before: string; after: string }>;
+  } | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -390,7 +502,10 @@ const receivingHref = (recordId: string) =>
   `/operation?tab=receiving&receipt=${encodeURIComponent(recordId)}`;
 const stockHref = "/operation?tab=stock-onhand";
 const deliveryHref = (orderId: string) =>
-  `/operation?tab=delivery&order=${encodeURIComponent(orderId)}`;
+  /* The Delivery page opens a row from `open`, on its `All delivery work`
+     view — the one spelling `monitorRowHref` and the Work cards already use.
+     `?order=` was read by nothing (found 2026-09-27). */
+  `/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}`;
 // THE MONEY DOOR OPENS THE CANONICAL REGISTER (payment/MASTER.md §16).
 // `/operation?tab=payments` was the Master-Sheet Balance desk — a SECOND form
 // for one act, which ownership Law C forbids. The order context travels as
@@ -410,6 +525,9 @@ const ringgit = (n: number) => fmtMoney(n);
 /** A date never ships bare — its meaning travels with it. */
 const dated = (label: string, iso: string | null) => (iso ? `${label}: ${iso}` : null);
 
+/** The customer's promise, in the Route's own word (owner ruling 2026-09-26). */
+const requested = (iso: string | null) => `Customer requested: ${iso ?? "Not recorded"}`;
+
 const skuKey = (sku: string) => normalizeSkuKey(sku) || sku;
 
 const unitQty = (unit: AllocationUnit) =>
@@ -420,6 +538,89 @@ const unitNames = (list: ReadonlyArray<AllocationUnit>) =>
 
 const truthy = (list: ReadonlyArray<string | null | undefined>): string[] =>
   list.filter((line): line is string => Boolean(line && line.trim().length > 0));
+
+/**
+ * ⭐ NOTHING ON A NODE IS EVER CUT. Measured 2026-09-27 at 1440/1180/820/743/390:
+ * the 208px box ended `RM 1,500.00 unpaid · by Tue, 22 Sep`, the gate's money
+ * line and every action context in an ellipsis. The box draws one row per
+ * line, so text is broken HERE, on a word, and the geometry counts the rows —
+ * the page draws the rows this function returns and no others.
+ *
+ * Budgets are characters per row at the governed type scale inside the box's
+ * 184px of text: `text-body` 13px fact lines, `text-label` 11px context rows,
+ * and requirement rows that give 12px to their tick.
+ */
+export const ROUTE_TEXT_BUDGET = { line: 26, requirement: 30, context: 32, action: 27 } as const;
+/* `action`: the instruction shares its row with the 20px owner chip and a 6px
+   gap, leaving 158px of 11px text. A supplier's name makes the instruction
+   long (`Ask {Supplier} for the Supplier DO for {PO No}`), so it wraps under
+   the chip — it never ends in "…". */
+
+/** A date travels as ISO and is SPELLED by the page (`Thu, 24 Sep`), one
+ *  character longer. The row is measured at the length the operator reads. */
+const spelledLength = (text: string) =>
+  text.replace(/\d{4}-\d{2}-\d{2}/g, "ddd, dd mmm").length;
+
+/**
+ * Facts are joined by ` · `, so a row breaks at a separator first — the line
+ * break then does the separator's work and no row starts or ends with a dot.
+ * Only a single fact longer than the row is broken on a word.
+ */
+export function wrapRouteText(text: string, budget: number): string[] {
+  const rows: string[] = [];
+  let row = "";
+  for (const fact of text.split(" · ")) {
+    if (row && spelledLength(`${row} · ${fact}`) <= budget) {
+      row = `${row} · ${fact}`;
+      continue;
+    }
+    if (row) rows.push(row);
+    row = "";
+    /* An amount is one word: `RM` never ends a row with its number on the next. */
+    const words = fact.split(" ").reduce<string[]>((list, word) => {
+      if (list.length > 0 && list[list.length - 1] === "RM") list[list.length - 1] = `RM ${word}`;
+      else list.push(word);
+      return list;
+    }, []);
+    for (const word of words) {
+      if (row && spelledLength(`${row} ${word}`) > budget) {
+        rows.push(row);
+        row = word;
+      } else {
+        row = row ? `${row} ${word}` : word;
+      }
+    }
+  }
+  if (row) rows.push(row);
+  return rows;
+}
+const wrapWords = (text: string) => wrapRouteText(text, ROUTE_TEXT_BUDGET.line);
+
+/* The read-failure words — `docs/COPY-STANDARD.md` § The Order Route words. */
+const UNREADABLE = {
+  delivery: {
+    what: "Could not read Delivery for this order.",
+    not: "This does not mean nothing is arranged.",
+    retry: "#retry-delivery",
+  },
+  payments: {
+    what: "Could not read Payments for this order.",
+    not: "This does not mean the order is unpaid.",
+    retry: "#retry-payments",
+  },
+  purchasing: {
+    what: "Could not read Purchasing for this line.",
+    not: "This does not mean there is no purchase order.",
+    retry: "#retry-purchasing",
+  },
+} as const;
+type UnreadableOwner = keyof typeof UNREADABLE;
+const tryAgain = (owner: UnreadableOwner): RouteDoor => ({
+  label: "Try again →",
+  href: UNREADABLE[owner].retry,
+});
+
+const NO_PRICE = "No price yet. Money does not hold this delivery";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Geometry. Fixed node width, height derived from content, so a connector can
@@ -463,9 +664,18 @@ function nodeHeight(node: {
     BOX_PAD +
     TITLE_H +
     node.lines.length * LINE_H +
-    node.requirements.length * REQ_H +
-    (node.action ? ACTION_H + CONTEXT_H : 0) +
-    (!node.action && node.door ? DOOR_H : 0)
+    node.requirements.reduce(
+      (rows, req) => rows + wrapRouteText(req.text, ROUTE_TEXT_BUDGET.requirement).length,
+      0,
+    ) * REQ_H +
+    (node.action
+      ? ACTION_H +
+        (wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).length - 1) * CONTEXT_H +
+        wrapRouteText(node.action.context.detail, ROUTE_TEXT_BUDGET.context).length * CONTEXT_H
+      : 0) +
+    /* A node that acts still shows its door: `Collect` tells the operator what
+       to do, `Open Payments →` is where (approved mock 2026-09-26). */
+    (node.door ? DOOR_H : 0)
   );
 }
 
@@ -485,6 +695,24 @@ function elbow(from: RouteNode, to: RouteNode): RoutePoint[] {
   ];
 }
 
+/** The same elbow, turning late: down the source's own column to the gap just
+ *  above the target, then across and in. */
+export function lateElbow(
+  from: { x: number; y: number; w: number; h: number },
+  to: { x: number; y: number; w: number; h: number },
+): RoutePoint[] {
+  const x1 = from.x + from.w / 2;
+  const x2 = to.x + to.w / 2;
+  const turn = to.y - ROW_GAP / 2;
+  if (x1 === x2) return [{ x: x1, y: from.y + from.h }, { x: x2, y: to.y }];
+  return [
+    { x: x1, y: from.y + from.h },
+    { x: x1, y: turn },
+    { x: x2, y: turn },
+    { x: x2, y: to.y },
+  ];
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * Node drafting. A branch is a vertical chain; the chain decides which of its
  * nodes is the head (the position being worked) and which are still future.
@@ -496,6 +724,13 @@ interface NodeDraft {
   title: string;
   complete: boolean;
   blocked?: boolean;
+  /** The owning read failed. Overrides every other state. */
+  unreadable?: boolean;
+  /** Nothing is owed HERE today: the step waits on somebody else, so it is
+   *  neither ticked nor the position being worked. */
+  passive?: boolean;
+  /** What a screen reader speaks, when it is not simply the lines. */
+  spoken?: string[];
   lines: (string | null | undefined)[];
   requirements?: GateRequirement[];
   action?: NodeAction | null;
@@ -527,10 +762,15 @@ function sealChain(
 ): { nodes: RouteNode[]; hasHead: boolean } {
   let headTaken = false;
   const nodes = drafts.map((draft) => {
-    const isHead = !draft.complete && !headTaken;
+    const failed = draft.unreadable === true;
+    const isHead = (failed || (!draft.complete && !draft.passive)) && !headTaken;
     if (isHead) headTaken = true;
-    const isCurrent = isHead && ownsCurrent;
-    const mark: NodeMark = draft.complete
+    /* A failed read is not a position: it takes the chain's head so nothing
+       after it is drawn as walked, and it never becomes CURRENT. */
+    const isCurrent = isHead && ownsCurrent && !failed;
+    const mark: NodeMark = failed
+      ? "unreadable"
+      : draft.complete
       ? "complete"
       : draft.blocked
         ? "blocked"
@@ -539,7 +779,13 @@ function sealChain(
           : isHead
             ? "waiting"
             : "future";
-    const lines = truthy(draft.lines);
+    /* The plate prints `text-label` 11px, so its row holds what a context row holds. */
+    const spoken = draft.spoken ?? truthy(draft.lines);
+    const lines = truthy(draft.lines).flatMap((line) =>
+      draft.kind === "goods-line" || draft.kind === "delivery-lane"
+        ? wrapRouteText(line, ROUTE_TEXT_BUDGET.context)
+        : wrapWords(line),
+    );
     const requirements = draft.requirements ?? [];
     /* An action belongs to the position being worked, not to a queue of nodes
        nobody has reached. */
@@ -552,6 +798,7 @@ function sealChain(
       title: draft.title,
       mark,
       lines,
+      spoken,
       requirements,
       action,
       door: doorway,
@@ -572,6 +819,8 @@ function sealChain(
  * ──────────────────────────────────────────────────────────────────────────── */
 
 interface LineFacts {
+  /** The node id stem — the line's id when the owners are read, else its SKU. */
+  key: string;
   sku: string;
   label: string;
   committedQty: number;
@@ -643,15 +892,16 @@ function purchaseChain(
       kind: "supplier",
       title: "SUPPLIER",
       complete: Boolean(po.expectedReadyDate),
-      lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Ready date not confirmed"],
-      action: {
-        ownerKey: "purchasing",
-        label: "Confirm ready date",
-        context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
-        },
-      },
-      door: open(po.id, poHref(po.id)),
+      lines: [po.expectedReadyDate ? dated("Estimated ready", po.expectedReadyDate) : "Supplier has not confirmed the ready date"],
+      /* Purchasing §5.8: no immediate reply is owed, and without the goods
+         facts the day-before check cannot be known, so nobody at Carres acts
+         here (the retired `confirm_ready_date` is not revived). */
+      passive: true,
+      action: null,
+      /* The PO's door already stands on PURCHASING directly above; a working
+         SUPPLIER node repeats no door (approved mock 2026-09-26). A complete
+         node still names its document. */
+      door: po.expectedReadyDate ? open(po.id, poHref(po.id)) : null,
     },
     {
       id: `${po.id}:receiving`,
@@ -663,13 +913,13 @@ function purchaseChain(
         : [
             receivedQty > 0 && receivedQty < orderedQty
               ? `${receivedQty} of ${orderedQty} received`
-              : "Not received yet",
+              : "Warehouse has not received the goods",
           ],
       action: {
         ownerKey: "receiving",
         label: "Check in",
         context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Estimated ready", po.expectedReadyDate) ?? dated("Requested Delivery Date", customerDelivery) ?? "Arrival date not recorded"}`,
+          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Estimated ready", po.expectedReadyDate) ?? requested(customerDelivery)}`,
         },
       },
       door: record ? open(record.recordNo, receivingHref(record.id)) : null,
@@ -686,62 +936,250 @@ function unassignedChain(
 ): NodeDraft[] {
   return [
     {
-      id: `${line.sku}:unassigned:purchasing`,
+      id: `${line.key}:unassigned:purchasing`,
       kind: "purchasing",
       title: "PURCHASING",
       complete: false,
       blocked: true,
-      lines: ["No Purchase Order yet"],
+      lines: ["Carres has not issued a Purchase Order"],
       action: {
         ownerKey: "purchasing",
         label: "Issue PO",
         context: {
-          detail: `${line.label} · ${units(qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
+          detail: `${line.label} · ${units(qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
         },
       },
       door: open("Purchasing", purchasingHref),
     },
     {
-      id: `${line.sku}:unassigned:supplier`,
+      id: `${line.key}:unassigned:supplier`,
       kind: "supplier",
       title: "SUPPLIER",
       complete: false,
-      lines: ["Ready date not confirmed"],
+      lines: ["Supplier has not confirmed the ready date"],
     },
     {
-      id: `${line.sku}:unassigned:receiving`,
+      id: `${line.key}:unassigned:receiving`,
       kind: "receiving",
       title: "RECEIVING",
       complete: false,
-      lines: ["Not received yet"],
+      lines: ["Warehouse has not received the goods"],
     },
   ];
+}
+
+/**
+ * The stations of a group whose owning read FAILED. The first carries the two
+ * sentences and `Try again →`; the rest carry the mark and the first sentence,
+ * so no node in the group is ticked, CURRENT or speaking a business sentence.
+ */
+function unreadableDrafts(
+  owner: UnreadableOwner,
+  stations: ReadonlyArray<{ id: string; kind: RouteNodeKind; title: string }>,
+): NodeDraft[] {
+  const words = UNREADABLE[owner];
+  return stations.map((station, index) => ({
+    ...station,
+    complete: false,
+    unreadable: true,
+    lines: index === 0 ? [words.what, words.not] : [words.what],
+    door: index === 0 ? tryAgain(owner) : null,
+  }));
+}
+
+const purchasingUnreadable = (input: SalesOrderRouteInput, line: LineFacts): boolean => {
+  const flag = input.unreadable?.purchasing;
+  if (!flag) return false;
+  if (flag === true) return true;
+  const key = skuKey(line.sku);
+  return flag.some((entry) => entry === line.key || skuKey(entry) === key);
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The goods chain, read from its owners (owner ruling 2026-09-26).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const readyStockHref = (so: number) => `/operation?tab=purchase&so=${so}`;
+
+/** PURCHASING → SUPPLIER → RECEIVING for one Purchase Order of one line. */
+function goodsSourceChain(
+  line: LineFacts,
+  source: RouteGoodsSource,
+  destination: string | null,
+  customerDelivery: string | null,
+): NodeDraft[] {
+  const stem = `${line.key}:${source.poId}`;
+  const arrived = source.pendingQty === 0 && source.qty > 0;
+  const arrival = source.expectedArrival;
+  const grn = source.latestGrn;
+  const supplier = source.supplierName ?? "the supplier";
+  /* Purchasing §5.6: an issued PO is not a sent PO. Until its CURRENT version
+     is marked `PO sent to supplier`, Purchasing owes the send; goods already
+     received prove the supplier had it. */
+  const sent = source.sent || source.receivedQty > 0;
+  return [
+    {
+      id: `${stem}:purchasing`,
+      kind: "purchasing",
+      title: "PURCHASING",
+      complete: sent,
+      lines: [source.poId, dated("Issued", source.issuedAt)],
+      action: sent
+        ? null
+        : {
+            ownerKey: "purchasing",
+            label: `Send ${source.poId} to ${supplier}`,
+            context: {
+              detail: `${source.poId} · ${units(source.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
+            },
+          },
+      door: open(source.poId, poHref(source.poId)),
+    },
+    {
+      id: `${stem}:supplier`,
+      kind: "supplier",
+      title: "SUPPLIER",
+      /* The answer is `confirmed`, the arrival was confirmed for its day — or
+         the goods are in, which is the strongest confirmation there is. */
+      complete: source.confirmed || arrived,
+      /* Purchasing §5.8: no immediate reply is owed. Outside the day-before
+         check the step waits on the supplier, and nobody at Carres acts. */
+      passive: !sent || !source.dayBeforeCheckOpen,
+      lines: [
+        source.poDeliveryDate
+          ? dated("PO Delivery Date", source.poDeliveryDate)
+          : "Supplier has not confirmed the ready date",
+        arrival
+          ? `Expected arrival: ${arrival.date} · ${arrival.change === "delayed" ? ["Delayed", arrival.reason].filter(Boolean).join(" · ") : "Earlier"}`
+          : null,
+      ],
+      /* The day-before check (Purchasing §5.7) asks for the Supplier DO; the
+         retired `confirm_ready_date` asked for nothing the supplier owes. */
+      action: sent && source.dayBeforeCheckOpen
+        ? {
+            ownerKey: "purchasing",
+            label: `Ask ${supplier} for the Supplier DO for ${source.poId}`,
+            context: {
+              detail: `${source.poId} · ${units(source.qty)} · ${destination ?? "Carres Warehouse"} · ${requested(customerDelivery)}`,
+            },
+          }
+        : null,
+      door: source.confirmed || arrived ? open(source.poId, poHref(source.poId)) : null,
+    },
+    {
+      id: `${stem}:receiving`,
+      kind: "receiving",
+      title: "RECEIVING",
+      complete: arrived && Boolean(grn),
+      lines:
+        arrived && grn
+          ? [`${grn.number} · ${dated("Received", grn.receivedAt) ?? "Received"}`]
+          : source.receivedQty > 0 || grn
+            ? [
+                `Warehouse received ${source.receivedQty} of ${source.qty}`,
+                grn ? `Latest: ${grn.number} · ${dated("Received", grn.receivedAt) ?? "Received"}` : null,
+                source.damagedOrWrongQty > 0 ? `${source.damagedOrWrongQty} damaged or wrong` : null,
+              ]
+            : [`Warehouse received 0 of ${source.qty}`],
+      action: {
+        ownerKey: "receiving",
+        label: "Check in",
+        context: {
+          detail: `${source.poId} · ${units(source.pendingQty)} · ${destination ?? "Carres Warehouse"} · ${
+            dated(arrival ? "Expected arrival" : "PO Delivery Date", arrival?.date ?? source.poDeliveryDate) ??
+            requested(customerDelivery)
+          }`,
+        },
+      },
+      door: grn ? open(grn.number, receivingHref(grn.id)) : null,
+    },
+  ];
+}
+
+/** The STOCK truth of one line, from the Units bound to it. */
+function goodsStockDraft(
+  line: LineFacts,
+  goods: RouteGoodsLine,
+  input: SalesOrderRouteInput,
+  purchasingFailed: boolean,
+): NodeDraft {
+  const base = { id: `${line.key}:stock`, kind: "stock" as const, title: "STOCK" };
+  const whole = goods.readyQty >= goods.qty && goods.qty > 0;
+  if (whole) {
+    return {
+      ...base,
+      complete: true,
+      lines: [`Warehouse has ${units(goods.qty)} ready`, goods.unitCodes.join(" · ") || null],
+      door: open("Stock", stockHref),
+    };
+  }
+  const count = `Warehouse has ${goods.readyQty} of ${goods.qty} Units ready`;
+  /* WHY the Units are short is Purchasing's answer; when Purchasing could not
+     be read the count stands alone. */
+  const why = purchasingFailed
+    ? null
+    : goods.shortBecause === "not-ordered"
+      ? "Carres has not ordered the goods"
+      : "Warehouse has not received the goods";
+  if (goods.readyStockQty > 0 && !purchasingFailed) {
+    return {
+      ...base,
+      complete: false,
+      lines: [count, why],
+      action: {
+        ownerKey: "sales",
+        label: "Choose Ready Unit",
+        context: {
+          detail: `${units(goods.readyStockQty)} in Ready Stock · ${requested(input.order.deliveryDate)}`,
+        },
+      },
+      door: door("Open Ready Stock →", readyStockHref(input.order.so)),
+    };
+  }
+  /* No eligible Ready Stock: the wait belongs to Purchasing or Receiving, and
+     Stock owes no action. */
+  return { ...base, complete: false, passive: true, lines: [count, why], door: open("Stock", stockHref) };
 }
 
 /** The STOCK truth of one goods line — its own fork off the Sales Order. */
 function stockDraft(
   line: LineFacts,
   destination: string | null,
-  customerDelivery: string | null,
+  _customerDelivery: string | null,
+  purchasingFailed = false,
+  notOrdered = false,
 ): NodeDraft {
   const readyQty = line.reservedQty + line.soldQty;
   const allReady = readyQty >= line.committedQty && line.committedQty > 0;
   const codes = unitNames([...line.reservedUnits, ...line.soldUnits]);
+  if (allReady) {
+    return {
+      id: `${line.key}:stock`,
+      kind: "stock",
+      title: "STOCK",
+      complete: true,
+      lines: [`Warehouse has ${units(line.committedQty)} ready`, codes || null, destination],
+      door: open("Stock", stockHref),
+    };
+  }
+  /* The count is Stock's own fact. WHY the Units are short is Purchasing's
+     answer (none when Purchasing could not be read), and the wait belongs to
+     Purchasing or Receiving: Stock owes no action, and the retired
+     `Create the Units` is not revived. */
   return {
-    id: `${line.sku}:stock`,
+    id: `${line.key}:stock`,
     kind: "stock",
     title: "STOCK",
-    complete: allReady,
-    lines: allReady
-      ? [`${units(line.committedQty)} ready`, codes || null, destination]
-      : unitsShortWords(readyQty, line.committedQty),
-    action: {
-      ownerKey: "stock",
-      label: "Create the Units",
-      context: {
-        detail: `${line.label} · ${units(Math.max(0, line.committedQty - readyQty))} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
-      },
-    },
+    complete: false,
+    passive: true,
+    lines: [
+      `Warehouse has ${readyQty} of ${line.committedQty} Units ready`,
+      purchasingFailed
+        ? null
+        : notOrdered
+          ? "Carres has not ordered the goods"
+          : "Warehouse has not received the goods",
+    ],
     door: open("Stock", stockHref),
   };
 }
@@ -762,7 +1200,7 @@ function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
       ownerKey: "delivery",
       label: "Assign logistics",
       context: {
-        detail: dated("Requested Delivery Date", input.order.deliveryDate) ?? "Requested Delivery Date not recorded",
+        detail: requested(input.order.deliveryDate),
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -781,12 +1219,12 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
     complete: Boolean(confirmed),
     lines: confirmed
       ? [dated("Scheduled delivery", confirmed), ...(booking?.slot ? [booking.slot] : [])]
-      : ["Not scheduled yet", dated("Requested delivery", input.order.deliveryDate)],
+      : ["Logistics has not scheduled the delivery", dated("Requested delivery", input.order.deliveryDate)],
     action: {
       ownerKey: "sales",
       label: "Confirm delivery date",
       context: {
-        detail: dated("Requested Delivery Date", input.order.deliveryDate) ?? "Requested Delivery Date not recorded",
+        detail: requested(input.order.deliveryDate),
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -794,58 +1232,61 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
 }
 
 /**
- * The MONEY branch under the 2026-08-19 ruling: a collection fact AND the gate
- * input — money in full before delivery is the only default, and the one
- * exception is a recorded APPROVED Delivery Payment Approval (COD on the
- * owner's terms). The branch prints what the customer owes, keeps the collect
- * action, and names the approval when one stands: an approved COD order still
- * OWES — the driver collects before unloading.
+ * ⭐ THE PAYMENT NODE SPEAKS IN TWO LINES — owner ruling 2026-09-26. Money in
+ * full before delivery is absolute (2026-08-19, door closed 2026-09-01), so the
+ * node says what that means for the truck — `Hold delivery` — over the amount
+ * and the day it must be paid by. The deadline is ONE arithmetic with the Work
+ * right panel and the Logistics card (`paymentDeadlineOf`, Law D): 2 working
+ * days before the Scheduled delivery, else the Customer requested date; 3 for
+ * an outstation delivery.
  */
-function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
+function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
   const payments = open("Payments", paymentsHref(input.order.so));
-  const action: NodeAction = {
-    ownerKey: "payment",
-    label: "Collect",
-    context: {
-      detail: dated("Collect before Requested Delivery Date", input.order.deliveryDate) ?? "Collection date not recorded",
-    },
-  };
-  if (!input.money.known) {
-    return {
-      id: "money",
-      kind: "money",
-      title: "MONEY",
-      complete: false,
-      lines: ["No price yet", "An unknown value never holds a delivery"],
-      door: payments,
-    };
+  const base = { id: "money", kind: "money" as const, title: "PAYMENT" };
+  if (input.unreadable?.payments) {
+    return unreadableDrafts("payments", [base])[0]!;
   }
-  if (input.money.outstanding <= 0) {
-    return {
-      id: "money",
-      kind: "money",
-      title: "MONEY",
-      complete: true,
-      lines: ["Paid in full"],
-      door: payments,
-    };
+  const holds = openFinanceExceptions(input.financeExceptions);
+  const financeLine =
+    holds.length === 0
+      ? null
+      : holds.length === 1
+        ? `Finance hold · ${holds[0]!.reason}`
+        : `Finance hold · ${holds.length} reasons`;
+  const owing = input.money.known && input.money.outstanding > 0;
+
+  if (!owing) {
+    if (financeLine) {
+      return { ...base, complete: false, blocked: true, lines: ["Hold delivery", financeLine], door: payments };
+    }
+    if (!input.money.known) {
+      return { ...base, complete: false, lines: [NO_PRICE], door: payments };
+    }
+    return { ...base, complete: true, lines: ["Customer paid in full"], door: payments };
   }
-  const approved = paymentApprovalOpensGate(input.paymentApprovals);
-  const pending = pendingPaymentApproval(input.paymentApprovals) !== null;
+
+  const scheduled = input.delivery.booking?.confirmedDate ?? null;
+  const anchor = scheduled ?? input.order.deliveryDate;
+  const deadline = paymentDeadlineOf({
+    anchorIso: anchor,
+    outstation: input.delivery.outstation === true,
+    holidays: input.publicHolidays ? new Set(input.publicHolidays) : undefined,
+  });
+  const amount = `Customer has not paid ${ringgit(input.money.outstanding)}${deadline ? ` · Customer must pay by ${deadline}` : ""}`;
+  /* An approval granted before the door closed is still honoured by the 0362
+     predicate, so the delivery is NOT held — the money is simply still owed. */
+  const honoured = paymentApprovalOpensGate(input.paymentApprovals) && !financeLine;
   return {
-    id: "money",
-    kind: "money",
-    title: "MONEY",
+    ...base,
     complete: false,
-    lines: [
-      `${ringgit(input.money.outstanding)} still to collect`,
-      ...(approved
-        ? ["COD approved — collect before unloading"]
-        : pending
-          ? ["Payment approval waiting for decision"]
-          : []),
-    ],
-    action,
+    lines: [honoured ? null : "Hold delivery", amount, financeLine],
+    action: {
+      ownerKey: "payment",
+      label: "Collect",
+      context: {
+        detail: scheduled ? `Scheduled delivery: ${scheduled}` : requested(input.order.deliveryDate),
+      },
+    },
     door: payments,
   };
 }
@@ -924,10 +1365,10 @@ function refusedDayLine(
   holidays: ReadonlyArray<string>,
 ): string | null {
   if (!confirmed) return null;
-  if (holidays.includes(confirmed)) return "Date falls on a public holiday — pick another day";
+  if (holidays.includes(confirmed)) return "Date falls on a public holiday. Pick another day";
   const day = new Date(`${confirmed}T00:00:00Z`);
   if (Number.isNaN(day.getTime())) return null;
-  return day.getUTCDay() === WEEKDAY_SUNDAY ? "Date falls on a Sunday — pick another day" : null;
+  return day.getUTCDay() === WEEKDAY_SUNDAY ? "Date falls on a Sunday. Pick another day" : null;
 }
 
 interface GoodsTotals {
@@ -967,22 +1408,22 @@ function goodsRequirement(
         return {
           id: "goods",
           met: true,
-          text: `Goods ready for this delivery (${units(scopeCommitted)} in, ${units(remaining)} still open)`,
+          text: `Warehouse has ${units(scopeCommitted)} ready for this delivery · ${units(remaining)} still open`,
         };
       }
     }
   }
 
   if (totals.committedQty === 0) {
-    return { id: "goods", met: true, text: "No goods on this order" };
+    return { id: "goods", met: true, text: "Customer ordered no goods" };
   }
   if (totals.readyQty >= totals.committedQty) {
-    return { id: "goods", met: true, text: `Goods ready (${units(totals.committedQty)})` };
+    return { id: "goods", met: true, text: `Warehouse has ${units(totals.committedQty)} ready` };
   }
   return {
     id: "goods",
     met: false,
-    text: `Goods not ready (${totals.readyQty} of ${totals.committedQty})`,
+    text: `Warehouse has ${totals.readyQty} of ${totals.committedQty} Units ready`,
   };
 }
 
@@ -1005,8 +1446,8 @@ function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequireme
     met: false,
     text:
       openOnes.length === 1
-        ? `Finance is holding this delivery: ${openOnes[0]!.reason} — Finance clears it`
-        : `Finance is holding this delivery for ${openOnes.length} reasons — Finance clears them`,
+        ? `Hold delivery · Finance hold · ${openOnes[0]!.reason}`
+        : `Hold delivery · Finance hold · ${openOnes.length} reasons`,
   };
 }
 
@@ -1021,27 +1462,22 @@ function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequireme
 function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
   if (!input.money.known && input.money.outstanding <= 0) {
     // §8: an unknown value never holds — a number nobody knows may not stand
-    // between a customer and their goods. The MONEY branch already warns.
-    return { id: "money", met: true, text: "No price yet — unknown never holds" };
+    // between a customer and their goods. The PAYMENT branch already warns.
+    return { id: "money", met: true, text: NO_PRICE };
   }
   if (input.money.outstanding <= 0) {
-    return { id: "money", met: true, text: "Money in full" };
+    return { id: "money", met: true, text: "Customer paid in full" };
   }
-  const approved = paymentApprovalOpensGate(input.paymentApprovals);
-  if (approved) {
-    return {
-      id: "money",
-      met: true,
-      text: "COD approved — collect before unloading",
-    };
+  /* The door closed on 2026-09-01 and no surface invites an approval. One
+     granted before that is history honoured: the line is met and reads `Paid`
+     on the terms recorded — the DO prints its COD instruction (Delivery §3). */
+  if (paymentApprovalOpensGate(input.paymentApprovals)) {
+    return { id: "money", met: true, text: "Customer paid in full" };
   }
-  const pending = pendingPaymentApproval(input.paymentApprovals) !== null;
   return {
     id: "money",
     met: false,
-    text: pending
-      ? `${ringgit(input.money.outstanding)} still outstanding — approval waiting for decision`
-      : `${ringgit(input.money.outstanding)} still outstanding — collect, or request a payment approval`,
+    text: `Customer has not paid ${ringgit(input.money.outstanding)}`,
   };
 }
 
@@ -1063,7 +1499,7 @@ function gateRequirements(
     {
       id: "appointment",
       met: Boolean(confirmed),
-      text: confirmed ? "Scheduled delivery recorded" : "Scheduled delivery not recorded",
+      text: confirmed ? "Logistics scheduled the delivery" : "Logistics has not scheduled the delivery",
     },
     moneyRequirement(input),
     financeExceptionRequirement(input),
@@ -1073,10 +1509,33 @@ function gateRequirements(
   return list;
 }
 
-function gateDraft(requirements: GateRequirement[], doNumber: string | null): NodeDraft {
+function gateDraft(
+  requirements: GateRequirement[],
+  doNumber: string | null,
+  failed: UnreadableOwner | null = null,
+  /** The document's row id, when Delivery's record carries it. A number may
+   *  change format; the id never does. */
+  doId: string | null = null,
+): NodeDraft {
+  if (failed) {
+    /* A gate that cannot read one of its requirements counts nothing: `3 of 5
+       requirements met` from a failed read is the false claim this mark stops. */
+    return {
+      id: "delivery-order",
+      kind: "delivery-order",
+      title: "DELIVERY ORDER",
+      complete: false,
+      unreadable: true,
+      lines: [UNREADABLE[failed].what],
+      door: null,
+    };
+  }
   const met = requirements.filter((r) => r.met).length;
   const total = requirements.length;
-  const ready = met === total;
+  /* ⭐ ISSUED = THE ROW EXISTS (owner ruling 2026-09-26). When Delivery's own
+     record names the live document, the document is the fact; the Route does
+     not re-judge a Delivery Order the system already issued. */
+  const ready = met === total || Boolean(doId && doNumber);
   return {
     id: "delivery-order",
     kind: "delivery-order",
@@ -1098,7 +1557,7 @@ function gateDraft(requirements: GateRequirement[], doNumber: string | null): No
        never to a control. */
     door:
       ready && doNumber
-        ? open(doNumber, `/operation/delivery-orders/${doNumber}`)
+        ? open(doNumber, `/operation/delivery-orders/${encodeURIComponent(doId ?? doNumber)}`)
         : null,
   };
 }
@@ -1146,13 +1605,19 @@ function deliverDraft(input: SalesOrderRouteInput): NodeDraft {
     kind: "deliver",
     title: "DELIVER",
     complete: false,
-    lines: confirmed ? ["Not delivered yet", dated("Scheduled", confirmed)] : ["Not delivered yet"],
+    lines: confirmed ? ["Logistics has not delivered the goods", dated("Scheduled", confirmed)] : ["Logistics has not delivered the goods"],
     door: open("Delivery", deliveryHref(input.order.id)),
   };
 }
 
-function photoDraft(input: SalesOrderRouteInput): NodeDraft {
+function photoDraft(input: SalesOrderRouteInput, scope: RouteDeliveryScope | null = null): NodeDraft {
   const photo = (input.delivery.photos ?? [])[0] ?? null;
+  /* The day is the one Delivery recorded on THIS scope's delivered result. */
+  const deliveredOn =
+    [...(scope?.attempts ?? [])]
+      .filter((attempt) => attempt.result === "delivered")
+      .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0]
+      ?.recordedAt.slice(0, 10) ?? input.order.deliveredAt;
   return {
     id: "delivery-photo",
     kind: "delivery-photo",
@@ -1160,12 +1625,12 @@ function photoDraft(input: SalesOrderRouteInput): NodeDraft {
     complete: Boolean(photo),
     lines: photo
       ? [photo.by ? `Uploaded by ${photo.by}` : "Uploaded", dated("Uploaded", photo.at)]
-      : ["No delivery photo yet"],
+      : ["Logistics has not uploaded the delivery photo"],
     action: {
       ownerKey: "delivery",
       label: "Upload delivery photo",
       context: {
-        detail: `${input.delivery.doNumber ?? "Delivery order"} · ${dated("Delivered", input.order.deliveredAt) ?? "Delivery date not recorded"}`,
+        detail: `${input.delivery.doNumber ?? "Delivery order"} · ${dated("Delivered", deliveredOn) ?? "Delivery date not recorded"}`,
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -1176,9 +1641,132 @@ function photoDraft(input: SalesOrderRouteInput): NodeDraft {
  * The resolver — branches, then geometry, then connectors.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderRouteMap {
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Delivery scopes — one lane each.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Dates leave this module as ISO and the page spells them. */
+const ROUTE_SPELL: DeliveryStatusSpell = {
+  date: (iso) => iso.slice(0, 10),
+  dateTime: (iso) => iso.slice(0, 10),
+  time: (value) => value,
+};
+
+const scopeKey = (scope: RouteDeliveryScope) => `${scope.leg}:${scope.trip}`;
+
+const arrivedOrDelivered = (scope: RouteDeliveryScope) =>
+  scope.attempts.some((attempt) => attempt.result === "delivered");
+
+/** The same input, seen from ONE scope: Delivery's record for that scope
+ *  stands where the V1 booking fields stood, so every draft below reads the
+ *  owner's record through the one path it already had. */
+function scopedInput(input: SalesOrderRouteInput, scope: RouteDeliveryScope): SalesOrderRouteInput {
+  return {
+    ...input,
+    delivery: {
+      ...input.delivery,
+      logistics: scope.partnerName?.trim() ? { partnerName: scope.partnerName } : null,
+      booking: scope.confirmedDate
+        ? { confirmedDate: scope.confirmedDate, slot: scope.confirmedTime, scope: null }
+        : null,
+      doNumber: scope.deliveryOrder?.number ?? null,
+      photos: scope.photos,
+      attempts: [],
+    },
+  };
+}
+
+/**
+ * ⭐ `DELIVER` PRINTS DELIVERY'S WORDS, NOT ITS OWN (owner ruling 2026-09-26).
+ * Line one is the scope's rung through Delivery's ONE label function; a second
+ * label function on this surface is a Law D defect. The Route's own sentence
+ * survives only for a scope with no Delivery Order yet.
+ */
+function scopeDeliverDraft(
+  input: SalesOrderRouteInput,
+  scope: RouteDeliveryScope,
+  id: string,
+): NodeDraft {
+  const doorway = open("Delivery", deliveryHref(input.order.id));
+  if (!scope.deliveryOrder) {
+    return {
+      id,
+      kind: "deliver",
+      title: "DELIVER",
+      complete: false,
+      lines: ["Logistics has not delivered the goods", dated("Scheduled", scope.confirmedDate)],
+      door: doorway,
+    };
+  }
+  const facts = {
+    partnerName: scope.partnerName,
+    confirmedDate: scope.confirmedDate,
+    confirmedTime: scope.confirmedTime,
+    hasDeliveryOrder: true,
+    handoverEvents: scope.handoverEvents,
+    attempts: scope.attempts,
+    intermediateLeg: scope.transfer,
+    legStop: scope.legStop,
+    missingFacts: [],
+    todayIso: null,
+  };
+  const status = deliveryWorkStatusOf(facts, ROUTE_SPELL);
+  const progress = deliveryJourneyProgressFromStatus(status, facts);
+  const done = status.kind === "delivered" || status.kind === "arrived";
+  const latest = [...scope.attempts].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
+  const second = done
+    ? dated(scope.transfer ? "Arrived" : "Delivered", latest?.recordedAt?.slice(0, 10) ?? null)
+    : status.kind === "failed"
+      ? (latest?.reason ?? status.reasonLabel ?? status.second)
+      : status.kind === "confirmed"
+        ? dated("Scheduled", scope.confirmedDate)
+        : status.second;
+  return {
+    id,
+    kind: "deliver",
+    title: "DELIVER",
+    complete: done,
+    blocked: status.kind === "failed",
+    lines: [progress.label, second],
+    action:
+      status.kind === "failed"
+        ? {
+            ownerKey: "delivery",
+            label: "Arrange new delivery date",
+            context: { detail: scope.deliveryOrder.number },
+          }
+        : null,
+    door: doorway,
+  };
+}
+
+export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderRouteMap {
+  /* ⭐ DELIVERY'S OWN RECORDS WIN (owner ruling 2026-09-26). An ordinary order
+     has one scope and keeps today's single chain, read from that scope. Two or
+     more scopes each take a lane; the money deadline then anchors on the first
+     scope that reaches the customer. */
+  const scopes =
+    given.unreadable?.delivery === true ? [] : [...(given.delivery.scopes ?? [])];
+  const anchor = scopes.find((scope) => !scope.transfer) ?? scopes[0] ?? null;
+  const input = anchor ? scopedInput(given, anchor) : given;
+  const laneScopes = scopes.length > 1 ? scopes : [];
+  const soleScope = scopes.length === 1 ? scopes[0]! : null;
   const soNumber = `SO-${input.order.so}`;
-  const lines: LineFacts[] = input.allocation.lines.map((line) => ({
+  const goodsById = new Map((input.goods ?? []).map((line) => [line.lineId, line]));
+  const lines: LineFacts[] = input.goods
+    ? input.goods.map((line) => ({
+        key: line.lineId,
+        sku: line.sku,
+        label: line.label,
+        committedQty: line.qty,
+        reservedUnits: [],
+        soldUnits: [],
+        reservedQty: line.readyQty,
+        soldQty: 0,
+        outstandingQty: Math.max(0, line.qty - line.readyQty),
+      }))
+    : input.allocation.lines.map((line) => ({
+    key: line.sku,
     sku: line.sku,
     label: input.lineLabels?.[line.sku]?.trim() || line.sku,
     committedQty: line.committedQty,
@@ -1208,9 +1796,47 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
   for (const line of lines) {
     const destinations = input.lineDestinations?.[line.sku] ?? [];
     const destination = destinations.length === 1 ? destinations[0]!.name : null;
-    const { slices, unassignedQty } = purchaseSlices(line, input.purchaseOrders);
+    const purchasingFailed = purchasingUnreadable(input, line);
+    const goods = goodsById.get(line.key) ?? null;
+    const { slices, unassignedQty } = purchasingFailed
+      ? { slices: [] as PurchaseSlice[], unassignedQty: 0 }
+      : goods
+        ? { slices: [] as PurchaseSlice[], unassignedQty: goods.uncoveredQty }
+        : purchaseSlices(line, input.purchaseOrders);
+
+    /* Short, and eligible Ready Stock exists: the fastest way to make the line
+       whole is a Unit already on the shelf, so STOCK is the position being
+       worked and takes CURRENT before the purchase chain can. */
+    const stockFirst = Boolean(goods && !purchasingFailed && goods.readyStockQty > 0 && goods.readyQty < goods.qty);
+    const sealStock = () =>
+      seal(
+        [
+          goods
+            ? goodsStockDraft(line, goods, input, purchasingFailed)
+            : stockDraft(line, destination, input.order.deliveryDate, purchasingFailed, unassignedQty > 0),
+        ],
+        "goods",
+      )[0]!;
+    const stockAhead = stockFirst ? sealStock() : null;
 
     const chains: RouteNode[][] = [];
+    if (purchasingFailed && line.outstandingQty > 0) {
+      chains.push(
+        seal(
+          unreadableDrafts("purchasing", [
+            { id: `${line.key}:unreadable:purchasing`, kind: "purchasing", title: "PURCHASING" },
+            { id: `${line.key}:unreadable:supplier`, kind: "supplier", title: "SUPPLIER" },
+            { id: `${line.key}:unreadable:receiving`, kind: "receiving", title: "RECEIVING" },
+          ]),
+          "goods",
+        ),
+      );
+    }
+    for (const source of purchasingFailed ? [] : (goods?.sources ?? [])) {
+      chains.push(
+        seal(goodsSourceChain(line, source, destination, input.order.deliveryDate), "goods"),
+      );
+    }
     for (const slice of slices) {
       chains.push(
         seal(
@@ -1227,20 +1853,27 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
         ),
       );
     }
-    const stock = seal([stockDraft(line, destination, input.order.deliveryDate)], "goods")[0]!;
+    const stock = stockAhead ?? sealStock();
 
-    const buyQty = slices.reduce((sum, slice) => sum + slice.qty, 0) + unassignedQty;
+    /* Owner ruling 2026-09-26: `on order` is covered by an issued PO, `to buy`
+       is covered by none. `to buy from factory` said *buy* about goods already
+       bought, and is retired. */
+    const onOrderQty = goods
+      ? purchasingFailed
+        ? 0
+        : goods.onOrderQty
+      : slices.reduce((sum, slice) => sum + slice.qty, 0);
     const { nodes: plateNodes } = sealChain(
       [
         {
-          id: `${line.sku}:goods-line`,
+          id: `${line.key}:goods-line`,
           kind: "goods-line",
           title: line.label,
           complete: true,
           lines: [
-            buyQty > 0
-              ? `Qty ${line.committedQty} · ${buyQty} to buy from factory`
-              : `Qty ${line.committedQty}`,
+`Customer ordered ${line.committedQty}`,
+            onOrderQty > 0 ? `Carres ordered ${onOrderQty} from supplier` : null,
+            unassignedQty > 0 ? `Carres has not ordered ${unassignedQty} yet` : null,
           ],
         },
       ],
@@ -1276,8 +1909,113 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     lanes.push({ plate: null, chains: [], stock: null, solo: soloNodes[0]!, w: NODE_W });
   }
 
-  const deliveryChain = seal([logisticsDraft(input), deliveryDateDraft(input)], "delivery");
-  const moneyChain = seal([moneyDraft(input)], "money");
+  const deliveryFailed = input.unreadable?.delivery === true;
+  const deliveryChain = seal(
+    deliveryFailed
+      ? unreadableDrafts("delivery", [
+          { id: "logistics", kind: "logistics", title: "LOGISTICS" },
+          { id: "delivery-date", kind: "delivery-date", title: "DELIVERY DATE" },
+        ])
+      : laneScopes.length > 0
+        ? []
+        : [logisticsDraft(input), deliveryDateDraft(input)],
+    "delivery",
+  );
+
+  /* ── ONE DELIVERY SCOPE IS ONE LANE (owner ruling 2026-09-26). The plate
+     names the scope; the lane carries its own LOGISTICS → DELIVERY DATE →
+     DELIVERY ORDER → DELIVER → DELIVERY PHOTO. `CURRENT` stays ONE for the
+     whole group — `seal` hands it to the earliest unfinished lane. ───────── */
+  interface DeliveryLane {
+    scope: RouteDeliveryScope;
+    plate: RouteNode;
+    gate: RouteNode;
+    /** Every node under the plate, in reading order. */
+    column: RouteNode[];
+    deliver: RouteNode;
+  }
+  const paymentsFailed = input.unreadable?.payments === true;
+  const goodsLane = (line: LineFacts): number => {
+    if (laneScopes.every((scope) => scope.trip === 0)) return 0;
+    const group = deliveryGroupOf(line.sku);
+    const index = laneScopes.findIndex(
+      (scope) => group != null && (scope.tripGroups ?? []).includes(group),
+    );
+    return index >= 0 ? index : 0;
+  };
+  const deliveryLanes: DeliveryLane[] = laneScopes.map((scope, index) => {
+    const key = scopeKey(scope);
+    const seen = scopedInput(given, scope);
+    const rename = (draft: NodeDraft): NodeDraft => ({ ...draft, id: `${draft.id}:${key}` });
+    const plate = sealChain(
+      [
+        {
+          id: `delivery-lane:${key}`,
+          kind: "delivery-lane",
+          /* `Leg 1` heads the plate; its two places take the rows under it,
+             so a long stop name is never cut. */
+          title: (scope.plate ?? "").split(" · ")[0] || `Trip ${scope.trip}`,
+          complete: true,
+          lines: [(scope.plate ?? "").split(" · ").slice(1).join(" · ")],
+          spoken: [scope.plate ?? `Trip ${scope.trip}`],
+        },
+      ],
+      "delivery",
+      false,
+    ).nodes[0]!;
+    const head = seal([rename(logisticsDraft(seen)), rename(deliveryDateDraft(seen))], "delivery");
+
+    /* Readiness follows the shipment: a trip counts the goods it carries, a
+       Journey's first leg counts the order, and a later leg counts nothing —
+       its goods are the ones the leg before it brought. */
+    const carried =
+      scope.trip > 0
+        ? lines.filter((line) => goodsLane(line) === index)
+        : index === 0
+          ? lines
+          : [];
+    const laneRequirements = gateRequirements(carried, goodsTotals(carried), seen).filter(
+      (requirement) => requirement.id !== "goods" || scope.trip > 0 || index === 0,
+    );
+    const before = scope.leg > 1 ? laneScopes[index - 1] ?? null : null;
+    if (before) {
+      const arrived = arrivedOrDelivered(before);
+      const stop = before.legStop?.trim();
+      laneRequirements.push({
+        id: "previous-leg",
+        met: arrived,
+        text: arrived
+          ? `Leg ${before.leg} arrived${stop ? ` at ${stop}` : ""}`
+          : `Leg ${before.leg} not arrived yet`,
+      });
+    }
+    const gate = sealChain(
+      [
+        rename(
+          gateDraft(
+            laneRequirements,
+            scope.deliveryOrder?.number ?? null,
+            paymentsFailed ? "payments" : null,
+            scope.deliveryOrder?.id ?? null,
+          ),
+        ),
+      ],
+      "gate",
+      false,
+    ).nodes[0]!;
+    const tailDrafts = [
+      scopeDeliverDraft(given, scope, `deliver:${key}`),
+      /* A transfer leg draws no DELIVERY PHOTO: the customer leg owes the proof. */
+      ...(scope.transfer ? [] : [rename(photoDraft(seen, scope))]),
+    ];
+    const tail =
+      gate.mark === "complete"
+        ? seal(tailDrafts, "delivery")
+        : sealChain(tailDrafts, "delivery", false).nodes;
+    return { scope, plate, gate, column: [...head, gate, ...tail], deliver: tail[0]! };
+  });
+
+  const moneyChain = seal([paymentDraft(input)], "money");
   const loanNodes = loanDrafts(input).map(
     (draft) => sealChain([draft], "loan", false).nodes[0]!,
   );
@@ -1290,8 +2028,15 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       : 0;
   const groups: { key: RouteBranchKey; label: string; w: number }[] = [];
   if (lanes.length > 0) groups.push({ key: "goods", label: "GOODS", w: goodsW });
-  groups.push({ key: "delivery", label: "DELIVERY", w: NODE_W });
-  groups.push({ key: "money", label: "MONEY", w: NODE_W });
+  groups.push({
+    key: "delivery",
+    label: "DELIVERY",
+    w:
+      deliveryLanes.length > 0
+        ? deliveryLanes.length * NODE_W + (deliveryLanes.length - 1) * COL_GAP
+        : NODE_W,
+  });
+  groups.push({ key: "money", label: "PAYMENT", w: NODE_W });
   if (loanNodes.length > 0) {
     groups.push({
       key: "loan",
@@ -1318,7 +2063,7 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     kind: "sales-order",
     title: "SALES ORDER",
     complete: true,
-    lines: [soNumber, dated("SO Date", input.order.placedAt)],
+    lines: [soNumber, dated("SO Doc Date", input.order.placedAt)],
     /* Order Route already sits inside this Sales Order object. A door back to
        the same object is circular navigation, not useful evidence (§0.1). */
     door: null,
@@ -1364,6 +2109,23 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
         }
         laneX += lane.w + COL_GAP;
       }
+    } else if (group.key === "delivery" && deliveryLanes.length > 0) {
+      /* The plates share one height, so every lane's stations start on the
+         same row and a leg reads across as easily as down. */
+      const plateH = Math.max(...deliveryLanes.map((lane) => lane.plate.h));
+      for (const lane of deliveryLanes) lane.plate.h = plateH;
+      deliveryLanes.forEach((lane, index) => {
+        const x = groupX + index * PITCH;
+        lane.plate.x = x;
+        lane.plate.y = rowTop;
+        let y = rowTop + lane.plate.h + ROW_GAP;
+        for (const laneNode of lane.column) {
+          laneNode.x = x;
+          laneNode.y = y;
+          y += laneNode.h + ROW_GAP;
+        }
+        deepest = Math.max(deepest, y - ROW_GAP);
+      });
     } else if (group.key === "delivery" || group.key === "money") {
       const chain = group.key === "delivery" ? deliveryChain : moneyChain;
       let y = rowTop;
@@ -1383,13 +2145,31 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     groupX += group.w + GROUP_GAP;
   }
 
-  const { nodes: gateNodes } = sealChain([gateDraft(requirements, doNumber)], "gate", false);
+  const gateFailed: UnreadableOwner | null = deliveryFailed
+    ? "delivery"
+    : input.unreadable?.payments
+      ? "payments"
+      : null;
+  const { nodes: gateNodes } = sealChain(
+    [gateDraft(requirements, doNumber, gateFailed, soleScope?.deliveryOrder?.id ?? null)],
+    "gate",
+    false,
+  );
   const gate = gateNodes[0]!;
   gate.x = centreX - NODE_W / 2;
   gate.y = deepest + GATE_GAP;
+  const laned = deliveryLanes.length > 0;
 
   const { nodes: tailNodes } = sealChain(
-    [deliverDraft(input), photoDraft(input)],
+    deliveryFailed
+      ? unreadableDrafts("delivery", [
+          { id: "deliver", kind: "deliver", title: "DELIVER" },
+          { id: "delivery-photo", kind: "delivery-photo", title: "DELIVERY PHOTO" },
+        ]).map((draft) => ({ ...draft, lines: [UNREADABLE.delivery.what], door: null }))
+      : [
+          soleScope ? scopeDeliverDraft(given, soleScope, "deliver") : deliverDraft(input),
+          photoDraft(input, soleScope),
+        ],
     "tail",
     false,
   );
@@ -1408,16 +2188,24 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       lane.solo ? [lane.solo] : [lane.plate!, ...lane.chains.flat(), lane.stock!],
     ),
     ...deliveryChain,
+    ...deliveryLanes.flatMap((lane) => [lane.plate, ...lane.column]),
     ...moneyChain,
     ...loanNodes,
-    gate,
-    ...tailNodes,
+    /* With lanes, every lane carries its own gate and tail; the one central
+       gate is not drawn. */
+    ...(laned ? [] : [gate, ...tailNodes]),
   ];
 
   /* ── connectors ──────────────────────────────────────────────────────── */
   const edges: RouteEdge[] = [];
-  const segment = (from: RouteNode, to: RouteNode, labelLines: string[], forceDashed = false) => {
-    const points = elbow(from, to);
+  const segment = (
+    from: RouteNode,
+    to: RouteNode,
+    labelLines: string[],
+    forceDashed = false,
+    late = false,
+  ) => {
+    const points = late ? lateElbow(from, to) : elbow(from, to);
     const style: RouteEdge["style"] =
       forceDashed || from.mark !== "complete" ? "dashed" : "solid";
     const drop = points[points.length - 1]!;
@@ -1429,6 +2217,7 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       labelLines,
       points,
       labelAt: labelLines.length > 0 ? { x: drop.x, y: to.y - 10 } : null,
+      ...(late ? { late: true } : {}),
     });
   };
 
@@ -1449,29 +2238,48 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
       segment(chain[chain.length - 1]!, stock, []);
     }
     if (lane.chains.length === 0) segment(plate, stock, []);
-    segment(stock, gate, []);
+    /* A goods tail joins the gate of the trip that carries it; on a Journey
+       every tail joins leg 1's gate. */
+    const line = lines.find((item) => `${item.key}:stock` === stock.id);
+    if (laned) segment(stock, deliveryLanes[line ? goodsLane(line) : 0]!.gate, [], false, true);
+    else segment(stock, gate, []);
   }
-  segment(origin, deliveryChain[0]!, []);
-  for (let i = 0; i < deliveryChain.length - 1; i += 1) {
-    segment(deliveryChain[i]!, deliveryChain[i + 1]!, []);
+  for (const lane of deliveryLanes) {
+    segment(origin, lane.plate, []);
+    segment(lane.plate, lane.column[0]!, []);
+    for (let i = 0; i < lane.column.length - 1; i += 1) {
+      segment(lane.column[i]!, lane.column[i + 1]!, []);
+    }
+    /* The last node of a lane has no trailing line. */
+    segment(moneyChain[moneyChain.length - 1]!, lane.gate, [], false, true);
   }
-  segment(deliveryChain[deliveryChain.length - 1]!, gate, []);
+  if (!laned) {
+    segment(origin, deliveryChain[0]!, []);
+    for (let i = 0; i < deliveryChain.length - 1; i += 1) {
+      segment(deliveryChain[i]!, deliveryChain[i + 1]!, []);
+    }
+    segment(deliveryChain[deliveryChain.length - 1]!, gate, []);
+  }
   segment(origin, moneyChain[0]!, []);
   for (let i = 0; i < moneyChain.length - 1; i += 1) {
     segment(moneyChain[i]!, moneyChain[i + 1]!, []);
   }
-  segment(moneyChain[moneyChain.length - 1]!, gate, []);
+  if (!laned) segment(moneyChain[moneyChain.length - 1]!, gate, []);
+  /* The loan is collected back where the customer is — the last lane. */
+  const collectAt = laned ? deliveryLanes[deliveryLanes.length - 1]!.deliver : deliver;
   for (const loanNode of loanNodes) {
     segment(origin, loanNode, []);
-    segment(loanNode, deliver, ["collect back"], true);
+    segment(loanNode, collectAt, ["collect back"], true);
   }
 
-  segment(gate, deliver, []);
-  segment(deliver, photo, []);
+  if (!laned) {
+    segment(gate, deliver, []);
+    segment(deliver, photo, []);
+  }
   /* The last node has no trailing line. */
 
   const width = PAD * 2 + spanW;
-  const height = photo.y + photo.h + PAD;
+  const height = (laned ? deepest : photo.y + photo.h) + PAD;
 
   const linkedProblems: LinkedProblem[] = [
     ...input.cases
@@ -1502,7 +2310,52 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     edges,
     bands,
     linkedProblems,
+    proposedChange: proposedChangeOf(input),
     width,
     height,
+  };
+}
+
+/**
+ * ⭐ `PROPOSED CHANGE` — owner ruling 2026-09-25. One band above the canvas,
+ * three sentences and no more: the fact with who and when, the door, and the
+ * sentence that stops the wrong reading. It links to the request (Law C); no
+ * proposed lane is ever drawn on the map.
+ */
+const valueWord = (value: string) =>
+  !value.trim() || /^[—–-]$/.test(value.trim()) ? "Not recorded" : value.trim();
+
+function proposedChangeOf(input: SalesOrderRouteInput): RouteProposedChange | null {
+  if (input.unreadable?.amendment) {
+    return {
+      kind: "unreadable",
+      fact: "Could not read the change requests for this order.",
+      changes: [],
+      more: 0,
+      door: { label: "Try again →", href: "#retry-amendment" },
+      rule: null,
+    };
+  }
+  const request = input.amendment ?? null;
+  if (!request) return null;
+  const stale = request.status === "stale";
+  const who = request.submittedBy?.trim() || "Staff";
+  const when = request.submittedAt ? ` on ${request.submittedAt.slice(0, 10)}` : "";
+  const approver = request.approver?.trim() || null;
+  const rows = request.changes ?? [];
+  return {
+    kind: stale ? "out-of-date" : "waiting",
+    /* WHO asked · WHAT object · WHO decides · WHAT they must do (owner, 2026-09-27). */
+    fact: stale
+      ? `${who} asked to change this order${when}. The order changed after that. ${who} must send the request again.`
+      : `${who} asked to change this order${when}. ${approver ?? "The approver"} has not approved it yet.`,
+    /* No dash stands for a value (owner ruling 2026-09-26): an empty side of
+       the arrow prints its word. */
+    changes: rows
+      .slice(0, 3)
+      .map((row) => `${row.what}: ${valueWord(row.before)} → ${valueWord(row.after)}`),
+    more: Math.max(0, rows.length - 3),
+    door: door("Open the request →", `/operation/orders/so/${encodeURIComponent(input.order.id)}`),
+    rule: "The map shows the order as it stands today, not the change.",
   };
 }

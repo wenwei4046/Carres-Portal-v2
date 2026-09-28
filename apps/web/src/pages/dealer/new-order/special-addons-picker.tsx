@@ -165,7 +165,7 @@ export function SpecialsSummary({
       {options.map((o, i) => (
         <div key={`o${i}`} className="t-tiny text-base-500">
           + {OPTION_KIND_LABEL[o.kind ?? ""] ?? o.kind ?? "Option"} {o.value ?? ""}
-          {o.label ? ` — ${o.label}` : ""}
+          {o.label ? `: ${o.label}` : ""}
           {fmtSur(o.surcharge)}
         </div>
       ))}
@@ -255,7 +255,7 @@ export function SpecialAddonsPicker({
                     className={selCls}
                     data-testid={`pick-choice-${def.code}-${gi}`}
                   >
-                    <option value="">— select —</option>
+                    <option value="">{g.label}</option>
                     {g.choices.map((c) => (
                       <option key={c.label} value={c.label}>
                         {c.label}

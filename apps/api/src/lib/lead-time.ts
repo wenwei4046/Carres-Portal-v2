@@ -64,7 +64,7 @@ export async function validateDeliveryLeadTime(
   if (date < minDate) {
     return {
       code: "lead_time_violation",
-      message: `Earliest delivery date is ${minDate} (${leadDays} days — the earliest date a store may sell)`,
+      message: `Earliest delivery date is ${minDate} (${leadDays} days, the earliest date a store may sell)`,
       minDate,
       leadDays,
     };

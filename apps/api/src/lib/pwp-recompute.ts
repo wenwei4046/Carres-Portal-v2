@@ -280,7 +280,7 @@ export async function recomputePwpLines(
         status: "bad_request",
         code: "pwp_not_eligible_specials",
         message:
-          "A line with special add-ons cannot be made a PWP/promo reward — remove the add-ons first.",
+          "A line with special add-ons cannot be made a PWP/promo reward. Remove the add-ons first.",
       };
     }
     // 2990s parity: a PWP/promo reward line must be quantity 1 — one voucher
@@ -529,7 +529,7 @@ export async function recomputePwpLines(
           status: "bad_request",
           code: "pwp_not_eligible_sofa_build",
           message:
-            "A sofa reward must be targeted by combo — this rule has no reward combos.",
+            "A sofa reward must be targeted by combo. This rule has no reward combos.",
         };
       }
       const matched = rewardComboIds.filter((id) => {

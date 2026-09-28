@@ -74,7 +74,7 @@ export default function SalesOrderSettings() {
         <ul className="grid gap-1 sm:grid-cols-2">
           {ELSEWHERE.map((row) => (
             <li key={row.what} className="text-meta text-base-700">
-              {row.what} — {row.owner}
+              {row.what}: {row.owner}
             </li>
           ))}
         </ul>

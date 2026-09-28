@@ -131,8 +131,20 @@ export function historyWords(text: string): string {
  * `Online order` is the authoritative source fact it records. The stored
  * event text is never rewritten — only read.
  */
+/**
+ * ⭐ THE STORED-PHRASE TABLE (owner ruling 2026-09-26). Measured on production:
+ * line 3 printed `awaiting logistics triage`, the V1 pipeline phrase that
+ * migrations 0024 / 0396 store in `order_history.text`. It is a pipeline word,
+ * not a result, so the record keeps `Order proceeded` on line 1 and prints no
+ * line 3. A stored enum this table does not know prints `Activity`, never
+ * itself. The stored event is never rewritten.
+ */
+const PIPELINE_PHRASES = [/^awaiting logistics triage$/i];
+const STORED_ENUM = /^[a-z]+(_[a-z0-9]+)+$/;
+
 function historyValueWords(segment: string): string {
   const s = segment.trim();
+  if (STORED_ENUM.test(s) && !(s in HISTORY_FIELD_WORDS)) return "Activity";
   if (/^0% deposit$/i.test(s)) return "No deposit";
   if (/^online$/i.test(s)) return "Online order";
   if (/^credit$/i.test(s)) return "Credit";
@@ -216,6 +228,7 @@ export function historyRecordWords(
   tail = tail.filter((t) => !said || !said.includes(t.trim().toLowerCase()));
 
   const detail: string[] = [];
+  tail = tail.filter((t) => !PIPELINE_PHRASES.some((phrase) => phrase.test(t.trim())));
   if (tail.length > 0) detail.push(tail.map(historyValueWords).join(" · "));
   detail.push(...metaLines);
   return { title, identity, detail };
@@ -248,7 +261,7 @@ export function revisionRecordWords(
       ? `Recorded by ${name} · ${when}`
       : kind === "system"
         ? `Recorded by System · ${when}`
-        : `Staff identity not recorded · ${when}`;
+        : ["Staff identity not recorded", r.actor_role?.trim() || null, when].filter(Boolean).join(" · ");
   const detail = [recorded];
   if (r.note && r.note.trim()) detail.push(r.note.trim());
   return { title, identity, detail };
