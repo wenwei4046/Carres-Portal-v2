@@ -364,6 +364,8 @@ describe("Bill form — Convert GRN to bill", () => {
     fireEvent.click(screen.getByTestId("convert-grn"));
     await screen.findByRole("dialog");
     fireEvent.keyDown(window, { key: "F3" });
+    // A save goes out a tick later; wait for it before saying none went.
+    await new Promise((r) => setTimeout(r, 50));
     expect(writes()).toHaveLength(0);
   });
 

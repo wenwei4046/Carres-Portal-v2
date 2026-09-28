@@ -144,6 +144,9 @@ describe("Other debtors — one invoice", () => {
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Issue this invoice?");
     expect(dialog).toHaveTextContent("RM 1,500.00 to Example Sister Sdn Bhd");
+    // The save key waits while the question is open.
+    fireEvent.keyDown(window, { key: "F3" });
+    await new Promise((r) => setTimeout(r, 50));
     expect(sent(`PUT /invoices/${I_DRAFT}`)).toHaveLength(0);
     fireEvent.click(within(dialog).getByRole("button", { name: "Issue invoice" }));
     await waitFor(() => expect(sent(`PUT /invoices/${I_DRAFT}`)).toHaveLength(1));
