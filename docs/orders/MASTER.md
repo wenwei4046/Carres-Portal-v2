@@ -118,8 +118,13 @@ exports are `defaultExpandedGoods`, `compactOrderRoute` and `RouteActionOwners` 
 `SalesOrderRoute.tsx`, all used inside the file or by its test. Nothing was deleted (red line 5);
 the acceptance line is answered when the owner of that sentence names the files.
 
-**Scope B · Identity and History — BUILT 2026-09-28, production walk owed; migration 0592 must be
-APPLIED through the governed path before the identity rule takes effect.** `actor_identities`
+**Scope B · Identity and History — BUILT 2026-09-28, production walk owed; migration 0592 APPLIED
+2026-09-28 on the owner's word (tracker `20260928022858`).** Verified under a real reader: an
+operation JWT gets `(id, name, role, is_person)`, a dealer JWT gets no row. On that day `principal`,
+`Operations` and the E2E test login carry every recorded History event and Revision and now read
+`Staff identity not recorded`; four named accounts marked not a person (`Khor Yee`, `Samantha`,
+`Herng`, `Chan chee liang`) carry none yet — if they are real staff, their person marker in Staff &
+Duties must be set before they act, or their actions will read the same way. `actor_identities`
 (0592) returns the account's role and `is_person`; `resolveActorIdentities` + `actorKindOf`
 (`apps/api/src/lib/actor-names.ts`) are the one classification History and Revisions read. A shared
 login's name never reaches the screen; its role word does. Until 0592 is applied the Worker reads
