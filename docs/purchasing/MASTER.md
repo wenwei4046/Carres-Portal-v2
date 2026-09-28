@@ -5608,6 +5608,18 @@ names: Display Request, Consignment Order, Consignment Return and Consignment Sa
 Do not use bare DR/CO/CRTN/CSN as conversational or human-facing action names. Existing official
 document-number prefixes, stored identifiers and contracts are unchanged. Owner discussions may
 pair the full English name with a Chinese explanation; Portal language remains governed by COPY.
+**CUSTOMER RETURN AND SUPPLIER LIABILITY — APPROVED TARGET / NOT BUILT;
+Jess, 2026-09-28.** Customer remedy, physical return and supplier settlement are separate facts.
+Service's authorised customer remedy does not wait for supplier recovery. Delivery/Stock record
+actual customer collection, receipt and inspection; a returned Unit does not automatically become
+available display stock. Purchasing records the supplier recovery/return outcome through existing
+source and permission controls; Finance owns supplier invoice and credit consequences. A customer
+refund, exchange or physical return neither cancels a supplier invoice nor proves supplier
+acceptance of return or reduction. Preserve the original sale notice and link any authoritative
+correction. Do not automatically restore supplier-consignment ownership. Conditions under which
+a supplier agrees to resume consignment or reduce liability remain unresolved commercial facts,
+not a uniform showroom policy or permission for Operation to accept terms.
+
 **Object/placement:** full-width view; 50/50 check/preview during issue/correction.
 **Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
 disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
