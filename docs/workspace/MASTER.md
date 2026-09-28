@@ -101,6 +101,11 @@ future routing everywhere but never rewrites history.
   carries `CR001`) and not an HR row (the shared login has one too) — separates a person from a
   shared or generic login. People/HR sets it when it creates an internal person; no signed-in caller
   may set or clear it (`person_marker_governed`).
+- **Named staff created before 0533 (owner answer, Jess 2026-09-28; migration 0599).** Khor Yee and
+  Samantha resigned (accounts disabled, so they hold no duty) and Herng is Business Development: all
+  three are people, and History names their acts. Chan chee liang's `warehouse` login is NETS's owner
+  and PIC, not Carres staff, so it is not a person here and may hold no Carres duty; naming a personal
+  NETS login in History waits for the governed personal NETS operator.
 - The shared owner login `principal@carres.com` is **not a person**. It may read everything its role
   reads, but it never holds, covers, assigns or executes any Duty. The principal role's "decides
   anything" rung on an approver Duty now requires a principal **person**.
