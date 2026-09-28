@@ -331,6 +331,12 @@ export interface GoodsMiniLine {
    * progress badge and never permission to buy. Read with `showStatus`.
    */
   status?: string;
+  /**
+   * Status line two (owner ruling 2026-09-28): why this line cannot be ticked
+   * and, where one exists, its door. The owning page draws it; absent = the
+   * single governed word, exactly as before.
+   */
+  statusNote?: ReactNode;
   /** The remainder this page can still buy on this line. Read with `showToBuy`. */
   toBuy?: number | null;
   orderBy?: string | null;
@@ -1017,7 +1023,10 @@ export default function GoodsMiniTable({
                   return <span className="tabular-nums">{line.qty}</span>;
                 case "status":
                   return line.status ? (
-                    <span data-testid={`goods-status-${line.key}`}>{line.status}</span>
+                    <>
+                      <span className="block" data-testid={`goods-status-${line.key}`}>{line.status}</span>
+                      {line.statusNote ?? null}
+                    </>
                   ) : (
                     <Absence>{GOODS_ABSENCE_WORDS.notRecorded}</Absence>
                   );

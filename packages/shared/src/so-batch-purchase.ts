@@ -151,6 +151,14 @@ export const SO_BATCH_PURCHASE_WORDS = {
    */
   statusNeedPo: "Need PO",
   statusNoPoNeeded: "No PO needed",
+  /**
+   * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28 (§9.1). When a row
+   * cannot be ticked, line two says why and, where a door exists, the next
+   * step. The reason words are the demand's own state words; only the doors
+   * are spelt here.
+   */
+  statusFixInCatalog: "Fix in Catalog",
+  statusOpenSettings: "Open Settings",
 
   /**
    * The deterministic compact summaries a parent cell prints when one Sales
@@ -1699,4 +1707,66 @@ export function compareSoBatchPlanning(
   return a.plan.rank - b.plan.rank ||
     (a.plan.date ?? "9999").localeCompare(b.plan.date ?? "9999") ||
     (b.so ?? 0) - (a.so ?? 0);
+}
+
+/**
+ * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28, Purchasing §9.1.
+ *
+ * `Status` keeps its first line (`Need PO` · `No PO needed`). When the row
+ * cannot be ticked, line two states WHY — read from exactly the facts the
+ * refused tick reads (`soBatchOrderUnselectableReason`, the leaf's own state
+ * and `soBatchToBuyState`), never a second arithmetic — and names the door
+ * that fixes it when one exists: Catalog owns SKU, supplier and cost;
+ * Purchasing Settings owns production days and collection
+ * (`PURCHASE_DEMAND_OWNER_DUTY`).
+ */
+export type SoBatchStatusDoor = "catalog" | "settings";
+
+export const SO_BATCH_STATUS_DOOR: Partial<Record<PurchaseDemandState, SoBatchStatusDoor>> = {
+  no_sku: "catalog",
+  no_supplier: "catalog",
+  no_cost: "catalog",
+  no_production_days: "settings",
+  no_pickup_partner: "settings",
+};
+
+export type SoBatchStatusWhy = { text: string; door: SoBatchStatusDoor | null };
+
+/** Catalog first: an unknown SKU or supplier makes every later setting moot. */
+function doorOf(states: readonly PurchaseDemandState[]): SoBatchStatusDoor | null {
+  const doors = states.map((s) => SO_BATCH_STATUS_DOOR[s]);
+  if (doors.includes("catalog")) return "catalog";
+  if (doors.includes("settings")) return "settings";
+  return null;
+}
+
+/** Line two of the parent row's Status, or null when the row can be ticked. */
+export function soBatchOrderStatusWhy(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): SoBatchStatusWhy | null {
+  if (soBatchOrderPlanning(order, leaves).group !== "to-buy") return null;
+  const text = soBatchOrderUnselectableReason(order, leaves, stateWords);
+  if (!text) return null;
+  return {
+    text,
+    door: doorOf(leaves.filter((r) => !isPurchaseDemandTimingState(r.state)).map((r) => r.state)),
+  };
+}
+
+/** Line two of one item line's Status, or null when the line can be ticked. */
+export function soBatchLeafStatusWhy(
+  leaf: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): SoBatchStatusWhy | null {
+  if (orderStatus === "ordered" || isSelectableForOrder(leaf, orderStatus)) return null;
+  if (!isPurchaseDemandTimingState(leaf.state)) {
+    return { text: stateWords[leaf.state], door: doorOf([leaf.state]) };
+  }
+  const state = soBatchToBuyState(leaf, orderStatus);
+  if (state.kind === "covered") return { text: soBatchOrderByAbsenceWord("already_on_po"), door: null };
+  if (state.kind === "unchecked") return { text: soBatchOrderByAbsenceWord("coverage_not_checked"), door: null };
+  return null;
 }

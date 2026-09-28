@@ -473,6 +473,15 @@ async function answerStockQuestion(answer: "yes" | "no" = "yes") {
   fireEvent.click(option);
 }
 
+/** Drive the kit purpose `Select` the way an operator does. */
+async function choosePurpose(value: string) {
+  const label = DEMAND_PURPOSES.find((p) => p.value === value)!.label;
+  const trigger = document.getElementById("mp-purpose")!;
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("option", { name: label }));
+}
+
 const pickRow = (sku: string) =>
   screen.getByText(sku, { selector: ".font-mono" }).closest("tr")!;
 
@@ -2023,6 +2032,22 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     expect(within(row).getByTestId(`mp-approval-${REQ1}`)).toHaveTextContent("Need approval");
   });
 
+  it("⭐ TWO-LINE STATUS (owner ruling 2026-09-28): plain `Need PO`, and line two says `Need approval first`", async () => {
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ1}`);
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
+    /* Plain text, never a coloured pill (ONE KIT LAW). */
+    expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
+  });
+
+  it("an approved request's Status is plain text with no second line", async () => {
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ2}`);
+    expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
+    expect(within(cell).queryByTestId(`mp-status-why-${REQ2}`)).toBeNull();
+  });
+
   it("`MPR No` is the identity and the entrance; a request with no number states the absence", async () => {
     await loaded();
     const entrance = screen.getByTestId(`mp-open-${REQ1}`);
@@ -2264,6 +2289,19 @@ describe("R2 · group membership", () => {
     const cell = screen.getByTestId(`mp-approval-${REQ1}`);
     expect(cell).toHaveTextContent("Sent back for changes");
     expect(within(cell).getByTestId("mp-row-owner")).toHaveAttribute("aria-label", "Siti · Edit and send again");
+  });
+
+  it("a sent-back request's `Need PO` also says `Need approval first`", async () => {
+    withRegister({
+      ...REGISTER,
+      requests: REGISTER.requests.map((r) =>
+        r.id === REQ1 ? { ...r, sent_back_at: "2026-08-20T00:00:00Z" } : r,
+      ),
+    });
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ1}`);
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
   });
 
   it("a sent-back request whose requester is unknown says so — never a shared account", async () => {
@@ -2732,7 +2770,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
     expect(await within(box).findByTestId("mp-stock-block-l2")).toHaveTextContent(
-      "This purchase did not record whether stock can answer it, so stock cannot be chosen.",
+      "This purchase did not record whether to use our stock, so stock cannot be chosen.",
     );
   });
 
@@ -3818,6 +3856,9 @@ describe("Round 2 · the object's rounds", () => {
        NULL and not a single Unit could ever be allocated. This is the question
        that feeds them, and the reason the whole feature is reachable. */
     await openWorkspace({ answerStockQuestion: false });
+    /* Ready Stock answers No by itself (owner 2026-09-28), so the gap is
+       asserted on a purpose that still asks. */
+    await choosePurpose("showroom_display");
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     await waitFor(() =>
@@ -3828,12 +3869,11 @@ describe("Round 2 · the object's rounds", () => {
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
   });
 
-  it("⛔ 0549 · NO DEFAULT ANSWER — a pre-picked option would be the guess the ruling bans", async () => {
+  it("⛔ 0549 · NO DEFAULT ANSWER outside Ready Stock — the SKU and the shelf never decide it", async () => {
     await openWorkspace({ answerStockQuestion: false });
-    /* Both answers must be reachable and NEITHER chosen. The ruling of
-       2026-09-18 forbids inferring the intent from the SKU, the shelf count or
-       the purpose; a pre-selected option is that inference with the operator's
-       name on it. */
+    await choosePurpose("showroom_display");
+    /* Both answers must be reachable and NEITHER chosen: only the Ready Stock
+       purpose answers by itself (owner 2026-09-28). */
     const trigger = document.getElementById("mp-stock-answer")!;
     expect(trigger.textContent).not.toContain(MW.canStockAnswerYes);
     expect(trigger.textContent).not.toContain(MW.canStockAnswerNo);
@@ -3842,6 +3882,23 @@ describe("Round 2 · the object's rounds", () => {
     expect(
       (await screen.findAllByRole("option")).map((o) => o.textContent),
     ).toEqual([MW.canStockAnswerYes, MW.canStockAnswerNo]);
+  });
+
+  it("⭐ OWNER 2026-09-28 · Ready Stock answers No by itself, the person may change it, and leaving Ready Stock takes the filled answer back", async () => {
+    await openWorkspace({ answerStockQuestion: false });
+    const trigger = () => document.getElementById("mp-stock-answer")!;
+    /* The form opens on Ready Stock: buying for the shelf is buying new stock. */
+    await waitFor(() => expect(trigger().textContent).toContain(MW.canStockAnswerNo));
+    /* A purpose that does not buy for the shelf takes the filled answer back. */
+    await choosePurpose("showroom_display");
+    await waitFor(() => expect(trigger().textContent).not.toContain(MW.canStockAnswerNo));
+    /* Back to Ready Stock: filled in again. */
+    await choosePurpose("ready_stock");
+    await waitFor(() => expect(trigger().textContent).toContain(MW.canStockAnswerNo));
+    /* The person's own answer wins and survives a purpose change. */
+    await answerStockQuestion("yes");
+    await choosePurpose("showroom_display");
+    await waitFor(() => expect(trigger().textContent).toContain(MW.canStockAnswerYes));
   });
 
   it("⭐ 0549 · THE ANSWER REACHES THE WIRE — both ways, and never invented", async () => {
@@ -3861,7 +3918,7 @@ describe("Round 2 · the object's rounds", () => {
     const sent = JSON.parse(
       String((requestPosts().at(-1)![1] as RequestInit).body),
     ) as { fulfilmentIntent?: string };
-    /* `No — this buys extra stock` is `additional_stock`, and the mapping is
+    /* `No, buy new stock` is `additional_stock`, and the mapping is
        asserted rather than assumed: send the wrong one and the shelf would be
        netted against a purchase that was meant to add to it. */
     expect(sent.fulfilmentIntent).toBe("additional_stock");
