@@ -5614,6 +5614,59 @@ The Oracle distinction is a research lesson, not financial advice or adopted pos
 | Settings and external partners | Existing authority | Contacts in Supplier Master, Site in Stock Settings, duties/covers in Workspace, product facts in Catalog. No new supplier portal, account provisioning or external cutover authorised |
 | Responsive, keyboard, loading/empty/error | UI verification outstanding | Use admitted kit; verify 1440/1180/820/743/390 and 200% zoom, focus/return context and long goods/multi-receipt cases. No numerical visual-quality score without rendered evidence |
 
+#### Direct 2990 interaction research and guided Carres journey
+
+**FACT — local code inspected 2026-09-28, not a live 2990 walkthrough.**
+`PurchaseConsignmentOrderDetail.tsx:554–565` offers `Receive Goods` on submitted/part-received
+orders and `Raise Return` once received/part-received, passing the source id to the next form.
+`PurchaseConsignmentReceiveDetail.tsx:338–344` offers a return directly from the posted receipt.
+The from-order and from-receive pickers (`PurchaseConsignmentReceiveFromOrder.tsx:200–236`,
+`PurchaseConsignmentReturnFromReceive.tsx:200–236`) carry supplier, source line, goods, variants,
+selected quantity and price to the next form, with remaining-quantity limits. Carres should reuse
+the principle of contextual next actions and source prefill, not the extra manual price entry.
+2990 also permits manual receiving without an order; that is not Carres authorisation to invent
+source/custody evidence. Its supplier order and receipt edit locks and cancelled-record deletion
+must not replace Carres's preserved document and actual-movement history.
+
+**FACT — billing boundary, scoped negative evidence.** The inspected 2990 Purchase Invoice route
+uses ordinary `grn_id`/`grn_item_id` and `/outstanding-grn-items`; its inspected consignment receipt
+child-lock explicitly says a purchase-consignment invoice is outside its scope. The mounted
+purchase-consignment routes and their frontend detail actions do not establish automatic
+successful-customer-delivery → supplier advice → supplier invoice matching. Do not assert such a
+complete flow exists or copy a Consignment Note name as proof of it. Further UI/manual processes
+could exist outside this inspected path; they are unverified, not disproven.
+
+**User requirement — 2026-09-28:** guide staff step by step by their intended operation, without
+requiring them to choose among unfamiliar document names. The user's current internal
+Consignment Note and later supplier bill must not be confused with the customer Sales Invoice.
+The earlier assistant suggestion equating that note to Consignment Sale Notice has not been
+verified against the current form and does not authorise deleting the Consignment Order or
+renaming the canonical notice. Existing approved business truth remains; final name consolidation
+requires the actual purpose/source/timing mapping, not an acronym decision.
+
+**PROPOSAL / NOT LAW — recommended guided journey; action descriptions below are product
+intent, not new approved English screen copy.**
+
+| Step / staff intent | Staff supplies | System leads to / completion and owner |
+|---|---|---|
+| Arrange PJ display replacement | Sales or proxy chooses PJ and exact existing Units, adds supplier-agreed new model/quantity/evidence | Reuse one Display Request and Stock identities; preserve negotiating Sales separately from recorder |
+| Resolve what's missing | Only missing Catalog/model/supplier facts; quotation when available | Contextual owning door returns to the same arrangement. Unconfirmed price stays Sales follow-up and does not gate consignment arrangements |
+| Prepare the agreed goods instruction | Operation checks incoming/outgoing scope, Sites and known transport/date facts | System selects the correct governed purchase/consignment/movement path from ownership and intent; employee does not pick document types. Consignment swap previews one price-free combined instruction |
+| Send that instruction | Authorised actor uses recorded supplier contact/channel and confirms actual sending | Store exact version/recipient/actor/time. Remain on the arrangement; do not create a second instruction for the paired return |
+| Coordinate the two movements | Confirmed dates/parties and any missing contact facts | Show incoming and outgoing side by side; either may happen first. Read the owning schedule/work records; operational assignment must pass existing duty admission |
+| Receive the new goods | Receiving person records exact receipt/condition/evidence | Open Receiving's same form at the correct Site. Partial/issue outcomes retain remaining work and stock controls, not automatic whole-arrangement completion |
+| Hand back old goods | Current holder records exact Units, recipient/time/proof | Open the same outgoing handover form from the arrangement; linked Consignment Return records progress. It is not a second manually entered inventory movement |
+| Later sell one displayed Unit | Sales follows existing customer Sales Order/Invoice flow and selects eligible exact stock | Existing customer flow owns reservation, invoice and delivery. Do not direct staff to a consignment supplier document to bill the customer |
+| Customer receives it | Delivery records authoritative successful Unit results | Generate the supplier sale-notification obligation from actual success; Operation checks/sends the notice. The final user-facing name remains subject to the verified internal-note mapping above |
+| Supplier later bills Carres | Finance records the actual supplier invoice and resolves commercial discrepancies | Link the sold Units, supplier notification and confirmed quotation terms; prevent duplicate matching. Detailed consignment invoice source/matching policy and post-sale return liability still require closure in Finance authority |
+
+One arrangement detail retains the current next actions, incoming/outgoing facts, supplier
+communication, quotation evidence and History. Registers remain searchable document views;
+Workspace opens the same owning actions in place and preserves return context. This is proposed
+composition, not permission to build a new wizard, dashboard, stepper or task ledger. New copy and
+any missing kit capability require their governed review. Unknown facts and read/save failures
+remain explicit; a submitted supplier message or printed paper never substitutes for receipt.
+
 #### Recommended whole solution and remaining owner boundary
 
 **PROPOSAL / NOT LAW:** morning Work shows admitted physical/document actions and commercial
