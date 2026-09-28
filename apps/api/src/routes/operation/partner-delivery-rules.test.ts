@@ -389,7 +389,7 @@ describe("GET /api/operation/orders/:id/booking/partner-check", () => {
     const res = await get(await makeJwt("operation"), checkUrl("2036-08-25"));
     const body = (await res.json()) as CheckBody;
     expect(body.warnings.map((w) => w.key)).toEqual(["capacity"]);
-    expect(body.warnings[0]!.message).toContain("its limit is 1 a day");
+    expect(body.warnings[0]!.message).toContain("Its limit is 1 a day");
   });
 });
 

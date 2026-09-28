@@ -727,7 +727,7 @@ describe("DeliveryOrdersRegister", () => {
   it("the empty state answers what is missing, why, and who does what next", () => {
     mount([]);
     const empty = screen.getByText(/No delivery orders yet/);
-    expect(empty.textContent).toContain("the system issues one");
+    expect(empty.textContent).toContain("The system issues one");
     expect(empty.textContent).toContain("Order Route");
   });
 

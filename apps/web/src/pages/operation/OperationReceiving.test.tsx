@@ -636,7 +636,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // The listing is complete before any rail choice (owner ruling
     // 2026-09-18): the page never opens on an empty date-picker.
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–2 of 2",
+      "Showing 1 to 2 of 2",
     );
     const first = h.registerAsks[0]!;
     expect(first.from).toBeNull();
@@ -995,7 +995,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     renderPage();
     // Two GRNs (Valid + Cancelled); the submitted count is Work, not a record.
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–2 of 2",
+      "Showing 1 to 2 of 2",
     );
   });
 
@@ -1077,7 +1077,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     await waitFor(() => expect(arrow).toHaveAttribute("aria-expanded", "true"));
     // Opening it narrowed nothing — both GRNs are still listed.
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–2 of 2",
+      "Showing 1 to 2 of 2",
     );
     const ask = h.registerAsks[h.registerAsks.length - 1]!;
     expect(ask.from).toBeNull();
@@ -1123,7 +1123,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
     h.pageLimit = 1;
     renderPage();
     expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1–1 of 2",
+      "Showing 1 to 1 of 2",
     );
     // Page 1 holds only the newest record; the second is NOT rendered.
     expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
@@ -1133,7 +1133,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
     fireEvent.click(screen.getByTestId("grn-page-next"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 2–2 of 2",
+        "Showing 2 to 2 of 2",
       ),
     );
     expect(
@@ -1146,7 +1146,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
     fireEvent.click(screen.getByTestId("grn-page-previous"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 1–1 of 2",
+        "Showing 1 to 1 of 2",
       ),
     );
   });
@@ -1157,13 +1157,13 @@ describe("OperationReceiving — one destination and the paged register", () => 
     fireEvent.click(screen.getByTestId("grn-page-next"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 2–2 of 2",
+        "Showing 2 to 2 of 2",
       ),
     );
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-        "Showing 1–1 of 1",
+        "Showing 1 to 1 of 1",
       ),
     );
   });

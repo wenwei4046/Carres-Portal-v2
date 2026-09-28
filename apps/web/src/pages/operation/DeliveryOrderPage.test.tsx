@@ -271,7 +271,7 @@ describe("DeliveryOrderPage", () => {
     expect(screen.getByText("Warehouse handover")).toBeTruthy();
     // Each fact renders in the Warehouse block AND in History (append-only).
     expect(screen.getAllByText(/Ready for handover/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Handed over — to NETS · received by Ahmad/)).toBeTruthy();
+    expect(screen.getByText(/Handed over to NETS · received by Ahmad/)).toBeTruthy();
     expect(screen.getAllByText(/Shasha/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Warehouse · Carres Klang/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Vehicle: WXY 1234/).length).toBeGreaterThan(0);
@@ -463,7 +463,7 @@ describe("DeliveryOrderPage", () => {
     it("no result yet: the section says evidence binds to a delivery, and offers no review act", () => {
       mount(payload());
       expect(screen.getByText("Evidence")).toBeTruthy();
-      expect(screen.getByText(/evidence binds to the delivery it proves/)).toBeTruthy();
+      expect(screen.getByText(/Evidence binds to the delivery it proves/)).toBeTruthy();
       expect(screen.queryByTestId("do-proof-review")).toBeNull();
       expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
     });

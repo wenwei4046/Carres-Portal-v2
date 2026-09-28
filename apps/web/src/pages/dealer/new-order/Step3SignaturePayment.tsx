@@ -630,7 +630,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                   className="w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
                   data-testid={`pay-followup-${fu.key}`}
                 >
-                  <option value="">Select {fu.label.toLowerCase()}</option>
+                  <option value="">{fu.label}</option>
                   {fu.options.map((o) => (
                     <option key={o} value={o}>
                       {o}

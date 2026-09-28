@@ -452,7 +452,7 @@ describe("Inbound · the list itself", () => {
     mount("&site=w&status=all");
     await waitFor(() =>
       expect(screen.getByTestId("inbound-page-range")).toHaveTextContent(
-        "Showing 1–1 of 1 arrangements",
+        "Showing 1 to 1 of 1 arrangements",
       ),
     );
     fireEvent.change(screen.getByLabelText("Arrival date from"), {

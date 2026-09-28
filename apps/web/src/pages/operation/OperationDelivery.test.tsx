@@ -514,12 +514,12 @@ describe("Day · Week · Month (owner correction 2026-09-07)", () => {
     expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
     const fourth = screen.getByTestId("delivery-monitor-month-day-2026-09-04");
     expect(fourth.getAttribute("aria-label")).toBe(
-      "Fri, 4 Sep — 2 deliveries · 1 exception · 2 Logistics not assigned",
+      "Fri, 4 Sep: 2 deliveries · 1 exception · 2 Logistics not assigned",
     );
     expect(within(fourth).getByText("Deliveries")).toBeTruthy();
     expect(within(fourth).getByText("Exceptions")).toBeTruthy();
     const fifth = screen.getByTestId("delivery-monitor-month-day-2026-09-05");
-    expect(fifth.getAttribute("aria-label")).toBe("Fri, 5 Sep — 1 delivery".replace("Fri", "Sat"));
+    expect(fifth.getAttribute("aria-label")).toBe("Sat, 5 Sep: 1 delivery");
     expect(within(fifth).queryByText("Exceptions")).toBeNull();
     expect(within(fifth).queryByText("Logistics not assigned")).toBeNull();
     /* Sunday visible, not a choice. */
