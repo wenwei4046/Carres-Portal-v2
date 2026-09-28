@@ -5616,9 +5616,23 @@ available display stock. Purchasing records the supplier recovery/return outcome
 source and permission controls; Finance owns supplier invoice and credit consequences. A customer
 refund, exchange or physical return neither cancels a supplier invoice nor proves supplier
 acceptance of return or reduction. Preserve the original sale notice and link any authoritative
-correction. Do not automatically restore supplier-consignment ownership. Conditions under which
-a supplier agrees to resume consignment or reduce liability remain unresolved commercial facts,
-not a uniform showroom policy or permission for Operation to accept terms.
+correction. Do not automatically restore supplier-consignment ownership.
+
+**SUPPLIER OUTCOME JOURNEY — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Guide staff
+through actual return and inspection → application of evidenced, already-confirmed supplier terms
+or obtaining the missing commercial confirmation → the corresponding goods arrangement and
+Finance treatment. Existing confirmed terms may resolve the case without asking for the same
+agreement again. Where terms do not resolve it, retain the outstanding commercial confirmation;
+Operation records evidence but cannot invent acceptance, negotiate price or decide liability.
+Supplier agreement to return, replace or reduce the bill is recorded with its exact goods/scope
+and evidence, subject to existing outcome permissions. Goods execution follows its owning return,
+replacement or receipt flow; Finance handles the actual invoice/credit consequence. A supplier
+agreement is not itself physical collection or a posted credit. Preserve the original sale,
+delivery, notice and invoice history and link the resulting correction/outcome. This is a
+case-specific confirmed-terms workflow, not a uniform promise that all suppliers accept customer
+returns. Unresolved terms remain visible. Detailed Finance matching and any legal ownership
+transition still need their owning authority; this approval does not claim those integrations
+are built or authorise automatic ownership reversal.
 
 **Object/placement:** full-width view; 50/50 check/preview during issue/correction.
 **Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
