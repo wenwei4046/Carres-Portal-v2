@@ -25,6 +25,7 @@ import {
   dayFee,
   dayKey,
   dayMayApprove,
+  dayRecordedGap,
   type CardAcquirer,
   type CardMatchHow,
   type CardSettlementDay,
@@ -75,6 +76,17 @@ const machine = (d: Pick<CardSettlementDay, "acquirer" | "group_key">) =>
 const paidOut = (d: CardSettlementDay) => (d.payout_date ? fmtDate(d.payout_date) : "Not in the file");
 /** Only a GHL day is a sale date; a Public Bank or Maybank day holds the sales of several dates. */
 const saleDate = (d: CardSettlementDay) => (d.acquirer === "GHL" ? fmtDate(d.day_date) : "");
+
+/**
+ * 0595, the Receiving button law: a matched day that may not be approved names
+ * its first gap on the disabled Approve day. The database refuses the same.
+ */
+function approveDayGap(d: CardSettlementDay): string | null {
+  if (d.voided_count > 0) return "Approve day: a matched payment was voided";
+  const gap = dayRecordedGap(d);
+  if (gap !== 0) return `Approve day: Recorded in Carres is ${rm(Math.abs(gap) / 100)} ${gap < 0 ? "short" : "over"}`;
+  return null;
+}
 
 const paymentWords = (p: CardSettlementPayment | undefined) =>
   p
@@ -308,8 +320,10 @@ function DayExpansion({
           </p>
           {r.payment_id ? (
             <>
-              <p>
-                {r.matched_how ? MATCHED_WORD[r.matched_how] : "Matched"} · {paymentWords(paymentOf.get(r.payment_id))}
+              <p className={paymentOf.get(r.payment_id)?.voided ? "text-kit-red-11" : undefined}>
+                {r.matched_how ? MATCHED_WORD[r.matched_how] : "Matched"} ·{" "}
+                {paymentOf.get(r.payment_id)?.voided ? "Payment voided · " : ""}
+                {paymentWords(paymentOf.get(r.payment_id))}
               </p>
               {day.payout_status === null && (
                 <span className="flex gap-2">
@@ -352,24 +366,30 @@ function DayExpansion({
         <p>
           {day.payout_status === "approved" ? "Payout approved" : "Payout prepared"} · {day.payout_move_no ?? "Move number not available"}
         </p>
-      ) : dayMayApprove(day) && day.holding_codes.length === 0 ? (
+      ) : open > 0 ? (
+        <p>
+          {open} {open === 1 ? "sale is" : "sales are"} not matched yet. Match every sale before you approve the day.
+        </p>
+      ) : approveDayGap(day) ? (
+        <Button variant="primary" disabled>
+          {approveDayGap(day)}
+        </Button>
+      ) : day.holding_codes.length === 0 ? (
         <p role="alert" className="text-kit-red-11">
           The sales on this day were not paid into a card account, so they cannot be paid out here. Check the payment method of each
           sale.
         </p>
-      ) : dayMayApprove(day) && day.holding_codes.length > 1 ? (
+      ) : day.holding_codes.length > 1 ? (
         <p role="alert" className="text-kit-red-11">
           The sales on this day were paid into more than one card account ({day.holding_codes.join(", ")}), so one payout cannot cover
           them. Check the payment method of each sale.
         </p>
-      ) : dayMayApprove(day) ? (
-        <Button variant="primary" onClick={() => onApproveDay(day)}>
-          Approve day
-        </Button>
       ) : (
-        <p>
-          {open} {open === 1 ? "sale is" : "sales are"} not matched yet. Match every sale before you approve the day.
-        </p>
+        dayMayApprove(day) && (
+          <Button variant="primary" onClick={() => onApproveDay(day)}>
+            Approve day
+          </Button>
+        )
       )}
     </div>
   );

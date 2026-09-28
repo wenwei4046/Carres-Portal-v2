@@ -34,6 +34,7 @@ const day = (over: Partial<CardSettlementDay>): CardSettlementDay => ({
   gross: 425,
   net: 420.75,
   recorded: 100,
+  voided_count: 0,
   reference: "Card settlement Public Bank 900000000001 / 90000001 18 Sep 2026",
   payout_status: null,
   payout_move_no: null,
@@ -250,8 +251,8 @@ describe("Card settlement", () => {
   });
 
   it("a matched day paid into no card account, or into two, says so in red and offers no Approve day (0576)", async () => {
-    const none = day({ group_key: "900000000061 / 90000061", row_count: 1, matched_count: 1, holding_codes: [] });
-    const two = day({ group_key: "900000000062 / 90000062", row_count: 2, matched_count: 2, holding_codes: ["1131", "1132"] });
+    const none = day({ group_key: "900000000061 / 90000061", row_count: 1, matched_count: 1, recorded: 425, holding_codes: [] });
+    const two = day({ group_key: "900000000062 / 90000062", row_count: 2, matched_count: 2, recorded: 425, holding_codes: ["1131", "1132"] });
     net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [none, two], rows: [] };
     show();
     for (const title of await screen.findAllByTitle("Check the sales")) fireEvent.click(title);
@@ -267,6 +268,41 @@ describe("Card settlement", () => {
       "The sales on this day were paid into more than one card account (1131, 1132), so one payout cannot cover them. Check the payment method of each sale.",
     );
     expect(within(b).queryByRole("button", { name: "Approve day" })).toBeNull();
+  });
+
+  it("0595: a matched day that does not add up names the gap on a disabled Approve day", async () => {
+    const short = day({ group_key: "900000000063 / 90000063", row_count: 3, matched_count: 3, recorded: 415 });
+    const over = day({ group_key: "900000000064 / 90000064", row_count: 3, matched_count: 3, recorded: 425.5 });
+    net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [short, over], rows: [] };
+    show();
+    for (const title of await screen.findAllByTitle("Check the sales")) fireEvent.click(title);
+
+    const a = await screen.findByTestId("card-day-PBB|2026-09-18|900000000063 / 90000063");
+    const shortButton = within(a).getByRole("button", { name: "Approve day: Recorded in Carres is RM 10.00 short" });
+    expect(shortButton).toBeDisabled();
+    fireEvent.click(shortButton);
+    expect(screen.queryByTestId("money-move-form")).toBeNull();
+
+    const b = await screen.findByTestId("card-day-PBB|2026-09-18|900000000064 / 90000064");
+    expect(within(b).getByRole("button", { name: "Approve day: Recorded in Carres is RM 0.50 over" })).toBeDisabled();
+    expect(within(b).queryByRole("button", { name: "Approve day" })).toBeNull();
+  });
+
+  it("0595: a matched payment voided since shows on its row and blocks Approve day", async () => {
+    const d = day({ row_count: 1, matched_count: 1, gross: 100, net: 99, recorded: 100, voided_count: 1 });
+    net.routes["GET /api/finance/card-settlement"] = {
+      ...REVIEW,
+      days: [d],
+      rows: [line({})],
+      payments: [{ ...REVIEW.payments[0]!, voided: true }],
+    };
+    show();
+    fireEvent.click((await screen.findAllByTitle("Check the sales"))[0]!);
+    const pbb = await screen.findByTestId("card-day-PBB|2026-09-18|900000000001 / 90000001");
+    expect(within(pbb).getByTestId("card-row-2")).toHaveTextContent("Matched by approval code · Payment voided · RM 100.00");
+    // its match can still be taken off
+    expect(within(within(pbb).getByTestId("card-row-2")).getByRole("button", { name: "Take off match" })).toBeEnabled();
+    expect(within(pbb).getByRole("button", { name: "Approve day: a matched payment was voided" })).toBeDisabled();
   });
 
   it("an import that opens earlier automatic matches again says so", async () => {
