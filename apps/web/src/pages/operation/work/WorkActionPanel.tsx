@@ -164,7 +164,7 @@ export default function WorkActionPanel({
               href={communication.href}
               target="_blank"
               rel="noreferrer"
-              className={`inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-[13px] font-semibold leading-[18px] ${blueIsMessage ? "bg-kit-blue-9 text-white hover:bg-kit-blue-10" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-[13px] font-semibold leading-[18px] ${blueIsMessage ? "bg-kit-blue-9 text-white hover:brightness-95" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
               data-testid="work-detail-open-chat"
             >
               <Icon name="message" size={14} />

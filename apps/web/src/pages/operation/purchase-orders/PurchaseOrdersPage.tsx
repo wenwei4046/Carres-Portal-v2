@@ -43,7 +43,7 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 /* The Sales Order's card: same heading face, same border, same padding. The
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
-import { Block } from "../SalesOrderWorkspace";
+import Block from "@/components/kit/Block";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,

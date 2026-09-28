@@ -123,7 +123,7 @@ import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 import type { IssuedPo } from "./components/PoIssueEvidence";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { Block } from "./SalesOrderWorkspace";
+import Block from "@/components/kit/Block";
 import {
   RecordRanks,
   groupHistoryChronology,

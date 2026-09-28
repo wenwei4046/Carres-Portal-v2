@@ -359,8 +359,16 @@ export function FilterRailRow({
   title,
   testId,
   resets = false,
+  tone = "default",
+  indent = false,
 }: {
   label: string;
+  /** `workspace` — the Work rail (Workspace MASTER §5.10 BUILD SHEET): rows
+   *  14/400 with the count on the right; the chosen row is the pale-blue wash
+   *  with the 3px blue edge, full width. */
+  tone?: "default" | "workspace";
+  /** A record row under its module row (the Work order list). */
+  indent?: boolean;
   supportingText?: string;
   /** Omitted renders no number. A live count is passed as-is — the fixed rows
    *  print zero rather than hiding it. */
@@ -381,7 +389,11 @@ export function FilterRailRow({
       aria-pressed={active}
       title={title}
       data-testid={testId}
-      className={[
+      className={tone === "workspace" ? [
+        "relative flex min-h-[36px] w-full items-center gap-2 py-2 pr-4 text-left text-control text-kit-slate-12",
+        indent ? "pl-6 font-semibold" : "pl-4",
+        active ? "bg-kit-blue-3" : "hover:bg-kit-slate-2",
+      ].join(" ") : [
         /* 36px minimum: 18px text-body line + 9px above and below. A wrapped
            label simply adds its second 18px line — natural height, same font,
            never a tooltip. `items-start` keeps the count on the first line. */
@@ -393,10 +405,10 @@ export function FilterRailRow({
         active ? "font-semibold" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
-      {active && !resets && (
+      {active && (tone === "workspace" || !resets) && (
         <span
           aria-hidden
-          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
+          className={tone === "workspace" ? "absolute bottom-0 left-0 top-0 w-[3px] bg-kit-blue-9" : "absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"}
         />
       )}
       <span className="min-w-0 flex-1 break-words">
@@ -406,7 +418,7 @@ export function FilterRailRow({
         )}
       </span>
       {count != null && (
-        <span className="shrink-0 tabular-nums text-meta leading-[18px] font-normal text-kit-slate-11">
+        <span className={tone === "workspace" ? `shrink-0 tabular-nums ${indent ? "text-meta" : "text-control"} font-normal text-kit-slate-11` : "shrink-0 tabular-nums text-meta leading-[18px] font-normal text-kit-slate-11"}>
           {count}
         </span>
       )}

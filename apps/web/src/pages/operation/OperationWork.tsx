@@ -1,72 +1,69 @@
 /**
- * OperationWork — My Work / Team Work over the one server Work feed.
+ * OperationWork — the Workspace Work page (Workspace MASTER §5.10, APPROVED /
+ * LOCKED by Jess 2026-09-28: "yes" to 定 and to the four kit admissions).
  *
- * **TWO FILTERS over the ONE open work set — never two datasets, never
- * another dashboard.** This page is ASSEMBLY:
+ * Three columns over the ONE server Work feed:
  *
- *   WHAT is open   ← owning-module projectors on the Worker
- *   WHO + WHEN     ← structured normal owner · cover · acting person · due
+ *   rail          My Task · Team Work, search, the month (Mon to Sat, each
+ *                 day's count), ATTENTION and MODULE; under the chosen module
+ *                 one row per order: its SO No and its task count
+ *   Mission       the order header and its Order Route stops — acts first,
+ *                 each act finished in place with the owning module's form
+ *   Communication one tab per outside party, recorded channels only
  *
- * PRESENTATION: object identity, problem fact, action sentence, then timing.
- * Owner identity is metadata/grouping and never part of the action sentence.
+ * Widths (the page never scales on desktop): 1340+ 280 · ≥460 · 340;
+ * 1100–1339 240 · ≥460 · 300; 900–1099 220 · ≥400 · 280. Each column scrolls
+ * alone. Below 900 is the phone round (not in this build): the three columns
+ * keep their 900 sizes and the page scrolls sideways.
  *
- * MY WORK shows only the signed-in person's actions (the scope answers who —
- * no repeated avatar). TEAM WORK groups per staff: avatar · full name ·
- * `{n} actions to do` · `{n} late` · the action list. Never a bare count word
- * — every count says WHAT it counts (card §7, supersedes the 2026-08-14
- * `open · overdue` tally). An item whose duty has no roster holder yet groups
- * under its DUTY word — never a hand-picked person, never the PIC borrowed
- * for another module's work.
- *
- * Interaction comes from the v2 feed. `open_module` remains a door to the
- * owning object; admitted `embedded` actions may use the owning module's
- * shared form and write contract. The selected action stays in Workspace;
- * only its explicit owning-object door navigates away.
+ * Counts count OCCURRENCES, never POs: a PO window with two unsent POs for one
+ * order is one task on that order's row.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { orderActionLines, workspaceDutyLabelOf, type OperationWorkItem, type OperationWorkModule } from "@carres/shared";
+import { useSearchParams } from "react-router-dom";
+import type { OperationWorkModule } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
-import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
-import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
-import { useOpenWorkSet, type WorkRow } from "./use-open-work";
-import {
-  filterWork,
-  inWorkDay,
-  isWorkDate,
-  parseWorkMonth,
-  parseWorkStatus,
-  toggleWorkStatus,
-  WORK_MODULES,
-  WORK_STATUS_ORDER,
-  WORK_STATUS_WORD,
-  workFocusDay,
-  workLayoutFor,
-  workModuleCounts,
-  workRailMonth,
-  workSections,
-  workStatusOf,
-  type WorkStatus,
-  type WorkWhen,
-} from "./work/work-model";
-import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
-import WorkActionPanel from "./work/WorkActionPanel";
-import WorkParties, { type Party } from "./work/WorkParties";
-import WorkOwnerSource from "./work/WorkOwnerSource";
-import PoWindowPanel, { usePoWindow } from "./work/PoWindowPanel";
-import ModuleHeader from "./components/ModuleHeader";
-import { FilterRailGroup, FilterRailRow, FilterRailSelect, FilterRailMonthGrid } from "./components/workspace-rail";
 import SearchInput from "@/components/kit/SearchInput";
+import ModuleHeader from "./components/ModuleHeader";
+import { FilterRailGroup, FilterRailMonthGrid, FilterRailRow } from "./components/workspace-rail";
+import { useOpenWorkSet, type WorkRow } from "./use-open-work";
+import { filterWork, isWorkDate, parseWorkMonth, WORK_MODULES, workFocusDay, workRailMonth, workStatusOf } from "./work/work-model";
+import { useWorkOrderIndex } from "./work/use-work-data";
+import { workOrderGroups, type WorkOrderGroup } from "./work/work-orders";
+import { STOP_ORDER, type CommParty, type WorkAct, type WorkPoFact } from "./work/work-stops";
+import WorkMission from "./work/WorkMission";
+import WorkPoMission from "./work/WorkPoMission";
 import WorkCommunication from "./work/WorkCommunication";
-import { WorkCardSkeleton, WorkSection } from "./work/WorkCard";
-import WorkListRow from "./work/WorkListRow";
+import WorkActionPanel from "./work/WorkActionPanel";
+import PoWindowPanel from "./work/PoWindowPanel";
+import { useLogisticsModel } from "./work/LogisticsCard";
 
-type ViewKey = "mine" | "team";
-
-/** Cards drawn per step once a list passes 50 (card kit §List states). */
-const CARD_STEP = 50;
+export const WORK_PAGE_COPY = {
+  title: "Workspace",
+  mine: "My Task",
+  team: "Team Work",
+  search: "Search work…",
+  attention: "Attention",
+  module: "Module",
+  allModules: "All modules",
+  broken: "Broken commitment",
+  missed: "Missed",
+  waiting: "Waiting for answer",
+  noDate: "No date",
+  previousMonth: "Previous month",
+  nextMonth: "Next month",
+  loading: "Loading…",
+  failed: "Work could not be loaded. Try again.",
+  empty: "Nothing assigned to you",
+  clear: "No open work. Every track is clear.",
+  seeTeam: "See Team Work",
+  nothingDue: (date: string) => `Nothing due on ${date}`,
+  noMissed: "No missed work",
+  openDay: (date: string) => `Open ${date}`,
+  openMissed: "Open Missed",
+} as const;
 
 const MODULE_LABEL: Record<OperationWorkModule, string> = {
   orders: "Sales Orders",
@@ -77,84 +74,30 @@ const MODULE_LABEL: Record<OperationWorkModule, string> = {
   issue_tracker: "Issue Tracker",
 };
 
-/**
- * ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
- * 2026-09-13, Delivery MASTER §10): the act with its recipient, then the
- * required result — never joined with `—`. `Deliver on {weekday, date}` is
- * spelled here through the one date home, because the engine spells no dates.
- */
-function deliveryLines(item: WorkRow): { act: string; result: string | null } | null {
-  if (item.module !== "delivery") return null;
-  const act =
-    item.ruleKey === "deliver_today" && item.dueIso
-      ? orderActionLines("deliver_today", { deliveryDate: fmtDate(item.dueIso) }).act
-      : item.action;
-  return { act, result: item.requiredResult || null };
+type Attention = "broken" | "missed" | "waiting" | "no_date";
+
+/** The three desktop width bands (§5.10 BUILD SHEET). */
+function columnsFor(width: number): { cols: string; band: "wide" | "mid" | "narrow" } {
+  if (width >= 1340) return { cols: "280px minmax(460px,1fr) 340px", band: "wide" };
+  if (width >= 1100) return { cols: "240px minmax(460px,1fr) 300px", band: "mid" };
+  return { cols: "220px minmax(400px,1fr) 280px", band: "narrow" };
 }
 
-/** A PO window's mission (Purchasing §5.6.1): the summary, whose `Open`
- *  door is the blue act while demand is left, then To buy and POs to send. */
-function PoWindowMission({ item, onOpen }: { item: OperationWorkItem; onOpen: () => void }) {
-  const { window } = usePoWindow(item);
-  return (
-    <>
-      <WorkActionPanel item={item} onOpen={onOpen} openIsPrimary={(window?.demand.rowIds.length ?? 0) > 0} />
-      <PoWindowPanel item={item} />
-    </>
-  );
-}
-
-/** Team Work's owner group: the normal owner, a named person, or the duty. */
-function ownerGroupKey(i: WorkRow): string {
-  return i.normalOwnerId ??
-    (i.ownerName ? `person:${i.ownerName}` : `duty:${i.ownerDuty ?? "No owner yet"}`);
+function inAttention(item: WorkRow, key: Attention): boolean {
+  if (key === "broken") return item.broken;
+  if (key === "missed") return item.timingBucket === "overdue";
+  if (key === "waiting") return workStatusOf(item) === "waiting";
+  return item.dueIso === null;
 }
 
 export default function OperationWork() {
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const workAreaRef = useRef<HTMLDivElement>(null);
-  /* ≥1280px of canvas the columns are 280 · ≥560 · 340; 1040–1279 they are
-     260 · ≥420 · 300 (Jess, 2026-09-27). Below 1040 the communication pane
-     is a drawer the person opens. The inbox shows ONE week; the month opens
-     from its name. */
-  const [wide, setWide] = useState(true);
-  const [commOpen, setCommOpen] = useState(false);
-  const [monthOpen, setMonthOpenState] = useState(() => {
-    try { return window.localStorage.getItem("carres.work.month") !== "week"; } catch { return true; }
-  });
-  const setMonthOpen = (next: boolean | ((v: boolean) => boolean)) => setMonthOpenState((before) => {
-    const value = typeof next === "function" ? next(before) : next;
-    try { window.localStorage.setItem("carres.work.month", value ? "month" : "week"); } catch { /* private window */ }
-    return value;
-  });
-  const [layout, setLayout] = useState<WorkLayout>(() =>
-    typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
-  );
-  const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
-  /* §5.10: which fact card of the order is open (one at a time); reset when
-     another order is chosen. */
-  const [openParty, setOpenParty] = useState<Party | null>(null);
-  /* §5.10: entering the detail on one stage puts focus on `Back to work`. */
-  const backRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (activePanel === "detail") backRef.current?.focus();
-  }, [activePanel]);
-
-  // The PAGE decides the panels, not the window: with the portal sidebar open
-  // a 1440px window leaves ~1200px of page. The page is this page's own
-  // full-width frame (canvas padding included), so the owner's breakpoints
-  // (1280 · 768) read exactly as written when no sidebar is drawn. A width of
-  // 0 means the page is not laid out yet — the window is the only honest
-  // estimate until it is.
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
   useLayoutEffect(() => {
-    const area = workAreaRef.current?.closest<HTMLElement>("[data-testid='operation-work']") ?? workAreaRef.current;
+    const area = areaRef.current;
     if (!area) return;
-    const measure = () => {
-      const width = area.getBoundingClientRect().width;
-      setLayout(workLayoutFor(width > 0 ? width : window.innerWidth));
-      setWide((width > 0 ? width : window.innerWidth) >= 1280);
-    };
+    const measure = () => setWidth(area.getBoundingClientRect().width || window.innerWidth);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(area);
@@ -164,623 +107,321 @@ export default function OperationWork() {
       window.removeEventListener("resize", measure);
     };
   }, []);
+  const layout = columnsFor(width);
 
-  // One identity, shared with the Right Rail (HF-3): the signed-in account id.
-  const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, refreshFailed, retry } = useOpenWorkSet();
+  const { items: allItems, generatedOn, myUserId, loading, error, retry, unhealthySources, refreshFailed } = useOpenWorkSet();
+  const { index } = useWorkOrderIndex();
 
-  // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
-  const linkedScope = params.get("scope");
-  const linkedOwner = params.get("owner");
-  const linkedWhen = params.get("when");
-  const activeView: ViewKey = linkedScope === "team" ? "team" : "mine";
-  const ownerFocus = linkedOwner;
+  const set = (patch: Record<string, string | null>) =>
+    setParams((before) => {
+      const next = new URLSearchParams(before);
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === "") next.delete(k);
+        else next.set(k, v);
+      }
+      return next;
+    }, { replace: true });
+
+  const scope: "mine" | "team" = params.get("scope") === "team" ? "team" : "mine";
   const search = params.get("q") ?? "";
-  const when: WorkWhen = ["broken", "overdue", "today", "later", "no_date"].includes(linkedWhen ?? "")
-    ? linkedWhen as WorkWhen
-    : "all";
   const moduleParam = params.get("module");
-  const moduleFilter: OperationWorkModule | "all" = WORK_MODULES.includes(moduleParam as OperationWorkModule)
-    ? moduleParam as OperationWorkModule
-    : "all";
-  const statuses = useMemo(() => parseWorkStatus(params.get("status")), [params]);
-  const day = params.get("day") ?? (params.get("when") ? "all" : "focus");
+  const moduleFilter: OperationWorkModule | "all" = WORK_MODULES.includes(moduleParam as OperationWorkModule) ? (moduleParam as OperationWorkModule) : "all";
 
-  const updateParam = (key: string, value: string | null) => setParams((before) => {
-    const next = new URLSearchParams(before);
-    // `all` clears a filter, but on the day list it IS a day choice: dropping
-    // it would fall back to the focus list while `All` still shows every count.
-    if (!value || (value === "all" && key !== "day")) next.delete(key);
-    else next.set(key, value);
-    return next;
-  }, { replace: true });
-
-  /** My Work — only the signed-in person's actions. */
-  const mineAll = useMemo(
-    () => (myUserId ? allItems.filter((i) => i.ownerId === myUserId) : []),
-    [allItems, myUserId],
+  const scoped = useMemo(
+    () => filterWork(scope === "mine" ? allItems.filter((i) => myUserId && i.ownerId === myUserId) : allItems, { search, when: "all", module: "all" }),
+    [allItems, myUserId, scope, search],
   );
-  const filters = useMemo(() => ({ search, when, module: moduleFilter }), [search, when, moduleFilter]);
-  const mine = useMemo(() => filterWork(mineAll, filters), [filters, mineAll]);
-  const filteredTeamItems = useMemo(() => filterWork(allItems, filters), [allItems, filters]);
-
-  /** Team Work — grouped per RESOLVED owner (§0.1 Action Owner Engine,
-   *  2026-08-27): an ops account (PIC · PO-duty holder), a named non-account
-   *  person (a salesperson), or — where no roster holder exists — the DUTY
-   *  word. */
-  const teamGroups = useMemo(() => {
-    const byOwner = new Map<string, WorkRow[]>();
-    for (const i of filteredTeamItems) {
-      const key = ownerGroupKey(i);
-      const list = byOwner.get(key) ?? [];
-      list.push(i);
-      byOwner.set(key, list);
-    }
-    const groups = [...byOwner.entries()].map(([key, items]) => {
-      const staffMember = key.startsWith("duty:") || key.startsWith("person:")
-        ? null
-        : staffById.get(key) ?? null;
-      // A resolved person without an ops account still has a NAME (the
-      // salesperson) — a person group, initials and all, never a duty word.
-      const personName = staffMember
-        ? personLabel(staffMember.name, staffMember.email)
-        : key.startsWith("person:")
-          ? key.slice(7)
-          : (items[0]?.ownerName ?? null);
-      // A duty group carries the duty KEY from the feed; the governed word
-      // comes from the shared catalogue (`PO Duty` · `Delivery Duty`), and a
-      // keyed duty with no holder prints the Staff & Duties door below.
-      const dutyKey = key.startsWith("duty:") && items[0]?.ownerDutyKey ? items[0].ownerDutyKey : null;
-      const dutyWord = key.startsWith("duty:")
-        ? dutyKey ? workspaceDutyLabelOf(dutyKey) : key.slice(5)
-        : null;
-      return {
-        key,
-        person: personName !== null,
-        userId: staffMember ? key : null,
-        dutyKey,
-        name: personName ?? dutyWord ?? "No owner yet",
-        items: [...items].sort((a, b) =>
-          (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
-        ),
-        late: items.filter((i) => i.timingBucket === "overdue").length,
-        coverName: items.find((i) => i.activeCover)?.activeCover?.name ?? null,
-      };
-    });
-    // People first (by printed name — coverage, never a ranking), duties last.
-    return groups.sort((a, b) =>
-      a.person && !b.person ? -1 : !a.person && b.person ? 1 : a.name.localeCompare(b.name),
-    );
-  }, [filteredTeamItems, staffById]);
-
-  /* The whole team's open set, before any filter — the header's answer when
-     My Work is empty (owner review 2026-09-25 item 5). */
-  const teamTotal = teamGroups.reduce((n, g) => n + g.items.length, 0);
-
-  const visibleTeamGroups = useMemo(
-    () => (ownerFocus ? teamGroups.filter((g) => g.key === ownerFocus) : teamGroups),
-    [teamGroups, ownerFocus],
-  );
-
-  const beforeDay = activeView === "mine"
-    ? mine
-    : visibleTeamGroups.flatMap((group) => group.items);
-  const dueIsos = useMemo(() => beforeDay.map((item) => item.dueIso), [beforeDay]);
-  /** MASTER §5.1: today when it is a working day, else the next working day. */
-  const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
+  const dueIsos = useMemo(() => scoped.map((i) => i.dueIso), [scoped]);
+  const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [generatedOn, dueIsos]);
+  const anyMissed = scoped.some((i) => i.timingBucket === "overdue");
   /* THE OPENING CHOICE (Jess, 2026-09-27): Missed when anything is missed,
-     else the focus day. Missed, a day and No date are one choice at a time —
-     a day never mixes in the missed work. */
-  const anyMissed = beforeDay.some((item) => item.timingBucket === "overdue");
-  const openDay = day === "focus" ? (anyMissed ? "missed" : focusDay) : day;
-  const selectedDay = openDay;
-  const inDay = (item: WorkRow) => inWorkDay(item, (openDay || "focus") as typeof day, generatedOn, focusDay);
-  /* Status (Jess, 2026-09-26: the rail's `Status` rows, more than one may be
-     on): one day's open set split by the recorded reply state; the rail's
-     date counts keep the whole open set. */
-  const inDaySet = beforeDay.filter(inDay);
-  const statusCounts = Object.fromEntries(WORK_STATUS_ORDER.map((k) => [k, 0])) as Record<WorkStatus, number>;
-  for (const item of inDaySet) statusCounts[workStatusOf(item)] += 1;
-  const visible = inDaySet.filter((item) => statuses.includes(workStatusOf(item)));
+     else the focus day. One choice at a time. */
+  const dayParam = params.get("day");
+  const choice = dayParam ?? (anyMissed ? "missed" : focusDay);
+  const inChoice = (item: WorkRow) =>
+    choice === "all"
+      ? true
+      : isWorkDate(choice)
+      ? item.timingBucket !== "overdue" && item.dueIso === choice
+      : ["broken", "missed", "waiting", "no_date"].includes(choice)
+        ? inAttention(item, choice as Attention)
+        : false;
+  const chosenSet = scoped.filter(inChoice);
+  const visible = moduleFilter === "all" ? chosenSet : chosenSet.filter((i) => i.module === moduleFilter);
 
-  /** Module counts ignore the module filter and nothing else: scope · owner ·
-   *  search · the other filters · the current list. With all modules they add
-   *  up to the rows in the list. */
-  const moduleCountRows = (activeView === "mine"
-    ? filterWork(mineAll, { ...filters, module: "all" })
-    : filterWork(allItems, { ...filters, module: "all" }).filter((item) => !ownerFocus || ownerGroupKey(item) === ownerFocus)
-  ).filter(inDay);
+  const spell = (iso: string) => fmtDate(iso);
+  const groups = useMemo(() => workOrderGroups(visible, index, spell), [visible, index]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chosenKey = params.get("order");
+  /* A related order opened from a PO view may hold no act of mine: its Route
+     still shows, with `Back to {PO No}` (A3). */
+  const backKey = params.get("back");
+  const selected: WorkOrderGroup | null =
+    groups.find((g) => g.key === chosenKey) ??
+    (chosenKey?.startsWith("order:")
+      ? { key: chosenKey, orderId: chosenKey.slice(6), label: chosenKey, items: [], acts: [] }
+      : null) ??
+    groups[0] ??
+    null;
 
-  /** The rail's visible MONTH (Jess, 2026-09-26): the URL's `month`, else the
-   *  month of the chosen date, else the month of the focus day. The arrows
-   *  move it one month without touching the chosen Date. */
-  const monthKey = parseWorkMonth(params.get("month")) ?? parseWorkMonth(isWorkDate(day) ? day : focusDay);
-  const railDates = useMemo(
-    () => (monthKey ? workRailMonth(beforeDay, generatedOn, monthKey) : null),
-    [beforeDay, generatedOn, monthKey],
+  /* The rail month: the URL's month, else the chosen date's, else today's. */
+  const monthKey = parseWorkMonth(params.get("month")) ?? parseWorkMonth(isWorkDate(choice) ? choice : focusDay || generatedOn);
+  const railDates = useMemo(() => (monthKey && generatedOn ? workRailMonth(scoped, generatedOn, monthKey) : null), [scoped, generatedOn, monthKey]);
+  const attentionCount = (key: Attention) => scoped.filter((i) => inAttention(i, key)).length;
+  const moduleCount = (m: OperationWorkModule | "all") => (m === "all" ? chosenSet : chosenSet.filter((i) => i.module === m)).length;
+
+  /* Communication follows the act being worked; an order opens on its first act. */
+  const [party, setParty] = useState<CommParty>("supplier");
+  const [workingAct, setWorkingAct] = useState<WorkAct | null>(null);
+  useEffect(() => {
+    /* The first act in Route order — the one the Mission draws on top. */
+    const first = [...(selected?.acts ?? [])].sort((a, b) => STOP_ORDER.indexOf(a.stop) - STOP_ORDER.indexOf(b.stop))[0] ?? null;
+    setWorkingAct(first);
+    if (first) setParty(first.party);
+  }, [selected?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pos: WorkPoFact[] = useMemo(() => {
+    if (!selected?.orderId) return [];
+    return index.windows.flatMap((w) =>
+      w.pos
+        .filter((p) => p.orderIds.includes(selected.orderId!))
+        .map((p) => ({ poId: p.poId, documentNo: p.documentNo, supplierName: p.supplierName, sent: p.sent })),
+    );
+  }, [index.windows, selected?.orderId]);
+
+  const titleRow = "flex h-16 shrink-0 items-center border-b border-kit-slate-5 px-4";
+  const scopeButton = (key: "mine" | "team", label: string) => (
+    <button
+      type="button"
+      aria-pressed={scope === key}
+      onClick={() => set({ scope: key === "team" ? "team" : null, order: null })}
+      className={`h-9 px-3 text-control ${scope === key ? "bg-kit-slate-3 font-semibold text-kit-slate-12" : "bg-white text-kit-slate-11 hover:bg-kit-slate-2"}`}
+      data-testid={`work-view-${key}`}
+    >
+      {label}
+    </button>
   );
-  const railSelected = selectedDay === "missed" || selectedDay === "no_date" || isWorkDate(selectedDay) ? selectedDay : null;
-  const moduleCounts = workModuleCounts(moduleCountRows);
-  const railModules = WORK_MODULES.map((key) => ({ key, label: MODULE_LABEL[key] }));
 
-  /* The four empty states, checked in order (HF-1, owner ruling 2026-09-17):
-     a failed source · filters with no match · an empty day while other work
-     is open · nothing open at all. Zero matches is never zero work. */
-  const filtersActive = Boolean(search) || when !== "all" || moduleFilter !== "all"
-    || (activeView === "team" && Boolean(ownerFocus));
-  const missedCount = railDates?.missed ?? 0;
-  const emptyDoor: { key: string; label: string } | null = (() => {
-    if (missedCount > 0 && day !== "missed") return { key: "missed", label: "Open Missed" };
-    const nextDate = beforeDay
-      .filter((item) => item.timingBucket !== "overdue" && item.dueIso !== null && item.dueIso !== selectedDay)
-      .map((item) => item.dueIso as string)
+  const rail = (
+    <nav className="flex min-h-0 min-w-0 flex-col border-r border-kit-slate-5 bg-white" aria-label="Work filters" data-testid="work-rail">
+      <div className={titleRow}>
+        <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-5" data-testid="work-view-switch">
+          {scopeButton("mine", WORK_PAGE_COPY.mine)}
+          {scopeButton("team", WORK_PAGE_COPY.team)}
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3">
+        <SearchInput id="work-search" toolbar placeholder={WORK_PAGE_COPY.search} value={search} onChange={(e) => set({ q: e.target.value || null })} data-testid="work-search" />
+        {railDates ? (
+          <div className="mt-3" data-testid="work-rail-month">
+            <div className="flex h-8 items-center gap-1">
+              <button type="button" aria-label={WORK_PAGE_COPY.previousMonth} title={WORK_PAGE_COPY.previousMonth} onClick={() => set({ month: railDates.previousMonth })} className="grid h-8 w-8 place-items-center rounded-control border border-kit-slate-5 text-kit-slate-11 hover:bg-kit-slate-3">
+                <Icon name="previous" size={16} />
+              </button>
+              <span className="flex-1 text-center text-strong text-kit-slate-12" data-testid="work-rail-month-label">{railDates.month}</span>
+              <button type="button" aria-label={WORK_PAGE_COPY.nextMonth} title={WORK_PAGE_COPY.nextMonth} onClick={() => set({ month: railDates.nextMonth })} className="grid h-8 w-8 place-items-center rounded-control border border-kit-slate-5 text-kit-slate-11 hover:bg-kit-slate-3">
+                <Icon name="forward" size={16} />
+              </button>
+            </div>
+            <FilterRailMonthGrid
+              testId="work-rail-days"
+              compact
+              weeks={railDates.weeks.map((week) => week.map((d) => d && { iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today }))}
+              chosenIso={isWorkDate(choice) ? choice : null}
+              onPick={(iso) => set({ day: iso, order: null })}
+            />
+          </div>
+        ) : null}
+        <div className="-mx-4">
+          <FilterRailGroup title={WORK_PAGE_COPY.attention} icon="late" groupKey="work-attention" chosen={null}>
+            {(["broken", "missed", "waiting", "no_date"] as Attention[]).map((key) => (
+              <FilterRailRow
+                key={key}
+                tone="workspace"
+                label={WORK_PAGE_COPY[key === "no_date" ? "noDate" : key]}
+                count={attentionCount(key)}
+                active={choice === key}
+                onClick={() => set({ day: key, order: null })}
+                testId={`work-rail-${key === "no_date" ? "no-date" : key}`}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title={WORK_PAGE_COPY.module} icon="modules" groupKey="work-module" chosen={null}>
+            {(["all", ...WORK_MODULES] as const).map((m) => (
+              <div key={m}>
+                <FilterRailRow
+                  tone="workspace"
+                  label={m === "all" ? WORK_PAGE_COPY.allModules : MODULE_LABEL[m]}
+                  count={moduleCount(m)}
+                  active={moduleFilter === m}
+                  resets={m === "all"}
+                  onClick={() => set({ module: m === "all" ? null : m, order: null })}
+                  testId={`work-rail-module-${m}`}
+                />
+                {moduleFilter === m
+                  ? groups.map((g) => (
+                      <FilterRailRow
+                        key={g.key}
+                        tone="workspace"
+                        indent
+                        label={g.label}
+                        supportingText={g.windowDate ? fmtDate(g.windowDate) : undefined}
+                        count={g.items.length}
+                        active={selected?.key === g.key}
+                        onClick={() => set({ order: g.key, back: null })}
+                        testId={`work-order-row-${g.label}`}
+                      />
+                    ))
+                  : null}
+              </div>
+            ))}
+          </FilterRailGroup>
+        </div>
+      </div>
+    </nav>
+  );
+
+  const logistics = useLogisticsModel(selected?.orderId ?? "");
+  /* THE EMPTY STATES, in order (HF-1, owner ruling 2026-09-17): a day with
+     nothing while other work is open names the door to it; zero matches is
+     never zero work. */
+  const nextDoor: { key: string; label: string } | null = (() => {
+    if (anyMissed && choice !== "missed") return { key: "missed", label: WORK_PAGE_COPY.openMissed };
+    const next = scoped
+      .filter((i) => i.timingBucket !== "overdue" && i.dueIso !== null && i.dueIso !== choice)
+      .map((i) => i.dueIso as string)
       .sort()[0];
-    return nextDate ? { key: nextDate, label: `Open ${fmtDate(nextDate)}` } : null;
+    return next ? { key: next, label: WORK_PAGE_COPY.openDay(fmtDate(next)) } : null;
   })();
-  const emptyState: "failed" | "no_match" | "day" | "clear" = unhealthySources.length > 0
-    ? "failed"
-    : filtersActive && beforeDay.length === 0
-      ? "no_match"
-      : beforeDay.length > 0
-        ? "day"
-        : "clear";
-  const clearFilters = () => setParams((before) => {
-    const next = new URLSearchParams(before);
-    for (const key of ["q", "when", "module", "status", "owner", "selected"]) next.delete(key);
-    return next;
-  }, { replace: true });
-  const emptyButton = "mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700";
-  /* The empty list is one white section that ends where its words end
-     (item 24), never a canvas-long blank. */
-  const emptyBody = emptyState === "failed" ? null : (
-    <div className="px-1 py-5 text-body text-kit-slate-11" data-testid="work-empty">
-      {emptyState === "no_match" ? (
+  const teamHasWork = allItems.length > 0;
+  const emptyState = (
+    <div className="p-6 text-body text-kit-slate-11" data-testid="work-empty">
+      {scoped.length > 0 ? (
         <>
-          {search ? (
-            <>
-              <p className="text-kit-slate-12">No work matches “{search}”</p>
-              <p>Clear search or change Filters.</p>
-            </>
-          ) : <p className="text-kit-slate-12">No work matches these filters</p>}
-          <button type="button" onClick={clearFilters} className={emptyButton}>Clear filters</button>
+          <p className="text-kit-slate-12">
+            {isWorkDate(choice) ? WORK_PAGE_COPY.nothingDue(fmtDate(choice)) : choice === "missed" ? WORK_PAGE_COPY.noMissed : WORK_PAGE_COPY.empty}
+          </p>
+          {nextDoor ? (
+            <button type="button" onClick={() => set({ day: nextDoor.key, order: null })} className="mt-3 h-9 rounded-control border border-kit-slate-5 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3">
+              {nextDoor.label}
+            </button>
+          ) : null}
         </>
-      ) : emptyState === "day" ? (
+      ) : scope === "mine" ? (
         <>
-          {/^\d{4}-\d{2}-\d{2}$/.test(selectedDay) ? (
-            <>
-              <p className="text-kit-slate-12">Nothing due on {fmtDate(selectedDay)}</p>
-              <p>Choose another date or review completed work.</p>
-            </>
-          ) : selectedDay === "missed" ? <p className="text-kit-slate-12">No missed work</p> : null}
-          {emptyDoor ? (
-            <button type="button" onClick={() => updateParam("day", emptyDoor.key)} className={emptyButton}>
-              {emptyDoor.label}
+          <p>{WORK_PAGE_COPY.empty}</p>
+          {teamHasWork ? (
+            <button type="button" onClick={() => set({ scope: "team" })} className="mt-3 h-9 rounded-control border border-kit-slate-5 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-empty-team-door">
+              {WORK_PAGE_COPY.seeTeam}
             </button>
           ) : null}
         </>
       ) : (
-        <>
-          <p>{activeView === "mine" ? "Nothing assigned to you" : "No open work — every track is clear."}</p>
-          {activeView === "mine" && teamTotal > 0 ? (
-            /* The door out of an empty My Work (item 6 of the review). */
-            <button type="button" onClick={() => updateParam("scope", "team")} className={emptyButton} data-testid="work-empty-team-door">
-              See Team Work
-            </button>
-          ) : null}
-        </>
+        <p>{WORK_PAGE_COPY.clear}</p>
       )}
     </div>
   );
-
-  const selectedId = params.get("selected");
-  /* ⭐ ONE ROW PER ORDER (Jess, 2026-09-26 night): the list and the panel work
-     in records; `selected` is the record's first act (the URL keeps an act id
-     so a deep link to one act still lands on its order). */
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
-  /* ONE CARD = ONE ACT (Jess, 2026-09-27); the middle is the WHOLE order: the
-     chosen act first, then every other open act on the same record. */
-  const missionItems = selected ? [selected, ...allItems.filter((i) => i.orderId === selected.orderId && i.id !== selected.id)] : [];
-  const stepOfSelected: Party | null = !selected ? null
-    : selected.module === "delivery" ? "logistics"
-    : selected.module === "purchasing" ? "supplier"
-    : selected.module === "receiving" ? "grn"
-    : "order";
-  const visibleIds = new Set(visible.map((item) => item.id));
-  // The date rail and its badge already say when; the list is one ordered run.
-  const myItems = workSections(visible).flatMap((section) => section.items);
-  /* The step the chosen act belongs to opens by itself. */
-  useEffect(() => { setOpenParty(stepOfSelected); setCommOpen(false); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const displayTeamGroups = visibleTeamGroups
-    .map((group) => ({ ...group, items: group.items.filter((item) => visibleIds.has(item.id)) }))
-    .filter((group) => group.items.length > 0);
-  /* THE INBOX KEYS (Jess, 2026-09-27): ↑/↓ and J/K move the choice, Home/End
-     jump to the ends, `/` goes to Search. The middle and the pane follow. */
-  const orderedRows = activeView === "mine" ? myItems : displayTeamGroups.flatMap((g) => g.items);
-  const moveChoice = (to: "next" | "prev" | "first" | "last") => {
-    if (orderedRows.length === 0) return;
-    const at = Math.max(0, orderedRows.findIndex((i) => i.id === selected?.id));
-    const index = to === "first" ? 0 : to === "last" ? orderedRows.length - 1 : to === "next" ? Math.min(orderedRows.length - 1, at + 1) : Math.max(0, at - 1);
-    const row = orderedRows[index]!;
-    openRow(row);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-work-row][data-id="${CSS.escape(row.id)}"]`)?.focus());
-  };
-  const onListKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("input, textarea, select, [role='combobox']")) return;
-    const key = event.key;
-    if (key === "ArrowDown" || key === "j") { event.preventDefault(); moveChoice("next"); }
-    else if (key === "ArrowUp" || key === "k") { event.preventDefault(); moveChoice("prev"); }
-    else if (key === "Home") { event.preventDefault(); moveChoice("first"); }
-    else if (key === "End") { event.preventDefault(); moveChoice("last"); }
-  };
-  useEffect(() => {
-    const onSlash = (event: KeyboardEvent) => {
-      if (event.key !== "/" || (event.target as HTMLElement)?.closest?.("input, textarea, select, [contenteditable]")) return;
-      event.preventDefault();
-      document.getElementById("work-search")?.focus();
-    };
-    window.addEventListener("keydown", onSlash);
-    return () => window.removeEventListener("keydown", onSlash);
-  }, []);
-  const openRow = (i: WorkRow) => {
-    updateParam("selected", i.id);
-    if (layout === "one") setActivePanel("detail");
-  };
-
-  /* Card kit §List states: past 50 cards the list draws 50 more each time its
-     end scrolls into view, in the same order, so keyboard order never jumps.
-     A new selection of filters starts again at 50. */
-  const [cardLimit, setCardLimit] = useState(CARD_STEP);
-  // Choosing a card is not a new selection of filters: `selected` never resets.
-  const listKey = [...params.entries()].filter(([key]) => key !== "selected").map(([k, v]) => `${k}=${v}`).join("&");
-  useEffect(() => setCardLimit(CARD_STEP), [listKey]);
-  const moreRef = useRef<HTMLDivElement>(null);
-  const listTotal = activeView === "mine" ? myItems.length : displayTeamGroups.reduce((n, g) => n + g.items.length, 0);
-  const hasMore = listTotal > cardLimit;
-  useEffect(() => {
-    const sentinel = moreRef.current;
-    if (!sentinel || !hasMore) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setCardLimit(Number.POSITIVE_INFINITY);
-      return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) setCardLimit((limit) => limit + CARD_STEP);
-    });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, cardLimit]);
-  let teamBudget = cardLimit;
-  const shownTeamGroups = displayTeamGroups.flatMap((g) => {
-    if (teamBudget <= 0) return [];
-    const items = g.items.slice(0, teamBudget);
-    teamBudget -= items.length;
-    return [{ ...g, items }];
-  });
-
-  /* The two-line picker row (Jess, 2026-09-26). A covered row names the
-     normal owner in My Work (`For Li Ching`); Team Work groups by that owner
-     already, so the row says nothing twice. */
-  const card = (i: WorkRow) => (
-    <WorkListRow
-      key={i.id}
-      item={i}
-      action={`${deliveryLines(i)?.act ?? i.action}`}
-      cover={activeView === "mine" && i.ownerState === "covered" ? (i.normalOwner?.name ?? "normal owner") : null}
-      selected={layout !== "one" && selected?.id === i.id}
-      onSelect={() => openRow(i)}
-      onOpenRecord={() => navigate(i.destination)}
-    />
-  );
-
-  /* THE RAIL EVERY PAGE FOLLOWS (Jess, 2026-09-26 — the Payment Monitor rail,
-     then her correction the same day): ONE header line `‹ Week of 28 Sep ›`,
-     then the whole month as a Monday–Saturday grid of day tiles (day number
-     over count; Sunday never drawn), then the fixed rows `Missed` and
-     `No date`, the `Status` rows (more than one may be on), the `Page` rows
-     and — in Team Work — the Owner select. A non-working day is a grey tile
-     with no count; today is the solid-blue tile; the chosen day is ringed.
-     Hidden, it leaves a 44px `Show filters` strip; the choice is remembered
-     per browser (`useFilterRailOpen`). */
-  const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
-  const pickDay = (key: string) => updateParam("day", key);
-  /* The week the inbox shows: the chosen day's, else today's, else the first. */
-  const weekOf = (weeks: NonNullable<typeof railDates>["weeks"]) =>
-    weeks.find((w) => w.some((d) => d && d.iso === railSelected)) ?? weeks.find((w) => w.some((d) => d?.today)) ?? weeks[0] ?? [];
-  const shiftWeek = (days: number) => {
-    if (!railDates) return;
-    const anchor = weekOf(railDates.weeks).find(Boolean)?.iso;
-    if (!anchor) return;
-    const d = new Date(`${anchor}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + days);
-    const iso = d.toISOString().slice(0, 10);
-    setParams((before) => {
-      const next = new URLSearchParams(before);
-      next.set("day", iso);
-      next.set("month", iso.slice(0, 7));
-      return next;
-    }, { replace: true });
-  };
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterCount = (moduleFilter !== "all" ? 1 : 0) + (activeView === "team" && ownerFocus ? 1 : 0) + (statuses.length === 1 && statuses[0] === "todo" ? 0 : 1);
-  const filtersPanel = railDates ? (<>
-      {filtersOpen ? (<div data-testid="work-filters">
-      {/* Status rows: each one is on or off on its own; the last one on stays. */}
-      <FilterRailGroup title="Status" icon="flag" chosen={statuses.length === 1 && statuses[0] === "todo" ? null : statuses.map((k) => WORK_STATUS_WORD[k]).join(" · ")}>
-        {WORK_STATUS_ORDER.map((k) => (
-          <FilterRailRow key={k} label={WORK_STATUS_WORD[k]} count={statusCounts[k]} active={statuses.includes(k)} resets={k === "todo"} testId={`work-rail-status-${k}`} onClick={() => updateParam("status", toggleWorkStatus(statuses, k))} />
+  /* A failed source is never zero work (HF-1): it says which one and when. */
+  const health =
+    !loading && !error && (unhealthySources.length > 0 || refreshFailed) ? (
+      <div className="shrink-0 border-b border-kit-amber-6 bg-kit-amber-3 px-6 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
+        {unhealthySources.map((source) => (
+          <p key={source.key}>
+            Could not refresh {MODULE_LABEL[source.key]}
+            {source.lastSuccessfulAt ? ` · Last updated ${fmtDate(source.lastSuccessfulAt, { time: true })}` : ""}
+          </p>
         ))}
-      </FilterRailGroup>
-      <FilterRailGroup title="Page" icon="modules" chosen={moduleFilter === "all" ? null : MODULE_LABEL[moduleFilter]}>
-        <FilterRailRow label="All pages" count={moduleCountRows.length} active={moduleFilter === "all"} resets testId="work-rail-page-all" onClick={() => updateParam("module", "all")} />
-        {railModules.map((m) => (
-          <FilterRailRow key={m.key} label={m.label} count={moduleCounts[m.key]} active={moduleFilter === m.key} testId={`work-rail-page-${m.key}`} onClick={() => updateParam("module", m.key)} />
-        ))}
-      </FilterRailGroup>
-      {activeView === "team" ? (
-        <FilterRailGroup title="Owner" icon="people" chosen={ownerFocus ? teamGroups.find((g) => g.key === ownerFocus)?.name ?? null : null}>
-          <FilterRailSelect
-            label="Owner"
-            value={ownerFocus}
-            options={teamGroups.map((g) => ({ value: g.key, label: g.name, count: g.items.length }))}
-            onChange={(next) => updateParam("owner", next)}
-            testId="work-rail-owner"
-            allLabel="All owners"
-          />
-        </FilterRailGroup>
-      ) : null}
-      </div>) : null}
-  </>) : null;
-  const rail = railDates ? (
-    <div className="flex shrink-0 flex-col border-b border-kit-slate-4 pb-1" data-testid="work-rail" aria-label="Work filters" role="group">
-      <div data-testid="work-rail-week" className="flex h-8 items-center gap-1">
-        <button type="button" aria-label={monthOpen ? "Previous month" : "Previous week"} title={monthOpen ? "Previous month" : "Previous week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.previousMonth) : shiftWeek(-7))}>
-          <Icon name="previous" size={16} />
-        </button>
-        <button type="button" aria-expanded={monthOpen} onClick={() => setMonthOpen((v) => !v)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1 rounded-control py-1 text-body font-semibold text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-rail-week-label">
-          {railDates.month}
-          <Icon name={monthOpen ? "collapse" : "expand"} size={14} />
-        </button>
-        <button type="button" aria-label={monthOpen ? "Next month" : "Next week"} title={monthOpen ? "Next month" : "Next week"} className={weekArrow} onClick={() => (monthOpen ? updateParam("month", railDates.nextMonth) : shiftWeek(7))}>
-          <Icon name="forward" size={16} />
-        </button>
+        {refreshFailed ? (
+          <p className="flex items-center gap-3">
+            {WORK_PAGE_COPY.failed}
+            <button type="button" onClick={retry} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-body text-kit-slate-12">Try again</button>
+          </p>
+        ) : null}
       </div>
-      <FilterRailMonthGrid
-        testId="work-rail-days"
-        compact
-        weeks={(monthOpen ? railDates.weeks : [weekOf(railDates.weeks)]).map((week) => week.map((d) => d && ({ iso: d.iso, label: d.label, weekday: d.weekday, dayNumber: d.dayNumber, closed: d.holiday, count: d.count, today: d.today })))}
-        chosenIso={railSelected}
-        onPick={pickDay}
-      />
-      <div className="grid grid-cols-2 gap-x-2">
-        <FilterRailRow label="Missed" count={railDates.missed} active={railSelected === "missed"} testId="work-rail-missed" onClick={() => pickDay("missed")} />
-        <FilterRailRow label="No date" count={railDates.noDate} active={railSelected === "no_date"} testId="work-rail-no-date" onClick={() => pickDay("no_date")} />
-      </div>
-    </div>
-  ) : null;
-
-  /* A status choice with nothing in it is its own sentence, never the day's
-     empty state (the day may well have To do work the choice hides). */
-  const listBody = !loading && visible.length === 0 && inDaySet.length > 0 ? (
-    <p className="py-2 text-body text-kit-slate-11" data-testid="work-tab-empty">
-      No work for this Status choice.
-    </p>
-  ) : loading ? (
-    <WorkCardSkeleton />
-  ) : error && !refreshFailed ? (
-    <div className="rounded-work border border-work-line bg-white px-4 py-3" data-testid="work-error">
-      <p className="text-body text-danger">Work could not be loaded. Try again.</p>
-      <button type="button" onClick={retry} className="mt-2 rounded-control border border-kit-slate-4 bg-white px-3 py-1.5 text-body text-kit-slate-12">
-        Try again
-      </button>
-    </div>
-  ) : activeView === "mine" ? (
-    myItems.length === 0 ? emptyBody : (
-      <div className="flex flex-col border-t border-kit-slate-4" data-testid="work-section-list">{myItems.slice(0, cardLimit).map(card)}</div>
-    )
-  ) : displayTeamGroups.length === 0 ? (
-    emptyBody
-  ) : (
-    <div className="flex flex-col gap-4">
-      {shownTeamGroups.map((g) => (
-        <section key={g.key} className="flex flex-col" data-testid={`work-owner-group-${g.key}`}>
-          <h3 className="flex h-8 min-w-0 items-center gap-2 whitespace-nowrap" data-testid={`work-owner-heading-${g.key}`}>
-            {g.person ? (
-              <span
-                aria-hidden="true"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold leading-4"
-                style={{
-                  /* Stable per-person colour — the account id where one
-                     exists, else the group key (a salesperson has no ops
-                     account; the hash only needs a stable string). */
-                  backgroundColor: avatarColor(g.userId ?? g.key).bg,
-                  color: avatarColor(g.userId ?? g.key).fg,
-                }}
-              >
-                {personInitials(g.name, "")}
-              </span>
-            ) : null}
-            <span className="min-w-0 truncate text-[15px] font-semibold leading-5 text-kit-slate-12">{g.name}</span>
-            <span className="shrink-0 text-[12px] font-normal leading-4 text-kit-slate-11">
-              {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
-              {g.late > 0 && <span className="font-medium text-danger"> · {g.late} missed</span>}
-            </span>
-            {g.coverName && (
-              <span className="min-w-0 truncate text-[12px] font-normal leading-4 text-kit-amber-11">
-                Cover today: {g.coverName}
-              </span>
-            )}
-          </h3>
-          {g.dutyKey && (
-            // The governed configuration failure with its ONE door
-            // (workspace/MASTER §4 · Delivery MASTER §13.1): never a
-            // fallback person, never a Work-local assignment control.
-            <p className="text-label text-kit-slate-11" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
-              Nobody holds {g.name}.{" "}
-              <Link className="text-kit-blue-11 underline" to="/operation?tab=staff-duties">
-                Set the holder in Workspace → Staff &amp; Duties
-              </Link>
-            </p>
+    ) : null;
+  const mission = (
+    <main className="flex min-h-0 min-w-0 flex-col border-r border-kit-slate-5 bg-white" data-testid="work-middle">
+      {health}
+      {loading ? (
+        <p className="p-6 text-body text-kit-slate-11" role="status">{WORK_PAGE_COPY.loading}</p>
+      ) : error ? (
+        <div className="p-6">
+          <p className="text-body text-kit-red-11">{WORK_PAGE_COPY.failed}</p>
+          <button type="button" onClick={retry} className="mt-2 h-9 rounded-control border border-kit-slate-5 px-3 text-body">Try again</button>
+        </div>
+      ) : !selected ? (
+        unhealthySources.length > 0 && scoped.length === 0 ? null : emptyState
+      ) : selected.poId ? (
+        <WorkPoMission
+          key={selected.poId}
+          poId={selected.poId}
+          acts={selected.acts}
+          items={selected.items}
+          index={index}
+          onOpenOrder={(orderId) => set({ order: `order:${orderId}`, back: selected.key })}
+          onPickAct={(act) => {
+            setWorkingAct(act);
+            setParty(act.party);
+          }}
+        />
+      ) : selected.orderId ? (
+        <WorkMission
+          key={selected.orderId}
+          back={backKey?.startsWith("po:") ? { label: `Back to ${backKey.slice(3)}`, onBack: () => set({ order: backKey, back: null }) } : null}
+          orderId={selected.orderId}
+          acts={selected.acts}
+          items={selected.items}
+          pos={pos}
+          logistics={selected.orderId ? logistics.model ?? null : null}
+          stacked={layout.band !== "wide"}
+          narrow={layout.band === "narrow"}
+          onPickAct={(act) => {
+            setWorkingAct(act);
+            setParty(act.party);
+          }}
+        />
+      ) : (
+        /* An occurrence that names no single order (A3): its own panel. */
+        <div className="min-h-0 flex-1 overflow-y-auto p-6" data-testid="work-object-mission">
+          {selected.items.map((item) =>
+            item.source.object.kind === "po_window" ? (
+              <div key={item.id} className="flex flex-col gap-3">
+                <WorkActionPanel item={item.source} onOpen={() => window.location.assign(item.destination)} />
+                <PoWindowPanel item={item.source} />
+              </div>
+            ) : (
+              <WorkActionPanel key={item.id} item={item.source} onOpen={() => window.location.assign(item.destination)} />
+            ),
           )}
-          {g.items.map(card)}
-        </section>
-      ))}
-    </div>
+        </div>
+      )}
+    </main>
   );
 
   return (
     <>
-      {/* The 50px Destination Header every listing carries (UI MASTER §6.0,
-          owner ruling 2026-09-25: Work follows the Sales Orders shell). It
-          embeds the global utilities; the page prints no count up here. */}
-      <ModuleHeader destinationHeader testId="work-destination-header" word="Work" docTitle="Work — Carres" />
+      <ModuleHeader destinationHeader testId="work-destination-header" word={WORK_PAGE_COPY.title} docTitle="Workspace — Carres" />
       <ListPageShell register testId="operation-work">
-      {/* The rail runs from the page header to the bottom (Jess, 2026-09-26:
-          the toolbar is the right column's, never a bar across the rail). */}
-      <div ref={workAreaRef} data-testid="work-area" data-layout={layout} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="work-right-column">
-        <WorkSplitShell
-          layout={layout}
-          activePanel={activePanel}
-          wide={wide}
-          commOpen={commOpen}
-          comm={selected && selected.source.object.kind !== "po_window" ? <WorkCommunication items={[selected.source]} party={openParty === "order" ? "customer" : openParty === "grn" ? "supplier" : openParty ?? undefined} onClose={layout === "two" ? () => setCommOpen(false) : undefined} /> : null}
-          list={(
-            /* The picker is ONE white card, like every card on the right (Jess,
-               2026-09-26: "why middle is not white?"). No search, no Clear
-               all: the rail's own rows reset themselves, the header's
-               Jump to… finds a record. */
-            <div className="flex min-h-0 flex-1 flex-col border-r border-kit-slate-5 bg-white px-3 pt-2" data-testid="work-list">
-                    {/* The picker's own controls, over the picker (Jess, 2026-09-26:
-                        "My Work, Team Work is under middle card"): the scope tabs on
-                        one line, the search on the next; never a bar across the
-                        detail. `Covering` is gone: cover shows on the row itself. */}
-              <section aria-label="Work toolbar" className="flex shrink-0 flex-wrap items-center gap-2 pb-2" data-testid="work-toolbar">
-                <div className="inline-flex overflow-hidden rounded-control border border-kit-slate-4 max-[599px]:basis-full" data-testid="work-view-switch">
-                  {(
-                    [
-                      ["mine", "My Work"],
-                      ["team", "Team Work"],
-                    ] as const
-                  ).map(([k, label]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      data-testid={`work-view-${k}`}
-                      aria-pressed={activeView === k}
-                      onClick={() => {
-                        setParams((before) => {
-                          const next = new URLSearchParams(before);
-                          if (k === "mine") {
-                            next.delete("scope");
-                            next.delete("owner");
-                          } else next.set("scope", "team");
-                          return next;
-                        }, { replace: true });
-                      }}
-                      className={`h-[34px] px-3 text-control max-[599px]:flex-1 ${
-                        activeView === k
-                          ? "bg-kit-slate-3 font-semibold text-kit-slate-12"
-                          : "bg-white text-kit-slate-11 hover:bg-kit-slate-2"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {activeView === "team" && ownerFocus && (
-                  <button
-                    type="button"
-                    data-testid="work-owner-clear"
-                    onClick={() => updateParam("owner", null)}
-                    className="rounded-full border border-kit-slate-12 bg-kit-slate-12 px-2 py-1 text-label text-white"
-                  >
-                    {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
-                    · Clear
-                  </button>
-                )}
-              </section>
-
-              <div className="flex shrink-0 items-center gap-2 pb-1">
-                <div className="min-w-0 flex-1">
-                  <SearchInput id="work-search" toolbar placeholder="Search work…" value={search} onChange={(event) => updateParam("q", event.target.value || null)} onKeyDown={(event) => { if (event.key === "Escape") (event.target as HTMLInputElement).blur(); }} data-testid="work-search" />
-                </div>
-                <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-control border border-kit-slate-4 px-2.5 text-body text-kit-slate-12 hover:bg-kit-slate-3" data-testid="work-filters-toggle">
-                  <Icon name="filter" size={14} />
-                  {filterCount > 0 ? `Filters ${filterCount}` : "Filters"}
-                </button>
-              </div>
-              {filtersPanel}
-              {rail}
-              {!loading && !error && unhealthySources.length > 0 ? (
-                <div className="mt-3 shrink-0 rounded-work border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
-                  {unhealthySources.map((source) => (
-                    <p key={source.key}>
-                      Could not refresh {MODULE_LABEL[source.key]}
-                      {source.lastSuccessfulAt
-                        ? ` · Last updated ${fmtDate(source.lastSuccessfulAt) === fmtDate(generatedOn)
-                          ? fmtDate(source.lastSuccessfulAt, { timeOnly: true })
-                          : fmtDate(source.lastSuccessfulAt, { time: true })}`
-                        : ""}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-              {refreshFailed ? (
-                // A failed refresh keeps the last good list and the filters;
-                // only this row says so (card kit §List states).
-                <div className="mt-3 flex shrink-0 items-center gap-3 rounded-work border border-work-line bg-white px-3 py-2" role="status" data-testid="work-refresh-failed">
-                  <p className="min-w-0 flex-1 text-body text-danger">Work could not be loaded. Try again.</p>
-                  <button type="button" onClick={retry} className="h-8 shrink-0 rounded-control border border-kit-slate-4 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3">
-                    Try again
-                  </button>
-                </div>
-              ) : null}
-              <div className="-mx-3 min-h-0 flex-1 overflow-y-auto pb-1" data-testid="work-card-scroll" onKeyDown={onListKey}>
-                <div key={statuses.join(",")} className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-[120ms] motion-safe:ease-out">
-                  {listBody}
-                </div>
-                {hasMore ? <div ref={moreRef} aria-hidden className="h-px" data-testid="work-list-more" /> : null}
-              </div>
-            </div>
-          )}
-          detail={selected ? (
-            <>
-              {layout === "one" ? (
-                <button ref={backRef} type="button" className="inline-flex h-10 shrink-0 items-center gap-1.5 self-start text-body text-kit-blue-11" data-testid="work-back" onClick={() => setActivePanel("list")}>
-                  <Icon name="back" />
-                  Back to work
-                </button>
-              ) : null}
-              {refreshFailed ? (
-                /* §5.10: the last good mission stays; only this line says so. */
-                <div className="flex shrink-0 items-center gap-3 rounded-work border border-work-line bg-white px-3 py-2" role="status" aria-live="polite" data-testid="work-detail-refresh-failed">
-                  <p className="min-w-0 flex-1 text-body text-kit-slate-12">Some information could not be refreshed.</p>
-                  <Button size="touch" onClick={retry}>Try again</Button>
-                </div>
-              ) : null}
-              {selected.source.object.kind === "po_window" ? (
-                <PoWindowMission item={selected.source} onOpen={() => navigate(selected.destination)} />
+        <div ref={areaRef} className="min-h-0 min-w-0 flex-1 overflow-x-auto" data-testid="work-area" data-band={layout.band}>
+          <div className="grid h-full min-h-0" style={{ gridTemplateColumns: layout.cols }}>
+            {rail}
+            {mission}
+            <aside className="flex min-h-0 min-w-0 flex-col bg-white" data-testid="work-comm-column">
+              {selected?.orderId || selected?.poId ? (
+                <WorkCommunication
+                  orderId={selected.orderId}
+                  supplierName={selected.poId ? selected.items.find((i) => i.recipient)?.recipient ?? null : null}
+                  party={party}
+                  onParty={setParty}
+                  sendAct={workingAct?.kind === "send_po"}
+                />
               ) : (
-                <>
-                  {layout === "two" ? (
-                    <div className="flex shrink-0 justify-end">
-                      <Button size="touch" icon="message" onClick={() => setCommOpen((v) => !v)} data-testid="work-open-communication">Communication</Button>
-                    </div>
-                  ) : null}
-                  <WorkParties key={selected.orderId} items={missionItems.map((i) => i.source)} activeStep={stepOfSelected} openParty={openParty} onOpenParty={setOpenParty} onOpenRecord={() => navigate(selected.destination)} />
-                </>
+                <header className={titleRow}>
+                  <h2 className="text-strong text-kit-slate-12">Communication</h2>
+                </header>
               )}
-              <WorkOwnerSource item={selected.source} />
-            </>
-          ) : loading || listTotal > 0 ? (
-            <WorkSection className="shrink-0 p-6" data-testid="work-detail-empty">
-              <p className="text-[15px] font-semibold leading-5 text-kit-slate-12">Select a work item</p>
-              <p className="mt-0.5 text-body text-kit-slate-11">Choose an item from the Work list to see its mission.</p>
-            </WorkSection>
-          ) : null /* nothing to select: no box asks for a choice */}
-        />
+            </aside>
+          </div>
         </div>
-      </div>
       </ListPageShell>
     </>
   );
