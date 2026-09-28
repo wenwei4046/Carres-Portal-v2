@@ -200,10 +200,10 @@ with the Operation permission boundary kept. **Not removed yet:** the page's own
 `sales_order_create` database function is untouched.
 
 **Scope F · Monthly demand — BUILT 2026-09-28, production walk owed.** The Sales Orders page has
-the shared 240px rail with a fixed `View` group (`Order list` · `Monthly demand`, kept in the URL as
-`?view=monthly`). Monthly demand's groups are `Period` (`Starting month` · `Months` 1 to 6, the
-resolved window printed beneath) · `Dealer / Sales Location` · `Customer Delivery Location` · `Product
-category`, all single choice, no `Clear filters`; they live in the URL and never carry into the
+the shared 240px rail with the kit `Tabs` bar `Order list` · `Monthly demand` on the rail's top
+divider (one row, one line; kept in the URL as `?view=monthly`). Monthly demand's groups are `Period` (`Starting month` · `Months` 1 to 6, the
+resolved window printed beneath; the header prints no month count) · `Sales Location` · `Customer
+Delivery Location` · `Product category`, all single choice, no `Clear filters`; they live in the URL and never carry into the
 Order list. The page is two blocks: `This month · {Mon YYYY}` (`Total Qty` · `Delivered` · `Not
 delivered`, ONE month) and one table, one row per month (`Before` · six months · `After` · `No
 delivery date` · `Total`), columns `Month` · the four categories · `Not in catalog` (only when a
@@ -218,12 +218,16 @@ counts; an unread SO Batch prints `Unavailable`, never zero. The kit admits `Doc
 3, its first column fixed while the rest scroll) and `TotalsSummary` (recipe 4), each with a `/ui`
 example. Measured at 1440 / 1180 / 820 / 743 / 390: no sideways page scroll, no dash, the table
 scrolls inside its own frame.
-**Order list rail — Dealer / Sales Location · Customer Delivery Location · Date · Delivery BUILT 2026-09-28,
+**Order list rail — Sales Location · Customer Delivery Location · Delivery BUILT 2026-09-28,
 production walk owed.** Each is a read-only fact filter: Delivery asks the one goods arithmetic
 (`registerDeliveryConditionOf` over `resolveUnitAllocation`: nothing sold · some sold · every
-committed unit sold; a service-only order is under All only); Date reads the chosen field (Proceed
-Date by default) with the engine's `Today` · `This week` · `This month`; a row clicked again is
-deselected; nothing carries between the two views.
+committed unit sold; a service-only order is under All only); a row clicked again is deselected;
+nothing carries between the two views. **No Date group — owner ruling 2026-09-28 (Jess: "why date
+got proceed date? ... today? this week, this month? i dont get it"; approved "yes").** A date is
+narrowed on its OWN column's ▽ (`Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date`,
+each with `Today` · `This week` · `This month` · `From` / `To`), the way Shopify and Linear filter a
+date: on the field itself, never a rail field picker plus a range. An old `?date=` / `?range=` link
+narrows nothing, so no filter the rail cannot show.
 **Obligations and Service Cases BUILT 2026-09-28, production walk owed.** `GET /orders/register-facts`
 answers per order `obligations` through `completionOfOrder` (the ONE composition the object page's
 `/:id/completion` now calls: goods, money in with storage, money out, loan) and `cases` from
@@ -591,7 +595,7 @@ do not present missing required dates as an ordinary monthly demand category. As
 requested delivery date, never document date, Proceed Date, supplier ETA or confirmed transport
 booking. Do not manufacture a date for ambiguous/missing source data. These buckets preserve
 visibility; they do not relax the order-entry requirement for a requested date. The local filter
-rail belongs to this monthly view and filters Dealer / Sales Location, customer delivery region
+rail belongs to this monthly view and filters Sales Location, customer delivery region
 and product category. Dealer location and customer delivery destination remain different facts.
 Both views use the shared rail shell under the following owner ruling.
 
@@ -600,15 +604,14 @@ Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240p
 wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
 each view exposes only its own controls. Do not add a second handmade rail.
 
-- Order list: Dealer / Sales Location; customer delivery State / City; date field (Proceed Date,
-  SO Doc Date, Customer Requested Delivery Date) and range (All dates, Today, This week, This month,
-  custom); delivery condition (All, Not delivered, Partially delivered, Fully delivered); whole-order
+- Order list: Sales Location; customer delivery State / City; delivery condition (All, Not delivered, Partially delivered, Fully delivered); whole-order
   obligations (All, Outstanding obligations, No action required); linked Service Cases (All,
-  Has open cases, Closed cases only, No cases). These are read-only factual filters, not a mutable
+  Has open cases, Closed cases only, No cases). Dates filter on their own column's ▽, not in the
+  rail (owner ruling 2026-09-28). These are read-only factual filters, not a mutable
   overall status, work queue or new status/group column. Service case filters read Service's truth.
   Unknown underlying facts must not be classified as completed or no cases.
 - Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
-  Dealer / Sales Location, customer delivery State / City, actual catalog product categories.
+  Sales Location, customer delivery State / City, actual catalog product categories.
   The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
   do not appear here and do not silently carry over from the list.
 - No Clear filters button inside either SO rail: this is Jess's explicit instruction, not
@@ -670,22 +673,19 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   top region with the kit `Tabs` bar `Order list` · `Monthly demand` (owner ruling 2026-09-28: a tab bar, not a collapsible group; every group closed until clicked, no description under a title); the scrolling region shows only
   the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
   months) and Export produces the matrix.
-- **Order list groups:** `Dealer / Sales Location` (multi-select with search) · `Customer Delivery
-  Location` (two selects) · `Date` (field select `Proceed Date` · `SO Doc Date` · `Customer Requested
-  Delivery Date` + range select `All dates` · `Today` · `This week` · `This month` · `Custom`) ·
-  `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
+- **Order list groups:** `Sales Location` (`All sales locations`) · `Customer Delivery
+  Location` (two selects) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
   (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
   cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
   select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
-  `Dealer / Sales Location` · `Customer Delivery Location` · `Product category` (multi-select, no
-  search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
+  `Sales Location` · `Customer Delivery Location` · `Product category`. No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
 - **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
   title", "not like other pages?").** Every group is single-choice like every other Portal rail
   (icon + 13px/600 title, 36px rows, chosen value in blue at the right, press again to unchoose);
-  `Dealer / Sales Location` keeps a search box because dealers are many; there is NO multi-select
-  and NO `FilterRailMultiSelect` — the 2026-09-22 multi-selection line is withdrawn and no kit
-  component is admitted. Several dealers together = `All dealers`.
+  `Sales Location` is one select (a search box waits for a kit admission); there is NO multi-select
+  and NO `FilterRailMultiSelect`; the 2026-09-22 multi-selection line is withdrawn and no kit
+  component is admitted. Several sales locations together = `All sales locations`.
 - **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
   "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
   **Corrected again the same day (Jess: "4 KPI is what? repeated?"): two blocks, not three.**
