@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceDutyActor } from "./workspace-duty-owner";
+import { routeActionOwnersOf, workspaceDutyActor } from "./workspace-duty-owner";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
 
 function duties(
@@ -50,5 +50,43 @@ describe("workspaceDutyActor", () => {
     }), "po_duty");
 
     expect(result).toBeNull();
+  });
+});
+
+describe("routeActionOwnersOf: every acting Route line names who", () => {
+  const withDelivery: WorkspaceDutiesResponse = {
+    can_assign: false,
+    duties: [{
+      key: "delivery_duty",
+      label: "Delivery Duty",
+      resolution: {
+        duty_key: "delivery_duty",
+        normal_user_id: "u-duty",
+        normal_user_name: "{delivery duty}",
+        acting_user_id: null,
+        acting_user_name: null,
+        actor_user_id: "u-duty",
+        is_cover: false,
+        is_superuser: false,
+        allowed: false,
+        source: "assignment",
+      },
+      assignments: [],
+      covers: [],
+    }] as WorkspaceDutiesResponse["duties"],
+  };
+
+  it("Delivery and Payment name the order's owner when it is established", () => {
+    const owner = { userId: "u-pic", name: "{order PIC}", email: "" };
+    const owners = routeActionOwnersOf(withDelivery, owner);
+    expect(owners.delivery).toEqual(owner);
+    expect(owners.payment).toEqual(owner);
+  });
+
+  it("until the order owner is established, today's Delivery Duty acts", () => {
+    const owners = routeActionOwnersOf(withDelivery, null);
+    expect(owners.delivery?.name).toBe("{delivery duty}");
+    expect(owners.payment?.name).toBe("{delivery duty}");
+    expect(owners.sales).toBeNull();
   });
 });

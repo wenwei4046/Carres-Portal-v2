@@ -135,7 +135,7 @@ import {
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
-import { workspaceDutyActor } from "./workspace-duty-owner";
+import { routeActionOwnersOf } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
@@ -2340,13 +2340,7 @@ function SalesOrderWorkspaceBody() {
     return userId && name ? { userId, name, email: "" } : null;
   }, [orderOwnerQ.data]);
   const routeOwners = useMemo(
-    () => ({
-      purchasing: workspaceDutyActor(dutyQ.data, "po_duty"),
-      receiving: workspaceDutyActor(dutyQ.data, "grn_duty"),
-      /* `Choose Ready Unit` is the Sales Order PIC's — the person acting for
-         the order today, cover included, from the one owner read. */
-      sales: routeOrderOwner,
-    }),
+    () => routeActionOwnersOf(dutyQ.data, routeOrderOwner),
     [dutyQ.data, routeOrderOwner],
   );
 
