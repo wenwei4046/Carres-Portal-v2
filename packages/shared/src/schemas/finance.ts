@@ -29,8 +29,9 @@ export type PaymentMethod = z.infer<typeof paymentMethodEnum>;
 /**
  * `financeTopupApproveInput` — POST /api/finance/payments/topup-approve.
  * Maps to RPC `finance_topup_approve(approval_id, method, reference, receipt_url)`
- * (migration 0062). Q1=A locked 2026-05-08 — wraps approval_decide +
- * dealer_topup atomically. Caller supplies the approval row id (from a
+ * (migration 0062, latest body 0559). It decides the approval, writes the
+ * payment and raises the deposit balance itself in one transaction; it does
+ * not call dealer_topup (closed to signed in users in 0593). Caller supplies the approval row id (from a
  * pending top_up approval) plus the actual payment instrument used.
  */
 export const financeTopupApproveInput = z.object({
