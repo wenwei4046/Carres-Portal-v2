@@ -1226,6 +1226,22 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      them carry NO icon ("Do not add decorative icons to every filter row"). Style C's one 11px
      supporting line under each title is owed: its words need owner approval before they reach the
      screen.
+   - **To do first, then the Route (Jess 2026-09-28: "i have to scroll to check one by one … can it
+     move to top which require to do").** Under the order header, `To do` holds the full cards of the
+     acts that are open now (missed first, then due), each with its button and in-card form; each act
+     appears ONCE. Below, `Order Route` keeps the vertical line with ONE LINE PER STOP (node · its
+     status, never the act's title again · `{n} of {m} done` · chevron); a stop holding an act is
+     tinted red/amber and pressing it opens that act's card at the top. A stop that cannot start yet
+     (SUPPLIER before the PO send is confirmed) shows its status only and, when opened, its facts with
+     NO empty checkboxes; a box appears only beside a step that has, or awaits, completion evidence.
+   - **No free text in a send record (Jess: "what is recipient? no free text").** `Channel` lists
+     only the channels the Supplier Master records for that supplier (SO-1333: Ohana WhatsApp group
+     and email; Nice Future WhatsApp group) and `Recipient` is the fact that follows from it
+     (Purchasing §5.6). No recorded channel → the form names the missing contact, no input.
+   - **Widths:** the page never scales on desktop. 1340+ as B2; 1100–1339 rail 240 · Mission ≥460 ·
+     Communication 300 with checklist rows stacking the state under the step; 900–1099 rail 220 ·
+     Mission ≥400 · Communication 280. Measured at 1440 / 1180 / 1023 / 919: 13px text, 36px buttons,
+     no sideways scroll, the three acts on the first screen. Phone (below 900) is its own round.
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
@@ -2383,3 +2399,5 @@ matrix. Its example objects, people, dates, amounts, permissions, photographs, s
 sidebar, Right Rail and unfinished filters remain fixtures and are not authority. Production must
 render the contract and owning-module facts governed here; it must not copy fixture records or the
 artifact's implementation.
+
+**Owner correction 2026-09-28 — actionable work first (local prototype):** show admitted unfinished cards above the collapsed Order Route, missed before due. Render each actionable card once; route rows link back to it. Supplier before send confirmation shows `Sending not confirmed`; expanding reveals read-only facts without empty completion boxes or a progress ratio. Recipient is a recorded supplier contact/group, never free text; multiple recorded destinations permit selection, missing contact data must not be invented. Production integration remains owed.
