@@ -183,7 +183,7 @@ export async function recomputeOptionPickLines(
     if (unknown.length > 0) {
       return {
         status: "bad_request",
-        message: `Option '${unknown[0]}' is no longer available — please reconfigure the line.`,
+        message: `Option '${unknown[0]}' is no longer available. Please reconfigure the line.`,
       };
     }
     const tol = Math.max(Math.abs(serverTotal) * 0.005, 0.01);

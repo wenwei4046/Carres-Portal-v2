@@ -547,7 +547,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
   const dealerRow = ord.dealers ?? null;
   const warehouseRow = ord.warehouses ?? null;
   const partnerRow = ord.delivery_partners ?? null;
-  const customerAddress: string = ord.customer_address ?? "—";
+  const customerAddress: string = ord.customer_address ?? "";
 
   const dealerName: string = dealerRow?.name ?? "Carres";
   const dealerContactParts: string[] = [];

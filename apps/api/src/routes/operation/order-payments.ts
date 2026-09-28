@@ -420,10 +420,10 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
   const amount = fee != null ? `RM ${fee.toLocaleString()}` : "the storage fee";
   const line =
     decision === "released"
-      ? `Delivery released by manager — ${amount} storage fee still owed`
+      ? `Delivery released by manager. ${amount} storage fee still owed`
       : decision === "waived"
-        ? `Delivery released by manager — ${amount} storage fee written off`
-        : `Storage release refused — ${amount} to collect before delivery`;
+        ? `Delivery released by manager. ${amount} storage fee written off`
+        : `Storage release refused. ${amount} to collect before delivery`;
   await sb.rpc("operation_add_annotation", {
     p_order_id: orderId,
     p_content: line,
@@ -523,7 +523,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
         error: "rule_violation",
         code: "extension_used",
         message:
-          "This order's one-time storage extension is already used — a further extension needs principal approval.",
+          "This order's one-time storage extension is already used. A further extension needs principal approval.",
       },
       403,
     );
@@ -567,7 +567,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     { day: "numeric", month: "short", year: "2-digit" },
   );
   const reasonText = deliveryReasonLabel(parsed.data.reasonKey);
-  const noteText = parsed.data.note?.trim() ? ` — ${parsed.data.note.trim()}` : "";
+  const noteText = parsed.data.note?.trim() ? `: ${parsed.data.note.trim()}` : "";
   await sb.rpc("operation_add_annotation", {
     p_order_id: orderId,
     p_content: `Delivery postponed → ${newDateText} · ${reasonText}${noteText}`,
