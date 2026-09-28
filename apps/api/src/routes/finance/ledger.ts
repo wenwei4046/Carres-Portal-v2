@@ -204,6 +204,9 @@ financeLedgerRouter.get("/entries", requireFinance, async (c) => {
   // of entry ids went into the URL and broke past 200 entries. Not through
   // gl_entry_departments: Postgres cannot inline that function, and it never
   // returned. On the view it looks up each entry by index.
+  // ponytail: with no dates it looks up every posted entry; about 10 s at
+  // 90,000 entries on a local copy. Default the Journal to a date range, or
+  // put the department on gl_entries, if the ledger grows that big.
   const embeds = [
     account ? "gl_entry_lines!inner(account_code)" : null,
     departmentType ? "gl_line_departments!inner(department_type,department_id)" : null,
