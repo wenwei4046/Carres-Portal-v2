@@ -2478,7 +2478,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | The gate refusal, request pending | **`RM {amount} is still outstanding — a payment approval is waiting for the approver's decision.`** | — |
 | Route gate, money met | **`Paid`** (owner ruling 2026-09-25; `Money in full` retired) · under approval **`COD approved — collect before unloading`** | Money in full · Settled |
 | Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
-| The drawer's absence sentence | **`No delivery order yet — the system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
+| The drawer's absence sentence | **`No delivery order yet. The system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
 
 ### PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12)
 
