@@ -889,7 +889,7 @@ Current implementation differences from the above target are build gaps, not a c
   deliberately selected and visible; removing it restores the prior permitted scope.
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
-  `../ERP-ARCHITECTURE.md` Law F.1. Only `Workspace → Staff & Duties` edits Duty assignments and
+  `../ERP-ARCHITECTURE.md` Law F.1. Only `Settings → Staff & Duties` edits Duty assignments and
   Buddy cover; People supplies
   active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
   Team Work and Quick Rail may change display density, but they may not query the rota, calculate
@@ -1179,6 +1179,15 @@ relevant section. Business values, permissions and workflow options are edited o
 auditable Workspace, never inside the launcher. Module tabs, portal navigation, Work Toolbars and
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
+
+**STAFF & DUTIES PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT.** The header gear →
+`All System Settings` → `Staff & Duties` is the one maintained destination. Remove its persistent
+main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Settings destination
+and preserves return context; contextual links are not duplicate editors. Preserve existing
+read-only visibility and manager-only writes. Workspace MASTER §4 owns the capability and this
+placement's acceptance boundary. Internal composition remains under review; do not nest the existing
+catalogue/detail into a permanently visible third narrow-screen column. This ruling changes no
+colour, spacing, typography, icon or other token value.
 
 **THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The
 Workspace's section rail is the governed Carres rail, not a fifth visual language. It drew a 280px

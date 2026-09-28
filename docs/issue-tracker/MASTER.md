@@ -409,7 +409,8 @@ duplicate Settings home, blank English report, copied Issue or deletion.
 
 ## §11.1 · Workspace destination composition
 
-Issue Tracker is the third `Workspace` destination beside `Work` and `Staff & Duties`; it is not a
+Issue Tracker is a `Workspace` destination beside `Work`; Staff & Duties belongs in global
+Settings (Workspace §4, owner-approved placement 2026-09-28 / NOT BUILT). Issue Tracker is not a
 Work scope and not a Dashboard. The Register answers what incidents exist and where accountability,
 money or learning remains incomplete. Shared Work answers who must perform the current admitted
 Issue action. One Issue and one versioned `issue_actions` occurrence retain the same identities on

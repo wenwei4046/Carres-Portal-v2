@@ -24,20 +24,23 @@ Dashboard
 
 WORKSPACE
   Work
-  Staff & Duties
   Issue Tracker
+
+HEADER SETTINGS
+  All System Settings
+    Staff & Duties
 ```
 
 `Workspace` is the left-bar section label for coordination destinations, not a landing page and not
 another Dashboard. Selecting `Work` opens My Work by default for staff and managers. Dashboard may
 drill into filtered Work, while Work never becomes a Dashboard tab.
 
-### 1.1 · Three-destination relationship
+### 1.1 · Cross-destination relationship
 
 | From | To | Exact reason and preserved context |
 |---|---|---|
 | Work item | Owning module object | Perform or record the required result; Work scope/filter remains in the URL |
-| Work `Not assigned` | Staff & Duties | Open the exact unresolved Duty; returning restores the same Work result |
+| Work `Not assigned` | Settings → Staff & Duties | Open the exact unresolved Duty; returning restores the same Work result |
 | Staff & Duties Duty | Team Work | Read-only `Open Team Work` with exact normal-owner/Duty filter; Staff & Duties never composes rows |
 | Issue Tracker Current Action | Work or same Issue result section | Shared action identity; no copied task and no second completion |
 | Work Issue item | Issue workspace | Open exact Issue and Current Action; My/Team scope remains recoverable |
@@ -48,7 +51,7 @@ drill into filtered Work, while Work never becomes a Dashboard tab.
 Browser Back returns to the same scope, saved view, search, filters, selected owner/Duty and scroll
 position where technically safe. A cross-page door never changes business state merely by opening.
 
-`Workspace → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
+`Settings → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
 actually acted. Workspace does not own module records or their completion facts.
 
 Carres has one cross-module Work coordination surface. Module Registers, queues and action views
@@ -112,7 +115,25 @@ future routing everywhere but never rewrites history.
 
 ## 4 · Staff & Duties
 
-`Workspace → Staff & Duties` is the only assignment surface. An authorised manager assigns one
+**ENTRY PLACEMENT — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+Jess approved this segment: move the one Staff & Duties destination to global Settings, remove its
+persistent main-menu row, and retain Work's direct door to the exact unresolved Duty. The page is
+reached through the header gear → `All System Settings` → `Staff & Duties`; a contextual Duty
+correction link opens that same destination without making the operator browse the Settings index.
+Return restores the originating Work context. Existing authorised read-only access and manager-only
+assignment controls remain intact. Module links lead to this same page; no second editor is created.
+Workspace still owns assignment/cover and the Shared Duty Resolver. Settings owns only placement;
+People/HR retains employee identity and eligibility, and modules retain actual work/completion.
+
+**Measured implementation boundary:** at review, the shipped page still occupied the main menu and
+Settings had no Staff & Duties section. Moving the destination is not yet BUILT or DEPLOYED. This
+approval does not approve the newly proposed internal page rearrangement, new cover actions or a
+complete Blueprint; continue the section-by-section PLAN review before application work. Existing
+approved capability contracts below remain in force. The relocation must preserve access, exact-Duty
+links and return context; it must fit the Settings shell without forcing three simultaneous columns
+on a narrow screen. No new token is approved or required by this placement ruling.
+
+`Settings → Staff & Duties` is the only assignment surface. An authorised manager assigns one
 Primary holder and optional effective-dated Buddy cover to each named Duty and can see immutable
 assignment history.
 
@@ -136,7 +157,7 @@ order, customer, delivery and ordinary collection work. The Work Engine routes t
 that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
 Duty is no longer the routine owner. It remains only the explicit fallback when a Sales Order has
 no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
-and `Set the holder in Workspace → Staff & Duties`. Delivery Settings never holds a roster or a
+and `Set the holder in Settings → Staff & Duties`. Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
 
 **Reason for the ruling:** the PIC sweep shares open orders between the two active operators,
@@ -148,7 +169,7 @@ rulings 2026-09-18, 0533). Its pickers list Principal people; the doors refuse e
 account — Shasha and Yu Jun included — as holder (`invalid_holder`) or cover (`invalid_cover`).
 Deciding a Manual Purchase admits only today's resolved actor — the holder, or their dated Principal
 cover — and never the principal role alone, the `ops_manager` position or an email list. Unheld
-answers `Nobody holds Purchasing Approver.` · `Set the holder in Workspace → Staff & Duties.` Nobody
+answers `Nobody holds Purchasing Approver.` · `Set the holder in Settings → Staff & Duties.` Nobody
 decides a Manual Purchase they raised (`own_request`), and the principal role no longer raises one.
 **Bootstrap:** no door can name the first holder (self-assignment is refused and the shared login
 may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` NULL, note `Bootstrap
@@ -695,9 +716,9 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
 | Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
 | Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
-| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Workspace → Staff & Duties`; do not falsely say the Duty has no holder |
+| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Settings → Staff & Duties`; do not falsely say the Duty has no holder |
 | Blocked | Stays in its own working-day group (no `Blocked` group) · `Blocked by {dependency}` plus the door that can resolve it; retain original working day and missed age; the `Blocked` filter narrows to these rows |
-| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
+| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Settings → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
 | Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
 | Source failed | Isolate and name the source; never omit its possible work or convert failure to zero |
@@ -2123,7 +2144,7 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
 | Multiple client queries with independent loading states | Replace with one validated Dashboard composition carrying per-source health |
 | `See all orders`, `Manage POs`, `Open warehouse` generic doors | Replace with one exact filtered owning-module drill-down per measure |
 | Whole-page RPC error | Retain retry, add per-source health and last-safe observation; never turn failure into zero |
-| Dashboard currently grouped under the left-bar `Workspace` section | Move it to the one independent top-level Dashboard position; Workspace contains Work, Staff & Duties and Issue Tracker only |
+| Dashboard currently grouped under the left-bar `Workspace` section | Move it to the one independent top-level Dashboard position; Workspace contains Work and Issue Tracker; Staff & Duties is under global Settings (§4 placement target) |
 
 No Dashboard production rebuild begins until each admitted measure has the section 8.2 contract and
 its owning module is production-verified. This blocks invented totals, not the already-honest Work
@@ -2235,7 +2256,7 @@ honest Work for admitted modules.
   recorded provenance; the Sales Orders `verifiedUnitIds` reader is evidence for display, not a new
   Unit assignment or Work source.
 - Migration 0425's shared Duty registry/resolver, effective primary assignment, dated cover,
-  audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
+  audit evidence, guarded API and the one Staff & Duties UI are production-proven
   for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
   module consumers remain implementation evidence until each module is production-verified.
 - **Staff & Duties §4.2 composition — DEPLOYED to production 2026-09-16 (`56e52d0e`, PR #1388);
@@ -2466,22 +2487,23 @@ The page Blueprint is reviewable when every row points to current truth with no 
 pages are built only when their acceptance contracts pass against current implementation and real
 authorised accounts. The global Dashboard remains outside these three destinations and retains its
 separate §§8–8.6 contract. Notifications and the right-rail boundary retain the supporting §7–7.1 contract and
-never become a fourth Workspace destination.
+never become additional Workspace destinations.
 
-### 13.1 · Owner-review result — 2026-09-16
+### 13.1 · Owner-review result — composition 2026-09-16; Duty placement 2026-09-28
 
 The composition review covers the complete relationship, not isolated screens:
 
 ```text
 Dashboard ──management fact drill-down──▶ owning Register / Team Work
 Workspace ──Work──▶ exact owning action door
-          ├─Staff & Duties──▶ shared owner/cover resolution
           └─Issue Tracker──▶ Issue truth + shared Current Action
+Settings ──Staff & Duties──▶ shared owner/cover resolution
 Right rail ──(no Work count; UI MASTER §5)
 Notifications ──event receipt──▶ Work / owning object
 ```
 
-No new business decision remains in the page composition. Implementation remains gated by the
+Staff & Duties entry placement follows §4’s 2026-09-28 ruling; its current internal-page review
+is not complete. Implementation remains gated by the
 module admission and production-proof work in §§6, 10 and 11; `Blueprint ready` does not mean those
 sources, migrations or pages are deployed.
 

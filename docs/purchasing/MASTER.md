@@ -2511,7 +2511,7 @@ configuration or issuance authority. **Nobody decides a Manual Purchase they rai
   position rung and no email list. The holder and cover must be active Principal people —
   Operation accounts, Shasha and Yu Jun included, are refused (`invalid_holder` /
   `invalid_cover`). Unheld refuses `no_purchase_approver` → `Nobody holds Purchasing Approver.` ·
-  `Set the holder in Workspace → Staff & Duties.` The holder away with no eligible cover means
+  `Set the holder in Settings → Staff & Duties.` The holder away with no eligible cover means
   the approval **waits**; it is never downgraded to Operation. The requester is refused
   (`own_request`). `canApprove` (the Approve/Refuse controls and the approver-only money) asks the
   same resolver and is false on the caller's own request; the approver name is read through
@@ -3454,8 +3454,8 @@ merged `f755dea8`, deployed, both canonical surfaces reporting that exact SHA; t
 carries every corrected word and zero retired words; committed production smoke on
 GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
 evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
-refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
-`Workspace → Staff & Duties`. The SECOND 2026-09-06 owner correction — one Receiving
+refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager records its holder
+in the one Staff & Duties surface. The SECOND 2026-09-06 owner correction — one Receiving
 destination with the rail month Calendar, governed Supplier-Delivery-Date filtering and
 server-side pagination — is PRODUCTION-VERIFIED 2026-09-07: PR #1117 merged `00bf3ced`,
 both canonical surfaces on that exact SHA, served bundle carrying every new governed word and
@@ -3581,7 +3581,7 @@ Warehouse submits count                (or Operation enters goods directly)
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
   into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
   so plainly and the Work card is unassigned; posting is not refused. The manager assigns the
-  holder in `Workspace → Staff & Duties`.
+  holder in `Settings → Staff & Duties`.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
   formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
@@ -3651,7 +3651,7 @@ Warehouse submits count                (or Operation enters goods directly)
   arrive — and reads the earliest expected arrival per line/batch; its card says `Supplier date
   passed · nothing received yet`, never `Goods arrived`, which stays the submitted count's fact. Owner = the resolved GRN Duty; completion = the posted
   session; lateness counts on the Warehouse calendar (Mon–Sat).
-- **`Workspace → Staff & Duties`** is the ONE assignment surface: the resolution today
+- **`Settings → Staff & Duties`** is the ONE assignment surface: the resolution today
   (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
   assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page
   never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
@@ -5828,7 +5828,7 @@ completion facts in the table above.
 Settings lives under the global header gear and requires authorised roles. It includes:
 
 - document number format/version and locked Unit ID family;
-- a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
+- a read-only door to `Settings → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
 - The legacy `/api/operation/po-duty` response-shape adapter is retired. `PurchaseOrdersPage`,
   `SalesOrderWorkspace` and `OperationOrdersControl` consume the shared Workspace Duty resolver;
