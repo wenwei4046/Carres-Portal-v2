@@ -19,7 +19,7 @@ import type { AppEnv } from "../../types";
  * Mounted by `ledger.ts` at `/api/finance/ledger/money-accounts`: the list is
  * part of the chart, and `index.ts` is not this change's to edit.
  *
- *   GET    /          the list: code, name, kind, in use, card account (0576)
+ *   GET    /          the list: code, name, kind, in use, card account (0576, 0583)
  *   POST   /          add a bank or holding account → 201 { code }
  *   PATCH  /:code     rename, or take in or out of use → { code }
  *   GET    /card-routes   which bank each card holding account pays out to (0541)
@@ -37,27 +37,31 @@ function fail(c: Context<AppEnv>, error: { code?: string; message?: string; deta
   return c.json(m.body, m.status);
 }
 
-/** 0576 `_card_payout_holdings()`'s card methods. The test pins this to the SQL. */
-const CARD_PAYMENT_METHODS = ["card", "credit_card", "debit_card"] as const;
-
 financeMoneyAccountsRouter.get("/", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  // 0576: a card account is an account a card method maps to, or a routed
-  // holding. These are the two reads of `_card_payout_holdings()`, the list
-  // gl_money_move_create refuses a card payout from.
-  const [list, mapped, routed] = await Promise.all([
-    sb.rpc("gl_money_accounts_list"),
-    sb.from("gl_payment_account_map").select("account_code").in("method", [...CARD_PAYMENT_METHODS]),
-    sb.from("card_settlement_routes").select("holding_code"),
-  ]);
-  const error = list.error ?? mapped.error ?? routed.error;
-  if (error) return fail(c, error);
-  const card = new Set<string>([
-    ...((mapped.data ?? []) as { account_code: string }[]).map((r) => r.account_code),
-    ...((routed.data ?? []) as { holding_code: string }[]).map((r) => r.holding_code),
-  ]);
+  // 0583: the card accounts come from the database's own list
+  // (`_card_payout_holdings()`), the one gl_money_move_create refuses a card
+  // payout from: mapped, routed, or posted to by a card sale.
+  const [list, card] = await Promise.all([sb.rpc("gl_money_accounts_list"), sb.rpc("gl_card_accounts_list")]);
+  if (list.error) return fail(c, list.error);
+  let cardCodes: Set<string>;
+  if (!card.error) cardCodes = new Set((card.data ?? []) as string[]);
+  else if (card.error.code === "PGRST202" || card.error.code === "42883") {
+    // Deployed before SQL 23 ran: the list isn't there yet, so read 0576's
+    // two sources, as before 0583. ponytail: drop this once 0583 is applied.
+    const [mapped, routed] = await Promise.all([
+      sb.from("gl_payment_account_map").select("account_code").in("method", ["card", "credit_card", "debit_card"]),
+      sb.from("card_settlement_routes").select("holding_code"),
+    ]);
+    const error = mapped.error ?? routed.error;
+    if (error) return fail(c, error);
+    cardCodes = new Set([
+      ...((mapped.data ?? []) as { account_code: string }[]).map((r) => r.account_code),
+      ...((routed.data ?? []) as { holding_code: string }[]).map((r) => r.holding_code),
+    ]);
+  } else return fail(c, card.error);
   const rows = (list.data ?? []) as Omit<MoneyAccountRow, "is_card_account">[];
-  return c.json(rows.map((r): MoneyAccountRow => ({ ...r, is_card_account: card.has(r.code) })));
+  return c.json(rows.map((r): MoneyAccountRow => ({ ...r, is_card_account: cardCodes.has(r.code) })));
 });
 
 financeMoneyAccountsRouter.post("/", requireFinance, async (c) => {

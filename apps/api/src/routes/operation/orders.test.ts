@@ -102,18 +102,26 @@ describe("GET /api/operation/orders", () => {
   /* ⭐ `{n} of {m}` needs the SERVER's count of the permitted scope — not the
      500-row page, not the search answer. */
   describe("salesOrderTotal — the Register's authoritative total", () => {
+    /* Which table each recorded call was made on — kept beside the calls so
+       the recorded shape the older assertions compare stays unchanged. */
+    let tableOfCall = new WeakMap<object, string>();
     function mockWithCount(opts: { rows: unknown[]; count: number | null; countError?: unknown }) {
       const calls: Array<{ head: boolean; method: string; args: unknown[] }> = [];
-      const from = vi.fn(() => {
+      tableOfCall = new WeakMap();
+      const record = (table: string, call: { head: boolean; method: string; args: unknown[] }) => {
+        tableOfCall.set(call, table);
+        calls.push(call);
+      };
+      const from = vi.fn((table: string) => {
         let head = false;
         const chain: Record<string, unknown> = {};
         chain.select = vi.fn((_cols: string, o?: { count?: string; head?: boolean }) => {
           head = Boolean(o?.head);
-          calls.push({ head, method: "select", args: [_cols, o] });
+          record(table, { head, method: "select", args: [_cols, o] });
           return chain;
         });
         for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
-          chain[m] = vi.fn((...args: unknown[]) => { calls.push({ head, method: m, args }); return chain; });
+          chain[m] = vi.fn((...args: unknown[]) => { record(table, { head, method: m, args }); return chain; });
         chain.then = (resolve: (v: unknown) => unknown) =>
           resolve(head ? { count: opts.count, error: opts.countError ?? null, data: null } : { data: opts.rows, error: null });
         return chain;
@@ -156,19 +164,50 @@ describe("GET /api/operation/orders", () => {
       expect(countCalls).toContainEqual({ head: true, method: "not", args: ["outlet_id", "is", null] });
     });
 
-    /* ⭐ THE SALES ORDERS REGISTER POPULATION — owner ruling 2026-09-21: only
-       orders Sales has handed to Operation. The rows and the total are both
-       narrowed off `place`, and each row carries the actual handoff moment. */
-    it("stage=proceeded drops Placed orders from the rows AND the total, and serves proceeded_at", async () => {
+    /* ⭐ THE SALES ORDERS REGISTER POPULATION — ONE POPULATION, ONE PREDICATE
+       (owner ruling 2026-09-26, Orders MASTER §0.1 REGISTER CLOSE-OUT item 4).
+       Every non-cancelled handed-over order, rentals excluded ON THE SERVER,
+       and the rows and the total are narrowed by the SAME calls. */
+    const populationCalls = (calls: Array<{ head: boolean; method: string; args: unknown[] }>, head: boolean) =>
+      calls
+        .filter((c) => c.head === head && tableOfCall.get(c) === "orders")
+        .filter((c) =>
+          (["in", "eq", "neq", "not"].includes(c.method) && c.args[0] === "status") ||
+          (c.method === "or" && String(c.args[0]).includes("source_system")))
+        .map((c) => ({ method: c.method, args: c.args }));
+
+    it("stage=proceeded reads the rows AND the total through one predicate, and serves proceeded_at", async () => {
       const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
       const body = await get("?stage=proceeded");
       expect(body.salesOrderTotal).toBe(29);
-      expect(calls).toContainEqual({ head: false, method: "neq", args: ["status", "place"] });
-      expect(calls).toContainEqual({ head: true, method: "neq", args: ["status", "place"] });
+      const expected = [
+        { method: "not", args: ["status", "in", "(place,cancelled)"] },
+        { method: "or", args: ["source_system.is.null,source_system.neq.rental"] },
+      ];
+      expect(populationCalls(calls, false)).toEqual(expected);
+      expect(populationCalls(calls, true)).toEqual(expected);
       const listSelect = calls.find((c) => !c.head && c.method === "select");
       expect(String(listSelect?.args[0])).toContain("proceeded_at");
       /* Never the planned production-start field in its place. */
       expect(calls.some((c) => c.method === "eq" && c.args[0] === "operation_stage")).toBe(false);
+    });
+
+    it("stage=proceeded keeps one predicate when a search narrows the rows", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
+      await get("?stage=proceeded&search=Tan");
+      expect(populationCalls(calls, false)).toEqual(populationCalls(calls, true));
+      expect(populationCalls(calls, false)).toHaveLength(2);
+    });
+
+    /* The list is shared (Delivery, Work, Payments, the dashboard, the old
+       Orders control). Off the Register's path nothing they receive changes:
+       Placed rows and rentals still ride the list. */
+    it("leaves every other caller's list as it was — no Register predicate without stage=proceeded", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 40 });
+      await get();
+      expect(populationCalls(calls, false)).toEqual([
+        { method: "in", args: ["status", ["place", "proceed_order", "delivered"]] },
+      ]);
     });
 
     it("says UNKNOWN (null), never a guess, when the count cannot be read", async () => {
@@ -2463,6 +2502,82 @@ describe("POST /api/operation/orders/:id/save", () => {
 describe("Sales Order amendment decision lane", () => {
   const AMENDMENT_ID = "00000000-0000-0000-0000-000000000a01";
 
+  /* ⭐ `PROPOSED CHANGE` (owner ruling 2026-09-25) names WHO submitted the
+     request. `sales_order_amendment_live` returns no sender, so the door reads
+     the request's own `submitted_by` and names it through the ONE resolver. */
+  describe("GET /:id/amendment names the sender", () => {
+    const ORDER = "00000000-0000-0000-0000-0000000000c1";
+    const SENDER = "00000000-0000-0000-0000-0000000000f1";
+    const live = { id: AMENDMENT_ID, status: "submitted", stale: false, submitted_at: "2026-09-24T03:00:00Z" };
+
+    function client(opts: { sender?: string | null; senderError?: boolean; names?: Array<{ id: string; name: string | null }> }) {
+      const rpc = vi.fn((fn: string) =>
+        fn === "sales_order_amendment_live"
+          ? Promise.resolve({ data: { amendment: live }, error: null })
+          : fn === "actor_display_names"
+            ? Promise.resolve({ data: opts.names ?? [], error: null })
+            : Promise.resolve({ data: null, error: null }),
+      );
+      const from = vi.fn((table: string) => {
+        if (table === "sales_order_amendments") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve(
+                    opts.senderError
+                      ? { data: null, error: { message: "boom" } }
+                      : { data: { submitted_by: opts.sender ?? null }, error: null },
+                  ),
+              }),
+            }),
+          };
+        }
+        return { select: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) };
+      });
+      return { rpc, from };
+    }
+
+    async function read(c: ReturnType<typeof client>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(c as any);
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER}/amendment`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("adds the sender's real name to the live request", async () => {
+      const body = await read(client({ sender: SENDER, names: [{ id: SENDER, name: "Mei Ling" }] }));
+      expect(body.amendment).toEqual({ ...live, submitted_by_name: "Mei Ling" });
+    });
+
+    it("never invents a person: an unresolved sender stays unnamed and the request still reads", async () => {
+      expect((await read(client({ sender: SENDER, names: [] }))).amendment.submitted_by_name).toBeNull();
+      expect((await read(client({ senderError: true }))).amendment).toEqual({ ...live, submitted_by_name: null });
+    });
+
+    it("returns no amendment untouched", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: { amendment: null }, error: null });
+      const from = vi.fn();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER}/amendment`, { headers: { Authorization: `Bearer ${jwt}` } }),
+        env,
+      );
+      expect(await res.json()).toEqual({ amendment: null });
+      expect(from).not.toHaveBeenCalled();
+    });
+  });
+
   it("returns the owner impact preview without writing another module", async () => {
     const impact = {
       amendment_id: AMENDMENT_ID,
@@ -2576,211 +2691,42 @@ describe("Sales Order amendment decision lane", () => {
   });
 });
 
-describe("POST /api/operation/orders (create)", () => {
-  it("calls sales_order_create; a missing dealer is refused before the database", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const good = await app.fetch(
-      new Request("http://t/api/operation/orders", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          header: {
-            customer_name: "Walk-in",
-            dealer_id: "00000000-0000-0000-0000-0000000000d1",
-            // orders_salesperson_required (0296) — the door demands it too.
-            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
-            // 0391 — the office door names the production start, as the POS
-            // door already did. This fixture gained the field rather than the
-            // rule being relaxed: this test's intent is the DEALER refusal, and
-            // a payload that is invalid for an unrelated reason cannot prove it.
-            proceed_date: "2026-09-01",
-          },
-          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
+describe("retired POST /api/operation/orders (the office create door)", () => {
+  /* ⭐ OWNER RULING 2026-09-27 (Jess): a customer order is born in the Sales
+     Portal and nowhere else; Operation receives it and never creates it. */
+  it.each([{}, { header: { customer_name: "Walk-in" }, lines: [{ sku: "X", qty: 1, unit_price: 1 }] }])(
+    "refuses a stale client before opening a database client: %j",
+    async (body) => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         }),
-      }),
-      env,
-    );
-    expect(good.status).toBe(201);
-    assertRpcCallShape(rpc, "sales_order_create", ["p_header", "p_lines"]);
+        env,
+      );
+      expect(res.status).toBe(410);
+      expect(await res.json()).toEqual({
+        error: "This action is no longer available. A Sales Order is created in the Sales Portal.",
+        code: "office_create_retired",
+      });
+      expect(userClient).not.toHaveBeenCalled();
+    },
+  );
 
-    rpc.mockClear();
-    const bad = await app.fetch(
-      new Request("http://t/api/operation/orders", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          header: { customer_name: "Walk-in" },
-          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
-        }),
-      }),
-      env,
-    );
-    expect(bad.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  /**
-   * ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START — owner ruling YH, 2026-08-28.
-   *
-   * The MASTER long read "`createOrderInput` refuses an order without one".
-   * TWO different objects carry that name: the POS door's
-   * `createOrderInputSchema` does refuse, and this local one did not. So the
-   * office could mint the single order nobody can repair — `proceed_date` is
-   * read-only on an existing order, so a NULL one had no screen that could
-   * supply it.
-   *
-   * The RPC refuses it again on its own side (0391); one layer is not a guard.
-   */
-  it("refuses an order with no proceed date, before the database", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
+  it("preserves the Operation permission boundary", async () => {
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request("http://t/api/operation/orders", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          header: {
-            customer_name: "Walk-in",
-            dealer_id: "00000000-0000-0000-0000-0000000000d1",
-            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
-            // every other field valid — ONLY the proceed date is absent
-          },
-          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
-        }),
+        body: "{}",
       }),
       env,
     );
-    expect(res.status).toBe(422);
-    /* COPY-STANDARD:1447 governs the words. A second spelling is exactly how
-       the POS ended up with two of them. */
-    expect(await res.json()).toMatchObject({
-      message: "Proceed date — pick the day production should start",
-    });
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (0393/0394).
-     The writer is main's, from the same report this branch answers — the office
-     create door was the one door that never stamped, so an order keyed here on
-     floor 3 with no lift was born carrying the three stair INPUTS and no fee.
-
-     This test is not the fix; it is the CONTRACT the fix has to keep, and that
-     door had none. What it pins is the non-fatal promise: the stamp runs after
-     the insert, so the order is already born and its Rev 1 minted, and a stamp
-     that fails may never report a create that did not fail. */
-  it("stamps the stair fee on a newly created order", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/orders", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          header: {
-            customer_name: "Walk-in",
-            dealer_id: "00000000-0000-0000-0000-0000000000d1",
-            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
-            proceed_date: "2026-09-01",
-            delivery_floor: 3,
-            delivery_has_lift: false,
-            delivery_stair_items: 3,
-          },
-          lines: [{ sku: "B1201S-K", qty: 5, unit_price: 1890 }],
-        }),
-      }),
-      env,
-    );
-    /* The create still succeeds and still returns the order. The stamp runs
-       after it and cannot change that — which is the contract being pinned. */
-    expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ so: 1400 });
-  });
-
-  /* The EDIT door is deliberately untouched: `revisionHeaderInput` keeps
-     proceed_date nullable-optional, because a save that only fixes a phone
-     number must not be forced to restate a date it may not change. Narrowing
-     the shared object would have broken every ordinary correction. */
-  it("leaves the edit door's proceed_date optional", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: ["customer_phone"] }, error: null });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ header: { customer_phone: "012-3456789" } }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    expect(rpc).toHaveBeenCalled();
-  });
-
-  /* ⭐ THE OFFICE DOOR CARRIES THE SAME CEILING AS EVERY OTHER SURFACE (YH,
-     2026-09-01 — audit F-8).
-     `MAX_DELIVERY_FLOOR` is 3 because Carres does not stair-carry above the
-     3rd floor. The POS clamps to it, the shared schema caps at it, and this
-     door had no upper bound at all — so an office-keyed order could store a
-     floor no shop floor can produce, promising a carry nobody performs. */
-  async function saveFloor(floor: number) {
-    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: [] }, error: null });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ header: { delivery_floor: floor } }),
-      }),
-      env,
-    );
-    return { res, rpc };
-  }
-
-  it("refuses a floor above the one Carres carries to, and writes nothing", async () => {
-    const { res, rpc } = await saveFloor(7);
-    /* 422 — the shape is right and the VALUE is refused, which is what this
-       door already answers for every other out-of-range field. */
-    expect(res.status).toBe(422);
-    expect(rpc, "refused before the RPC, not by it").not.toHaveBeenCalled();
-  });
-
-  it("still accepts the top floor Carres does carry to", async () => {
-    const { res } = await saveFloor(3);
-    expect(res.status).toBe(201);
-  });
-
-  /* ⭐ RE-PINNED (YH, 2026-09-01 — "office follow POS"). This asserted that 0
-     stayed legal here, on the reasoning that the office inherits orders where
-     nobody recorded a floor. MEASURED, and the reasoning does not hold: the
-     office form reads the floor as `delivery_floor ?? 1` in all four places it
-     touches it, so a null already reaches the operator AND already saves as 1.
-     The zero was not an inherited value being protected — it was one only a
-     non-UI caller could produce. Both ends match the POS now: 1 to 3. */
-  it("refuses 0 too — the office asks the same 1-to-3 the POS does", async () => {
-    const { res, rpc } = await saveFloor(0);
-    expect(res.status).toBe(422);
-    expect(rpc, "refused before the RPC").not.toHaveBeenCalled();
-  });
-
-  it("still accepts 1 — the floor a customer actually stands on", async () => {
-    const { res } = await saveFloor(1);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
   });
 });
 
@@ -3261,8 +3207,11 @@ describe("GET /api/operation/orders/:id/revisions", () => {
       salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
     });
     const body = await revisions();
-    expect(rpc).toHaveBeenCalledTimes(1);
+    /* Two doors since 0592 — the name and the person marker — and each is
+       asked ONCE, for the distinct ids. */
+    expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc).toHaveBeenCalledWith("actor_display_names", { p_ids: [SELLER, STAFF] });
+    expect(rpc).toHaveBeenCalledWith("actor_identities", { p_ids: [SELLER, STAFF] });
     expect(salespersonsIn).toHaveBeenCalledTimes(1);
     expect(salespersonsIn).toHaveBeenCalledWith("user_id", [SELLER, STAFF]);
     expect(body.revisions.map((r: { created_by_name: string | null }) => r.created_by_name)).toEqual([

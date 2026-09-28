@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyTouchesDeliveryDate, salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
-import { resolveActorNames } from "../../lib/actor-names";
+import { actorKindOf, actorRoleWord, resolveActorIdentities, resolveActorNames } from "../../lib/actor-names";
 import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
 import type { Context, MiddlewareHandler } from "hono";
@@ -41,7 +41,9 @@ import {
   classifySalesOrderChange,
   SALES_ORDER_EDIT_HEADER_KEYS,
   type SalesOrderChangeSide,
+  stockMatchKey,
 } from "@carres/shared";
+import { readFreeStock } from "../../lib/purchase-demand-read";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { loadBookingContext } from "../../lib/booking-context";
@@ -129,30 +131,6 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
 }
 
 /**
- * The server's truthful classification of who acted — the browser renders it
- * and never re-derives it (the Card's contract: "The browser does not infer
- * `System` from a null id").
- *
- *   human    a person id was recorded and resolved to a real name
- *   system   the event's own structured facts prove the portal/automation
- *            acted (`metadata.actor === "system"`, the marker an automated
- *            writer stamps). A missing person id is NEVER promoted to this.
- *   missing  the actor was not recorded, or the recorded id cannot be
- *            resolved to a name — an audit-data defect the UI states plainly
- *            (`Staff identity not recorded`), never a person guess.
- */
-function actorKindOf(
-  byUserId: string | null | undefined,
-  resolvedName: string | null,
-  metadata?: unknown,
-): "human" | "system" | "missing" {
-  if (byUserId) return resolvedName ? "human" : "missing";
-  const meta = metadata as Record<string, unknown> | null | undefined;
-  if (meta && typeof meta === "object" && meta.actor === "system") return "system";
-  return "missing";
-}
-
-/**
  * sku → `Model · Variant`, the ONE human-readable product name in this module.
  *
  * **Extracted by STAGE 1, not written by it.** The detail route has resolved
@@ -199,6 +177,28 @@ async function resolveSkuLabels(
 }
 
 // ----- GET / list -----
+/* ⭐ ONE POPULATION, ONE PREDICATE — owner ruling 2026-09-26 (Orders MASTER
+   §0.1 REGISTER CLOSE-OUT item 4). The Sales Orders Register is every
+   non-cancelled order Sales has handed to Operation, rentals excluded. It is
+   defined HERE, once, and both reads the Register makes — its rows and its
+   total — call it, so `{n} of {m}` can never count two different sets.
+
+   Rentals are recognised by the same fact the Register's browser test reads
+   (`source_system === "rental"`, `isRental` in sales-order-facts.ts); a NULL
+   `source_system` is a native order and stays. The list is shared with
+   Delivery, Work, Payments, the dashboard and the old Orders control: this
+   predicate rides only `?stage=proceeded`, the parameter the Register sends,
+   so what every other caller receives is unchanged. */
+const SALES_ORDER_REGISTER_EXCLUDED_STATUSES = "(place,cancelled)";
+const SALES_ORDER_REGISTER_NOT_RENTAL = "source_system.is.null,source_system.neq.rental";
+function salesOrderRegisterPopulation<
+  Q extends { not(column: string, operator: string, value: string): Q; or(filters: string): Q },
+>(q: Q): Q {
+  return q
+    .not("status", "in", SALES_ORDER_REGISTER_EXCLUDED_STATUSES)
+    .or(SALES_ORDER_REGISTER_NOT_RENTAL);
+}
+
 operationOrdersRouter.get("/", requireOperation, async (c) => {
   const parsed = ListOperationOrdersQuery.safeParse({
     stage: c.req.query("stage") ?? undefined,
@@ -318,22 +318,25 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // from the surface it links to.
       "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
+    ;
+
+  if (stage === "proceeded") {
+    // The Sales Orders Register's population — the ONE predicate its total
+    // below is counted with (salesOrderRegisterPopulation).
+    q = salesOrderRegisterPopulation(q);
+  } else {
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
     // before; existing M2 tests still pass.
-    .in("status", ["place", "proceed_order", "delivered"]);
-
-  if (stage === "placed") {
-    // 'placed' is a synthetic stage derived from `status='place'` (pre-push
-    // orders may have NULL operation_stage or 'placed' depending on whether
-    // they were seeded post-0024). Filter on status, not stage.
-    q = q.eq("status", "place");
-  } else if (stage === "proceeded") {
-    // The Sales Orders Register's population (owner ruling 2026-09-21): only
-    // orders Sales has handed to Operation. Synthetic too, so on status.
-    q = q.neq("status", "place");
-  } else if (stage !== "all") {
-    q = q.eq("operation_stage", stage);
+    q = q.in("status", ["place", "proceed_order", "delivered"]);
+    if (stage === "placed") {
+      // 'placed' is a synthetic stage derived from `status='place'` (pre-push
+      // orders may have NULL operation_stage or 'placed' depending on whether
+      // they were seeded post-0024). Filter on status, not stage.
+      q = q.eq("status", "place");
+    } else if (stage !== "all") {
+      q = q.eq("operation_stage", stage);
+    }
   }
   // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
   // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
@@ -364,7 +367,8 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   /* ⭐ THE REGISTER'S TOTAL IS A COUNT, NEVER THE ROWS IT HAPPENED TO LOAD
      (Listing Standard follow-up, 2026-09-17). `{n} of {m} sales orders` needs
      `m` = every Sales Order the caller may read in this stage/channel scope —
-     rentals excluded exactly as the Register excludes them, and the SEARCH
+     rentals excluded, the Register's own path through the SAME predicate as
+     its rows (salesOrderRegisterPopulation), and the SEARCH
      NOT applied, so a search answered first still has its denominator. The
      list above stops at 500 rows and a search replaces the rows, so neither
      `rows.length` nor a remembered number is the total. Same RLS client, one
@@ -372,12 +376,16 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
      prints no `of` rather than guess. */
   let totalQ = sb
     .from("orders")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["place", "proceed_order", "delivered"])
-    .or("source_system.is.null,source_system.neq.rental");
-  if (stage === "placed") totalQ = totalQ.eq("status", "place");
-  else if (stage === "proceeded") totalQ = totalQ.neq("status", "place");
-  else if (stage !== "all") totalQ = totalQ.eq("operation_stage", stage);
+    .select("id", { count: "exact", head: true });
+  if (stage === "proceeded") {
+    totalQ = salesOrderRegisterPopulation(totalQ);
+  } else {
+    totalQ = totalQ
+      .in("status", ["place", "proceed_order", "delivered"])
+      .or("source_system.is.null,source_system.neq.rental");
+    if (stage === "placed") totalQ = totalQ.eq("status", "place");
+    else if (stage !== "all") totalQ = totalQ.eq("operation_stage", stage);
+  }
   if (channel === "dealers") totalQ = totalQ.is("outlet_id", null);
   if (channel === "showrooms") totalQ = totalQ.not("outlet_id", "is", null);
 
@@ -766,6 +774,107 @@ operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
 });
 
 // ----- GET /:id detail -----
+/**
+ * ⭐ MONTHLY DEMAND'S FACTS — owner rulings 2026-09-22 / 2026-09-26 (Orders
+ * MASTER § Monthly demand).
+ *
+ * The Register's list stops at 500 rows, newest first, so a month-by-month
+ * sum built from it silently drops the OLDEST orders — the `Before` row, the
+ * goods owed longest. This read pages until a page comes back short and
+ * returns only the facts the arithmetic needs; `monthlyDemandOf`
+ * (packages/shared) does the arithmetic in the browser.
+ *
+ * ONE population: `salesOrderRegisterPopulation`, the Register's own.
+ * Delivered = Stock's Units SOLD against the order. A failed read of them
+ * fails the read: an unread delivery is not zero delivered.
+ *
+ * Declared BEFORE `/:id`, which would otherwise read the word as an order id.
+ */
+const MONTHLY_DEMAND_PAGE = 1000;
+operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  type Row = {
+    id: string;
+    so: number | null;
+    delivery_date: string | null;
+    delivery_date_tbd: boolean | null;
+    customer_address_state: string | null;
+    customer_address_city: string | null;
+    outlets?: { name?: string | null } | null;
+    dealers?: { name?: string | null } | null;
+    order_lines?: Array<{ id: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }> | null;
+  };
+  const rows: Row[] = [];
+  for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+    const { data, error } = await salesOrderRegisterPopulation(
+      sb
+        .from("orders")
+        .select(
+          "id, so, delivery_date, delivery_date_tbd, customer_address_state, customer_address_city, outlets(name), dealers(name), order_lines(id, sku, qty, attrs)",
+        ),
+    )
+      .order("id", { ascending: true })
+      .range(from, from + MONTHLY_DEMAND_PAGE - 1);
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    const page = (data ?? []) as unknown as Row[];
+    rows.push(...page);
+    if (page.length < MONTHLY_DEMAND_PAGE) break;
+  }
+
+  /* The catalog's category, through the ONE category reader. It fails open: a
+     line it cannot place reads null, which the arithmetic counts as
+     `Not in catalog` — never dropped. */
+  const categoryBySku = await skuCategories(
+    sb,
+    rows.flatMap((o) => (o.order_lines ?? []).map((l) => l.sku).filter(Boolean)),
+  );
+
+  const delivered = new Map<string, Array<{ orderLineId: string | null; sku: string; qty: number }>>();
+  /* An order id is a 36-character UUID; 100 of them is a 4KB URL. */
+  for (const batch of chunk(rows.map((o) => o.id), 100)) {
+    if (batch.length === 0) continue;
+    for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+      const { data, error } = await sb
+        .from("ops_stock_items")
+        .select("sku, qty, sold_order_id, reserved_order_line_id")
+        .eq("status", "sold")
+        .in("sold_order_id", batch)
+        .order("id", { ascending: true })
+        .range(from, from + MONTHLY_DEMAND_PAGE - 1);
+      if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+      const page = (data ?? []) as Array<{ sku: string | null; qty: number | null; sold_order_id: string | null; reserved_order_line_id?: string | null }>;
+      for (const unit of page) {
+        if (!unit.sold_order_id || !unit.sku) continue;
+        delivered.set(unit.sold_order_id, [
+          ...(delivered.get(unit.sold_order_id) ?? []),
+          { orderLineId: unit.reserved_order_line_id ?? null, sku: unit.sku, qty: unit.qty ?? 1 },
+        ]);
+      }
+      if (page.length < MONTHLY_DEMAND_PAGE) break;
+    }
+  }
+
+  return c.json({
+    orders: rows.map((o) => ({
+      id: o.id,
+      so: o.so,
+      deliveryDate: o.delivery_date,
+      deliveryDateTbd: Boolean(o.delivery_date_tbd),
+      salesLocation: o.outlets?.name?.trim() || o.dealers?.name?.trim() || null,
+      state: o.customer_address_state,
+      city: o.customer_address_city,
+      lines: (o.order_lines ?? []).map((l) => ({
+        id: l.id,
+        sku: l.sku,
+        qty: Number(l.qty),
+        category: categoryBySku.get(l.sku) ?? null,
+        attrs: l.attrs ?? null,
+      })),
+      delivered: delivered.get(o.id) ?? [],
+    })),
+  });
+});
+
 operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1050,13 +1159,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
      * without this route being redeployed. */
     metadata: unknown;
   }>;
-  const actorById = await resolveActorNames(sb, historyRows.map((h) => h.by_user_id));
+  /* ⭐ WHO ACTED IS DECIDED ONCE (owner ruling 2026-09-26): History and
+     Revisions read the one classification. A shared role login is nobody — its
+     name never reaches the screen, its role word does. */
+  const actorById = await resolveActorIdentities(sb, historyRows.map((h) => h.by_user_id));
   const historyWithActor = historyRows.map((h) => {
-    const actor = h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null;
+    const identity = h.by_user_id ? (actorById.get(h.by_user_id) ?? null) : null;
+    const actor_kind = actorKindOf(h.by_user_id, identity, h.metadata);
     return {
       ...h,
-      actor,
-      actor_kind: actorKindOf(h.by_user_id, actor, h.metadata),
+      actor: actor_kind === "human" ? (identity?.name ?? null) : null,
+      actor_kind,
+      actor_role: actorRoleWord(identity),
     };
   });
 
@@ -1083,22 +1197,6 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
 // the whitelist, the lines diff, Rev-1 minting and immutability; nothing in
 // this file writes orders/order_lines directly.
 // ─────────────────────────────────────────────────────────────
-
-const revisionLineInput = z.object({
-  /** Present = update this line in place (keeps attrs + source_po); absent =
-   *  a new line. */
-  id: z.string().uuid().optional(),
-  sku: z.string().trim().min(1, "A line needs a SKU"),
-  qty: z.number().int().min(1, "Qty must be at least 1"),
-  unit_price: z.number().min(0, "Unit price must be 0 or more"),
-  /** The line's CONFIGURATION — sofa fabric, bedframe colour/gap, the cascade
-   *  payload Create-PO reads. Honoured by the CREATE door only (0374); the
-   *  SAVE door keeps a line's attrs by matching on `id`, so it neither needs
-   *  nor accepts them here. Absent stays NULL: a line with no configuration
-   *  must not gain an empty object that later code reads as "configured, with
-   *  nothing in it". */
-  attrs: z.record(z.unknown()).optional(),
-});
 
 /**
  * The editable header keys — mirrors the SAVE RPC whitelist verbatim.
@@ -1218,14 +1316,16 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   } catch (e) {
     console.error("revision documents unreadable", { orderId: id, reason: e instanceof Error ? e.message : String(e) });
   }
-  const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
+  const identityById = await resolveActorIdentities(sb, rows.map((r) => r.created_by));
   const revisions = rows.map((r) => {
-    const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
+    const identity = r.created_by ? (identityById.get(r.created_by) ?? null) : null;
+    const actor_kind = actorKindOf(r.created_by, identity);
     const doc = docByRevision.get(r.revision) ?? null;
     return {
       ...r,
-      created_by_name,
-      actor_kind: actorKindOf(r.created_by, created_by_name),
+      created_by_name: actor_kind === "human" ? (identity?.name ?? null) : null,
+      actor_kind,
+      actor_role: actorRoleWord(identity),
       document_path: doc?.path ?? null,
       document_stored_at: doc?.stored_at ?? null,
     };
@@ -1353,6 +1453,101 @@ operationOrdersRouter.get("/:id/allocation", requireOperation, async (c) => {
 // `holder_party_id` is NULL on every Unit today (measured 2026-08-21), so
 // `holderName` comes back null and the screen prints its governed absence. That
 // is an honest fact about a door nobody has built yet, never a missing one.
+/**
+ * ⭐ THE ORDER ROUTE'S GOODS RECORDS — owner ruling 2026-09-26 (Orders MASTER
+ * § THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK).
+ *
+ * One read for one order: its lines, the `po_line_sources` lineage, the
+ * Purchase Orders that lineage names with their lines, supplier answers and
+ * arrival confirmations, the receipts of those Purchase Orders, the Units
+ * reserved to or sold against the order, and Stock's count of eligible Ready
+ * Stock. It ARRANGES nothing and judges nothing — `routeGoodsLinesOf`
+ * (packages/shared) does, in the browser, with the owners' own functions.
+ *
+ * A failed Purchasing read does not fail the route: the lines and their Units
+ * still answer and `failed.purchasing` says what could not be read, so the
+ * Route can print `Could not read Purchasing` instead of `Carres has not
+ * issued a Purchase Order`.
+ */
+operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [{ data: order, error: orderErr }, { data: lines, error: linesErr }] = await Promise.all([
+    sb.from("orders").select("so").eq("id", id).maybeSingle(),
+    sb.from("order_lines").select("id, sku, qty").eq("order_id", id),
+  ]);
+  const ownError = orderErr ?? linesErr;
+  if (ownError) { const m = mapPgError(ownError); return c.json(m.body, m.status); }
+  if (!order) return c.json({ error: "Order not found" }, 404);
+
+  const { data: units, error: unitsErr } = await sb
+    .from("ops_stock_items")
+    .select("unit_code, status, reserved_order_line_id, sku")
+    .or(`and(status.eq.reserved,reserved_ref.eq.SO-${(order as { so: number }).so}),and(status.eq.sold,sold_order_id.eq.${id})`);
+  if (unitsErr) { const m = mapPgError(unitsErr); return c.json(m.body, m.status); }
+
+  /* ── Purchasing and Receiving: soft as ONE owner ───────────────────────── */
+  const purchasing = await (async () => {
+    const sources = await sb.from("po_line_sources")
+      .select("order_line_id, po_id, po_line_id, qty").eq("order_id", id).order("created_at", { ascending: true });
+    if (sources.error) return null;
+    const sourceRows = (sources.data ?? []) as Array<{ po_id: string }>;
+    const poIds = [...new Set(sourceRows.map((row) => row.po_id).filter(Boolean))];
+    if (poIds.length === 0) return { sources: [], purchaseOrders: [], receipts: [] };
+    const [pos, poLines, promises, confirmations, receipts] = await Promise.all([
+      sb.from("purchase_orders")
+        .select("id, status, supplier_id, destination_id, placed_at, official_delivery_date, eta_date, version").in("id", poIds),
+      sb.from("purchase_order_lines")
+        .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty").in("po_id", poIds),
+      sb.from("po_supplier_promises")
+        .select("id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by, answer_group")
+        .in("po_id", poIds).order("recorded_at", { ascending: false }),
+      sb.from("po_arrival_confirmations")
+        .select("po_id, po_version, for_date, destination_id").in("po_id", poIds),
+      sb.from("warehouse_receipts")
+        .select("id, po_id, grn_no, goods_received_at, status, lines").in("po_id", poIds),
+    ]);
+    if (pos.error || poLines.error || promises.error || confirmations.error || receipts.error) return null;
+    const ofPo = <T extends { po_id?: unknown }>(list: T[] | null, poId: string) =>
+      (list ?? []).filter((row) => row.po_id === poId);
+    return {
+      sources: sources.data ?? [],
+      purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string }>).map((po) => ({
+        ...po,
+        lines: ofPo(poLines.data as Array<Record<string, unknown>>, po.id).map(({ po_id: _po, ...line }) => line),
+        promises: ofPo(promises.data as Array<Record<string, unknown>>, po.id),
+        arrival_confirmations: ofPo(confirmations.data as Array<Record<string, unknown>>, po.id),
+      })),
+      receipts: ((receipts.data ?? []) as Array<Record<string, unknown>>).map(({ lines: counted, ...receipt }) => ({
+        ...receipt,
+        goods_received_at: typeof receipt.goods_received_at === "string" ? receipt.goods_received_at.slice(0, 10) : null,
+        line_ids: Array.isArray(counted)
+          ? (counted as Array<{ id?: unknown }>).map((line) => line.id).filter((v): v is string => typeof v === "string")
+          : [],
+      })),
+    };
+  })();
+
+  /* ── Stock's own count of eligible Ready Stock: exact Units, by its match ─ */
+  const readyStock: Record<string, number> = {};
+  const free = await readFreeStock(sb);
+  for (const line of (lines ?? []) as Array<{ sku: string }>) {
+    const eligible = (free.freeUnitsByKey.get(stockMatchKey(line.sku)) ?? [])
+      .filter((unit) => unit.identityScope === "unit").length;
+    if (eligible > 0) readyStock[line.sku] = eligible;
+  }
+
+  return c.json({
+    lines: lines ?? [],
+    sources: purchasing?.sources ?? [],
+    purchaseOrders: purchasing?.purchaseOrders ?? [],
+    receipts: purchasing?.receipts ?? [],
+    units: units ?? [],
+    readyStock,
+    failed: { purchasing: purchasing === null },
+  });
+});
+
 operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1921,105 +2116,21 @@ operationOrdersRouter.post(
   return c.json(data, 201);
 });
 
-// POST / — the office birth door ([+ New Sales Order]). Normal orders are
-// still born in the Sales Portal; this one inserts status='place' and mints
-// Rev 1 from the created state.
-const createOrderInput = z.object({
-  header: revisionHeaderInput
-    .extend({
-      customer_name: z.string().trim().min(1, "Customer name is required"),
-      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-      delivery_date_tbd: z.boolean().optional(),
-      dealer_id: z.string().uuid({ message: "A dealer is required" }),
-      // orders_salesperson_required (0296) — every portal-written order
-      // names who sold it; only the AutoCount archive importer is exempt.
-      salesperson_id: z.string().uuid({ message: "A salesperson is required" }),
-      // A birth NAMES the parties; `sales_order_create` derives channel from
-      // whether an outlet is given. Only the EDIT door lost these to 0329.
-      outlet_id: z.string().uuid().nullable().optional(),
-      /**
-       * 0391 — the office door names the production start, as the POS door
-       * already did (owner ruling YH, 2026-08-28).
-       *
-       * ⭐ TIGHTENED HERE, NOT ON `revisionHeaderInput`. The same object is
-       * reused by the EDIT door above, where `.nullable().optional()` is
-       * exactly what Jess's read-only ruling wants left alone — a save that
-       * only fixes a phone number must not be forced to restate a date it is
-       * not allowed to change. A birth and a correction ask different things
-       * of the same field, so only the birth is narrowed.
-       *
-       * The MASTER long read "`createOrderInput` refuses an order without
-       * one". That was true of the POS's `createOrderInputSchema` and never
-       * of THIS object, which merely shares its name — so the office could
-       * mint an order the object page then renders read-only as
-       * `Not recorded` forever. `sales_order_create` refuses it again on its
-       * own side (0391), because one layer is not a guard.
-       */
-      /* ⛔ THE MESSAGE RIDES `required_error`, NOT ONLY `.regex()`. A regex
-         message fires only when a STRING fails the pattern; an ABSENT field
-         reports Zod's own `"Required"` — which is the commonest case here and
-         the one an operator actually meets. Carrying the ruled sentence on all
-         three arms is what makes the refusal teach instead of merely refuse
-         (COPY-STANDARD rule 6). Caught by the test, not by reading. */
-      proceed_date: z
-        .string({
-          required_error: "Proceed date — pick the day production should start",
-          invalid_type_error: "Proceed date — pick the day production should start",
-        })
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "Proceed date — pick the day production should start"),
-    })
-    .strict(),
-  lines: z.array(revisionLineInput.omit({ id: true })).min(1, "An order needs at least one item"),
-});
-
-operationOrdersRouter.post("/", requireOperation, async (c) => {
-  const raw = await c.req.json().catch(() => ({}));
-  const parsed = createOrderInput.safeParse(raw);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
-      },
-      422,
-    );
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("sales_order_create", {
-    p_header: parsed.data.header,
-    p_lines: parsed.data.lines,
-  });
-  if (error) {
-    const m = mapPipelineV2Error(error);
-    return c.json(m.body, m.status);
-  }
-
-  /* 0393/0394 — STAIR CARRY ON AN OFFICE-BORN ORDER. Reported from
-     `/operation/orders/so/new`: the fee showed on the form and reached neither
-     the SO nor MONEY.
-
-     The POS door appends the fee into `create_order`’s payload, but
-     `sales_order_create` (0374) takes only a header and lines — it has no addon
-     parameter at all, so there is nothing to append TO. Rather than widen a
-     locked birth RPC, the order is stamped immediately after it exists, through
-     the SAME 0394 door the edit path uses. One writer, two callers.
-
-     Non-fatal for the same reason as the edit path: the order is already born
-     and its Rev 1 minted, so failing here would report a lost create that was
-     not lost. */
-  const createdId = (data as { id?: string } | null)?.id;
-  if (createdId) {
-    const stamped = await restampStairCarry(sb, createdId);
-    if (!stamped.ok) {
-      console.error("stair carry stamp failed on office create", {
-        orderId: createdId,
-        reason: stamped.reason,
-      });
-    }
-  }
-  return c.json(data, 201);
-});
+/* ⭐ THE OFFICE CREATE DOOR IS RETIRED — owner ruling 2026-09-27 (Jess). A
+   customer order is the dealer's or showroom's act in the Sales Portal and
+   nowhere else; Operation receives it and never creates it. Measured: every
+   one of the 58 `Order created` events from this door came from office logins
+   — test data. The permission boundary is kept; a stale client is refused
+   before any database client opens. */
+operationOrdersRouter.post("/", requireOperation, (c) =>
+  c.json(
+    {
+      error: "This action is no longer available. A Sales Order is created in the Sales Portal.",
+      code: "office_create_retired",
+    },
+    410,
+  ),
+);
 
 // POST /:id/floors — 3.2's read-only consequence evaluator. A POST for the
 // body's sake only: it calls ONE read-only definer function
@@ -2303,7 +2414,26 @@ operationOrdersRouter.get("/:id/amendment", requireOperation, async (c) => {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
-  return c.json(data);
+  /* ⭐ `PROPOSED CHANGE` names WHO submitted the request (owner ruling
+     2026-09-25). The live read returns no sender, so the door reads the
+     request's own `submitted_by` and names it through the ONE resolver. FAILS
+     OPEN: an unread or unresolved sender stays unnamed — a person is never
+     invented and the request is never dropped. */
+  const amendment = (data as { amendment?: Record<string, unknown> | null } | null)?.amendment ?? null;
+  if (!amendment || typeof amendment.id !== "string") return c.json(data);
+  const sender = await sb
+    .from("sales_order_amendments")
+    .select("submitted_by")
+    .eq("id", amendment.id)
+    .maybeSingle();
+  const senderId = sender.error
+    ? null
+    : ((sender.data as { submitted_by?: string | null } | null)?.submitted_by ?? null);
+  const names = senderId ? await resolveActorNames(sb, [senderId]) : new Map<string, string>();
+  return c.json({
+    ...(data as object),
+    amendment: { ...amendment, submitted_by_name: (senderId && names.get(senderId)) || null },
+  });
 });
 
 operationOrdersRouter.post("/:id/amendment", requireOperation, async (c) => {

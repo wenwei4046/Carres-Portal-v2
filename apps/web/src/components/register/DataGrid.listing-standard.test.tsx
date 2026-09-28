@@ -292,3 +292,95 @@ describe("header sort indicator", () => {
     expect(desc.textContent?.replace("sorted descending", "")).not.toContain("v");
   });
 });
+
+/* ⭐ AN EMPTY CELL IS EMPTY — owner ruling 2026-09-26 (COPY-STANDARD "NO DASH
+   ANYWHERE ON A SCREEN", UI MASTER §6.0, Orders MASTER §0.1 REGISTER CLOSE-OUT
+   item 2). The engine draws nothing for a blank value, on every listing; a
+   real zero is a value and still prints. */
+describe("an empty cell is empty", () => {
+  interface Fact {
+    id: string;
+    name: string | null | undefined;
+    note: string | null | undefined;
+    qty: number | null;
+  }
+  const FACTS: Fact[] = [
+    { id: "n", name: null, note: null, qty: 0 },
+    { id: "u", name: undefined, note: undefined, qty: null },
+    { id: "e", name: "", note: "", qty: 7 },
+  ];
+  const FACT_COLUMNS: DataGridColumn<Fact>[] = [
+    { key: "name", label: "Name", width: 120, accessor: (r) => r.name },
+    { key: "note", label: "Note", width: 120, accessor: (r) => r.note },
+    {
+      key: "qty",
+      label: "Qty",
+      width: 80,
+      align: "right",
+      filterType: "number",
+      numberValue: (r) => r.qty,
+      accessor: (r) => r.qty,
+    },
+  ];
+  const DASH = /[—–]/;
+  const mountFacts = (extra: Partial<Parameters<typeof DataGrid<Fact>>[0]> = {}) =>
+    render(
+      <DataGrid<Fact>
+        rows={FACTS}
+        columns={FACT_COLUMNS}
+        storageKey={`empty-${Math.random()}`}
+        rowKey={(r) => r.id}
+        {...extra}
+      />,
+    );
+  const bodyCells = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLTableCellElement>("tbody tr[data-row-nav] td")];
+
+  it("draws nothing for null, undefined and an empty string", () => {
+    const { container } = mountFacts();
+    const cells = bodyCells(container);
+    expect(cells).toHaveLength(9);
+    const blank = cells.filter((td) => td.textContent === "");
+    /* name + note on all three rows, and the one null quantity. */
+    expect(blank).toHaveLength(7);
+    for (const td of blank) expect(td.childElementCount).toBe(0);
+    expect(container.querySelector("tbody")?.textContent ?? "").not.toMatch(DASH);
+  });
+
+  it("still prints a real zero", () => {
+    const { container } = mountFacts();
+    const texts = bodyCells(container).map((td) => td.textContent);
+    expect(texts).toContain("0");
+    expect(texts).toContain("7");
+  });
+
+  it("announces no dash either — no aria-label or title carries one", () => {
+    const { container } = mountFacts();
+    for (const el of container.querySelectorAll("[aria-label], [title]")) {
+      expect(el.getAttribute("aria-label") ?? "").not.toMatch(DASH);
+      expect(el.getAttribute("title") ?? "").not.toMatch(DASH);
+    }
+  });
+
+  it("draws nothing beside the chevron when the expansion's own column is blank", () => {
+    const { container } = mountFacts({
+      expandable: {
+        renderExpansion: () => <div>goods</div>,
+        trigger: { columnKey: "name" },
+      },
+    });
+    const triggers = [...container.querySelectorAll<HTMLButtonElement>("tbody button[aria-expanded]")];
+    expect(triggers.length).toBeGreaterThan(0);
+    for (const b of triggers) expect(b.textContent ?? "").not.toMatch(DASH);
+    expect(container.querySelector("tbody")?.textContent ?? "").not.toMatch(DASH);
+  });
+
+  it("names a number filter's two boxes by their own words, never a dash", () => {
+    mountFacts();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Qty" }));
+    const min = screen.getByLabelText("Min");
+    const max = screen.getByLabelText("Max");
+    expect(min).toHaveAttribute("placeholder", "Min");
+    expect(max).toHaveAttribute("placeholder", "Max");
+  });
+});
