@@ -1782,6 +1782,13 @@ Owned. These are test rows (Constitution §6, no backfill); the go-live opening 
 `Supplier Consignment` and the supplier for every other supplier's display Unit. Measured the same
 day: one purchase order carries `is_consignment`.
 
+**Showroom handoff connection — APPROVED TARGET / NOT BUILT, Jess 2026-09-28.**
+Purchasing MASTER §9.8 owns the display-arrangement handoff: replacement/removal starts by selecting
+this register's existing showroom Units; new placement may have no outgoing Unit. Sales supplies
+negotiated goods/price/conditions; Operation prepares the governed documents and execution.
+Stock remains the sole authority for Unit identity, location, ownership and physical evidence.
+This connection introduces no second inventory, production data correction or new Stock action.
+
 ### 12.10 Month-end Stock Confirmation and Finance handoff
 
 **CURRENT CARRES →** a warehouse may not finish the physical Count on the month's final day;
