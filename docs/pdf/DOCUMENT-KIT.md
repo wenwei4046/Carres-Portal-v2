@@ -20,9 +20,9 @@ is the family's, not the Sales Order's alone. One copy, one truth.
 | **Purchase Order** | supplier | [`PO-PDF-STANDARD.md`](PO-PDF-STANDARD.md) | ✅ |
 | **Delivery Order** | customer, crew | [`DO-PDF-STANDARD.md`](DO-PDF-STANDARD.md) | ✅ built, **old style — owes the kit** |
 | **Goods Received Note** | internal, supplier claim | *(none yet)* · business rules: `purchasing/MASTER.md` §Receiving | ✅ built, **old style + no standard** |
-| **Tax Invoice** | customer | *(none yet)* | ✅ built, **no standard, SST unresolved** |
-| **Payment Request** | customer | *(none yet)* | ✅ built — the SAME template as the Tax Invoice, switched by `doc_title`. An imported order's own tax invoice lives in AutoCount, so this mode prints no SST rows and reads `Total due`. Two documents, one file: change one, check both. |
-| **Receipt** | customer | *(none yet)* | ✅ built, no standard |
+| **Invoice** (was *Tax Invoice*) | customer | *(none yet)* · `payment/MASTER.md` §4 | ✅ built, **no standard** — owner confirmed 2026-09-25: no SST rows, no `TAX INVOICE` mode; ONE per Sales Order, issued by the system at `Balance due` RM 0 and sent with the Receipt |
+| **Payment Request** | customer | — | ❌ **RETIRED, owner confirmed 2026-09-25** — an Invoice never asks for money; the customer pays against the Sales Order's `Balance due`. The `doc_title` switch inside the Invoice template goes with it. |
+| **Receipt** | customer | *(none yet)* · `payment/MASTER.md` §4 | ✅ built, **no standard** — owner confirmed 2026-09-25: one per payment received, the POS deposit included; the standard is owed |
 | **Payment Voucher** · **Other Debtor Invoice** | finance | *(none yet)* | ✅ built, no standard |
 | **Loan Note** · **Extension Agreement** · **Pickup sheet** · **Listing export** | mixed | *(none yet)* | ✅ built, no standard |
 | **Purchase Return (PR)** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.6 | ❌ **the Register is LIVE, the document is not** (0548 applied, screen deployed 2026-09-19). Money-free (§4) |
@@ -31,8 +31,8 @@ is the family's, not the Sales Order's alone. One copy, one truth.
 | **Supplier Claim pack** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.5 | ❌ approved, not built |
 | **Delivery Return** | customer | *(none yet)* · `service/MASTER.md` §Document decision | ❌ approved, not built |
 | **Visual Service Note** | warehouse, logistics, supplier | *(none yet)* · `service/MASTER.md` §Document decision | ❌ approved, not built — role-specific copies reveal only what that role needs |
-| **Credit Note** | customer, finance | *(none yet)* · `service/MASTER.md` · `stock/MASTER.md` | ❌ approved, not built — Finance owns it; no supplier document carries the credit |
-| **Customer Statement** | customer | *(none yet)* · `payment/MASTER.md` | ❌ **the read is BUILT, the document is not** — `GET /invoices/statement/:orderId` feeds a screen only, so a customer asking what they owe across orders gets a screenshot |
+| **Credit Note** | customer, finance | *(none yet)* · `payment/MASTER.md` §4 · `service/MASTER.md` · `stock/MASTER.md` | ❌ approved, not built — owner confirmed 2026-09-25 as a MISSING document to build (a price lowered after money was paid; the exceptional refund); Finance owns it; no supplier document carries the credit |
+| **Customer Statement** | customer | *(none yet)* · `payment/MASTER.md` §4 | ❌ **the read is BUILT, the document is not** — owner confirmed 2026-09-25 as a MISSING document to build; `GET /invoices/statement/:orderId` already derives it |
 | **Rental agreement (signed)** · **Diglant Forecast proposal** | customer / Diglant | `rental/MASTER.md` | ❌ not built. The forecast must print `Forecast proposal — Not a Purchase Order` |
 
 A document with no standard of its own still obeys THIS file.
