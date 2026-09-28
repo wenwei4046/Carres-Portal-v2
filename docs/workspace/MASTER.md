@@ -1312,7 +1312,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      |---|---|---|
      | Page columns | `PageShell` + `grid-layout` | ≥1340: rail 280 · Mission ≥460 · Communication 340; 1100–1339: 240 · ≥460 · 300; 900–1099: 220 · ≥400 · 280; never scales; below 900 = phone round |
      | Column title rows | `SectionHeader` | 64px tall, 15/600 slate-12, one bottom line shared by all three columns |
-     | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; chosen row blue-3 + 3px blue edge |
+     | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; ONE blue in the rail (Jess 2026-09-28: "why force to select all module with blue? confusing like select 2"): only the chosen ORDER row is blue-3 + 3px blue edge; a chosen filter (Attention, Module, the day) is the grey chip with bold text like the `My Task` · `Team Work` switch; the month grid prints each day's count UNDER its number (13 over 11/500, 36px rows), today a dark ring |
      | Order header | `DetailShell` header slots | three blocks of two lines: `SO No` link 15/600 over customer 13/400 · `Proceed Date` 11/500 over date 13 · `Customer Requested Delivery Date` 11/500 over date 13 |
      | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 6, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
      | Card button | `Button` secondary | 36px, top right of the card; opens the owning form in the card |
@@ -1378,7 +1378,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 8b. **The left column copies the ChatGPT order-desk rail (Jess, 2026-09-27: "i want the left nav
    rail, follow" / "i asked you copy").** Top to bottom: search and `Filters` · the month · the Mon
    to Sat grid with each day's count printed under its number (today ringed, the chosen day a
-   pale-blue chip; a past day's work counts once, under `Missed`) · `ATTENTION`: `! Missed {n}` ·
+   grey chip, never blue; a past day's work counts once, under `Missed`) · `ATTENTION`: `! Missed {n}` ·
    `○ No date {n}` · `MODULE`: `All modules {n}`, then the list, then `Sales Orders` ·
    `Purchasing` · `Warehouse` · `Delivery` · `Payment`, each with its icon and count. **The list
    is one row per order** showing only the SO number and right-aligned numeric task count

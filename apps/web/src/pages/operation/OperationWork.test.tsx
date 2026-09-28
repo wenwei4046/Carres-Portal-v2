@@ -176,6 +176,10 @@ describe("Workspace Work page — §5.10", () => {
     expect(row).toHaveTextContent(/^SO-13181$/);
     expect(row).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("work-mission-stub")).toHaveAttribute("data-order", "order-1");
+    // ONE blue in the rail (Jess 2026-09-28: "confusing like select 2"): the chosen
+    // order row only; the chosen filter `All modules` is the grey chip.
+    expect([...rail.querySelectorAll('[class*="bg-kit-blue"]')]).toEqual([row, ...row.querySelectorAll('[class*="bg-kit-blue"]')]);
+    expect(screen.getByTestId("work-rail-module-all").className).toContain("bg-kit-slate-3");
   });
 
   it("shows only my occurrences in My Task and everyone's in Team Work", () => {

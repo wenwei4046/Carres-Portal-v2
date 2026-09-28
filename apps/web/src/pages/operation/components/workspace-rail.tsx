@@ -391,8 +391,12 @@ export function FilterRailRow({
       data-testid={testId}
       className={tone === "workspace" ? [
         "relative flex min-h-[36px] w-full items-center gap-2 py-2 pr-4 text-left text-control text-kit-slate-12",
-        indent ? "pl-6 font-semibold" : "pl-4",
-        active ? "bg-kit-blue-3" : "hover:bg-kit-slate-2",
+        indent ? "pl-6" : "pl-4",
+        /* ONE BLUE IN THE RAIL (Jess, 2026-09-28: "why force to select all
+           module with blue? confusing like select 2"): only the chosen order
+           row is blue. A chosen filter (Attention, Module) is the grey chip
+           with bold text, the same as the My Task / Team Work switch. */
+        active ? (indent ? "bg-kit-blue-3 font-semibold" : "bg-kit-slate-3 font-semibold") : "hover:bg-kit-slate-2",
       ].join(" ") : [
         /* 36px minimum: 18px text-body line + 9px above and below. A wrapped
            label simply adds its second 18px line — natural height, same font,
@@ -405,7 +409,7 @@ export function FilterRailRow({
         active ? "font-semibold" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
-      {active && (tone === "workspace" || !resets) && (
+      {active && (tone === "workspace" ? indent : !resets) && (
         <span
           aria-hidden
           className={tone === "workspace" ? "absolute bottom-0 left-0 top-0 w-[3px] bg-kit-blue-9" : "absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"}
@@ -674,8 +678,11 @@ export function useFilterRailOpen(
  * a closed day (public holiday) is grey text with its name only in the
  * accessible name and tooltip. Today is the number in a RING; the week that
  * holds today is the tinted row (Jess, 2026-09-26: "circle the day you are
- * today, not write today; the week should have colour"). The ONE blue is the
- * chosen tile: solid, white text. Six columns share the 216px row.
+ * today, not write today; the week should have colour"). The full grid's
+ * chosen tile is solid blue, white text. The compact Work grid has NO blue
+ * (Jess, 2026-09-28: one blue in the Work rail = the chosen order row): its
+ * chosen day is the darker grey chip, today a dark ring. Six columns share
+ * the 216px row.
  */
 export interface RailWeekDay {
   iso: string;
@@ -699,7 +706,7 @@ export function FilterRailMonthGrid({
   testId,
   compact = false,
 }: {
-  /** The Work inbox's month: 25px rows, the count beside the number, a day
+  /** The Work inbox's month: 36px rows, the count under the number, a day
    *  with work dark and a day without it grey (Jess, 2026-09-27). */
   compact?: boolean;
   weeks: readonly (readonly (RailWeekDay | null)[])[];
@@ -735,14 +742,15 @@ export function FilterRailMonthGrid({
                 data-today={d.today ? "yes" : undefined}
                 data-closed={closed ? "yes" : undefined}
                 className={[
-                  compact
-                    ? "flex h-[22px] min-w-0 items-center justify-center gap-0.5 rounded-control tabular-nums"
-                    : "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
-                  chosen ? (compact ? "bg-kit-blue-3 text-kit-blue-11" : "bg-kit-blue-9 text-white") : closed || (compact && d.count === 0) ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
+                  /* The count sits UNDER the day number in both grids (Workspace
+                     §5.10 8b; Jess 2026-09-28 on the compact grid's count beside
+                     the number: "failed ui. how to make it easy read"). */
+                  "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
+                  chosen ? (compact ? "bg-kit-slate-5 text-kit-slate-12" : "bg-kit-blue-9 text-white") : closed || (compact && d.count === 0) ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
                 ].join(" ")}
               >
-                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-[12px] ${d.count > 0 && !closed ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? (compact ? "ring-1 ring-kit-blue-9" : chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12") : ""}`}>{d.dayNumber}</span>
-                <span className={compact ? `min-w-[10px] text-left text-[10px] leading-[14px] ${chosen ? "text-kit-blue-11" : "text-kit-slate-11"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-body ${(d.count > 0 && !closed) || chosen ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? (compact ? "ring-1 ring-kit-slate-12" : chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12") : ""}`}>{d.dayNumber}</span>
+                <span className={compact ? `h-3.5 text-label ${chosen ? "text-kit-slate-12" : "text-kit-slate-11"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
                   {!closed && d.count > 0 ? d.count : ""}
                 </span>
               </button>
