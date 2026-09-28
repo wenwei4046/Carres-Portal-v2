@@ -95,8 +95,10 @@ describe("Carres date formatting", () => {
     // `fmtDayChip` was deleted by the ruling: the year rule made it identical
     // to `fmtDate` except on the one input where it would have been wrong.
     const mod = await import("./fmt-date");
-    // appYearNow / appTodayIso are the business-timezone clock, not a spelling.
+    // appYearNow / appTodayIso and the three 0601 helpers are the
+    // business-timezone clock and form values, not a spelling.
     expect(Object.keys(mod).sort()).toEqual([
+      "appDateIsoOf", "appDateTimeInput", "appDateTimeInputToIso",
       "appTodayIso", "appYearNow", "fmtDate", "fmtDateShort", "fmtMonth",
     ]);
   });
@@ -122,3 +124,19 @@ describe("appTodayIso — today in the business timezone", () => {
     expect(appTodayIso()).toBe("2026-08-15");
   });
 });
+
+describe("0601 — the arrival clock in the business timezone", () => {
+  it("reads an instant's Kuala Lumpur date, and passes a bare date through", async () => {
+    const { appDateIsoOf } = await import("./fmt-date");
+    expect(appDateIsoOf("2026-09-30T17:30:00Z")).toBe("2026-10-01");
+    expect(appDateIsoOf("2026-09-30")).toBe("2026-09-30");
+    expect(appDateIsoOf(null)).toBe("");
+  });
+  it("fills a datetime-local field with Kuala Lumpur time, and turns it back into a +08:00 instant", async () => {
+    const { appDateTimeInput, appDateTimeInputToIso } = await import("./fmt-date");
+    expect(appDateTimeInput("2026-09-28T01:15:00Z")).toBe("2026-09-28T09:15");
+    expect(appDateTimeInputToIso("2026-09-28T09:15")).toBe("2026-09-28T09:15:00+08:00");
+    expect(new Date(appDateTimeInputToIso("2026-09-28T09:15")).toISOString()).toBe("2026-09-28T01:15:00.000Z");
+  });
+});
+

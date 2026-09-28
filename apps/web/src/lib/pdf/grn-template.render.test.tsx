@@ -142,3 +142,23 @@ it("compresses only consecutive Units with the same outcome, never hiding a gap 
   expect(text).toMatch(/U1-000-099 ?: Not received/);
   await doc.destroy();
 });
+
+it("prints the arrival clock and Received by the receiving party (0601)", async () => {
+  const pageText = async (data: GrnTemplateData) => {
+    const doc = await render(data);
+    const words: string[] = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const content = await (await doc.getPage(n)).getTextContent();
+      words.push(...content.items.flatMap((item) => "str" in item ? [item.str] : []));
+    }
+    await doc.destroy();
+    return words.join(" ").replace(/\s+/g, " ");
+  };
+  const timed = await pageText({ ...sample(), goods_received_time: "09:15", received_by: "NETS" });
+  expect(timed).toMatch(/Goods Received Date.*Wed, 23 Sep 2026 09:15/);
+  expect(timed).not.toContain("Time not recorded");
+  expect(timed).toMatch(/Received by.*NETS/);
+  const older = await pageText({ ...sample(), received_by: "Not recorded" });
+  expect(older).toContain("Time not recorded");
+  expect(older).toMatch(/Received by.*Not recorded/);
+});

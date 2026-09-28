@@ -7,6 +7,7 @@ import {
   resolvedCategory,
   lineKind,
   lineSortRank,
+  catalogCategoryWordOf,
 } from "./line-category";
 import { lineReadiness, readinessCounts } from "./line-readiness";
 
@@ -296,3 +297,16 @@ describe("resolvedCategory — the catalog first, the parser only where it is si
     expect(resolvedCategory(MISSED, "  BEDFRAME ")).toBe("bedframe");
   });
 });
+
+describe("catalogCategoryWordOf — a receipt reads the Catalog, never a guess (owner 2026-09-28)", () => {
+  it("prints the Catalog category through the governed words", () => {
+    expect(catalogCategoryWordOf("SMOKE-K", "mattress")).toBe("Mattress");
+    expect(catalogCategoryWordOf("Memory Pillow", "accessory")).toBe("Pillow");
+  });
+  it("prints Not recorded when the Catalog cannot be read, never Other goods or a SKU-text guess", () => {
+    expect(catalogCategoryWordOf("SMOKE King Mattress", null)).toBe("Not recorded");
+    expect(catalogCategoryWordOf("SMOKE King Mattress", "")).toBe("Not recorded");
+    expect(catalogCategoryWordOf("ZX-9", "guarantee")).toBe("Not recorded");
+  });
+});
+

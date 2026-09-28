@@ -481,7 +481,11 @@ export default function OperationReceiving() {
         sortable: true,
         searchValue: (r) => r.goods_received_at ?? "",
         exportValue: (r) =>
-          r.goods_received_at ? fmtDate(r.goods_received_at) : "",
+          r.goods_received_time
+            ? fmtDate(r.goods_received_time, { time: true })
+            : r.goods_received_at
+              ? `${fmtDate(r.goods_received_at)} · Time not recorded`
+              : "",
         /* The table's date column OWNS detailed date filtering (owner
            correction 2026-09-06) — the rail's date group is the GRN's
            creation date, which is a different fact. */
@@ -489,9 +493,20 @@ export default function OperationReceiving() {
         dateValue: (r) => r.goods_received_at,
         sortFn: (a, b) =>
           (a.goods_received_at ?? "").localeCompare(b.goods_received_at ?? ""),
+        /* 0601 · the date, then its KL clock on the inline second line; an
+           older GRN says `Time not recorded` — never back-filled. */
         accessor: (r) => (
-          <span className="tabular-nums text-body text-base-900">
-            {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
+          <span className="flex flex-col" data-testid={`grn-received-${r.id}`}>
+            <span className="tabular-nums text-body text-base-900">
+              {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
+            </span>
+            {r.goods_received_at ? (
+              <span className="tabular-nums text-meta text-base-500">
+                {r.goods_received_time
+                  ? fmtDate(r.goods_received_time, { timeOnly: true })
+                  : "Time not recorded"}
+              </span>
+            ) : null}
           </span>
         ),
       },

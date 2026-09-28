@@ -255,3 +255,54 @@ describe("grnTemplateDataOf — the Amend LIVE preview", () => {
     });
   });
 });
+
+describe("grnTemplateDataOf — who received it and when (0601, owner 2026-09-17 / 09-28)", () => {
+  it("prints the arrival time in Kuala Lumpur, on the KL date", () => {
+    // 17:30 UTC on 30 Sep is 01:30 on 1 Oct in Kuala Lumpur.
+    const d = grnTemplateDataOf(
+      detail({ receipt: { goods_received_at: "2026-10-01", goods_received_time: "2026-09-30T17:30:00+00:00" } }),
+    );
+    expect(d.goods_received_on).toBe("2026-10-01");
+    expect(d.goods_received_time).toBe("01:30");
+  });
+
+  it("an older record carries no clock — never back-filled", () => {
+    const d = grnTemplateDataOf(detail());
+    expect(d.goods_received_time).toBeNull();
+  });
+
+  it("prints Received by the company at a partner-run Site, the staff member at a Carres site", () => {
+    expect(grnTemplateDataOf(detail({ receipt: { received_by_kind: "company", received_by_name: "NETS" } })).received_by).toBe("NETS");
+    expect(grnTemplateDataOf(detail({ receipt: { received_by_kind: "staff", received_by_name: "Shasha" } })).received_by).toBe("Shasha");
+    expect(grnTemplateDataOf(detail()).received_by).toBe("Not recorded");
+  });
+
+  it("the posting label names a non-duty Operation poster plainly", () => {
+    const d = grnTemplateDataOf(detail({ receipt: { posted_authority: "operation_staff" } }));
+    expect(d.duty.authority_label).toBe("Operation staff");
+  });
+
+  it("a SKU the Catalog could not answer prints Not recorded, never Other goods", () => {
+    const input = detail();
+    input.line_info = {};
+    const d = grnTemplateDataOf(input);
+    expect(d.lines[0]!.category).toBe("Not recorded");
+  });
+
+  it("the Amend preview reflects a named Unit and a corrected arrival time", () => {
+    const input = detail();
+    input.receipt.unit_results[0]!.po_line_id = "lr1";
+    const d = grnTemplateDataOf(input, {
+      reason: "Wrong Unit scanned",
+      goodsReceivedTime: "2026-09-01T02:15:00+00:00",
+      units: { si1: "not_received" },
+      todayIso: "2026-09-06",
+    });
+    expect(d.goods_received_time).toBe("10:15");
+    expect(d.lines[0]!.unit_results).toEqual([{ unit_code: "U-0001", outcome_label: "Not received" }]);
+    // One named Unit back to Not received: 2 − 1 received on this GRN.
+    expect(d.lines[0]!.received_qty).toBe(1);
+    expect(d.lines[0]!.pending_delivery_qty).toBe(4);
+  });
+});
+

@@ -151,6 +151,8 @@ export function GrnTemplate(data: GrnTemplateData) {
     deliver_to,
     goods_arrived_at,
     goods_received_on,
+    goods_received_time,
+    received_by,
     lines,
     unit_results,
     extra_lines,
@@ -169,7 +171,13 @@ export function GrnTemplate(data: GrnTemplateData) {
   const receiptRows: Array<[string, string | null]> = [
     ["GRN Doc Date", niceDate(grn_doc_date)],
     ["Goods arrived at", goods_arrived_at],
-    ["Goods Received Date", goods_received_on ? `${niceDate(goods_received_on)}${/^\d{4}-\d{2}-\d{2}$/.test(goods_received_on) ? " · Time not recorded" : ""}` : null],
+    // 0601 · the physical arrival clock in Kuala Lumpur; an older record
+    // keeps its date and says so, never a back-filled time.
+    ["Goods Received Date", goods_received_on
+      ? `${niceDate(goods_received_on)}${goods_received_time ? ` ${goods_received_time}` : " · Time not recorded"}`
+      : null],
+    // 0601 · `Received by {company or staff name}` (owner ruling 2026-09-28).
+    ["Received by", received_by ?? "Not recorded"],
   ];
 
   const quantities = [

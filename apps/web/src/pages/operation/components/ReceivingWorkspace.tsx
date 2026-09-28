@@ -14,10 +14,11 @@ import {
   type ReceivingExtraLine,
   type ReceivingUnitOutcome,
 } from "@carres/shared";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { appDateTimeInput, appDateTimeInputToIso, fmtDateShort } from "@/lib/fmt-date";
 import {
   useOfficeReceiveMutation,
   usePoReceiving,
+  useReceivingReceiver,
   type operationPoListRow,
   type ReceivingEvent,
   type ReceivingExpectedUnit,
@@ -27,6 +28,7 @@ import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import Checkbox from "@/components/kit/Checkbox";
+import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
 
 /**
@@ -57,13 +59,6 @@ import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
  *    uncertain response returns the first posting instead of a second GRN.
  */
 
-/** Today in MYT — the app's zone, never the browser's. The SERVER still owns
- *  the bounds; this only seeds the field. */
-function todayMYT(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-  }).format(new Date());
-}
 
 /** What one line is counting on THIS delivery. */
 interface Count {
@@ -265,10 +260,11 @@ function ReadMode({
           </button>
         )}
         {!closed && summary.pendingDeliveryQty > 0 && dutyKnown && !dutyAllowed && (
-          /* The same rule the SQL door holds (0426): the fact, then who may.
-             A button the server would refuse is never offered. */
+          /* The same rule the SQL door holds (0601, owner 2026-09-25): every
+             active Operation staff member may receive. A button the server
+             would refuse is never offered. */
           <div className="mt-2 text-label text-kit-slate-9" data-testid="receiving-duty-refusal">
-            Only GRN duty may save a receiving.
+            Only Operation staff may save a receiving.
           </div>
         )}
         {closed && (
@@ -458,7 +454,10 @@ function ReceivingMode({
 }) {
   const lines = useMemo(() => po.purchase_order_lines ?? [], [po]);
 
-  const [goodsReceivedAt, setGoodsReceivedAt] = useState(todayMYT);
+  /** 0601 · Goods Received Date is a time point: the date AND the clock,
+   *  seeded with now in Kuala Lumpur (never the browser's zone). The SERVER
+   *  owns the bounds — not in the future, not before the PO date. */
+  const [goodsReceivedAt, setGoodsReceivedAt] = useState(() => appDateTimeInput());
   // No suggestion, ever: this number is the SUPPLIER's.
   const [doNumber, setDoNumber] = useState("");
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
@@ -467,6 +466,10 @@ function ReceivingMode({
   /** `Supplier Deliver To` is the instruction; `Actual Site` is where the goods
    *  physically arrived. "" = the PO's own booked warehouse. */
   const [actualSiteId, setActualSiteId] = useState<string>("");
+  /** 0601 · who the GRN will name as `Received by` — the SAME SQL rule the
+   *  posting stamps, asked for this Site and the signed-in person. */
+  const receiverQ = useReceivingReceiver(actualSiteId || po.warehouse_id);
+  const receiver = receiverQ.data?.receiver ?? null;
   const [arrivalEvidence, setArrivalEvidence] = useState<
     ReceivingArrivalEvidence[]
   >([]);
@@ -616,7 +619,9 @@ function ReceivingMode({
     save.mutate({
       doNumber: doNumber.trim(),
       doFilePath,
-      goodsReceivedAt,
+      goodsReceivedTime: goodsReceivedAt
+        ? appDateTimeInputToIso(goodsReceivedAt)
+        : undefined,
       note: note.trim() || undefined,
       actualSiteId:
         actualSiteId && actualSiteId !== po.warehouse_id
@@ -694,8 +699,9 @@ function ReceivingMode({
             Goods Received Date
           </span>
           <input
-            type="date"
+            type="datetime-local"
             value={goodsReceivedAt}
+            max={appDateTimeInput()}
             onChange={(e) => setGoodsReceivedAt(e.target.value)}
             aria-label="Goods Received Date"
             data-testid="goods-received-at"
@@ -729,6 +735,27 @@ function ReceivingMode({
             ))}
           </select>
         </div>
+        {receiver ? (
+          /* 0601 · the SYSTEM fills the receiver (owner ruling 2026-09-28):
+             the operating company at a partner-run Site, the signed-in Carres
+             staff member at a Carres site — a grey automatic fact, never a
+             field to type (UI MASTER: `Fact` `automatic`). */
+          <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
+            <span className="w-32 shrink-0 text-label text-kit-slate-9">
+              Received by
+            </span>
+            <div
+              role="textbox"
+              aria-readonly
+              aria-label="Received by"
+              data-kit="automatic-field"
+              data-testid="received-by"
+              className={`${CONTROL_BASE.replace("bg-white", "bg-kit-slate-3")} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
+            >
+              {receiver.name ?? "Staff identity not recorded"}
+            </div>
+          </div>
+        ) : null}
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Supplier DO No

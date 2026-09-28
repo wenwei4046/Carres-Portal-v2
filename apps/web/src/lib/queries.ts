@@ -4055,7 +4055,15 @@ export interface WarehouseReceiptQueueRow {
   actual_site_name?: string | null;
   posted_duty_holder_name?: string | null;
   posted_duty_cover_name?: string | null;
-  posted_authority?: "grn_duty" | "cover" | "superuser" | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | null;
+  /** 0601 — Goods Received Date as a time point; null on an older record
+   *  (`Time not recorded`, never back-filled). */
+  goods_received_time?: string | null;
+  /** 0601 — `Received by {company or staff name}` (see `receivedByWords`). */
+  received_by_kind?: "company" | "staff" | null;
+  received_by_name?: string | null;
+  /** 0601 — the version an amendment starts from (first save wins). */
+  revision?: number;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
   /** 0440-era detail read: the same files, each with a signed VIEW url. */
   arrival_evidence_files?: Array<{
@@ -4242,6 +4250,20 @@ export function useWorkspaceCoverDutyMutation(
   });
 }
 
+/** 0601 — who the GRN will name as `Received by` if the signed-in person
+ *  saves at this Site. `null` = not known (the form draws nothing). */
+export function useReceivingReceiver(siteId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "receiving-receiver", siteId ?? ""] as const,
+    queryFn: () =>
+      apiFetch<{ receiver: { kind: "company" | "staff"; name: string | null } | null }>(
+        `/api/operation/warehouse-receipts/receiver?site=${encodeURIComponent(siteId!)}`,
+      ),
+    enabled: !!siteId,
+    staleTime: 60_000,
+  });
+}
+
 export function useReceivingDuty(
   opts?: Partial<UseQueryOptions<ReceivingDutyContext>>,
 ) {
@@ -4304,7 +4326,13 @@ export function useReceivingSessionDetail(id: string | null) {
 export interface ReceivingAmendBody {
   reason: string;
   saveKey?: string;
+  /** 0601 — the GRN version this correction starts from. */
+  basedOnRevision: number;
   goodsReceivedAt?: string;
+  /** 0601 — the corrected arrival time point (ISO with offset). */
+  goodsReceivedTime?: string;
+  /** 0601 — each exact Unit the person names: Received ↔ Not received. */
+  units?: Array<{ stockItemId: string; outcome: "received" | "not_received" }>;
   doNumber?: string;
   actualSiteId?: string | null;
   /** 0427 — a corrected signed-DO file; the old path is preserved in the

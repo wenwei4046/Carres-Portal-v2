@@ -1211,6 +1211,7 @@ export {
   receivingWorkItems,
   RECEIVING_UNIT_OUTCOME_LABEL,
   RECEIVING_AUTHORITY_LABEL,
+  receivedByWords,
   RECEIVING_WORK_WORDS,
   // 2026-09-06 owner correction — the Register is the GRN record; the rail
   // speaks exactly five governed category rows through the shared ladder.
@@ -1935,6 +1936,8 @@ export {
   // register footer so Receiving and Sales Orders speak one rule.
   GOODS_CATEGORY_WORDS,
   goodsCategoryWordOf,
+  catalogCategoryWordOf,
+  CATALOG_CATEGORY_NOT_RECORDED,
   type GoodsCategoryWord,
   type CoreCat,
   type LineClass,

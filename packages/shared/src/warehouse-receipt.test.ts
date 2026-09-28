@@ -11,6 +11,8 @@ import {
   WAREHOUSE_RECEIPT_STATUS_LABEL,
   RECEIVING_CATEGORY_ROWS,
   receiptCategoryWords,
+  receivedByWords,
+  RECEIVING_AUTHORITY_LABEL,
   type WarehouseReceiptDraft,
   type WarehouseReceiptLineDraft,
 } from "./warehouse-receipt";
@@ -402,3 +404,38 @@ describe("receiptCategoryWords — the rail's five governed rows", () => {
     ).toEqual(["Mattress"]);
   });
 });
+
+describe("receiptCategoryWords reads the Catalog only (owner 2026-09-28)", () => {
+  const rl = (sku: string) => ({
+    id: sku, sku, received_now: 1, damaged_qty: 0, wrong_item_qty: 0,
+    wrong_item_claim_type: null,
+  });
+  it("a SKU the Catalog cannot answer lights no row, even when its name looks like a mattress", () => {
+    expect(receiptCategoryWords([rl("KING MATTRESS SMOKE")], new Map())).toEqual([]);
+  });
+});
+
+describe("receivedByWords — the GRN receiver (owner ruling 2026-09-28)", () => {
+  it("a partner-run Site names the operating company", () => {
+    expect(receivedByWords({ received_by_kind: "company", received_by_name: "NETS" })).toBe("NETS");
+  });
+  it("a Carres-run Site names the staff member who saved", () => {
+    expect(receivedByWords({ received_by_kind: "staff", received_by_name: "Shasha" })).toBe("Shasha");
+  });
+  it("a shared login is never printed as a person", () => {
+    expect(receivedByWords({ received_by_kind: "staff", received_by_name: null })).toBe(
+      "Staff identity not recorded",
+    );
+  });
+  it("a GRN saved before the receiver was recorded says so, never a guess", () => {
+    expect(receivedByWords({ received_by_kind: null, received_by_name: null })).toBe("Not recorded");
+    expect(receivedByWords({})).toBe("Not recorded");
+  });
+});
+
+describe("RECEIVING_AUTHORITY_LABEL — every Operation staff member may post (owner 2026-09-25)", () => {
+  it("names a non-duty poster plainly", () => {
+    expect(RECEIVING_AUTHORITY_LABEL.operation_staff).toBe("Operation staff");
+  });
+});
+
