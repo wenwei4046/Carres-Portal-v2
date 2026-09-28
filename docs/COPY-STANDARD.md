@@ -1038,6 +1038,15 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
+### Showroom document names — owner instruction 2026-09-28
+
+Use full document names in explanatory copy and action context: `Display Request`,
+`Consignment Order`, `Consignment Return`, `Consignment Sale Notice`. Do not substitute bare
+`DR`, `CO`, `CRTN` or `CSN` as names the operator must decode. Keep the existing plural navigation
+labels and official document-number prefixes unchanged; this does not rename identifiers,
+numbering, stored fields or previously governed column labels. In owner discussions, give the
+full English name with a Chinese explanation when useful; this does not change Portal language.
+
 ### Consignment Order document content — owner ruling 2026-09-28
 
 **APPROVED TARGET / NOT BUILT.** `COMING IN` and `GOING BACK` are the combined CO PDF's goods

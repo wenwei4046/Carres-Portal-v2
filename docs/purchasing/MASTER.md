@@ -5493,8 +5493,34 @@ customer; no `+ New`.
 **Left rail:** `Ready to issue`, `PDF not sent`, `Supplier contact missing`, `Correction must be sent`, `Sent`. Finance invoice/match facts are read-only links, not Purchasing work.
 **Columns:** Notice No., Supplier, Units Sold, Customer Received, Sales Ref, Source CO, Notice,
 Finance. Customer personal information and selling price are absent.
-**Journey:** Delivery success auto-creates → Current PO Duty checks exact Units → sends notice →
-Finance later reads the same object.
+**Journey — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Actual successful customer
+handover of exact supplier-owned Units creates the source-linked Consignment Sale Notice under
+§7.7; an order, deposit, reservation, planned delivery or failed handover does not. Partial success
+includes only the successfully delivered Units. Repeat processing of the same supplier/delivery
+attempt returns the same notice, not another notification obligation.
+
+The operator opens the notice awaiting sending → checks the automatically sourced supplier,
+Unit IDs, model, quantity and actual handover date → previews the official document → sends it
+to the supplier's recorded contact/channel → records sending of that version with recipient,
+channel, actual actor and time. Current PO Duty/cover owns the operational action under existing
+permissions; no second sales or warehouse reminder is required to generate it. Missing contact
+information identifies its owning supplier-contact maintenance door; never invent a recipient.
+Opening a messaging app, downloading or previewing the document is not sending evidence.
+Do not ask Operation to re-enter Delivery/Stock facts or manually create the notice.
+
+The page presents delivered goods, supplier-notification state/evidence, and read-only links to
+Finance's subsequent invoice/matching records. The official notice excludes customer identity,
+contact details/address, customer selling price and supplier settlement amounts (§7.7).
+Finance continues from this same source record and the governed commercial evidence; no separate
+Operation settlement table or payable writer is created. Outstanding Finance work does not keep
+a correctly completed supplier-send action open. Later customer return never deletes the original
+notice; authoritative corrections retain document lineage and any required correction-send work.
+
+**Naming — owner instruction 2026-09-28.** Explain the four Showroom surfaces using their full
+names: Display Request, Consignment Order, Consignment Return and Consignment Sale Notice.
+Do not use bare DR/CO/CRTN/CSN as conversational or human-facing action names. Existing official
+document-number prefixes, stored identifiers and contracts are unchanged. Owner discussions may
+pair the full English name with a Chinese explanation; Portal language remains governed by COPY.
 **Object/placement:** full-width view; 50/50 check/preview during issue/correction.
 **Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
 disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
