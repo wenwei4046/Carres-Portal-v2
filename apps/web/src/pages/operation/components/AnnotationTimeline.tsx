@@ -172,7 +172,7 @@ function ImportGroupRow({ run }: { run: TimelineEntry[] }) {
   const earliest = run[run.length - 1];
   const range =
     run.length > 1
-      ? `${fmtDate(earliest.occurred_at)} – ${fmtDate(latest.occurred_at)}`
+      ? `${fmtDate(earliest.occurred_at)} to ${fmtDate(latest.occurred_at)}`
       : fmtDate(latest.occurred_at);
   return (
     <div className="border-t border-dashed border-base-100 first:border-t-0">

@@ -541,9 +541,9 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       key: `addon-${index}`,
       category: "Service",
       unitIds: [],
-      unitAbsence: "—",
+      unitAbsence: "",
       deliverTo: [],
-      deliverToAbsence: "—",
+      deliverToAbsence: "",
       sku: addon.addon_key ?? "",
       qty: addon.qty,
       item: addon.addon_key
@@ -948,7 +948,7 @@ export default function SalesOrdersRegister() {
             <p className="px-2 pt-1 text-label text-base-600" data-testid="monthly-demand-window">
               {demandWindow.first === demandWindow.last
                 ? fmtMonth(demandWindow.first)
-                : `${fmtMonth(demandWindow.first)} – ${fmtMonth(demandWindow.last)}`}
+                : `${fmtMonth(demandWindow.first)} to ${fmtMonth(demandWindow.last)}`}
             </p>
           </FilterRailGroup>
           <FilterRailGroup title="Dealer / Sales Location" icon="people">

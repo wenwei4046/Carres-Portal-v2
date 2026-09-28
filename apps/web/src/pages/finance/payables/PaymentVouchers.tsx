@@ -433,6 +433,39 @@ export function voucherTotal(
   return cents(billPart + advancePart + linePart);
 }
 
+/** The Receiving button law (COPY-STANDARD): a disabled Save names the FIRST
+ *  missing fact, top to bottom. null = nothing missing, Save is live. */
+export function voucherSaveGap(f: {
+  purpose: Purpose;
+  supplierId: string;
+  payee: string;
+  voucherDate: string;
+  payFrom: string;
+  picks: Record<string, BillPick>;
+  advance: string;
+  lines: Array<Pick<DirectLine, "accountCode" | "description" | "amount" | "departmentType">>;
+  total: number;
+}): string | null {
+  const forBills = f.purpose === "SUPPLIER_BILLS";
+  if (forBills && f.supplierId === "") return "Save: pick the supplier";
+  if (f.supplierId === "" && f.payee.trim() === "") return "Save: type the payee";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.voucherDate)) return "Save: pick the voucher date";
+  if (f.payFrom === "") return "Save: pick Paid from";
+  const ticked = Object.values(f.picks).filter((p) => p.on);
+  if (ticked.some((p) => (num(p.amount) ?? 0) <= 0)) return "Save: type the Pay now amount on each ticked bill";
+  if (f.advance.trim() !== "" && (num(f.advance) ?? -1) < 0) return "Save: type the advance in numbers";
+  if (forBills && ticked.length === 0 && (num(f.advance) ?? 0) <= 0) return "Save: tick a bill or type an advance";
+  for (const [i, l] of f.lines.entries()) {
+    if (l.accountCode === "") return `Save: pick the account on line ${i + 1}`;
+    if (l.description.trim() === "") return `Save: type the description on line ${i + 1}`;
+    if ((num(l.amount) ?? 0) <= 0) return `Save: type the amount on line ${i + 1}`;
+    if (l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
+  }
+  if (!forBills && f.lines.length === 0) return "Save: add a line";
+  if (f.total <= 0) return "Save: the total must be above RM 0.00";
+  return null;
+}
+
 function VoucherForm() {
   const { id } = useParams<{ id: string }>();
   const [params] = useSearchParams();
@@ -517,7 +550,6 @@ function VoucherForm() {
   const lineChoices = (accounts.data ?? []).filter((a) => a.for_voucher_line);
   const total = voucherTotal(purpose, picks, lines, advance);
   const advanceN = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
-  const pickedCount = Object.values(picks).filter((p) => p.on).length;
   // The bill's own price check (the Bills register's Price Check), so Finance
   // sees it where it decides to pay. A flag, never a block (0477).
   const billChecks = Object.fromEntries((useSupplierBills().data ?? []).map((b) => [b.id, b]));
@@ -563,14 +595,8 @@ function VoucherForm() {
     );
   }
 
-  const linesOk = lines.every((l) => l.accountCode !== "" && l.description.trim() !== ""
-    && (num(l.amount) ?? 0) > 0 && l.departmentType !== null);
-  const picksOk = Object.values(picks).filter((p) => p.on).every((p) => (num(p.amount) ?? 0) > 0);
   const advanceOk = advance.trim() === "" || (num(advance) ?? -1) >= 0;
-  const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && advanceOk
-    && total > 0
-    && (purpose === "SUPPLIER_BILLS" ? supplierId !== "" && (pickedCount > 0 || advanceN > 0) : lines.length > 0)
-    && (supplierId !== "" || payee.trim() !== "");
+  const gap = voucherSaveGap({ purpose, supplierId, payee, voucherDate, payFrom, picks, advance, lines, total });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -583,7 +609,7 @@ function VoucherForm() {
           <span className="flex items-center gap-2">
             <Button variant="ghost"
               onClick={() => navigate(id ? `/finance/payment-vouchers/${id}` : "/finance/payment-vouchers")}>Cancel</Button>
-            <Button variant="primary" disabled={!ready} loading={save.isPending} onClick={submit}>Save</Button>
+            <Button variant="primary" disabled={gap !== null} loading={save.isPending} onClick={submit}>{gap ?? "Save"}</Button>
           </span>
         }
       />
@@ -739,7 +765,7 @@ function BillPicks({ rows, picks, onChange, billChecks }: {
                 <td className="py-1 pr-2">{b.due_date ? fmtDate(b.due_date) : "No due date"}</td>
                 <td className="py-1 pr-2 text-right">{money(b.total_amount)}</td>
                 <td className="py-1 pr-2 text-right">{money(b.available)}</td>
-                <td className="py-1 pr-2" data-testid={`price-check-${b.bill_id}`}>{billChecks[b.bill_id] ? priceCheckWord(billChecks[b.bill_id]!) : "—"}</td>
+                <td className="py-1 pr-2" data-testid={`price-check-${b.bill_id}`}>{billChecks[b.bill_id] ? priceCheckWord(billChecks[b.bill_id]!) : ""}</td>
                 <td className="py-1">
                   <input aria-label={`Amount for ${b.bill_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}

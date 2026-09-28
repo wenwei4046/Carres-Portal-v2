@@ -171,7 +171,6 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
   // no SST rows, no tax disclaimer, the band reads "Total due".
   const isTaxInvoice = title === "TAX INVOICE";
 
-  const dash = "—";
   const money = (v: number) => formatMoney(v, currency);
   const groups = bandedLines(lines);
 
@@ -303,7 +302,7 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
                   </Text>
                   <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
                   <Text style={[styles.cellMoney, styles.colDisc]}>
-                    {discount && discount > 0 ? moneyDigits(discount) : dash}
+                    {moneyDigits(discount && discount > 0 ? discount : 0)}
                   </Text>
                   <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(line.line_total)}</Text>
                 </View>
@@ -323,7 +322,7 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
           <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
           <Text style={[styles.cellMoney, styles.colPrice]}> </Text>
           <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
-            {totalDiscount > 0 ? money(totalDiscount) : dash}
+            {money(totalDiscount > 0 ? totalDiscount : 0)}
           </Text>
           <Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text>
         </View>

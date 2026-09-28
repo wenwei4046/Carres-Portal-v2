@@ -2234,6 +2234,12 @@ verification or approval of unreviewed visual details.
   form, the internal MPR preview, PO review and the saved detail; the configurator's own small
   remark slot (✎, the one Sales already has) is the only free note. The database columns stay
   (never dropped); the doors stop writing them. `What is this for?` (Other Purchase) is unchanged.
+  **BUILT 2026-09-26 (PR #1672); migration `0591` APPLIED 2026-09-28** through the governed path:
+  a full-file rolled-back production probe, then the exact file. Tracker row `20260928041419`,
+  `md5(statements[1])` = file md5 `7e161e96e157fe09463408342e382272`; both door bodies match the
+  replayed full-chain database (`purchasing_create_request_with_lines` `40a8b4e1…`,
+  `purchasing_resubmit_request` `7f198296…`). The authenticated owner walk (configure a line →
+  issue → PO PDF prints it) is still owed.
 
 **Approval boundary — owner selected A, 2026-09-22; APPROVED.**
 Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,

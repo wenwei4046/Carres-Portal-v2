@@ -1114,7 +1114,7 @@ describe("every line names WHO (owner ruling 2026-09-27: who + object + who + ac
           changes: [
             { what: "Customer Requested Delivery Date", before: "2026-09-24", after: "2026-10-05" },
             { what: "Latex Pillow", before: "Qty 4", after: "Qty 2" },
-            { what: "Address", before: "—", after: "12 Jalan Satu" },
+            { what: "Address", before: "Not recorded", after: "12 Jalan Satu" },
             { what: "Phone", before: "012", after: "013" },
           ],
         },

@@ -41,7 +41,7 @@ export default function EscalationInboxCard({ onViewOrder }: Props) {
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="font-mono text-label font-semibold text-base-700 group-hover:text-primary transition-colors">
-                    #{item.orders?.so ?? "—"} {item.orders?.customer_name ?? ""}
+                    #{item.orders?.so ?? ""} {item.orders?.customer_name ?? ""}
                   </span>
                   <span className="font-mono text-label text-base-400 whitespace-nowrap">
                     {fmtDate(item.created_at)}
@@ -51,7 +51,7 @@ export default function EscalationInboxCard({ onViewOrder }: Props) {
                   {item.content}
                 </p>
                 <span className="text-label text-base-400">
-                  by {item.app_users?.name ?? "—"}
+                  by {item.app_users?.name ?? ""}
                 </span>
               </button>
             </li>

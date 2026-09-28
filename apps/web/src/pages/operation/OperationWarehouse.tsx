@@ -315,7 +315,7 @@ export default function OperationWarehouse({
                 {t.warehouse.name}
               </div>
               <div className="font-body text-label text-base-500 mt-0.5">
-                {t.warehouse.address ?? "—"}
+                {t.warehouse.address ?? ""}
               </div>
               <div className="flex gap-[22px] mt-3">
                 <div>
@@ -625,7 +625,7 @@ export default function OperationWarehouse({
                       title={
                         row.low_threshold === null && row.high_threshold === null
                           ? "No threshold set — click to configure"
-                          : `Low ${row.low_threshold ?? "—"} / High ${row.high_threshold ?? "—"}`
+                          : `Low ${row.low_threshold ?? ""} / High ${row.high_threshold ?? ""}`
                       }
                     >
                       <Settings2 size={13} strokeWidth={2} className="mr-1" /> Threshold

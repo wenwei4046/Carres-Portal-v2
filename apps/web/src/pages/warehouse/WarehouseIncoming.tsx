@@ -122,7 +122,7 @@ export default function WarehouseIncoming() {
                     {po.po_id}
                   </td>
                   <td className="px-4 py-3 text-base-800">
-                    {po.supplier_name ?? "—"}
+                    {po.supplier_name ?? ""}
                   </td>
                   <td className="px-4 py-3 text-base-700">
                     <div className="text-meta">
@@ -138,7 +138,7 @@ export default function WarehouseIncoming() {
                     {po.eta_date ? (
                       fmtDate(po.eta_date)
                     ) : (
-                      <span className="text-base-400">—</span>
+                      null
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right">

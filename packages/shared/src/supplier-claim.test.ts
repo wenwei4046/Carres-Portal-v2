@@ -71,7 +71,7 @@ describe("supplier claim vocabulary — S1's words plus exactly one", () => {
   it("labels a key, and falls back to the key itself", () => {
     expect(supplierClaimTypeLabel("colour_uneven")).toBe("Colour uneven");
     expect(supplierClaimTypeLabel(SUPPLIER_CLAIM_LATE)).toBe("Late delivery");
-    expect(supplierClaimTypeLabel(null)).toBe("—");
+    expect(supplierClaimTypeLabel(null)).toBe("");
     expect(supplierClaimTypeLabel("something_new")).toBe("something_new");
   });
 
@@ -82,7 +82,7 @@ describe("supplier claim vocabulary — S1's words plus exactly one", () => {
   it("labels a status", () => {
     expect(supplierClaimStatusLabel("open")).toBe("Open");
     expect(supplierClaimStatusLabel("closed")).toBe("Closed");
-    expect(supplierClaimStatusLabel(undefined)).toBe("—");
+    expect(supplierClaimStatusLabel(undefined)).toBe("");
   });
 });
 
@@ -298,8 +298,8 @@ describe("the ask and the answer are two separate closed lists", () => {
     expect(isRequestedActionFor("damaged", "please_fix_it")).toBe(false);
     expect(isRequestedActionFor("damaged", null)).toBe(false);
     expect(isRequestedActionFor(null, "replace")).toBe(false);
-    expect(supplierClaimRequestLabel(null)).toBe("—");
-    expect(supplierClaimResponseLabel(null)).toBe("—");
+    expect(supplierClaimRequestLabel(null)).toBe("");
+    expect(supplierClaimResponseLabel(null)).toBe("");
   });
 
   it("keeps the supplier's answer list wide — they may offer anything, or refuse", () => {
@@ -475,7 +475,7 @@ describe("claimNextMove — who owes the next move", () => {
     expect(claimMoveOwnerLabel("carres")).toBe("Carres");
     expect(claimMoveOwnerLabel("supplier", "Ohana")).toBe("Ohana");
     expect(claimMoveOwnerLabel("supplier", null)).toBe("supplier");
-    expect(claimMoveOwnerLabel(null)).toBe("—");
+    expect(claimMoveOwnerLabel(null)).toBe("");
   });
 });
 
@@ -613,8 +613,8 @@ describe("Customer Resolution — what are we doing for the CUSTOMER?", () => {
       expect(customerResolutionLabel(r.key)).toBe(r.label);
       expect(r.label).not.toMatch(/_/);
     }
-    expect(customerResolutionLabel(null)).toBe("—");
-    expect(customerResolutionLabel(undefined)).toBe("—");
+    expect(customerResolutionLabel(null)).toBe("");
+    expect(customerResolutionLabel(undefined)).toBe("");
   });
 
   it("explains each option in one plain line — a DEFINITION, never a consequence", () => {
@@ -749,8 +749,8 @@ describe("Carres Execution — in what ORDER do the goods move?", () => {
       expect(carresExecutionLabel(e.key)).toBe(e.label);
       expect(e.label).not.toMatch(/_/);
     }
-    expect(carresExecutionLabel(null)).toBe("—");
-    expect(carresExecutionLabel(undefined)).toBe("—");
+    expect(carresExecutionLabel(null)).toBe("");
+    expect(carresExecutionLabel(undefined)).toBe("");
   });
 
   it("explains each option in one plain line — a DEFINITION, never a consequence", () => {

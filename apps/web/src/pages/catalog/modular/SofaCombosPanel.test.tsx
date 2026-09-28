@@ -130,8 +130,8 @@ describe("SofaCombosPanel — principal-gating", () => {
     // sampleCombo pricesByHeight: 28 -> 2640, 32 -> 2800.
     expect(screen.getByTestId("sofa-combo-price-sc-1-28")).toHaveTextContent("2,640");
     expect(screen.getByTestId("sofa-combo-price-sc-1-32")).toHaveTextContent("2,800");
-    // a height with no price shows a — cell (the cell exists, no price testid).
-    expect(screen.getByTestId("sofa-combo-cell-sc-1-24")).toHaveTextContent("—");
+    // a height with no price shows an empty cell (the cell exists, no price testid).
+    expect(screen.getByTestId("sofa-combo-cell-sc-1-24")).not.toHaveTextContent(/[—–]/);
     expect(screen.queryByTestId("sofa-combo-price-sc-1-24")).not.toBeInTheDocument();
   });
 
@@ -320,8 +320,8 @@ describe("SofaCombosPanel — cost / margin", () => {
 
     // margin = (2640 − 1980) / 2640 = 25.0%
     expect(screen.getByTestId("sofa-combo-margin-28").textContent).toContain("25.0%");
-    // a height with no price/cost shows an em-dash margin
-    expect(screen.getByTestId("sofa-combo-margin-24").textContent).toBe("—");
+    // a height with no price/cost shows an empty margin
+    expect(screen.getByTestId("sofa-combo-margin-24").textContent).toBe("");
 
     fireEvent.click(screen.getByTestId("sofa-combo-save"));
     await waitFor(() => expect(mockCreateMutateAsync).toHaveBeenCalledOnce());
@@ -348,9 +348,9 @@ describe("SofaCombosPanel — cost / margin", () => {
     fireEvent.click(screen.getByTestId("sofa-combo-edit-sc-1"));
     expect((screen.getByTestId("sofa-combo-cost-28") as HTMLInputElement).value).toBe("1980");
     expect((screen.getByTestId("sofa-combo-cost-32") as HTMLInputElement).value).toBe("");
-    // 28: (2640 − 1980)/2640 = 25.0%; 32 has price but no cost → em-dash
+    // 28: (2640 − 1980)/2640 = 25.0%; 32 has price but no cost → empty margin
     expect(screen.getByTestId("sofa-combo-margin-28").textContent).toContain("25.0%");
-    expect(screen.getByTestId("sofa-combo-margin-32").textContent).toBe("—");
+    expect(screen.getByTestId("sofa-combo-margin-32").textContent).toBe("");
   });
 
   it("edit: clearing the only cost → costByHeight null in the payload", async () => {

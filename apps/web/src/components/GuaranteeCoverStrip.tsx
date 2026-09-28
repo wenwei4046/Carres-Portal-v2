@@ -62,7 +62,7 @@ export default function GuaranteeCoverStrip({ orderId }: { orderId: string }) {
                   g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
                 }`}
               >
-                {displayGuaranteeId(g) ?? "—"}
+                {displayGuaranteeId(g) ?? ""}
               </span>{" "}
               {g.coversLabel ?? g.coversSku ?? "item not attached"}
               <span className="text-base-500">

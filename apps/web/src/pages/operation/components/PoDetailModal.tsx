@@ -210,7 +210,7 @@ export default function PoDetailModal({
               #PO-{poShortId}
             </div>
             <div className="text-body text-base-700 font-body mt-1">
-              {supplier?.name ?? "—"}
+              {supplier?.name ?? ""}
             </div>
           </div>
           <span
@@ -229,9 +229,9 @@ export default function PoDetailModal({
             gridTemplateColumns: "1fr 1fr",
           }}
         >
-          <KV label="Supplier" value={supplier?.name ?? "—"} />
-          <KV label="Warehouse" value={warehouse?.name ?? "—"} />
-          <KV label="ETA" value={po.eta_date ?? "—"} mono />
+          <KV label="Supplier" value={supplier?.name ?? ""} />
+          <KV label="Warehouse" value={warehouse?.name ?? ""} />
+          <KV label="ETA" value={po.eta_date ?? ""} mono />
           <KV
             label="PO status"
             value={status.label}
@@ -239,14 +239,14 @@ export default function PoDetailModal({
           />
           <KV
             label="Supplier status"
-            value={po.sup_status?.replace(/_/g, " ") ?? "—"}
+            value={po.sup_status?.replace(/_/g, " ") ?? ""}
           />
           <KV
             label="Order refs"
             mono
             value={
               soRefs.length === 0 ? (
-                "—"
+                ""
               ) : (
                 <div className="flex flex-col gap-0.5" data-testid="po-detail-order-refs">
                   {soRefs.map((d) => {

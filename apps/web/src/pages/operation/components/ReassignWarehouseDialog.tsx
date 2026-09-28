@@ -98,7 +98,7 @@ export default function ReassignWarehouseDialog({
           {totalUnits === 1 ? "" : "s"}
         </div>
         <div className="font-mono text-label text-base-500 mt-1.5">
-          {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || "—"}
+          {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || ""}
         </div>
         <div className="text-meta mt-2 text-base-600 font-body">
           Originally bound for{" "}
@@ -141,7 +141,7 @@ export default function ReassignWarehouseDialog({
             <strong>{newWh.name}</strong>
           </div>
           <div className="font-mono text-label mt-1">
-            {newWh.address ?? "—"}
+            {newWh.address ?? ""}
           </div>
           <div className="text-label text-base-500 mt-1.5">
             Supplier will be notified · status returns to{" "}

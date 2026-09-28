@@ -226,7 +226,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           ? "last 30 days"
           : period === "90d"
             ? "last 90 days"
-            : `${fromDate || "—"} to ${toDate || "—"}`;
+            : `${fromDate || ""} to ${toDate || ""}`;
   const skuLabel = sku ? (skuByCode.get(sku)?.variant ?? sku) : "all SKUs";
 
   function clearAll() {
@@ -837,12 +837,9 @@ function MovementTableRow({
             {row.note}
           </div>
         ) : null}
-        {!row.ref && !row.note ? (
-          <div className="text-label text-base-400">—</div>
-        ) : null}
       </div>
       <div className="font-body text-label text-base-500 capitalize truncate">
-        {row.by_role ?? "—"}
+        {row.by_role ?? ""}
       </div>
     </div>
   );

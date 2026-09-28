@@ -2,6 +2,7 @@
 // module tab bar, so UI-KIT §8.3's Module-tab law applies: no breadcrumb and
 // no big title, because the active tab already says "Settings". Same shape as
 // its siblings Claims and Receiving.
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { Block } from "./SalesOrderWorkspace";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -102,7 +103,7 @@ function ChangeLine({
   const was = settingValueLabel(settingKey, change.oldValue);
   return (
     <div className="text-label text-base-500 mt-1" data-testid="setting-change-line">
-      {change.changedBy ?? "—"} · {fmtDate(change.changedAt)}
+      {change.changedBy ?? GOODS_ABSENCE_WORDS.notRecorded} · {fmtDate(change.changedAt)}
       {was ? ` · was ${was}` : ""}
     </div>
   );

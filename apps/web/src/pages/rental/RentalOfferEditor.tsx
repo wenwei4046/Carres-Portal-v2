@@ -458,7 +458,7 @@ export default function RentalOfferEditor({
                     <div className="text-meta text-base-400 truncate">{t.sub}</div>
                   </div>
                   <div className="text-right t-num text-meta text-base-500">
-                    {t.listPrice == null ? "—" : rm(t.listPrice)}
+                    {t.listPrice == null ? "" : rm(t.listPrice)}
                   </div>
                   {terms.map((term) => (
                     <div key={term} className="text-right">
@@ -468,7 +468,7 @@ export default function RentalOfferEditor({
                         min={0}
                         step="0.01"
                         value={rentFee(t.key, term)}
-                        placeholder="—"
+                        placeholder=""
                         onChange={(e) =>
                           setRentDraft((d) => ({
                             ...d,
@@ -532,7 +532,7 @@ export default function RentalOfferEditor({
                     <div className="text-meta text-base-400 truncate">{t.sub}</div>
                   </div>
                   <div className="text-right t-num text-meta text-base-500">
-                    {t.listPrice == null ? "—" : rm(t.listPrice)}
+                    {t.listPrice == null ? "" : rm(t.listPrice)}
                   </div>
                   <div className="text-right">
                     <input
@@ -854,7 +854,7 @@ export default function RentalOfferEditor({
                   data-testid={`offer-service-${p.id}`}
                 >
                   <div className="text-body truncate">{p.name}</div>
-                  <div className="text-meta text-base-500 truncate">{p.sku ?? "—"}</div>
+                  <div className="text-meta text-base-500 truncate">{p.sku ?? ""}</div>
                   <div className="text-meta text-base-600">
                     {p.visitsPerYear} / yr ·{" "}
                     <b>{serviceVisitsTotal(p.durationMonths, p.visitsPerYear)} total</b>
@@ -891,7 +891,7 @@ export default function RentalOfferEditor({
                       min={0}
                       step="0.01"
                       value={d.monthly}
-                      placeholder="—"
+                      placeholder=""
                       onChange={(e) => set({ monthly: e.target.value })}
                       data-testid={`offer-service-monthly-${p.id}`}
                     />
@@ -903,7 +903,7 @@ export default function RentalOfferEditor({
                       min={0}
                       step="0.01"
                       value={d.outright}
-                      placeholder="—"
+                      placeholder=""
                       onChange={(e) => set({ outright: e.target.value })}
                       data-testid={`offer-service-outright-${p.id}`}
                     />

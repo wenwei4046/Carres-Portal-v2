@@ -182,7 +182,7 @@ export default function RentalConfigurePage({
           <div className="cfg-header__totalLabel">Per month</div>
           <div className="cfg-header__totalNum" data-testid="rental-cfg-monthly">
             <sup>RM</sup>
-            {plan ? (plan.monthlyFee * qty).toLocaleString("en-MY") : "—"}
+            {plan ? (plan.monthlyFee * qty).toLocaleString("en-MY") : ""}
           </div>
           {/* Both figures are what the CUSTOMER pays, so both carry the
               quantity. Showing a per-unit fee beside a whole-cart total is how

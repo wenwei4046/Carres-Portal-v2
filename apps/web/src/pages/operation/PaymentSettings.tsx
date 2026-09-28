@@ -355,7 +355,7 @@ function StorageRuleCard({ group, rule, onSaved }: {
         onChange={(e) => set("reason", e.target.value)} disabled={step === "review"} />
       {step === "review" && <div className="col-span-2" data-testid={`storage-rule-review-${group}`}>
         <p className="font-semibold">Review changes</p>
-        <p>Free storage {rule?.free_days ?? "—"} → {free} calendar days · Charge {rule ? rm(Number(rule.charge_amount)) : "—"} → {rm(charge ?? 0)} every {cycle} days</p>
+        <p>Free storage {rule?.free_days ?? ""} → {free} calendar days · Charge {rule ? rm(Number(rule.charge_amount)) : ""} → {rm(charge ?? 0)} every {cycle} days</p>
         <p>Effective from {fmtDate(draft.effectiveFrom)} · {draft.reason.trim()}</p>
         <p className="text-label font-normal text-kit-slate-11">Existing storage cases keep the rule they started under.</p>
       </div>}

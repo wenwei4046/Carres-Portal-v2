@@ -213,13 +213,13 @@ export function PickupEventTemplate(data: PickupEventPrintPayload) {
               <Text style={styles.threadDl}>SO-{t.order_dl}</Text>
               <Text style={styles.threadCustomer}>{displayCustomerName(t.customer_name)}</Text>
               <Text style={styles.threadEta}>
-                ETA: {t.customer_delivery_date ?? "—"}
+                {t.customer_delivery_date ? `ETA: ${t.customer_delivery_date}` : " "}
               </Text>
             </View>
             {t.sku_lines.length === 0 ? (
               <View style={styles.threadLineRowLast}>
                 <Text style={styles.threadLineSku}>(no line items)</Text>
-                <Text style={styles.threadLineQty}>—</Text>
+                <Text style={styles.threadLineQty}> </Text>
               </View>
             ) : (
               t.sku_lines.map((l, idx) => {

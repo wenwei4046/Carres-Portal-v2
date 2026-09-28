@@ -324,7 +324,7 @@ export function summarisePoolUsage(
     r.draws += 1;
     perReason.set(e.reason, r);
 
-    const sku = e.sku?.trim() || "—";
+    const sku = e.sku?.trim() || "No SKU";
     const s =
       perSku.get(sku) ??
       perSku.set(sku, { units: 0, draws: 0, byReason: new Map() }).get(sku)!;

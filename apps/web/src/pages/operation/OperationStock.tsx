@@ -132,10 +132,10 @@ export default function OperationStock() {
                     {s.available}
                   </td>
                   <td className="px-4 py-2.5 text-right text-base-600 font-mono">
-                    {s.incoming || "—"}
+                    {s.incoming || ""}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono">
-                    {s.price > 0 ? `RM ${s.price.toLocaleString()}` : "—"}
+                    {s.price > 0 ? `RM ${s.price.toLocaleString()}` : ""}
                   </td>
                 </tr>
               );

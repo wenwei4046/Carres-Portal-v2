@@ -1036,7 +1036,7 @@ export default function GoodsMiniTable({
                   /* ⭐ A NUMBER ONLY WHERE THERE IS ONE TO ACT ON, and the note
                      belongs to BOTH branches (owner correction 2026-09-11).
                      The absence used to return early, so a row whose figure had
-                     deliberately been withheld printed a bare `—` with nothing
+                     deliberately been withheld printed a bare dash with nothing
                      saying why — which is the same silence the page spent this
                      whole card removing. */
                   return (

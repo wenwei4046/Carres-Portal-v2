@@ -1,3 +1,4 @@
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -71,12 +72,12 @@ type OverviewResponse = {
   scorecardWindow?: { days: number; asOf: string; truncated: boolean };
 };
 
-/** The figure, or an em dash. Never a zero nobody earned. */
+/** The figure, or nothing — the reason prints right under it. Never a zero nobody earned. */
 function rateText(r: ScorecardRate): string {
-  return r.known ? `${r.pct}%` : "—";
+  return r.known ? `${r.pct}%` : "";
 }
 
-/** Why a figure is missing — the sentence goes under the dash so the reader is
+/** Why a figure is missing — the sentence goes under the empty figure so the reader is
  *  never left guessing whether the supplier is perfect or unmeasured. */
 function rateWhy(r: ScorecardRate): string | null {
   return r.known ? null : SCORECARD_UNKNOWN_TEXT[r.reason];
@@ -128,7 +129,7 @@ export default function OperationSuppliers() {
               <div>
                 <div className="text-strong font-semibold">{s.name}</div>
                 <div className="text-label text-base-500 mt-[3px]">
-                  {s.contactEmail ?? s.contact ?? "—"}
+                  {s.contactEmail ?? s.contact ?? GOODS_ABSENCE_WORDS.notRecorded}
                 </div>
               </div>
               <KindChip kind={s.kind} />
@@ -146,7 +147,7 @@ export default function OperationSuppliers() {
               <Stat label="Received" v={s.receivedPos} />
             </div>
             <div className="mt-3 text-label text-base-500">
-              Covers · {s.catCovered.length ? s.catCovered.join(" · ") : "—"}
+              Covers · {s.catCovered.length ? s.catCovered.join(" · ") : GOODS_ABSENCE_WORDS.notRecorded}
             </div>
             <CardScorecard sc={s.scorecard} />
           </button>
@@ -231,7 +232,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
             <div className="text-meta text-base-600 mt-1">
               {/* P1 — the free-text lead time is not appended here either;
                   see the card above. */}
-              {supplier.contactEmail ?? supplier.contact ?? "—"}
+              {supplier.contactEmail ?? supplier.contact ?? GOODS_ABSENCE_WORDS.notRecorded}
             </div>
           </div>
           <button

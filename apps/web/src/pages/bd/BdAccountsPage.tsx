@@ -132,7 +132,7 @@ export default function BdAccountsPage({ onClose }: { onClose: () => void }) {
                       </span>
                     </div>
                     <div style={{ fontSize: 11.5, color: "var(--fg-muted)", marginTop: 1 }}>
-                      {[d.region, d.contact].filter(Boolean).join(" · ") || "—"}
+                      {[d.region, d.contact].filter(Boolean).join(" · ") || ""}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>

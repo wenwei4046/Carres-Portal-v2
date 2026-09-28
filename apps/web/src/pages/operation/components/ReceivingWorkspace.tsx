@@ -944,7 +944,7 @@ function ReceivingMode({
                       data-testid={`wrong-type-${l.id}`}
                       className={FIELD}
                     >
-                      <option value="">—</option>
+                      <option value=""></option>
                       {wrongTypes.map((o) => (
                         <option key={o.key} value={o.key}>
                           {o.label}

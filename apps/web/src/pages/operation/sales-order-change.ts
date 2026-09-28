@@ -140,7 +140,7 @@ export function diffRows(args: {
   categoryOf: (sku: string) => string | null;
 }): DiffRow[] {
   const { before, after } = args;
-  const rows: DiffRow[] = args.header.map((h) => ({ what: h.label, before: h.before || "—", after: h.after || "—" }));
+  const rows: DiffRow[] = args.header.map((h) => ({ what: h.label, before: h.before || "", after: h.after || "" }));
   const beforeLine = new Map(before.lines.filter((l) => l.id).map((l) => [l.id!, l]));
   const describe = (l: EditLine) =>
     `${l.qty} × ${fmtMoney(l.unit_price)}${configWords(l.attrs) ? ` · ${configWords(l.attrs)}` : ""}`;
@@ -153,7 +153,7 @@ export function diffRows(args: {
     if (!changed) continue;
     rows.push({
       what: `${args.nameOfSku(l.sku)} (${l.sku})`,
-      before: !was || l.added ? "—" : describe(was),
+      before: !was || l.added ? "" : describe(was),
       after: l.removed ? "Cancelled" : describe(l),
     });
   }
@@ -168,7 +168,7 @@ export function diffRows(args: {
     if (!changed) continue;
     rows.push({
       what: args.nameOfAddon(a.addon_key),
-      before: !was || a.added ? "—" : `${was.qty} × ${fmtMoney(was.unit_price)}`,
+      before: !was || a.added ? "" : `${was.qty} × ${fmtMoney(was.unit_price)}`,
       after: a.removed ? "Cancelled" : `${a.qty} × ${fmtMoney(a.unit_price)}`,
     });
   }

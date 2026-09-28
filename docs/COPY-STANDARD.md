@@ -3471,17 +3471,13 @@ row, no dash for tax and no "tax included / excluded" claim appears.
 ## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
 
 **⭐ NO DASH ANYWHERE ON A SCREEN — OWNER RULING 2026-09-26 (Jess: *"i don't want UI got dash — this bad
-UI"*), portal-wide, APPROVED TARGET / NOT BUILT.** A dash (`—` or `–`) never stands for a value, an
+UI"*), portal-wide, VALUES AND RANGES BUILT 2026-09-28 (Orders MASTER §0.0 Scope D).** A dash (`—` or `–`) never stands for a value, an
 empty cell, an unknown or a placeholder, on any page, in any register, table, card, route node,
-PDF or prepared message. An empty cell draws nothing (UI MASTER §6.0); a missing fact prints its
+PDF or prepared message. An empty cell draws nothing (UI MASTER §6.0), except on a Purchasing
+goods table, where the cell says why (§ "A goods cell with nothing in it says why", Jess 2026-09-27); a missing fact prints its
 word (`Not recorded`, `No PO yet`, `No {field word}`); a fact that is zero prints `0` / `RM 0.00`;
-a control's placeholder is its label's word. **Measured 2026-09-26: 154 source files in `apps/web`
-and `packages/shared` still print a dash as a value** — the register engine's empty cell
-(`DataGrid.tsx:2580, :2592`) and its filter placeholders (`:3536, :3552`), `fmt-date.ts` fallbacks,
-every PDF template's empty cell (`do-template`, `po-template`, `invoice-template`,
-`pickup-event-template`, `extension-agreement-template`), the WhatsApp templates' `REF: —`, the
-Guarantee strip, and page-local literals such as the Sales Order Items `Disc (RM)` cell. The sweep
-is one BUILD scope across the portal, not per module. Punctuation inside an owner-approved sentence
+a control's placeholder is its label's word; a prepared message leaves out a line whose value is
+missing; a range reads `to` (`Mon to Fri`, `09:00 to 17:00`). Punctuation inside an owner-approved sentence
 (`Reconstructed copy — original issued document unavailable.`) is a sentence, not a value, and is
 untouched.
 
@@ -3861,6 +3857,8 @@ Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP dra
 | Ledger link | **Ledger entry** · **reversed by `JE-…`** | `gl_entries` | |
 | An unknown stored value | **Not known** | anything the word map lacks | never the raw value |
 | Buttons | **+ New Bill** · **Convert GRN to bill** · **Confirm bill** · **Cancel bill** · **+ New Payment Voucher** · **Prepare voucher** · **Check voucher** · **Approve payment** · **Return to draft** · **Cancel voucher** · **Add other creditor** · **Attach file** · **Use this GRN** | — | form buttons stay `Save` / `Cancel`; line lists stay `+ Add line` / `Remove` |
+| Bill form: the disabled Save NAMES its gap (the Receiving button law; first gap wins, top to bottom); in Finance a colon joins Save and the gap | **Save: pick the supplier** · **Save: type the supplier invoice No** · **Save: pick the bill date** · **Save: add a line** · **Save: type the amount on line `n`** · **Save: pick the department on line `n`** | — | a greyed `Save` that says nothing is the defect this row closes |
+| Payment voucher form: the disabled Save NAMES its gap (the Receiving button law; first gap wins, top to bottom) | **Save: pick the supplier** · **Save: type the payee** · **Save: pick the voucher date** · **Save: pick Paid from** · **Save: type the Pay now amount on each ticked bill** · **Save: type the advance in numbers** · **Save: tick a bill or type an advance** · **Save: pick the account on line `n`** · **Save: type the description on line `n`** · **Save: type the amount on line `n`** · **Save: pick the department on line `n`** · **Save: add a line** · **Save: the total must be above RM 0.00** | — | the supplier, line amount, department and add a line words are the bill row's approved words, reused |
 
 **Three dictionary conflicts, reported rather than decided:**
 
@@ -4586,6 +4584,7 @@ Screen words (Finance Settings):
 - Button: `Add account`. Modal title: `Add account`.
 - Fields: `Under`, `Number`, `Name`, checkbox `It is a heading`, `First account number`, `First account name`.
 - Money account add, field `Number`, hint `Leave blank to use the next free number.`
+- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: type the number` · `Save: type the name` · `Save: type the first account number` · `Save: type the first account name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
 
 Database sentences (shown as written):
 - `<code> <name> is not a heading. Add the account under a heading.`

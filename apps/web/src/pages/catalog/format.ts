@@ -11,6 +11,6 @@ export function fmtRm(n: number): string {
 
 /** A short human summary of a combo's slots, e.g. "2A(LHF)|2A(RHF) + L(LHF)". */
 export function slotsSummary(slots: string[][]): string {
-  if (slots.length === 0) return "—";
+  if (slots.length === 0) return "";
   return slots.map((s) => s.join("|")).join(" + ");
 }

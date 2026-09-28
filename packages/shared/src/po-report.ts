@@ -211,10 +211,9 @@ function matches(line: PoReportLine, f: PoReportFilters): boolean {
   return true;
 }
 
-/** The em dash the portal already prints for "no value" (`fmtDate` returns it).
- *  A category nobody can resolve gets no invented word — it gets the glyph the
- *  portal already uses, and it is still counted. */
-const NO_CATEGORY_LABEL = "—";
+/** A category nobody can resolve reads `No category` (COPY: `No {field word}`;
+ *  no dash anywhere, owner ruling 2026-09-26), and it is still counted. */
+const NO_CATEGORY_LABEL = "No category";
 
 function blankRow(key: string, label: string): PoReportRow {
   return { key, label, pos: 0, ordered: 0, received: 0, outstanding: 0, poIds: [] };

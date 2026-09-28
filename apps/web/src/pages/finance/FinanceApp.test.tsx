@@ -64,6 +64,12 @@ vi.mock("@/lib/payables-queries", async (importOriginal) => {
     useApBillOutstanding: () => waiting,
   };
 });
+// Only which view the Dealers route asks for matters here, not the list.
+vi.mock("../principal/PrincipalDealers", () => ({
+  default: ({ financeView }: { financeView?: boolean }) => (
+    <div data-testid="dealers-page">{financeView ? "finance view" : "principal view"}</div>
+  ),
+}));
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string; user: { id: string } | null }) => unknown) =>
@@ -165,6 +171,15 @@ describe("Finance routing", () => {
     auth.role = "operation";
     show("/finance/settings");
     expect(screen.queryByTestId("finance-settings-destination-header")).not.toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("the principal keeps Invite dealer, Suspend and Reactivate on /finance/dealers; Finance does not (0543)", () => {
+    show("/finance/dealers");
+    expect(screen.getByTestId("dealers-page")).toHaveTextContent("finance view");
+    cleanup();
+    auth.role = "principal";
+    show("/finance/dealers");
+    expect(screen.getByTestId("dealers-page")).toHaveTextContent("principal view");
     auth.role = "finance";
   });
   it("operation staff never reach the ledger", () => {

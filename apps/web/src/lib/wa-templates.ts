@@ -54,8 +54,14 @@ export function rmAmount(n: number): string {
 }
 
 /** {items} block — ONE line per item: "{qty}× {model}". */
+/** One labelled message line; an absent value omits the whole line — a message
+ *  never prints a dash for a value (no dash anywhere, owner ruling 2026-09-26). */
+function factLine(label: string, value: string | null | undefined, suffix = ""): string {
+  return value ? `${label}: ${value}${suffix}\n` : "";
+}
+
 export function itemsBlock(lines: { sku: string; qty: number }[]): string {
-  if (lines.length === 0) return "—";
+  if (lines.length === 0) return "";
   return lines.map((l) => `${l.qty}× ${l.sku}`).join("\n");
 }
 
@@ -75,9 +81,9 @@ export function buildCustomerReminder(i: CustomerChaseInput): string {
     `Hi ${i.salutation},\n` +
     `Just a friendly reminder regarding your order.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
+    factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("Item", itemsBlock(i.lines)) +
     `\n` +
     `Do let us know once arranged. Thank you!`
   );
@@ -95,9 +101,9 @@ export function buildCustomerFinalReminder(
     `Hi ${i.salutation},\n` +
     `Final reminder — your delivery is arranged for ${i.when} and the balance below is still outstanding.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
+    factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("Item", itemsBlock(i.lines)) +
     `\n` +
     `Kindly settle before delivery so everything can proceed as planned. Thank you!`
   );
@@ -109,9 +115,9 @@ export function buildCustomerChase(i: CustomerChaseInput): string {
     `Hi ${i.salutation},\n` +
     `Following up on your order — the balance below is still outstanding.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
+    factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("Item", itemsBlock(i.lines)) +
     `\n` +
     `Kindly arrange payment so we can proceed. Thank you!`
   );
@@ -135,9 +141,9 @@ export function buildLogisticReminder(i: LogisticChaseInput): string {
     `Hi ${i.logistic ?? "team"},\n` +
     `Friendly reminder — this delivery still needs an arrangement.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
-    `Customer: ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("REF", i.ref) +
+    factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
+    factLine("Item", itemsBlock(i.lines)) +
     `Deadline: ${i.deadline}\n` +
     `\n` +
     `Please confirm the delivery date + time slot with the customer. Thank you!`
@@ -150,9 +156,9 @@ export function buildLogisticChase(i: LogisticChaseInput): string {
     `Hi ${i.logistic ?? "team"},\n` +
     `Following up — this delivery is still not booked${i.overdue ? " and the deadline has passed" : ""}.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
-    `Customer: ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("REF", i.ref) +
+    factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
+    factLine("Item", itemsBlock(i.lines)) +
     `Deadline: ${i.deadline}${i.overdue ? " — overdue" : ""}\n` +
     `\n` +
     `Please confirm the delivery date + time slot with the customer today. Thank you!`
@@ -174,9 +180,9 @@ export function buildSupplierReminder(i: SupplierChaseInput): string {
     `Hi,\n` +
     `Friendly reminder — checking the stock ETA for this PO.\n` +
     `\n` +
-    `PO: ${i.poNo ?? "—"}\n` +
-    `Our ref: ${i.ref ?? "—"}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("PO", i.poNo) +
+    factLine("Our ref", i.ref) +
+    factLine("Item", itemsBlock(i.lines)) +
     `Needed by: ${i.deadline}\n` +
     `\n` +
     `Please advise when the stock will be ready. Thank you!`
@@ -189,9 +195,9 @@ export function buildSupplierChase(i: SupplierChaseInput): string {
     `Hi,\n` +
     `Following up — we still need the stock ETA for this PO.\n` +
     `\n` +
-    `PO: ${i.poNo ?? "—"}\n` +
-    `Our ref: ${i.ref ?? "—"}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("PO", i.poNo) +
+    factLine("Our ref", i.ref) +
+    factLine("Item", itemsBlock(i.lines)) +
     `Needed by: ${i.deadline}\n` +
     `\n` +
     `Please confirm the ready date today so we can plan the delivery. Thank you!`
@@ -235,19 +241,19 @@ export function buildSupplierGroupMessage(
   let totalUnits = 0;
   for (const r of rows) {
     const refTag = includePo
-      ? `${r.ref ?? "—"}${r.po ? ` (PO ${r.po})` : ""}`
-      : (r.ref ?? "—");
+      ? [r.ref, r.po ? (r.ref ? `(PO ${r.po})` : `PO ${r.po}`) : null].filter(Boolean).join(" ")
+      : (r.ref ?? "");
     for (const it of r.items) {
       const e = bySku.get(it.sku) ?? { qty: 0, refs: [] };
       e.qty += it.qty;
-      if (!e.refs.includes(refTag)) e.refs.push(refTag);
+      if (refTag && !e.refs.includes(refTag)) e.refs.push(refTag);
       bySku.set(it.sku, e);
       totalUnits += it.qty;
     }
   }
   const body = [...bySku.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([sku, e]) => `*${sku}* ×${e.qty}\n_${e.refs.join(", ")}_`)
+    .map(([sku, e]) => `*${sku}* ×${e.qty}${e.refs.length > 0 ? `\n_${e.refs.join(", ")}_` : ""}`)
     .join("\n\n");
   return `${opener}\n\n${body}\n\nTotal ${totalUnits} unit${totalUnits === 1 ? "" : "s"}. ${closer}`;
 }
@@ -332,10 +338,11 @@ export function buildPartnerGroupMessage(
       : `Appreciate a confirmed date + slot per delivery. Thank you!`;
   const body = rows
     .map((r) => {
-      const head = `_${r.ref ?? "—"}_ — ${r.customer ?? "—"}${r.region ? ` (${r.region})` : ""}`;
+      const who = r.customer ? `${r.customer}${r.region ? ` (${r.region})` : ""}` : "";
+      const head = [r.ref ? `_${r.ref}_` : "", who].filter(Boolean).join(" — ");
       const items = itemsBlock(r.items);
       const when = `by ${r.deadline}${r.overdue ? " — overdue" : ""}`;
-      return `${head}\n${items}\n${when}`;
+      return [head, items, when].filter(Boolean).join("\n");
     })
     .join("\n\n");
   return `${opener}\n\n${body}\n\n${rows.length} deliver${rows.length === 1 ? "y" : "ies"}. ${closer}`;

@@ -147,7 +147,7 @@ export default function CustomerStep({
   const probe = useCustomerTypeProbe(debouncedPhone);
   const customerType =
     debouncedPhone.length < 8
-      ? "—"
+      ? ""
       : probe.isLoading
         ? "Checking…"
         : probe.data?.existing

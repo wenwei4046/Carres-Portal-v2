@@ -625,7 +625,7 @@ export default function PrincipalNewOrder() {
                 onChange={(e) => setC({ race: e.target.value })}
                 className={INPUT_CLASS}
               >
-                <option value="">—</option>
+                <option value="">Race</option>
                 {["Malay", "Chinese", "Indian", "Other"].map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -641,7 +641,7 @@ export default function PrincipalNewOrder() {
                 onChange={(e) => setC({ gender: e.target.value })}
                 className={INPUT_CLASS}
               >
-                <option value="">—</option>
+                <option value="">Gender</option>
                 {["Female", "Male"].map((g) => (
                   <option key={g} value={g}>
                     {g}
@@ -737,7 +737,7 @@ export default function PrincipalNewOrder() {
                   className={INPUT_CLASS}
                   data-testid={`raw-custom-${f.key}`}
                 >
-                  <option value="">—</option>
+                  <option value="">{f.label}</option>
                   {f.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -785,7 +785,7 @@ export default function PrincipalNewOrder() {
                 }
                 className={INPUT_CLASS}
               >
-                <option value="">—</option>
+                <option value="">Relationship</option>
                 {RELATIONSHIPS.map((r) => (
                   <option key={r} value={r}>
                     {r}

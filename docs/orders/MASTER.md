@@ -118,8 +118,13 @@ exports are `defaultExpandedGoods`, `compactOrderRoute` and `RouteActionOwners` 
 `SalesOrderRoute.tsx`, all used inside the file or by its test. Nothing was deleted (red line 5);
 the acceptance line is answered when the owner of that sentence names the files.
 
-**Scope B · Identity and History — BUILT 2026-09-28, production walk owed; migration 0592 must be
-APPLIED through the governed path before the identity rule takes effect.** `actor_identities`
+**Scope B · Identity and History — BUILT 2026-09-28, production walk owed; migration 0592 APPLIED
+2026-09-28 on the owner's word (tracker `20260928022858`).** Verified under a real reader: an
+operation JWT gets `(id, name, role, is_person)`, a dealer JWT gets no row. On that day `principal`,
+`Operations` and the E2E test login carry every recorded History event and Revision and now read
+`Staff identity not recorded`; four named accounts marked not a person (`Khor Yee`, `Samantha`,
+`Herng`, `Chan chee liang`) carry none yet — if they are real staff, their person marker in Staff &
+Duties must be set before they act, or their actions will read the same way. `actor_identities`
 (0592) returns the account's role and `is_person`; `resolveActorIdentities` + `actorKindOf`
 (`apps/api/src/lib/actor-names.ts`) are the one classification History and Revisions read. A shared
 login's name never reaches the screen; its role word does. Until 0592 is applied the Worker reads
@@ -155,10 +160,21 @@ rows and its total call ONE predicate (`salesOrderRegisterPopulation`: status no
 Payments and the dashboard receive from the shared list is unchanged. Measured: on that shared path
 the count excludes rentals while the rows include them — left as it is, because changing it changes
 what other modules receive.
-**Scope D, second half · the portal-wide dash sweep — NOT BUILT.** Measured 2026-09-28: 160 source
-files in `apps/web` and `packages/shared` still write a dash as a value from their own column or
-template (the engine no longer adds one). It crosses every module and several open PRs, so it ships
-as its own change, module by module.
+**Scope D, second half · the portal-wide dash sweep — VALUES AND RANGES BUILT 2026-09-28, production
+walk owed.** Every dash that stood for a value in `apps/web` and `packages/shared` is gone (about 300
+lines in 150 files, one change): a blank cell, a missing label, an unread date, a PDF cell and a
+select's empty row now draw nothing, or the field's own word where one reads better (`No category` in
+the PO report, `No SKU` in pool usage, `No position → COO` in HR history; a select's empty row reads
+its label: `Marital status`, `Bank`, `Race`). A zero discount prints `0.00` / `RM 0.00` on the Sales
+Order and Invoice papers; a quantity line's Unit ID cell on the PO paper and the PO page draws nothing
+(PO PDF Standard updated). A WhatsApp message omits a line whose value is missing (`REF:`,
+`Customer:`, `PO:`) instead of printing `REF: —`. Every range reads `to` (`Mon to Fri`,
+`09:00 to 17:00`, `1 Sep 2026 to 28 Feb 2027`). Rental's `Visits due` tile, which only ever showed a
+dash, is removed. **Not swept here:** `WarehouseStockRegister`, `WarehouseUnitDetail` and
+`WarehouseUnitProblemReport` belong to the open Inventory change (#1677), which removes their dashes;
+and a dash used as a separator or inside a sentence (`{a} — {b}`, `Total — unchanged`): measured
+752 lines in 226 files, many of them owner-approved words, so it is a separate pass that reads each
+sentence.
 
 **Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
 (`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's

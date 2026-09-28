@@ -315,6 +315,8 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
   const [refusal, setRefusal] = useState<{ field: "name" | "code" | null; message: string } | null>(null);
   const trimmed = name.trim();
   const trimmedCode = code.trim();
+  // The Receiving button law: the disabled Save names the first gap, top to bottom.
+  const renameGap = !trimmed ? "Save: type the name" : !trimmedCode ? "Save: type the number" : null;
   const submit = () => {
     setRefusal(null);
     // 0570's shape, checked here too so the sentence sits under the Number
@@ -342,8 +344,8 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={save.isPending} disabled={!trimmed || !trimmedCode} onClick={submit}>
-            Save
+          <Button variant="primary" loading={save.isPending} disabled={renameGap !== null} onClick={submit}>
+            {renameGap ?? "Save"}
           </Button>
         </>
       }
@@ -357,6 +359,24 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
       </div>
     </Modal>
   );
+}
+
+/** The Receiving button law (COPY-STANDARD): a disabled Save names the FIRST
+ *  missing field, top to bottom. null = nothing missing, Save is live. */
+export function addAccountSaveGap(f: {
+  parent: string | undefined;
+  code: string;
+  name: string;
+  isHeading: boolean;
+  firstCode: string;
+  firstName: string;
+}): string | null {
+  if (!f.parent) return "Save: pick Under";
+  if (!f.code.trim()) return "Save: type the number";
+  if (!f.name.trim()) return "Save: type the name";
+  if (f.isHeading && !f.firstCode.trim()) return "Save: type the first account number";
+  if (f.isHeading && !f.firstName.trim()) return "Save: type the first account name";
+  return null;
 }
 
 /**
@@ -375,7 +395,7 @@ function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () =
   const [firstCode, setFirstCode] = useState("");
   const [firstName, setFirstName] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
-  const ready = !!parent && !!code.trim() && !!name.trim() && (!isHeading || (!!firstCode.trim() && !!firstName.trim()));
+  const gap = addAccountSaveGap({ parent, code, name, isHeading, firstCode, firstName });
   const submit = () => {
     setRefusal(null);
     const shaped = ledgerAccountCodeInput.safeParse(code);
@@ -406,8 +426,8 @@ function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () =
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={add.isPending} disabled={!ready} onClick={submit}>
-            Save
+          <Button variant="primary" loading={add.isPending} disabled={gap !== null} onClick={submit}>
+            {gap ?? "Save"}
           </Button>
         </>
       }

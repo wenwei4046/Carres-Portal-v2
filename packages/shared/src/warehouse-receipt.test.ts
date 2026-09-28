@@ -290,7 +290,7 @@ describe("status words", () => {
   });
 
   it("falls back to the raw value rather than a blank", () => {
-    expect(warehouseReceiptStatusLabel(null)).toBe("—");
+    expect(warehouseReceiptStatusLabel(null)).toBe("");
     expect(warehouseReceiptStatusLabel("something_new")).toBe("something_new");
   });
 });
@@ -319,7 +319,7 @@ describe("receivingRecordNo — the Receiving Record's document number", () => {
     expect(receivingRecordNo({ id: R.id, submitted_at: "2026-07-31T10:00:00Z" })).toMatch(
       /^GRN-310726-\d{4}$/,
     );
-    expect(receivingRecordNo({ id: R.id })).toBe("—");
+    expect(receivingRecordNo({ id: R.id })).toBe("");
   });
 });
 
