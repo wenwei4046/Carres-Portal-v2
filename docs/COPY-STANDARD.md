@@ -938,6 +938,11 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 `Available again only after inspection.` · `Owner consent` · `Record owner consent` ·
 route stops `Issue` · `Supplier received RO` · `Picked up` · `Returned` · `Inspected`.
 
+**Create Repair Order words — owner approved 2026-09-28.** `Save repair order` · `Not available yet`
+(a location option Stock does not govern yet) · `Already on {RO No}` · problem choices reuse
+`Damaged` · `Missing component` · `Something else` with `What did you see?` and
+`What happened, in one sentence`.
+
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 
 `Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom

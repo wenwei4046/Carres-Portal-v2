@@ -5049,6 +5049,36 @@ the card opens this page; completion is the owning fact (evidenced Supplier rece
 handover, Receiving GRN, recorded inspection) — never a manual tick and never a Supplier reply.
 The photo/video viewer is still a kit request (UI MASTER §6.8) and must join the kit first.
 
+#### Create Repair Order — owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.
+
+References mined: Shopify Returns (select items → reason per item → confirm), Odoo Repairs (pick the
+serial-tracked product, then supplier and who pays) and Carres's own Warehouse `Report a problem`
+(shipped: `What did you see?` choice grid, photo, one sentence). Kept: per-Unit reason after
+selection, and the SAME problem choices as `unitProblemChoices` (`Damaged` · `Missing component` ·
+`Something else`) — no second vocabulary. Rejected: Odoo's parts/quotation table.
+
+```text
+Create Repair Order                                   [Cancel] [Save repair order]
+1 Goods      Choose where the goods are now: Carres Klang | Showroom | Dealer
+             [Add Units] → Tick the Unit ID on each item to send for repair
+             per Unit: What did you see? · Photo · What happened, in one sentence ·
+                       Repair Requirement
+2 Repair     Supplier · Cost Responsibility (Not decided | Carres pays | Supplier pays) ·
+             Price (optional) · Repair Quotation (optional file)
+3 Locations  Supplier Pickup Location (from the Unit) · Supplier Return Location
+```
+
+- Only real Units are selectable. A reserved, sold, held, out or already-in-repair Unit cannot be
+  ticked and says why on the row (`Reserved for {SO No}` · `Already on {RO No}` · the Stock word).
+- A Claim-origin RO arrives with Units, problem and evidence prefilled by reference; nothing is
+  re-entered or re-uploaded.
+- `RO Doc Date` is set by the system. `Save repair order` mints `RO No` (the commission owns the
+  number; the return leg references it — §9.7 conflict 1) and opens the RO object page, where
+  `Issue repair order` sends it.
+- Missing price saves and issues; it prints `Not recorded`, never RM0.
+- Showroom and Dealer are drawn but disabled with `Not available yet` until Stock §12.9 governs
+  those Sites (falsifier: a governed Showroom/Dealer row in `warehouses`).
+
 #### Register, detail and shared UI
 
 **OWNER-CONFIRMED REGISTER UI — Jess, 2026-09-20. APPROVED TARGET / NOT BUILT.** This closes the
