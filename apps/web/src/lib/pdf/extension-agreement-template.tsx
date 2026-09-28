@@ -89,22 +89,22 @@ export function ExtensionAgreementTemplate(data: ExtensionAgreementTemplateData)
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Customer</Text>
-          <Text style={styles.partyName}>{displayCustomerName(customer.name) || "—"}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(customer.name) || " "}</Text>
           {customer.phone ? <Text style={styles.partySub}>{customer.phone}</Text> : null}
         </View>
 
         <View style={styles.detailBlock}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Original requested delivery date</Text>
-            <Text style={styles.detailValue}>{original_date || "—"}</Text>
+            <Text style={styles.detailValue}>{original_date || " "}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>New requested delivery date</Text>
-            <Text style={styles.detailValue}>{new_date || "—"}</Text>
+            <Text style={styles.detailValue}>{new_date || " "}</Text>
           </View>
           <View style={styles.detailRowLast}>
             <Text style={styles.detailLabel}>Reason for delay</Text>
-            <Text style={styles.detailValue}>{reason || "—"}</Text>
+            <Text style={styles.detailValue}>{reason || " "}</Text>
           </View>
         </View>
 

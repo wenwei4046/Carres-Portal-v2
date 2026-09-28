@@ -485,7 +485,7 @@ export function manualPurchaseHistoryRecord(e: ManualPurchaseHistoryEvent): {
     case "line_not_going_ahead":
       return {
         title,
-        detail: [[e.sku, e.reason].filter(Boolean).join(" — ")].filter((s) => s !== ""),
+        detail: [[e.sku, e.reason].filter(Boolean).join(" · ")].filter((s) => s !== ""),
       };
     case "sent_back":
       return { title, detail: e.reason ? [e.reason] : [] };

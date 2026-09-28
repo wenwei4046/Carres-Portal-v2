@@ -37,6 +37,16 @@ function renderedText(node: ReactNode): string {
   return renderedText(el.props.children);
 }
 
+/** Every string leaf the template draws — a dash standing alone is a dash printed as a value. */
+function leafTexts(node: ReactNode): string[] {
+  if (typeof node === "string" || typeof node === "number") return [String(node)];
+  if (Array.isArray(node)) return node.flatMap(leafTexts);
+  if (!isValidElement(node)) return [];
+  const el = node as ReactElement<{ children?: ReactNode }>;
+  if (typeof el.type === "function") return leafTexts((el.type as (p: unknown) => ReactNode)(el.props));
+  return leafTexts(el.props.children);
+}
+
 /** The page-level blocks in order, and whether each one starts a new page. */
 function pageBlocks(data: PoTemplateData): Array<{ text: string; breaks: boolean }> {
   const doc = PoTemplate(data) as ReactElement<{ children: ReactElement<{ children: ReactNode[] }> }>;
@@ -263,14 +273,14 @@ describe("Unit IDs — runs computed from the codes, last three digits bold", ()
     expect(SRC).toMatch(/fontWeight: 700 \}\}>\{code\.slice\(-3\)\}/);
   });
 
-  it("a quantity line prints —; an exact-unit line with no Unit IDs says so before it is sent", () => {
+  it("a quantity line's Unit ID cell draws nothing; an exact-unit line with no Unit IDs says so before it is sent", () => {
     const data = twoLocationV2();
     data.lines = [
       { sku: "PIL-STD", description: "Pillow — Standard", qty: 4, unit: "pc", identity_mode: "quantity", unit_codes: [], sources: [{ so: 1311, qty: 4 }] },
       { sku: "B1201F-K", description: "Forte Mattress — King", qty: 1, unit: "pc", identity_mode: "exact_unit", unit_codes: [], sources: [{ so: 1311, qty: 1 }] },
     ];
     const text = renderedText(PoTemplate(data));
-    expect(text).toContain("—");
+    expect(leafTexts(PoTemplate(data)).filter((t) => /^\s*[—–]\s*$/.test(t))).toEqual([]);
     expect(text).toContain("Unit IDs missing on this line — do not send this PO");
   });
 

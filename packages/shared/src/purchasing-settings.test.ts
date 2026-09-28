@@ -571,7 +571,7 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
     // `{}` is a recorded EMPTY array, which is a different fact from nothing
     // recorded — it reads as the glyph, not as a blank.
     expect(settingValueLabel("supplier_work_week", "{}")).toBe("Mon–Sat");
-    expect(settingValueLabel("po_days", "{}")).toBe("—");
+    expect(settingValueLabel("po_days", "{}")).toBe("");
   });
 
   it("the parser survives what a text column can hold", () => {
