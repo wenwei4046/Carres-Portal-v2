@@ -447,22 +447,22 @@ export function voucherSaveGap(f: {
   total: number;
 }): string | null {
   const forBills = f.purpose === "SUPPLIER_BILLS";
-  if (forBills && f.supplierId === "") return "Save — pick the supplier";
-  if (f.supplierId === "" && f.payee.trim() === "") return "Save — type the payee";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.voucherDate)) return "Save — pick the voucher date";
-  if (f.payFrom === "") return "Save — pick Paid from";
+  if (forBills && f.supplierId === "") return "Save: pick the supplier";
+  if (f.supplierId === "" && f.payee.trim() === "") return "Save: type the payee";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.voucherDate)) return "Save: pick the voucher date";
+  if (f.payFrom === "") return "Save: pick Paid from";
   const ticked = Object.values(f.picks).filter((p) => p.on);
-  if (ticked.some((p) => (num(p.amount) ?? 0) <= 0)) return "Save — type the Pay now amount on each ticked bill";
-  if (f.advance.trim() !== "" && (num(f.advance) ?? -1) < 0) return "Save — type the advance in numbers";
-  if (forBills && ticked.length === 0 && (num(f.advance) ?? 0) <= 0) return "Save — tick a bill or type an advance";
+  if (ticked.some((p) => (num(p.amount) ?? 0) <= 0)) return "Save: type the Pay now amount on each ticked bill";
+  if (f.advance.trim() !== "" && (num(f.advance) ?? -1) < 0) return "Save: type the advance in numbers";
+  if (forBills && ticked.length === 0 && (num(f.advance) ?? 0) <= 0) return "Save: tick a bill or type an advance";
   for (const [i, l] of f.lines.entries()) {
-    if (l.accountCode === "") return `Save — pick the account on line ${i + 1}`;
-    if (l.description.trim() === "") return `Save — type the description on line ${i + 1}`;
-    if ((num(l.amount) ?? 0) <= 0) return `Save — type the amount on line ${i + 1}`;
-    if (l.departmentType === null) return `Save — pick the department on line ${i + 1}`;
+    if (l.accountCode === "") return `Save: pick the account on line ${i + 1}`;
+    if (l.description.trim() === "") return `Save: type the description on line ${i + 1}`;
+    if ((num(l.amount) ?? 0) <= 0) return `Save: type the amount on line ${i + 1}`;
+    if (l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
   }
-  if (!forBills && f.lines.length === 0) return "Save — add a line";
-  if (f.total <= 0) return "Save — the total must be above RM 0.00";
+  if (!forBills && f.lines.length === 0) return "Save: add a line";
+  if (f.total <= 0) return "Save: the total must be above RM 0.00";
   return null;
 }
 

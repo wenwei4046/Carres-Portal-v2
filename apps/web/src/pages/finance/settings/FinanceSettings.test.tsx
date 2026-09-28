@@ -335,13 +335,13 @@ describe("Finance Settings — the chart of accounts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add account" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).getByRole("button", { name: "Save — pick Under" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
 
     const f = { parent: "2000", code: "2140", name: "Deposits held", isHeading: true, firstCode: "2141", firstName: "Hall deposits" };
-    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save — type the number");
-    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save — type the name");
-    expect(addAccountSaveGap({ ...f, firstCode: "" })).toBe("Save — type the first account number");
-    expect(addAccountSaveGap({ ...f, firstName: "" })).toBe("Save — type the first account name");
+    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save: type the number");
+    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save: type the name");
+    expect(addAccountSaveGap({ ...f, firstCode: "" })).toBe("Save: type the first account number");
+    expect(addAccountSaveGap({ ...f, firstName: "" })).toBe("Save: type the first account name");
     expect(addAccountSaveGap({ ...f, isHeading: false, firstCode: "" })).toBeNull();
     expect(addAccountSaveGap(f)).toBeNull();
   });

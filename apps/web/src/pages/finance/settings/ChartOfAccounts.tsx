@@ -316,7 +316,7 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
   const trimmed = name.trim();
   const trimmedCode = code.trim();
   // The Receiving button law: the disabled Save names the first gap, top to bottom.
-  const renameGap = !trimmed ? "Save — type the name" : !trimmedCode ? "Save — type the number" : null;
+  const renameGap = !trimmed ? "Save: type the name" : !trimmedCode ? "Save: type the number" : null;
   const submit = () => {
     setRefusal(null);
     // 0570's shape, checked here too so the sentence sits under the Number
@@ -371,11 +371,11 @@ export function addAccountSaveGap(f: {
   firstCode: string;
   firstName: string;
 }): string | null {
-  if (!f.parent) return "Save — pick Under";
-  if (!f.code.trim()) return "Save — type the number";
-  if (!f.name.trim()) return "Save — type the name";
-  if (f.isHeading && !f.firstCode.trim()) return "Save — type the first account number";
-  if (f.isHeading && !f.firstName.trim()) return "Save — type the first account name";
+  if (!f.parent) return "Save: pick Under";
+  if (!f.code.trim()) return "Save: type the number";
+  if (!f.name.trim()) return "Save: type the name";
+  if (f.isHeading && !f.firstCode.trim()) return "Save: type the first account number";
+  if (f.isHeading && !f.firstName.trim()) return "Save: type the first account name";
   return null;
 }
 

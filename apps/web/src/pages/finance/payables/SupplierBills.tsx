@@ -476,13 +476,13 @@ export function billSaveGap(f: {
   billDate: string;
   lines: Array<Pick<LineDraft, "qty" | "unitPrice" | "amount" | "departmentType">>;
 }): string | null {
-  if (f.supplierId === "") return "Save — pick the supplier";
-  if (f.invoiceNo.trim() === "") return "Save — type the supplier invoice No";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.billDate)) return "Save — pick the bill date";
-  if (f.lines.length === 0) return "Save — add a line";
+  if (f.supplierId === "") return "Save: pick the supplier";
+  if (f.invoiceNo.trim() === "") return "Save: type the supplier invoice No";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.billDate)) return "Save: pick the bill date";
+  if (f.lines.length === 0) return "Save: add a line";
   for (const [i, l] of f.lines.entries()) {
-    if ((lineAmount(l) ?? 0) <= 0) return `Save — type the amount on line ${i + 1}`;
-    if (l.departmentType === null) return `Save — pick the department on line ${i + 1}`;
+    if ((lineAmount(l) ?? 0) <= 0) return `Save: type the amount on line ${i + 1}`;
+    if (l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
   }
   return null;
 }
