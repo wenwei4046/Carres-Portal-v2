@@ -2032,6 +2032,22 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     expect(within(row).getByTestId(`mp-approval-${REQ1}`)).toHaveTextContent("Need approval");
   });
 
+  it("⭐ TWO-LINE STATUS (owner ruling 2026-09-28): plain `Need PO`, and line two says `Need approval first`", async () => {
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ1}`);
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
+    /* Plain text, never a coloured pill (ONE KIT LAW). */
+    expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
+  });
+
+  it("an approved request's Status is plain text with no second line", async () => {
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ2}`);
+    expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
+    expect(within(cell).queryByTestId(`mp-status-why-${REQ2}`)).toBeNull();
+  });
+
   it("`MPR No` is the identity and the entrance; a request with no number states the absence", async () => {
     await loaded();
     const entrance = screen.getByTestId(`mp-open-${REQ1}`);
@@ -2273,6 +2289,19 @@ describe("R2 · group membership", () => {
     const cell = screen.getByTestId(`mp-approval-${REQ1}`);
     expect(cell).toHaveTextContent("Sent back for changes");
     expect(within(cell).getByTestId("mp-row-owner")).toHaveAttribute("aria-label", "Siti · Edit and send again");
+  });
+
+  it("a sent-back request's `Need PO` also says `Need approval first`", async () => {
+    withRegister({
+      ...REGISTER,
+      requests: REGISTER.requests.map((r) =>
+        r.id === REQ1 ? { ...r, sent_back_at: "2026-08-20T00:00:00Z" } : r,
+      ),
+    });
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ1}`);
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
   });
 
   it("a sent-back request whose requester is unknown says so — never a shared account", async () => {
