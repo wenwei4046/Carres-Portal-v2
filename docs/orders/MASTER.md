@@ -187,8 +187,10 @@ History and the Order Route all call it, and `SalesOrderAbsence` is the same blo
 permission words with the way back and no retry (the Register prints no button and its footer no
 count); a 404 or an invalid parameter prints `Sales Order not found.`; anything else keeps the
 surface's own sentence with `Try again`. No transport message reaches the screen.
-**Not built in E:** loading does not yet reserve the final geometry on the object page (two panes)
-or the Route (the 320px canvas skeleton); both still draw the kit `Loading` line.
+**Loading geometry BUILT 2026-09-28:** the object page loads into its own split (form card skeleton ·
+A4 paper frame, the same `half` / `form-first` / `stack` grid) and the Route into the canvas's own
+framed box (`h-[calc(100vh-260px)]`, min 420px) with one node-sized skeleton; the kit `Loading` line is
+gone from both.
 
 **The office create door — RETIRED IN CODE 2026-09-28 (owner ruling 2026-09-27), production walk
 owed.** The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;

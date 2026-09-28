@@ -694,3 +694,17 @@ describe("stacked goods lines", () => {
     expect(nodeEl("L2:goods-line")).not.toHaveAttribute("data-mark", "unreadable");
   });
 });
+
+describe("Order Route — loading holds the canvas geometry (Scope E)", () => {
+  it("draws the framed canvas box, not a bare line, while the route loads", () => {
+    render(
+      <MemoryRouter>
+        <SalesOrderRoute route={map()} owners={owners} loading />
+      </MemoryRouter>,
+    );
+    const frame = screen.getByTestId("route-loading");
+    expect(frame.className).toContain("h-[calc(100vh-260px)]");
+    expect(frame.className).toContain("min-h-[420px]");
+    expect(screen.queryByTestId("route-canvas")).not.toBeInTheDocument();
+  });
+});
