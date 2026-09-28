@@ -5011,6 +5011,44 @@ remaining quantities and dates visible. Failed repair, new damage, refusal, canc
 to repair needs its owning authorised outcome. Closure does not erase stock obligations or restore
 availability. A supplier saying the work is finished is not receipt or inspection evidence.
 
+#### RO object page — owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.
+
+References mined: Odoo Repairs (progress header Draft → Confirmed → Under Repair → Repaired; a
+per-line warranty/cost flag), SAP S/4 repair order (return, repair and inspection as separate
+steps) and Carres's own PO object page (§9.3, owner-approved 2026-09-25). Kept: the route header
+and per-Unit inspection. Rejected: Odoo's parts/quotation table (price is never a column or gate,
+2026-09-19 ruling).
+
+```text
+Repair Orders / {RO No}                                   [Open PDF]
+{document state} · {Supplier}
+ROUTE  Issue ── Supplier received RO ── Picked up ── Returned ── Inspected
+       Carres return target: {date} | Awaiting Supplier receipt of RO
+CURRENT ACTION   line one · line two · ONE primary button
+Repair order     Supplier · Supplier Claim No · Cost Responsibility ·
+                 Supplier Pickup Location · Supplier Return Location · Price
+Goods            PO No / Unit ID · Items · Problem · Evidence   (one row per Unit)
+Supplier reply   [Record Supplier reply] · Supplier date not reported | Supplier Expected Return Date
+Owner consent    only for non-Carres-owned Units · [Record owner consent]
+History          Today · Yesterday · Earlier
+```
+
+Shared `Block` + `Fact` card grammar (§8.2, ONE KIT LAW); full-width; only Issue/revision uses the
+governed 50/50 preview. The CURRENT ACTION block walks the route, one primary button at a time:
+
+| Stop | Line one | Line two | Door |
+|---|---|---|---|
+| Not issued | `Send {RO No} to {Supplier}` | `The 14 working days start when {Supplier} receives it.` | `Issue repair order` |
+| Issued, receipt not recorded | `Ask {Supplier} to confirm they received {RO No}` | `Target starts when they confirm.` | `Record Supplier receipt` |
+| Waiting for pickup | `Hand {n} Units to {Supplier}` | `Warehouse records who collected them.` | opens Outbound |
+| Out for repair | `Waiting for {Supplier} to return {n} Units` | `Carres return target {date}` | `Record Supplier reply` |
+| Returned, not inspected | `Inspect {n} returned Units` | `Available again only after inspection.` | opens Receiving |
+
+Workspace path: each stop is the same fact projected as a Work card for the RO follow-up Duty;
+the card opens this page; completion is the owning fact (evidenced Supplier receipt, Outbound
+handover, Receiving GRN, recorded inspection) — never a manual tick and never a Supplier reply.
+The photo/video viewer is still a kit request (UI MASTER §6.8) and must join the kit first.
+
 #### Register, detail and shared UI
 
 **OWNER-CONFIRMED REGISTER UI — Jess, 2026-09-20. APPROVED TARGET / NOT BUILT.** This closes the
@@ -5305,7 +5343,7 @@ invoice/settlement.
 | Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
-| Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |
+| Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | The Units are received back (GRN) or an authorised outcome closes the repair; a Supplier reply or date never closes it (§9.7, corrected 2026-09-28) |
 | Consignment Unit sold | Current PO Duty | `Issue the sale notice to Dorsettloft` | Current notice version sent |
 | Supplier invoice missing | Finance/AP Duty | `Ask Dorsettloft to send the invoice` | Supplier invoice fact exists |
 

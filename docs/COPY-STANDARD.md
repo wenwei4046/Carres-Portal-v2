@@ -930,6 +930,14 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
+**RO object page words — owner approved 2026-09-28 (Purchasing MASTER §9.7 "RO object page").**
+`Send {RO No} to {Supplier}` · `The 14 working days start when {Supplier} receives it.` ·
+`Ask {Supplier} to confirm they received {RO No}` · `Target starts when they confirm.` ·
+`Record Supplier receipt` · `Hand {n} Units to {Supplier}` · `Warehouse records who collected them.` ·
+`Waiting for {Supplier} to return {n} Units` · `Inspect {n} returned Units` ·
+`Available again only after inspection.` · `Owner consent` · `Record owner consent` ·
+route stops `Issue` · `Supplier received RO` · `Picked up` · `Returned` · `Inspected`.
+
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 
 `Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom
