@@ -468,6 +468,25 @@ export function lineAmount(l: Pick<LineDraft, "qty" | "unitPrice" | "amount">): 
   return num(l.amount.trim() === "" ? null : l.amount);
 }
 
+/** The Receiving button law (COPY-STANDARD): a disabled Save names the FIRST
+ *  missing fact, top to bottom. null = nothing missing, Save is live. */
+export function billSaveGap(f: {
+  supplierId: string;
+  invoiceNo: string;
+  billDate: string;
+  lines: Array<Pick<LineDraft, "qty" | "unitPrice" | "amount" | "departmentType">>;
+}): string | null {
+  if (f.supplierId === "") return "Save: pick the supplier";
+  if (f.invoiceNo.trim() === "") return "Save: type the supplier invoice No";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.billDate)) return "Save: pick the bill date";
+  if (f.lines.length === 0) return "Save: add a line";
+  for (const [i, l] of f.lines.entries()) {
+    if ((lineAmount(l) ?? 0) <= 0) return `Save: type the amount on line ${i + 1}`;
+    if (l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
+  }
+  return null;
+}
+
 function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
   const q = l.qty.trim() === "" ? null : Number(l.qty);
   const p = l.unitPrice.trim() === "" ? null : Number(l.unitPrice);
@@ -577,8 +596,7 @@ function BillForm() {
     return <div className="p-6 text-body">Only a draft bill can be changed. <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${id}`}>Back to the bill</Link></div>;
   }
 
-  const ready = supplierId !== "" && invoiceNo.trim() !== "" && /^\d{4}-\d{2}-\d{2}$/.test(billDate)
-    && lines.length > 0 && lines.every((l) => (lineAmount(l) ?? 0) > 0 && l.departmentType !== null);
+  const gap = billSaveGap({ supplierId, invoiceNo, billDate, lines });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -590,7 +608,7 @@ function BillForm() {
         right={
           <span className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => navigate(id ? `/finance/bills/${id}` : "/finance/bills")}>Cancel</Button>
-            <Button variant="primary" disabled={!ready} loading={save.isPending} onClick={submit}>Save</Button>
+            <Button variant="primary" disabled={gap !== null} loading={save.isPending} onClick={submit}>{gap ?? "Save"}</Button>
           </span>
         }
       />
