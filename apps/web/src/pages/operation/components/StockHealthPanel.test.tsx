@@ -258,7 +258,7 @@ describe("did the plan work", () => {
     );
     renderPanel();
     expect((await screen.findByTestId("accuracy-2026-06")).textContent).toContain(
-      "we ordered too little",
+      "We ordered too little",
     );
   });
 
