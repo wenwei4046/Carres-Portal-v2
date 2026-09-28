@@ -324,7 +324,7 @@ export function ChangeMyPinModal({
         return `Wrong current PIN${typeof body.remaining === "number" ? ` (${body.remaining} tries left)` : ""}`;
       }
       if (body?.error === "pin_locked") {
-        return "Too many attempts — locked for 15 minutes, try again later";
+        return "Too many attempts. Locked for 15 minutes, try again later";
       }
       return e.message;
     }
@@ -361,7 +361,7 @@ export function ChangeMyPinModal({
   return (
     <ModalShell
       title="Change my PIN"
-      subtitle={`${name} — verify your current PIN, then pick a new 6-digit one.`}
+      subtitle={`${name}: verify your current PIN, then pick a new 6-digit one.`}
       onClose={onClose}
       footer={
         <>
@@ -516,7 +516,7 @@ export function AddStaffModal({
       },
       {
         onSuccess: () => {
-          toast.success(`Added ${name.trim()} — they can sign in with their PIN now`);
+          toast.success(`Added ${name.trim()}. They can sign in with their PIN now`);
           onClose();
         },
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not add staff"),
@@ -527,7 +527,7 @@ export function AddStaffModal({
   return (
     <ModalShell
       title="Add staff"
-      subtitle="Their PIN is set right here — they'll appear on the sign-in screen immediately."
+      subtitle="Their PIN is set right here. They'll appear on the sign-in screen immediately."
       onClose={onClose}
       footer={
         <>
@@ -583,7 +583,7 @@ export function AddStaffModal({
             data-testid="staff-add-gender"
             className={inputCls}
           >
-            <option value="">— select —</option>
+            <option value="">Select</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
@@ -630,7 +630,7 @@ export function AddStaffModal({
             data-testid="staff-add-outlet"
             className={inputCls}
           >
-            <option value="">— all {branchNoun(storeKind).toLowerCase()}s —</option>
+            <option value="">All {branchNoun(storeKind).toLowerCase()}s</option>
             {outlets.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
@@ -745,7 +745,7 @@ export function EditStaffModal({
   return (
     <ModalShell
       title="Edit staff"
-      subtitle={`${staff.name} — update their profile. PIN changes use the Set/Reset PIN action instead.`}
+      subtitle={`${staff.name}: update their profile. PIN changes use the Set/Reset PIN action instead.`}
       onClose={onClose}
       footer={
         <>
@@ -805,7 +805,7 @@ export function EditStaffModal({
             data-testid="staff-edit-gender"
             className={inputCls}
           >
-            <option value="">— select —</option>
+            <option value="">Select</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>

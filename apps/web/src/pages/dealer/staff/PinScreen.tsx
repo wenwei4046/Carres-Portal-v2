@@ -192,12 +192,12 @@ function StaffKeypad({
             const until = Date.parse(body.lockedUntil);
             setLockedUntil(Number.isNaN(until) ? Date.now() + 15 * 60_000 : until);
             setNow(Date.now());
-            setMessage("Too many tries — locked for a few minutes.");
+            setMessage("Too many tries. Locked for a few minutes.");
           } else if (code === "bad_pin") {
             const remaining = typeof body?.remaining === "number" ? body.remaining : null;
             setMessage(remaining !== null ? `Wrong PIN · ${remaining} tries left` : "Wrong PIN");
           } else if (code === "no_pin") {
-            setMessage("No PIN set — ask the owner to set one.");
+            setMessage("No PIN set. Ask the owner to set one.");
           } else {
             setMessage(e instanceof ApiError ? e.message : "Could not verify");
           }
