@@ -2699,8 +2699,10 @@ Falsifier: the owner rules that intent is derived from the purpose vocabulary in
 column is dropped and the derivation replaces it.
 
 ✅ **CLOSED BY 0549 — APPLIED TO PRODUCTION 2026-09-20 (owner ruling 2026-09-20): the create form asks the question.**
-`Can stock answer this?` sits beside `Need for`, two answers, **no default**, and `Send` refuses an
-unanswered form with `Send — say whether stock can answer this`. The route sends
+The question (worded `Use stock we already have?` since the owner correction of 2026-09-28) sits
+beside `Need for`, two answers, and `Send` refuses an unanswered form with `Send: say whether to use
+our stock`. **Owner ruling 2026-09-28:** a `Ready Stock` purpose answers `No, buy new stock` by itself
+(buying for the shelf); the requester may change it, and every other purpose still starts empty. The route sends
 `p_fulfilment_intent` BY NAME — that is the whole fix, because PostgREST resolves an RPC by the
 argument names it carries — and `purchasing_create_request_with_lines` gained the parameter and
 names it in turn when it calls the header door. NULL stays legal and stays its own state: a request

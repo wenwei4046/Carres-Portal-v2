@@ -2337,12 +2337,28 @@ function CreateRequestWorkspace({
    * 0549). Whether Units already on the shelf may answer this request, or it
    * is buying EXTRA on top of them.
    *
-   * ⛔ IT STARTS EMPTY AND HAS NO DEFAULT. The ruling forbids inferring the
-   * intent from the SKU, the shelf count or the purpose, and a pre-selected
-   * option is that inference wearing the operator's name. `Send` names the
-   * gap instead, exactly as it does for every other missing header fact.
+   * It starts empty, and `Send` names the gap like every other missing header
+   * fact, with ONE owner exception (Jess, 2026-09-28): a `Ready Stock`
+   * purpose buys stock for the shelf, so it answers `No, buy new stock` by
+   * itself. The requester may still change it; an answer the page filled in
+   * is taken back if the purpose changes away from Ready Stock, and an
+   * answer the person chose is never touched.
    */
   const [stockAnswer, setStockAnswer] = useState<ManualPurchaseIntent | null>(null);
+  const stockAnswerFilled = useRef(false);
+  useEffect(() => {
+    if (purpose === "ready_stock") {
+      if (stockAnswer == null) {
+        stockAnswerFilled.current = true;
+        setStockAnswer("additional_stock");
+      }
+    } else if (stockAnswerFilled.current) {
+      stockAnswerFilled.current = false;
+      setStockAnswer(null);
+    }
+    // Only a purpose change decides this; the answer itself is read, not watched.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purpose]);
   const [dest, setDest] = useState<string | undefined>(undefined);
   /** Card 06 §3.2 — `Delivery Date`: when supplier goods must reach the
    *  selected Deliver To. The SERVER proposes it from the slowest selected
@@ -2831,7 +2847,7 @@ function CreateRequestWorkspace({
                   ("yes" to the sketch), the Sales Order fact grammar. Row 1: the
                   automatic facts, then Purpose. Row 2: the purpose's own second
                   box (its title changes with the purpose; Ready Stock and
-                  Showroom Display have none, so `Can stock answer this?` moves
+                  Showroom Display have none, so `Use stock we already have?` moves
                   left). Owner 2026-09-26: no free text — the former
                   `Purchase requirement` is gone; a line is CONFIGURED. */}
               <div className="mp-create-general grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -2905,16 +2921,19 @@ function CreateRequestWorkspace({
           />
         </div>
       ) : null}
-        {/* ⭐ CAN STOCK ANSWER THIS? — the ONE fact the whole Ready Stock
-            allocation reads (0546; 0549 writes it). No default option and no
-            pre-selection: the ruling of 2026-09-18 forbids inferring the
-            intent. `Send` names the gap. */}
+        {/* ⭐ USE STOCK WE ALREADY HAVE? — the ONE fact the whole Ready Stock
+            allocation reads (0546; 0549 writes it). Empty until answered, and
+            `Send` names the gap, except that a Ready Stock purpose answers No
+            by itself (owner 2026-09-28). */}
         <div>
           <Select
             id="mp-stock-answer"
             label={MW.canStockAnswer}
             value={stockAnswer ?? undefined}
-            onValueChange={(v) => setStockAnswer(v as ManualPurchaseIntent)}
+            onValueChange={(v) => {
+              stockAnswerFilled.current = false;
+              setStockAnswer(v as ManualPurchaseIntent);
+            }}
             options={[
               { value: "concrete_need", label: MW.canStockAnswerYes },
               { value: "additional_stock", label: MW.canStockAnswerNo },

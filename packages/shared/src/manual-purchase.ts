@@ -51,19 +51,17 @@ export const MANUAL_PURCHASE_WORDS = {
    * ever wrote it, so every request stored NULL and not one Unit could be
    * allocated. This is the question that feeds them.
    *
-   * ⛔ NO DEFAULT. A pre-selected answer is a guess wearing the operator's
-   * name, which is the exact thing the ruling bans; the field starts empty and
-   * `Send` names the gap like every other missing header fact.
+   * The field starts empty and `Send` names the gap like every other missing
+   * header fact. One owner exception (Jess, 2026-09-28): a `Ready Stock`
+   * purpose answers `No, buy new stock` by itself; the requester may change it.
    *
-   * The words reuse the vocabulary the read-only reasons already carry —
-   * `This purchase buys extra stock` and `whether stock can answer it` — so
-   * the question and its later consequence read as one sentence rather than
-   * two dialects.
+   * Plain words (Jess, 2026-09-28, "what mean can answer this?"): the question
+   * says what the person decides, use the stock we have or buy new.
    */
-  canStockAnswer: "Can stock answer this?",
-  canStockAnswerYes: "Yes, existing stock can answer this",
-  canStockAnswerNo: "No, this buys extra stock",
-  sendNeedsStockAnswer: "Send: say whether stock can answer this",
+  canStockAnswer: "Use stock we already have?",
+  canStockAnswerYes: "Yes, use our free stock first",
+  canStockAnswerNo: "No, buy new stock",
+  sendNeedsStockAnswer: "Send: say whether to use our stock",
   cancel: "Cancel",
   /** The Deliver To door on an existing request (0421): the text button that
    *  opens the choice, and the act that closes it. */
