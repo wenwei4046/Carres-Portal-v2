@@ -105,7 +105,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
   if (configQ.error) {
     return (
       <div className="text-body text-danger">
-        Failed to load the rental config. Try refreshing — your session may have expired.
+        Failed to load the rental config. Try refreshing. Your session may have expired.
       </div>
     );
   }
@@ -149,7 +149,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
           <div className="kicker">Rental</div>
           <h1 className="text-page font-display mt-1.5 text-base-900">Rental</h1>
           <p className="text-body text-base-600 mt-1 max-w-[560px]">
-            What each rental product is sold as at the POS — rent monthly or buy outright, which
+            What each rental product is sold as at the POS: rent monthly or buy outright, which
             options and colours the customer may pick, and which care plan rides along.
           </p>
         </div>
@@ -167,7 +167,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
       <section className="flex items-start justify-between gap-4">
         <p className="text-meta text-base-500 max-w-[520px]">
           An <b>offer</b> says which model is on offer, in which variants, with which options and
-          gifts — then prices it two ways: monthly to rent, or once to own. A <b>service package</b>{" "}
+          gifts. It then prices it two ways: monthly to rent, or once to own. A <b>service package</b>{" "}
           is a care plan (visits over a duration) an offer can give away free or sell. Nothing
           reaches a store until the offer is switched on.
         </p>
@@ -250,7 +250,7 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
               <b>Guarantee &amp; Service Package</b> → <b>Recurring</b>. One place for both a
               guarantee and a care plan, because they are the same thing with a different number
               of visits. Anything below was authored here before that and still powers the rental
-              offer it is attached to — but no new plan should be added here.
+              offer it is attached to. No new plan should be added here.
             </div>
           </div>
           {/* addOpen is hard false: the only thing that used to open it was the
@@ -325,12 +325,12 @@ function OffersSection({
       </div>
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         One offer per model. Each offer can open the rent lane, the buy lane, or both.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {offers.length === 0 && (
         <div className="text-body text-base-500 py-4" data-testid="offers-empty">
-          No {SECTION_LABEL[section].toLowerCase()} offer yet — pick a model to author the first
+          No {SECTION_LABEL[section].toLowerCase()} offer yet. Pick a model to author the first
           rent-to-own or outright offer.
         </div>
       )}
@@ -603,7 +603,7 @@ function ModelPickerModal({
         </div>
         {models.length === 0 && (
           <p className="text-body text-base-500" data-testid="offer-model-empty">
-            No model matches — every other model already has an offer.
+            No model matches. Every other model already has an offer.
           </p>
         )}
         <div
@@ -665,9 +665,9 @@ function ServicePackagesSection({
       </div>
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         A care plan: N visits a year over the duration (e.g. 2 years × 2 visits/yr = 4 visits). Each
-        plan is its own SKU — <span className="t-num">SVC-MAT-CLEAN-1Y2</span> — so it can be sold,
+        plan is its own SKU (<span className="t-num">SVC-MAT-CLEAN-1Y2</span>), so it can be sold,
         gifted and invoiced like any other product.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {addOpen && isPrincipal && (
@@ -693,7 +693,7 @@ function ServicePackagesSection({
         </div>
         {packages.length === 0 && (
           <div className="text-body text-base-500 px-3 py-4" data-testid="packages-empty">
-            No service packages yet — author one to sell cleaning care standalone or bundle it free
+            No service packages yet. Author one to sell cleaning care standalone or bundle it free
             with an offer.
           </div>
         )}
@@ -881,7 +881,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
           className={INPUT_CLS}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Mattress Care — 1 year"
+          placeholder="e.g. Mattress Care 1 year"
           maxLength={120}
           data-testid="pkg-name"
         />
@@ -911,9 +911,9 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
             onChange={(e) => setServiceType(e.target.value as ServicePackage["serviceType"])}
             data-testid="pkg-type"
           >
-            <option value="cleaning">Cleaning — CLEAN</option>
-            <option value="repair">Repair — REPAIR</option>
-            <option value="other">Other — SVCX</option>
+            <option value="cleaning">Cleaning (CLEAN)</option>
+            <option value="repair">Repair (REPAIR)</option>
+            <option value="other">Other (SVCX)</option>
           </select>
         </div>
         <div>
@@ -978,13 +978,13 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
           className="text-meta text-base-600 bg-base-50 border border-base-200 rounded-[4px] px-3 py-2"
           data-testid="pkg-sku-preview"
         >
-          Service SKU <b className="t-num">{previewSku}</b> — built from category × type × duration ×
+          Service SKU <b className="t-num">{previewSku}</b> is built from category × type × duration ×
           visits. Change any of them and the code changes with it, so two plans can never collide.
         </div>
       )}
       {pkg?.sku && (
         <div className="text-meta text-base-500">
-          SKU <b className="t-num">{pkg.sku}</b> — a minted code is permanent; a different duration
+          SKU <b className="t-num">{pkg.sku}</b>. A minted code is permanent; a different duration
           or visit count wants a new package.
         </div>
       )}
