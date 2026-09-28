@@ -1864,10 +1864,8 @@ This is the shared default for ALL Portal listings, not a PO visual pilot. It su
 listing typography, rail appearance and blue-grey surface prescriptions in this document.
 Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
 
-- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles — and, from 2026-09-27
-  (owner ruling, after the flat data-table dashboard reference), ONE 11px slate-11 supporting line under
-  the title saying what the group narrows (`Dealer / Sales Location` · `Where the order was sold`) through
-  the existing `supportingText` slot, no new component; collapsible groups with remembered
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, and NO supporting line
+  under a title (owner ruling 2026-09-28, RAIL GROUPS ARE HEADERS FIRST); collapsible groups with remembered
   expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
   leave that space empty. Icons supplement labels and come from the existing kit. Each group
   remains single-choice; no new multi-select. Preserve each page's filter content and control type:
