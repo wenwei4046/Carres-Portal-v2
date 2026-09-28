@@ -358,10 +358,11 @@ the current month. Departure excludes the person on its effective date and immed
 affected current/future allocation. Workspace §4 owns this shared rule; it does not grant approval
 capability or rewrite completed Purchasing/Receiving evidence.
 
-**NEWCOMER LIMIT — OWNER CORRECTION 2026-09-28 / NOT BUILT:** a newcomer must not start with
-PO Duty because Purchasing is too complex for that default. Joining staff/rotation is not automatic
-PO eligibility. The suggested generic three-person PO/GRN cycle remains unapproved; PO readiness
-and initial GRN participation require the remaining Blueprint review (Workspace §4).
+**NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / NOT BUILT:** newcomers do not take PO Duty
+in their calendar month of joining. From the first day of the following month, active staff with
+the existing role/access eligibility automatically join PO rotation without a separate manager
+competency confirmation or training sign-off. Admission is not a guarantee of holding the next PO
+slot. Workspace §4 owns the timing; the exact multi-person rotation order remains under review.
 
 ### 5.4 Deliver To
 

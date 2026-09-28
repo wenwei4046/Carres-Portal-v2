@@ -151,14 +151,15 @@ month. Re-resolve the affected current/future routine allocation through the one
 preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
 change source-owned task completion or decide the remaining multi-person rotation/cover details.
 
-**NEWCOMER PO LIMIT — OWNER CORRECTION 2026-09-28 / APPROVED TARGET / NOT BUILT.**
-A newcomer must not start on PO Duty merely because they joined staff or reached a monthly rotation
-boundary: Purchasing is too complex for that default. The next-month entry ruling does not mean
-new staff are eligible for every Duty. The proposed generic three-person PO/GRN cycle is NOT
-APPROVED and must not be implemented. How PO readiness is confirmed and how a newcomer first
-participates in GRN remain proposals pending owner review; do not invent a probation duration,
-automatic promotion date or new receiving-posting permission gate.
-
+**NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+A new employee does not take PO Duty during their calendar month of joining. From the first day of
+the following month they automatically join the PO rotation, provided they remain active and meet
+the existing role/access eligibility. No separate manager competency confirmation, training sign-off
+or fixed probation period is required for that transition. Joining in a month means that calendar
+month, not a rolling 30-day wait; the company calendar/timezone governs the boundary. Automatic
+admission makes the person available for the governed rotation; it does not mean every newcomer
+must be the PO holder on that first day. Existing approval capability and receiving-posting rules
+remain separate. The exact multi-person rotation order remains under review.
 
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,
