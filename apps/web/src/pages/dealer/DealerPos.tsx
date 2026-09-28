@@ -175,8 +175,23 @@ export default function DealerPos({
   const cancelPendingOrder = useCancelOrder(stripePending?.orderId ?? "");
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  // The category drawer belongs only to catalog step 1. Close it before a
+  // later step mounts so returning to the catalog never revives stale UI.
+  useEffect(() => {
+    if (step !== 1) setCategoryOpen(false);
+  }, [step]);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const nonPhone = window.matchMedia("(min-width: 768px)");
+    const closeOutsidePhone = (event: MediaQueryListEvent) => {
+      if (event.matches) setCategoryOpen(false);
+    };
+    nonPhone.addEventListener("change", closeOutsidePhone);
+    return () => nonPhone.removeEventListener("change", closeOutsidePhone);
+  }, []);
   // 0255 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
   const [teamOpen, setTeamOpen] = useState(false);
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
@@ -1193,16 +1208,17 @@ export default function DealerPos({
         </div>
       </header>
 
-      {/* Phone-only top bar. The disabled menu button reserves Day 5's stable
-          category-drawer trigger; the existing catalog FAB remains the only
-          phone cart entrance until it becomes Day 8's sticky cart bar. */}
+      {/* Phone-only top bar. The category button opens Day 5's catalog drawer;
+          the existing catalog FAB remains the only phone cart entrance until
+          it becomes Day 8's sticky cart bar. */}
       <header className={`pos-mobile-topbar hidden${submitted ? " is-complete" : ""}`}>
         <div className="pos-mobile-topbar__main">
           <button
             type="button"
             className="pos-mobile-topbar__icon"
-            aria-label="Categories menu unavailable"
-            disabled
+            aria-label={step === 1 ? "Open categories" : "Categories available in catalog"}
+            onClick={() => setCategoryOpen(true)}
+            disabled={step !== 1}
           >
             <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -1446,6 +1462,8 @@ export default function DealerPos({
               }}
               cartOpen={cartOpen}
               onCartOpenChange={setCartOpen}
+              categoryOpen={categoryOpen}
+              onCategoryOpenChange={setCategoryOpen}
               pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
               pwpClaimGroup={pwpActive ? getClaimGroup() : undefined}
               customerPhone={pwpActive ? customerPhone : undefined}
