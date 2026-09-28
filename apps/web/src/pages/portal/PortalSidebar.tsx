@@ -869,7 +869,7 @@ export default function PortalSidebar({ drawer = false }: {
       {/* Header — brand + collapse toggle. */}
       {collapsed ? (
         <div className="px-2 pb-[18px] flex flex-col items-center gap-2.5">
-          <Link to={homeHref} title="Carres — home" className="grid place-items-center">
+          <Link to={homeHref} title="Carres home" className="grid place-items-center">
             <img
               src="/carres-logo.png"
               alt="Carres"
