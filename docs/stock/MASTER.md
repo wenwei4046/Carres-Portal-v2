@@ -653,26 +653,19 @@ operated by HOUZS — owner instruction 2026-09-25: add it now, not later) are a
 count` and `Confirm collection from Warehouse` return when Counts and NETS logins are built — no
 switch for a capability that does not exist.
 
-**SHOWROOM DISPLAY CAPACITY — OWNER RULING, Jess 2026-09-28; APPROVED TARGET / NOT
-BUILT.** Each Carres showroom Site has separately maintained display capacities for Sofa,
-Mattress and Bedframe within the existing Warehouse Settings Sites record. Do not create a
-Purchasing-owned showroom list or a second settings door. Capacity is per showroom and product
-category, not a portal-wide default or a limit on stock Unit IDs. Sofa capacity counts displayed
-sets; mattress and bedframe capacities count their respective displayed items, independently:
-a mattress displayed on a bedframe occupies capacity in each category, not two generic slots.
-PJ Showroom's current Sofa capacity is 11 sets. Its Mattress/Bedframe capacities and other
-showrooms' capacities remain unset until supplied; unset is unknown, not zero. An explicitly
-recorded zero means no display capacity for that category. Do not infer capacity from imported
-stock, duplicate the 11-set value across Sites, or invent floor Positions/Rack/Bin.
+**SHOWROOM SPACE PLANNING — OWNER RULING, Jess 2026-09-28; APPROVED TARGET / NOT
+BUILT.** Do not add fixed Sofa, Mattress or Bedframe display-capacity settings at this stage.
+Showrooms can change their product mix and layout; independent category limits would not reliably
+represent usable space. Sites remain maintained in the existing Warehouse Settings authority.
+PJ's roughly 11 sofa sets is a current owner-reported layout reference only, not a configured
+maximum, verified occupancy, Unit-count limit or receipt gate. Reassess capacity management only
+when measured operational need justifies it; no capacity-setting work is currently approved.
 
-Existing Manage Warehouse Settings permission governs maintenance, with attributable change
-history. Changing capacity does not create or remove stock, revise prior physical events or
-block receipt. Purchasing's display arrangement reads this Site-owned capacity alongside current,
-incoming and outgoing display quantities, applying §9.8 of its MASTER. Current occupancy must
-come from verified physical/display facts and correct set grouping; do not count every stored
-Unit as an occupied display set. Where those facts are incomplete, show uncertainty instead of
-false remaining capacity. Exact screen wording/composition remains governed by COPY and the shared
-UI kit; no application implementation or live configuration change is authorised here.
+For each display arrangement, use actual displayed goods and planned incoming/outgoing goods,
+and have Operation coordinate available placement space with the receiving showroom under
+Purchasing MASTER §9.8. Do not calculate free capacity or full-site alerts from fixed category
+limits. Preserve verified Stock identities and physical evidence; no new display inventory,
+Positions/Rack/Bin or production data changes are authorised.
 
 **COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
 mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of

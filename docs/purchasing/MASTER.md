@@ -5372,24 +5372,22 @@ One display arrangement must retain all three movement scopes:
   A later supplier delivery can coordinate collection on the same visit; incoming receipt and
   outgoing return remain distinct physical facts. Never create another set of outgoing Units.
 
-**SHOWROOM DISPLAY CAPACITY CONNECTION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
-Stock MASTER §7 owns per-showroom Sofa, Mattress and Bedframe display capacities in Warehouse
-Settings → Sites, including PJ's current 11 sofa sets. Read those settings in the display
-arrangement; do not maintain a second capacity list in Purchasing. Capacity is not actual occupancy
-or a limit on stock Unit IDs. Unset capacities remain unknown. This does not change the 36 imported
-PJ Unit records or establish their verified ownership; no production backfill is authorised.
+**DISPLAY SPACE COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+For each arrangement, show the actual displayed goods and quantities, planned incoming goods and
+planned outgoing goods. Operation coordinates movement timing and confirms with the receiving
+showroom that placement space is arranged. Preserve the approved either-movement-first rule;
+planned movements do not change actual stock or occupancy before evidenced physical events.
+Use verified set composition where quantities are expressed as sets; do not assume two sofas
+equal two sets or that Unit-record count equals occupied display space. Incomplete facts remain
+explicit rather than a fabricated occupancy figure.
 
-**CAPACITY-AWARE COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
-Show current occupied sofa sets, planned incoming sets and planned outgoing sets together against
-the Site's configured Sofa display capacity. Apply the same category-specific guidance to Mattress
-and Bedframe, using their own capacities and quantities. When full, prompt Operation to coordinate removal
-timing and actual space before the incoming placement. Preserve the approved either-movement-first
-rule; this is a planning prompt, not an unconditional receipt block. Do not assume two new sofas
-equal two outgoing sets or that current occupancy is 11. Confirm relevant set composition and
-movement timing; planned movements do not change actual occupancy until evidenced physical events.
-If set grouping or current occupancy is unverified, make that uncertainty explicit rather than
-presenting a computed free-capacity figure as fact. Exact UI composition and new screen wording
-remain subject to the shared kit and copy authority; this ruling does not authorise application build.
+Stock MASTER §7 governs showroom Sites and the space-planning boundary. Do not introduce fixed
+Sofa/Mattress/Bedframe capacity settings, computed remaining-capacity figures, automatic full-site
+alerts or a numeric receipt block at this stage. PJ's roughly 11 sofa sets is a current layout
+reference only; product mix and layout may change. This does not change imported PJ Unit records
+or establish their ownership. Space coordination is part of the arrangement, not a new approval
+role or separate capacity ledger. Exact UI composition and wording remain subject to the shared
+kit and COPY authority; this ruling authorises no application build or production backfill.
 
 **SUPPLIER QUOTATION RECORDING — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
 Operation may upload a supplier quotation and transcribe its model/specification, prices and terms
