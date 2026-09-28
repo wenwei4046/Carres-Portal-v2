@@ -6,6 +6,7 @@ import {
   REPAIR_ORDER_UNIT_COLUMN_ORDER,
   REPAIR_PROBLEM_CHOICES,
   klDate,
+  repairOrderCategory,
   repairOrderConditions,
   repairOrderFooter,
   repairOrderGrnCell,
@@ -62,6 +63,11 @@ describe("the Carres return target", () => {
 });
 
 describe("derived facts", () => {
+  it("Category prints dictionary words in dictionary order", () => {
+    expect(repairOrderCategory(row({ units: [unit({ category: "Sofa" }), unit({ stock_item_id: "b", category: "Mattress" })] }))).toBe("Mattress · Sofa");
+    expect(repairOrderCategory(row())).toBeNull();
+  });
+
   it("stage walks the route from facts only", () => {
     expect(repairOrderStage(row())).toBe("not_issued");
     expect(repairOrderStage(row({ issued: true }))).toBe("awaiting_receipt");

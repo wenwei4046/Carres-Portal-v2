@@ -13,7 +13,7 @@ import type { RepairOrderEligibleUnit } from "@carres/shared";
 import RepairOrderCreate from "./RepairOrderCreate";
 
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Repair Orders</header> }));
-vi.mock("@/components/EvidenceUploadField", () => ({ default: () => <div data-testid="upload" /> }));
+vi.mock("@/components/EvidenceUploadField", () => ({ default: (p: { ariaLabel: string }) => <div data-testid={`upload-${p.ariaLabel}`} /> }));
 
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -71,6 +71,28 @@ describe("Create Repair Order", () => {
     expect(within(group).getByText("Not available yet")).toBeInTheDocument();
     // Add Units waits for the Site.
     expect(screen.getByTestId("repair-order-add-units")).toBeDisabled();
+  });
+
+  it("PJ Showroom stays selectable after Units are added; switching Site clears the Units", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Carres Klang" }));
+    fireEvent.click(screen.getByTestId("repair-order-add-units"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "U1-000-011" }));
+    fireEvent.click(screen.getByTestId("repair-order-add-picked"));
+    const pj = screen.getByRole("button", { name: "PJ Showroom" });
+    expect(pj).toBeEnabled();
+    fireEvent.click(pj);
+    expect(screen.queryByTestId("repair-order-unit-U1-000-011")).not.toBeInTheDocument();
+  });
+
+  it("the Photo and Repair Quotation fields are the kit upload component", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Carres Klang" }));
+    fireEvent.click(screen.getByTestId("repair-order-add-units"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "U1-000-011" }));
+    fireEvent.click(screen.getByTestId("repair-order-add-picked"));
+    expect(screen.getByTestId("upload-Photo of U1-000-011")).toBeInTheDocument();
+    expect(screen.getByTestId("upload-Repair Quotation")).toBeInTheDocument();
   });
 
   it("a refused Unit cannot be ticked and says why on its row", () => {

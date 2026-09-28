@@ -122,12 +122,14 @@ export function repairOrderColumns(): DataGridColumn<RepairOrderListRow>[] {
       key: "claim_no",
       label: L.claim_no,
       width: W.documentNo,
-      /* Empty for a direct inventory repair: an absent link prints the
-         governed absence, never a word implying a relationship. */
-      accessor: (r) =>
-        r.claim_no ? (
-          <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=claims&claim=${encodeURIComponent(r.claim_no)}`}>{r.claim_no}</Link>
-        ) : <Absence />,
+      /* EMPTY for a direct inventory repair (§9.7): no Claim, no word. */
+      accessor: (r) => (
+        <span data-testid="repair-order-claim-cell">
+          {r.claim_no ? (
+            <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=claims&claim=${encodeURIComponent(r.claim_no)}`}>{r.claim_no}</Link>
+          ) : null}
+        </span>
+      ),
       searchValue: (r) => r.claim_no ?? "",
       exportValue: (r) => r.claim_no ?? "",
     },

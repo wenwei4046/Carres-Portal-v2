@@ -31,16 +31,21 @@ import {
   repairOrderConsentOutstanding,
   repairOrderCurrentAction,
   repairOrderDocumentState,
+  repairOrderInspected,
   repairOrderPickedUp,
+  repairOrderReturnedQty,
   repairOrderRoute,
+  klDate,
+  REPAIR_ORDER_SENDING_NOT_CONFIRMED,
   type RepairOrderDetail,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "@/lib/api";
-import { useOperationRepairOrder } from "@/lib/queries";
+import { useOperationRepairOrder, useRepairOrderEvidence } from "@/lib/queries";
+import EvidenceUploadField from "@/components/EvidenceUploadField";
+import RouteStop from "@/components/kit/RouteStop";
 import { fmtDate } from "@/lib/fmt-date";
 import Block from "@/components/kit/Block";
 import Button from "@/components/kit/Button";
-import Icon from "@/components/kit/Icon";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
@@ -60,6 +65,8 @@ const CHANNELS = [
   { value: "email", label: "Email" },
   { value: "print", label: "Print" },
 ] as const;
+const QUOTE_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
+const QUOTE_PDF_MIMES = ["application/pdf"] as const;
 const RECEIPT_CHANNELS = [...CHANNELS, { value: "phone", label: "Phone" }] as const;
 
 function refusal(error: unknown): string {
@@ -103,6 +110,37 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
   const consentScope = ro.units.filter((u) => (u.ownership ?? "carres_owned") !== "carres_owned");
   const consentOpen = repairOrderConsentOutstanding(ro);
   const canCancel = !ro.cancelled_at && repairOrderPickedUp(ro) === 0 && !ro.pickup_source_id;
+  const canRemove = !ro.cancelled_at && !ro.issued && ro.sends.length === 0 && ro.units.length > 1;
+  const today = klDate(new Date().toISOString());
+  const overdue = Boolean(ro.return_target_date && ro.return_target_date < today);
+  const n = ro.units.length;
+  const lastSend = ro.sends.length ? ro.sends[ro.sends.length - 1]! : null;
+  /* The one fact each stop shows; counts use the shared `{n} of {m} done`. */
+  const stopFact = (stop: string) => {
+    switch (stop) {
+      case "Issue":
+        return lastSend ? fmtDate(lastSend.sent_at, { time: true }) : REPAIR_ORDER_SENDING_NOT_CONFIRMED;
+      case "Supplier received RO":
+        return ro.supplier_received_at ? fmtDate(ro.supplier_received_at, { time: true }) : REPAIR_ORDER_ABSENT;
+      case "Picked up":
+        return `${repairOrderPickedUp(ro)} of ${n} done`;
+      case "Returned":
+        return `${repairOrderReturnedQty(ro)} of ${n} done`;
+      default:
+        return `${repairOrderInspected(ro)} of ${n} done`;
+    }
+  };
+  const remove = useMutation({
+    mutationFn: (stockItemId: string) =>
+      apiFetch(`/api/operation/repair-orders/${ro.id}/units/${stockItemId}/remove`, { method: "POST", body: "{}" }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["operation", "repair-orders"] }),
+  });
+  const quotation = useMutation({
+    mutationFn: (path: string) =>
+      apiFetch(`/api/operation/repair-orders/${ro.id}/quotation`, { method: "POST", body: JSON.stringify({ path }) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["operation", "repair-orders"] }),
+  });
+  const evidence = useRepairOrderEvidence(ro.quotation_path ? ro.id : null);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["operation", "repair-orders"] });
@@ -150,22 +188,23 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
             ) : null}
           </header>
 
-          {/* ROUTE — five stops, derived from facts */}
+          {/* ROUTE — five stops, derived from facts, drawn with the kit
+              RouteStop (Workspace §5.10 kit admission): a stop is a state,
+              never a field. */}
           <Block title="Route">
-            <ol className="grid grid-cols-2 gap-2 sm:grid-cols-5" data-testid="repair-order-route">
-              {route.map(({ stop, state }) => (
-                <li
+            <div data-testid="repair-order-route">
+              {route.map(({ stop, state }, i) => (
+                <RouteStop
                   key={stop}
-                  data-state={state}
-                  /* Blue belongs to the primary button alone (tokens §2.2):
-                     the current stop is marked by weight and a dark edge. */
-                  className={`flex items-center gap-1.5 rounded-control border px-2 py-1.5 text-body ${state === "current" ? "border-kit-slate-11 font-semibold text-kit-slate-12" : state === "done" ? "border-kit-slate-5 text-kit-slate-12" : "border-kit-slate-5 text-kit-slate-11"}`}
+                  label={stop}
+                  tone={state === "done" ? "done" : state === "current" ? (overdue && stop === "Returned" ? "missed" : "due") : "none"}
+                  last={i === route.length - 1}
+                  data-testid={`repair-order-stop-${stop}`}
                 >
-                  {state === "done" ? <Icon name="confirm" size={14} /> : null}
-                  <span>{stop}</span>
-                </li>
+                  <p className="text-body text-kit-slate-12">{stopFact(stop)}</p>
+                </RouteStop>
               ))}
-            </ol>
+            </div>
             <p className="text-body text-kit-slate-12" data-testid="repair-order-target">
               {ro.return_target_date ? `Carres return target: ${fmtDate(ro.return_target_date)}` : REPAIR_ORDER_AWAITING_RECEIPT}
             </p>
@@ -193,25 +232,65 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Fact idPrefix="ro-fact" label="RO Doc Date" value={fmtDate(ro.ro_doc_date)} own={false} framed />
               <Fact idPrefix="ro-fact" label="Supplier" value={ro.supplier_name ?? REPAIR_ORDER_ABSENT} own={false} framed />
-              <Fact
-                idPrefix="ro-fact"
-                label="Supplier Claim No"
-                own={false}
-                framed
-                value={ro.claim_no ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=claims&claim=${encodeURIComponent(ro.claim_no)}`}>{ro.claim_no}</Link> : REPAIR_ORDER_ABSENT}
-              />
+              {/* A direct inventory repair has no Claim: the fact is omitted (§9.7). */}
+              {ro.claim_no ? (
+                <Fact
+                  idPrefix="ro-fact"
+                  label="Supplier Claim No"
+                  own={false}
+                  framed
+                  value={<Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=claims&claim=${encodeURIComponent(ro.claim_no)}`}>{ro.claim_no}</Link>}
+                />
+              ) : null}
               <Fact idPrefix="ro-fact" label="Cost Responsibility" value={REPAIR_COST_RESPONSIBILITY_LABEL[ro.cost_responsibility]} own={false} framed />
               <Fact idPrefix="ro-fact" label="Supplier Pickup Location" value={ro.pickup_site_name ?? REPAIR_ORDER_ABSENT} own={false} framed />
               <Fact idPrefix="ro-fact" label="Supplier Return Location" value={ro.return_site_name ?? REPAIR_ORDER_ABSENT} own={false} framed />
               {/* Unknown price is `Not recorded` — never RM0. */}
               <Fact idPrefix="ro-fact" label="Price" value={ro.price == null ? REPAIR_ORDER_ABSENT : `RM ${ro.price.toFixed(2)}`} own={false} framed />
-              <Fact idPrefix="ro-fact" label="Repair Quotation" value={ro.quotation_path ? "Recorded" : REPAIR_ORDER_ABSENT} own={false} framed />
+              {ro.quotation_path ? (
+                <Fact
+                  idPrefix="ro-fact"
+                  label="Repair Quotation"
+                  own={false}
+                  framed
+                  value={evidence.data?.quotation?.url ? <a className="text-kit-blue-11 hover:underline" href={evidence.data.quotation.url} target="_blank" rel="noreferrer">Recorded</a> : "Recorded"}
+                />
+              ) : (
+                <div>
+                  <h3 className="mb-2 text-label text-kit-slate-11">Repair Quotation</h3>
+                  <EvidenceUploadField<{ path: string; kind: string }>
+                    entries={[]}
+                    onChange={(entries) => { const last = entries[entries.length - 1]; if (last) quotation.mutate(last.path); }}
+                    sign={(file) => apiFetch<{ token: string; path: string }>("/api/ops/issues/evidence/upload-url", {
+                      method: "POST", body: JSON.stringify({ mimeType: file.type, scope: { kind: "repair_quotation", id: ro.id } }),
+                    })}
+                    bucket="issue-evidence"
+                    imageMimes={QUOTE_IMAGE_MIMES}
+                    videoMimes={[]}
+                    pdfMimes={QUOTE_PDF_MIMES}
+                    imageMaxBytes={10 * 1024 * 1024}
+                    videoMaxBytes={0}
+                    pdfMaxBytes={20 * 1024 * 1024}
+                    maxFiles={1}
+                    ariaLabel="Repair Quotation"
+                    disabled={quotation.isPending || Boolean(ro.cancelled_at)}
+                    testId="repair-order-quotation-upload"
+                  />
+                </div>
+              )}
             </div>
           </Block>
 
           {/* GOODS — one row per exact Unit */}
           <Block title="Goods">
-            <RepairOrderUnitsTable roId={ro.id} units={ro.units} pickupLocation={ro.pickup_site_name} returnLocation={ro.return_site_name} />
+            {remove.error ? <p role="alert" className="text-body text-kit-red-11">{refusal(remove.error)}</p> : null}
+            <RepairOrderUnitsTable
+              roId={ro.id}
+              units={ro.units}
+              pickupLocation={ro.pickup_site_name}
+              returnLocation={ro.return_site_name}
+              onRemove={canRemove ? (u) => remove.mutate(u.stock_item_id) : undefined}
+            />
           </Block>
 
           {/* SUPPLIER REPLY — its own date; never the Carres target */}

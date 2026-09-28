@@ -9,9 +9,8 @@
  *              [Add Units] → Tick the Unit ID on each item to send for repair
  *              per Unit: What did you see? · Photo · What happened, in one sentence ·
  *                        Repair Requirement
- * 2 Repair     Supplier · Cost Responsibility · Price (optional) · Repair Quotation (optional —
- *              NOT in slice A: the shared upload door takes photos/video only; the RO
- *              stores `quotation_path` and the door accepts it once a PDF door exists)
+ * 2 Repair     Supplier · Cost Responsibility · Price (optional) · Repair Quotation (optional,
+ *              photo or PDF: the upload slot admits PDF for this purpose only)
  * 3 Locations  Supplier Pickup Location (from the Unit) · Supplier Return Location
  * ```
  *
@@ -65,6 +64,7 @@ type Upload = { path: string; kind: "photo" | "video" };
 
 const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
 const VIDEO_MIMES = ["video/mp4", "video/quicktime"] as const;
+const PDF_MIMES = ["application/pdf"] as const;
 
 export function repairOrderDraftReady(units: readonly UnitDraft[], supplier: string, site: string | null, returnSite: string) {
   return (
@@ -92,6 +92,9 @@ export default function RepairOrderCreate({ claimId }: { claimId: string | null 
   const [price, setPrice] = useState("");
   const [returnSite, setReturnSite] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
+  const [quotation, setQuotation] = useState<{ path: string; kind: string }[]>([]);
+  // The upload slot's folder before the RO exists: one per create page.
+  const [quoteScope] = useState(() => crypto.randomUUID());
   const request = useRef<{ key: string; id: string } | null>(null);
 
   // A Claim-origin RO defaults its Supplier to the Claim's; it may differ.
@@ -123,6 +126,7 @@ export default function RepairOrderCreate({ claimId }: { claimId: string | null 
       supplier_claim_id: claimId,
       cost_responsibility: cost,
       price: price.trim() === "" ? null : Number(price),
+      quotation_path: quotation[0]?.path ?? null,
       pickup_site_id: site,
       return_site_id: returnSite,
       units: units.map((u) => ({
@@ -183,8 +187,15 @@ export default function RepairOrderCreate({ claimId }: { claimId: string | null 
                   key={s.id}
                   variant={site === s.id ? "primary" : "neutral"}
                   aria-pressed={site === s.id}
-                  disabled={units.length > 0 && site !== s.id}
-                  onClick={() => setSite(s.id)}
+                  onClick={() => {
+                    /* The goods are where they are: another Site means other
+                       Units, so the ones picked here come off the list. */
+                    if (site !== s.id) {
+                      setUnits([]);
+                      setReturnSite("");
+                    }
+                    setSite(s.id);
+                  }}
                 >
                   {s.name}
                 </Button>
@@ -257,6 +268,26 @@ export default function RepairOrderCreate({ claimId }: { claimId: string | null 
                 options={REPAIR_COST_RESPONSIBILITIES.map((v) => ({ value: v, label: REPAIR_COST_RESPONSIBILITY_LABEL[v] }))} />
               {/* Optional. Empty is unknown — it prints `Not recorded`, never RM0. */}
               <Input id="ro-price" type="number" label="Price" hint="Optional" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <div>
+                <h3 className="mb-2 text-label text-kit-slate-11">Repair Quotation</h3>
+                <EvidenceUploadField<{ path: string; kind: string }>
+                  entries={quotation}
+                  onChange={setQuotation}
+                  sign={(file) => apiFetch<{ token: string; path: string }>("/api/ops/issues/evidence/upload-url", {
+                    method: "POST", body: JSON.stringify({ mimeType: file.type, scope: { kind: "repair_quotation", id: quoteScope } }),
+                  })}
+                  bucket="issue-evidence"
+                  imageMimes={IMAGE_MIMES}
+                  videoMimes={[]}
+                  pdfMimes={PDF_MIMES}
+                  imageMaxBytes={10 * 1024 * 1024}
+                  videoMaxBytes={0}
+                  pdfMaxBytes={20 * 1024 * 1024}
+                  maxFiles={1}
+                  ariaLabel="Repair Quotation"
+                  disabled={save.isPending}
+                />
+              </div>
             </div>
           </Block>
 

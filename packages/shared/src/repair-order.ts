@@ -3,6 +3,7 @@ import { addWorkingDays } from "./working-days";
 import { myHolidaySet } from "./my-holidays";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { PO_DELAY_REASONS } from "./po-workspace";
+import { GOODS_CATEGORY_WORDS } from "./line-category";
 
 /**
  * ⭐ REPAIR ORDERS — the owner-approved vocabulary, column order, rail
@@ -261,8 +262,14 @@ export function repairOrderPoNo(row: RepairOrderListRow): string | null {
   if (pos.length === 0) return null;
   return pos.join(" · ");
 }
+/** Categories in the dictionary's display order (`Mattress` · `Bedframe` ·
+ *  `Sofa` · `Pillow` · `Mattress protector` …), never first-seen order. */
 export function repairOrderCategory(row: RepairOrderListRow): string | null {
-  const cats = [...new Set(row.units.map((u) => u.category).filter((c): c is string => Boolean(c)))];
+  const rank = (c: string) => {
+    const i = (GOODS_CATEGORY_WORDS as readonly string[]).indexOf(c);
+    return i < 0 ? GOODS_CATEGORY_WORDS.length : i;
+  };
+  const cats = [...new Set(row.units.map((u) => u.category).filter((c): c is string => Boolean(c)))].sort((a, b) => rank(a) - rank(b));
   return cats.length ? cats.join(" · ") : null;
 }
 export function repairOrderItems(row: RepairOrderListRow): string | null {

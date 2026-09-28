@@ -28,8 +28,8 @@ const base: RepairOrderDetail = {
   pickup_site_name: "Carres Klang", return_site_id: "w1", return_site_name: "Carres Klang", issued: false,
   supplier_received_at: null, return_target_date: null, cancelled_at: null, latest_reply: null,
   units: [
-    unit({ stock_item_id: "a", unit_id: "U1-000-090", po_no: "PO/2604-087", sku: "DSL9038-SET-2S+L", category: "sofa", item: "DSL9038", item_spec: "SET-2S+L", evidence: [{ path: "x.jpg", kind: "photo", source: "unit" }] }),
-    unit({ stock_item_id: "b", unit_id: "U1-000-087", po_no: "PO2603-110", sku: "SONIC-Q", category: "mattress", item: "Sonic", item_spec: "Queen", problem: "missing_component" }),
+    unit({ stock_item_id: "a", unit_id: "U1-000-090", po_no: "PO/2604-087", sku: "DSL9038-SET-2S+L", category: "Sofa", item: "DSL9038", item_spec: "SET-2S+L", evidence: [{ path: "x.jpg", kind: "photo", source: "unit" }] }),
+    unit({ stock_item_id: "b", unit_id: "U1-000-087", po_no: "PO2603-110", sku: "SONIC-Q", category: "Mattress", item: "Sonic", item_spec: "Queen", problem: "missing_component" }),
   ],
   quotation_path: null, supplier_received_source: null, supplier_received_evidence: null, return_target_working_days: null,
   return_target_calendar: null, cancel_reason: null, created_by: "{Operation staff}", created_at: "2026-09-28T02:00:00Z",
@@ -39,7 +39,7 @@ const second: RepairOrderDetail = {
   ...base, id: "ro-2", ro_no: "{RO No 2}", supplier_name: "Laveo", issued: true, supplier_received_at: "2026-09-28T03:00:00Z",
   return_target_date: "2026-10-16", cost_responsibility: "supplier_pays",
   sends: [{ version: 1, recipient: "{Supplier WhatsApp group}", channel: "whatsapp", sent_by: "{Operation staff}", sent_at: "2026-09-28T02:30:00Z" }],
-  units: [unit({ stock_item_id: "c", unit_id: "U1-000-085", po_no: "PO2601-121", sku: "B1201S-Q", category: "mattress", item: "B1201S", item_spec: "Queen", actual_pickup_date: "2026-09-28T06:00:00Z", collected_by: "{Driver}", pickup_proof: true })],
+  units: [unit({ stock_item_id: "c", unit_id: "U1-000-085", po_no: "PO2601-121", sku: "B1201S-Q", category: "Mattress", item: "B1201S", item_spec: "Queen", actual_pickup_date: "2026-09-28T06:00:00Z", collected_by: "{Driver}", pickup_proof: true })],
 };
 const eligible: RepairOrderEligibleUnit[] = [
   { id: "e1", unit_id: "U1-000-086", sku: "M1401S-K", item: "M1401S · King", po_no: "PO2601-116", site_id: "w1", site_name: null, display: false, ownership: "carres_owned", refusal: null },
@@ -55,7 +55,8 @@ window.fetch = async (input, init) => {
   if (init?.method && init.method !== "GET") return new Response(JSON.stringify({ message: "Local preview does not save records." }), { status: 405 });
   if (url.includes("/api/operation/repair-orders/options")) return json({ sites: [{ id: "w1", name: "Carres Klang", carres: true }, { id: "w2", name: "PJ Showroom", carres: true }], suppliers: [{ id: "s1", name: "Hookka Industries" }, { id: "s2", name: "Laveo" }] });
   if (url.includes("/api/operation/repair-orders/eligible-units")) return json({ units: eligible });
-  if (/\/api\/operation\/repair-orders\/[^/?]+\/evidence/.test(url)) return json({ files: [] });
+  if (url.includes("/api/ops/issues/evidence/upload-url")) return json({ token: "t", path: "x" });
+  if (/\/api\/operation\/repair-orders\/[^/?]+\/evidence/.test(url)) return json({ files: [], quotation: null });
   if (/\/api\/operation\/repair-orders\/[^/?]+/.test(url)) return json({ repairOrder: base });
   if (url.includes("/api/operation/repair-orders")) return json({ repairOrders: [base, second] });
   return json({});

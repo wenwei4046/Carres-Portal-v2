@@ -952,11 +952,12 @@ route stops `Issue` · `Supplier received RO` · `Picked up` · `Returned` · `I
 reasons, reused) · `Consent given` · `Consent refused` · `Cancel repair order` · `Add Units` · `Find Unit`
 · `Remove` · `Optional`. Refusal words on the Add Units row and from the create door: `Reserved for
 {SO No}` · `On {DO No}` · `Delivered` · `On {Claim No}` · `Not received` · `This Unit is on the road` ·
-`Waiting inspection` · `Already on {RO No}` · `Counted stock` · `Not in stock`. Empty and failure words:
+`Waiting inspection` · `This Unit is in repair` · `Already on {RO No}` · `Counted stock` · `Not in stock`.
+Route stop facts reuse `{n} of {m} done` and `Sending not confirmed`. Empty and failure words:
 `Nothing to do for this Repair Order.` · `Repair Order not found` · `Units could not be loaded` ·
 `Search Repair Orders`. History titles: `Created` · `Repair order issued to {supplier}` · `Supplier
 received RO` · `Supplier reply` · `Owner consent` · `Picked up` · `Returned` · `Cancelled`.
-`Repair Quotation` prints `Recorded` or `Not recorded`; `Price` prints `RM {amount}` or `Not recorded`.
+`Repair Quotation` prints `Recorded` (opens the file) or offers the upload (photo or PDF); `Price` prints `RM {amount}` or `Not recorded`.
 
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 

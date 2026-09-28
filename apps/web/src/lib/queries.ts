@@ -3936,7 +3936,7 @@ export interface RepairOrderEvidenceUrl {
   url: string | null;
 }
 export function fetchRepairOrderEvidence(id: string) {
-  return apiFetch<{ files: RepairOrderEvidenceUrl[] }>(`/api/operation/repair-orders/${encodeURIComponent(id)}/evidence`);
+  return apiFetch<{ files: RepairOrderEvidenceUrl[]; quotation: { path: string; url: string | null } | null }>(`/api/operation/repair-orders/${encodeURIComponent(id)}/evidence`);
 }
 export function useRepairOrderEvidence(id: string | null) {
   return useQuery({

@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  goodsCategoryWordOf,
   repairOrderCancelInputSchema,
   repairOrderConsentInputSchema,
   repairOrderCreateInputSchema,
@@ -98,7 +99,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: R
   if (ids.length === 0) return { rows: [], error: null };
 
   const [units, sends, replies, consents, sources] = await Promise.all([
-    readAllIn(ids, (b, f, t) => sb.from("repair_order_units").select("repair_order_id, stock_item_id, unit_code, po_no, sku, ownership, problem, problem_note, repair_requirement, evidence, released_at").in("repair_order_id", b).order("unit_code").range(f, t)),
+    readAllIn(ids, (b, f, t) => sb.from("repair_order_units").select("repair_order_id, stock_item_id, unit_code, po_no, sku, ownership, problem, problem_note, repair_requirement, evidence, released_at, removed_at").in("repair_order_id", b).is("removed_at", null).order("unit_code").range(f, t)),
     readAllIn(ids, (b, f, t) => sb.from("document_sends").select("document_id, version, recipient, channel, confirmed, sent_by, sent_at").eq("document_kind", "repair_order").in("document_id", b).order("sent_at").range(f, t)),
     readAllIn(ids, (b, f, t) => sb.from("repair_order_supplier_replies").select("id, repair_order_id, expected_return_date, reason, note, reference, recorded_by, recorded_at").in("repair_order_id", b).order("recorded_at").range(f, t)),
     readAllIn(ids, (b, f, t) => sb.from("repair_order_owner_consents").select("id, repair_order_id, stock_item_ids, outcome, evidence, note, recorded_by, recorded_at").in("repair_order_id", b).order("recorded_at").range(f, t)),
@@ -176,7 +177,9 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: R
       unit_id: u.unit_code as string,
       po_no: str(u.po_no),
       sku: str(u.sku),
-      category: cat?.category ?? null,
+      // The shared dictionary word (`Mattress` · `Sofa` …), read by the ONE
+      // category ladder; `Not recorded` only when there is no SKU to read.
+      category: u.sku ? goodsCategoryWordOf({ sku: u.sku as string, category: cat?.category ?? null }) : null,
       item: cat?.item ?? null,
       item_spec: cat?.spec ?? null,
       ownership: str(u.ownership),
@@ -339,11 +342,15 @@ router.get("/:id", async (c) => {
 router.get("/:id/evidence", async (c) => {
   gate(c);
   const sb = userClient(c.env, c.var.auth.jwt);
-  // RLS is the boundary: the caller must be able to read the RO's Units.
-  const { data, error } = await sb.from("repair_order_units").select("stock_item_id, unit_code, evidence").eq("repair_order_id", c.req.param("id"));
-  if (error) return failRo(c, error);
+  // RLS is the boundary: the caller must be able to read the RO and its Units.
+  const [unitsRes, roRes] = await Promise.all([
+    sb.from("repair_order_units").select("stock_item_id, unit_code, evidence").eq("repair_order_id", c.req.param("id")),
+    sb.from("repair_orders").select("quotation_path").eq("id", c.req.param("id")).maybeSingle(),
+  ]);
+  if (unitsRes.error) return failRo(c, unitsRes.error);
+  if (roRes.error) return failRo(c, roRes.error);
   const admin = adminClient(c.env);
-  const files = await Promise.all((data ?? []).flatMap((u) =>
+  const files = await Promise.all((unitsRes.data ?? []).flatMap((u) =>
     ((u.evidence as RepairOrderEvidenceFile[]) ?? []).map(async (e) => {
       // Unit photos live in `issue-evidence`; Claim photos in the Claim's own
       // bucket (`delivery-orders`, 0288) and are read by reference.
@@ -351,7 +358,13 @@ router.get("/:id/evidence", async (c) => {
       const { data: signed } = await admin.storage.from(bucket).createSignedUrl(e.path, SIGNED_URL_TTL_SECONDS);
       return { stock_item_id: u.stock_item_id as string, unit_id: u.unit_code as string, ...e, url: signed?.signedUrl ?? null };
     })));
-  return c.json({ files });
+  const path = str((roRes.data as Row | null)?.quotation_path);
+  let quotation: { path: string; url: string | null } | null = null;
+  if (path) {
+    const { data: signed } = await admin.storage.from("issue-evidence").createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+    quotation = { path, url: signed?.signedUrl ?? null };
+  }
+  return c.json({ files, quotation });
 });
 
 // ── writes ───────────────────────────────────────────────────────────────────
@@ -408,6 +421,25 @@ router.post("/:id/owner-consent", async (c) => {
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("repair_order_record_owner_consent", { p_ro_id: c.req.param("id"), p_input: p.data });
   if (error) return failRo(c, error);
   return c.json({ consentId: data }, 201);
+});
+
+router.post("/:id/quotation", async (c) => {
+  gate(c);
+  let path = "";
+  try { path = String(((await c.req.json()) as { path?: unknown }).path ?? ""); } catch { path = ""; }
+  if (!path.trim()) return c.json({ error: "invalid_input", code: "invalid_param", message: "Upload the Repair Quotation first" }, 422);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("repair_order_record_quotation", { p_ro_id: c.req.param("id"), p_path: path.trim() });
+  if (error) return failRo(c, error);
+  return c.json(data);
+});
+
+router.post("/:id/units/:unitId/remove", async (c) => {
+  gate(c);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("repair_order_remove_unit", {
+    p_ro_id: c.req.param("id"), p_stock_item_id: c.req.param("unitId"),
+  });
+  if (error) return failRo(c, error);
+  return c.json(data);
 });
 
 router.post("/:id/cancel", async (c) => {

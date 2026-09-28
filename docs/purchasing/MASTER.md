@@ -4914,9 +4914,23 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 | Carres return target = 14 OFFICE working days (Mon–Fri + the shared Malaysian holiday set) from the KL date of evidenced Supplier receipt, computed once by `repairOrderReturnTarget` (shared working-day engine); the door refuses a target outside the governed period and snapshots period + calendar name | `packages/shared/src/repair-order.ts`, 0602 |
 | API `/api/operation/repair-orders`: register, `/:id` (id or RO No), `/options`, `/eligible-units`, `/:id/evidence` (signed on open), create, issue, supplier-receipt, supplier-reply, owner-consent, cancel | `apps/api/src/routes/operation/repair-orders.ts` |
 | Web: live sidebar row; the 17-column register, ▸ per-Unit inspector, five-group rail, footer and states; the RO object page (route, CURRENT ACTION with one door per stop in the approved words, Repair order, Goods, Supplier reply, Owner consent, History); Create Repair Order (Carres Sites + disabled `Dealer`, Add Units drawer with refusal words on the row, per-Unit problem/photo/sentence/requirement, Supplier, Cost Responsibility, optional Price, grey automatic RO Doc Date and pickup location). Evidence opens the kit `SavedEvidenceViewer` | `OperationRepairOrders.tsx`, `RepairOrderObject.tsx`, `RepairOrderCreate.tsx` |
+| **Goods sent for repair cannot be promised (owner, 2026-09-28).** `repair_order_create` puts each Unit `In repair` through Stock's governed flag door `ops_stock_flag_repair` (`needs_repair`), which every sell path already honours (`unit_availability` → not available; pool draw, bind and Use this PO refuse it). No custody is written. The same door lifts it when the repair ends for that Unit: the RO is cancelled, the Unit is removed before Issue (`repair_order_remove_unit`; the last Unit cannot be removed, cancel instead), or its return inspection is recorded (Stock's `ops_stock_resolve_unit_hold`, observed by a trigger). A Unit already `In repair` outside an RO is refused by name | 0602 |
+| `Repair Quotation`: photo or PDF, recorded at create or once later on the object (`repair_order_record_quotation`); the upload slot admits PDF for the `repair_quotation` purpose only and the `issue-evidence` bucket admits `application/pdf` | 0602, `routes/ops/issues.ts` |
 | Pickup: the `Hand {n} Units` door opens Stock's arrival-source form with `?ro=`; the pickup itself is Stock's existing `arrival_source_handover` (the ONE custody writer) and the return is Receiving's `receiving_arrival_post` with a GRN — proven end to end on a replayed chain | `ArrivalSourceWorkspace.tsx`, integration test |
 
-**Remaining, in dependency order:** the RO PDF (`Reason` box + photo page, DOCUMENT-KIT §3 rules 11–12) and the `Open PDF` / 50/50 Issue preview · Work cards for each stop (Workspace §6) · a PDF-capable upload door for `Repair Quotation` (the column and door field exist; the shared upload door takes photos/video only) · releasing a Unit from its RO after the authorised completion (inspection result), which today keeps `Already on {RO No}` after return · Stock's supplier party for the pickup (`arrival_sources.party_id` must be a Stock operating party; a repair Supplier is not one yet, so staff pick the carrier) · Dealer as a Site (Stock §12.9) · the Settings row for the 14-day period · PO/PRTN/CO onto `document_sends`.
+**Owner rulings on the slice A report (2026-09-28):** pickup only from Carres Sites (accepted); a
+Unit on an active RO is NOT sellable (decision 1 rejected, built as above); the held-for-inspection,
+reply-reason, optional-photo, receipt-version, Claim-origin and consent-outcome decisions accepted.
+
+**STOCK DEPENDENCY — the Supplier as the pickup party.** `arrival_sources.party_id` must be an
+active Stock operating party (`stock_operating_parties`), and a repair Supplier is not one, so today
+staff record the carrier who actually collects. When the Supplier collects in person, Stock must
+admit the Supplier (or a supplier-party kind) as a party; Purchasing does not write that list.
+
+**Remaining, in dependency order:** the RO PDF (`Reason` box + photo page, DOCUMENT-KIT §3 rules
+11–12) and the `Open PDF` / 50/50 Issue preview · Work cards for each stop (Workspace §6) · a
+Claim-held Unit's release when its Claim hold ends without `hold_released_at` · Dealer as a Site
+(Stock §12.9) · the Settings row for the 14-day period · PO/PRTN/CO onto `document_sends`.
 This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
 ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
 The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
@@ -5333,18 +5347,11 @@ This document authorises the target, not a migration, build-card creation or pro
 **The two structural conflicts named on 2026-09-20 (RO No minted by the return leg in 0490; no
 document-agnostic send ledger) are resolved by 0602 on the branch — see "Build state" above.**
 
-**Also measured 2026-09-20, and not defects — recorded so the next chat does not re-derive them:**
-the outbound leg has no owning record (`apps/web/src/pages/operation/warehouse-schedule-view.ts:69`
-states `repair-pickup` and `supplier-return` render nothing today); `Repair Orders` is a live
-sidebar row since slice A; `OperationOpsRepair.tsx` is the legacy Stock `needs_repair`
-queue and is NOT this register; `ops_stock_items.ownership` admits only `carres_owned` and
-`supplier_consignment` (`0366_…sql:117`), so the screen has exactly two ownership words and
-`Dealer` is a LOCATION; and `warehouse_kind` is only `own` / `logistics_partner` (`0027`), so
-Showroom and Dealer are not governed Stock Sites yet — Stock §12.9 holds that as an approved
-target. **Consequence, planner decision 2026-09-20:** the UI is drawn for all three locations now,
-and selection opens Warehouse first, with Showroom and Dealer following Stock's Site work. This
-neither narrows the 2026-09-18 approved scope nor pretends a Dealer Site exists today.
-*Falsifier: a governed Showroom/Dealer Site row in `warehouses`, which would open selection at once.*
+**Measured, not defects:** `OperationOpsRepair.tsx` is the legacy Stock `needs_repair` queue and
+is NOT this register; `ops_stock_items.ownership` admits only `carres_owned` and
+`supplier_consignment` (`0366_…sql:117`), so `Dealer` is a LOCATION, not an owner. PJ Showroom is a
+governed Site (`warehouses` kind `own`) and is selectable; a Dealer is not a Carres Site (§7.4a,
+Stock §12.9).
 
 
 ### 9.8 Display Requests

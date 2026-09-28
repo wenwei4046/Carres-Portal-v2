@@ -29,10 +29,17 @@
 --
 -- ── WHAT THIS FILE DOES NOT DO ──────────────────────────────────────────────
 --
---   · IT MOVES NO STOCK. Creating or issuing a Repair Order writes no
---     `ops_stock_items` row. The pickup is Stock's `arrival_source_handover`
---     on the RO's `repair-return` source (0490) — the ONE custody writer; this
---     file adds no second one.
+--   · IT MOVES NO CUSTODY. Status, Site and holder are never written here.
+--     The pickup is Stock's `arrival_source_handover` on the RO's
+--     `repair-return` source (0490) — the ONE custody writer.
+--   · BUT GOODS SENT FOR REPAIR CANNOT BE PROMISED (owner, 2026-09-28): the
+--     create door puts each Unit `In repair` through Stock's own governed
+--     flag door `ops_stock_flag_repair` (0137/0500), which every sell path
+--     already honours (`unit_availability` → not_available; pool draw, bind
+--     and Use-this-PO refuse it). The same door lifts the flag when the
+--     repair ends for that Unit: the RO is cancelled, the Unit is removed
+--     before Issue, or its return inspection is recorded (Stock's
+--     `ops_stock_resolve_unit_hold`, observed by a trigger).
 --   · IT TOUCHES NO FINANCE. `price` is an optional recorded fact; NULL is
 --     unknown, never RM0 (owner ruling 2026-09-19). No approval gate exists.
 --   · IT INVENTS NO STATUS. Every stage on the object page is DERIVED from a
@@ -97,6 +104,16 @@ create policy document_sends_read_internal on public.document_sends
   for select to authenticated using ((select public.is_internal()));
 grant select on public.document_sends to authenticated;
 revoke insert, update, delete on public.document_sends from authenticated, anon;
+
+-- The Repair Quotation may be a PDF (§9.7). The private `issue-evidence`
+-- bucket (0589) admits PDF from here on; the upload-slot route issues a PDF
+-- slot for the `repair_quotation` purpose only, so every other proof stays
+-- photo or video. The 20 MB bucket limit is unchanged.
+update storage.buckets
+   set allowed_mime_types = allowed_mime_types || array['application/pdf']
+ where id = 'issue-evidence'
+   and allowed_mime_types is not null
+   and not ('application/pdf' = any (allowed_mime_types));
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 2 · the Repair Order
@@ -196,8 +213,12 @@ create table if not exists public.repair_order_units (
   -- the authorised completion). The partial unique index below is the
   -- "no duplicate active repair" rule, in the database.
   released_at         timestamptz,
+  -- Set only when the Unit was taken OFF the RO before Issue: it is no longer
+  -- part of the commission and the paper never names it.
+  removed_at          timestamptz,
   created_at          timestamptz not null default now(),
-  constraint repair_order_units_once unique (repair_order_id, stock_item_id)
+  constraint repair_order_units_once unique (repair_order_id, stock_item_id),
+  constraint repair_order_units_removed_is_released check (removed_at is null or released_at is not null)
 );
 
 create unique index if not exists repair_order_units_one_active_repair
@@ -327,6 +348,10 @@ begin
    limit 1;
   if v_ro is not null then
     return format('Already on %s', v_ro);
+  end if;
+  -- Already In repair outside any RO (the legacy Stock flag): its own work first.
+  if coalesce(p_item.needs_repair, false) then
+    return 'This Unit is in repair';
   end if;
   v_lock := public.receiving_unit_lock_reason(p_item);
   if v_lock is not null
@@ -479,6 +504,12 @@ begin
     raise exception 'too many Units on one Repair Order' using errcode = '22023', detail = 'too_many_units';
   end if;
 
+  if coalesce(p_input->>'quotation_path', '') ~ '[^[:space:]]'
+     and (split_part(btrim(p_input->>'quotation_path'), '/', 1) <> 'repair_quotation'
+          or not exists (select 1 from storage.objects where bucket_id = 'issue-evidence' and name = btrim(p_input->>'quotation_path'))) then
+    raise exception 'upload the Repair Quotation first' using errcode = '22023', detail = 'quotation_not_uploaded';
+  end if;
+
   insert into repair_orders (
     id, request_id, ro_no, ro_doc_date, supplier_id, supplier_claim_id,
     cost_responsibility, price, quotation_path, pickup_site_id, return_site_id, created_by
@@ -547,6 +578,8 @@ begin
       btrim(coalesce(v_unit->>'repair_requirement', '')),
       coalesce(v_unit->'evidence', '[]'::jsonb)
     );
+    -- ⭐ Not sellable from this moment (owner, 2026-09-28), through Stock's door.
+    perform public.ops_stock_flag_repair(v_item.id, true);
     v_count := v_count + 1;
   end loop;
 
@@ -802,6 +835,136 @@ $fn$;
 revoke all on function public.repair_order_record_owner_consent(uuid, jsonb) from public, anon;
 grant execute on function public.repair_order_record_owner_consent(uuid, jsonb) to authenticated;
 
+-- ── the ONE way a repair ends for a Unit ─────────────────────────────────────
+-- Marks the RO line released and lifts Stock's `In repair` flag through the
+-- same governed door that set it. Called on cancel, on removal before Issue
+-- and when the return inspection is recorded — never anywhere else.
+create or replace function public._repair_order_release_unit(p_ro_id uuid, p_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  update repair_order_units set released_at = now()
+   where repair_order_id = p_ro_id and stock_item_id = p_item_id and released_at is null;
+  if found then
+    perform public.ops_stock_flag_repair(p_item_id, false);
+  end if;
+end;
+$fn$;
+revoke all on function public._repair_order_release_unit(uuid, uuid) from public, anon, authenticated;
+
+-- ── remove a Unit before Issue ───────────────────────────────────────────────
+create or replace function public.repair_order_remove_unit(p_ro_id uuid, p_stock_item_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_role app_role := public._repair_order_gate();
+  v_ro   repair_orders;
+begin
+  select * into v_ro from repair_orders where id = p_ro_id for update;
+  if not found then
+    raise exception 'Repair Order not found' using errcode = 'P0002', detail = 'ro_not_found';
+  end if;
+  if v_ro.cancelled_at is not null then
+    raise exception '% is cancelled', v_ro.ro_no using errcode = '22023', detail = 'ro_cancelled';
+  end if;
+  -- The Supplier has read the paper: changing its goods is a revision, not a removal.
+  if exists (select 1 from document_sends where document_kind = 'repair_order' and document_id = v_ro.id and confirmed) then
+    raise exception '% is already issued', v_ro.ro_no using errcode = '22023', detail = 'already_issued';
+  end if;
+  if not exists (select 1 from repair_order_units where repair_order_id = v_ro.id and stock_item_id = p_stock_item_id and released_at is null) then
+    raise exception 'that Unit is not on this Repair Order' using errcode = '22023', detail = 'unit_not_on_ro';
+  end if;
+  if (select count(*) from repair_order_units where repair_order_id = v_ro.id and released_at is null) = 1 then
+    raise exception 'this is the last Unit; cancel the Repair Order instead' using errcode = '22023', detail = 'last_unit';
+  end if;
+  perform public._repair_order_release_unit(v_ro.id, p_stock_item_id);
+  update repair_order_units set removed_at = now()
+   where repair_order_id = v_ro.id and stock_item_id = p_stock_item_id;
+  insert into audit_log (role, actor_text, action, ref)
+  values (v_role, auth.uid()::text, 'repair_order_remove_unit', v_ro.ro_no || ' · ' || p_stock_item_id::text);
+  return jsonb_build_object('id', v_ro.id, 'removed', p_stock_item_id);
+end;
+$fn$;
+revoke all on function public.repair_order_remove_unit(uuid, uuid) from public, anon;
+grant execute on function public.repair_order_remove_unit(uuid, uuid) to authenticated;
+
+-- ── the return inspection ends the repair for that Unit ─────────────────────
+-- Receiving holds a returned repair for inspection (0490: status on_hold,
+-- hold_reason inspection). Stock records the inspection result by releasing
+-- that hold (`ops_stock_resolve_unit_hold`). This trigger only OBSERVES that
+-- fact; it writes no custody and lifts the flag through the governed door.
+create or replace function public._repair_order_inspection_recorded()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_ro uuid;
+begin
+  for v_ro in
+    select ru.repair_order_id
+      from repair_order_units ru
+     where ru.stock_item_id = new.id and ru.released_at is null
+       and exists (
+         select 1 from arrival_sources a
+           join warehouse_receipts r on r.arrival_source_id = a.id and r.status = 'posted'
+           join receiving_unit_results ur on ur.receipt_id = r.id and ur.stock_item_id = new.id
+          where a.repair_order_id = ru.repair_order_id
+            and ur.outcome in ('received', 'received_with_issue'))
+  loop
+    perform public._repair_order_release_unit(v_ro, new.id);
+  end loop;
+  return null;
+end;
+$fn$;
+revoke all on function public._repair_order_inspection_recorded() from public, anon, authenticated;
+
+drop trigger if exists repair_order_inspection_recorded on public.ops_stock_items;
+create trigger repair_order_inspection_recorded
+  after update of hold_released_at on public.ops_stock_items
+  for each row
+  when (new.hold_released_at is not null and new.hold_released_at is distinct from old.hold_released_at)
+  execute function public._repair_order_inspection_recorded();
+
+-- ── record the Supplier's Repair Quotation later (optional; never a gate) ────
+-- Set once; a second quotation is a revision of the commission, not an edit.
+create or replace function public.repair_order_record_quotation(p_ro_id uuid, p_path text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_role app_role := public._repair_order_gate();
+  v_ro   repair_orders;
+begin
+  select * into v_ro from repair_orders where id = p_ro_id for update;
+  if not found then
+    raise exception 'Repair Order not found' using errcode = 'P0002', detail = 'ro_not_found';
+  end if;
+  if v_ro.quotation_path is not null then
+    raise exception 'the Repair Quotation is already recorded' using errcode = '40001', detail = 'quotation_already_recorded';
+  end if;
+  if coalesce(p_path, '') !~ '[^[:space:]]' or split_part(btrim(p_path), '/', 1) <> 'repair_quotation'
+     or not exists (select 1 from storage.objects where bucket_id = 'issue-evidence' and name = btrim(p_path)) then
+    raise exception 'upload the Repair Quotation first' using errcode = '22023', detail = 'quotation_not_uploaded';
+  end if;
+  update repair_orders set quotation_path = btrim(p_path) where id = v_ro.id;
+  insert into audit_log (role, actor_text, action, ref)
+  values (v_role, auth.uid()::text, 'repair_order_record_quotation', v_ro.ro_no);
+  return jsonb_build_object('id', v_ro.id);
+end;
+$fn$;
+revoke all on function public.repair_order_record_quotation(uuid, text) from public, anon;
+grant execute on function public.repair_order_record_quotation(uuid, text) to authenticated;
+
 -- ── cancel: before pickup only ───────────────────────────────────────────────
 create or replace function public.repair_order_cancel(p_ro_id uuid, p_reason text)
 returns jsonb
@@ -837,7 +1000,8 @@ begin
 
   update repair_orders set cancelled_at = now(), cancelled_by = auth.uid(), cancel_reason = btrim(p_reason)
    where id = v_ro.id;
-  update repair_order_units set released_at = now() where repair_order_id = v_ro.id and released_at is null;
+  perform public._repair_order_release_unit(v_ro.id, ru.stock_item_id)
+     from repair_order_units ru where ru.repair_order_id = v_ro.id and ru.released_at is null;
 
   insert into audit_log (role, actor_text, action, ref)
   values (v_role, auth.uid()::text, 'repair_order_cancel', v_ro.ro_no || ' · ' || btrim(p_reason));
@@ -1007,7 +1171,9 @@ begin
     'public.repair_order_record_supplier_receipt(uuid,timestamptz,text,text,date,text)',
     'public.repair_order_record_supplier_reply(uuid,jsonb)',
     'public.repair_order_record_owner_consent(uuid,jsonb)',
-    'public.repair_order_cancel(uuid,text)'
+    'public.repair_order_cancel(uuid,text)',
+    'public.repair_order_remove_unit(uuid,uuid)',
+    'public.repair_order_record_quotation(uuid,text)'
   ] loop
     if has_function_privilege('anon', v_fn, 'execute') then
       raise exception 'sanity: anon can execute %', v_fn;

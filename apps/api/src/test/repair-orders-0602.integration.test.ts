@@ -51,10 +51,14 @@ const U = {
   consign: uid("b7"),
   partner: uid("b8"),
   cancelMe: uid("b9"),
+  inRepair: uid("ba"),
+  rm1: uid("bb"),
+  rm2: uid("bc"),
 };
 const code = (key: keyof typeof U) => `U8${RUN}-${String(Object.keys(U).indexOf(key) + 100)}-001`;
 const SKU = `IT-RO-${HEX}`;
 const PHOTO = `unit/${U.free}/it-${HEX}.jpg`;
+const QUOTE = `repair_quotation/${uid("99")}/it-${HEX}.pdf`;
 
 type Result = { ok: true; row: Record<string, unknown> } | { ok: false; why: string; detail: string };
 
@@ -99,6 +103,10 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
       units,
       ...over,
     })]);
+  const availability = async (id: string) =>
+    (await q("select needs_repair, public.unit_availability(status, needs_repair, hold_reason, condition) a from ops_stock_items where id = $1", [id])).rows[0] as { needs_repair: boolean; a: string };
+  const released = async (ro: string, id: string) =>
+    (await q("select released_at is not null r from repair_order_units where repair_order_id = $1 and stock_item_id = $2", [ro, id])).rows[0]?.r as boolean;
   const stockRow = async (id: string) =>
     (await q("select status, warehouse_id, holder_party_id from ops_stock_items where id = $1", [id])).rows[0];
 
@@ -130,13 +138,16 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
       ["onClaim", { status: "on_hold", hold_claim_id: CLAIM, hold_reason: "damaged", held_at: new Date().toISOString() }],
       ["consign", { ownership: "supplier_consignment", supplier: "Hooka" }],
       ["partner", { warehouse_id: PARTNER_WH }],
+      ["inRepair", { needs_repair: true }],
+      ["rm1", {}],
+      ["rm2", {}],
     ];
     for (const [key, over] of units) {
       const row = { id: U[key], unit_code: code(key), sku: SKU, warehouse_id: KLANG, status: "free", ownership: "carres_owned", qty: 1, po_no: "PO260920-1111", ...over };
       const cols = Object.keys(row);
       await q(`insert into ops_stock_items (${cols.join(",")}) values (${cols.map((_, i) => `$${i + 1}`).join(",")})`, Object.values(row));
     }
-    await q("insert into storage.objects (bucket_id, name) values ('issue-evidence', $1)", [PHOTO]);
+    await q("insert into storage.objects (bucket_id, name) values ('issue-evidence', $1), ('issue-evidence', $2)", [PHOTO, QUOTE]);
     await q("insert into purchasing_settings (id) values (1) on conflict (id) do nothing");
     await q("set local session_replication_role = origin");
   });
@@ -175,7 +186,7 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
     expect(noUnits).toMatchObject({ ok: false, detail: "no_units" });
   });
 
-  it("creates the RO: it mints RO No at creation, dates it in KL, snapshots the Units and moves no stock", async () => {
+  it("creates the RO: it mints RO No at creation, dates it in KL, snapshots the Units and moves no custody", async () => {
     await as(OP);
     const before = await stockRow(U.free);
     const r = await create([
@@ -197,7 +208,39 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
     expect(ro.s).toBe(OTHER_SUPPLIER);
     const units = (await q("select unit_code, ownership, problem from repair_order_units where repair_order_id = $1 order by unit_code", [roId])).rows;
     expect(units.map((u) => u.unit_code)).toEqual([code("free"), code("consign")].sort());
+    // Custody (status, Site, holder) does not move — the goods are still here.
     expect(await stockRow(U.free)).toEqual(before);
+  });
+
+  it("goods sent for repair cannot be promised to a customer: create puts the Unit In repair through the Stock flag door", async () => {
+    await owner();
+    expect(await availability(U.free)).toEqual({ needs_repair: true, a: "not_available" });
+    expect(await availability(U.consign)).toEqual({ needs_repair: true, a: "not_available" });
+    const audit = (await q("select count(*)::int n from audit_log where action = 'ops_stock.flag_repair' and ref = $1", [U.free])).rows[0].n;
+    expect(audit).toBe(1);
+  });
+
+  it("a Unit already In repair outside any RO is refused by name", async () => {
+    await as(OP);
+    const r = await create([unitInput(U.inRepair)]);
+    expect((r as { why: string }).why).toContain("This Unit is in repair");
+  });
+
+  it("removing a Unit before Issue releases it; after Issue the door refuses", async () => {
+    await as(OP);
+    const made = await create([unitInput(U.rm1), unitInput(U.rm2)]);
+    const id = (made as unknown as { row: { r: { id: string } } }).row.r.id;
+    expect(await attempt("select public.repair_order_remove_unit($1, $2) as r", [id, U.rm1])).toMatchObject({ ok: true });
+    await owner();
+    expect(await released(id, U.rm1)).toBe(true);
+    // Removed before Issue: no longer part of the commission.
+    expect((await q("select removed_at is not null r from repair_order_units where repair_order_id = $1 and stock_item_id = $2", [id, U.rm1])).rows[0].r).toBe(true);
+    expect(await availability(U.rm1)).toEqual({ needs_repair: false, a: "available" });
+    await as(OP);
+    // The last Unit cannot be removed — cancel the Repair Order instead.
+    expect(await attempt("select public.repair_order_remove_unit($1, $2) as r", [id, U.rm2])).toMatchObject({ ok: false, detail: "last_unit" });
+    await attempt("select public.repair_order_issue($1, 'whatsapp', 'x', null) as r", [id]);
+    expect(await attempt("select public.repair_order_remove_unit($1, $2) as r", [id, U.rm2])).toMatchObject({ ok: false, detail: "already_issued" });
   });
 
   it("a Unit already on an active RO is refused by name: Already on {RO No}", async () => {
@@ -305,6 +348,16 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
     expect(tamper).toMatchObject({ ok: false, detail: "supplier_evidence_append_only" });
   });
 
+  it("the Repair Quotation may be a PDF, recorded once, and only an uploaded one", async () => {
+    await owner();
+    const mimes = (await q("select allowed_mime_types m from storage.buckets where id = 'issue-evidence'")).rows[0]?.m as string[] | undefined;
+    if (mimes) expect(mimes).toContain("application/pdf");
+    await as(OP);
+    expect(await attempt("select public.repair_order_record_quotation($1, $2) as r", [roId, "unit/x/q.pdf"])).toMatchObject({ ok: false, detail: "quotation_not_uploaded" });
+    expect(await attempt("select public.repair_order_record_quotation($1, $2) as r", [roId, QUOTE])).toMatchObject({ ok: true });
+    expect(await attempt("select public.repair_order_record_quotation($1, $2) as r", [roId, QUOTE])).toMatchObject({ ok: false, detail: "quotation_already_recorded" });
+  });
+
   it("owner consent is recorded only for non-Carres-owned Units", async () => {
     await as(OP);
     const carres = await attempt("select public.repair_order_record_owner_consent($1, $2::jsonb) as r", [roId, JSON.stringify({ stock_item_ids: [U.free], outcome: "given", evidence: "x" })]);
@@ -325,6 +378,10 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
     expect(r.ok).toBe(true);
     const issue = await attempt("select public.repair_order_issue($1, 'whatsapp', 'x', null) as r", [id]);
     expect(issue).toMatchObject({ ok: false, detail: "ro_cancelled" });
+    await owner();
+    expect(await released(id, U.cancelMe)).toBe(true);
+    expect(await availability(U.cancelMe)).toEqual({ needs_repair: false, a: "available" });
+    await as(OP);
     // The Unit is free for a new repair again.
     const again = await create([unitInput(U.cancelMe)]);
     expect(again.ok).toBe(true);
@@ -380,6 +437,18 @@ describe.skipIf(!URL)("Repair Orders slice A (real PostgreSQL, 0602)", () => {
     expect(grn.grn_no).toMatch(/^GRN-/);
     // Repaired goods wait for inspection before they are sold again.
     expect((await stockRow(U.free)).status).toBe("on_hold");
+    await owner();
+    expect(await released(roId, U.free)).toBe(false);
+
+    // The inspection result is recorded through Stock's own hold door: that
+    // ends the repair for this Unit and it is available again.
+    await as(OP);
+    expect(await attempt("select public.ops_stock_resolve_unit_hold($1, 'back_to_stock', 'Repaired, checked') as r", [U.free])).toMatchObject({ ok: true });
+    await owner();
+    expect(await released(roId, U.free)).toBe(true);
+    expect(await availability(U.free)).toEqual({ needs_repair: false, a: "available" });
+    // The Unit on the same RO that has not come back stays In repair.
+    expect(await released(roId, U.consign)).toBe(false);
   });
 
   it("the legacy Claim-only repair-return still mints its own number (existing identities are permanent)", async () => {

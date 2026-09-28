@@ -54,11 +54,15 @@ export default function RepairOrderUnitsTable({
   units,
   pickupLocation,
   returnLocation,
+  onRemove,
 }: {
   roId: string;
   units: readonly RepairOrderUnitRow[];
   pickupLocation: string | null;
   returnLocation: string | null;
+  /** Object page only, before Issue: take a Unit off the RO. The register's
+   *  expansion never passes it — the inspector stays read-only (§9.7). */
+  onRemove?: (unit: RepairOrderUnitRow) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const hasEvidence = units.some((u) => u.evidence.length > 0);
@@ -95,6 +99,9 @@ export default function RepairOrderUnitsTable({
                 <Cell>
                   <div className="break-words">{unit.po_no ?? <Absence />}</div>
                   <SecondLine>{unit.unit_id}</SecondLine>
+                  {onRemove ? (
+                    <Button variant="ghost" size="sm" onClick={() => onRemove(unit)}>Remove</Button>
+                  ) : null}
                 </Cell>
                 <Cell>
                   <div className="break-words">{unit.item ?? <Absence />}</div>

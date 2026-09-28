@@ -47,7 +47,7 @@ const UNITS = [
 function builder(rows: unknown[]): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
-    select: vi.fn(() => b), order: vi.fn(() => b), in: vi.fn(() => b), eq: vi.fn(() => b), limit: vi.fn(() => b),
+    select: vi.fn(() => b), order: vi.fn(() => b), in: vi.fn(() => b), eq: vi.fn(() => b), is: vi.fn(() => b), limit: vi.fn(() => b),
     range: vi.fn((from: number, to: number) => Promise.resolve({ data: rows.slice(from, to + 1), error: null })),
     maybeSingle: vi.fn(() => Promise.resolve({ data: rows[0] ?? null, error: null })),
     then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(res, rej),
@@ -87,7 +87,10 @@ function client(over: Partial<Record<string, unknown[]>> = {}, rpc: (name: strin
       if (!(t in tables)) throw new Error(`unmocked table ${t}`);
       return builder(tables[t]!);
     }),
-    storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: "https://signed" } }) }) },
+    storage: { from: () => ({
+      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" } }),
+      createSignedUploadUrl: async (path: string) => ({ data: { token: "t", path }, error: null }),
+    }) },
   };
 }
 
@@ -230,6 +233,50 @@ describe("writes", () => {
     expect(sb.calls.map((x) => x.name)).toEqual(["repair_order_record_owner_consent", "repair_order_cancel"]);
   });
 });
+
+describe("remove a Unit before Issue, and the category word", () => {
+  it("a later Repair Quotation reaches its door, and the evidence read signs it", async () => {
+    const sb = client({ repair_orders: [{ ...RO, quotation_path: "repair_quotation/x/q.pdf" }] }, () => ({ data: { id: RO_ID }, error: null }));
+    const res = await call(sb, `/${RO_ID}/quotation`, { method: "POST", body: JSON.stringify({ path: "repair_quotation/x/q.pdf" }) });
+    expect(res.status).toBe(200);
+    expect(sb.calls[0]).toEqual({ name: "repair_order_record_quotation", args: { p_ro_id: RO_ID, p_path: "repair_quotation/x/q.pdf" } });
+    const ev = (await (await call(sb, `/${RO_ID}/evidence`)).json()) as { quotation: { url: string } | null };
+    expect(ev.quotation?.url).toBe("https://signed");
+  });
+
+  it("remove reaches its door", async () => {
+    const sb = client({}, () => ({ data: { id: RO_ID }, error: null }));
+    const res = await call(sb, `/${RO_ID}/units/11111111-2222-4333-8444-000000000003/remove`, { method: "POST", body: "{}" });
+    expect(res.status).toBe(200);
+    expect(sb.calls[0]).toEqual({ name: "repair_order_remove_unit", args: { p_ro_id: RO_ID, p_stock_item_id: "11111111-2222-4333-8444-000000000003" } });
+  });
+  it("Category prints the shared dictionary word, never the raw catalog value", async () => {
+    const sb = client({ product_skus: [{ sku: "SKU-1", variant: "Queen", product_models: { name: "Sonic", category: "mattress" } }] });
+    const row = ((await (await call(sb, "")).json()) as { repairOrders: RepairOrderListRow[] }).repairOrders[0]!;
+    expect(row.units[0]!.category).toBe("Mattress");
+  });
+});
+
+describe("the Repair Quotation upload slot", () => {
+  it("accepts a PDF only for the repair_quotation purpose", async () => {
+    const sb = client();
+    const slot = (body: object) => fetchUpload(sb, body);
+    const pdf = await slot({ mimeType: "application/pdf", scope: { kind: "repair_quotation", id: "11111111-2222-4333-8444-000000000009" } });
+    expect(pdf.status).toBe(200);
+    expect(((await pdf.json()) as { path: string }).path).toMatch(/^repair_quotation\/.+\.pdf$/);
+    const elsewhere = await slot({ mimeType: "application/pdf", scope: { kind: "unit", id: "11111111-2222-4333-8444-000000000009" } });
+    expect(elsewhere.status).toBe(422);
+  });
+});
+
+async function fetchUpload(sb: ReturnType<typeof client>, body: object) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(adminClient).mockReturnValue(sb as any);
+  const jwt = await signTestJwt("11111111-1111-1111-1111-000000000001", { email: "operation@x", app_metadata: { role: "operation" } });
+  return app.fetch(new Request("http://t/api/ops/issues/evidence/upload-url", {
+    method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+  }), env);
+}
 
 describe("GET /api/operation/repair-orders/eligible-units", () => {
   it("needs the Site and prints each Unit's refusal words from the database", async () => {

@@ -18,6 +18,7 @@ import { RepairOrdersRegister } from "./OperationRepairOrders";
 import { RepairOrderView } from "./RepairOrderObject";
 
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Repair Orders</header> }));
+vi.mock("@/components/EvidenceUploadField", () => ({ default: (p: { testId?: string }) => <div data-testid={p.testId ?? "upload"} /> }));
 vi.mock("@/lib/queries", () => ({
   useOperationRepairOrders: () => ({ data: undefined, isLoading: false, isError: false }),
   useOperationRepairOrder: () => ({ data: undefined, isLoading: true }),
@@ -147,6 +148,40 @@ describe("the register (owner-confirmed 2026-09-20)", () => {
     unmount();
     wrap(<RepairOrdersRegister rows={[]} isError onRetry={() => undefined} />);
     expect(screen.getByRole("alert")).toHaveTextContent("Repair Orders could not be loaded");
+  });
+});
+
+describe("review fixes 2026-09-28", () => {
+  it("a direct repair prints NOTHING in Supplier Claim No, and the object omits the fact", () => {
+    const { unmount } = wrap(<RepairOrdersRegister rows={[row()]} />);
+    expect(headings()).toContain("Supplier Claim No");
+    const cells = screen.getAllByTestId("repair-order-claim-cell");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) expect(cell.textContent).toBe("");
+    unmount();
+    wrap(<RepairOrderView ro={detail()} />);
+    expect(screen.queryByText("Supplier Claim No")).not.toBeInTheDocument();
+  });
+
+  it("the route is drawn with the kit RouteStop, one per stop, never as input boxes", () => {
+    wrap(<RepairOrderView ro={detail({ issued: true })} />);
+    const stops = ["Issue", "Supplier received RO", "Picked up", "Returned", "Inspected"].map((s) => screen.getByTestId(`repair-order-stop-${s}`));
+    expect(stops.map((el) => el.getAttribute("data-tone"))).toEqual(["done", "due", "none", "none", "none"]);
+  });
+
+  it("before Issue a Unit can be removed from the RO", async () => {
+    wrap(<RepairOrderView ro={detail()} />);
+    expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+  });
+
+  it("after Issue nothing can be removed", () => {
+    wrap(<RepairOrderView ro={detail({ issued: true })} />);
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  });
+
+  it("with no Repair Quotation the object offers the upload", () => {
+    wrap(<RepairOrderView ro={detail()} />);
+    expect(screen.getByTestId("repair-order-quotation-upload")).toBeInTheDocument();
   });
 });
 
