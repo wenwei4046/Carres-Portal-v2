@@ -155,10 +155,21 @@ rows and its total call ONE predicate (`salesOrderRegisterPopulation`: status no
 Payments and the dashboard receive from the shared list is unchanged. Measured: on that shared path
 the count excludes rentals while the rows include them — left as it is, because changing it changes
 what other modules receive.
-**Scope D, second half · the portal-wide dash sweep — NOT BUILT.** Measured 2026-09-28: 160 source
-files in `apps/web` and `packages/shared` still write a dash as a value from their own column or
-template (the engine no longer adds one). It crosses every module and several open PRs, so it ships
-as its own change, module by module.
+**Scope D, second half · the portal-wide dash sweep — VALUES AND RANGES BUILT 2026-09-28, production
+walk owed.** Every dash that stood for a value in `apps/web` and `packages/shared` is gone (about 300
+lines in 150 files, one change): a blank cell, a missing label, an unread date, a PDF cell and a
+select's empty row now draw nothing, or the field's own word where one reads better (`No category` in
+the PO report, `No SKU` in pool usage, `No position → COO` in HR history; a select's empty row reads
+its label: `Marital status`, `Bank`, `Race`). A zero discount prints `0.00` / `RM 0.00` on the Sales
+Order and Invoice papers; a quantity line's Unit ID cell on the PO paper and the PO page draws nothing
+(PO PDF Standard updated). A WhatsApp message omits a line whose value is missing (`REF:`,
+`Customer:`, `PO:`) instead of printing `REF: —`. Every range reads `to` (`Mon to Fri`,
+`09:00 to 17:00`, `1 Sep 2026 to 28 Feb 2027`). Rental's `Visits due` tile, which only ever showed a
+dash, is removed. **Not swept here:** `WarehouseStockRegister`, `WarehouseUnitDetail` and
+`WarehouseUnitProblemReport` belong to the open Inventory change (#1677), which removes their dashes;
+and a dash used as a separator or inside a sentence (`{a} — {b}`, `Total — unchanged`): measured
+752 lines in 226 files, many of them owner-approved words, so it is a separate pass that reads each
+sentence.
 
 **Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
 (`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's
