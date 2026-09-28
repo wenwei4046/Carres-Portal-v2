@@ -1056,8 +1056,10 @@ joins the kit with its `/ui` example and its UI MASTER entry in the build that f
 **Reference (evidence, not authority):** `docs/workspace/work-reference/prototype.html` and
 `work-1440.png` · `work-1440-form-open.png` · `work-1023.png` (SO-1333, test data, 2026-09-28).
 **Still owed, not locked:** the rail group titles' 11px supporting lines (words need owner approval);
-the phone layout below 900px (its own round); the Sales Orders Order Route still prints `Waiting for
-purchase` and `Confirm ready date` against Purchasing law (sent to the Sales Orders chat 2026-09-28).
+the phone layout below 900px (its own round); the Sales Orders Order Route conflicts (`Waiting for purchase`,
+`Confirm ready date`) are agreed and fixed in PR #1695 by the Sales Orders chat — the Route now reads
+`po_sends`, acts `Send {PO No} to {Supplier}` until the current version is sent, and SUPPLIER's day-before
+act is `Ask {Supplier} for the Supplier DO for {PO No}`; the build re-tallies once #1695 is on main.
 **READY FOR CARD — Workspace Work page (desktop).** Build the §5.10 page for real orders from the
 Work feed and the owning modules' components; acceptance = the BUILD SHEET values measured at 1440 /
 1180 / 1023 / 919, the three SO-1333 acts on the first screen, no free-text send record, no page
