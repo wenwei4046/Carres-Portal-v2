@@ -5236,7 +5236,7 @@ neither narrows the 2026-09-18 approved scope nor pretends a Dealer Site exists 
 with the supplier about the display goods, price and conditions; Operation does not negotiate or
 set the price. This internal record hands that arrangement to Operation for documentation and
 execution. Recording negotiated terms does not bypass existing commercial or Manual Purchase
-approval. Detailed action assignment, delegation of entry and new screen wording remain under
+approval. Detailed action assignment and new screen wording remain under
 review; this ruling does not approve the complete Showroom Blueprint or application build.
 
 **Purpose / source:** record a new display placement, replacement, removal or change and connect
@@ -5253,6 +5253,17 @@ may be recorded with model details/photos; resolve them to governed Catalog SKU 
 formal supplier-document issuance. Catalog owns product facts; Operation cannot invent the SKU
 or price. Read known facts and require only missing information. Missing price/conditions go back
 to the negotiating Sales person rather than being decided by Operation.
+
+**ENTRY AND COMMERCIAL FOLLOW-UP — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Sales may create the handoff directly; Operation may record it on Sales's behalf from the supplied
+conversation/material. Both entry paths identify and retain the actual negotiating Sales person.
+The person who records the handoff and the negotiating Sales person are distinct facts; proxy
+entry never impersonates Sales or transfers commercial responsibility to Operation. Record the
+actual creator and time in History. Missing model details, price or agreed conditions are assigned
+back to that negotiating Sales person to complete. Operation may identify and record the gap but
+may not invent the answer or negotiate/set the price. Both paths create the same source-linked
+Display Request, not separate queues or duplicate supplier orders. This ruling permits proxy
+entry, not supplier-document issuance, commercial approval or changing Stock through that entry.
 
 **Commercial and physical connections:** Carres purchases follow Manual Purchase approval → PO;
 supplier-owned placement follows CO; consignment swap connects incoming goods and an outgoing
