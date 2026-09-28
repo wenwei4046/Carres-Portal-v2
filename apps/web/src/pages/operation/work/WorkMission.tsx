@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import { AssignLogisticsForm, DeliveryDateForm, SendPoForm, SupplierAnswerForm, useRefreshWork, WorkDocumentSheet, type WorkDocument } from "./WorkActForms";
 import { useWorkOrderRoute } from "./use-work-data";
 import { workStopsOf, type WorkAct, type WorkPoFact, type WorkStopCard } from "./work-stops";
+import { receiveButtonOf, type WorkReceiveTarget } from "./WorkReceivingView";
 
 export const MISSION_COPY = {
   proceedDate: "Proceed Date",
@@ -59,6 +60,7 @@ export default function WorkMission({
   narrow = false,
   onPickAct,
   back = null,
+  onReceive,
 }: {
   orderId: string;
   acts: readonly WorkAct[];
@@ -71,6 +73,8 @@ export default function WorkMission({
   narrow?: boolean;
   /** The act being worked picks Communication's tab. */
   onPickAct: (act: WorkAct) => void;
+  /** Opens Receiving's own full-width view inside Workspace (§5.10). */
+  onReceive?: (target: WorkReceiveTarget) => void;
   /** Opened from a PO view (A3): `Back to {PO No}` above the header. */
   back?: { label: string; onBack: () => void } | null;
 }) {
@@ -131,9 +135,15 @@ export default function WorkMission({
           why={c.why ? { text: c.why, tone: c.whyTone } : null}
           headerSlot={
             doorItem ? (
-              <Button size="touch" onClick={() => navigate(doorItem.destination)} data-testid={`work-door-${act!.key}`}>
-                {`Open ${doorItem.source.object.label}`}
-              </Button>
+              receiveButtonOf(doorItem.destination) && onReceive ? (
+                <Button size="touch" onClick={() => onReceive(receiveButtonOf(doorItem.destination)!.target)} data-testid={`work-act-${act!.key}`}>
+                  {receiveButtonOf(doorItem.destination)!.label}
+                </Button>
+              ) : (
+                <Button size="touch" onClick={() => navigate(doorItem.destination)} data-testid={`work-door-${act!.key}`}>
+                  {`Open ${doorItem.source.object.label}`}
+                </Button>
+              )
             ) : act && act.kind !== "other" && !formOpen ? (
               <Button
                 size="touch"

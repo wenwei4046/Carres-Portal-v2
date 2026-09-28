@@ -22,6 +22,12 @@ vi.mock("./work/WorkMission", () => ({
   ),
 }));
 vi.mock("./work/WorkCommunication", () => ({ default: () => <div data-testid="work-comm-stub" /> }));
+vi.mock("./work/WorkReceivingView", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./work/WorkReceivingView")>()),
+  default: ({ target, onBack }: { target: { kind: string; id: string }; onBack: () => void }) => (
+    <div data-testid="work-receiving-stub" data-target={`${target.kind}:${target.id}`}><button type="button" onClick={onBack}>‹ Workspace</button></div>
+  ),
+}));
 vi.mock("./work/LogisticsCard", () => ({ useLogisticsModel: () => ({ model: null }) }));
 vi.mock("./work/PoWindowPanel", () => ({ default: () => <div data-testid="po-window-panel-stub" />, usePoWindow: () => ({ window: null, loading: false, failed: false }) }));
 let indexState: import("./work/work-orders").WorkOrderIndex = { poOrders: new Map(), orderBySo: new Map(), soByOrder: new Map(), windows: [] };
@@ -180,6 +186,15 @@ describe("Workspace Work page — §5.10", () => {
     // order row only; the chosen filter `All modules` is the grey chip.
     expect([...rail.querySelectorAll('[class*="bg-kit-blue"]')]).toEqual([row, ...row.querySelectorAll('[class*="bg-kit-blue"]')]);
     expect(screen.getByTestId("work-rail-module-all").className).toContain("bg-kit-slate-3");
+  });
+
+  it("hosts Receiving's own full-width view INSIDE Workspace and returns to the same place (§5.10; Jess 2026-09-28 'why jump to others page?')", () => {
+    show("/operation?tab=work&grn=po:PO260903-4316");
+    expect(screen.getByTestId("work-receiving-stub")).toHaveAttribute("data-target", "po:PO260903-4316");
+    expect(screen.getByTestId("work-area")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(screen.getByRole("button", { name: "‹ Workspace" }));
+    expect(screen.queryByTestId("work-receiving-stub")).toBeNull();
+    expect(screen.getByTestId("work-area")).not.toHaveAttribute("aria-hidden");
   });
 
   it("shows only my occurrences in My Task and everyone's in Team Work", () => {

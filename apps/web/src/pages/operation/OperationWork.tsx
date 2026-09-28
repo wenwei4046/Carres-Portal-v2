@@ -38,6 +38,7 @@ import WorkPoMission from "./work/WorkPoMission";
 import WorkCommunication from "./work/WorkCommunication";
 import WorkActionPanel from "./work/WorkActionPanel";
 import WorkIssueCard from "./work/WorkIssueCard";
+import WorkReceivingView, { decodeReceiveTarget, encodeReceiveTarget, receiveButtonOf, type WorkReceiveTarget } from "./work/WorkReceivingView";
 import PoWindowPanel from "./work/PoWindowPanel";
 import { useLogisticsModel } from "./work/LogisticsCard";
 
@@ -156,6 +157,9 @@ export default function OperationWork() {
   /* A related order opened from a PO view may hold no act of mine: its Route
      still shows, with `Back to {PO No}` (A3). */
   const backKey = params.get("back");
+  /* Receiving's own full-width view, hosted HERE (§5.10: nothing leaves Workspace). */
+  const receiving = decodeReceiveTarget(params.get("grn"));
+  const onReceive = (target: WorkReceiveTarget) => set({ grn: encodeReceiveTarget(target) });
   const selected: WorkOrderGroup | null =
     groups.find((g) => g.key === chosenKey) ??
     (chosenKey?.startsWith("order:")
@@ -359,6 +363,7 @@ export default function OperationWork() {
           items={selected.items}
           index={index}
           onOpenOrder={(orderId) => set({ order: `order:${orderId}`, back: selected.key })}
+          onReceive={onReceive}
           onPickAct={(act) => {
             setWorkingAct(act);
             setParty(act.party);
@@ -375,6 +380,7 @@ export default function OperationWork() {
           logistics={selected.orderId ? logistics.model ?? null : null}
           stacked={layout.band !== "wide"}
           narrow={layout.band === "narrow"}
+          onReceive={onReceive}
           onPickAct={(act) => {
             setWorkingAct(act);
             setParty(act.party);
@@ -394,7 +400,15 @@ export default function OperationWork() {
                  own form (§5.10: nothing sends the operator to another page). */
               <WorkIssueCard key={item.id} item={item.source} />
             ) : (
-              <WorkActionPanel key={item.id} item={item.source} onOpen={() => window.location.assign(item.destination)} />
+              <WorkActionPanel
+                key={item.id}
+                item={item.source}
+                onOpen={() => {
+                  const receive = receiveButtonOf(item.destination);
+                  if (receive) onReceive(receive.target);
+                  else window.location.assign(item.destination);
+                }}
+              />
             ),
           )}
         </div>
@@ -406,7 +420,8 @@ export default function OperationWork() {
     <>
       <ModuleHeader destinationHeader testId="work-destination-header" word={WORK_PAGE_COPY.title} docTitle="Workspace · Carres" />
       <ListPageShell register testId="operation-work">
-        <div ref={areaRef} className="min-h-0 min-w-0 flex-1 overflow-x-auto" data-testid="work-area" data-band={layout.band}>
+        {receiving ? <WorkReceivingView target={receiving} onBack={() => set({ grn: null })} /> : null}
+        <div ref={areaRef} className={`min-h-0 min-w-0 flex-1 overflow-x-auto ${receiving ? "pointer-events-none invisible h-0 flex-none" : ""}`} data-testid="work-area" data-band={layout.band} aria-hidden={receiving ? true : undefined}>
           <div className="grid h-full min-h-0" style={{ gridTemplateColumns: layout.cols }}>
             {rail}
             {mission}
