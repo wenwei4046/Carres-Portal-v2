@@ -5404,6 +5404,20 @@ and invoice follow-up reference the same goods separately. This approves the ope
 journey, not detailed financial reversals, unresolved exception policies, screen copy/composition,
 the complete Showroom Blueprint or implementation.
 
+**ARRANGEMENT CHANGE AND PARTIAL EXECUTION — APPROVED TARGET / NOT BUILT;
+Jess, 2026-09-28.** Changing a movement leg updates only its remaining instructions and work.
+If new display goods have arrived but old goods have not left, preserve the new receipt and
+explicitly continue, revise or stop the old-goods arrangement through its owning authority. If old
+goods are already in the warehouse, preserve their actual location and outstanding supplier
+collection even if the new placement changes. Stopping an unexecuted scope records reason and
+preserves the prior supplier instruction and sending history. A changed supplier commitment
+requires attributable revised communication; changing a local status alone is insufficient.
+Stock MASTER §5 governs rescheduling, pre-collection cancellation and real return/redirect
+handovers after collection. Cancellation never erases executed facts or restores stock to an
+old location. Partial execution retains the exact remaining goods and obligations. Commercial
+and Finance consequences remain with their owners and specific source permissions still apply.
+This ruling does not decide disputed supplier charges or post-sale ownership/liability.
+
 **DISPLAY SPACE COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
 For each arrangement, show the actual displayed goods and quantities, planned incoming goods and
 planned outgoing goods. Operation coordinates movement timing and confirms with the receiving
@@ -5631,7 +5645,7 @@ snapshot, so these are separate observations. This audit is not responsive/visua
   U1-000-297) plus older Carres Klang display rows. Its Showroom Display count was 102, not PJ's
   36 imported records: the broad display filter is not an exact PJ selector. Stock §12.9 owns
   the 36-row test-import/incorrect ownership caveat. No new count or ownership backfill approved.
-- **REAL GAP / CONTRADICTION:** detailed amendment/cancellation and post-sale commercial reversal;
+- **REAL GAP / CONTRADICTION:** detailed document amendment controls and post-sale commercial reversal;
   commercial successor routing when the original Sales person is inactive; no-Sales-Order movement
   coordination admission; opening-stock provenance and display-set/individual-Unit reconciliation;
   exact Showroom UI/copy and Work rules. Existing generic controls resolve many mechanics but not
@@ -5666,8 +5680,8 @@ The Oracle distinction is a research lesson, not financial advice or adopted pos
 | Missing historical supplier order | Partial authority: §6.2 opening stock | Preserve verified opening-count provenance/supplier/ownership. Recommend support without a fabricated backdated Consignment Order; exact allowed provenance on sale/return still needs explicit closure |
 | Multiple suppliers / Sites | Real composition gap | One arrangement may link supplier-specific instructions; no supplier sees another supplier's goods/conditions. A cross-supplier replacement is separate incoming/outgoing obligations, not one combined supplier document |
 | Edit before issuance | Ordinary mechanics | Preserve actual actor/history; do not mint official Units for drafts; warn against concurrent stale changes |
-| Amendment after sending | General version law; consignment detail gap | Preserve number, old PDF and sent evidence; revise only unfulfilled scope; send changed instruction once. Changes to received/handed-over facts use owning corrections, not silent edits |
-| Cancellation before/after partial movement | General Stock law; consignment detail gap | Stop only unexecuted scope with reason; completed movements remain true. If one leg happened, resolve the other explicitly; never erase a receipt or move stock back via Cancel |
+| Amendment after sending | Approved arrangement boundary §9.8; detailed document controls remain | Preserve number, old PDF and sent evidence; revise only unfulfilled scope; send changed instruction once. Changes to received/handed-over facts use owning corrections, not silent edits |
+| Cancellation before/after partial movement | Resolved Stock §5 and approved arrangement boundary §9.8 | Stop only unexecuted scope with reason; completed movements remain true. If one leg happened, resolve the other explicitly; never erase a receipt or move stock back via Cancel |
 | Copy/duplicate arrangement | Not required for first completion | Do not offer blank copy of live Units, price acceptance or sent evidence. Search/reuse source avoids accidental second commitment; optional prefilled draft only if later justified |
 | Reserved / damaged / missing outgoing Unit | Stock rules resolved | Revalidate eligibility at action, respect Sales Order reservation/protective control; Sales/Purchasing cannot silently release it. Report stock issue with evidence; retain unresolved movement |
 | Direct showroom receipt / label / wrong or short goods | Stock/Receiving target; delivery proof incomplete | One Receiving engine, exact issued identities, receiver label rule, observable outcomes/claim evidence. Source page must not require supplier-applied labels; physical rollout needs receiving-side identity proof |
@@ -5749,17 +5763,6 @@ return/redirect handover; Cancel cannot restore the original location. Each Unit
 confirmed holder, including partial collection/arrival. Consignment instructions retain distinct
 incoming/outgoing dates and follow governed document revision/sending rules. These existing
 constraints need no fresh owner approval.
-
-**PROPOSAL / NOT LAW — apply these constraints to the complete display arrangement.**
-Changing one leg updates only its remaining instructions and work. If new display goods have
-arrived but old goods have not left, keep the new receipt and explicitly continue, revise or stop
-the old-goods arrangement through its owning authority. If old goods are already in the warehouse,
-keep their actual location and outstanding supplier collection even if the new placement changes.
-A stopped unexecuted scope records reason and preserves the prior supplier instruction/sending
-history; any changed supplier commitment requires attributable revised communication, not a local
-status alone. Outstanding commercial/Finance consequences remain with their owners. Falsifier:
-a more specific governing source/commitment rule requires additional approval or treatment; that
-rule wins. This proposal does not decide disputed supplier charges or post-sale ownership/liability.
 
 #### Recommended whole solution and remaining owner boundary
 
