@@ -1238,6 +1238,12 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      only the channels the Supplier Master records for that supplier (SO-1333: Ohana WhatsApp group
      and email; Nice Future WhatsApp group) and `Recipient` is the fact that follows from it
      (Purchasing §5.6). No recorded channel → the form names the missing contact, no input.
+   - **Six fixes 2026-09-28 (Jess "yes"):** the `3 working days before` check is a STEP (§5.9: done
+     only when the company has the details), so LOGISTICS reads `1 of 2 done` and is not ticked; the
+     four Communication tabs stay on one row; SUPPLIER's line is its own sentence `Supplier has not
+     confirmed the ready date`; every text is at least 4.5:1 (calendar, search hint, counts, the SO
+     link); a stop's outline takes its state colour (red missed · amber due); a route line carries one
+     status and wraps below 1100px instead of being cut.
    - **Widths:** the page never scales on desktop. 1340+ as B2; 1100–1339 rail 240 · Mission ≥460 ·
      Communication 300 with checklist rows stacking the state under the step; 900–1099 rail 220 ·
      Mission ≥400 · Communication 280. Measured at 1440 / 1180 / 1023 / 919: 13px text, 36px buttons,
@@ -2401,3 +2407,5 @@ render the contract and owning-module facts governed here; it must not copy fixt
 artifact's implementation.
 
 **Owner correction 2026-09-28 — actionable work first (local prototype):** show admitted unfinished cards above the collapsed Order Route, missed before due. Render each actionable card once; route rows link back to it. Supplier before send confirmation shows `Sending not confirmed`; expanding reveals read-only facts without empty completion boxes or a progress ratio. Recipient is a recorded supplier contact/group, never free text; multiple recorded destinations permit selection, missing contact data must not be invented. Production integration remains owed.
+
+Review fixes (owner approved 2026-09-28): communication tabs wrap within their panel at medium widths. Time reminders are facts without checkbox or progress weight. DELIVERY ORDER has one requirements ratio, no second done ratio. Unavailable messages cannot be copied; disconnected prototype messaging controls remain disabled.
