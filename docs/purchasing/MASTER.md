@@ -5464,7 +5464,23 @@ supplier collection, overdelivery or claim outcome; no blank `+ New`.
 Paired CO, Work.
 **Journey:** system creates source-linked return → standalone return sends PDF; paired swap uses the
 combined CO PDF → scan exact Unit and prove collection.
-**Object/placement:** full-width view; 50/50 only for standalone issue/revision.
+**Object/placement — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Full-width view;
+50/50 only for standalone issue/revision. The operator reads three areas: exact goods to hand back
+(existing Unit IDs/model, supplier and current Site from Stock, never retyped); confirmed collection
+arrangement (actual collecting party and date, unresolved facts kept explicit); actual handover
+(exact Units, recipient, time and evidence). Planned quantity is not handed-over quantity.
+Partial collection leaves the uncollected Units at their evidenced location and retains the
+remaining collection work. No manual stock removal or whole-return completion is inferred from
+issuing/sending the document.
+
+A paired swap's CO shows the linked CRTN progress and opens the same owning handover action,
+including through Workspace; staff need not find another record to repeat the work. The CRTN
+Register remains the cross-record view of outstanding supplier collections. A swap uses the one
+combined CO supplier instruction; only a standalone return sends its own CRTN document.
+Supplier return retains its CRTN source and the shared physical-handover contract; it is not a
+Carres Site-to-Site Transfer. Stock owns custody, Purchasing owns the supplier instruction, and
+actual receiving/recipient evidence determines the physical result. This admits the information
+and interaction direction, not a new kit component or completed application implementation.
 **Exceptions:** supplier collects wrong/partial Unit, Unit condition disputed, date changed,
 unidentified legacy Unit.
 **Connections:** CO/Display/Claim, Stock custody, supplier. Unsold return creates no refund, credit or
