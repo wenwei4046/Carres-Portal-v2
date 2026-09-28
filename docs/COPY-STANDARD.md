@@ -235,6 +235,7 @@ NOT BUILT; Workspace MASTER §4). The one global
 | Duty next primary assignment (owner-approved 2026-09-28; NOT BUILT) | `Next assignment` — person and effective dates; omit when none exists; does not change today's normal owner | Upcoming owner · a future person shown as current |
 | Duty record disclosure (owner-approved 2026-09-28; NOT BUILT) | `Assignment & cover history` — collapsed by default, all authorised records remain reachable; distinguish record time from effective dates | future terms described as already completed |
 | Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |
+| Duty assignment form (owner-approved 2026-09-28; NOT BUILT) | Read-only `Duty` · `Normal owner` · `Effective`; inputs `Holder` · `Effective from` · `Until` · `Note`; `Cancel` / `Assign holder` | a future holder presented as current · a save claimed before confirmation from the source |
 | Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
 | Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
 | Duty no match | `No duties match this search` · `Clear search` | No duties |

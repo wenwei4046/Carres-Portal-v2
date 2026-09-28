@@ -1191,7 +1191,10 @@ the current facts. Catalogue/detail at 1440/1180px; list then full-width detail 
 Settings navigation opens on demand; never force a third narrow-screen column. The separately approved
 2026-09-28 catalogue shows today's holder/active cover/unassigned answer; future dates belong in
 detail (Workspace §4.2), with no token change. Remaining interaction
-review is still open. This ruling changes no
+review is still open. Workspace §4.3 also carries the owner-approved 2026-09-28 / NOT BUILT
+assignment form: current read-only facts above the focused inputs, one confirmation, preserved
+input on failure, and single-column narrow-screen layout. Date-conflict policy is not approved by
+that presentation ruling. This ruling changes no
 colour, spacing, typography, icon or other token value.
 
 **THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The

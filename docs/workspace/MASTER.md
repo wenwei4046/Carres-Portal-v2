@@ -267,11 +267,30 @@ or production completion; the remaining action/exception details continue in PLA
 
 ### 4.3 · Change-holder contract
 
-`Assign holder` opens a focused action surface with `Duty`, `Holder`, `Effective from`, optional
-`Until` and optional factual `Note`. Eligible choices come from People's active authorised Carres
-staff only; a departed, disabled, external Warehouse or ineligible account is not offered and is
-refused again at the write door. The system shows the current holder and the resulting effective
-period before confirmation.
+**FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+`Assign holder` opens one focused action surface. Show read-only `Duty`, `Normal owner` and the
+current assignment's `Effective` period above the inputs, followed by required `Holder` and
+`Effective from`, optional `Until` and optional factual `Note`. Do not preselect a person or start
+date. The selected person and effective dates remain visible before the single primary
+`Assign holder` confirmation; `Cancel` closes without a write.
+
+Eligible choices come from People's active authorised Carres staff only; a departed, disabled,
+external Warehouse or ineligible account is not offered and is refused again at the write door.
+Existing person-only, manager and no-self-assignment gates remain. Personnel loading/failure must
+be distinguishable from a successfully loaded list with no eligible choice; never imply that a
+failed read proves nobody is eligible. Missing fields use §4.4.1's exact repair sentences. Preserve
+input on refusal/failure, prevent duplicate confirmation while saving, and only announce completion
+after the authoritative assignment write succeeds. A successful future assignment appears under
+`Next assignment` without changing today's owner early. No Work is marked complete by this act.
+
+Use the shared focused dialog at 1440/1180px and a single-column form at 820/743/390px. Names wrap,
+content scrolls vertically, and controls remain reachable above the on-screen keyboard. Closing
+returns focus to the originating action. Readers retain `Duty assignments are set by the manager.`
+and see no write imitation. This surface introduces no Waiting/Urgent/Missed task state.
+
+This approval covers form presentation only. The conflict between §4.4.1's primary-period refusal
+copy and the current newest-effective-assignment behaviour remains under PLAN review; this approval
+does not settle overlapping-date policy or authorise application Build.
 
 The act appends a new assignment; it never edits or deletes an old row. Overlap resolution is
 server-owned and must not leave two primaries effective on one day. A future assignment does not
