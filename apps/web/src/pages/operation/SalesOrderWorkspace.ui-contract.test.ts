@@ -1010,9 +1010,13 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
     /* ⭐ THE SO PAGE FIELD STANDARD (2026-09-22): a grey box means editable, and
        the three exceptions print as plain text. */
-    expect(workspace).toContain('data-kit={framed ? "readonly-field" : "plain-fact"}');
+    /* A system-filled value on a form wears the grey automatic box (owner
+       2026-09-28); every other framed fact is the white readonly field. */
+    expect(workspace).toContain('data-kit={framed ? (automatic ? "automatic-field" : "readonly-field") : "plain-fact"}');
     expect(workspace).toContain('<Fact own={false} label="SO Doc Date"');
-    expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
+    /* ONE skin: the white control, or the same control with the kit's
+       disabled-grey fill for an automatic value. Never a second copy. */
+    expect(workspace).toContain('${automatic ? CONTROL_BASE.replace("bg-white", "bg-kit-slate-3") : CONTROL_BASE} ${CONTROL_BORDER.rest}');
     /* Announced as what it is drawn as. A box that looks typable and reads to
        a screen reader as loose text is the same defect in the other channel. */
     expect(workspace).toContain('role="textbox"');
