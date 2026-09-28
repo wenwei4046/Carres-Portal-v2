@@ -848,7 +848,7 @@ export default function SalesOrderRoute({
     [],
   );
 
-  if (loading) return <Loading label="Opening the order route" />;
+  if (loading) return <RouteLoadingFrame />;
 
   return (
     <div className="flex flex-col gap-3" data-testid="sales-order-route">
@@ -1009,6 +1009,21 @@ export default function SalesOrderRoute({
             <Maximize2 size={14} aria-hidden="true" />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Loading holds the canvas's final geometry (Orders MASTER § A READ FAILURE
+ *  HAS THREE FACES): the same framed box the map will fill, so nothing jumps. */
+export function RouteLoadingFrame() {
+  return (
+    <div
+      data-testid="route-loading"
+      className="relative flex h-[calc(100vh-260px)] min-h-[420px] items-start overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 p-6"
+    >
+      <div className="w-[208px] rounded-card border border-kit-slate-5 bg-white p-3">
+        <Loading variant="skeleton" lines={3} label="Opening the order route" />
       </div>
     </div>
   );

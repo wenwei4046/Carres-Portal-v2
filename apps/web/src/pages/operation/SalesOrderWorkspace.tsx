@@ -146,7 +146,7 @@ import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
-import SalesOrderRoute, { type RouteRetryOwner } from "./SalesOrderRoute";
+import SalesOrderRoute, { RouteLoadingFrame, type RouteRetryOwner } from "./SalesOrderRoute";
 import { salesOrderRouteInputOf, type RouteOrderDetail } from "./sales-order-route-input";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
@@ -3861,7 +3861,7 @@ function SalesOrderWorkspaceBody() {
       {showRoute ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
-            <Loading label="Opening the order route" />
+            <RouteLoadingFrame />
           ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <SalesOrderReadFailure
@@ -3950,8 +3950,21 @@ function SalesOrderWorkspaceBody() {
            and the page scrolls normally. */
         <div ref={splitHostRef} className={`min-h-0 flex-1 bg-kit-slate-3 ${split === "stack" ? "overflow-auto" : "overflow-hidden"}`}>
           {!isNew && detailQ.isLoading && (
-            <div className="px-4 py-4">
-              <Loading label="Opening the sales order" />
+            /* Loading holds the two panes' final geometry: the same split the
+               form and the paper will fill, so the page does not jump. */
+            <div
+              data-testid="so-loading"
+              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
+              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
+            >
+              <div className="min-w-0 px-4 py-4">
+                <div className="rounded-card border border-kit-slate-5 bg-white p-4">
+                  <Loading variant="skeleton" lines={6} label="Opening the sales order" />
+                </div>
+              </div>
+              <div className={`min-w-0 bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}>
+                <div className="mx-auto aspect-[210/297] max-w-[700px] rounded-card border border-kit-slate-5 bg-white" />
+              </div>
             </div>
           )}
           {!isNew && !detailQ.isLoading && detailQ.isError && (
