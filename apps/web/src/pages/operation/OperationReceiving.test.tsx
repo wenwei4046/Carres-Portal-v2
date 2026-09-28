@@ -1253,12 +1253,12 @@ describe("ReceivingWorkspace — the active Session", () => {
     expect(screen.getByTestId("do-number")).toHaveValue("");
     const save = screen.getByTestId("receiving-save");
     expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Save — add a DO number");
+    expect(save).toHaveTextContent("Save: add a DO number");
 
     fireEvent.change(screen.getByTestId("do-number"), {
       target: { value: "DO-5512" },
     });
-    expect(save).toHaveTextContent("Save — upload signed DO");
+    expect(save).toHaveTextContent("Save: upload signed DO");
     expect(save).toBeDisabled();
   });
 

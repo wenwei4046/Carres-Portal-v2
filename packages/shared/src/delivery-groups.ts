@@ -153,5 +153,5 @@ export function deliveryScopeSentence(
   if (waiting.length === 0) return null;
   const going = scope.map(deliveryGroupLabel).join(" + ");
   const later = waiting.map(deliveryGroupLabel).join(" + ");
-  return `${going} only — ${later} follows on a second trip`;
+  return `${going} only. ${later} follows on a second trip`;
 }

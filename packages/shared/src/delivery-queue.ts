@@ -87,7 +87,7 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     // raises this step from order birth) and told the operator the opposite of
     // the rule. The DEADLINE is unchanged; only the sentence was wrong.
     description:
-      "No logistics company is picked yet — assign one as soon as the route is known, whether or not the goods are in; late once the customer's date is under 3 working days away",
+      "No logistics company is picked yet. Assign one as soon as the route is known, whether or not the goods are in; late once the customer's date is under 3 working days away",
   },
   {
     key: "chase",
@@ -102,7 +102,7 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     // The three other steps are not settings: they are the shape of the work.
     leadWorkingDays: 3,
     description:
-      "Logistics assigned but the customer has not confirmed a date + slot — late once the promised date is the configured number of working days away",
+      "Logistics assigned but the customer has not confirmed a date + slot. Late once the promised date is the configured number of working days away",
   },
   {
     key: "deliver_today",
@@ -110,7 +110,7 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     label: orderActionQueue("deliver_today"),
     anchor: "confirmed_date",
     leadWorkingDays: 0,
-    description: "The customer confirmed TODAY as the delivery day — it goes out today",
+    description: "The customer confirmed TODAY as the delivery day. It goes out today",
   },
   {
     key: "photo",
@@ -119,7 +119,7 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     anchor: "delivered_at",
     leadWorkingDays: -1,
     description:
-      "Delivered with no delivery photo attached yet — late one working day after the delivery",
+      "Delivered with no delivery photo attached yet. Late one working day after the delivery",
   },
 ];
 

@@ -334,7 +334,7 @@ describe("claimNextMove — who owes the next move", () => {
     expect(claimNextMove(move())).toEqual({
       key: "ask",
       owner: "carres",
-      label: "Call Ohana — agree the fix",
+      label: "Call Ohana to agree the fix",
     });
   });
 
@@ -344,7 +344,7 @@ describe("claimNextMove — who owes the next move", () => {
     expect(claimNextMove(move({ requested_action: "replace" }))).toEqual({
       key: "answer",
       owner: "supplier",
-      label: "Call Ohana — confirm what happens next",
+      label: "Call Ohana to confirm what happens next",
     });
   });
 
@@ -361,7 +361,7 @@ describe("claimNextMove — who owes the next move", () => {
       owner: "supplier",
       // R8 — this branch used to read `confirm the new delivery date`. One
       // action has ONE row line; the specificity loss is reported in the PR.
-      label: "Call Ohana — confirm what happens next",
+      label: "Call Ohana to confirm what happens next",
     });
   });
 
@@ -379,7 +379,7 @@ describe("claimNextMove — who owes the next move", () => {
     ).toEqual({
       key: "close",
       owner: "carres",
-      label: "Close SC-1001 — Ohana delivered the rest",
+      label: "Close SC-1001. Ohana delivered the rest",
     });
   });
 
@@ -411,7 +411,7 @@ describe("claimNextMove — who owes the next move", () => {
     ).toEqual({
       key: "close",
       owner: "carres",
-      label: "Close SC-1001 — Ohana agreed: Replacement",
+      label: "Close SC-1001. Ohana agreed: Replacement",
     });
   });
 
@@ -420,7 +420,7 @@ describe("claimNextMove — who owes the next move", () => {
       claimNextMove(
         move({ requested_action: "replace", supplier_response: "reject" }),
       ).label,
-    ).toBe("Close SC-1001 — Ohana refused");
+    ).toBe("Close SC-1001. Ohana refused");
   });
 
   it("a closed claim owes nobody anything and shows no action", () => {
@@ -438,7 +438,7 @@ describe("claimNextMove — who owes the next move", () => {
   it("falls back to the role word when the supplier has no name on file", () => {
     for (const n of [null, "", "   "]) {
       expect(claimNextMove(move({ supplier_name: n })).label).toBe(
-        "Call supplier — agree the fix",
+        "Call supplier to agree the fix",
       );
     }
   });

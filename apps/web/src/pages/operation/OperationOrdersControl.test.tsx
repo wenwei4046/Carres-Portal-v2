@@ -3035,7 +3035,7 @@ describe("Delivery column (T1 booking truth)", () => {
     // rows, and BOTH cells truncated carrying it.
     const cell = within(row(2003));
     expect(cell.getByText("NETS")).toBeInTheDocument();
-    expect(cell.queryByText("NETS — confirm delivery date")).toBeNull();
+    expect(cell.queryByText("NETS: confirm delivery date")).toBeNull();
   });
 
   it("C14 · the sentence is gone from the whole LIST, not just from one fixture row", () => {
@@ -3045,7 +3045,7 @@ describe("Delivery column (T1 booking truth)", () => {
     // The verb-LESS form is the duplicate; an exact-string query, because
     // `Call NETS — confirm delivery date` legitimately ends the same way and a
     // loose regex would match the very line this card is protecting.
-    expect(screen.queryByText("NETS — confirm delivery date")).toBeNull();
+    expect(screen.queryByText("NETS: confirm delivery date")).toBeNull();
     // ...and that protected line is still there, as the two structured lines
     // of the 2026-09-13 ruling (`Call NETS` over the 2026-09-24 result words).
     expect(screen.getAllByText(/^Call NETS$/).length).toBeGreaterThan(0);

@@ -564,7 +564,7 @@ export function claimNextMove(c: SupplierClaimMoveInput): SupplierClaimMove {
     return {
       key: "ask",
       owner: "carres",
-      label: `Call ${who} — agree the fix`,
+      label: `Call ${who} to agree the fix`,
     };
   }
 
@@ -574,7 +574,7 @@ export function claimNextMove(c: SupplierClaimMoveInput): SupplierClaimMove {
       return {
         key: "close",
         owner: "carres",
-        label: `Close ${c.claim_no} — ${who} delivered the rest`,
+        label: `Close ${c.claim_no}. ${who} delivered the rest`,
       };
     }
     // R8 (2026-07-28) — this step, and ONLY this step, has a dictionary row.
@@ -601,8 +601,8 @@ export function claimNextMove(c: SupplierClaimMoveInput): SupplierClaimMove {
     owner: "carres",
     label:
       c.supplier_response === "reject"
-        ? `Close ${c.claim_no} — ${who} refused`
-        : `Close ${c.claim_no} — ${who} agreed: ${supplierClaimResponseLabel(
+        ? `Close ${c.claim_no}. ${who} refused`
+        : `Close ${c.claim_no}. ${who} agreed: ${supplierClaimResponseLabel(
             c.supplier_response,
           )}`,
   };

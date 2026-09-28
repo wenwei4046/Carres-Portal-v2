@@ -748,9 +748,9 @@ export function poReviseSaveGapOf(input: {
   nothingChanged: boolean;
   reasonEmpty: boolean;
 }): string | null {
-  if (input.belowFloorSku != null) return "Save — below received";
-  if (input.nothingChanged) return "Save — nothing changed";
-  if (input.reasonEmpty) return "Save — say why";
+  if (input.belowFloorSku != null) return "Save: below received";
+  if (input.nothingChanged) return "Save: nothing changed";
+  if (input.reasonEmpty) return "Save: say why";
   return null;
 }
 

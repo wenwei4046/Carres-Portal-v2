@@ -77,9 +77,9 @@ export function paymentApprovalReason(
   if (paymentApprovalOpensGate(approvals)) return null;
   const pending = pendingPaymentApproval(approvals);
   if (pending) {
-    return `${fmtMoney(outstanding)} is still outstanding — a payment approval is waiting for the approver's decision.`;
+    return `${fmtMoney(outstanding)} is still outstanding. A payment approval is waiting for the approver's decision.`;
   }
-  return `${fmtMoney(outstanding)} is still outstanding — collect it in full, or request a payment approval.`;
+  return `${fmtMoney(outstanding)} is still outstanding. Collect it in full, or request a payment approval.`;
 }
 
 /**
@@ -89,7 +89,7 @@ export function paymentApprovalReason(
  * must see land before the goods come down.
  */
 export function codInstruction(outstanding: number): string {
-  return `COLLECT ${fmtMoney(outstanding)} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`;
+  return `COLLECT ${fmtMoney(outstanding)} BY ONLINE TRANSFER BEFORE UNLOADING. NO CASH.`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export const paymentApprovalDecideInput = z.object({
   reason: z
     .string()
     .trim()
-    .min(1, "The decision records the approver's reason — black and white."),
+    .min(1, "The decision records the approver's reason in black and white."),
 });
 export type PaymentApprovalDecideInput = z.infer<
   typeof paymentApprovalDecideInput

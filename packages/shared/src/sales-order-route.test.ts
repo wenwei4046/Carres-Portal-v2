@@ -485,7 +485,7 @@ describe("the DELIVERY ORDER gate", () => {
     expect(requirement(map, "money")).toEqual({
       id: "money",
       met: true,
-      text: "No price yet — money does not hold this delivery",
+      text: "No price yet. Money does not hold this delivery",
     });
   });
 
@@ -503,7 +503,7 @@ describe("the DELIVERY ORDER gate", () => {
     expect(requirement(map, "refused-day")).toEqual({
       id: "refused-day",
       met: false,
-      text: "Date falls on a Sunday — pick another day",
+      text: "Date falls on a Sunday. Pick another day",
     });
   });
 
@@ -519,7 +519,7 @@ describe("the DELIVERY ORDER gate", () => {
       }),
     );
     expect(requirement(map, "refused-day")!.text).toBe(
-      "Date falls on a public holiday — pick another day",
+      "Date falls on a public holiday. Pick another day",
     );
   });
 
@@ -872,8 +872,8 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
 
   it("no price: the dictionary's one spelling on the node and on the gate", () => {
     const map = resolveSalesOrderRoute(input({ money: { known: false, outstanding: 0 } }));
-    expect(node(map, "money").lines.join(" ")).toBe("No price yet — money does not hold this delivery");
-    expect(requirement(map, "money")?.text).toBe("No price yet — money does not hold this delivery");
+    expect(node(map, "money").lines.join(" ")).toBe("No price yet. Money does not hold this delivery");
+    expect(requirement(map, "money")?.text).toBe("No price yet. Money does not hold this delivery");
   });
 
   it("prints none of the words retired on 2026-09-26, approval rows or not", () => {

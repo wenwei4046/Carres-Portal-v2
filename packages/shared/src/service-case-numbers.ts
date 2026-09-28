@@ -491,7 +491,7 @@ export function caseNumbersHeadline(input: {
   } else {
     if (topIssue) {
       parts.push(
-        `${topIssue.label} is the most common problem — ${topIssue.count} of ${opened}.`,
+        `${topIssue.label} is the most common problem: ${topIssue.count} of ${opened}.`,
       );
     }
     if (topSupplier) {

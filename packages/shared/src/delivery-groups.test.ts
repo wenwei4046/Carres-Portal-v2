@@ -73,10 +73,10 @@ describe("deliveryScopeSentence", () => {
 
   it("names BOTH halves on a split, so nobody forgets what is still owed", () => {
     expect(deliveryScopeSentence(["bed"], ["bed", "sofa"])).toBe(
-      "Bed set only — Sofa follows on a second trip",
+      "Bed set only. Sofa follows on a second trip",
     );
     expect(deliveryScopeSentence(["sofa"], ["bed", "sofa"])).toBe(
-      "Sofa only — Bed set follows on a second trip",
+      "Sofa only. Bed set follows on a second trip",
     );
   });
 });

@@ -270,7 +270,7 @@ export function warehouseLoadedLine(card: {
   handedOver: number;
   unitsRequired: number;
 }): string {
-  if (card.handedOver === 0) return "Warehouse loaded — nothing yet";
+  if (card.handedOver === 0) return "Warehouse loaded nothing yet";
   return `Warehouse loaded ${card.handedOver} of ${card.unitsRequired} Units`;
 }
 

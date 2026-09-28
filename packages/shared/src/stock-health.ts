@@ -271,7 +271,7 @@ export function stockHealthHeadline(counts: StockHealthCounts): string {
   if (rated === 0)
     return counts.unrated === 0
       ? "No stock on the floor to watch."
-      : `Nothing is watched yet — ${counts.unrated} ${items(counts.unrated)} still need a number.`;
+      : `Nothing is watched yet. ${counts.unrated} ${items(counts.unrated)} still need a number.`;
   if (counts.critical > 0)
     return `${counts.critical} ${items(counts.critical)} ${isAre(counts.critical)} below the keep level.`;
   if (counts.low > 0)
@@ -619,7 +619,7 @@ export function computePlanAccuracy(input: {
 /** The words for a withheld month — one place, shared with the screen. */
 export const ACCURACY_WITHHELD_LABEL: Record<AccuracyWithheld, string> = {
   month_not_over:
-    "This month is still running. The figures appear once it ends — part of a month of sales against a whole month of ordering reads as a failed plan.",
+    "This month is still running. The figures appear once it ends. Part of a month of sales against a whole month of ordering reads as a failed plan.",
   records_start_later:
     "Sales records do not go back that far, so what sold cannot be counted for that month.",
 };
