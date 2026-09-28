@@ -33,7 +33,7 @@ function SignatureLink({ path }: { path: string }) {
         .from(SIGNATURE_BUCKET)
         .createSignedUrl(key, 3600);
       if (error || !data?.signedUrl) {
-        toast.error(`Couldn't open the signature — ${error?.message ?? "no URL"}`);
+        toast.error(`Couldn't open the signature: ${error?.message ?? "no URL"}`);
         return;
       }
       window.open(data.signedUrl, "_blank", "noopener");
@@ -144,7 +144,7 @@ export default function FinanceRentalApprover() {
       <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground">
         <b>Approve</b> puts the contract live: the monthly schedule is written, the unit is
         allocated, and the store can collect the first month by card.{" "}
-        <b>Reject</b> fails the application and leaves no money behind — the reason you type is
+        <b>Reject</b> fails the application and leaves no money behind. The reason you type is
         recorded against it.
       </div>
     </div>
@@ -207,7 +207,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             ) : (
               <span
                 className="px-2 py-0.5 rounded-full text-label font-semibold bg-amber-50 text-amber-800 border border-amber-200"
-                title="This application predates signature capture — no signature is on file, and approval is now refused without one."
+                title="This application predates signature capture. No signature is on file, and approval is now refused without one."
               >
                 Not signed yet
               </span>
@@ -248,7 +248,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
       <div className="px-4 pb-2 text-label text-muted-foreground">
         {r.creditReference
           ? `Credit bureau: ${r.creditReference}`
-          : "Credit bureau (CBM) check is not wired yet — assess this one by hand."}
+          : "Credit bureau (CBM) check is not wired yet. Assess this one by hand."}
       </div>
       <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2">
         <label className="block">

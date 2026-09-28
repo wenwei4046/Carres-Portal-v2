@@ -70,7 +70,7 @@ export default function DealerCommission() {
   ], []);
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
-    <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission — Carres" />
+    <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission · Carres" />
     {q.isError ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"

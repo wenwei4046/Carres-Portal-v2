@@ -62,7 +62,7 @@ export default function PaymentCorrectAllocation({ payment, onClose }: {
       void qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
       onClose();
     },
-    onError: (e: Error) => toast.error(`The allocation was not corrected — ${e.message}`),
+    onError: (e: Error) => toast.error(`The allocation was not corrected: ${e.message}`),
   });
 
   const setLine = (i: number, patch: Partial<{ orderId: string; amount: string }>) =>

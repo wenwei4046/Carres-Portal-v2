@@ -167,12 +167,12 @@ describe("the form", () => {
   it("keeps Record journal entry disabled, naming the gap, until debits equal credits", async () => {
     show("/finance/ledger?entry=new");
     await screen.findByTestId("manual-journal-form");
-    expect(screen.getByRole("button", { name: "Record journal entry — type the narration" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: type the narration" })).toBeDisabled();
 
     await fillOpeningBalance("12500.49");
     expect(screen.getByTestId("journal-totals")).toHaveTextContent("Total · Debit RM 12,500.50 · Credit RM 12,500.49");
     expect(screen.getByTestId("journal-difference")).toHaveTextContent("Difference RM 0.01");
-    expect(screen.getByRole("button", { name: "Record journal entry — make debits equal credits" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: make debits equal credits" })).toBeDisabled();
 
     type(2, "Credit", "12500.50");
     expect(screen.getByTestId("journal-difference")).toHaveTextContent("Difference RM 0.00");
@@ -184,11 +184,11 @@ describe("the form", () => {
     await fillOpeningBalance();
     type(1, "Credit", "5");
     expect(within(line(1)).getByText("A line takes a debit or a credit, not both.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Record journal entry — check line 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: check line 1" })).toBeDisabled();
     type(1, "Credit", "");
     type(2, "Credit", "12x");
     expect(within(line(2)).getByText("Type the amount in numbers, like 1500.00.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Record journal entry — check line 2" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: check line 2" })).toBeDisabled();
   });
 
   it("names a line with no account, and a line with no amount", async () => {
@@ -196,11 +196,11 @@ describe("the form", () => {
     await screen.findByTestId("manual-journal-form");
     narrate("Correction of a test entry");
     type(1, "Debit", "10");
-    expect(screen.getByRole("button", { name: "Record journal entry — choose an account on line 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: choose an account on line 1" })).toBeDisabled();
     await pick(1, "900-S002 Rent");
-    expect(screen.getByRole("button", { name: "Record journal entry — add a second line" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: add a second line" })).toBeDisabled();
     await pick(2, "310-1000 Bank — current account");
-    expect(screen.getByRole("button", { name: "Record journal entry — type a debit or a credit on line 2" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record journal entry: type a debit or a credit on line 2" })).toBeDisabled();
   });
 
   it("adds and removes lines, and never goes below two", async () => {

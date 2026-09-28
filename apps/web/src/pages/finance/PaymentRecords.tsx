@@ -101,7 +101,7 @@ export default function PaymentRecords() {
       });
       window.open(URL.createObjectURL(blob), "_blank", "noopener");
     } catch (e) {
-      toast.error(`The receipt could not be opened — ${(e as Error).message}`);
+      toast.error(`The receipt could not be opened: ${(e as Error).message}`);
     } finally {
       setPrinting(false);
     }
@@ -168,7 +168,7 @@ export default function PaymentRecords() {
   );
   return <div className="flex h-full min-h-0 flex-col">
     {query.isError ? <>
-      <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records — Payments — Carres" />
+      <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records · Payments · Carres" />
       <div role="alert" className="p-6 text-body">
         <p>Payment Records could not be loaded. Try again.</p>
         <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
@@ -178,12 +178,12 @@ export default function PaymentRecords() {
       ? <PaymentRecordObject payment={payment} onClose={close} printing={printing}
           onPrint={() => void printReceipt(payment)} />
       : <>
-        <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records — Payments — Carres" />
+        <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records · Payments · Carres" />
         <div className="p-6 text-body"><p>{query.isLoading ? "Loading payment…" : "Payment not available."}</p>
           <button className="btn-secondary mt-3" onClick={close}>Back to Payment Records</button></div>
       </>
     : <>
-      <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records — Payments — Carres" />
+      <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records · Payments · Carres" />
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
           storageKey="carres.payment.records.v1" appearance="reference" exportName="Payment Records"
@@ -279,7 +279,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
   const openHold = (holdsQ.data ?? []).find((h) => h.status === "open") ?? null;
   const holdDone = (done: string, failed: string) => ({
     onSuccess: () => { toast.success(done); setHolding(null); },
-    onError: (e: Error) => toast.error(`${failed} — ${e.message}`),
+    onError: (e: Error) => toast.error(`${failed}: ${e.message}`),
   });
   const openHoldM = useOpenFinanceException(payment.order_id, holdDone("Delivery held", "The delivery was not held"));
   const clearHoldM = useClearFinanceException(payment.order_id, holdDone("Hold cleared", "The hold was not cleared"));
@@ -313,7 +313,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
       void qc.invalidateQueries({ queryKey: qk.finance.paymentRegister(), exact: true });
       void qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
     },
-    onError: (e) => toast.error(`The payment was not voided — ${e.message}`),
+    onError: (e) => toast.error(`The payment was not voided: ${e.message}`),
   });
   const overflow = [
     ...(mayCorrect && live && payment.kind !== "storage"

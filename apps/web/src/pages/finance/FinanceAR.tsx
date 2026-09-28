@@ -101,7 +101,7 @@ export default function FinanceAR() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="ar-destination-header" word="AR · Receivables"
-        docTitle="AR · Receivables — Carres" />
+        docTitle="AR · Receivables · Carres" />
       {query.isError ? (
         <div role="alert" className="p-6 text-body">
           <p>Invoices could not be loaded. Try again.</p>

@@ -93,7 +93,7 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
             fee to 0 in the order, so the two do not disagree.</p>}
         {correctionInFlight && <p className="text-label font-normal text-base-500"
           data-testid="storage-correction-note">
-          A Storage Invoice correction is in progress — the replacement is a draft and asks
+          A Storage Invoice correction is in progress. The replacement is a draft and asks
           for nothing until it is issued. Issue it so the money is asked again.</p>}
         {cases.length === 0 && !casesQ.isLoading &&
           <p className="text-label font-normal text-kit-slate-11">
@@ -103,7 +103,7 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
           <p className="font-semibold">What the customer asked for</p>
           {requests.map((r) => <p key={r.id} className="text-label font-normal">
             {fmtDate(r.requested_date)} · {REASON_WORD[r.reason_key] ?? r.reason_key}
-            {r.reason_detail ? ` — ${r.reason_detail}` : ""}
+            {r.reason_detail ? `: ${r.reason_detail}` : ""}
             {r.free_storage_requested ? " · asked for free storage" : ""}
             {" · storage terms acknowledged"}
           </p>)}
@@ -151,19 +151,20 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
       void qc.invalidateQueries({ queryKey: ["finance", "invoice-register"], exact: false });
       onDone();
     },
-    onError: (e: Error) => toast.error(`The Storage Invoice was not created — ${e.message}`),
+    onError: (e: Error) => toast.error(`The Storage Invoice was not created: ${e.message}`),
   });
   return <div className="rounded-card border border-base-200 p-3" data-testid={`storage-case-${c.product_group}`}>
     <p className="font-semibold">{GROUP_WORD[c.product_group]}{c.status === "closed" ? " · Closed" : ""}</p>
     <p>Storage started {fmtDate(c.storage_start)} · today is day {charge.dayOfStorage}</p>
     <p>Free until {fmtDate(charge.freeUntilIso)}
       {c.approved_free_until && c.approved_free_until >= charge.freeUntilIso
-        ? ` · approved${c.approval_reason ? ` — ${c.approval_reason}` : ""}` : ""}</p>
+        ? ` · approved${c.approval_reason ? `: ${c.approval_reason}` : ""}` : ""}</p>
     <p>{charge.commencedPeriods === 0
       ? "No storage charge yet."
-      : billed >= charge.commencedPeriods
-        ? `${charge.commencedPeriods} charge period${charge.commencedPeriods === 1 ? "" : "s"} started · ${rm(charge.amountOwed)} — all on a Storage Invoice.`
-        : `${charge.commencedPeriods} charge period${charge.commencedPeriods === 1 ? "" : "s"} started · ${rm(charge.amountOwed)} — ${unbilled} not on a Storage Invoice yet.`}</p>
+      : `${charge.commencedPeriods} charge period${charge.commencedPeriods === 1 ? "" : "s"} started · ${rm(charge.amountOwed)}`}</p>
+    {charge.commencedPeriods > 0 && <p>{billed >= charge.commencedPeriods
+      ? "All on a Storage Invoice."
+      : `${unbilled} not on a Storage Invoice yet.`}</p>}
     <div className="flex flex-wrap gap-2 mt-2">
       {canAct && c.status === "open" && unbilled > 0 &&
         <button className="btn-secondary" disabled={mint.isPending}
@@ -223,7 +224,7 @@ function StorageChecks({ storageCase: c, canAct }: {
       setChecking(false); setLocation(""); setPackaging(""); setNote(""); setFile(null);
       void qc.invalidateQueries({ queryKey: ["finance", "storage-inspections", c.id] });
     },
-    onError: (e: Error) => toast.error(`The check was not recorded — ${e.message}`),
+    onError: (e: Error) => toast.error(`The check was not recorded: ${e.message}`),
   });
   async function submit() {
     if (!file || saving || record.isPending) return;
@@ -234,7 +235,7 @@ function StorageChecks({ storageCase: c, canAct }: {
       .from(ATTACHMENTS_BUCKET)
       .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
     setSaving(false);
-    if (error) { toast.error(`The photo upload failed — ${error.message}`); return; }
+    if (error) { toast.error(`The photo upload failed: ${error.message}`); return; }
     record.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
   }
   return <div className="mt-2" data-testid={`storage-checks-${c.product_group}`}>
@@ -309,7 +310,7 @@ function EndStorage({ caseId, onDone }: { caseId: string; onDone: () => void }) 
       method: "POST", body: JSON.stringify({ caseId, reason: reason.trim() }),
     }),
     onSuccess: () => { toast.success("Storage ended"); onDone(); },
-    onError: (e: Error) => toast.error(`Storage was not ended — ${e.message}`),
+    onError: (e: Error) => toast.error(`Storage was not ended: ${e.message}`),
   });
   if (!asking) return <button className="btn-secondary" onClick={() => setAsking(true)}>End storage</button>;
   return <span className="flex items-center gap-2" data-testid="storage-end-form">
@@ -338,7 +339,7 @@ function StartForm({ orderId, onDone, onBack }: {
       }),
     }),
     onSuccess: () => { toast.success("Storage started"); onDone(); },
-    onError: (e: Error) => toast.error(`Storage was not started — ${e.message}`),
+    onError: (e: Error) => toast.error(`Storage was not started: ${e.message}`),
   });
   return <div className="rounded-card border border-base-200 p-3 space-y-2" data-testid="storage-start-form">
     <label className="block"><span className="text-label">Goods</span>
@@ -382,7 +383,7 @@ function ExtraFreeForm({ caseId, onDone, onBack }: {
       body: JSON.stringify({ caseId, freeUntil: until, reason: reason.trim(), evidenceUrl }),
     }),
     onSuccess: () => { toast.success("Free storage approved"); onDone(); },
-    onError: (e: Error) => toast.error(`Free storage was not approved — ${e.message}`),
+    onError: (e: Error) => toast.error(`Free storage was not approved: ${e.message}`),
   });
   async function submit() {
     if (!file || saving || approve.isPending) return;
@@ -393,7 +394,7 @@ function ExtraFreeForm({ caseId, onDone, onBack }: {
       .from(ATTACHMENTS_BUCKET)
       .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
     setSaving(false);
-    if (error) { toast.error(`The written request upload failed — ${error.message}`); return; }
+    if (error) { toast.error(`The written request upload failed: ${error.message}`); return; }
     approve.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
   }
   return <div className="mt-2 rounded-card border border-base-200 p-3 space-y-2" data-testid="storage-extra-free-form">
@@ -466,7 +467,7 @@ function LaterDateForm({ orderId, onDone, onBack }: {
       }),
     }),
     onSuccess: () => { toast.success("The customer's request is recorded"); onDone(); },
-    onError: (e: Error) => toast.error(`The request was not recorded — ${e.message}`),
+    onError: (e: Error) => toast.error(`The request was not recorded: ${e.message}`),
   });
   async function submit() {
     if (!file || saving || record.isPending) return;
@@ -477,7 +478,7 @@ function LaterDateForm({ orderId, onDone, onBack }: {
       .from(ATTACHMENTS_BUCKET)
       .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
     setSaving(false);
-    if (error) { toast.error(`The upload failed — ${error.message}`); return; }
+    if (error) { toast.error(`The upload failed: ${error.message}`); return; }
     record.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
   }
   return <div className="mt-2 rounded-card border border-base-200 p-3 space-y-2"

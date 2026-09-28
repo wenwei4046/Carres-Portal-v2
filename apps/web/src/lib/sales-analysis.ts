@@ -42,7 +42,7 @@ export interface SalesAnalyticsResponse {
  *  thin-sample warning (2990s MIN_SAMPLE). */
 export const MIN_SAMPLE = 10;
 
-export const AGE_BANDS = ["<25", "25–34", "35–44", "45–54", "55+"] as const;
+export const AGE_BANDS = ["<25", "25 to 34", "35 to 44", "45 to 54", "55+"] as const;
 export type AgeBand = (typeof AGE_BANDS)[number];
 
 /** Precise age from the birthday (2990s: no stored bucket — banded at render). */
@@ -62,9 +62,9 @@ export function ageBandOf(birthdayIso: string | null, at: Date): AgeBand | null 
   const age = ageOf(birthdayIso, at);
   if (age === null) return null;
   if (age < 25) return "<25";
-  if (age < 35) return "25–34";
-  if (age < 45) return "35–44";
-  if (age < 55) return "45–54";
+  if (age < 35) return "25 to 34";
+  if (age < 45) return "35 to 44";
+  if (age < 55) return "45 to 54";
   return "55+";
 }
 

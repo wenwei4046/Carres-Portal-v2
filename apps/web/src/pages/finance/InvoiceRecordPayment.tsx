@@ -56,7 +56,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   });
   const idempotencyKey = useRef(crypto.randomUUID());
   const record = useRecordPayment(orderId, {
-    onError: (e) => toast.error(`Payment was not recorded — ${e.message}`),
+    onError: (e) => toast.error(`Payment was not recorded: ${e.message}`),
   });
   // §16 — only Active manual methods are selectable, and since 0476 that list
   // is the registry, so a method a manager added is offered here too. Until
@@ -80,7 +80,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error(`${spec.evidence} is too large — 10 MB at most.`);
+      toast.error(`${spec.evidence} is too large: 10 MB at most.`);
       return;
     }
     setFile(f);
@@ -103,7 +103,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
         });
       if (error) {
         setSaving(false);
-        toast.error(`${spec.evidence} upload failed — ${error.message}`);
+        toast.error(`${spec.evidence} upload failed: ${error.message}`);
         return;
       }
       receiptUrl = `${ATTACHMENTS_BUCKET}/${path}`;

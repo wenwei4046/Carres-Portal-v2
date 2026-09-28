@@ -127,7 +127,7 @@ export default function PartyModal({
         {party && (
           <Checkbox
             id="party-active"
-            label="Active — can be chosen on a new invoice or receipt"
+            label="Active: can be chosen on a new invoice or receipt"
             checked={active}
             onCheckedChange={setActive}
           />

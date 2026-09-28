@@ -76,7 +76,7 @@ export function LoanNoteTemplate(data: LoanNoteTemplateData) {
     <Document>
       <Page size="A4" style={styles.page}>
         <DocHeader
-          docTitle="LOAN NOTE — TEMPORARY, NOT A SALE"
+          docTitle="LOAN NOTE: TEMPORARY, NOT A SALE"
           docMetaRows={[`Loan note: ${ln_no}`, orderRow, `Date: ${issue_date}`]}
         />
 
@@ -111,7 +111,7 @@ export function LoanNoteTemplate(data: LoanNoteTemplateData) {
             your order is being prepared.
           </Text>
           <Text style={styles.termsLine}>
-            • It will be COLLECTED BACK when your order is delivered — nothing to arrange separately.
+            • It will be COLLECTED BACK when your order is delivered. Nothing to arrange separately.
           </Text>
           <Text style={styles.termsLine}>
             • Please keep it in good condition. Loss or damage while in your care may be chargeable.

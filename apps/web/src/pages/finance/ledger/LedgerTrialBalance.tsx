@@ -145,7 +145,7 @@ export default function LedgerTrialBalance() {
 
   return <div className="flex h-full min-h-0 flex-col">
     <ModuleHeader destinationHeader testId="trial-balance-destination-header" word="Trial Balance"
-      docTitle="Trial Balance — Carres" />
+      docTitle="Trial Balance · Carres" />
     {notStarted ? <div role="alert" className="p-6 text-body">
       <p>The ledger has no start date yet. Nothing can be totalled.</p>
     </div> : query.isError ? <div role="alert" className="p-6 text-body">

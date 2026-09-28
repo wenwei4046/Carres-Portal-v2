@@ -198,7 +198,7 @@ export default function FinanceReports() {
   const month = wholeMonth(from, to);
 
   return <div className="flex h-full min-h-0 flex-col">
-    <ModuleHeader destinationHeader testId="reports-destination-header" word="Reports" docTitle="Reports — Carres" />
+    <ModuleHeader destinationHeader testId="reports-destination-header" word="Reports" docTitle="Reports · Carres" />
     <div className="min-h-0 flex-1 overflow-auto p-6">
       <div className="flex flex-col gap-6">
         {/* Payment MASTER §16: Reports → Payment is a destination of this

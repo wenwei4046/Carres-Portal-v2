@@ -3846,7 +3846,7 @@ a second entry because a sentence told her to try again after the first one stoo
 | | **`Customer, supplier and other party accounts are not listed. They move only through their own documents.`** | Why control accounts are missing from the picker. |
 | | **`Total · Debit {money} · Credit {money} · Difference {money}`** | The live totals; the difference is red until it is RM 0.00. |
 | Button | **`Record journal entry`** | Records the entry; it gets its JE number at once. Asks first. Same verb as `Record receipt`. |
-| | **`Record journal entry — {gap}`**, gaps: `choose the date` · `choose a day from {date} on` · `type the narration` · `check line {n}` · `choose an account on line {n}` · `type a debit or a credit on line {n}` · `add a second line` · `the total is larger than the ledger can hold` · `make debits equal credits` | The disabled button names the first thing missing (the `Save method — type a name` pattern). |
+| | **`Record journal entry: {gap}`**, gaps: `choose the date` · `choose a day from {date} on` · `type the narration` · `check line {n}` · `choose an account on line {n}` · `type a debit or a credit on line {n}` · `add a second line` · `the total is larger than the ledger can hold` · `make debits equal credits` | The disabled button names the first thing missing (the `Save method — type a name` pattern). |
 | Dialog | **`Record this journal entry?`** · **`{money} debit and credit, dated {date}. A recorded entry cannot be changed. To correct it, record another entry.`** · **`It gets its entry number now.`** · **`Cancel`** · **`Record journal entry`** | The ask-first dialog. |
 | Done | **`Journal entry recorded.`** | The toast; the new entry then opens. |
 | Unknown outcome | **`The connection dropped. Check the Journal for this entry before you record it again.`** · **`The answer did not come back. Check the Journal for this entry before you record it again.`** | No answer came back, so the entry may stand, and the API cannot vouch that the request key (0502) is honoured. Never `Try again`: a second press could be a second entry. |
@@ -3916,7 +3916,7 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | The method the provider records (a receipt row, never a manual choice) | **`Online payment`** | e-wallet · Stripe · Online |
 | An invoice before the issue draws its number (Generate invoice header · PDF preview stamp) | **`Draft`** · **`DRAFT`** on the preview paper | a predicted `INV-YYYY-…` number · Pending |
 | Where a Sales Invoice is issued (the old AR drawer door is gone) | **`To issue a Sales Invoice, open the order and choose Generate invoice.`** | Issue invoice (AR drawer) |
-| The correction door on an issued invoice | **`Void and replace`** · `Void and replace — say why this invoice is wrong` | Void invoice · Cancel invoice · Edit invoice |
+| The correction door on an issued invoice | **`Void and replace`** · `Void and replace: say why this invoice is wrong` | Void invoice · Cancel invoice · Edit invoice |
 | Its reason field | **`Why is this invoice wrong?`** | Void reason · Remarks |
 | What it will do, said before the act | **`{INV No} is voided and keeps its paper. A replacement draft with the same lines is created; issue it from the order with Generate invoice. It gets a new number.`** | Are you sure? |
 | After the act | **`{INV No} voided — the replacement draft is ready. Issue it from the order: Generate invoice.`** | Done · Voided successfully |
@@ -3961,7 +3961,7 @@ with where it appears.
 | `An advance cannot be less than RM 0.00` | Form and API refusal. |
 | `No advance` · `{RM} · {RM} left` | The Advance column of the Payment Vouchers register. |
 | `Advance on this voucher` · `Applied to bills` · `Money back` · `Advance left` | The voucher's Advance card and its facts. |
-| `Not paid yet — approving the payment pays it` | Advance left before the voucher is approved. |
+| `Not paid yet. Approving the payment pays it` | Advance left before the voucher is approved. |
 | `Apply advance` · `Apply advance to a bill?` · `Apply advance to this bill?` | Action on the voucher's Advance card and the bill's Payments card, and its modal. |
 | `Take advance off` · `Take this advance off the bill?` | Undo one knock-off; needs a reason. |
 | `Record money back` · `Cancel money back` · `Cancel this money back?` | The supplier sent part of an advance back (money back); the approver reverses it. |

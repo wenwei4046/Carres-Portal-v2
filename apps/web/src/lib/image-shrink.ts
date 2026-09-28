@@ -46,7 +46,7 @@ export async function shrinkImage(file: Blob): Promise<ShrunkImage> {
   }
   if (blob.size > TARGET_BYTES) {
     throw new Error(
-      "Image is still over 2 MB after compression — please try a smaller photo.",
+      "Image is still over 2 MB after compression. Please try a smaller photo.",
     );
   }
   return { blob, width, height };
