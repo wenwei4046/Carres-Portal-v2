@@ -125,7 +125,9 @@ const demandPurchase: SoBatchPurchaseResponse = {
     orderId: o.id, so: o.so, customer: "{customer}", status: "blank" as const,
     proceededAt: `${appTodayIso()}T09:00:00+08:00`, requestedDeliveryDate: o.deliveryDate,
     deliveryCity: o.city, deliveryState: o.state, pos: [],
-    lines: [{ orderLineId: o.lines[0]!.id, sku: o.lines[0]!.sku, qty: o.lines[0]!.qty, stockTaken: 0,
+    /* A delivered Unit was taken from stock first — SO Batch's own rule. */
+    lines: [{ orderLineId: o.lines[0]!.id, sku: o.lines[0]!.sku, qty: o.lines[0]!.qty,
+      stockTaken: o.delivered.reduce((sum, unit) => sum + unit.qty, 0),
       item: "{item}", variant: "{size}", category: "mattress" as const, pos: [] }],
     outstandingSuppliers: [],
   })),
