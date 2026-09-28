@@ -191,7 +191,7 @@ describe("HrTeamTab", () => {
     // positions registry chips (name also appears in the row selects) + the
     // 职位更替 history line
     expect(screen.getAllByText("Chairman").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("— → COO")).toBeInTheDocument();
+    expect(screen.getByText("No position → COO")).toBeInTheDocument();
     expect(screen.getByText("by Loo")).toBeInTheDocument();
   });
 

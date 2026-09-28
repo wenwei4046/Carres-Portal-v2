@@ -143,10 +143,9 @@ export default function OperationRental() {
       </div>
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-3 gap-3 mb-7 max-w-[680px]">
+      <div className="grid grid-cols-2 gap-3 mb-7 max-w-[452px]">
         <StatTile label="Active agreements" value={String(activeAgreements)} />
         <StatTile label="Units in rental" value={String(unitsInRental)} />
-        <StatTile label="Visits due" value="" />
       </div>
 
       {/* AGREEMENTS */}

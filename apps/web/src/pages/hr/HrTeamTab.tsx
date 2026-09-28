@@ -1346,7 +1346,7 @@ export default function HrTeamTab() {
                 </span>
                 <span className="font-semibold text-base-900 truncate">{h.subjectName}</span>
                 <span className="text-base-600 truncate">
-                  {h.prevPosition ?? ""} → {h.newPosition ?? ""}
+                  {h.prevPosition ?? "No position"} → {h.newPosition ?? "No position"}
                 </span>
                 {h.changedBy && (
                   <span className="ml-auto text-base-400 shrink-0">by {h.changedBy}</span>
