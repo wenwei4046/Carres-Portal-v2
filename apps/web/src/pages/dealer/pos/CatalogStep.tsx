@@ -238,7 +238,13 @@ export default function CatalogStep({
   useEffect(() => {
     if (previousActiveRailRef.current === activeRail) return;
     previousActiveRailRef.current = activeRail;
-    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(max-width: 767px)").matches
+    ) {
+      return;
+    }
 
     activeChipRef.current?.scrollIntoView({
       behavior: "smooth",

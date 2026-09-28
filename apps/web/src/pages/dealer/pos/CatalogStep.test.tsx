@@ -1,28 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { CatalogResponse } from "@carres/shared";
+import { mockMatchMedia } from "@/test/setup";
 import { emptyDraft } from "../new-order/draft";
 import CatalogStep from "./CatalogStep";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn() } }));
 
 const scrollIntoView = vi.fn();
-
-function setPhoneViewport(matches: boolean) {
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  });
-}
 
 function catalog(): CatalogResponse {
   return {
@@ -57,7 +42,6 @@ function catalogWithAccessory(): CatalogResponse {
 describe("CatalogStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setPhoneViewport(true);
     Object.defineProperty(Element.prototype, "scrollIntoView", {
       configurable: true,
       value: scrollIntoView,
@@ -139,6 +123,7 @@ describe("CatalogStep", () => {
   });
 
   it("shows only the five popular phone chips while the drawer keeps every available entry", () => {
+    mockMatchMedia(true);
     const onCategoryOpenChange = vi.fn();
     render(
       <CatalogStep
@@ -166,6 +151,7 @@ describe("CatalogStep", () => {
   });
 
   it("centers a newly active popular chip on phone without scrolling on initial render", () => {
+    mockMatchMedia(true);
     render(
       <CatalogStep
         draft={emptyDraft()}
@@ -188,7 +174,6 @@ describe("CatalogStep", () => {
   });
 
   it("does not auto-scroll chips outside the phone breakpoint", () => {
-    setPhoneViewport(false);
     render(
       <CatalogStep
         draft={emptyDraft()}
@@ -201,6 +186,27 @@ describe("CatalogStep", () => {
     );
 
     fireEvent.click(screen.getByTestId("pos-mobile-chip-accessory"));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("does not fail when the environment has no matchMedia implementation", () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={() => {}}
+        catalog={catalogWithAccessory()}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+      />,
+    );
+
+    expect(() => fireEvent.click(screen.getByTestId("pos-mobile-chip-accessory"))).not.toThrow();
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 

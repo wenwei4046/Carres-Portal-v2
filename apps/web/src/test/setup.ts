@@ -19,6 +19,29 @@ import { cleanup, configure } from "@testing-library/react";
  * ------------------------------------------------------------------------- */
 configure({ asyncUtilTimeout: 5000 });
 
+/**
+ * jsdom does not provide matchMedia. Default every test to a desktop viewport;
+ * responsive tests can opt into a matching query explicitly.
+ */
+export function mockMatchMedia(matches = false) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string): MediaQueryList => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
+mockMatchMedia();
+
 /* ---------------------------------------------------------------------------
  * jsdom gaps that Radix primitives depend on (card D0.5b).
  *
@@ -75,4 +98,5 @@ if (typeof Element !== "undefined") {
 
 afterEach(() => {
   cleanup();
+  mockMatchMedia();
 });
