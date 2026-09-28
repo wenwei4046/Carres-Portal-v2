@@ -1292,30 +1292,31 @@ describe("the Sales Orders rail and its two views", () => {
     useMonthlyDemandFactsSpy.mockClear();
   });
 
-  it("has one View group with Order list and Monthly demand, and no Clear filters", () => {
+  it("switches Order list and Monthly demand with a tab bar, and has no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    expect(within(rail).getByText("View")).toBeInTheDocument();
-    expect(screen.getByTestId("sales-orders-view-list")).toHaveTextContent("Order list");
-    expect(screen.getByTestId("sales-orders-view-monthly")).toHaveTextContent("Monthly demand");
+    /* Two views of the same orders: a tab bar, not a collapsible group (owner ruling 2026-09-28). */
+    expect(within(rail).getByRole("tab", { name: "Order list" })).toBeInTheDocument();
+    expect(within(rail).getByRole("tab", { name: "Monthly demand" })).toBeInTheDocument();
+    expect(within(rail).queryByText("View")).not.toBeInTheDocument();
     expect(within(rail).queryByText(/Clear filters/i)).not.toBeInTheDocument();
   });
 
   it("opens on the Order list, which does not read Monthly demand", () => {
     mount();
-    expect(screen.getByTestId("sales-orders-view-list")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Order list" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("register-column")).toBeInTheDocument();
     expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(false);
   });
 
   it("choosing Monthly demand writes it to the URL, replaces the list, and reads its facts", () => {
     mount();
-    fireEvent.click(screen.getByTestId("sales-orders-view-monthly"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
     expect(screen.getByTestId("location")).toHaveTextContent("view=monthly");
     expect(screen.queryByTestId("register-column")).not.toBeInTheDocument();
     expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(true);
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Period", "Dealer / Sales Location", "Delivery State / City", "Product category"]) {
+    for (const group of ["Period", "Dealer / Sales Location", "Customer Delivery Location", "Product category"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
   });
@@ -1338,7 +1339,7 @@ describe("the Sales Orders rail and its two views", () => {
 
   it("Monthly demand's filters never carry into the Order list", () => {
     mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
-    fireEvent.click(screen.getByTestId("sales-orders-view-list"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Order list" }));
     const at = screen.getByTestId("location").textContent ?? "";
     expect(at).not.toContain("view=");
     expect(at).not.toContain("dealer=");
@@ -1388,7 +1389,7 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
   it("the Order list carries the Dealer, State / City, Date and Delivery groups, and no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Dealer / Sales Location", "Delivery State / City", "Date", "Delivery"]) {
+    for (const group of ["Dealer / Sales Location", "Customer Delivery Location", "Date", "Delivery"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
     expect(within(rail).queryByText(/Clear/i)).not.toBeInTheDocument();
@@ -1445,7 +1446,7 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
 
   it("the Order list's filters never carry into Monthly demand", () => {
     mount("/operation/orders?dealer=%7Bdealer%201%7D&delivery=not_delivered&range=today");
-    fireEvent.click(screen.getByTestId("sales-orders-view-monthly"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
     const at = screen.getByTestId("location").textContent ?? "";
     expect(at).not.toContain("dealer=");
     expect(at).not.toContain("delivery=");

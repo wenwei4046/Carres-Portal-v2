@@ -72,6 +72,14 @@ vi.mock("@/lib/queries", async () => {
 
 import OperationDelivery from "./OperationDelivery";
 import { MONITOR_COPY } from "./delivery-monitor";
+import { openRailGroups } from "@/test/rail";
+
+/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 
 /** The one consistent example: Friday, 4 September 2026. */
 const TODAY = "2026-09-04";
@@ -177,7 +185,7 @@ const CALENDAR_ENTRY = "/operation?tab=delivery&view=week";
 
 function wrap(node: React.ReactNode, initialEntry = CALENDAR_ENTRY) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return renderOpen(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialEntry]}>
         {node}

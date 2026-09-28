@@ -474,13 +474,10 @@ function useFloatingRail(ref: React.RefObject<HTMLDivElement>): boolean {
 }
 
 /** A select's visible name and, for a group's first control, its supporting line. */
-function RailFieldWords({ supporting, label }: { supporting?: string; label?: string }) {
-  return (
-    <>
-      {supporting ? <p className="px-2 pb-1 text-meta text-kit-slate-11">{supporting}</p> : null}
-      {label ? <p className="px-2 pt-1 text-meta text-kit-slate-11">{label}</p> : null}
-    </>
-  );
+/** A select's own label inside a group (a group carries no description line,
+ *  owner ruling 2026-09-28). */
+function RailFieldWords({ label }: { label: string }) {
+  return <p className="px-2 pt-1 text-meta text-kit-slate-11">{label}</p>;
 }
 
 function ExpandedLines({ row }: { row: RegisterRow }) {

@@ -82,7 +82,8 @@ describe("FilterRail style C", () => {
   it("normal-case title with an icon, and NO chosen value while the group is not filtered", () => {
     render(<StatusRail />);
     const group = heading(/Pickup status/);
-    expect(group).toHaveAttribute("aria-expanded", "true");
+    /* Headers first: a group opens on the operator's click (owner ruling 2026-09-28). */
+    expect(group).toHaveAttribute("aria-expanded", "false");
     expect(group.querySelector("[data-icon=waiting]")).not.toBeNull();
     expect(within(group).queryByTestId("rail-group-chosen")).toBeNull();
   });
@@ -101,19 +102,23 @@ describe("FilterRail style C", () => {
     expect(within(heading(/Supplier/)).getByTestId("rail-group-chosen")).toHaveTextContent("Hooka");
   });
 
-  it("collapsing hides the controls but never clears the filter, and is remembered", () => {
+  it("a group opens on click and is remembered; closing hides the rows but never clears the filter", () => {
     const first = render(<StatusRail />);
-    fireEvent.click(screen.getByTestId("row-late"));
+    expect(screen.getByTestId("row-late")).not.toBeVisible();
     fireEvent.click(heading(/Pickup status/));
-    expect(heading(/Pickup status/)).toHaveAttribute("aria-expanded", "false");
+    expect(heading(/Pickup status/)).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("row-late")).toBeVisible();
+    fireEvent.click(screen.getByTestId("row-late"));
+    expect(localStorage.getItem("carres.filterRail.probe-rail.Pickup status")).toBe("1");
+    fireEvent.click(heading(/Pickup status/));
     expect(screen.getByTestId("row-late")).not.toBeVisible();
     expect(screen.getByTestId("row-late")).toHaveAttribute("aria-pressed", "true");
     expect(within(heading(/Pickup status/)).getByTestId("rail-group-chosen")).toHaveTextContent("Late pickups");
-    expect(localStorage.getItem("carres.filterRail.probe-rail.Pickup status")).toBe("0");
+    fireEvent.click(heading(/Pickup status/));
     first.unmount();
     render(<StatusRail />);
-    expect(heading(/Pickup status/)).toHaveAttribute("aria-expanded", "false");
-    expect(heading(/Supplier/)).toHaveAttribute("aria-expanded", "true");
+    expect(heading(/Pickup status/)).toHaveAttribute("aria-expanded", "true");
+    expect(heading(/Supplier/)).toHaveAttribute("aria-expanded", "false");
   });
 
   it("keyboard: the heading is a real button (Enter/Space toggle natively)", () => {

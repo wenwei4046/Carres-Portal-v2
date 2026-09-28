@@ -1339,6 +1339,16 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**RAIL GROUPS ARE HEADERS FIRST — OWNER RULING 2026-09-28 (Jess: "international keep got description
+under menu? … it should every category header, and click to expand listing"), overwrites the
+2026-09-27 "icon + title + one supporting line".** Shopify, Linear and SAP Fiori facet panels show
+the group title only. Every `FilterRailGroup` is **closed until the operator opens it** (the choice is
+remembered per rail and group); a closed group still shows its **chosen value on the header**. No
+description line under a group title. A page with two views of the same records switches them with
+the kit `Tabs` bar at the top of the rail, never with a collapsible group. A closed group's rows are
+not drawn (the body's display follows `open`; `hidden` alone had lost to `flex`, so every rail drew
+its rows even when closed — fixed the same day).
+
 **LOCAL FILTER RAIL — COMPACT FACT DROPDOWN — APPROVED / LOCKED, owner ruling 2026-09-11.**
 A rail SECTION whose facts are a long, open-ended list collapses into ONE control —
 `FilterRailSelect` in the same `workspace-rail.tsx` — instead of printing every value as a row.

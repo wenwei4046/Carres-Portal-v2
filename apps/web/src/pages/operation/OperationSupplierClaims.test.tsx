@@ -5,6 +5,14 @@ import { MemoryRouter } from "react-router-dom";
 import { claimNextMove } from "@carres/shared";
 import type { SupplierClaimListRow } from "@/lib/queries";
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import { openRailGroups } from "@/test/rail";
+
+/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 const claimsQuery = vi.fn();
 const photosQuery = vi.fn();
 const refreshPhotos = vi.fn();
@@ -56,7 +64,7 @@ function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
 
 function show(at = "/operation?tab=claims") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<MemoryRouter initialEntries={[at]}><OperationSupplierClaims /></MemoryRouter>, {
+  return renderOpen(<MemoryRouter initialEntries={[at]}><OperationSupplierClaims /></MemoryRouter>, {
     wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
   });
 }
