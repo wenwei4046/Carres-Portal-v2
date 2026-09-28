@@ -621,7 +621,9 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "lastMonth", label: "Last month" },
   { key: "overdue", label: "Overdue" },
 ];
-const dateMatchesPreset = (iso: string | null | undefined, preset: DatePreset): boolean => {
+/** Exported so a page's rail answers `Today` / `This week` / `This month` with
+ *  the engine's ONE date arithmetic (Mon to Sun week, Malaysia time). */
+export const dateMatchesPreset = (iso: string | null | undefined, preset: DatePreset): boolean => {
   if (!iso) return false;
   const d = String(iso).slice(0, 10);
   if (d.length < 10) return false;
