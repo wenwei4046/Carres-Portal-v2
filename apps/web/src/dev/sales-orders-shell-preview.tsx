@@ -146,6 +146,14 @@ window.fetch = async (input, init) => {
   if (/\/api\/operation\/orders\/monthly-demand/.test(url)) {
     return new Response(JSON.stringify({ orders: demandOrders }), { status: 200, headers: { "content-type": "application/json" } });
   }
+  /* The Order list's server facts: a spread so every rail value has rows. */
+  if (/\/api\/operation\/orders\/register-facts/.test(url)) {
+    const facts = Object.fromEntries(orders.map((o, i) => [o.id, {
+      obligations: i % 3 === 0 ? "none" : "outstanding",
+      cases: i % 5 === 0 ? "open" : i % 7 === 0 ? "closed" : "none",
+    }]));
+    return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false } }), { status: 200, headers: { "content-type": "application/json" } });
+  }
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
   }

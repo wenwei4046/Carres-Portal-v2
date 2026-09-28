@@ -5838,6 +5838,23 @@ export function useMonthlyDemandFacts(enabled: boolean) {
   });
 }
 
+/** The Order list's two server-owned fact filters (Orders MASTER §Left rail):
+ *  obligations through the object page's completion, cases from Service. A
+ *  fact the server could not establish is `null` and matches no filter. */
+export interface SalesOrderRegisterFacts {
+  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }>;
+  failed: { obligations: boolean; cases: boolean };
+}
+
+export function useSalesOrderRegisterFacts(enabled: boolean) {
+  return useQuery<SalesOrderRegisterFacts>({
+    queryKey: ["operation", "orders", "register-facts"] as const,
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => apiFetch<SalesOrderRegisterFacts>("/api/operation/orders/register-facts"),
+  });
+}
+
 /* ─── STAGE 3 · card 3.3 — the attribution request lane ─────────────────────
  *
  * Four hooks, and the split between them IS the law: SUBMIT writes a request,

@@ -325,7 +325,9 @@ export function FilterRailGroup({
         <span className="shrink-0 text-kit-slate-11">
           <Icon name={icon} />
         </span>
-        <span className="min-w-0 flex-1 break-words text-body font-semibold text-kit-slate-12">
+        {/* A title never breaks inside a word (it may still wrap at a space); the
+            chosen value beside it gives way and truncates instead. */}
+        <span className="min-w-min flex-1 break-normal text-body font-semibold text-kit-slate-12">
           {title}
         </span>
         {shown != null && (

@@ -74,6 +74,7 @@ import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
   useCatalog,
   useMonthlyDemandFacts,
+  useSalesOrderRegisterFacts,
   useOperationOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
@@ -398,7 +399,18 @@ function useNarrowCanvas(): [(node: HTMLDivElement | null) => void, boolean] {
 const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"] as const;
 /* The Order list's own rail (Orders MASTER §Left rail, owner approved
    2026-09-22). Read-only FACT filters: none is a status or a work queue. */
-const LIST_PARAMS = ["dealer", "state", "city", "date", "range", "delivery", "requested"] as const;
+const LIST_PARAMS = ["dealer", "state", "city", "date", "range", "delivery", "obligations", "cases", "requested"] as const;
+const LIST_OBLIGATIONS = [
+  { key: "outstanding", label: "Outstanding obligations" },
+  { key: "none", label: "No action required" },
+] as const;
+type ListObligations = (typeof LIST_OBLIGATIONS)[number]["key"];
+const LIST_CASES = [
+  { key: "open", label: "Has open cases" },
+  { key: "closed", label: "Closed cases only" },
+  { key: "none", label: "No cases" },
+] as const;
+type ListCases = (typeof LIST_CASES)[number]["key"];
 const LIST_DATE_FIELDS = [
   { key: "proceed", label: "Proceed Date" },
   { key: "doc", label: "SO Doc Date" },
@@ -767,6 +779,16 @@ export default function SalesOrdersRegister() {
   const listDelivery: RegisterDeliveryCondition | null = monthly
     ? null
     : REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === urlParams.get("delivery"))?.key ?? null;
+  const listObligations: ListObligations | null = monthly
+    ? null
+    : LIST_OBLIGATIONS.find((o) => o.key === urlParams.get("obligations"))?.key ?? null;
+  const listCases: ListCases | null = monthly
+    ? null
+    : LIST_CASES.find((o) => o.key === urlParams.get("cases"))?.key ?? null;
+  /* Obligations and cases are the SERVER's facts (the object page's completion
+     and Service's own statuses); the list never guesses them. */
+  const registerFactsQ = useSalesOrderRegisterFacts(!monthly);
+  const registerFacts = registerFactsQ.data?.facts ?? null;
   /* A facet row clicked again is deselected (no Clear button in the rail). */
   const toggleParam = useCallback(
     (key: string, value: string) =>
@@ -854,9 +876,12 @@ export default function SalesOrdersRegister() {
             !listDelivery ||
             registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []) === listDelivery,
         )
+        /* An unknown fact matches no chosen value: never classified. */
+        .filter((r) => !listObligations || registerFacts?.[r.id]?.obligations === listObligations)
+        .filter((r) => !listCases || registerFacts?.[r.id]?.cases === listCases)
         .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listRange, listDateField, listDelivery],
+    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listRange, listDateField, listDelivery, listObligations, listCases, registerFacts],
   );
   const activeConditions = useMemo(() => {
     const dateLabel = LIST_DATE_FIELDS.find((f) => f.key === listDateField)!.label;
@@ -879,10 +904,20 @@ export default function SalesOrdersRegister() {
         label: REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === listDelivery)!.label,
         onClear: () => setParam("delivery", null),
       },
+      listObligations && {
+        key: "obligations",
+        label: LIST_OBLIGATIONS.find((o) => o.key === listObligations)!.label,
+        onClear: () => setParam("obligations", null),
+      },
+      listCases && {
+        key: "cases",
+        label: LIST_CASES.find((o) => o.key === listCases)!.label,
+        onClear: () => setParam("cases", null),
+      },
     ].filter((c): c is { key: string; label: string; onClear: () => void } => Boolean(c));
     return list.length > 0 ? list : undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listRange, listDateField, listDelivery]);
+  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listRange, listDateField, listDelivery, listObligations, listCases]);
   /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
      read (rentals excluded, search not applied), carried on every list answer,
      so a search answered before any unsearched load still has it and a created
@@ -1140,6 +1175,40 @@ export default function SalesOrdersRegister() {
                 active={listDelivery === c.key}
                 testId={`sales-orders-rail-delivery-${c.key}`}
                 onClick={() => toggleParam("delivery", c.key)}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title="Obligations" icon="money">
+            <RailFieldWords supporting="What the order still owes" />
+            {registerFactsQ.data?.failed.obligations || registerFactsQ.isError ? (
+              <p className="px-2 text-meta text-kit-slate-11" data-testid="sales-orders-rail-obligations-unread">
+                Could not read what the orders still owe.
+              </p>
+            ) : null}
+            {LIST_OBLIGATIONS.map((o) => (
+              <FilterRailRow
+                key={o.key}
+                label={o.label}
+                active={listObligations === o.key}
+                testId={`sales-orders-rail-obligations-${o.key}`}
+                onClick={() => toggleParam("obligations", o.key)}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title="Service Cases" icon="message">
+            <RailFieldWords supporting="Customer complaints" />
+            {registerFactsQ.data?.failed.cases || registerFactsQ.isError ? (
+              <p className="px-2 text-meta text-kit-slate-11" data-testid="sales-orders-rail-cases-unread">
+                Could not read the Service Cases.
+              </p>
+            ) : null}
+            {LIST_CASES.map((o) => (
+              <FilterRailRow
+                key={o.key}
+                label={o.label}
+                active={listCases === o.key}
+                testId={`sales-orders-rail-cases-${o.key}`}
+                onClick={() => toggleParam("cases", o.key)}
               />
             ))}
           </FilterRailGroup>
