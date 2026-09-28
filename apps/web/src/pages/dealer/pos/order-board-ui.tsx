@@ -76,7 +76,7 @@ export function monthLabel(anchor: Date): string {
   return anchor.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 }
 export function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "";
   return new Date(iso).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" });
 }
 export function daysAgo(iso: string): string {
@@ -191,7 +191,7 @@ export function OrderCard({
       )}
 
       <div className="os-card__foot">
-        <span>{staffName ?? "—"}</span>
+        <span>{staffName ?? ""}</span>
         <span>{daysAgo(order.placedAt)}</span>
       </div>
     </button>

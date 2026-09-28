@@ -417,7 +417,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
                 <td className="py-1 pr-3">{l.warehouse_receipt_id ? (l.grn_no ?? `GRN of ${l.grn_po_id ?? "a PO"}`) : "Not from a GRN"}</td>
                 <td className="py-1 pr-3">{l.description ?? l.sku ?? "No description"}</td>
                 <td className="py-1 pr-3">{l.account_code} {l.account_name ?? ""}</td>
-                <td className="py-1 pr-3 text-right">{l.qty ?? "—"}</td>
+                <td className="py-1 pr-3 text-right">{l.qty ?? ""}</td>
                 <td className="py-1 pr-3 text-right">{money(l.unit_price)}</td>
                 <td className="py-1 pr-3">{l.po_line_id ? priceDiffWord(num(l.price_diff)) : "No PO price"}</td>
                 <td className="py-1 pr-3"><DepartmentName type={l.department_type} id={l.department_id} /></td>

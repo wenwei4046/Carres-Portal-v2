@@ -301,7 +301,7 @@ function SofaComboCard({
                   {fmtRM(price as number)}
                 </span>
               ) : (
-                <span className="text-meta text-base-300">—</span>
+                null
               )}
             </div>
           );
@@ -382,9 +382,9 @@ function SofaComboHistoryModal({
   onClose: () => void;
 }) {
   const rows: { label: string; value: string }[] = [
-    { label: "Created", value: combo.createdAt ? fmtDateTime(combo.createdAt) : "—" },
+    { label: "Created", value: combo.createdAt ? fmtDateTime(combo.createdAt) : "" },
     { label: "Effective from", value: fmtDate(combo.effectiveFrom) },
-    { label: "Last updated", value: combo.updatedAt ? fmtDateTime(combo.updatedAt) : "—" },
+    { label: "Last updated", value: combo.updatedAt ? fmtDateTime(combo.updatedAt) : "" },
     { label: "Status", value: combo.active ? "Active" : "Inactive" },
   ];
   return (
@@ -839,7 +839,7 @@ function SofaComboEditor({
                     className={`block text-meta mt-0.5 text-right t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
                     data-testid={`sofa-combo-margin-${h}`}
                   >
-                    {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
+                    {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : ""}
                   </span>
                 </label>
               );

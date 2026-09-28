@@ -232,7 +232,7 @@ export default function OperationImport() {
                       <td className="px-2 py-1">{r.itemGroup}</td>
                       <td className="px-2 py-1">{r.qty}</td>
                       <td className="px-2 py-1 truncate max-w-xs">{r.detailDescription}</td>
-                      <td className="px-2 py-1 font-mono text-base-600">{r.poDocNo ?? "—"}</td>
+                      <td className="px-2 py-1 font-mono text-base-600">{r.poDocNo ?? ""}</td>
                       <td className="px-2 py-1">{r.debtorName}</td>
                     </tr>
                   ))}

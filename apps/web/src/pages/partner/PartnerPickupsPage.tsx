@@ -158,11 +158,11 @@ export default function PartnerPickupsPage() {
                 buckets.scheduled.map((r) => (
                   <Card
                     key={r.thread_id}
-                    primary={r.po_id ?? "—"}
+                    primary={r.po_id ?? ""}
                     doNumber={r.do_number}
                     secondary={r.customer_name}
                     dateLabel="Delivery on"
-                    dateValue={r.confirm_delivery_date ?? "—"}
+                    dateValue={r.confirm_delivery_date ?? ""}
                     action={
                       <div className="flex flex-col gap-1.5">
                         <PrintDoButton orderId={r.order_id} threadId={r.thread_id} />
@@ -193,14 +193,14 @@ export default function PartnerPickupsPage() {
                 buckets.delivered.map((r) => (
                   <Card
                     key={r.thread_id}
-                    primary={r.po_id ?? "—"}
+                    primary={r.po_id ?? ""}
                     doNumber={r.do_number}
                     secondary={r.customer_name}
                     dateLabel="Delivered on"
                     dateValue={
                       r.delivered_at
                         ? r.delivered_at.slice(0, 10)
-                        : (r.confirm_delivery_date ?? "—")
+                        : (r.confirm_delivery_date ?? "")
                     }
                     action={
                       <PrintDoButton orderId={r.order_id} threadId={r.thread_id} />
@@ -266,7 +266,7 @@ function PipelineColumn({
 }
 
 function EmptyDash() {
-  return <div className="text-center text-base-400 text-label py-6">—</div>;
+  return null;
 }
 
 function Card({

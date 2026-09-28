@@ -423,7 +423,7 @@ function DeliveryRow({ d }: { d: DayDelivery }) {
           </span>
         </div>
         <div className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}>
-          {d.customer || "—"}
+          {d.customer || ""}
         </div>
         <div className="text-label text-base-500 truncate">
           {carrier}

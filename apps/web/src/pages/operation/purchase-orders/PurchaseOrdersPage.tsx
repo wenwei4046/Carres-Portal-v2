@@ -1197,7 +1197,7 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
       category: goodsCategoryOf(line),
       unitIds: counted ? [] : unitIds,
       unitNode: counted
-        ? <Absence>—</Absence>
+        ? null
         : unitsQ.isError
         ? <span className="text-kit-amber-11">Unit IDs could not be read</span>
         : unitsQ.isLoading
@@ -1688,7 +1688,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                   {/* The Units are the line's own rows: one permanent Unit ID
                       per physical piece, born with the official PO and bound
                       to this line (0442/0443). A quantity line has none by
-                      law and prints `—`; an exact-unit line with none is an
+                      law and prints ""; an exact-unit line with none is an
                       integrity failure, never an ordinary empty state. They
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
@@ -1696,7 +1696,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                     unitLoading ? <span className="text-kit-slate-11">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
-                      ? <Absence>—</Absence>
+                      ? null
                     : unitsOf(line).length
                       ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"

@@ -640,7 +640,7 @@ function POCard({
               className="font-mono text-body font-semibold text-foreground mt-0.5"
               data-testid={`collection-eta-${po.id}`}
             >
-              {po.eta_date ?? "—"}
+              {po.eta_date ?? ""}
             </div>
           </div>
           {po.do_number && (
@@ -808,7 +808,7 @@ function PODrawer({
 
           <div className="grid grid-cols-2 gap-4 mb-5">
             <Field label="Placed" value={new Date(po.placed_at).toLocaleDateString()} />
-            <Field label="ETA" value={po.eta_date ?? "—"} />
+            <Field label="ETA" value={po.eta_date ?? ""} />
             {po.do_number && <Field label="DO Number" value={po.do_number} />}
             {po.expected_ready_date && (
               <Field label="Expected ready" value={po.expected_ready_date} />

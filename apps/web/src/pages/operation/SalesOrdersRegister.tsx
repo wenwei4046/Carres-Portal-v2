@@ -541,9 +541,9 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       key: `addon-${index}`,
       category: "Service",
       unitIds: [],
-      unitAbsence: "—",
+      unitAbsence: "",
       deliverTo: [],
-      deliverToAbsence: "—",
+      deliverToAbsence: "",
       sku: addon.addon_key ?? "",
       qty: addon.qty,
       item: addon.addon_key

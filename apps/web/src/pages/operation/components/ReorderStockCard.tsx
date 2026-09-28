@@ -149,7 +149,7 @@ function ReorderRow({
         {row.incoming}
       </span>
       <span className="text-right font-mono text-body text-base-700">
-        {row.reorderPoint == null ? "—" : row.reorderPoint}
+        {row.reorderPoint == null ? "" : row.reorderPoint}
       </span>
 
       <div className="min-w-0">

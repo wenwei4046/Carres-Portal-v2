@@ -1187,7 +1187,7 @@ function CurrentIssuesPanel({
  *  → em-dash, never the lowercase normalize slug. */
 function skuCode(sku: string): string {
   const m = sku.trim().match(/([A-Za-z]{0,3}\d{3,}[A-Za-z]{0,2}(?:-[A-Za-z])?)\s*$/);
-  return m ? m[1].toUpperCase() : "—";
+  return m ? m[1].toUpperCase() : "";
 }
 
 /** Site SHORT name for the Items LOCATION column (§9 — "Klang/NETS", never
@@ -1859,7 +1859,7 @@ function DrawerBody({
     ? "TBD"
     : order.delivery_date
       ? fmtDate(order.delivery_date).split(", ")[0]
-      : "—";
+      : "";
   // Full canonical date (date law §A0: weekday ALWAYS on a displayed date) —
   // the Delivery card shows this; deadlineLabel (weekday stripped) stays for
   // the short message-template strings only.
@@ -1867,7 +1867,7 @@ function DrawerBody({
     ? "TBD"
     : order.delivery_date
       ? fmtDate(order.delivery_date)
-      : "—";
+      : "";
   // Optional preferred-name/title for customer messages — never auto Mr/Ms.
   // Local-only for now (an ops_order_control column is deploy-gated), keyed by
   // order so it sticks across sessions on this machine.
@@ -2497,7 +2497,7 @@ function DrawerBody({
           ? `${RM(collectedAll)} in`
           : totalSet
             ? "nothing received yet"
-            : "—",
+            : "",
     },
     {
       panel: "Items",
@@ -3213,7 +3213,7 @@ function DrawerBody({
                                   </span>
                                 )
                               ) : (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               )}
                             </td>
                             {/* STOCK ETA — red alert when late / missing;
@@ -3221,7 +3221,7 @@ function DrawerBody({
                                 no longer repeats it). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService || isAcc || rd === "reserved" ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : etaEditSku === l.sku ? (
                                 <input
                                   type="date"
@@ -3322,7 +3322,7 @@ function DrawerBody({
                                   >
                                     {l.sku}
                                   </span>
-                                  {(lineSize(l.sku) || skuCode(l.sku) !== "—") && (
+                                  {(lineSize(l.sku) || skuCode(l.sku) !== "") && (
                                     <span className="block text-meta text-base-500 leading-tight truncate">
                                       {lineSize(l.sku) === "K"
                                         ? "King"
@@ -3331,10 +3331,10 @@ function DrawerBody({
                                           : lineSize(l.sku) === "S"
                                             ? "Single"
                                             : null}
-                                      {lineSize(l.sku) && skuCode(l.sku) !== "—"
+                                      {lineSize(l.sku) && skuCode(l.sku) !== ""
                                         ? " · "
                                         : null}
-                                      {skuCode(l.sku) !== "—" ? (
+                                      {skuCode(l.sku) !== "" ? (
                                         <span className="font-mono text-label">
                                           {skuCode(l.sku)}
                                         </span>
@@ -3355,7 +3355,7 @@ function DrawerBody({
                             {/* PO — In stock / PO#### */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : poNo ? (
                                 <span className="font-mono text-meta text-base-700 truncate block max-w-[110px]" title={poNo}>
                                   {poNo}
@@ -3369,7 +3369,7 @@ function DrawerBody({
                                 quiet fact; [+ Arrived] records an arrival. */}
                             <td className="border-b border-base-100 px-1.5 py-1 align-middle">
                               {isService || isAcc || !poNo ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : (
                                 <span className="inline-flex items-center gap-1.5">
                                   <span
@@ -3605,7 +3605,6 @@ function DrawerBody({
             <Panel
               title="Warehouse stock"
               grow
-              summary={<MiniBadge tone="muted">—</MiniBadge>}
               actions={warehouseMenu}
             >
               <div className="flex-1 grid place-items-center text-meta text-base-400 p-6">
@@ -4689,7 +4688,7 @@ function CustomerIdentityCard({
     return (
       <div
         className="kpi-box grid place-items-center py-2"
-        title={`${order.customer_name ? displayCustomerName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+        title={`${order.customer_name ? displayCustomerName(order.customer_name) : ""} · #${order.so} · ${statusWord}`}
       >
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -4708,7 +4707,7 @@ function CustomerIdentityCard({
             className={`block text-body font-semibold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ? displayCustomerName(order.customer_name) : "—"}
+            {order.customer_name ? displayCustomerName(order.customer_name) : ""}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}
@@ -5730,7 +5729,7 @@ function PaymentForm({
               aria-label="Receiving bank"
               className={cell}
             >
-              <option value="">—</option>
+              <option value="">Bank</option>
               {MY_BANKS.map((b) => (
                 <option key={b} value={b}>
                   {b}
@@ -6193,7 +6192,7 @@ function StorageCard({
             )}
           </span>
         ) : (
-          <span className={soft}>—</span>
+          null
         )}
           </DRow>
 
@@ -7185,7 +7184,7 @@ function PoRow({ po, divider }: { po: operationOrderDetailPo; divider: boolean }
           </div>
         ))}
         <div className="text-meta text-base-500 mt-0.5">
-          ETA {po.eta_date ?? "—"} · Σ {got}/{totalQty}
+          ETA {po.eta_date ?? ""} · Σ {got}/{totalQty}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1.5">

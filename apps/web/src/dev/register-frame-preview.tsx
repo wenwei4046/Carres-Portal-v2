@@ -34,7 +34,7 @@ const GOODS: GoodsMiniLine[] = [
     key: "g2",
     category: "Service",
     unitIds: [],
-    unitAbsence: "—",
+    unitAbsence: "",
     deliverTo: [],
     deliverToAbsence: "Not applicable",
     sku: "dispose-mattress",

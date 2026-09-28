@@ -773,7 +773,7 @@ export default function OperationReceiving() {
         category: words?.category ?? "",
         unitIds: [],
         /* Extra goods never enter Inventory, so they never become a Unit. */
-        unitAbsence: "—",
+        unitAbsence: "",
         deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
         deliverToAbsence: "Not recorded",
         supplier: r.supplier_name ?? undefined,

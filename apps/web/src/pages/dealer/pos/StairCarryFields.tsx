@@ -109,7 +109,7 @@ export default function StairCarryFields({
                 setDelivery({ stairItems: safe });
               }}
               disabled={itemsTotal === 0}
-              placeholder={itemsTotal === 0 ? "—" : ""}
+              placeholder={itemsTotal === 0 ? "" : ""}
               className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
             />
             <button

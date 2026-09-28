@@ -103,7 +103,7 @@ function representativeSofaSku(skus: ProductSkuDto[]): ProductSkuDto | null {
 /** A compact cells summary like "2A + L + 1A" — read arm→arm left-to-right
  *  (the shared walk order, Loo 2026-07-11), not canvas insertion order. */
 function cellsSummary(payload: SofaBuildAddPayload): string {
-  if (payload.cells.length === 0) return "—";
+  if (payload.cells.length === 0) return "";
   const withIds = payload.cells.map((c, i) => ({ ...c, id: `sum-${i}` }));
   return orderSofaCellsLeftToRight(withIds, payload.height)
     .map((c) => c.moduleCode)

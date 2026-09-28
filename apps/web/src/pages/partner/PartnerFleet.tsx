@@ -200,9 +200,9 @@ export default function PartnerFleet() {
                       {v.plate}
                     </td>
                     <td className="p-3 text-body text-base-700">{v.vehicle_type}</td>
-                    <td className="p-3 text-body text-base-700">{v.capacity ?? "—"}</td>
-                    <td className="p-3 text-body text-base-700">{v.driver_name ?? "—"}</td>
-                    <td className="p-3 text-meta text-base-600">{v.driver_phone ?? "—"}</td>
+                    <td className="p-3 text-body text-base-700">{v.capacity ?? ""}</td>
+                    <td className="p-3 text-body text-base-700">{v.driver_name ?? ""}</td>
+                    <td className="p-3 text-meta text-base-600">{v.driver_phone ?? ""}</td>
                     <td className="p-3 text-right">
                       <button
                         type="button"

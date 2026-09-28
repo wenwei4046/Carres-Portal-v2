@@ -870,7 +870,7 @@ function HoursSection({
                               aria-label={`${cellLabel} opens at`}
                               onChange={(e) => patch(weekday, activity, { opensAt: e.target.value })}
                             />
-                            <span aria-hidden>–</span>
+                            <span>to</span>
                             <Input
                               id={`${id}-closes`}
                               type="time"
@@ -1022,7 +1022,7 @@ function HolidaysSection({
                 aria-label="Public-holiday opens at"
                 onChange={(e) => patch({ opensAt: e.target.value })}
               />
-              <span aria-hidden>–</span>
+              <span>to</span>
               <Input
                 id="holiday-closes"
                 type="time"

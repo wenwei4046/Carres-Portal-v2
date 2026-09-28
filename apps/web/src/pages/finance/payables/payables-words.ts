@@ -85,7 +85,7 @@ export function num(v: number | string | null | undefined): number | null {
 /** Money for the screen. An absent or unreadable figure is a dash, never RM 0.00. */
 export function money(v: number | string | null | undefined): string {
   const n = num(v);
-  return n === null ? "—" : rm(n);
+  return n === null ? "" : rm(n);
 }
 
 /** Round to the cent — the database stores numeric(12,2). */

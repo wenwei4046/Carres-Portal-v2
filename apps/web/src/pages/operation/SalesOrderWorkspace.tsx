@@ -536,8 +536,8 @@ function draftTemplateData(
     status_label: base?.status_label ?? "Draft",
     channel: draft.outlet_id ? "showroom" : (base?.channel ?? "dealer"),
     customer: {
-      name: draft.customer_name || "—",
-      address: addressString(draft, baseline) || "—",
+      name: draft.customer_name || "",
+      address: addressString(draft, baseline) || "",
       phone: draft.customer_phone || null,
       email: draft.customer_email || null,
       emergency: emergencyString(draft) || null,
@@ -639,16 +639,16 @@ export function snapshotTemplateData(
   const paid = asOf ? payments.reduce((n, pm) => n + Number(pm.amount), 0) : (base?.paid ?? 0);
   const str = (k: string) => (h[k] == null ? null : String(h[k]));
   return {
-    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? "—"),
+    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? ""),
     issue_date: (str("placed_at") ?? base?.issue_date ?? "").slice(0, 10),
     proceed_date: str("proceed_date"),
     order_id: base?.order_id ?? "snapshot",
-    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? "—"),
+    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? ""),
     status_label: base?.status_label ?? "",
     channel: base?.channel ?? "dealer",
     customer: {
-      name: str("customer_name") ?? "—",
-      address: str("customer_address") ?? "—",
+      name: str("customer_name") ?? "",
+      address: str("customer_address") ?? "",
       phone: str("customer_phone"),
       email: str("customer_email"),
       emergency: str("customer_emergency"),
@@ -4027,7 +4027,7 @@ function SalesOrderWorkspaceBody() {
             </span>
             <span className="pr-6 text-base-500">Services</span>
             <span className="text-right tabular-nums text-base-900" data-testid="money-services">
-              {money.known ? fmtMoney(money.services) : "—"}
+              {money.known ? fmtMoney(money.services) : ""}
             </span>
             <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Total payable</span>
             <span className={`${TOTAL_RULE} text-right font-semibold tabular-nums text-base-900`} data-testid="money-total-payable">

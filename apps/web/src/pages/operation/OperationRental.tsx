@@ -146,7 +146,7 @@ export default function OperationRental() {
       <div className="grid grid-cols-3 gap-3 mb-7 max-w-[680px]">
         <StatTile label="Active agreements" value={String(activeAgreements)} />
         <StatTile label="Units in rental" value={String(unitsInRental)} />
-        <StatTile label="Visits due" value="—" />
+        <StatTile label="Visits due" value="" />
       </div>
 
       {/* AGREEMENTS */}
@@ -195,7 +195,7 @@ export default function OperationRental() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-base-800">
-                        {a.customerName ?? <span className="text-base-400">—</span>}
+                        {a.customerName ?? null}
                       </div>
                       {a.customerPhone && (
                         <div className="text-meta font-mono text-base-500 mt-0.5">
@@ -245,7 +245,7 @@ export default function OperationRental() {
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-base-300">—</span>
+                        null
                       )}
                     </td>
                   </tr>
@@ -323,7 +323,7 @@ export default function OperationRental() {
                       {fmtDate(u.warrantyUntil)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap font-mono text-base-700">
-                      {linkedNo ?? <span className="text-base-400">—</span>}
+                      {linkedNo ?? null}
                     </td>
                   </tr>
                 );

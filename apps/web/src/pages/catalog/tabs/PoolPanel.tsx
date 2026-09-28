@@ -222,7 +222,7 @@ export default function PoolPanel({
                       {fmtRm(e.surcharge)}
                     </>
                   ) : (
-                    <span className="text-base-300">—</span>
+                    null
                   )}
                 </span>
               )}
@@ -282,7 +282,7 @@ export default function PoolPanel({
                   step="0.01"
                   value={r.surcharge}
                   onChange={(e) => patchRow(i, { surcharge: e.target.value })}
-                  placeholder="—"
+                  placeholder=""
                   className={`${INPUT_CLS} text-right t-num text-meta`}
                   aria-label={`row ${i + 1} surcharge`}
                 />

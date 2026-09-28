@@ -715,7 +715,7 @@ export default function HrSetupTab({
                     </span>
                   </div>
                   <div className="shrink-0 text-meta text-base-500 t-num">
-                    now {pct != null ? `${pct}%` : "—"}
+                    now {pct != null ? `${pct}%` : ""}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
                     <input
@@ -842,7 +842,7 @@ export default function HrSetupTab({
                     <option value="cbo">CBO</option>
                   </select>
                   <div className="shrink-0 text-meta text-base-500 t-num">
-                    now {pct != null ? `${pct}%` : "—"}
+                    now {pct != null ? `${pct}%` : ""}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
                     <input

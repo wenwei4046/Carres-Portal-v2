@@ -508,6 +508,6 @@ function headingSentence(iso: string): string {
 }
 
 function rangeSentence(dates: string[]): string {
-  if (dates.length === 0) return "—";
+  if (dates.length === 0) return "";
   return `${headingSentence(dates[0]!)} — ${headingSentence(dates[dates.length - 1]!)}`;
 }
