@@ -141,10 +141,12 @@ export const MANUAL_PURCHASE_WORDS = {
    *  `Remark` was the retired To Order dialog's word and rode in with the
    *  port; the state, the input id and the payload always said `note`. */
   note: "Note",
-  alreadyHave: "WHAT WE ALREADY HAVE",
-  freeStock: "free stock",
-  alreadyOnPo: "already on PO",
-  stillNeeded: "still needed",
+  /** Sentence case over three framed facts headed `Free Stock` ·
+   *  `Already On PO` · `Still Needed` (the col* words below) — the Sales
+   *  Order kit, owner 2026-09-27. */
+  alreadyHave: "What we already have",
+  /** The hint under `Still Needed` when it is 0. */
+  mayNotBeNeeded: "This request may not be needed at all.",
   /**
    * THE PERMANENT REGISTER'S NINE COLUMNS — the settled design, owner
    * ruling 2026-09-11, exactly and in this order:

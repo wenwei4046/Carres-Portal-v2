@@ -71,6 +71,8 @@ export const GOODS_ABSENCE_WORDS = {
   nothingToBuy: "Nothing to buy",
   /** A receiving quantity before the count. */
   notCounted: "Not counted",
+  /** A choice the form still asks for (SO Batch Deliver To, the MPR preview). */
+  notChosen: "Not chosen",
 } as const;
 
 /**

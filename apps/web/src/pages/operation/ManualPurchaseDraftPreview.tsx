@@ -24,7 +24,7 @@
  * Every word here is already in the dictionary — the section names, the field
  * names and `Draft` — so the preview respells nothing the form says.
  */
-import { MANUAL_PURCHASE_WORDS as MW } from "@carres/shared";
+import { GOODS_ABSENCE_WORDS, MANUAL_PURCHASE_WORDS as MW } from "@carres/shared";
 
 export interface ManualPurchaseDraftFact {
   label: string;
@@ -129,7 +129,9 @@ function Section({
           <div key={f.label}>
             <dt>{f.label}</dt>
             <dd data-testid={`mp-preview-${f.label.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
-              {f.value}
+              {/* A draft fact not yet chosen says so — never a blank (owner
+                  2026-09-27: "write clear why blank"). */}
+              {f.value ?? GOODS_ABSENCE_WORDS.notChosen}
             </dd>
           </div>
         ))}

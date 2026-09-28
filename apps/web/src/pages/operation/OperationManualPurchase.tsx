@@ -2853,7 +2853,7 @@ function CreateRequestWorkspace({
             onClose={() => setConfigureId(null)}
           />
         ) : null}
-        <h2 className="mp-create-heading">
+        <h2 className="mp-create-heading text-kit-slate-12">
           {editing ? MW.editAndSendAgain : "New Manual Purchase Request"}
         </h2>
         {/* ⭐ THE SALES ORDER COMPOSITION (owner 2026-09-22): the form on the
@@ -3250,32 +3250,41 @@ function AlreadyHave({
   const already = onPo.data?.alreadyOnPo ?? 0;
   const still = stillNeededOf(qty, free, already);
   return (
-    <div
-      className="ml-1 flex flex-col gap-0.5 border-l-2 border-base-100 pl-3 text-meta"
-      data-testid={`mp-already-have-${index}`}
-    >
-      <span className="text-label font-semibold text-kit-slate-11">
-        {MW.alreadyHave}
-      </span>
-      <span className="text-base-700">
-        {MW.freeStock} <span className="tabular-nums">{free}</span>
-      </span>
-      <span className="text-base-700">
-        {MW.alreadyOnPo} <span className="tabular-nums">{already}</span>
-        {onPo.data?.firstPo ? (
-          <span className="text-base-600">
-            {" "}
-            · {onPo.data.firstPo.id}
-            {onPo.data.firstPo.eta ? ` · ${fmtDate(onPo.data.firstPo.eta)}` : ""}
-          </span>
-        ) : null}
-      </span>
-      <span className="text-base-700" data-testid={`mp-still-needed-${index}`}>
-        {MW.stillNeeded} <span className="tabular-nums font-semibold">{still}</span>
-        {still === 0 && qty > 0 ? (
-          <span className="text-base-600"> — this request may not be needed at all</span>
-        ) : null}
-      </span>
+    /* ONE KIT (owner 2026-09-27, "must follow sales order ui kit"): the three
+       decision facts are the Sales Order page's own framed `Fact`s — label
+       above value, one box each — never an uppercase caption over loose
+       lowercase lines. The arithmetic is still PRINTED, never left to the
+       reader. */
+    <div className="flex flex-col gap-2" data-testid={`mp-already-have-${index}`}>
+      <span className="text-meta font-semibold text-kit-slate-12">{MW.alreadyHave}</span>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <SharedFact idPrefix={`mp-have-${index}`} framed label={MW.colFreeStock} value={<span className="tabular-nums">{free}</span>} />
+        <SharedFact
+          idPrefix={`mp-have-${index}`}
+          framed
+          label={MW.colAlreadyOnPo}
+          value={
+            <span className="block min-w-0">
+              <span className="tabular-nums">{already}</span>
+              {onPo.data?.firstPo ? (
+                <span className="text-kit-slate-11">
+                  {" "}
+                  · {onPo.data.firstPo.id}
+                  {onPo.data.firstPo.eta ? ` · ${fmtDate(onPo.data.firstPo.eta)}` : ""}
+                </span>
+              ) : null}
+            </span>
+          }
+        />
+        <SharedFact
+          idPrefix={`mp-have-${index}`}
+          framed
+          label={MW.colStillNeeded}
+          testId={`mp-still-needed-${index}`}
+          value={<span className="tabular-nums font-semibold">{still}</span>}
+          hint={still === 0 && qty > 0 ? MW.mayNotBeNeeded : undefined}
+        />
+      </div>
     </div>
   );
 }

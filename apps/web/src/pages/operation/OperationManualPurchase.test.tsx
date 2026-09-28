@@ -1174,10 +1174,11 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     fireEvent.change(document.getElementById("mp-qty-0")!, { target: { value: "3" } });
 
     const block = await screen.findByTestId("mp-already-have-0");
-    await waitFor(() => expect(block.textContent).toContain(MW.alreadyOnPo));
+    await waitFor(() => expect(block.textContent).toContain(MW.colAlreadyOnPo));
     // free 2 (the picker's own number) · already on PO 1 (the endpoint's) →
     // still needed 0 — the arithmetic the screen prints, never the reader's.
-    expect(block.textContent).toContain(MW.freeStock);
+    expect(block.textContent).toContain(MW.colFreeStock);
+    expect(block.textContent).toContain("What we already have");
     expect(screen.getByTestId("mp-still-needed-0").textContent).toContain("0");
     expect(block.textContent).toContain("PO-2041");
     expect(block.textContent).toContain("may not be needed");
