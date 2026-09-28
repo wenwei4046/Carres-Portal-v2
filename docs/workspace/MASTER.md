@@ -1173,8 +1173,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
    none. Copying or opening WhatsApp completes nothing.
 7. **REVISION 12 · THE CARD BLUEPRINT — built from the module acts (Jess, 2026-09-28: "your job to
-   plan and blueprint what to do, check with every module what mission and show"; PROPOSAL until
-   定).** Order header as before. Under `Order Route · To do {n}`, one stop per module in Route order
+   plan and blueprint what to do, check with every module what mission and show").** Order header as before. Under `Order Route · To do {n}`, one stop per module in Route order
    (`Purchasing · Receiving · Warehouse · Payment · Delivery`); the line joins modules only.
    - **Card = the Sales Order `Block`:** white, 1px `slate-5` line, 6px radius, 12/16 padding.
      Every module has at least one card.
@@ -1359,7 +1358,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    is `Workspace`; the scope switch reads `My Task` · `Team Work` (replacing `My Work`). COPY entry
    owed on lock. There is no per-person tab (no `Jess` tab): an approval request is a Work
    occurrence owned by the person holding the approver Duty (§§3–4: Purchasing Approver, Payment
-   Approver, Finance Approver and the others), so it arrives in that holder's `My Task`. PROPOSAL /
+   Approver, Finance Approver and the others), so it arrives in that holder's `My Task`. STILL A PROPOSAL (not covered by the 2026-09-28 lock) /
    NOT LAW: an ATTENTION row `To approve {n}` for the signed-in person's approval occurrences, so
    an approver finds them in one press.
 9. No dash on any screen; one blue; 12 / 14 / 16 / 20 type only; no icon beside every fact. The
