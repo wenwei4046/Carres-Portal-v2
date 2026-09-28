@@ -142,7 +142,7 @@ export default function DutyDetail({
               <Fact label="Effective">
                 <span className="text-body text-kit-slate-12">
                   {activeAssignment.effective_until
-                    ? `${fmtDate(activeAssignment.effective_from)} – ${fmtDate(activeAssignment.effective_until)}`
+                    ? `${fmtDate(activeAssignment.effective_from)} to ${fmtDate(activeAssignment.effective_until)}`
                     : `from ${fmtDate(activeAssignment.effective_from)}`}
                 </span>
               </Fact>
@@ -154,7 +154,7 @@ export default function DutyDetail({
                     {`${shownCover.acting_user_name ?? shownCover.acting_user_id} covering for ${shownCover.normal_user_name ?? shownCover.normal_user_id}`}
                   </span>
                   <span className="text-body text-kit-slate-12">
-                    {`${fmtDate(shownCover.starts_on)} – ${fmtDate(shownCover.ends_on)}`}
+                    {`${fmtDate(shownCover.starts_on)} to ${fmtDate(shownCover.ends_on)}`}
                   </span>
                   {note.kind === "cover_scheduled" ? (
                     <span className="ml-2 text-label text-kit-slate-9">
@@ -299,7 +299,7 @@ export function DutyHistory({ duty }: { duty: Duty }) {
               event={`${a.holder_name ?? a.holder_id} holds ${duty.label}`}
               actor={[
                 a.effective_until
-                  ? `${fmtDate(a.effective_from)} – ${fmtDate(a.effective_until)}`
+                  ? `${fmtDate(a.effective_from)} to ${fmtDate(a.effective_until)}`
                   : `from ${fmtDate(a.effective_from)}`,
                 ...(a.assigned_by_name
                   ? [`Assigned by ${a.assigned_by_name}`]
@@ -320,7 +320,7 @@ export function DutyHistory({ duty }: { duty: Duty }) {
               testId={`cover-${v.id}`}
               event={`${v.acting_user_name ?? v.acting_user_id} covering for ${v.normal_user_name ?? v.normal_user_id}`}
               actor={[
-                `${fmtDate(v.starts_on)} – ${fmtDate(v.ends_on)}`,
+                `${fmtDate(v.starts_on)} to ${fmtDate(v.ends_on)}`,
                 ...(v.assigned_by_name ? [`Added by ${v.assigned_by_name}`] : []),
               ]}
               note={v.reason}

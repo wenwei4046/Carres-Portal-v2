@@ -381,7 +381,7 @@ function OfferRow({
       ? "no monthly price yet"
       : fees.length === 1 || Math.min(...fees) === Math.max(...fees)
         ? `${rm(fees[0]!)} / mo`
-        : `${rm(Math.min(...fees))}–${rm(Math.max(...fees))} / mo`;
+        : `${rm(Math.min(...fees))} to ${rm(Math.max(...fees))} / mo`;
 
   function toggleActive() {
     patch.mutate(

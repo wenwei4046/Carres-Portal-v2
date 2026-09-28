@@ -90,8 +90,8 @@ describe("Receiving and Collection hours are separate", () => {
   it("keeps different windows on the same day", () => {
     const r = resolveWarehouseSchedule(input({ workingHours: NORMAL_WEEK }));
     expect(r.reason).toBe("Normal working hours");
-    expect(scheduleCellWord(r.receiving)).toBe("09:00–17:00");
-    expect(scheduleCellWord(r.collection)).toBe("10:00–16:00");
+    expect(scheduleCellWord(r.receiving)).toBe("09:00 to 17:00");
+    expect(scheduleCellWord(r.collection)).toBe("10:00 to 16:00");
   });
 
   it("closes Receiving only, leaving Collection open", () => {
@@ -104,7 +104,7 @@ describe("Receiving and Collection hours are separate", () => {
       }),
     );
     expect(scheduleCellWord(r.receiving)).toBe("Closed");
-    expect(scheduleCellWord(r.collection)).toBe("10:00–16:00");
+    expect(scheduleCellWord(r.collection)).toBe("10:00 to 16:00");
   });
 
   it("closes Collection only, leaving Receiving open", () => {
@@ -116,7 +116,7 @@ describe("Receiving and Collection hours are separate", () => {
         ]),
       }),
     );
-    expect(scheduleCellWord(r.receiving)).toBe("09:00–17:00");
+    expect(scheduleCellWord(r.receiving)).toBe("09:00 to 17:00");
     expect(scheduleCellWord(r.collection)).toBe("Closed");
   });
 
@@ -237,7 +237,7 @@ describe("schedule precedence", () => {
       }),
     );
     expect(r.reason).toBe("Special hours");
-    expect(scheduleCellWord(r.receiving)).toBe("08:00–11:00");
+    expect(scheduleCellWord(r.receiving)).toBe("08:00 to 11:00");
   });
 
   it("a company closure beats a public holiday and the week", () => {
@@ -275,7 +275,7 @@ describe("schedule precedence", () => {
       }),
     );
     expect(r.reason).toBe("Normal working hours");
-    expect(scheduleCellWord(r.receiving)).toBe("09:00–17:00");
+    expect(scheduleCellWord(r.receiving)).toBe("09:00 to 17:00");
   });
 
   it("an UNSAVED policy changes nothing, even on a holiday date", () => {
@@ -353,26 +353,26 @@ describe("every public-holiday availability option", () => {
 
   it("`Receiving only` keeps the week's receiving window and shuts collection", () => {
     const r = on("receiving_only");
-    expect(scheduleCellWord(r.receiving)).toBe("09:00–17:00");
+    expect(scheduleCellWord(r.receiving)).toBe("09:00 to 17:00");
     expect(r.collection.availability).toBe("closed");
   });
 
   it("`Collection only` keeps the week's collection window and shuts receiving", () => {
     const r = on("collection_only");
     expect(r.receiving.availability).toBe("closed");
-    expect(scheduleCellWord(r.collection)).toBe("10:00–16:00");
+    expect(scheduleCellWord(r.collection)).toBe("10:00 to 16:00");
   });
 
   it("`Normal working hours` leaves the week alone", () => {
     const r = on("normal");
-    expect(scheduleCellWord(r.receiving)).toBe("09:00–17:00");
-    expect(scheduleCellWord(r.collection)).toBe("10:00–16:00");
+    expect(scheduleCellWord(r.receiving)).toBe("09:00 to 17:00");
+    expect(scheduleCellWord(r.collection)).toBe("10:00 to 16:00");
   });
 
   it("`Special hours` applies the policy's own window to both", () => {
     const r = on("special", { specialOpensAt: "10:00", specialClosesAt: "13:00" });
-    expect(scheduleCellWord(r.receiving)).toBe("10:00–13:00");
-    expect(scheduleCellWord(r.collection)).toBe("10:00–13:00");
+    expect(scheduleCellWord(r.receiving)).toBe("10:00 to 13:00");
+    expect(scheduleCellWord(r.collection)).toBe("10:00 to 13:00");
   });
 
   it("names the state in the reason, so the operator sees WHY", () => {

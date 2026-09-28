@@ -503,5 +503,5 @@ export function hhmm(t: string | null | undefined): string | null {
 export function scheduleCellWord(s: WarehouseActivitySchedule): string {
   if (s.availability === "not_configured") return NOT_CONFIGURED;
   if (s.availability === "closed") return "Closed";
-  return `${hhmm(s.opensAt) ?? ""}–${hhmm(s.closesAt) ?? ""}`;
+  return `${hhmm(s.opensAt) ?? ""} to ${hhmm(s.closesAt) ?? ""}`;
 }

@@ -827,7 +827,7 @@ function HoursSection({
                         ? NOT_CONFIGURED
                         : cell.closed
                           ? "Closed"
-                          : `${cell.opensAt}–${cell.closesAt}`}
+                          : `${cell.opensAt} to ${cell.closesAt}`}
                     </td>
                   );
                 }
@@ -1155,7 +1155,7 @@ function SpecialDatesSection({
           {upcoming.map((r) => (
             <li key={r.id} className="text-body">
               <span className="font-semibold">{r.onDate}</span> · {SPECIAL_DATE_WORD[r.kind]}
-              {r.opensAt && r.closesAt ? ` · ${hhmm(r.opensAt)}–${hhmm(r.closesAt)}` : ""} · {r.reason}
+              {r.opensAt && r.closesAt ? ` · ${hhmm(r.opensAt)} to ${hhmm(r.closesAt)}` : ""} · {r.reason}
               <div className="text-meta text-kit-slate-11">
                 {r.updatedByName ?? r.createdByName ?? "Not recorded"} · {fmtDate(r.updatedAt)}
               </div>

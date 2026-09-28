@@ -127,8 +127,8 @@ function weekLabel(from: string, to: string): string {
   const right = fmtDateShort(to);
   const sameTail = left.slice(left.indexOf(" ")) === right.slice(right.indexOf(" "));
   return sameTail
-    ? `${left.slice(0, left.indexOf(" "))} – ${right}`
-    : `${left} – ${right}`;
+    ? `${left.slice(0, left.indexOf(" "))} to ${right}`
+    : `${left} to ${right}`;
 }
 
 export default function OperationReceiving() {

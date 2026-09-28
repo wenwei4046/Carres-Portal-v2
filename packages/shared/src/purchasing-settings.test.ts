@@ -114,7 +114,7 @@ describe("workWeekOffDaysFor — keyed by SUPPLIER, not by category", () => {
   });
 
   it("an unset week falls back to the portal's own working-day definition", () => {
-    // Sunday off, Mon–Sat — never a purchasing constant. A supplier with no
+    // Sunday off, Mon to Sat — never a purchasing constant. A supplier with no
     // week also has no production time, so it is already out of the plan.
     expect(workWeekOffDaysFor(SETTINGS, NOBODY)).toEqual([0]);
     expect(workWeekOffDaysFor(SETTINGS, null)).toEqual([0]);
@@ -175,8 +175,8 @@ describe("lastChangeFor — the line under each row", () => {
 
 describe("workWeekLabel", () => {
   it("states the days the factory WORKS", () => {
-    expect(workWeekLabel([0, 6])).toBe("Mon–Fri");
-    expect(workWeekLabel([0])).toBe("Mon–Sat");
+    expect(workWeekLabel([0, 6])).toBe("Mon to Fri");
+    expect(workWeekLabel([0])).toBe("Mon to Sat");
   });
   it("a non-contiguous week is listed, not faked into a range", () => {
     expect(workWeekLabel([0, 3])).toBe("Mon Tue Thu Fri Sat");
@@ -359,7 +359,7 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
   });
 
   it("a factory that does NOT work Saturday lands a day later on the same lead", () => {
-    // Nice Future is Mon–Fri (offDays [0,6]) on the same 7-day mattress lead:
+    // Nice Future is Mon to Fri (offDays [0,6]) on the same 7-day mattress lead:
     // ready Wed 12 Aug, arriving Thu 13 Aug. Same number, different week — the
     // reason production may never be counted on a portal-wide calendar.
     expect(
@@ -455,7 +455,7 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
 describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", () => {
   it("walks both legs backwards on their OWN calendars — Ohana works Saturday", () => {
     // 30 Sep 2026 (Wed) − 1 office transit day = Tue 29 Sep; − 14 Ohana
-    // working days (Mon–Sat) = Sat 12 Sep.
+    // working days (Mon to Sat) = Sat 12 Sep.
     expect(
       orderByFromDeliveryDate(SETTINGS, {
         supplierId: OHANA,
@@ -546,16 +546,16 @@ describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", ()
 describe("P20.4 · an audited setting value reads as business, never as SQL", () => {
   it("the two rows production actually holds stop printing `{0}`", () => {
     // `{0}` = off Sunday only → the factory works Monday to Saturday.
-    expect(settingValueLabel("supplier_work_week", "{0}")).toBe("Mon–Sat");
+    expect(settingValueLabel("supplier_work_week", "{0}")).toBe("Mon to Sat");
     // `{0,6}` = off Sunday and Saturday → Monday to Friday.
-    expect(settingValueLabel("supplier_work_week", "{0,6}")).toBe("Mon–Fri");
+    expect(settingValueLabel("supplier_work_week", "{0,6}")).toBe("Mon to Fri");
   });
 
   it("`po_days` had the identical defect waiting, and reads the same way", () => {
     // Stored the other way round from a work week — these are the days the
     // office SENDS — and it must still read as days.
     expect(settingValueLabel("po_days", "{1,3,5}")).toBe("Mon Wed Fri");
-    expect(settingValueLabel("po_days", "{1,2,3,4,5}")).toBe("Mon–Fri");
+    expect(settingValueLabel("po_days", "{1,2,3,4,5}")).toBe("Mon to Fri");
   });
 
   it("every other key stores one number and prints as itself", () => {
@@ -570,7 +570,7 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
     }
     // `{}` is a recorded EMPTY array, which is a different fact from nothing
     // recorded — it reads as the glyph, not as a blank.
-    expect(settingValueLabel("supplier_work_week", "{}")).toBe("Mon–Sat");
+    expect(settingValueLabel("supplier_work_week", "{}")).toBe("Mon to Sat");
     expect(settingValueLabel("po_days", "{}")).toBe("");
   });
 
@@ -589,7 +589,7 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
   it("`workWeekLabel` and `weekdayListLabel` are the same labeller", () => {
     expect(workWeekLabel([0, 6])).toBe(weekdayListLabel([1, 2, 3, 4, 5]));
     expect(workWeekLabel([0])).toBe(weekdayListLabel([1, 2, 3, 4, 5, 6]));
-    // Two working days do not collapse into a range — `Mon Tue`, never `Mon–Tue`.
+    // Two working days do not collapse into a range — `Mon Tue`, never `Mon to Tue`.
     expect(weekdayListLabel([1, 2])).toBe("Mon Tue");
   });
 });
@@ -602,7 +602,7 @@ describe("poDeliveryWorkingDays — the n of `PO {n}-Day Delivery Date` (owner 2
     ],
   } as unknown as Pick<import("./purchasing-settings").PurchasingSettings, "suppliers">;
 
-  it("Mon 21 Sep 2026 → Fri 9 Oct 2026 on a Mon–Fri supplier is 14 — the owner's example", () => {
+  it("Mon 21 Sep 2026 → Fri 9 Oct 2026 on a Mon to Fri supplier is 14 — the owner's example", () => {
     expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(14);
   });
 

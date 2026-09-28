@@ -715,7 +715,7 @@ export function weekdayListLabel(days: readonly number[]): string {
   const isMonRun =
     on.every((w, i) => (i === 0 ? w.day === 1 : w.day === on[i - 1]!.day + 1)) && on[0]!.day === 1;
   return isMonRun && on.length > 2
-    ? `${labels[0]}–${labels[labels.length - 1]}`
+    ? `${labels[0]} to ${labels[labels.length - 1]}`
     : labels.join(" ");
 }
 

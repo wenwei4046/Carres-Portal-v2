@@ -241,7 +241,7 @@ export default function CalendarPanel() {
               title={
                 r.fromIso === r.toIso
                   ? undefined
-                  : `${fmtDateShort(r.fromIso)} – ${fmtDateShort(r.toIso)}`
+                  : `${fmtDateShort(r.fromIso)} to ${fmtDateShort(r.toIso)}`
               }
               className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-label font-semibold transition-colors ${
                 active
