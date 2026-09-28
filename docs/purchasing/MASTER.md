@@ -913,6 +913,11 @@ PO Delivery Date or the customer promise. An absent immediate answer after confi
 not create work. Date-specific confirmation opens only one Office working day before the effective
 arrival while Pending Delivery Qty remains above zero; an earlier evidenced exception may revise
 that effective date and therefore the future occurrence.
+It opens only for a PO whose CURRENT version carries the `PO sent to supplier` mark: a supplier
+cannot confirm delivery of a PO it never received, and until the mark the PO acts through the PO
+window's send line alone. **Fixed 2026-09-28** — the Work projection had derived the check for
+unsent POs (PO-20260903-4316 / -7907, found by the Workspace Work BUILD chat); the PO Register
+facet and the Order Route already required the send mark.
 
 ---
 
