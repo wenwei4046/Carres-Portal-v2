@@ -175,7 +175,9 @@ dash, is removed. **Not swept here:** `WarehouseStockRegister`, `WarehouseUnitDe
 and a dash used as a separator or inside a sentence (`{a} — {b}`, `Total — unchanged`): measured
 752 lines in 226 files. **Owner ruling 2026-09-28:** these go too, approved words included. Two facts
 become two lines where the surface has room, otherwise one clear line (COPY § NO DASH AS A
-SEPARATOR EITHER). APPROVED TARGET / NOT BUILT; it ships as the Scope D third pass.
+SEPARATOR EITHER). **BUILT 2026-09-28 (#1709, `a91aca00`), production walk owed.** Left on purpose:
+never-rendered rule descriptions, catalog descriptions parsed as data, and the three Warehouse files of
+open #1677.
 
 **Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
 (`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's
