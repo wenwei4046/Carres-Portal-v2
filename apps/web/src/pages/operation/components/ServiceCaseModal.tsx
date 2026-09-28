@@ -429,13 +429,13 @@ function IntakeRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex gap-2">
       <dt className="text-meta w-24 shrink-0 pt-0.5 text-base-500">{label}</dt>
-      <dd className="text-body text-base-800">{value || "—"}</dd>
+      <dd className="text-body text-base-800">{value || ""}</dd>
     </div>
   );
 }
 
 function reporterLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return CASE_REPORTERS.find((r) => r.key === key)?.label ?? key;
 }
 

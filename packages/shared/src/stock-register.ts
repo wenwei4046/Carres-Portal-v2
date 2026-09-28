@@ -64,6 +64,18 @@ export interface StockRegisterUnit {
   soDate?: string | null;
   expectedArrival?: string | null;
   purchasePurpose?: string | null;
+  /** Owner rulings 2026-09-25 (Stock MASTER §7) — read from the owning
+   *  receipt and handover events, never from a PO date or a stored total:
+   *  the day the goods entered Carres control (a posted receipt; for goods
+   *  booked in before Receiving existed, the recorded date in) … */
+  goodsReceivedDate?: string | null;
+  /** … the day the Warehouse posted OUT to a Logistics company (blank while
+   *  the Unit stands in a Site) … */
+  shipDate?: string | null;
+  /** … the company whose driver took the goods, printed as its own name … */
+  pickupBy?: string | null;
+  /** … and where they are going: the DO's customer address or the next Site. */
+  deliveryLocation?: string | null;
 }
 
 /**

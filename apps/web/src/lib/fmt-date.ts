@@ -118,7 +118,7 @@ export function fmtDate(
   opts?: { time?: boolean; year?: YearMode; timeOnly?: boolean },
 ): string {
   const p = parts(iso);
-  if (!p) return "—";
+  if (!p) return "";
   /* ⭐ THE CLOCK ALONE (2026-08-25) — for a list already grouped under a date
      heading, where repeating the day on every row makes the reader re-parse the
      same string to find the one boundary that matters. It is an OPTION on the
@@ -141,10 +141,10 @@ export function fmtDate(
  * `toLocaleDateString` (COPY-STANDARD: never hand a date to the locale).
  */
 export function fmtMonth(period: string | null | undefined): string {
-  if (!period) return "—";
+  if (!period) return "";
   const [y, m] = period.slice(0, 7).split("-").map(Number);
   const mon = MONTHS[(m ?? 0) - 1];
-  if (!mon || !Number.isFinite(y)) return "—";
+  if (!mon || !Number.isFinite(y)) return "";
   return `${mon} ${y}`;
 }
 
@@ -177,7 +177,7 @@ export function fmtMonth(period: string | null | undefined): string {
  */
 export function fmtDateShort(iso: string | null | undefined): string {
   const p = parts(iso);
-  if (!p) return "—";
+  if (!p) return "";
   return carriesYear(p.full, undefined)
     ? `${p.day} ${p.mon} ${p.yr}`
     : `${p.day} ${p.mon}`;

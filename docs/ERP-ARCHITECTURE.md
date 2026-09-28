@@ -468,8 +468,10 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 - The order's own lifecycle: placed → being arranged → finished.
 
 **ACTIONS**
-- Take the order · change what was sold (up-sell only, through the approved change path) ·
-  set or correct the promised date · assign or reassign the PIC · cancel the order.
+- Take the order **in the Sales Portal only** (owner ruling 2026-09-27: Operation has no create
+  door; the Register has no `New Sales Order`) · change what was sold (up-sell only, through the
+  approved change path) · set or correct the promised date · assign or reassign the PIC · cancel
+  the order.
 
 **SUMMARISES — read-only, and each of these must be a summary rather than a form**
 - whether the goods are bought (Purchasing) · where they are (Stock) · whether they arrived
@@ -1061,7 +1063,7 @@ Malaysia) or whose Logistics Partner is not the Klang Valley default.
                              The message states the delivery date, the balance, the payment
                              link, and that a delay asked after the goods leave carries a
                              storage charge.
-2. Money earlier             Payment must be complete 3 working days before Confirmed Delivery
+2. Money earlier             Payment must be complete 3 working days before Scheduled delivery
                              (the customer's delivery date — owner chose this anchor), not
                              Klang Valley's 2.
 ```

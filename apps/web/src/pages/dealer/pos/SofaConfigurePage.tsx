@@ -586,7 +586,7 @@ export default function SofaConfigurePage({
   const cardHeight = offeredHeights[0] ?? "24";
   const cardPriceLabel = (codes: string[]) => {
     const t = pricePick(codes, "PRICE_1", cardHeight, null).total;
-    return t > 0 ? `From RM ${t.toLocaleString("en-MY")}` : "—";
+    return t > 0 ? `From RM ${t.toLocaleString("en-MY")}` : "";
   };
 
   // Hero pane previews the SELECTED (else first) pick — CLICK only, no
@@ -1055,7 +1055,7 @@ export default function SofaConfigurePage({
                     {qpDisplayTotal.toLocaleString("en-MY")}
                   </>
                 ) : (
-                  "—"
+                  ""
                 )}
               </div>
               <div className="cfg-header__totalNote">
@@ -1074,7 +1074,7 @@ export default function SofaConfigurePage({
                     {custTotal.toLocaleString("en-MY")}
                   </>
                 ) : (
-                  "—"
+                  ""
                 )}
               </div>
               <div className="cfg-header__totalNote">component total · combo when matched</div>

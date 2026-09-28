@@ -186,7 +186,7 @@ function RefundRow({ r }: { r: RefundDisplayRow }) {
         {r.kind === "credit" ? "Credit" : "Refund"}
       </span>
       <span className="text-muted-foreground text-label truncate" title={r.reason ?? ""}>
-        {r.reason ?? "—"}
+        {r.reason ?? ""}
       </span>
       <span className="text-label text-muted-foreground truncate">{detail}</span>
       <span className="font-mono text-right font-semibold text-primary">{rm(r.amount)}</span>

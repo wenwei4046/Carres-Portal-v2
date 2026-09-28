@@ -212,7 +212,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
               {dealer.name}
             </h2>
             <div className="text-meta text-base-600 mt-1">
-              {dealer.contact ?? "—"}
+              {dealer.contact ?? ""}
             </div>
           </div>
           <button
@@ -228,7 +228,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
         <div className="flex gap-2 mb-[18px] items-center">
           <DealerStatusPill status={dealer.status} />
           <span className="text-label text-base-500">
-            {dealer.region} · joined {dealer.joined_date ?? "—"}
+            {dealer.region} · joined {dealer.joined_date ?? ""}
           </span>
         </div>
 
@@ -243,7 +243,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
             v={
               outstandingNum > 0
                 ? `RM ${outstandingNum.toLocaleString()}`
-                : "—"
+                : ""
             }
             accent={outstandingNum > 0}
           />
@@ -267,7 +267,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                       SO-{o.so}
                     </div>
                     <div className="text-label text-base-500">
-                      {o.customerName ?? "—"}
+                      {o.customerName ?? ""}
                     </div>
                   </div>
                   <div className="text-right">

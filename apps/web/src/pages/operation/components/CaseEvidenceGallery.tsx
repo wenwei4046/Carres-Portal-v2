@@ -169,7 +169,7 @@ export default function CaseEvidenceGallery({
  *  the same fault on the same day is the normal case. */
 function stamp(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso || "—";
+  if (Number.isNaN(d.getTime())) return iso || "";
   return `${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })} · ${d.toLocaleTimeString(
     "en-GB",
     { hour: "2-digit", minute: "2-digit" },

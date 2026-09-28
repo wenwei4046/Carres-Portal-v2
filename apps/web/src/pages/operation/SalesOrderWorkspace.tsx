@@ -70,6 +70,7 @@ import {
   EMERGENCY_RELATIONSHIPS,
   LIFT_OPTIONS,
   lineClass,
+  lineKind,
   MAX_DELIVERY_FLOOR,
   maxLeadDaysFor,
   minDeliveryDateISO,
@@ -78,10 +79,13 @@ import {
   receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
+  routeDeliveryScopesOf,
+  routeGoodsLinesOf,
   salesOrderNumberWord,
   salesOrderParamOf,
   supplierClaimStatusLabel,
   myHolidaySet,
+  mytDayOf,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
@@ -124,6 +128,8 @@ import {
   useSalesOrderAmendment,
   useSalesOrderRevisions,
   useSalesOrderExpansion,
+  useCollectionOwner,
+  useLogisticsCardFacts,
   useSalesOrderRouteFacts,
   useSalesOrderIdByNumber,
   useSalespersons,
@@ -146,7 +152,8 @@ import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
-import SalesOrderRoute from "./SalesOrderRoute";
+import SalesOrderReadFailure from "./SalesOrderReadFailure";
+import SalesOrderRoute, { type RouteRetryOwner } from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 
@@ -529,8 +536,8 @@ function draftTemplateData(
     status_label: base?.status_label ?? "Draft",
     channel: draft.outlet_id ? "showroom" : (base?.channel ?? "dealer"),
     customer: {
-      name: draft.customer_name || "—",
-      address: addressString(draft, baseline) || "—",
+      name: draft.customer_name || "",
+      address: addressString(draft, baseline) || "",
       phone: draft.customer_phone || null,
       email: draft.customer_email || null,
       emergency: emergencyString(draft) || null,
@@ -632,16 +639,16 @@ export function snapshotTemplateData(
   const paid = asOf ? payments.reduce((n, pm) => n + Number(pm.amount), 0) : (base?.paid ?? 0);
   const str = (k: string) => (h[k] == null ? null : String(h[k]));
   return {
-    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? "—"),
+    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? ""),
     issue_date: (str("placed_at") ?? base?.issue_date ?? "").slice(0, 10),
     proceed_date: str("proceed_date"),
     order_id: base?.order_id ?? "snapshot",
-    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? "—"),
+    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? ""),
     status_label: base?.status_label ?? "",
     channel: base?.channel ?? "dealer",
     customer: {
-      name: str("customer_name") ?? "—",
-      address: str("customer_address") ?? "—",
+      name: str("customer_name") ?? "",
+      address: str("customer_address") ?? "",
       phone: str("customer_phone"),
       email: str("customer_email"),
       emergency: str("customer_emergency"),
@@ -884,7 +891,9 @@ export function Block({
           id={headingId}
           className={
             titleTone === "sales-order"
-              ? "text-strong text-kit-blue-11"
+              ? /* ONE KIT LAW (owner ruling 2026-09-27): a card title is black bold,
+                   never blue. It overwrites the 2026-09-21 "remain blue" ruling. */
+                "text-strong text-kit-slate-12"
               : "font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
           }
         >
@@ -1087,23 +1096,28 @@ function CustomFields({
   fields,
   values,
   onChange,
+  locked,
 }: {
   fields: CustomField[];
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
+  /** The page's one lock: a locked field carries no star and no placeholder. */
+  locked: boolean;
 }) {
   return (
     <>
       {fields.map((f) => {
         const id = `so-custom-${f.key}`;
         const value = values[f.key] ?? "";
+        /* Locked and absent reads `Not recorded`, the same as every built-in field. */
+        if (locked && !value) return <Fact key={f.key} label={f.label} value="Not recorded" />;
         if (f.type === "select") {
           return (
             <Select
               key={f.key}
               id={id}
               label={f.label}
-              required={f.required}
+              required={!locked && f.required}
               value={value || undefined}
               onValueChange={(v) => onChange(f.key, v)}
               options={f.options.map((o) => ({ value: o, label: o }))}
@@ -1116,7 +1130,7 @@ function CustomFields({
               key={f.key}
               id={id}
               label={f.label}
-              required={f.required}
+              required={!locked && f.required}
               value={value || null}
               onChange={(iso) => onChange(f.key, iso ?? "")}
             />
@@ -1127,7 +1141,7 @@ function CustomFields({
             key={f.key}
             id={id}
             label={f.label}
-            required={f.required}
+            required={!locked && f.required}
             type={f.type === "number" ? "number" : "text"}
             value={value}
             onChange={(e) => onChange(f.key, e.target.value)}
@@ -1186,17 +1200,10 @@ function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
 /** The absence the object page prints for a number or param no order carries
  *  (COPY-STANDARD: `Sales Order not found.`). */
 function SalesOrderAbsence() {
-  const navigate = useNavigate();
+  /* The kit's own block and button, through the one translator (owner ruling 2026-09-26). */
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2" data-testid="so-not-found">
-      <p className="text-body text-base-700">Sales Order not found.</p>
-      <button
-        type="button"
-        className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-        onClick={() => navigate("/operation/orders")}
-      >
-        Back to Sales Orders
-      </button>
+    <div className="flex h-full flex-col items-center justify-center" data-testid="so-not-found">
+      <SalesOrderReadFailure error={{ status: 404 }} surface="sales-order" />
     </div>
   );
 }
@@ -1290,11 +1297,20 @@ function SalesOrderWorkspaceBody() {
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
   const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
+  /* ⭐ ROUTE FACTS LOAD ONLY WHEN THE ROUTE IS OPEN (owner ruling 2026-09-26).
+     Measured: the fan-in fired on every opened order — eleven requests the
+     Order tab never reads. */
   const routeFactsQ = useSalesOrderRouteFacts(
     isNew ? null : (orderId ?? null),
-    !isNew && Boolean(orderId),
+    showRoute,
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
+  /* The leg that reaches the customer decides the payment deadline's clock. */
+  const routeCustomerLeg = useMemo(() => {
+    const stops = detailQ.data?.order?.delivery_stops ?? [];
+    return stops.length >= 2 ? Math.max(...stops.map((stop) => Number(stop.leg) || 0)) : 0;
+  }, [detailQ.data]);
+  const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
      owns that translation. The route facts carry only open/closed. */
   const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
@@ -1492,8 +1508,15 @@ function SalesOrderWorkspaceBody() {
   /** Proposing again over an out-of-date request withdraws it first (server). */
   const [replaceAmendmentId, setReplaceAmendmentId] = useState<string | null>(null);
   const role = useAuth((st) => st.role);
-  /** A saved order's cards are read-only until `Edit` (oldrev keeps its own lock). */
-  const formLocked = mode === "object" && !editing;
+  /** THE LOCKED STATE (owner ruling 2026-09-26): View and a historical version
+   *  are ONE locked presentation; Edit and Create alone draw controls. */
+  const formLocked = (mode === "object" && !editing) || mode === "oldrev";
+  /** Locked and absent prints `Not recorded`, because a `Select` or `Pick a date` placeholder is a question. */
+  const lockedFact = (label: string, present: unknown, control: React.ReactNode) =>
+    formLocked && !present ? <Fact label={label} value="Not recorded" /> : control;
+  /** `Disc (RM)` is zero unless the line really carries a numeric discount (SO-PDF-STANDARD §10). */
+  const discountOf = (row: object) =>
+    typeof (row as { discount?: unknown }).discount === "number" ? (row as { discount: number }).discount : 0;
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -1826,6 +1849,8 @@ function SalesOrderWorkspaceBody() {
      * sold it. */
     if (needDealer && !draft.salesperson_id) return "A salesperson is required";
     if (needDealer && draftLinesPayload().length === 0) return "An order needs at least one item";
+    /* Edit cannot return an order to no date, so a legacy TBD order picks one before it commits (owner ruling 2026-09-26). */
+    if (!needDealer && !draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";
     /* The delivery date is a PROMISE (orders/MASTER — THE THREE DELIVERY
      * DATES). A date inside the production lead is a promise the factory
      * cannot keep, and the POS has refused it since 2026-05-22 — this door
@@ -2398,6 +2423,28 @@ function SalesOrderWorkspaceBody() {
         (goodsTruthQ.data?.lines ?? []).map((line) => [line.sku, line.deliverTo]),
       ),
       cancelledLines,
+      /* ⭐ THE GOODS CHAIN READS ITS OWNERS (owner ruling 2026-09-26): the
+         `po_line_sources` lineage, the supplier's newest evidenced answer, the
+         posted receipts and the Units bound to each line — arranged by the
+         shared `routeGoodsLinesOf`. A service line moves no Unit and draws no
+         goods lane. */
+      goods: facts.goods
+        ? routeGoodsLinesOf({
+            ...facts.goods,
+            todayIso: appTodayIso(),
+            holidays: myHolidaySet(),
+            lines: facts.goods.lines
+              .filter((line) => lineKind(line.sku) !== "service")
+              .map((line) => ({
+                ...line,
+                qty: Number(line.qty),
+                label:
+                  detail.lines.find((row) => row.id === line.id)?.label?.trim() ||
+                  detail.lines.find((row) => row.sku === line.sku)?.label?.trim() ||
+                  line.sku,
+              })),
+          })
+        : undefined,
       allocation: facts.allocation,
       purchaseOrders: detail.pos.map((po) => ({
         id: po.id,
@@ -2420,16 +2467,39 @@ function SalesOrderWorkspaceBody() {
         receivedAt: record.goods_received_at,
       })),
       delivery: {
+        /* ⭐ DELIVERY'S OWN RECORDS, ONE SCOPE PER LANE (owner ruling
+           2026-09-26). The arrangement, the live Delivery Order, its attempts,
+           its handover facts and the photos bound to its number — arranged by
+           the shared `routeDeliveryScopesOf`. The V1 booking fields below are
+           only the fallback for an order Delivery has recorded nothing on. */
+        scopes: facts.delivery
+          ? routeDeliveryScopesOf({
+              stops: detail.order.delivery_stops ?? [],
+              arrangements: facts.delivery.arrangements,
+              deliveryOrders: facts.delivery.deliveryOrders,
+              attempts: facts.delivery.attempts,
+              handoverEvents: facts.delivery.handoverEvents,
+              photos: detail.control?.delivery_photos ?? [],
+              lines: detail.lines.map((line) => ({ sku: line.sku, qty: Number(line.qty) })),
+              fallbackPartnerName: facts.brief?.assignedLogistics?.partnerName ?? null,
+              fallbackConfirmedDate: facts.brief?.appointment?.dateIso ?? null,
+              fallbackConfirmedTime: facts.brief?.appointment?.slot ?? null,
+            })
+          : undefined,
+        /* Payment must be complete 3 working days before an outstation
+           delivery, 2 in the Klang Valley — the Work panel's own reading of
+           the partner (Law D). */
+        outstation: routePartnerQ.data?.partner ? !routePartnerQ.data.partner.kvDefault : false,
         /* The document's own number (0356/Law D) — the gate stops depending on
            an attempt existing before it can print the number the system
            already minted. */
         doNumber: detail.order.do_number ?? null,
         /* Delivery's own answer about who carries this order — the LOGISTICS
            node never infers a company from the region default. */
-        logistics: facts.brief.assignedLogistics
+        logistics: facts.brief?.assignedLogistics
           ? { partnerName: facts.brief.assignedLogistics.partnerName }
           : null,
-        booking: facts.brief.appointment
+        booking: facts.brief?.appointment
           ? {
               confirmedDate: facts.brief.appointment.dateIso,
               slot: facts.brief.appointment.slot,
@@ -2504,6 +2574,32 @@ function SalesOrderWorkspaceBody() {
       /* Sunday and Malaysian public holidays are the two days no company runs
          (§8) — the gate names the refused day instead of failing silently. */
       publicHolidays: [...myHolidaySet()],
+      /* ⭐ A FAILED READ IS `unreadable`, NEVER A BUSINESS SENTENCE (owner
+         ruling 2026-09-26). The group whose owner could not be read says so;
+         every other group draws from its own read. */
+      unreadable: {
+        delivery: facts.failed.delivery,
+        payments: facts.failed.payments,
+        purchasing: facts.failed.purchasing,
+        amendment: amendmentQ.isError,
+      },
+      /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
+         still waiting for a decision is announced. */
+      amendment:
+        liveAmendment && (liveAmendment.status === "submitted" || liveAmendment.stale)
+          ? {
+              status: liveAmendment.stale ? "stale" : "submitted",
+              submittedAt: liveAmendment.submitted_at ? mytDayOf(liveAmendment.submitted_at) : null,
+              submittedBy: liveAmendment.submitted_by_name?.trim() || null,
+              /* WHAT changes — the same rows the Order tab's request shows
+                 (one arithmetic, Law D). The Route prints the first three. */
+              changes: (requestView?.rows ?? []).map((row) => ({
+                what: row.what,
+                before: row.before,
+                after: row.after,
+              })),
+            }
+          : null,
     });
   }, [
     orderId,
@@ -2513,17 +2609,39 @@ function SalesOrderWorkspaceBody() {
     serviceCasesQ.data,
     cancelledLines,
     money,
+    liveAmendment,
+    amendmentQ.isError,
+    requestView,
+    routePartnerQ.data,
   ]);
+
+  const retryRouteRead = useCallback(
+    (owner: RouteRetryOwner) => {
+      if (owner === "amendment") void amendmentQ.refetch();
+      else void routeFactsQ.refetch();
+    },
+    [amendmentQ, routeFactsQ],
+  );
 
   /* The Route hands out the action-engine line; the ROSTER names the person.
      One duty read, the same one the Team board and the PO chips use. */
   const dutyQ = useWorkspaceDuties();
+  const orderOwnerQ = useCollectionOwner(orderId ?? null, showRoute);
+  const routeOrderOwner = useMemo(() => {
+    const owner = orderOwnerQ.data?.owner ?? null;
+    const userId = owner?.acting_user_id ?? owner?.normal_user_id ?? null;
+    const name = owner?.acting_user_name ?? owner?.normal_user_name ?? null;
+    return userId && name ? { userId, name, email: "" } : null;
+  }, [orderOwnerQ.data]);
   const routeOwners = useMemo(
     () => ({
       purchasing: workspaceDutyActor(dutyQ.data, "po_duty"),
       receiving: workspaceDutyActor(dutyQ.data, "grn_duty"),
+      /* `Choose Ready Unit` is the Sales Order PIC's — the person acting for
+         the order today, cover included, from the one owner read. */
+      sales: routeOrderOwner,
     }),
-    [dutyQ.data],
+    [dutyQ.data, routeOrderOwner],
   );
 
   /* The real parties, with no placeholder — the attribution form supplies its
@@ -2636,8 +2754,11 @@ function SalesOrderWorkspaceBody() {
           disabled={!printData}
           onClick={() => void openPrint()}
           data-testid="workspace-print"
+          aria-label={mode === "oldrev" ? "Print this version" : "Print"}
         >
-          <Printer size={14} /> {mode === "oldrev" ? "Print this version" : "Print ▾"}
+          {/* Below 480px `Print` is its icon; the word stays for a reader. */}
+          <Printer size={14} aria-hidden="true" />
+          <span className="max-[479px]:sr-only">{mode === "oldrev" ? "Print this version" : "Print ▾"}</span>
         </Button>
       )}
       {canEditOrder && !editing && (
@@ -2650,7 +2771,7 @@ function SalesOrderWorkspaceBody() {
           {/* `⋮` LAST, ICON ONLY — owner ruling (Jess, 2026-09-21); its accessible
               name and tooltip are `More actions`. The retired `Propose a change to
               the customer` door is gone: the whole-page Edit carries that change. */}
-          <summary className="btn-ghost cursor-pointer list-none px-2 text-body" aria-label="More actions" title="More actions">⋮</summary>
+          <summary className="btn-ghost cursor-pointer list-none px-2 text-body max-md:inline-grid max-md:h-10 max-md:w-10 max-md:place-items-center max-md:px-0" aria-label="More actions" title="More actions">⋮</summary>
           <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
             <button
               type="button"
@@ -2813,7 +2934,8 @@ function SalesOrderWorkspaceBody() {
                     </span>
                   </td>
                   <td className="px-2 py-2 text-center">
-                    {l.removed || protectedLine(l) ? <span className={strike}>{l.qty}</span> : (
+                    {/* A locked line prints text: no number box exists in View or a historical version. */}
+                    {formLocked || l.removed || protectedLine(l) ? <span className={strike}>{l.qty}</span> : (
                       <div className="min-w-[56px]">
                         <Input id={`so-edit-qty-${l.key}`} aria-label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)}
                           onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
@@ -2821,7 +2943,7 @@ function SalesOrderWorkspaceBody() {
                     )}
                   </td>
                   <td className="px-2 py-2 text-right">
-                    {l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price)}</span> : (
+                    {formLocked || l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price)}</span> : (
                       <div className="min-w-[80px]">
                         <Input id={`so-edit-price-${l.key}`} aria-label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01"
                           value={String(l.unit_price)}
@@ -2829,7 +2951,8 @@ function SalesOrderWorkspaceBody() {
                       </div>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right text-base-500">—</td>
+                  {/* Zero is the fact, the dash was the banned absent-value glyph. */}
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(l))}</td>
                   <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(l.qty * l.unit_price)}</td>
                 </tr>,
                 open && canConfig ? (
@@ -2870,7 +2993,7 @@ function SalesOrderWorkspaceBody() {
                   </td>
                   <td className={`px-2 py-2 text-center ${strike}`}>{a.qty}</td>
                   <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.unit_price)}</td>
-                  <td className="px-2 py-2 text-right text-base-500">—</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(a))}</td>
                   <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.qty * a.unit_price)}</td>
                 </tr>
               );
@@ -2907,8 +3030,9 @@ function SalesOrderWorkspaceBody() {
       {/* ⭐ THE DOORS BELONG TO EDIT, THE TABLE BELONGS TO BOTH. The same
           commercial composition now stands in View (owner ruling 2026-09-21),
           and a page that reads until `Edit` is pressed cannot offer `Add item`
-          or `Add service` while it is reading. */}
-      {editing && (
+          or `Add service` while it is reading. The lock is asked first, so a
+          historical version can never draw the door. */}
+      {!formLocked && editing && (
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex items-end gap-2">
           <div className="flex-1">
@@ -3069,7 +3193,8 @@ function SalesOrderWorkspaceBody() {
               blank may be filled, a recorded date may not be moved or cleared.
               This control is the door, not the lock. */}
           <div data-pos-field="proceedDate">
-            {mode === "create" || (mode === "object" && (editing || !baseline.proceed_date)) ? (
+            {/* A never-recorded date reads `Not recorded` while locked; Edit opens the picker. */}
+            {mode === "create" || (mode === "object" && editing) ? (
               <DatePicker id="so-proceed" label="Proceed Date" value={draft.proceed_date}
                 hint={
                   mode === "object" && !baseline.proceed_date
@@ -3088,7 +3213,7 @@ function SalesOrderWorkspaceBody() {
               </span>
             )}
           </div>
-          {mode === "create" || editing ? (
+          {mode === "create" || (!formLocked && editing) ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
                 hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
@@ -3097,14 +3222,10 @@ function SalesOrderWorkspaceBody() {
                     ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
                     : undefined
                 }
-                onChange={(iso) => setField("delivery_date", iso)} />
-              {editing && (
-                <div className="mt-2">
-                  <Checkbox id="so-promised-tbd" label="Delivery date to be confirmed"
-                    checked={draft.delivery_date_tbd}
-                    onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
-                </div>
-              )}
+                /* A date changes only into another date: picking one in Edit ends a legacy TBD (owner ruling 2026-09-26). */
+                onChange={(iso) =>
+                  setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: mode === "create" ? d.delivery_date_tbd : false }))
+                } />
             </div>
           ) : (
             <div data-pos-field="deliveryDate">
@@ -3131,7 +3252,7 @@ function SalesOrderWorkspaceBody() {
               remains its only writer; the SO page simply stops printing it. */}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
+          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
         </div>
         {/* THE ONE DOOR for goods, price and the promised date — opened from
             `More actions` since 2026-08-26. The component still MOUNTS here
@@ -3140,7 +3261,7 @@ function SalesOrderWorkspaceBody() {
             rule + padding therefore appear only when there is a live panel to
             separate; with nothing pending this renders an empty, invisible
             div rather than a bordered strip with no content in it. */}
-        {editing && (
+        {!formLocked && editing && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Select id="so-instalment" label="Instalment months"
               value={draft.installment_months == null ? "none" : String(draft.installment_months)}
@@ -3288,7 +3409,8 @@ function SalesOrderWorkspaceBody() {
             then who they are demographically. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div data-pos-field="name">
-            <Input id="so-name" label="Full name" required value={draft.customer_name}
+            {/* A locked field is not a question, so the star belongs to Edit and Create. */}
+            <Input id="so-name" label="Full name" required={!formLocked} value={draft.customer_name}
               onChange={(e) => setField("customer_name", e.target.value)} />
           </div>
           <div data-pos-field="phone">
@@ -3297,35 +3419,38 @@ function SalesOrderWorkspaceBody() {
           </div>
           {customerBuiltins["email"]?.enabled !== false && (
             <div data-pos-field="email">
-              <Input id="so-email" label="Email" required={customerBuiltins["email"]?.required}
+              <Input id="so-email" label="Email" required={!formLocked && customerBuiltins["email"]?.required}
                 value={draft.customer_email}
                 onChange={(e) => setField("customer_email", e.target.value)} />
             </div>
           )}
           {customerBuiltins["race"]?.enabled !== false && (
             <div data-pos-field="race">
-              <Select id="so-race" label="Race" required={customerBuiltins["race"]?.required}
+              {lockedFact("Race", draft.customer_race,
+              <Select id="so-race" label="Race" required={!formLocked && customerBuiltins["race"]?.required}
                 value={draft.customer_race || undefined}
                 onValueChange={(v) => setField("customer_race", v)}
-                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />
+                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />)}
             </div>
           )}
           {customerBuiltins["gender"]?.enabled !== false && (
             <div data-pos-field="gender">
-              <Select id="so-gender" label="Gender" required={customerBuiltins["gender"]?.required}
+              {lockedFact("Gender", draft.customer_gender,
+              <Select id="so-gender" label="Gender" required={!formLocked && customerBuiltins["gender"]?.required}
                 value={draft.customer_gender || undefined}
                 onValueChange={(v) => setField("customer_gender", v)}
-                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />
+                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />)}
             </div>
           )}
           {customerBuiltins["birthday"]?.enabled !== false && (
             <div data-pos-field="birthday">
-              <DatePicker id="so-birthday" label="Birthday" required={customerBuiltins["birthday"]?.required}
+              {lockedFact("Birthday", draft.customer_birthday,
+              <DatePicker id="so-birthday" label="Birthday" required={!formLocked && customerBuiltins["birthday"]?.required}
                 value={draft.customer_birthday}
-                onChange={(iso) => setField("customer_birthday", iso)} />
+                onChange={(iso) => setField("customer_birthday", iso)} />)}
             </div>
           )}
-          <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} />
+          <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
         </div>
         {/* ⭐ Merged from the retired `Emergency contact` card (YH,
             2026-08-27). It is the same person's fact, so it is the same
@@ -3356,7 +3481,7 @@ function SalesOrderWorkspaceBody() {
               </datalist>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
+              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
             </div>
           </>
         )}
@@ -3380,7 +3505,7 @@ function SalesOrderWorkspaceBody() {
                   onChange={(e) => setField("customer_billing", e.target.value)} />
               </div>
             )}
-            <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
+            <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
           </div>
       </Block>
       </fieldset>
@@ -3453,39 +3578,45 @@ function SalesOrderWorkspaceBody() {
                 column to preserve. An address the list cannot express still has
                 two homes — the free-text lines above, and `Address not given
                 yet` for the genuinely unknown. */}
+            {/* THE LOCKED STATE (owner ruling 2026-09-26): an absent answer reads
+                `Not recorded`, and the hints belong to Edit and Create. */}
+            {lockedFact("State", draft.customer_address_state,
             <Select id="so-state" label="State"
               value={draft.customer_address_state || undefined}
               disabled={draft.customer_address_unknown}
               onValueChange={(v) =>
                 setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
               }
-              options={MY_STATES.map((st) => ({ value: st, label: st }))} />
+              options={MY_STATES.map((st) => ({ value: st, label: st }))} />)}
+            {lockedFact("City", draft.customer_address_city,
             <Select id="so-city" label="City"
               value={draft.customer_address_city || undefined}
               disabled={draft.customer_address_unknown || !draft.customer_address_state}
-              hint={!draft.customer_address_state ? "Pick a state first" : undefined}
+              hint={!formLocked && !draft.customer_address_state ? "Pick a state first" : undefined}
               onValueChange={(v) =>
                 setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
               }
-              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
+              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />)}
+            {lockedFact("Postcode", draft.customer_address_postcode,
             <Select id="so-postcode" label="Postcode"
               value={draft.customer_address_postcode || undefined}
               disabled={draft.customer_address_unknown || !draft.customer_address_city}
-              hint={!draft.customer_address_city ? "Pick a city first" : undefined}
+              hint={!formLocked && !draft.customer_address_city ? "Pick a city first" : undefined}
               onValueChange={(v) => setField("customer_address_postcode", v)}
               options={getPostcodes(
                 draft.customer_address_state || null,
                 draft.customer_address_city || null,
-              ).map((pc) => ({ value: pc, label: pc }))} />
-            <Select id="so-building-type" label="Building type" required
+              ).map((pc) => ({ value: pc, label: pc }))} />)}
+            {lockedFact("Building type", draft.building_type,
+            <Select id="so-building-type" label="Building type" required={!formLocked}
               error={
-                !draft.customer_address_unknown && !draft.building_type
+                !formLocked && !draft.customer_address_unknown && !draft.building_type
                   ? "Fill in the building type first — a condominium can only take a half-day delivery."
                   : undefined
               }
               value={draft.building_type || undefined}
               onValueChange={(v) => setField("building_type", v)}
-              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
+              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />)}
           </div>
           {/* ⭐ DELIVERY ACCESS SITS WITH THE ADDRESS IT DESCRIBES
               (approved Sales Order detail composition, 2026-09-10). Floor,
@@ -3530,6 +3661,8 @@ function SalesOrderWorkspaceBody() {
                     under the box, which reads as advice rather than as the limit
                     the input actually enforces. One statement, in the field's own
                     name, and the separate hint line goes with it. */}
+                {/* Locked prints the number as text: a number box is an Edit control. */}
+                {formLocked ? <Fact label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} value={String(draft.delivery_floor)} /> :
                 <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
                   type="number" min={1} max={MAX_DELIVERY_FLOOR}
                   value={String(draft.delivery_floor)}
@@ -3543,7 +3676,7 @@ function SalesOrderWorkspaceBody() {
                          only this box could type and nothing could mean. */
                       Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
                     )
-                  } />
+                  } />}
               {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
                   then put a default value, rather than leaving it blank". The
                   STORED value stays null until somebody types; this shows the
@@ -3593,6 +3726,7 @@ function SalesOrderWorkspaceBody() {
                 value={draft.delivery_has_lift ? "Has lift" : "No lift"}
                 onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
                 options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+              {formLocked ? <Fact label="Items needing stair carry" value={String(draft.delivery_stair_items ?? 0)} /> :
               <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
                 max={stair?.itemsTotal}
                 hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
@@ -3606,11 +3740,12 @@ function SalesOrderWorkspaceBody() {
                         ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
                         : Math.max(0, Number(e.target.value) || 0),
                   )
-                } />
+                } />}
           {/* One service editor in Delivery; the Items rows are its charge projection. */}
-          {(draft.addons.some((a) => !a.removed) || editing) && (
-            <div className={`flex min-w-0 flex-col gap-3${editing ? " sm:col-span-2" : ""}`} data-testid="delivery-services" data-pos-field="orderAddons">
-              {editing ? (
+          {/* The service editor asks the lock first, so a historical version only reads. */}
+          {(draft.addons.some((a) => !a.removed) || (!formLocked && editing)) && (
+            <div className={`flex min-w-0 flex-col gap-3${!formLocked && editing ? " sm:col-span-2" : ""}`} data-testid="delivery-services" data-pos-field="orderAddons">
+              {!formLocked && editing ? (
                 <FieldFrame id="so-services-editor">
                   <div id="so-services-editor" role="group" aria-label="Services" className="flex flex-col gap-3">
                     {draft.addons.map((a) => {
@@ -3652,7 +3787,7 @@ function SalesOrderWorkspaceBody() {
                   ))}
                 </div>
               } />}
-              {editing && serviceOptions.length > 0 && (
+              {!formLocked && editing && serviceOptions.length > 0 && (
                 <Select id="so-add-delivery-service" label="Add service" value=""
                   onValueChange={addServiceToDraft}
                   options={serviceOptions.map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
@@ -3892,7 +4027,7 @@ function SalesOrderWorkspaceBody() {
             </span>
             <span className="pr-6 text-base-500">Services</span>
             <span className="text-right tabular-nums text-base-900" data-testid="money-services">
-              {money.known ? fmtMoney(money.services) : "—"}
+              {money.known ? fmtMoney(money.services) : ""}
             </span>
             <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Total payable</span>
             <span className={`${TOTAL_RULE} text-right font-semibold tabular-nums text-base-900`} data-testid="money-total-payable">
@@ -4031,14 +4166,14 @@ function SalesOrderWorkspaceBody() {
             <Loading label="Opening the order route" />
           ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white">
-              <EmptyState
-                title="This order route could not be opened"
-                detail={(routeFactsQ.error as Error | undefined)?.message ?? (detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
-                action={<Button variant="neutral" onClick={() => void routeFactsQ.refetch()}>Try again</Button>}
+              <SalesOrderReadFailure
+                error={detailQ.error ?? revisionsQ.error ?? routeFactsQ.error}
+                surface="order-route"
+                onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); void routeFactsQ.refetch(); }}
               />
             </div>
           ) : orderRoute ? (
-            <SalesOrderRoute route={orderRoute} owners={routeOwners} />
+            <SalesOrderRoute route={orderRoute} owners={routeOwners} onRetry={retryRouteRead} />
           ) : (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <EmptyState title="No route facts were found for this sales order" />
@@ -4064,14 +4199,10 @@ function SalesOrderWorkspaceBody() {
             {detailQ.isLoading || revisionsQ.isLoading ? (
               <Loading label={objectView === "History" ? "Opening the history" : "Opening the revisions"} />
             ) : detailQ.isError || revisionsQ.isError ? (
-              <EmptyState
-                title={objectView === "History" ? "This history could not be opened" : "These revisions could not be opened"}
-                detail={(detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
-                action={
-                  <Button variant="neutral" onClick={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}>
-                    Try again
-                  </Button>
-                }
+              <SalesOrderReadFailure
+                error={detailQ.error ?? revisionsQ.error}
+                surface={objectView === "History" ? "history" : "revisions"}
+                onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}
               />
             ) : (
             <SalesOrderLedger
@@ -4128,14 +4259,10 @@ function SalesOrderWorkspaceBody() {
           {!isNew && !detailQ.isLoading && detailQ.isError && (
             <div className="px-4 py-4">
               <div className="rounded-card border border-kit-slate-5 bg-white">
-                <EmptyState
-                  title="This sales order could not be opened"
-                  detail={(detailQ.error as Error | undefined)?.message}
-                  action={
-                    <Button variant="neutral" onClick={() => void detailQ.refetch()}>
-                      Try again
-                    </Button>
-                  }
+                <SalesOrderReadFailure
+                  error={detailQ.error}
+                  surface="sales-order"
+                  onRetry={() => void detailQ.refetch()}
                 />
               </div>
             </div>

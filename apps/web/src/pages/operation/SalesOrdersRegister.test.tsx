@@ -52,6 +52,29 @@ const useCatalogSpy = vi.fn((..._args: unknown[]) => catalogHookState);
  * older printed "No delivery order yet" while holding a DO. It answers with
  * nothing, so a register that went back to it would fail twice — here on the
  * call, and below on the DO number that vanished. */
+/* Monthly demand's facts — only read while that view is chosen. */
+const useMonthlyDemandFactsSpy = vi.fn((..._args: unknown[]) => ({
+  data: {
+    orders: [
+      {
+        id: "o-1",
+        so: 1303,
+        deliveryDate: "2026-10-12",
+        deliveryDateTbd: false,
+        salesLocation: "{dealer 1}",
+        state: "Selangor",
+        city: "Petaling Jaya",
+        lines: [{ id: "l-1", sku: "MS12 Firmcare 10inch Queen", qty: 2, category: "mattress" }],
+        delivered: [],
+      },
+    ],
+    toBuyByLine: new Map([["l-1", 1]]),
+  },
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: vi.fn(),
+}));
 const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => ({
   data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
   isLoading: false,
@@ -68,6 +91,7 @@ vi.mock("@/lib/queries", async () => {
     useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
     useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
     useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
+    useMonthlyDemandFacts: (...args: unknown[]) => useMonthlyDemandFactsSpy(...args),
   };
 });
 
@@ -103,13 +127,13 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     ...over,
   }) as operationOrderListRow;
 
-function mount() {
+function mount(at = "/operation/orders") {
   /* The register's own list hook is the mocked spy; the provider serves the
    * OTHER live hooks on the page chrome (ModuleHeader's top-bar badges). */
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/orders"]}>
+      <MemoryRouter initialEntries={[at]}>
         <SalesOrdersRegister />
         <LocationProbe />
       </MemoryRouter>
@@ -259,18 +283,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
-    /* §6.7 — Row 1 carries global utilities only. The one primary create action
-     * lives on the LEFT of Row 2. Reversing either half is the defect. */
-    expect(
-      within(screen.getByTestId("work-toolbar")).getByRole("button", {
-        name: "New Sales Order",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("sales-orders-destination-header")).queryByRole("button", {
-        name: "New Sales Order",
-      }),
-    ).not.toBeInTheDocument();
+    /* ⭐ OWNER RULING 2026-09-27 (Jess: "add new sales order should not be
+     * here"). A customer order is born in the Sales Portal and nowhere else:
+     * the Register carries no create button, on either row. */
+    expect(screen.queryByRole("button", { name: "New Sales Order" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sales-order")).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
@@ -959,7 +976,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(within(goods).queryByText("Not recorded")).toBeNull();
   });
 
-  it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {
+  it("draws nothing for Service Unit ID and routing, never a dash and never an invented non-applicable state", () => {
     listHookState.data = {
       orders: [order({ order_lines: [], order_addons: [{ addon_key: "disposal_service", qty: 1, unit_price: 0 }] })],
     };
@@ -967,7 +984,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(goods).not.toHaveTextContent("Not applicable");
-    expect(within(goods).getAllByText("—")).toHaveLength(2);
+    expect(goods).not.toHaveTextContent(/[—–]/);
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {
@@ -1022,34 +1039,33 @@ describe("Cancel SO", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
   });
 
-  it("keeps the destructive entry last, below a divider, so a slipped click cannot reach it", () => {
+  /* REGISTER CLOSE-OUT — owner ruling 2026-09-26 (Orders MASTER §0.1 item 1):
+     `Edit · View · Print · ─ Cancel SO`, and nothing of Delivery's. */
+  it("reads Edit, View, Print, then Cancel SO alone below the divider", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    const labels = screen
-      .getAllByRole("menuitem")
-      .map((b) => b.textContent?.trim())
-      .filter((t): t is string =>
-        [
-          "View",
-          "Edit",
-          "Print PDF",
-          "Cancel SO",
-        ].includes(t ?? ""),
-      );
+    const labels = screen.getAllByRole("menuitem").map((b) => b.textContent?.trim());
+    expect(labels).toEqual(["Edit", "View", "Print", "Cancel SO"]);
     expect(labels[labels.length - 1]).toBe("Cancel SO");
   });
 
-  /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` and `Print PDF` were
-     two rows calling one handler with one argument list, so the menu offered
-     a choice that did not exist. This pins the INTENT — the row menu names an
-     act once — not the surviving spelling of the word. */
-  it("names the document act ONCE — no Preview row shadowing Print", () => {
+  it("carries nothing of Delivery's — no Delivery Order act on a Sales Order row", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    const labels = screen.getAllByRole("menuitem").map((b) => b.textContent?.trim() ?? "");
+    expect(labels.some((l) => l.includes("Delivery Order"))).toBe(false);
+  });
+
+  /* ONE ACT, ONE NAME (YH, 2026-08-28). The row menu names the document act
+     once, and the word is `Print` — the Export menu's own word. */
+  it("names the document act ONCE, as Print — never Print PDF or Preview PDF", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
     const labels = screen
       .getAllByRole("menuitem")
       .map((b) => b.textContent?.trim());
-    expect(labels).toContain("Print PDF");
+    expect(labels.filter((l) => l === "Print")).toHaveLength(1);
+    expect(labels).not.toContain("Print PDF");
     expect(labels).not.toContain("Preview PDF");
   });
 });
@@ -1202,15 +1218,6 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 selected sales order\b/);
   });
 
-  it("draws New Sales Order as the kit primary 32px control, not a page-local capsule", () => {
-    mount();
-    const create = screen.getByTestId("new-sales-order");
-    expect(create).toHaveAttribute("data-kit", "button");
-    expect(create.className).toContain("h-8");
-    expect(create.className).not.toContain("rounded-full");
-    expect(create.querySelector("svg")).toHaveAttribute("stroke-width", "2");
-  });
-
   it("says a failed load in one kit error with the fact and Try again", () => {
     const refetch = vi.fn();
     listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("socket hang up"), refetch };
@@ -1224,10 +1231,10 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it("keeps the toolbar and New Sales Order when the list fails to load", () => {
+  it("keeps the toolbar when the list fails to load", () => {
     listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("x"), refetch: vi.fn() };
     mount();
-    expect(within(screen.getByTestId("work-toolbar")).getByTestId("new-sales-order")).toBeInTheDocument();
+    expect(screen.getByTestId("work-toolbar")).toBeInTheDocument();
     expect(screen.getByTestId("grid-footer")).not.toHaveTextContent("sales order");
   });
 
@@ -1242,5 +1249,83 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     mount();
     const row = screen.getByTestId("grid-parent-row");
     expect(within(row).queryByRole("button", { name: /Kelana|Selangor|Not recorded/ })).toBeNull();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * THE RAIL — ONE VIEW SELECTOR (owner rulings 2026-09-22 / 26 / 27).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("the Sales Orders rail and its two views", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [
+          order({ id: "a", so: 1401, delivery_date: "2026-10-05" }),
+          order({ id: "b", so: 1402, delivery_date: "2026-11-05" }),
+          order({ id: "c", so: 1403, delivery_date: "2026-09-05" }),
+        ],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    useMonthlyDemandFactsSpy.mockClear();
+  });
+
+  it("has one View group with Order list and Monthly demand, and no Clear filters", () => {
+    mount();
+    const rail = screen.getByTestId("sales-orders-rail");
+    expect(within(rail).getByText("View")).toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-view-list")).toHaveTextContent("Order list");
+    expect(screen.getByTestId("sales-orders-view-monthly")).toHaveTextContent("Monthly demand");
+    expect(within(rail).queryByText(/Clear filters/i)).not.toBeInTheDocument();
+  });
+
+  it("opens on the Order list, which does not read Monthly demand", () => {
+    mount();
+    expect(screen.getByTestId("sales-orders-view-list")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("register-column")).toBeInTheDocument();
+    expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(false);
+  });
+
+  it("choosing Monthly demand writes it to the URL, replaces the list, and reads its facts", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-view-monthly"));
+    expect(screen.getByTestId("location")).toHaveTextContent("view=monthly");
+    expect(screen.queryByTestId("register-column")).not.toBeInTheDocument();
+    expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(true);
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const group of ["Period", "Dealer / Sales Location", "Delivery State / City", "Product category"]) {
+      expect(within(rail).getByText(group)).toBeInTheDocument();
+    }
+  });
+
+  it("a month door narrows the Order list to that month, and says so", () => {
+    mount("/operation/orders?requested=2026-10");
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("SO-1401")).toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1403")).not.toBeInTheDocument();
+    expect(grid).toHaveTextContent("Customer Requested Delivery Date: Oct 2026");
+  });
+
+  it("a Before door narrows to everything owed before the window", () => {
+    mount("/operation/orders?requested=before%3A2026-10");
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("SO-1403")).toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1401")).not.toBeInTheDocument();
+  });
+
+  it("Monthly demand's filters never carry into the Order list", () => {
+    mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
+    fireEvent.click(screen.getByTestId("sales-orders-view-list"));
+    const at = screen.getByTestId("location").textContent ?? "";
+    expect(at).not.toContain("view=");
+    expect(at).not.toContain("dealer=");
+    expect(at).not.toContain("months=");
   });
 });

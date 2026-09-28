@@ -226,7 +226,7 @@ function PlanTrail({
         <div key={s.label} className="text-meta">
           <span className="text-base-500">{s.label}: </span>
           <span className={s.who ? "text-base-900" : "text-base-400"}>
-            {s.who ?? "—"}
+            {s.who ?? ""}
           </span>
         </div>
       ))}
@@ -377,10 +377,10 @@ function PlanRow({
         <Num v={row.sold30} dim={row.sold30 === 0} />
         <Num v={row.sold90} dim={row.sold90 === 0} />
         <span className="text-right font-mono text-body text-base-500">
-          {row.weekendShare == null ? "—" : `${Math.round(row.weekendShare * 100)}%`}
+          {row.weekendShare == null ? "" : `${Math.round(row.weekendShare * 100)}%`}
         </span>
         <span className="text-right font-mono text-body text-base-700">
-          {row.suggestedQty == null ? "—" : row.suggestedQty}
+          {row.suggestedQty == null ? "" : row.suggestedQty}
         </span>
         <Num v={row.proposedQty} strong />
 
@@ -468,7 +468,7 @@ function QtyCell({
         className="text-right font-mono text-body text-base-700"
         data-testid={`plan-${kind}-${sku}`}
       >
-        {value == null ? "—" : value}
+        {value == null ? "" : value}
       </span>
     );
   }

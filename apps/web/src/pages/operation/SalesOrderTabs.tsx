@@ -38,28 +38,40 @@ export default function SalesOrderTabs({
   }, [docTitle, identity]);
   return (
     <header className="shrink-0 border-b border-base-200 bg-white" data-testid="sales-order-tabs">
-      <div className="flex h-11 items-center gap-3 px-6">
+      {/* ⭐ BELOW 768px THE HEADER IS TWO ROWS — owner ruling 2026-09-26 (Jess).
+          Measured at 375px: `SO-1365` and `Print ▾` overprinted each other —
+          one 44px row held the back link, the number, the actions and the
+          global icons, all `shrink-0`. Row 1 is the way back and the global
+          icons; row 2 is the identity and the actions. From 768px it is the
+          one row it always was. */}
+      <div className="flex flex-wrap items-center gap-x-3 px-4 md:h-11 md:flex-nowrap md:px-6">
         <Link
           to={backTo}
-          className="inline-flex h-full shrink-0 items-center gap-1.5 text-body text-base-600 hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          className="order-1 inline-flex h-11 shrink-0 items-center gap-1.5 text-body text-base-600 hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:order-none md:h-full"
           aria-label={backLabel}
           onClick={onBack}
         >
           <ArrowLeft size={14} /> {backLabel}
         </Link>
-        <span className="h-4 w-px bg-base-200" aria-hidden="true" />
+        <span className="hidden h-4 w-px bg-base-200 md:block" aria-hidden="true" />
         {/* ⭐ IDENTITY SURVIVES NARROW WIDTH — owner ruling 2026-08-15 (Chai).
-            The whole label used to be ONE truncating span inside a `min-w-0`
-            flex item, so below medium desktop it collapsed to the bare icon
-            and the header stopped saying which order was open. The SO number
-            is the identity and never shrinks; the CUSTOMER is context and is
-            the part allowed to truncate away. Locked by MASTER §0.1: identity
-            persists in View AND Edit. */}
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-body font-semibold text-base-900">
+            The SO number is the identity and never shrinks; the CUSTOMER is
+            context and is the part allowed to truncate away, with its full
+            name kept for a reader. Locked by MASTER §0.1: identity persists in
+            View AND Edit. */}
+        <span
+          className="order-3 inline-flex h-11 min-w-0 flex-1 items-center gap-1.5 text-body font-semibold text-base-900 md:order-none md:h-auto md:flex-none"
+          data-testid="object-header-identity"
+          aria-label={[identity, customer].filter(Boolean).join(" · ")}
+        >
           <ClipboardList size={15} className="shrink-0 text-base-700" />
           <span className="shrink-0" data-testid="object-identity">{identity}</span>
           {customer && (
-            <span className="min-w-0 truncate font-normal text-base-600" data-testid="object-identity-customer">
+            <span
+              className="min-w-0 truncate font-normal text-base-600"
+              data-testid="object-identity-customer"
+              title={customer}
+            >
               · {customer}
             </span>
           )}
@@ -69,11 +81,18 @@ export default function SalesOrderTabs({
             </span>
           )}
         </span>
-        <div className="flex-1" />
-        {right && <div className="flex shrink-0 items-center gap-2">{right}</div>}
-        <TopBarIcons />
+        <div className="hidden flex-1 md:block" />
+        {right && (
+          <div className="order-4 flex shrink-0 items-center gap-2 md:order-none" data-testid="object-header-actions">
+            {right}
+          </div>
+        )}
+        <div className="order-2 ml-auto md:order-none md:ml-0" data-testid="object-header-global">
+          <TopBarIcons />
+        </div>
+        <span className="order-2 basis-full md:hidden" data-testid="object-header-break" aria-hidden="true" />
       </div>
-      {navigation && <div className="flex h-9 items-stretch px-6" data-testid="object-navigation">{navigation}</div>}
+      {navigation && <div className="flex h-9 items-stretch overflow-x-auto px-4 md:px-6" data-testid="object-navigation">{navigation}</div>}
     </header>
   );
 }

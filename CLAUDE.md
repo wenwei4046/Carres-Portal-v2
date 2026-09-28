@@ -46,6 +46,19 @@ On a conflict, Business wins.
   `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one
   inline "just this once".
+- **THE ONE KIT LAW — owner ruling 2026-09-27 (Jess: "every page must follow · delete the old UI
+  kit, update the new · chats don't read and create new").** There is ONE UI kit:
+  `docs/01-design-tokens.md` · `docs/02-components.md` · `docs/03-page-patterns.md` ·
+  `docs/ui/MASTER.md` §6.0. Every page, every module, every chat follows it; a page that differs
+  is a defect, never a "page style". Before ANY UI proposal, mock or build, read §6.0 and the
+  tokens — a chat that has not read them may not draw. Never create a new component, colour, type
+  size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
+  (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
+  the kit in the same change — never leave two versions. The old kit files are gone
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
+  recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
+  **card titles are black bold `text-strong`, never blue** · **column separators by column
+  count** · **rail = icon + title + one supporting line** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's
@@ -82,7 +95,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Module / responsibility | Canonical current authority | State | Resume execution at |
 |---|---|---|---|
 | Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
-| Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Approved-target gaps explicitly named in that MASTER; preserve verified register/object truth |
+| Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED · Blueprint 2026-09-26 PLAN COMPLETE** | §0.0 READY scopes A–F (APPROVED TARGET / NOT BUILT); preserve verified register/object truth |
 | Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
 | PO windows + supplier delay/day-before evidence | `docs/purchasing/MASTER.md` §§5.6.1, 5.7; Workspace §6.2; Orders charter; Stock §2; Delivery §1; COPY | **DEPLOYED — PO window Work card + storage; migrations 0584/0585 APPLIED 2026-09-25; per-line `Record supplier answer` + day-before check per batch DEPLOYED 2026-09-26 with 0587 APPLIED (Purchasing §5.7 production record); owner walk owed; Settings screen for window times not built** | Batch demand into editable 11:30 and optional 16:00 standard windows on the days ticked in the `PO Days` setting (Jess 2026-09-25; she sets it to every Office working day); supplier earlier cut-off wins. Default PO date is not confirmation. Supplier answers are recorded per PO goods line in one `Record supplier answer` form (Confirmed / New date / Split delivery; photo, video, PDF evidence; eight governed delay reasons — Jess 2026-09-25); one-working-day-before asks for Supplier DO or exact-date confirmation per batch. Workspace §5.10/§6.1 mirror this; Purchasing owns the write doors. Preserve module boundaries. |
 | Chase answer link (all modules) + outstation release | `docs/ERP-ARCHITECTURE.md` §§6.4–6.5; Delivery §14.1; Payment "Collection timing" | **OWNER-APPROVED 2026-09-24 / NOT BUILT** | Every remind/chase to an outside party links to its scoped Portal answer surface; answers write the owning module's record; NETS first, each party's login rollout needs owner authorisation. Outstation: customer WhatsApp confirmation with proof before the first leg leaves Klang; payment complete 3 working days before Confirmed Delivery. |
@@ -628,6 +641,13 @@ Never create an empty master for symmetry.
   nothing was read** — Law 4 already requires the challenge; this rule says it is not optional
   and it is not on request.
 - **She agrees, then you build.** A settled decision is not reopened unless she reopens it.
+- **⭐ TOP-TO-TOE IS AUTOMATIC, AND SHE NEVER POINTS TWICE — owner ruling 2026-09-27 (Jess).** Before a
+  surface reaches her: walk ALL of it against the ONE KIT and the dictionary AND against two or three
+  NAMED international products (Shopify · Stripe · Linear · SAP Fiori · NN/g; AutoCount / 2990 for the
+  team's habits), then bring EVERY deviation with its fix and a PNG of the whole page in ONE message.
+  Never fix the one thing she pointed at and wait for the next; never make her ask "is this
+  international?" or "which brand do we copy?" — say it first. Every UI segment starts by invoking the
+  installed UI/UX design skill and says so.
 - **Count before you propose UI.** Measure fill rates with SQL; empty fields do not reach the
   screen.
 - Anything she must paste elsewhere is written in **English**.

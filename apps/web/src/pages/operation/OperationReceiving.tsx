@@ -127,8 +127,8 @@ function weekLabel(from: string, to: string): string {
   const right = fmtDateShort(to);
   const sameTail = left.slice(left.indexOf(" ")) === right.slice(right.indexOf(" "));
   return sameTail
-    ? `${left.slice(0, left.indexOf(" "))} – ${right}`
-    : `${left} – ${right}`;
+    ? `${left.slice(0, left.indexOf(" "))} to ${right}`
+    : `${left} to ${right}`;
 }
 
 export default function OperationReceiving() {
@@ -773,7 +773,7 @@ export default function OperationReceiving() {
         category: words?.category ?? "",
         unitIds: [],
         /* Extra goods never enter Inventory, so they never become a Unit. */
-        unitAbsence: "—",
+        unitAbsence: "",
         deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
         deliverToAbsence: "Not recorded",
         supplier: r.supplier_name ?? undefined,

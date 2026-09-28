@@ -134,7 +134,7 @@ export default function PrincipalAudit() {
             <div className="min-w-0">
               <div className="text-base-900">{displayAction(e.action)}</div>
               <div className="text-label text-base-500 mt-0.5">
-                {e.actor ?? "—"}
+                {e.actor ?? ""}
                 {displayRef(e.ref) ? ` · ${displayRef(e.ref)}` : ""}
               </div>
             </div>

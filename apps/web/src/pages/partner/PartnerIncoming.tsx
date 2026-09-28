@@ -128,7 +128,7 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
 
   const requestedAt = order.request_for_delivery_at
     ? fmtDate(order.request_for_delivery_at)
-    : "—";
+    : "";
   const deliveryDate = order.delivery_date ? fmtDate(order.delivery_date) : "Date TBD";
 
   return (

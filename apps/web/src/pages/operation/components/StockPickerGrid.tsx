@@ -420,10 +420,10 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                   className="px-2 py-1 text-foreground tabular-nums truncate"
                   title={r.dateLabel ? `in since ${r.dateLabel}` : ""}
                 >
-                  {r.ageDays != null ? `${r.ageDays}d` : "—"}
+                  {r.ageDays != null ? `${r.ageDays}d` : ""}
                 </div>
                 <div className="px-2 py-1 font-mono text-foreground truncate" title={r.poNo ?? ""}>
-                  {r.poNo ?? "—"}
+                  {r.poNo ?? ""}
                 </div>
                 <div className="px-1 py-1 text-right">
                   {loaning ? (

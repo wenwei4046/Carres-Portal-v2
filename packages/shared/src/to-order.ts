@@ -1844,7 +1844,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
       rows.push({
         orderId,
         so: orderLines[0].so,
-        customer: orderLines[0].customerName ?? "—",
+        customer: orderLines[0].customerName ?? "",
         // A Ready Stock row has no customer and no SO; what it HAS is a
         // destination, and that is what the group header says instead.
         readyStock: orderLines[0].readyStock === true ? true : undefined,

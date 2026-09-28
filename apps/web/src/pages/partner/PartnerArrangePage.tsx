@@ -227,7 +227,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
                 onChange={(e) => setCdReason(e.target.value)}
                 data-testid="partner-cannot-deliver-reason"
               >
-                <option value="">—</option>
+                <option value=""></option>
                 {CANNOT_DELIVER_REASONS.map((r) => (
                   <option key={r.key} value={r.key}>
                     {r.label}

@@ -912,7 +912,7 @@ function AmendPanel({
           Goods Received Date
         </span>
         <span className="tabular-nums text-kit-slate-9">
-          {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : "—"}
+          {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : ""}
         </span>
         <span className="text-kit-slate-9">→</span>
         <input

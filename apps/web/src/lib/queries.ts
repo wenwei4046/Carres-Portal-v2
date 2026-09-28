@@ -318,7 +318,12 @@ import {
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema, type LogisticsCardFacts } from "@carres/shared";
+import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
+import {
+  soBatchOrderLineOutstandingQty,
+  soBatchPurchaseResponseSchema,
+  type MonthlyDemandOrder,
+} from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -3200,6 +3205,9 @@ export interface operationOrderDetailHistoryRow {
    *  event's own facts prove automation; the browser never infers it from a
    *  null id. Optional: an older Worker does not send it. */
   actor_kind?: "human" | "system" | "missing";
+  /** The governed role word of the account that acted — kept beside
+   *  `Staff identity not recorded` when the account is a shared login. */
+  actor_role?: string | null;
   /** The structured half of the event — reason/note/changed/revision. */
   metadata?: unknown;
 }
@@ -5522,6 +5530,9 @@ export interface SalesOrderRevisionRow {
   /** Server-side classification of the recorder; the browser never infers
    *  `system` from a null id. Optional: an older Worker does not send it. */
   actor_kind?: "human" | "system" | "missing";
+  /** The governed role word of the account that acted — kept beside
+   *  `Staff identity not recorded` when the account is a shared login. */
+  actor_role?: string | null;
   /** CARD 1 (0340) — who asked: staff_correction | customer_change. NULL on
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
@@ -5649,7 +5660,8 @@ export interface DeliveryPaymentApprovalRow {
 
 export interface SalesOrderRouteFactsResponse {
   allocation: SalesOrderAllocation;
-  brief: BookingBrief;
+  /** Null only when Delivery's read failed — see `failed.delivery`. */
+  brief: BookingBrief | null;
   attempts: DeliveryAttemptRow[];
   loans: SofaLoanDto[];
   refunds: SalesOrderRouteRefund[];
@@ -5660,7 +5672,32 @@ export interface SalesOrderRouteFactsResponse {
   paymentApprovals: DeliveryPaymentApprovalRow[];
   /** 0492 (Card 15) — the loan offer conversation on the Sales Order. */
   loanOffers: LoanOfferView[];
+  /** ⭐ OWNER RULING 2026-09-26 — a failed read yellows its own group and
+   *  never blanks the map. Only the owners whose failure words are registered
+   *  in COPY-STANDARD fail soft; any other failed read still fails the route
+   *  whole, because drawing nothing as if nothing existed is the lie. */
+  failed: { delivery: boolean; payments: boolean; purchasing: boolean };
+  /** ⭐ A3 — the goods records of this order (owner ruling 2026-09-26): its
+   *  lines, the `po_line_sources` lineage, the Purchase Orders with their
+   *  answers, the receipts, the bound Units and Stock's Ready Stock count.
+   *  Null only when the read itself failed. */
+  goods: (Omit<RouteGoodsFacts, "todayIso" | "holidays" | "lines"> & {
+    lines: Array<{ id: string; sku: string; qty: number }>;
+  }) | null;
+  /** ⭐ A2 — Delivery's OWN records for this order (owner ruling 2026-09-26):
+   *  every leg's arrangement, every Delivery Order with its attempts and
+   *  handover facts. Null only when Delivery could not be read. */
+  delivery: {
+    arrangements: DeliveryArrangementRow[];
+    deliveryOrders: DeliveryOrderRow[];
+    attempts: DeliveryOrderAttemptRow[];
+    handoverEvents: DeliveryHandoverKindRow[];
+  } | null;
 }
+
+type SalesOrderRouteGoodsPayload = NonNullable<SalesOrderRouteFactsResponse["goods"]> & {
+  failed: { purchasing: boolean };
+};
 
 /** One loan-offer record as the API returns it, with the offered Unit's ID. */
 export type LoanOfferView = LoanOfferRow & { unit_id: string | null };
@@ -5681,45 +5718,117 @@ export function useSalesOrderRouteFacts(
     queryKey: orderId ? ([...qk.operation.orderRoute(orderId), poKey] as const) : (["operation", "orders", "null", "route"] as const),
     queryFn: async () => {
       const id = encodeURIComponent(orderId ?? "");
-      const receivingPromise = Promise.all(poIds.map((poId) =>
-        apiFetch<{ sessions: SalesOrderRouteReceivingSession[] }>(
-          `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
-        ),
-      ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals, loanOffers] =
-        await Promise.all([
-          apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
-          apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
-          apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`),
-          apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
-          apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
-          apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
-          apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
-          // The gate's two money records (0355 + 0362, owner ruling
-          // 2026-08-19). The route reads the same tables the server-side gate
-          // reads, so the canvas and the refusal can never disagree (Law D).
-          apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
-          apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
-          apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
-        ]);
-      const receiving = await receivingPromise;
+      const soft = <T,>(read: Promise<T>) =>
+        read.then(
+          (value) => ({ ok: true as const, value }),
+          () => ({ ok: false as const }),
+        );
+      const [
+        allocation, loans, refunds, cases, claims, loanOffers, receiving,
+        booking, attempts, financeExceptions, paymentApprovals, arrangements, documents, goods,
+      ] = await Promise.all([
+        apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
+        apiFetch<SofaLoansResponse>(`/api/operation/orders/${id}/loans`),
+        apiFetch<{ refunds: SalesOrderRouteRefund[] }>(`/api/operation/orders/${id}/refunds`),
+        apiFetch<{ items: SalesOrderRouteCase[] }>(`/api/ops/service-cases?orderId=${id}`),
+        apiFetch<{ claims: SalesOrderRouteClaim[] }>("/api/operation/supplier-claims?status=all"),
+        apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
+        /* Inside the one `Promise.all`, so a failed receiving read rejects the
+           query instead of escaping as an unhandled rejection. */
+        Promise.all(poIds.map((poId) =>
+          apiFetch<{ sessions: SalesOrderRouteReceivingSession[] }>(
+            `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
+          ),
+        )),
+        // Delivery's reads — a failure is `unreadable`, never `Logistics not assigned`.
+        soft(apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`)),
+        soft(apiFetch<{ attempts: DeliveryAttemptRow[] }>(`/api/operation/orders/${id}/delivery-attempts`)),
+        // The gate's two money records (0355 + 0362, owner ruling
+        // 2026-08-19). The route reads the same tables the server-side gate
+        // reads, so the canvas and the refusal can never disagree (Law D).
+        soft(apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`)),
+        soft(apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`)),
+        // A2 — Delivery's own records, narrowed to this order by the door itself.
+        soft(apiFetch<DeliveryArrangementsPayload>(`/api/operation/delivery-arrangements?order=${id}`)),
+        soft(apiFetch<DeliveryOrdersRegisterPayload>(`/api/operation/delivery-orders?order=${id}`)),
+        // A3 — Purchasing's, Receiving's and Stock's records, one read.
+        soft(apiFetch<SalesOrderRouteGoodsPayload>(`/api/operation/orders/${id}/route-goods`)),
+      ]);
+      const deliveryFailed = !booking.ok || !attempts.ok || !arrangements.ok || !documents.ok;
+      const paymentsFailed = !financeExceptions.ok || !paymentApprovals.ok;
       return {
         allocation: allocation.allocation,
-        brief: booking.brief,
-        attempts: attempts.attempts,
+        brief: booking.ok && !deliveryFailed ? booking.value.brief : null,
+        attempts: attempts.ok && !deliveryFailed ? attempts.value.attempts : [],
         loans: loans.loans,
         refunds: refunds.refunds,
         cases: cases.items,
         receiving: receiving.flatMap((result) => result.sessions),
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
-        financeExceptions,
-        paymentApprovals,
+        financeExceptions: financeExceptions.ok && !paymentsFailed ? financeExceptions.value : [],
+        paymentApprovals: paymentApprovals.ok && !paymentsFailed ? paymentApprovals.value : [],
         loanOffers: loanOffers.offers,
+        failed: {
+          delivery: deliveryFailed,
+          payments: paymentsFailed,
+          purchasing: !goods.ok || goods.value.failed.purchasing,
+        },
+        goods: goods.ok ? goods.value : null,
+        delivery:
+          !deliveryFailed && arrangements.ok && documents.ok
+            ? {
+                arrangements: arrangements.value.arrangements,
+                deliveryOrders: documents.value.deliveryOrders,
+                attempts: documents.value.attempts,
+                handoverEvents: documents.value.handoverEvents,
+              }
+            : null,
       };
     },
     enabled: !!orderId && open,
     staleTime: 10_000,
     ...opts,
+  });
+}
+
+/**
+ * MONTHLY DEMAND's facts (Orders MASTER, Monthly demand). Two reads in one
+ * query, each from its owner's existing door:
+ *
+ *   the orders   REQUIRED. Without them there is no view, so the query fails.
+ *   To buy       SOFT. SO Batch Purchase's own arithmetic per order. A read
+ *                that fails or does not parse is `null`, which the page prints
+ *                as `Unavailable`, never as zero.
+ */
+export interface MonthlyDemandFacts {
+  orders: MonthlyDemandOrder[];
+  /** SO Batch Purchase's still-to-buy quantity per ORDER LINE, so a Product
+   *  category narrows it with the lines it counts. Null = unread. */
+  toBuyByLine: Map<string, number> | null;
+}
+
+export function useMonthlyDemandFacts(enabled: boolean) {
+  return useQuery<MonthlyDemandFacts>({
+    queryKey: ["operation", "orders", "monthly-demand"] as const,
+    enabled,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const [demand, toBuyByLine] = await Promise.all([
+        apiFetch<{ orders: MonthlyDemandOrder[] }>("/api/operation/orders/monthly-demand"),
+        Promise.resolve()
+          .then(() => apiFetch<unknown>("/api/operation/purchase/demands"))
+          .then((body) => {
+            const read = soBatchPurchaseResponseSchema.parse(body);
+            return new Map(
+              read.registerRows.flatMap((row) =>
+                row.lines.map((line) => [line.orderLineId, soBatchOrderLineOutstandingQty(line)] as const),
+              ),
+            );
+          })
+          .catch(() => null),
+      ]);
+      return { orders: demand.orders ?? [], toBuyByLine };
+    },
   });
 }
 
@@ -6010,6 +6119,9 @@ export interface SalesOrderAmendment {
   customer_agreement_covers_proposal?: boolean;
   /** Who sent the request (0562 · the whole-page lane names the sender). */
   submitted_by?: string | null;
+  /** The sender's real name, resolved by the API through the one actor
+   *  resolver. Null when unresolved — a person is never invented. */
+  submitted_by_name?: string | null;
 }
 
 /** How the customer's acceptance is evidenced (0562). A signed document, a
@@ -6826,6 +6938,8 @@ export interface DeliveryOrderRow {
   do_number: string;
   /** 0491 — 0 the whole-order trip; 1..n one leg of the order's Journey. */
   leg?: number | null;
+  /** 0542 — 0 unsplit; 1..3 one trip of a split delivery. */
+  trip?: number | null;
   issued_at: string;
   trip_groups: string[] | null;
   delivery_date: string | null;

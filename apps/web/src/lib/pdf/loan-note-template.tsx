@@ -82,22 +82,22 @@ export function LoanNoteTemplate(data: LoanNoteTemplateData) {
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Customer</Text>
-          <Text style={styles.partyName}>{displayCustomerName(customer.name) || "—"}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(customer.name) || " "}</Text>
           {customer.phone ? <Text style={styles.partySub}>{customer.phone}</Text> : null}
         </View>
 
         <View style={styles.detailBlock}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Loaned item</Text>
-            <Text style={styles.detailValue}>{item || "—"}</Text>
+            <Text style={styles.detailValue}>{item || " "}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Condition at hand-over</Text>
-            <Text style={styles.detailValue}>{condition || "—"}</Text>
+            <Text style={styles.detailValue}>{condition || " "}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Source</Text>
-            <Text style={styles.detailValue}>{source || "—"}</Text>
+            <Text style={styles.detailValue}>{source || " "}</Text>
           </View>
           <View style={styles.detailRowLast}>
             <Text style={styles.detailLabel}>Return</Text>

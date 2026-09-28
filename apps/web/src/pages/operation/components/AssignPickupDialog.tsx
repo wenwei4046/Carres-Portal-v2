@@ -201,7 +201,7 @@ export default function AssignPickupDialog({
           To <strong>{warehouse?.name ?? "Warehouse"}</strong>
         </div>
         <div className="font-mono text-label text-base-500 mt-1.5">
-          {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || "—"}
+          {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || ""}
         </div>
       </div>
 

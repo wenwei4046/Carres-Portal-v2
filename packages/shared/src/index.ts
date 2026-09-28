@@ -1,6 +1,7 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
+export * from "./unit-problem";
 
 /* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
    the fee onto the order. The Worker cannot import from the web app, which
@@ -16,6 +17,12 @@ export {
 export {
   resolveSalesOrderRoute,
   NODE_W as ROUTE_NODE_W,
+  ROUTE_TEXT_BUDGET,
+  lateElbow as routeLateElbow,
+  wrapRouteText,
+  type RouteDeliveryScope,
+  type RouteProposedChange,
+  type RouteUnreadable,
   type GateRequirement,
   type GateRequirementId,
   type LinkedProblem,
@@ -38,6 +45,19 @@ export {
   type SalesOrderRouteMap,
   type StationOwnerKey,
 } from "./sales-order-route";
+export {
+  MONTHLY_DEMAND_CATEGORIES,
+  monthlyDemandOf,
+  monthlyDemandWindowOf,
+  type MonthlyDemandCategory,
+  type MonthlyDemandFilters,
+  type MonthlyDemandOrder,
+  type MonthlyDemandRow,
+  type MonthlyDemandView,
+} from "./monthly-demand";
+export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
+export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
+export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
   INSTALMENT_MONTHS,
@@ -1297,6 +1317,15 @@ export {
   type StockRegisterTotals,
   type StockRegisterUnit,
 } from "./stock-register";
+export {
+  INVENTORY_STATUS_RAIL,
+  STOCK_CONDITION_WORDS,
+  inventoryStatusOf,
+  isHeldUnit,
+  stillToArriveLine,
+  stockConditionOf,
+  type InventoryStatus,
+  type InventoryWordsInput, goodsReceivedAbsence } from "./inventory-words";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {

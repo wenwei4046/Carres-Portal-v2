@@ -390,7 +390,7 @@ describe("the words", () => {
 
   it("passes an unknown reason key through rather than printing nothing", () => {
     expect(caseDelayReasonLabel("retired_key")).toBe("retired_key");
-    expect(caseDelayReasonLabel(null)).toBe("—");
+    expect(caseDelayReasonLabel(null)).toBe("");
     expect(caseDelayReasonLabel("no_stock")).toBe("No replacement in stock");
   });
 });

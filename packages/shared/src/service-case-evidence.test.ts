@@ -239,6 +239,6 @@ describe("caseEvidenceSlotLabel", () => {
   it("shows an unknown stored slot as itself rather than hiding the file", () => {
     expect(caseEvidenceSlotLabel("retired_slot")).toBe("retired_slot");
     expect(caseEvidenceSlotLabel("overall_photo")).toBe("Photo of the whole item");
-    expect(caseEvidenceSlotLabel(null)).toBe("—");
+    expect(caseEvidenceSlotLabel(null)).toBe("");
   });
 });

@@ -428,7 +428,7 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
             <p key={l.line_no} className="flex flex-wrap justify-between gap-2">
               <span>
                 {l.account_code} · {l.account_name}
-                {" — "}
+                {" · "}
                 {l.description ?? "No description"}
                 {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
               </span>

@@ -231,20 +231,20 @@ export default function OperationGuarantees() {
                           g.guaranteeId ? "text-base-900" : "text-base-400 line-through"
                         }`}
                       >
-                        {displayGuaranteeId(g) ?? "—"}
+                        {displayGuaranteeId(g) ?? ""}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`pill ${d.pill}`}>{d.label}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-base-900">{g.customerName || "—"}</div>
+                      <div className="text-base-900">{g.customerName || ""}</div>
                       {g.customerPhone && (
                         <div className="font-mono text-label text-base-500">{g.customerPhone}</div>
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-meta text-base-700">
-                      {g.so != null ? `SO-${g.so}` : "—"}
+                      {g.so != null ? `SO-${g.so}` : ""}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-base-900">
@@ -275,7 +275,7 @@ export default function OperationGuarantees() {
                           {g.claimCaseNo ? ` · ${g.claimCaseNo}` : ""}
                         </span>
                       ) : (
-                        <span className="text-meta text-base-500">—</span>
+                        null
                       )}
                     </td>
                   </tr>

@@ -128,7 +128,6 @@ export function missionRouteModel(input: MissionRouteInput): MissionRouteModel {
     ? range.fromIso === range.toIso
       ? d(range.fromIso)
       : sameMonth(range.fromIso, range.toIso)
-        /* `29 Sep to 3 Oct` — a dash never joins two dates (Jess, 2026-09-26). */
         ? `${+range.fromIso.slice(8, 10)} to ${d(range.toIso)}`
         : `${d(range.fromIso)} to ${d(range.toIso)}`
     : null;

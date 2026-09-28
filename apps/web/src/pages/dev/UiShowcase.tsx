@@ -34,6 +34,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
 import DetailShell, { type IdentitySlot } from "@/components/kit/DetailShell";
+import DocumentTable from "@/components/kit/DocumentTable";
 import Drawer from "@/components/kit/Drawer";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import EmptyState from "@/components/kit/EmptyState";
@@ -54,6 +55,7 @@ import Tabs from "@/components/kit/Tabs";
 import Textarea from "@/components/kit/Textarea";
 import Toast from "@/components/kit/Toast";
 import Tooltip from "@/components/kit/Tooltip";
+import TotalsSummary from "@/components/kit/TotalsSummary";
 import { Z_LADDER } from "@/components/kit/overlay-layer";
 import { fmtDate } from "@/lib/fmt-date";
 import {
@@ -160,7 +162,7 @@ interface DemoRow {
 const DEMO_ROWS: DemoRow[] = [
   { id: "1", ref: "SO-1256", customer: "Tan Wei Ming", owing: "2,000" },
   { id: "2", ref: "SO-1257", customer: "Lim Ah Kaw", owing: "480" },
-  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "—" },
+  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "" },
 ];
 
 const DEMO_COLUMNS: Column<DemoRow>[] = [
@@ -1063,7 +1065,7 @@ export default function UiShowcase() {
                     rows={[]}
                     columns={DEMO_COLUMNS}
                     rowId={(r) => r.id}
-                    totals={{ label: "Totals", cell: () => "—" }}
+                    totals={{ label: "Totals", cell: () => "" }}
                     empty="No demands match this filter"
                   />
                 </div>
@@ -1082,6 +1084,47 @@ export default function UiShowcase() {
             first drag. The layout is NOT remembered between sessions: §0.4 rules that the tool's
             shape is the company's, not the operator's, so a reload puts the columns back.
           </p>
+        </Section>
+
+        {/* ─── Table recipes 3 and 4 — owner ruling 2026-09-27 ─────────────── */}
+        <Section
+          id="document-table"
+          title="DocumentTable · TotalsSummary — table recipes 3 and 4"
+          note="The table a document draws inside a card, and its totals tail. Row lines only, no column lines; numbers right and tabular; only the closing total is 600. A row may be a door, opened from its first cell."
+        >
+          <Grid>
+            <Sample label="DocumentTable — two door rows, one plain row, the closing total">
+              <Card>
+                <DocumentTable
+                  label="Example document table"
+                  columns={[
+                    { key: "month", label: "Month" },
+                    { key: "mattress", label: "Mattress", numeric: true },
+                    { key: "sofa", label: "Sofa", numeric: true },
+                    { key: "total", label: "Total Qty", numeric: true },
+                  ]}
+                  rows={[
+                    { key: "a", cells: { month: "{Mon YYYY}", mattress: 4, sofa: 1, total: 5 }, onOpen: () => {}, openLabel: "Open Sales Orders for {Mon YYYY}" },
+                    { key: "b", cells: { month: "{Mon YYYY}", mattress: 0, sofa: 2, total: 2 }, onOpen: () => {}, openLabel: "Open Sales Orders for {Mon YYYY}" },
+                    { key: "c", cells: { month: "No delivery date", mattress: 1, sofa: 0, total: 1 } },
+                    { key: "t", cells: { month: "Total", mattress: 5, sofa: 3, total: 8 }, total: true },
+                  ]}
+                />
+              </Card>
+            </Sample>
+            <Sample label="TotalsSummary — no frame, one line between rows, one strong row">
+              <Card>
+                <TotalsSummary
+                  label="Example totals"
+                  rows={[
+                    { key: "total", label: "Total Qty", value: 8 },
+                    { key: "delivered", label: "Delivered", value: 3 },
+                    { key: "owed", label: "Not delivered", value: 5, strong: true },
+                  ]}
+                />
+              </Card>
+            </Sample>
+          </Grid>
         </Section>
 
         <Section

@@ -393,7 +393,7 @@ export default function HrCommissionTab({
                       <div className="text-label text-base-500 truncate">
                         {[row.staff.storeName, row.staff.outletName]
                           .filter(Boolean)
-                          .join(" · ") || "—"}
+                          .join(" · ") || ""}
                       </div>
                     </td>
                     <td className="px-2 text-right text-body t-num">
@@ -571,22 +571,22 @@ export default function HrCommissionTab({
                       {rm(row.basis)}
                     </td>
                     <td className="px-2 text-right text-body t-num">
-                      {row.directCommission > 0 ? rm(row.directCommission) : "—"}
+                      {row.directCommission > 0 ? rm(row.directCommission) : ""}
                     </td>
                     <td className="px-2 text-right text-body t-num">
                       {row.overrideCommission > 0
                         ? rm(row.overrideCommission)
-                        : "—"}
+                        : ""}
                     </td>
                     <td className="px-2 text-right text-body t-num">
                       {row.perModelCommission > 0
                         ? rm(row.perModelCommission)
-                        : "—"}
+                        : ""}
                     </td>
                     <td className="px-2 text-right text-body t-num">
                       {row.milestoneCommission > 0
                         ? rm(row.milestoneCommission)
-                        : "—"}
+                        : ""}
                     </td>
                     <td className="px-3 text-right text-body t-num font-semibold">
                       {rm(row.commission)}

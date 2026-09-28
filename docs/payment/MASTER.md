@@ -95,7 +95,7 @@ Sales Order        customer Invoice documents (Sales · Storage · Additional St
 Payment            incoming Payment records, allocations, Receipt snapshots
 Warehouse          goods readiness
 Purchasing/Receiving   expected arrival facts
-Delivery           confirmed delivery, Logistics Partner, Delivery Orders
+Delivery           scheduled delivery, Logistics company, Delivery Orders
 Workspace          duties, cover, working calendars
 ```
 
@@ -289,7 +289,7 @@ Saturday deadline while the Monitor still names the Saturday (`Payment due Sat, 
 the Work item is due Friday. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
 day gives each owner its own governed previous working day. Logistics Partner DO lead time is
-Delivery's own setting (`Delivery Settings → Logistics Partners → Delivery Order needed {n}
+Delivery's own setting (`Delivery Settings → Logistics → Delivery Order needed {n}
 working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace

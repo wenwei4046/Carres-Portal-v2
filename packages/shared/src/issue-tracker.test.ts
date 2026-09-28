@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type IssueIntake,
   buildIssueEnglish,
   issueActionInputSchema,
   issueActionResultInputSchema,
@@ -20,6 +21,14 @@ const intake = {
   impact: "SO-1319 cannot use this Unit",
   evidence: [{ kind: "photo" as const, count: 3 }],
 };
+
+describe("official English agrees with its proof", () => {
+  it("one photo WAS added; several WERE", () => {
+    const base: Omit<IssueIntake, "evidence"> = { problemObject: "item", observedProblem: "damaged", foundByKind: "warehouse", foundByName: "Mei Ling", observedOn: "2026-08-14", linkedObjects: [{ kind: "purchase_order", id: "po", label: "PO-2041" }], affectedObject: "Unit CU-000128", impact: "SO-1319 cannot use this Unit" };
+    expect(buildIssueEnglish({ ...base, evidence: [{ kind: "photo", count: 1 }] })).toContain("1 photo was added by Mei Ling");
+    expect(buildIssueEnglish({ ...base, evidence: [{ kind: "photo", count: 3 }] })).toContain("3 photos were added by Mei Ling");
+  });
+});
 
 describe("Issue Tracker operating model", () => {
   it("creates official English from facts without asking staff to compose it", () => {

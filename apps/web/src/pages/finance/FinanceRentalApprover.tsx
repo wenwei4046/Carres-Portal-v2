@@ -235,9 +235,9 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
         <Field label="Product" value={r.sku} mono />
         <Field label="Starts" value={fmtDate(r.startDate)} />
         <Field label="Applied" value={fmtDate(r.createdAt)} />
-        <Field label="Email" value={r.customer.email ?? "—"} />
-        <Field label="Address" value={r.customer.address ?? "—"} />
-        <Field label="Due once at signing" value={r.oneOffTotal > 0 ? rm(r.oneOffTotal) : "—"} />
+        <Field label="Email" value={r.customer.email ?? ""} />
+        <Field label="Address" value={r.customer.address ?? ""} />
+        <Field label="Due once at signing" value={r.oneOffTotal > 0 ? rm(r.oneOffTotal) : ""} />
         {r.orderSo ? <Field label="Sales order" value={`SO-${r.orderSo}`} mono /> : null}
         {r.notes ? <Field label="Note from the store" value={r.notes} /> : null}
       </div>

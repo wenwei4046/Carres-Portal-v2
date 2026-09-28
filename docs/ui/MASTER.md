@@ -1630,8 +1630,14 @@ detailed record and lose to this page wherever they disagree. The reference page
 Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is not proof of build.
 
 ```
+0  KIT      ONE kit, every page (owner ruling 2026-09-27). A card / panel / block
+            title is `text-strong` 15/600 slate-12 — BLACK BOLD, never blue, never a
+            band; blue is the primary button, links and selection only. No dash as a
+            value anywhere. A page that differs is a defect, not a style.
 1  PAGE     Header 50px: page name + Jump to · alerts · help · settings only
-            Toolbar: one blue create button · Search · Export · Columns
+            Toolbar: the module's create button ONLY where the module is the
+            record's birthplace (Sales Orders has none — orders are born in the
+            Sales Portal) · Search · Export · Columns
             Table · 32px footer. Nothing above the table (no KPI cards)
 2  COLUMNS  Order = the module MASTER's owner-approved list, never guessed
             Record date(s) first, then the document number
@@ -1639,6 +1645,7 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             Another document's number opens that document
 3  WORDS    Only words in COPY-STANDARD
             A required fact prints no absence word (empty = system error)
+            An empty cell draws NO glyph — never `—` (owner ruling 2026-09-26)
             A document not made yet: No PO yet · No DO yet
             Loading · Could not be loaded + Try again · empty — never mixed
 4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
@@ -1652,7 +1659,8 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             never cut. The row never grows
             Own approved designs, not this rule: SO Batch Purchase ·
             Manual Purchase · Payment Monitor · Delivery Monitor
-6  HEADER   11px/600 grey band · the same simple filter icon on every column
+6  HEADER   11px/600 grey band · the filter icon shows on hover, focus, or while
+            that column is filtered — never on every column at rest (owner 2026-09-27)
             Sort = a 12px arrow icon (ArrowUp / ArrowDown) in the header ink,
             never a letter; its direction is spoken to a screen reader
 7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
@@ -1664,6 +1672,19 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             scrolls itself; the page never scrolls sideways
 12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard
 ```
+
+**TABLE RECIPES — owner ruling 2026-09-27 (Jess: "every chat doesn't know how to draw this UI").**
+The portal has exactly FOUR tables. Each is a kit component with a live `/ui` example; a page
+IMPORTS one and never draws a `<table>` of its own — `check-design-standard.mjs` refuses page-local
+table styling. A fifth table does not exist until it joins the kit.
+
+| # | Where | Component | Recipe (locked numbers) |
+|---|---|---|---|
+| 1 | a Register / listing | `DataGrid` (kit) | header 36px slate-3 11/600 · 40px one-line rows · 8px insets · column separators by column count (tokens §5.1) · hover slate-3, selection blue-3 · 32px footer |
+| 2 | a row's goods expansion | `GoodsMiniTable` (kit) | header 27px · 51px two-line rows · four-sided frame · §6.9 connector |
+| 3 | a document table inside a card (SO `Items`, `Payment` rows, PO lines) | `DocumentTable` — **admit to the kit** (today `components/so-document-table.ts`, page-local) | header 11/500 slate-11 over a 1px slate-5 line · 13px rows, 8px cell insets, 1px slate-5 line beneath each · NO vertical lines · amounts right, tabular · only the closing total 600 |
+| 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
+
 
 **Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
 PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
@@ -1790,14 +1811,19 @@ This is the shared default for ALL Portal listings, not a PO visual pilot. It su
 listing typography, rail appearance and blue-grey surface prescriptions in this document.
 Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
 
-- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, collapsible groups with remembered
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles — and, from 2026-09-27
+  (owner ruling, after the flat data-table dashboard reference), ONE 11px slate-11 supporting line under
+  the title saying what the group narrows (`Dealer / Sales Location` · `Where the order was sold`) through
+  the existing `supportingText` slot, no new component; collapsible groups with remembered
   expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
   leave that space empty. Icons supplement labels and come from the existing kit. Each group
   remains single-choice; no new multi-select. Preserve each page's filter content and control type:
   an existing dropdown remains a dropdown inside its group. Collapse does not clear a filter.
 - **Special rails:** Payment Monitor weekly plans and Warehouse schedule day lists use the same
   heading, divider and text treatment; preserve their content, date meaning and behavior.
-  Sales Orders has no local filter rail; do not add one for visual consistency.
+  Sales Orders gains the owner-approved rail of 2026-09-22 / 2026-09-26 (Orders MASTER § Monthly
+  demand): the view selector in the fixed region and six single-choice groups in the shared style C —
+  no new kit component (the multi-select admitted earlier on 2026-09-26 was withdrawn the same day).
 - **Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11;
   form/button helper 12px slate-11; input error/save failure 13px error color with text and icon;
   cannot-act reason 13px dark grey or warning color according to meaning. Never use slate-9 for
@@ -2087,17 +2113,15 @@ and keeps stock/issue lifecycle verification separate.
   picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
   was in the shared destination header and is fixed there — see §6.7 below.
 
-**THE SHARED TWO-LINE LISTING ROW IS 54px — owner ruling 2026-09-18, APPROVED / NOT BUILT.** A
-listing whose cells carry two-line identity or two-line goods uses one shared 54px row with
-vertically centred checkbox, disclosure and quantity. It is the goods-row geometry, NOT a
-portal-wide replacement: the engine's 38px single-line row (`--grid-row-h`) stays correct for
-single-line registers, and existing per-page exceptions keep their own approved heights
-(SO Batch 40px, Payment Monitor 72px). Short content fits 54px; long content and accessibility
-needs may grow the row — **a required party, number, document or date is never ellipsised to
-protect the height.** No page-local row or header height. *Falsifier: the DOM measurement owed at
-build. 54px is the owner's reviewed number from the 2026-09-18 mockups; no shipped surface states
-it yet, so the build measures it in the rendered shell at 1440/1180/820/390 and reports back
-rather than hard-coding a number nobody checked.*
+**THE SHARED TWO-LINE LISTING ROW IS 51px — owner ruling 2026-09-26 (Jess: *"I like the current row
+height"*), overwriting the 2026-09-18 mockup number 54px.** A one-line listing row stays 40px (§6.0
+rule 5). A row whose Item cell carries two lines — product name 13px/18 over configuration 11px/14,
+the configuration on ONE line ending in `…` — is 8 + 18 + 2 + 14 + 8 = 50px plus its 1px rule:
+**51px, measured on the Sales Orders goods expansion at 1440 (PR #1518) and kept.** Every row of a
+two-line goods table is that height, a line with no configuration keeping the empty 14px second
+line, so rows never differ. It is the goods-row geometry, not a portal-wide replacement: single-line
+registers keep 40px, and the per-page exceptions keep their own approved heights (Payment Monitor
+72px). A required party, number, document or date is never ellipsised to protect the height.
 
 **ONE CELL MAY CARRY A DOCUMENT AND THE EXACT GOODS IT NAMES — NEVER TWO DOCUMENTS.** The stock
 picker's `PO No / Ref No` with the Unit ID on line two (§9.1) is the approved shape, and Supplier
@@ -2249,7 +2273,7 @@ behaviour, not Purchasing business fields or page-specific colours.
 | Dividers / connector | 1px |
 | Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
 | Single-line parent row | 38px minimum, existing density law |
-| Two-line goods / Unit rows | 54px minimum, shared across the same table; grow together if content requires |
+| Two-line goods / Unit rows | 51px, shared across the same table (owner 2026-09-26); grow together only if content requires |
 | Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
 | Standard control | 32px minimum; checkbox 16px, vertically centred |
 | Toolbar / footer | 45px / 32px minimum |

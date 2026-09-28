@@ -182,7 +182,7 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
     poNo: row.poNo,
     ref: reference,
     lines: row.lines ?? [],
-    deadline: row.effectiveIso ? spell(row.effectiveIso) : "TBD",
+    deadline: row.effectiveIso ? spell(row.effectiveIso) : "",
   });
   return (
     <section aria-label={`${row.supplier ?? row.poNo} · ${row.poNo}`} className="flex flex-col gap-1 border-b border-kit-slate-4 pb-3 last:border-b-0 last:pb-0" data-testid={`party-supplier-row-${row.poNo}`}>

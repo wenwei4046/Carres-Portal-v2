@@ -520,7 +520,7 @@ export default function PaymentMonitor() {
   );
 
   const weekStart = plan.weekStartIso;
-  const weekLabel = `${fmtDate(weekStart)} – ${fmtDate(addDays(weekStart, 4))}`;
+  const weekLabel = `${fmtDate(weekStart)} to ${fmtDate(addDays(weekStart, 4))}`;
   const onPlanWeek = mondayOf(planDay) === weekStart;
   const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
 

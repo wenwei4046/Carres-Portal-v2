@@ -170,7 +170,7 @@ export default function ConfirmProceedDialog({
       >
         <div className="label mb-1.5">Order lines</div>
         <div className="font-mono text-label text-base-600">
-          {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || "—"}
+          {lines.map((l) => `${l.sku} ×${l.qty}`).join(" · ") || ""}
         </div>
       </div>
 

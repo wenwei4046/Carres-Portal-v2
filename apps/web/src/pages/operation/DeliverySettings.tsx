@@ -218,7 +218,7 @@ function ChangesList({ changes, partnerId }: { changes: DeliverySettingChangeRow
             <li key={c.id} className="py-1.5 text-body">
               <span className="font-medium text-kit-slate-12">{c.what}</span>
               <span className="ml-2 text-kit-slate-11">
-                {c.actor_name ?? "—"} · {fmtDate(c.changed_at, { time: true })}
+                {c.actor_name ?? ""} · {fmtDate(c.changed_at, { time: true })}
               </span>
               <details className="mt-0.5">
                 <summary className="cursor-pointer text-label text-kit-slate-11">Old and new value</summary>

@@ -1123,7 +1123,7 @@ function logisticOf(
     (o.ops_assigned_logistic ? partnerName.get(o.ops_assigned_logistic) ?? null : null)
   );
 }
-const NO_CARRIER = "—";
+const NO_CARRIER = "";
 
 // ─── Logistics delivery state (locked column spec 2026-07-12 · T1 booking truth
 // 2026-07-26) ─────────────────────────────────────────────────────────────────
@@ -1690,7 +1690,7 @@ function tagLabel(t: { kind: ItemKind; qty: number; name: string }): string {
 
 /** Flat single-line rollup (CSV export + tooltips). */
 function itemRollup(lines: { sku: string; qty: number }[]): string {
-  return itemTags(lines).map(tagLabel).join(" · ") || "—";
+  return itemTags(lines).map(tagLabel).join(" · ") || "";
 }
 
 /** Units of ONE core category (Mattress / Bedframe / Sofa) on an order — the
@@ -3502,7 +3502,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         ((a, b) => (a === F_NO_VALUE ? 1 : b === F_NO_VALUE ? -1 : a.localeCompare(b))),
     );
     return {
-      options: values.map((v) => ({ value: v, label: v === F_NO_VALUE ? "—" : toLabel(v) })),
+      options: values.map((v) => ({ value: v, label: v === F_NO_VALUE ? "" : toLabel(v) })),
       selected: colFilters.get(key) ?? new Set<string>(),
       onChange: setColFilter(key),
       label: `Filter ${label}`,
@@ -5444,7 +5444,7 @@ function CustomerCell({ o }: { o: operationOrderListRow }) {
           {o.customer_name}
         </div>
       ) : (
-        <div className="text-base-300">—</div>
+        null
       )}
       <div
         className="t4-caption truncate"
@@ -5454,7 +5454,7 @@ function CustomerCell({ o }: { o: operationOrderListRow }) {
             : loc.label ?? undefined
         }
       >
-        {loc.label ?? "—"}
+        {loc.label ?? ""}
       </div>
     </div>
   );
@@ -5475,7 +5475,7 @@ function DeadlineCell({
         {fmtDate(o.delivery_date)}
       </span>
     ) : (
-      <span className="text-base-300">—</span>
+      null
     );
   if (o.delivery_date_tbd)
     return (
@@ -5483,7 +5483,7 @@ function DeadlineCell({
         TBD
       </span>
     );
-  if (!o.delivery_date) return <span className="text-base-300">—</span>;
+  if (!o.delivery_date) return null;
 
   const datePart = fmtDate(o.delivery_date);
   // Reuse the SAME DUE bucket as the top filter header so they can never
@@ -5707,7 +5707,7 @@ function NextActionCell({
           <span className="truncate min-w-0">{line}</span>
         </button>
         {/* ⭐ The REQUIRED RESULT — line two of a Delivery Work sentence
-            (owner ruling 2026-09-13), never joined to the act with `—`. */}
+            (owner ruling 2026-09-13), never joined to the act with "". */}
         {actionLines.result ? (
           <span className="block max-w-full truncate text-meta text-base-500" data-testid="next-action-result">
             {actionLines.result}
@@ -5850,7 +5850,7 @@ function StockDot({
           {num}/{coreTotal}
         </div>
       ) : (
-        <div className="text-base-300">—</div>
+        null
       )}
       <div
         className="tabular-nums t4-caption truncate"

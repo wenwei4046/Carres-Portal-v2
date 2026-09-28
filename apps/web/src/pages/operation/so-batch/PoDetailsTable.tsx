@@ -440,7 +440,7 @@ export default function PoDetailsTable({
                 {r.itemDetail ? <div className="mt-0.5 text-base-600">{r.itemDetail}</div> : null}
               </td>
               <td className="px-2 py-2 tabular-nums">
-                {r.qty == null ? <Absence>—</Absence> : r.qty}
+                {r.qty == null ? null : r.qty}
               </td>
               <td className="px-2 py-2">
                 {r.deliverTo ? r.deliverTo : <Absence>Not recorded</Absence>}

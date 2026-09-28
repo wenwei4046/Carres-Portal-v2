@@ -91,7 +91,7 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
 export function warehouseReceiptStatusLabel(
   key: string | null | undefined,
 ): string {
-  if (!key) return "—";
+  if (!key) return "";
   return (
     WAREHOUSE_RECEIPT_STATUS_LABEL[key as WarehouseReceiptStatus] ?? key
   );
@@ -415,7 +415,7 @@ export function receivingRecordNo(
   revision = 0,
 ): string {
   const date = r.goods_received_at ?? (r.submitted_at ?? "").slice(0, 10);
-  if (!date) return "—";
+  if (!date) return "";
   return docNumber({ prefix: "GRN", date, seed: r.id, revision });
 }
 
