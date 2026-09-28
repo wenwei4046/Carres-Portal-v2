@@ -577,6 +577,12 @@ page's. Drawn 2026-09-26 on: the Purchase Order object (`Purchase order` · `Goo
 detail, the Review Purchase Orders work pane (`Purchase order` facts + `Goods lines`), the Supplier
 Claim panel and the seven Purchasing Settings sections. Table heads keep their uppercase `text-label`
 row; a document's own heading (GRN, PO paper) keeps its document face.
+**On a form the person is filling in, a value the SYSTEM fills wears a GREY box (owner ruling
+2026-09-28, Jess "yes" after reading the white `Requested By` / `Proceed Date` as fields to fill).**
+The shared `Fact` takes `automatic`: the same bordered box with the kit's `kit-slate-3` fill (the
+disabled-control grey) and `data-kit="automatic-field"`; text stays slate-12. Everything the person
+fills stays white. First drawn on the Manual Purchase create page (`Requested By`, `Proceed Date`); a
+detail or review page, where nothing is being filled in, keeps the white box.
 
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```

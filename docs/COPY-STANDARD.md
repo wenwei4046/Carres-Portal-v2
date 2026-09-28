@@ -943,13 +943,6 @@ route stops `Issue` · `Supplier received RO` · `Picked up` · `Returned` · `I
 `Damaged` · `Missing component` · `Something else` with `What did you see?` and
 `What happened, in one sentence`.
 
-**Display Request words — owner approved 2026-09-28 (Purchasing MASTER §9.8).** `Display: Carres buys` ·
-`Display: Supplier consigns` · `New Display Request` · `What do you want?` · `Add a new model` ·
-`Replace a model` · `Remove a model` · `Which showroom?` · `Needed by` · `Send request` ·
-`{Supplier} supplies display goods on consignment.` · `Create a Consignment Order for {n} {Item}.` ·
-`Create consignment order` · `Create manual purchase` · `Not going ahead`. Register heading `Showroom`
-(never `Outlet`).
-
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 
 `Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom

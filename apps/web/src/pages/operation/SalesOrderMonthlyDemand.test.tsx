@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { monthlyDemandOf, type MonthlyDemandOrder, type MonthlyDemandView } from "@carres/shared";
-import SalesOrderMonthlyDemand from "./SalesOrderMonthlyDemand";
+import SalesOrderMonthlyDemand, { monthlyDemandSheet } from "./SalesOrderMonthlyDemand";
 
 const order = (id: string, over: Partial<MonthlyDemandOrder>): MonthlyDemandOrder => ({
   id,
@@ -129,7 +129,7 @@ describe("Monthly demand", () => {
 
   it("`Total` and `No delivery date` are not doors", () => {
     mount();
-    expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+    expect(within(screen.getByRole("table")).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
       "Open Sales Orders for Before Nov 2026",
       "Open Sales Orders for Nov 2026",
       "Open Sales Orders for Dec 2026",
@@ -192,5 +192,32 @@ describe("Monthly demand", () => {
       expect(text.replace(heading, "")).not.toContain("–");
       unmount();
     }
+  });
+});
+
+describe("Export writes the matrix on screen (owner ruling 2026-09-26)", () => {
+  it("the view's own toolbar carries Export alone: no Search, no Columns", () => {
+    mount();
+    const bar = screen.getByTestId("monthly-demand-toolbar");
+    expect(within(bar).getByRole("button", { name: "Export" })).toBeEnabled();
+    expect(within(bar).queryByRole("searchbox")).toBeNull();
+    expect(within(bar).queryByRole("button", { name: "Columns" })).toBeNull();
+  });
+
+  it("the sheet is the By month table: same columns, same row names, Unavailable stays a word", () => {
+    const view = viewOf({ toBuyByLine: null });
+    mount({ view });
+    const table = screen.getByRole("table");
+    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    const names = within(table).getAllByRole("row").slice(1).map((r) => r.querySelector("td, th")?.textContent?.trim());
+    const sheet = monthlyDemandSheet(view);
+    expect(sheet.headers).toEqual(headers);
+    expect(sheet.rows.map((r) => r[0])).toEqual(names);
+    expect(sheet.rows.every((r) => r[r.length - 1] === "Unavailable")).toBe(true);
+  });
+
+  it("an empty window cannot be exported", () => {
+    mount({ view: viewOf({ orders: [] }) });
+    expect(screen.getByTestId("monthly-demand-export")).toBeDisabled();
   });
 });

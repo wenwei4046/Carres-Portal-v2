@@ -908,6 +908,7 @@ export function Fact({
   testId,
   hint,
   wide = false,
+  automatic = false,
 }: {
   label: string;
   value: React.ReactNode;
@@ -923,6 +924,11 @@ export function Fact({
   hint?: string;
   /** Spans the whole fact grid row — a free-text reason or requirement. */
   wide?: boolean;
+  /** A value the SYSTEM fills on a form the person is filling in
+   *  (`Requested By`, `Proceed Date` on a create page). Drawn in a grey
+   *  box so it never reads as a field waiting for input (owner 2026-09-28:
+   *  "yes" to grey automatic fields, the Shopify / SAP read-only look). */
+  automatic?: boolean;
 }) {
   const id = `${idPrefix}-${label.replace(/\s+/g, "-").toLowerCase()}`;
   const field = (
@@ -932,12 +938,12 @@ export function Fact({
         role="textbox"
         aria-readonly
         aria-label={label}
-        data-kit={framed ? "readonly-field" : "plain-fact"}
+        data-kit={framed ? (automatic ? "automatic-field" : "readonly-field") : "plain-fact"}
         data-editable={own ? "yes" : "no"}
         data-testid={testId ?? id}
         className={
           framed
-            ? `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
+            ? `${automatic ? CONTROL_BASE.replace("bg-white", "bg-kit-slate-3") : CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
             : "flex min-h-8 min-w-0 items-center break-words px-0 py-1 text-body text-base-900"
         }
       >

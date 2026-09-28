@@ -2870,11 +2870,21 @@ function CreateRequestWorkspace({
                   left). Owner 2026-09-26: no free text — the former
                   `Purchase requirement` is gone; a line is CONFIGURED. */}
               <div className="mp-create-general grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SharedFact idPrefix="mp-create-fact" framed label={MW.createRequestedBy} testId="mp-raised-by" value={requesterName} />
+        <SharedFact idPrefix="mp-create-fact" framed automatic label={MW.createRequestedBy} testId="mp-raised-by" value={requesterName} />
         {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
             Malaysia-date preview before Send; the stored hand-off truth
             after. Never an input, never a browser clock. */}
-        <SharedFact idPrefix="mp-create-fact" framed label={MW.proceedDate} testId="mp-proceed-date" value={plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null} />
+        <SharedFact idPrefix="mp-create-fact" framed automatic label={MW.proceedDate} testId="mp-proceed-date" value={
+          /* Automatic, never picked: it is the day the request is sent (MASTER
+             §9.2). The server's plan answers first; until it does, the
+             server's own Malaysia date stands in (the `todayIso` prop exists
+             for exactly this). Never a blank box (owner 2026-09-27). */
+          plan.data?.proceedDate
+            ? fmtDate(plan.data.proceedDate)
+            : todayIso
+              ? fmtDate(todayIso)
+              : GOODS_ABSENCE_WORDS.notRecorded
+        } />
         <div>
           <Select
             id="mp-purpose"

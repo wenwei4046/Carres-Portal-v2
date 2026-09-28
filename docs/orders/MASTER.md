@@ -228,8 +228,10 @@ deselected; nothing carries between the two views.
 answers per order `obligations` through `completionOfOrder` (the ONE composition the object page's
 `/:id/completion` now calls: goods, money in with storage, money out, loan) and `cases` from
 `service_case_statuses.is_closed`; a read that failed is `null` and matches no chosen value, and the
-group says it could not read. **Not built in F:** Export of the matrix; a custom date range; search
-and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
+group says it could not read. **Monthly demand Export BUILT 2026-09-28:** the view's own Row 2 carries
+`Export` alone (no Search, no Columns) and writes the `By month` table as on screen (`Monthly demand
+{first} to {last} {date}.xlsx`; `Unavailable` stays a word). **Not built in F:** a custom date range;
+search and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
 SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
 `To buy` is `0` for an Accessory or a `Not in catalog` line; a Unit sold before 0471 names no line
 and is matched to the first line of its SKU.

@@ -1082,6 +1082,20 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     ]);
   });
 
+  it("automatic facts are GREY, input fields stay white (owner 2026-09-28)", async () => {
+    /* Jess read the white `Requested By` / `Proceed Date` boxes as fields to
+       fill. The system fills them, so they wear the grey box; what the person
+       fills stays white. */
+    await openWorkspace({ answerStockQuestion: false });
+    for (const id of ["mp-raised-by", "mp-proceed-date"]) {
+      const box = screen.getByTestId(id);
+      expect(box.getAttribute("data-kit")).toBe("automatic-field");
+      expect(box.className).toContain("bg-kit-slate-3");
+      expect(box.className).not.toContain("bg-white");
+    }
+    expect(document.getElementById("mp-purpose")!.className).toContain("bg-white");
+  });
+
   it("Card 06 · Proceed Date is a read-only server preview; the browser holds no clock", async () => {
     await openWorkspace();
     // The server's Malaysia date, as a FACT — no input anywhere near it.
@@ -1089,6 +1103,17 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       expect(screen.getByTestId("mp-proceed-date").textContent).not.toBe(""),
     );
     expect(screen.getByTestId("mp-proceed-date").querySelector("input")).toBeNull();
+  });
+
+  it("Proceed Date is never a blank box: before the plan answers it reads the server's own date (owner 2026-09-28)", async () => {
+    /* The plan read never answers here. The Register's `todayIso` is the
+       server's Malaysia date, and the form prints it rather than an empty box. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) return new Promise(() => {});
+      return Promise.resolve(respond(url, init));
+    });
+    await openWorkspace({ answerStockQuestion: false });
+    expect(screen.getByTestId("mp-proceed-date").textContent).toBe("Sun, 30 Aug");
   });
 
   it("Card 06 · complete lead facts DEFAULT Delivery Date from the slowest line — Send goes live", async () => {

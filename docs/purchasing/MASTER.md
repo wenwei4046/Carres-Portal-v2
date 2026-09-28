@@ -191,7 +191,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available and reports a source-linked Purchasing claim; later discovery on a Stock Unit/receipt opens a Purchasing stock claim directly | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Purchasing claim authority; GRN/Unit evidence; related customer Service Case read-only; Finance credit read-only |
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
 | Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Authorised inventory repair or Claim outcome creates RO (§9.7); same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Authorised inventory repair or stock-claim outcome; Stock custody; Goods Receipt/inspection on return |
-| Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Showroom asks for a model/display change; Purchasing decides buy, consignment, swap or no action | Showroom enters simple request; Purchasing resolves supplier/SKU/path | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
+| Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Sales hands over the negotiated display arrangement; Operation documents the governed purchase, consignment or movement path | Select existing Stock Units where applicable; Sales supplies new goods and agreed terms; resolve missing Catalog facts before formal issue | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
 | Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
 | Consignment sale notice | Staff may forget to tell supplier after a sale | Mature ERP creates consumption advice after actual consumption | **ADAPT + IMPROVE** | Successful delivery of exact supplier-owned Unit auto-creates one notice per supplier × attempt | Current PO Duty checks and sends; Finance later matches invoice | `Consignment Sale Notices` Register; no `+ New`; 50/50 while issuing/correcting | Delivery success; Stock ownership; source CO; Finance/AP continuation |
@@ -2226,7 +2226,7 @@ The three sections, in the SAME reading order on the form and preview, are:
 
 1. **Request Details** — drawn in the Sales Order fact grammar, one title one box,
    three to a row, in this reading order (owner ruling 2026-09-26 — "yes" to the
-   sketch): **row 1** automatic `Requested By` · automatic `Proceed Date` · `Purpose`;
+   sketch): **row 1** automatic `Requested By` · automatic `Proceed Date` (both in the grey automatic box, owner 2026-09-28; UI MASTER one card grammar) · `Purpose`;
    **row 2** the purpose's own second box, whose title changes with the purpose —
    `Service Case` (Service Case) · `Staff member` (Internal Staff Purchase) ·
    `Subsidiary` (Subsidiary Purchase) · `What is this for?` (Other Purchase, required
@@ -5315,51 +5315,65 @@ neither narrows the 2026-09-18 approved scope nor pretends a Dealer Site exists 
 
 ### 9.8 Display Requests
 
-**Owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.** Replaces the earlier sketch.
+**SHOWROOM HANDOFF — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Sales negotiates
+with the supplier about the display goods, price and conditions; Operation does not negotiate or
+set the price. This internal record hands that arrangement to Operation for documentation and
+execution. Recording negotiated terms does not bypass existing commercial or Manual Purchase
+approval. Detailed action assignment and new screen wording remain under
+review; this ruling does not approve the complete Showroom Blueprint or application build.
 
-**Purpose / source:** Carres showroom staff ask for a new display model, a replacement or a removal.
-The path follows the supplier's display arrangement (§7.4a), so the system proposes it and PO Duty
-confirms:
+**Purpose / source:** record a new display placement, replacement, removal or change and connect
+it to the existing goods and the agreed supplier arrangement. For a replacement/removal, choose the
+showroom (PJ Showroom exists today), then select the exact existing display Units from Stock.
+Bring forward Unit ID, model, supplier, current location, ownership and stock state; do not ask
+Sales to recreate those facts or keep a second showroom inventory. A new display placement need
+not select an outgoing Unit.
 
-```text
-Supplier setting `Display: Carres buys`        → Manual Purchase (purpose Showroom Display) → PO
-Supplier setting `Display: Supplier consigns`  → Consignment Order
-Remove a consigned model                       → Consignment Return
-Replace a consigned model                      → one Consignment Order: COMING IN + GOING BACK
-```
+**Journey:** select the existing display goods where applicable → Sales supplies the new goods,
+negotiated price/conditions/date and supporting supplier conversation or quotation → Operation
+checks completeness and prepares the source-linked execution documents. New goods without a SKU
+may be recorded with model details/photos; resolve them to governed Catalog SKU facts before
+formal supplier-document issuance. Catalog owns product facts; Operation cannot invent the SKU
+or price. Read known facts and require only missing information. Missing price/conditions go back
+to the negotiating Sales person rather than being decided by Operation.
 
-The setting lives on the supplier in Settings → Suppliers (Hookka and Ohana: `Carres buys`; every
-other display supplier: `Supplier consigns`). References mined: SAP Retail store requisition (source
-decides the follow-on document), Lightspeed store replenishment request (three questions), Odoo
-replenishment routes per vendor. A direct Manual Purchase with purpose `Showroom Display` stays
-available to Purchasing staff; showroom staff use this door.
+**ENTRY AND COMMERCIAL FOLLOW-UP — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Sales may create the handoff directly; Operation may record it on Sales's behalf from the supplied
+conversation/material. Both entry paths identify and retain the actual negotiating Sales person.
+The person who records the handoff and the negotiating Sales person are distinct facts; proxy
+entry never impersonates Sales or transfers commercial responsibility to Operation. Record the
+actual creator and time in History. Missing model details, price or agreed conditions are assigned
+back to that negotiating Sales person to complete. Operation may identify and record the gap but
+may not invent the answer or negotiate/set the price. Both paths create the same source-linked
+Display Request, not separate queues or duplicate supplier orders. This ruling permits proxy
+entry, not supplier-document issuance, commercial approval or changing Stock through that entry.
 
-**Showroom staff create (one question at a time):**
+**Commercial and physical connections:** Carres purchases follow Manual Purchase approval → PO;
+supplier-owned placement follows CO; consignment swap connects incoming goods and an outgoing
+CRTN; removal of Carres-owned goods uses the governed Stock movement, not an invented purchase.
+The route follows verified ownership and agreed terms. Issuing a document is neither sending it
+nor moving a Unit. Incoming receipt and outgoing handover remain separate owner-module facts.
+An existing supplier conversation is evidence, not proof of formal issuance, sending or receipt.
 
-```text
-New Display Request                                [Cancel] [Send request]
-What do you want?   Add a new model | Replace a model | Remove a model
-Which showroom?     governed showroom Sites
-Model               Choose from Catalog → Configure (same drawer as the Sales portal)
-Current Unit        scan or choose Unit ID (Replace / Remove only)
-Photo               optional
-Needed by           date
-```
+**Stock readiness:** Stock MASTER §12.9 records PJ Site, its 36 imported display Unit records,
+showroom filtering and ownership support. That import is test data and all 36 were marked Carres
+Owned; it is not verified ownership evidence. Apply the owner ruling: Hookka/Ohana display goods
+are Carres Owned; other suppliers' showroom displays are Supplier Consignment. Preserve Stock's
+recorded opening-import correction boundary; this plan authorizes no production backfill.
+Transfer and showroom scan/Count delivery gaps stay with Stock. Do not call PJ Site absent or
+recreate its Unit list.
 
-**Object:** full-width, no PDF. Route `Request → Purchasing decision → Ordered → At showroom`.
-CURRENT ACTION for PO Duty: line one `{Supplier} supplies display goods on consignment.` (or the buy
-sentence), line two `Create a Consignment Order for {n} {Item}.`, one primary door
-(`Create consignment order` / `Create manual purchase`), and `Not going ahead` with its reason
-under a secondary menu. The created document is source-linked; the DR never duplicates it.
+**Object/placement:** internal full-width object; no PDF preview. Reuse the shared kit and owning
+forms. Workspace may open those same forms in place; it creates no second request, inventory or
+business writer. The existing register column contract remains Request No., Outlet, Requested By,
+Current Unit/Model, Requested Model, Reason, Needed Date, Purchasing Decision, Source Order, Work.
+The former decision-first rail wording and exact handoff controls require this page's copy/design
+review before build; they must not imply that Operation negotiates Sales's supplier price.
 
-**Register columns:** `Request No` · `Showroom` · `Requested By` · `Current Unit / Model` ·
-`Requested Model` · `Reason` · `Needed by` · `Purchasing Decision` · `Source Order`. No `Work`
-column (UI MASTER §6.7). **Left rail:** `Purchasing decision missing` · `SKU missing` ·
-`Supplier path missing` · `Ready to order` · `Ordered` · `At showroom` · `Not going ahead`.
-**Work:** `Showroom display change` is owned by PO Duty and closes when the linked MPR/CO/CRTN
-exists or the request is marked not going ahead. **Exceptions:** Catalog SKU absent, supplier has no
-display setting (`Supplier path missing`), old Unit has no ID, duplicate request.
-**Connections:** Showroom Site (Stock §12.9), Catalog, Manual Purchase, CO/CRTN, Stock Unit.
+**Exceptions:** missing Catalog SKU, unclear ownership, unidentified old Unit, unavailable model,
+duplicate arrangement, incomplete negotiated terms, and partial incoming/outgoing fulfilment.
+**Connections:** Sales/Showroom, Catalog, Manual Purchase, CO/CRTN, Stock Unit/transfer, Receiving,
+Workspace. Existing approvals, custody evidence, permissions and supplier-document controls remain.
 
 ### 9.9 Consignment Orders
 
@@ -5504,7 +5518,7 @@ are snapshots, not editable truth or a second settlement ledger.
 
 | Role | May do | May not do |
 |---|---|---|
-| Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, choose supplier price, change ownership |
+| Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, change ownership |
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
