@@ -129,12 +129,15 @@ function railStorageKey(railKey: string | null, groupKey: string): string | null
   return railKey ? `carres.filterRail.${railKey}.${groupKey}` : null;
 }
 
+/* A group opens only when the operator opened it (international facet
+   panels: Shopify, Linear, SAP Fiori — headers first, one click to see a
+   group's choices). The chosen value always shows on the header. */
 function readGroupOpen(key: string | null): boolean {
-  if (!key) return true;
+  if (!key) return false;
   try {
-    return localStorage.getItem(key) !== "0";
+    return localStorage.getItem(key) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -344,7 +347,9 @@ export function FilterRailGroup({
         </span>
       </button>
       <GroupContext.Provider value={groupCtx}>
-        <div id={bodyId} hidden={!open} className="mt-1 flex flex-col gap-0.5">
+        {/* `hidden` alone lost to `flex` (a class beats the attribute), so a
+            closed group still drew its rows: the display follows `open`. */}
+        <div id={bodyId} hidden={!open} className={`mt-1 flex-col gap-0.5 ${open ? "flex" : "hidden"}`}>
           {children}
         </div>
       </GroupContext.Provider>
@@ -519,7 +524,7 @@ export function FilterRailExpandableRow({
         </button>
       </div>
       {children && (
-        <div id={bodyId} hidden={!open} className="ml-4 flex flex-col gap-0.5">
+        <div id={bodyId} hidden={!open} className={`ml-4 flex-col gap-0.5 ${open ? "flex" : "hidden"}`}>
           {children}
         </div>
       )}

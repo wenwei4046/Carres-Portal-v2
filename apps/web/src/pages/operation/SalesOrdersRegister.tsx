@@ -64,6 +64,7 @@ import {
 } from "@/components/register/DataGrid";
 import Money from "@/components/Money";
 import Button from "@/components/kit/Button";
+import Tabs from "@/components/kit/Tabs";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import Popover from "@/components/kit/Popover";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -1019,29 +1020,24 @@ export default function SalesOrdersRegister() {
       onHide={() => setRailOpen(false)}
       header={(
         <div className="pr-8">
-          <FilterRailGroup title="View" icon="modules" chosen={null}>
-            {/* The group's supporting line sits under its heading, as in every group. */}
-            <RailFieldWords supporting="Order list or Monthly demand" />
-            <FilterRailRow
-              label="Order list"
-              active={view === "list"}
-              testId="sales-orders-view-list"
-              onClick={() => chooseView("list")}
-            />
-            <FilterRailRow
-              label="Monthly demand"
-              active={view === "monthly"}
-              testId="sales-orders-view-monthly"
-              onClick={() => chooseView("monthly")}
-            />
-          </FilterRailGroup>
+          {/* Two views of the same orders: a tab bar, not a collapsible group. */}
+          <Tabs
+            fill
+            label="Sales Orders view"
+            value={view}
+            onValueChange={(next) => chooseView(next === "monthly" ? "monthly" : "list")}
+            tabs={[
+              { value: "list", label: "Order list" },
+              { value: "monthly", label: "Monthly demand" },
+            ]}
+          />
         </div>
       )}
     >
       {monthly ? (
         <>
           <FilterRailGroup title="Period" icon="date">
-            <RailFieldWords supporting="Which months to show" label="Starting month" />
+            <RailFieldWords label="Starting month" />
             <FilterRailSelect
               label="Starting month"
               value={startMonth === currentMonth ? null : startMonth}
@@ -1066,7 +1062,6 @@ export default function SalesOrdersRegister() {
             </p>
           </FilterRailGroup>
           <FilterRailGroup title="Dealer / Sales Location" icon="people">
-            <RailFieldWords supporting="Where the order was sold" />
             <FilterRailSelect
               label="Dealer / Sales Location"
               value={dealer}
@@ -1076,8 +1071,8 @@ export default function SalesOrdersRegister() {
               allLabel="All dealers"
             />
           </FilterRailGroup>
-          <FilterRailGroup title="Delivery State / City" icon="delivery">
-            <RailFieldWords supporting="Where the goods go" label="State" />
+          <FilterRailGroup title="Customer Delivery Location" icon="delivery">
+            <RailFieldWords label="State" />
             <FilterRailSelect
               label="State"
               value={deliveryState}
@@ -1097,7 +1092,6 @@ export default function SalesOrdersRegister() {
             />
           </FilterRailGroup>
           <FilterRailGroup title="Product category" icon="goods">
-            <RailFieldWords supporting="Which kind of goods" />
             <FilterRailSelect
               label="Product category"
               value={category}
@@ -1111,7 +1105,6 @@ export default function SalesOrdersRegister() {
       ) : (
         <>
           <FilterRailGroup title="Dealer / Sales Location" icon="people">
-            <RailFieldWords supporting="Where the order was sold" />
             <FilterRailSelect
               label="Dealer / Sales Location"
               value={listDealer}
@@ -1121,8 +1114,8 @@ export default function SalesOrdersRegister() {
               allLabel="All dealers"
             />
           </FilterRailGroup>
-          <FilterRailGroup title="Delivery State / City" icon="delivery">
-            <RailFieldWords supporting="Where the goods go" label="State" />
+          <FilterRailGroup title="Customer Delivery Location" icon="delivery">
+            <RailFieldWords label="State" />
             <FilterRailSelect
               label="State"
               value={listState}
@@ -1147,7 +1140,6 @@ export default function SalesOrdersRegister() {
             />
           </FilterRailGroup>
           <FilterRailGroup title="Date" icon="date">
-            <RailFieldWords supporting="Which date to read" />
             <FilterRailSelect
               label="Date"
               value={listDateField === "proceed" ? null : listDateField}
@@ -1167,7 +1159,6 @@ export default function SalesOrdersRegister() {
             ))}
           </FilterRailGroup>
           <FilterRailGroup title="Delivery" icon="goods">
-            <RailFieldWords supporting="What has been delivered" />
             {REGISTER_DELIVERY_CONDITIONS.map((c) => (
               <FilterRailRow
                 key={c.key}
@@ -1179,7 +1170,6 @@ export default function SalesOrdersRegister() {
             ))}
           </FilterRailGroup>
           <FilterRailGroup title="Obligations" icon="money">
-            <RailFieldWords supporting="What the order still owes" />
             {registerFactsQ.data?.failed.obligations || registerFactsQ.isError ? (
               <p className="px-2 text-meta text-kit-slate-11" data-testid="sales-orders-rail-obligations-unread">
                 Could not read what the orders still owe.
@@ -1196,7 +1186,6 @@ export default function SalesOrdersRegister() {
             ))}
           </FilterRailGroup>
           <FilterRailGroup title="Service Cases" icon="message">
-            <RailFieldWords supporting="Customer complaints" />
             {registerFactsQ.data?.failed.cases || registerFactsQ.isError ? (
               <p className="px-2 text-meta text-kit-slate-11" data-testid="sales-orders-rail-cases-unread">
                 Could not read the Service Cases.
