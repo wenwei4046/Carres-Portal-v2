@@ -148,9 +148,10 @@ the order.`). Card titles are black bold (`text-strong` slate-12) under the ONE 
 which overwrites the 2026-09-21 "remain blue" ruling on this page.
 **Rules 6 and 7 of THE LOCKED STATE are superseded, not built:** the owner's correction of 2026-09-27
 — Operation never creates a Sales Order by any door — removes the office create door they describe.
-**Not built in C:** a locked field that HAS a value still draws its disabled box (name, phone, address,
-a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
-longer offers prints an empty box.
+A locked field that HAS a value keeps its grey box: that is THE SO PAGE FIELD STANDARD (Jess
+2026-09-22, a grey box means "this can be changed with `Edit`"), not a gap; absent values and number
+boxes print as text. A chosen value a `Select` no longer offers prints as itself (kit `Select`, BUILT
+2026-09-28), never an empty box.
 
 **Scope D, first half · Register close-out — BUILT 2026-09-28, production walk owed.** The row menu
 reads `Edit · View · Print · ─ Cancel SO`, and carries nothing of Delivery's. The engine draws
