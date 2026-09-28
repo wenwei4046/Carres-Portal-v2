@@ -5315,17 +5315,51 @@ neither narrows the 2026-09-18 approved scope nor pretends a Dealer Site exists 
 
 ### 9.8 Display Requests
 
-**Purpose / source:** showroom staff request a new model, replacement, removal or display change;
-Purchasing chooses the commercial path.
-**Left rail:** `Purchasing decision missing`, `SKU missing`, `Supplier path missing`, `Ready to order`, `Ordered`, `At showroom`, `Not going ahead`.
-**Columns:** Request No., Outlet, Requested By, Current Unit/Model, Requested Model, Reason, Needed
-Date, Purchasing Decision, Source Order, Work.
-**Journey:** showroom logs in → records simple request/photo/current Unit → Purchasing decides Buy,
-Consignment, Swap, Remove or No Action → system creates the correct source-linked record.
-**Object/placement:** internal full-width object; no PDF preview.
-**Exceptions:** Catalog SKU absent, unclear ownership, old Unit has no ID, supplier/model unavailable,
-duplicate request.
-**Connections:** Showroom, Catalog, Manual Purchase, CO/CRTN, Stock transfer/Unit.
+**Owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.** Replaces the earlier sketch.
+
+**Purpose / source:** Carres showroom staff ask for a new display model, a replacement or a removal.
+The path follows the supplier's display arrangement (§7.4a), so the system proposes it and PO Duty
+confirms:
+
+```text
+Supplier setting `Display: Carres buys`        → Manual Purchase (purpose Showroom Display) → PO
+Supplier setting `Display: Supplier consigns`  → Consignment Order
+Remove a consigned model                       → Consignment Return
+Replace a consigned model                      → one Consignment Order: COMING IN + GOING BACK
+```
+
+The setting lives on the supplier in Settings → Suppliers (Hookka and Ohana: `Carres buys`; every
+other display supplier: `Supplier consigns`). References mined: SAP Retail store requisition (source
+decides the follow-on document), Lightspeed store replenishment request (three questions), Odoo
+replenishment routes per vendor. A direct Manual Purchase with purpose `Showroom Display` stays
+available to Purchasing staff; showroom staff use this door.
+
+**Showroom staff create (one question at a time):**
+
+```text
+New Display Request                                [Cancel] [Send request]
+What do you want?   Add a new model | Replace a model | Remove a model
+Which showroom?     governed showroom Sites
+Model               Choose from Catalog → Configure (same drawer as the Sales portal)
+Current Unit        scan or choose Unit ID (Replace / Remove only)
+Photo               optional
+Needed by           date
+```
+
+**Object:** full-width, no PDF. Route `Request → Purchasing decision → Ordered → At showroom`.
+CURRENT ACTION for PO Duty: line one `{Supplier} supplies display goods on consignment.` (or the buy
+sentence), line two `Create a Consignment Order for {n} {Item}.`, one primary door
+(`Create consignment order` / `Create manual purchase`), and `Not going ahead` with its reason
+under a secondary menu. The created document is source-linked; the DR never duplicates it.
+
+**Register columns:** `Request No` · `Showroom` · `Requested By` · `Current Unit / Model` ·
+`Requested Model` · `Reason` · `Needed by` · `Purchasing Decision` · `Source Order`. No `Work`
+column (UI MASTER §6.7). **Left rail:** `Purchasing decision missing` · `SKU missing` ·
+`Supplier path missing` · `Ready to order` · `Ordered` · `At showroom` · `Not going ahead`.
+**Work:** `Showroom display change` is owned by PO Duty and closes when the linked MPR/CO/CRTN
+exists or the request is marked not going ahead. **Exceptions:** Catalog SKU absent, supplier has no
+display setting (`Supplier path missing`), old Unit has no ID, duplicate request.
+**Connections:** Showroom Site (Stock §12.9), Catalog, Manual Purchase, CO/CRTN, Stock Unit.
 
 ### 9.9 Consignment Orders
 
