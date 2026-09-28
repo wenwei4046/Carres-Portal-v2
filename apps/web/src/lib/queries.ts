@@ -318,6 +318,9 @@ import {
   type DeliveryTemplateRow,
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
+  type RepairOrderDetail,
+  type RepairOrderEligibleUnit,
+  type RepairOrderListRow,
 } from "@carres/shared";
 import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
 import {
@@ -3878,6 +3881,69 @@ export interface SupplierClaimListRow {
 export interface SupplierClaimsResponse {
   claims: SupplierClaimListRow[];
   counts: { open: number; closed: number; all: number };
+}
+
+/**
+ * ⭐ REPAIR ORDERS — `docs/purchasing/MASTER.md` §9.7, migration 0602. The row
+ * shapes are `@carres/shared`'s, so the API, the register, the object page and
+ * the tests read one idea of what a Repair Order is.
+ */
+export interface RepairOrdersResponse {
+  repairOrders: RepairOrderListRow[];
+}
+export function useOperationRepairOrders(opts?: Partial<UseQueryOptions<RepairOrdersResponse>>) {
+  return useQuery({
+    queryKey: ["operation", "repair-orders"] as const,
+    queryFn: () => apiFetch<RepairOrdersResponse>("/api/operation/repair-orders"),
+    ...opts,
+  });
+}
+export function useOperationRepairOrder(idOrNo: string | null) {
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "one", idOrNo] as const,
+    enabled: Boolean(idOrNo),
+    queryFn: () =>
+      apiFetch<{ repairOrder: RepairOrderDetail }>(`/api/operation/repair-orders/${encodeURIComponent(idOrNo ?? "")}`),
+  });
+}
+export interface RepairOrderOptions {
+  sites: { id: string; name: string; carres: boolean }[];
+  suppliers: { id: string; name: string }[];
+}
+export function useRepairOrderOptions() {
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "options"] as const,
+    queryFn: () => apiFetch<RepairOrderOptions>("/api/operation/repair-orders/options"),
+  });
+}
+export function useRepairOrderEligibleUnits(site: string | null, claim: string | null, search: string) {
+  const p = new URLSearchParams();
+  if (site) p.set("site", site);
+  if (claim) p.set("claim", claim);
+  if (search.trim()) p.set("search", search.trim());
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "eligible", site, claim, search.trim()] as const,
+    enabled: Boolean(site),
+    queryFn: () => apiFetch<{ units: RepairOrderEligibleUnit[] }>(`/api/operation/repair-orders/eligible-units?${p}`),
+  });
+}
+export interface RepairOrderEvidenceUrl {
+  stock_item_id: string;
+  unit_id: string;
+  path: string;
+  kind: "photo" | "video";
+  source: "unit" | "claim";
+  url: string | null;
+}
+export function fetchRepairOrderEvidence(id: string) {
+  return apiFetch<{ files: RepairOrderEvidenceUrl[]; quotation: { path: string; url: string | null } | null }>(`/api/operation/repair-orders/${encodeURIComponent(id)}/evidence`);
+}
+export function useRepairOrderEvidence(id: string | null) {
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "evidence", id] as const,
+    enabled: Boolean(id),
+    queryFn: () => fetchRepairOrderEvidence(id ?? ""),
+  });
 }
 
 /**

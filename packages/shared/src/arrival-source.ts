@@ -84,6 +84,8 @@ export const arrivalSourceCreateInput = z
     kind: movementKind,
     claim_id: z.string().uuid().nullable(),
     case_id: z.string().uuid().nullable(),
+    /** 0602: the Repair Order that authorises a repair-return; the leg wears its RO No. */
+    repair_order_id: z.string().uuid().nullable().optional(),
     case_approval: caseApprovalInput.optional(),
     from_site_id: z.string().uuid().nullable(),
     to_site_id: z.string().uuid(),
@@ -110,7 +112,7 @@ export const arrivalSourceCreateInput = z
       c.addIssue({ code: "custom", message: "Choose two different Sites" });
     if (
       (v.kind === "supplier-replacement" && !v.claim_id) ||
-      (v.kind === "repair-return" && !v.claim_id && !v.case_id)
+      (v.kind === "repair-return" && !v.claim_id && !v.case_id && !v.repair_order_id)
     )
       c.addIssue({
         code: "custom",

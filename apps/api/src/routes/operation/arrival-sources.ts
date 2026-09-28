@@ -30,13 +30,26 @@ router.get("/options", requireOperation, async (c) => {
   }> = [];
   const claim = c.req.query("claim"),
     caseId = c.req.query("case"),
+    ro = c.req.query("ro"),
     search = c.req.query("q");
   if (
     (claim && !idSchema.safeParse(claim).success) ||
-    (caseId && !idSchema.safeParse(caseId).success)
+    (caseId && !idSchema.safeParse(caseId).success) ||
+    (ro && !idSchema.safeParse(ro).success)
   )
     return c.json({ message: "Invalid source" }, 422);
   if (claim) q = q.eq("hold_claim_id", claim);
+  /* 0602: a repair pickup offers only the Repair Order's own, still-active
+     Units — the door refuses any other, and the picker should not offer it. */
+  if (ro) {
+    const res = await sb
+      .from("repair_order_units")
+      .select("stock_item_id")
+      .eq("repair_order_id", ro)
+      .is("released_at", null);
+    if (res.error) return fail(c, res.error);
+    q = q.in("id", (res.data ?? []).map((r) => r.stock_item_id as string));
+  }
   if (caseId) {
     const res = await sb
       .from("service_cases")

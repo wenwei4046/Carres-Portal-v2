@@ -81,9 +81,12 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
 router.post("/evidence/upload-url", requireOperationOrPrincipal, async (c) => {
   const raw = await c.req.json<{ mimeType?: string; scope?: { kind?: string; id?: string } }>().catch(() => ({} as { mimeType?: string; scope?: { kind?: string; id?: string } }));
   const mime = raw.mimeType ?? "";
-  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : mime === "video/mp4" ? "mp4" : mime === "video/quicktime" ? "mov" : mime === "image/jpeg" ? "jpg" : null;
-  if (!ext) return c.json({ error: "invalid_param", code: "invalid_param", message: "Only JPEG, PNG, WebP, MP4 or MOV evidence is accepted" }, 422);
   const kind = /^[a-z_]+$/.test(raw.scope?.kind ?? "") ? raw.scope!.kind! : "issue";
+  /* A PDF is admitted for ONE purpose only: a supplier's Repair Quotation
+     (Purchasing MASTER §9.7). Every other proof stays photo or video. */
+  const pdf = mime === "application/pdf" && kind === "repair_quotation";
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : mime === "video/mp4" ? "mp4" : mime === "video/quicktime" ? "mov" : mime === "image/jpeg" ? "jpg" : pdf ? "pdf" : null;
+  if (!ext) return c.json({ error: "invalid_param", code: "invalid_param", message: "Only JPEG, PNG, WebP, MP4 or MOV evidence is accepted" }, 422);
   const id = /^[0-9a-f-]{36}$/i.test(raw.scope?.id ?? "") ? raw.scope!.id! : "unscoped";
   const path = `${kind}/${id}/${crypto.randomUUID()}.${ext}`;
   const { data, error } = await adminClient(c.env).storage.from("issue-evidence").createSignedUploadUrl(path);

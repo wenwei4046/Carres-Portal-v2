@@ -880,8 +880,8 @@ describe("PortalSidebar — the Purchasing map", () => {
     for (const key of [
       /* `purchase-returns` LEFT this list on 2026-09-19 — §9.6's register, its
          read and its storage shipped, so it is a destination now and is
-         asserted as one in the test below. */
-      "repair-orders",
+         asserted as one in the test below. `repair-orders` left it with §9.7
+         slice A (migration 0602). */
       "display-requests",
       "consignment-orders",
       "consignment-returns",
@@ -908,6 +908,15 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(row.tagName).toBe("A");
     expect(row.getAttribute("href")).toBe("/operation?tab=purchase-returns");
     expect(row.getAttribute("aria-disabled")).not.toBe("true");
+    expect(row.textContent).not.toContain("Coming soon");
+  });
+
+  it("Repair Orders is a real door now — §9.7 slice A", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-problems"));
+    const row = child("repair-orders");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=repair-orders");
     expect(row.textContent).not.toContain("Coming soon");
   });
 
