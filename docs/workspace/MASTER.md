@@ -1271,7 +1271,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    pale-blue chip; a past day's work counts once, under `Missed`) · `ATTENTION`: `! Missed {n}` ·
    `○ No date {n}` · `MODULE`: `All modules {n}`, then the list, then `Sales Orders` ·
    `Purchasing` · `Warehouse` · `Delivery` · `Payment`, each with its icon and count. **The list
-   is one row per order** (`SO-1362` / `2 actions` / `Missed` or its date), opening directly under
+   is one row per order** showing only the SO number and right-aligned numeric task count
+   (`SO-1333` / `2`; owner correction 2026-09-28). No customer name, `actions` suffix, or repeated
+   `Missed` status appears in the row; Attention already supplies the selected status. Counts retain
+   the selected Attention/day and module scope. The order row opens directly under
    the chosen module, and it overwrites the earlier one-act-per-row Inbox ruling: the order's acts
    are the numbered `To do` list (A6). A chosen row is the pale-blue wash with the 3px blue edge.
    Kept from Carres law against the prototype: `No date` (not `No working date`) and no count on a
