@@ -43,6 +43,39 @@ import type { IsoDate } from "./working-days";
 // ── The words ───────────────────────────────────────────────────────────────
 
 /**
+ * ⭐ A GOODS CELL THAT HOLDS NOTHING SAYS WHY — owner ruling 2026-09-27 (Jess:
+ * "dash meaning not showing as blank, I want just write clear why blank").
+ * No `—` and no empty cell on a goods table: each absence names its reason.
+ * COPY-STANDARD "A goods cell with nothing in it" is the dictionary entry.
+ */
+export const GOODS_ABSENCE_WORDS = {
+  /** `Unit ID` on a line Catalog counts by quantity (accessories) — it has none by law. */
+  countedByQuantity: "Counted by quantity",
+  /** `Unit ID` before the PO exists — Units are born with the official PO (0443). */
+  unitAtIssue: "Created when PO is issued",
+  /** `Order By` on a line that is already ordered. */
+  alreadyOrdered: "Already ordered",
+  /** `Ordered Qty` when Ready Stock answered the line and no PO exists. */
+  fromReadyStock: "From ready stock",
+  /** `Supplier Deliver To` on a line nothing is bought for. */
+  noPurchaseNeeded: "No purchase needed",
+  /** `Supplier` when Catalog names none. */
+  supplierNotSet: "Supplier not set",
+  /** `PO Delivery Date` before a PO exists. */
+  noPoYet: "No PO yet",
+  /** The ☑ cell of a line that is a service, not goods. */
+  service: "Service",
+  /** A fact nobody recorded. */
+  notRecorded: "Not recorded",
+  /** `To buy` when nothing is left to buy. */
+  nothingToBuy: "Nothing to buy",
+  /** A receiving quantity before the count. */
+  notCounted: "Not counted",
+  /** A choice the form still asks for (SO Batch Deliver To, the MPR preview). */
+  notChosen: "Not chosen",
+} as const;
+
+/**
  * Every fixed string To Order shows. A word that is not here has not been
  * ruled, and inventing one on a screen is the failure this module exists to
  * make impossible (COPY-STANDARD is the canonical home; this is its mirror).

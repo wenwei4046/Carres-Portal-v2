@@ -2,10 +2,12 @@
  * Block — the ONE card (ONE KIT LAW, owner ruling 2026-09-27; admitted to the
  * kit with the Work page, Jess 2026-09-28 "kit ok"). It was born on the Sales
  * Order page and every page that draws a card imports it from here: Sales
- * Order, Purchase Orders, Manual Purchase, the Warehouse Unit and Workspace.
+ * Order, Purchase Orders, Manual Purchase, Purchasing's review and settings
+ * cards, the Warehouse Unit and Workspace.
  *
- * The `sales-order` tone is the kit card: white, 1px `slate-5`, radius 6,
- * 12/16 padding, a black `text-strong` title over a 1px rule.
+ * One chrome (owner instruction 2026-09-26, "follow sales order ui kit … every
+ * page of purchasing"): white, 1px `slate-5`, the kit card radius, 12/16
+ * padding, a black `text-strong` title over a 1px rule.
  */
 import { useState } from "react";
 
@@ -21,12 +23,13 @@ import { useState } from "react";
  */
 export default function Block({
   title,
-  /** ⭐ THE BLUE TITLE IS THE SALES ORDER PAGE'S, NOT EVERY PAGE'S. `Block` is
-   *  shared — `PurchaseOrdersPage` draws its object with the same card — and the
-   *  owner ruling that made the title blue (Jess, 2026-09-21/22) is a SALES
-   *  ORDER ruling. So the blue is opt-in and the shared default is unchanged;
-   *  no other page moves. */
-  titleTone = "shared",
+  /* ⭐ ONE CHROME FOR EVERY OBJECT / DETAIL / REVIEW CARD — owner instruction
+     (Jess, 2026-09-26): "follow sales order ui kit … every page of
+     purchasing". The blue title over a 1px rule (owner ruling 2026-09-21/22)
+     is no longer the Sales Order page's opt-in; the former `shared` tone — a
+     mono UPPERCASE title beside a left band — is RETIRED. Purchase Orders,
+     Manual Purchase, the Review Purchase Orders pane, Supplier Claims and
+     Purchasing Settings draw this same card. */
   note,
   headerSlot,
   subtitle,
@@ -40,7 +43,6 @@ export default function Block({
    *  Jess 2026-09-28): under the title, inside the header, 13/400 — red when
    *  missed, amber when due, else grey. It says WHY the card is here. */
   why?: { text: string; tone: "missed" | "due" | "none" } | null;
-  titleTone?: "shared" | "sales-order";
   note?: string;
   /** ⭐ A STANDING FACT ABOUT THE WHOLE CARD BELONGS BESIDE ITS NAME
    *  (Jess, 2026-08-26). `note` is prose; this slot takes a rendered chip, so a
@@ -87,36 +89,19 @@ export default function Block({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
-      {/* ⭐ THE CARD TITLE IS BLUE, SENTENCE CASE, OVER A 1px RULE — OWNER
-          RULING (Jess, 2026-09-21), re-affirmed 2026-09-22: **"remain blue"**,
-          kept after the challenge that blue elsewhere means clickable
-          (`docs/orders/MASTER.md` § "Order view — one page, foreign facts
-          read-only" → CARD ORDER AND NAMES).
-
-          Two ranks only: card title `text-strong` 15px/600 sentence case in
-          `kit-blue-11`, on a WHITE card with a 1px rule; the in-card label is
-          13px/600 slate-11.
-
-          ⛔ WHAT THIS RETIRES: the mono UPPERCASE `text-signature-700` heading
-          and the `border-l-2` blue-grey band beside it. Both were this page's
-          own 2026-08-24/28 answers to "a section must read as a section"; the
-          owner has since ruled the answer, so the older reasoning is removed
-          rather than left beside it to be re-argued. */}
-      <div
-        className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 ${
-          titleTone === "sales-order" ? "border-b border-kit-slate-5 pb-2" : "border-l-2 border-base-300 pl-2"
-        }`}
-      >
-        <h2
-          id={headingId}
-          className={
-            titleTone === "sales-order"
-              ? /* ONE KIT LAW (owner ruling 2026-09-27): a card title is black bold,
-                   never blue. It overwrites the 2026-09-21 "remain blue" ruling. */
-                "text-strong text-kit-slate-12"
-              : "font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
-          }
-        >
+      {/* ⭐ ONE CARD, ONE CHROME — every page draws its cards from here.
+          A white card with a 1px rule under the title; the title is
+          `text-strong` slate-12 BLACK bold, sentence case (ONE KIT LAW, Jess
+          2026-09-27, which overwrote the 2026-09-21 "remain blue" ruling).
+          Blue stays for the primary button, links and selection only. There
+          is no second tone and no band: the grey band and the mono uppercase
+          heading are retired. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-kit-slate-5 pb-2">
+        {/* ONE KIT LAW (Jess, 2026-09-27): the card title is BLACK bold
+            `text-strong` slate-12 — never blue (blue is the primary button,
+            links and selection only), never a band. Overwrites the
+            2026-09-21 "remain blue" ruling in the one place every page draws from. */}
+        <h2 id={headingId} className="text-strong text-kit-slate-12">
           {title}
         </h2>
         {headerSlot}
@@ -174,10 +159,7 @@ export default function Block({
               margin of their own. Opt-in with the SO tone because Purchase
               Orders and Manual Purchase share this component and space their
               own bodies. */}
-          <div
-            id={bodyId}
-            className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}
-          >
+          <div id={bodyId} className="mt-3 flex flex-col gap-3 [&>*:empty]:hidden">
             {children}
           </div>
         </>

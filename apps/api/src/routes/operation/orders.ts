@@ -1494,9 +1494,9 @@ operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
     const sourceRows = (sources.data ?? []) as Array<{ po_id: string }>;
     const poIds = [...new Set(sourceRows.map((row) => row.po_id).filter(Boolean))];
     if (poIds.length === 0) return { sources: [], purchaseOrders: [], receipts: [] };
-    const [pos, poLines, promises, confirmations, receipts] = await Promise.all([
+    const [pos, poLines, promises, confirmations, receipts, sends] = await Promise.all([
       sb.from("purchase_orders")
-        .select("id, status, supplier_id, destination_id, placed_at, official_delivery_date, eta_date, version").in("id", poIds),
+        .select("id, status, supplier_id, destination_id, placed_at, official_delivery_date, eta_date, version, suppliers(name)").in("id", poIds),
       sb.from("purchase_order_lines")
         .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty").in("po_id", poIds),
       sb.from("po_supplier_promises")
@@ -1506,14 +1506,18 @@ operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
         .select("po_id, po_version, for_date, destination_id").in("po_id", poIds),
       sb.from("warehouse_receipts")
         .select("id, po_id, grn_no, goods_received_at, status, lines").in("po_id", poIds),
+      /* Purchasing §5.6: only `confirmed_sent` for the current version is a sent PO (0377). */
+      sb.from("po_sends").select("po_id, po_version, kind").in("po_id", poIds),
     ]);
-    if (pos.error || poLines.error || promises.error || confirmations.error || receipts.error) return null;
+    if (pos.error || poLines.error || promises.error || confirmations.error || receipts.error || sends.error) return null;
     const ofPo = <T extends { po_id?: unknown }>(list: T[] | null, poId: string) =>
       (list ?? []).filter((row) => row.po_id === poId);
     return {
       sources: sources.data ?? [],
-      purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string }>).map((po) => ({
+      purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string; suppliers?: unknown }>).map(({ suppliers, ...po }) => ({
         ...po,
+        supplier_name: (Array.isArray(suppliers) ? suppliers[0] : suppliers as { name?: string } | null)?.name ?? null,
+        sends: ofPo(sends.data as Array<Record<string, unknown>>, po.id).map(({ po_id: _po, ...send }) => send),
         lines: ofPo(poLines.data as Array<Record<string, unknown>>, po.id).map(({ po_id: _po, ...line }) => line),
         promises: ofPo(promises.data as Array<Record<string, unknown>>, po.id),
         arrival_confirmations: ofPo(confirmations.data as Array<Record<string, unknown>>, po.id),

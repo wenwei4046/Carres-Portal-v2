@@ -1,3 +1,4 @@
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -773,7 +774,7 @@ export default function OperationReceiving() {
         category: words?.category ?? "",
         unitIds: [],
         /* Extra goods never enter Inventory, so they never become a Unit. */
-        unitAbsence: "",
+        unitAbsence: GOODS_ABSENCE_WORDS.countedByQuantity,
         deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
         deliverToAbsence: "Not recorded",
         supplier: r.supplier_name ?? undefined,

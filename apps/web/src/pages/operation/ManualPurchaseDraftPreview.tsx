@@ -24,7 +24,7 @@
  * Every word here is already in the dictionary — the section names, the field
  * names and `Draft` — so the preview respells nothing the form says.
  */
-import { MANUAL_PURCHASE_WORDS as MW } from "@carres/shared";
+import { GOODS_ABSENCE_WORDS, MANUAL_PURCHASE_WORDS as MW } from "@carres/shared";
 
 export interface ManualPurchaseDraftFact {
   label: string;
@@ -39,7 +39,8 @@ export interface ManualPurchaseDraftLine {
   item: string;
   supplier: string | null;
   qty: number;
-  note: string | null;
+  /** 0591 — the line's configuration words (colour · fabric · size · options). */
+  configuration: string | null;
 }
 
 export default function ManualPurchaseDraftPreview({
@@ -91,7 +92,7 @@ export default function ManualPurchaseDraftPreview({
                         picked line shows, never the model word alone. */}
                     <span className="mp-preview-sku">{l.sku}</span>
                     <span className="mp-preview-item"> · {l.item}</span>
-                    {l.note ? <span className="mp-preview-note">{l.note}</span> : null}
+                    {l.configuration ? <span className="mp-preview-note">{l.configuration}</span> : null}
                   </td>
                   <td>{l.supplier ?? null}</td>
                   <td className="mp-preview-num">{l.qty}</td>
@@ -128,7 +129,9 @@ function Section({
           <div key={f.label}>
             <dt>{f.label}</dt>
             <dd data-testid={`mp-preview-${f.label.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
-              {f.value}
+              {/* A draft fact not yet chosen says so — never a blank (owner
+                  2026-09-27: "write clear why blank"). */}
+              {f.value ?? GOODS_ABSENCE_WORDS.notChosen}
             </dd>
           </div>
         ))}

@@ -1,3 +1,4 @@
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -71,12 +72,12 @@ type OverviewResponse = {
   scorecardWindow?: { days: number; asOf: string; truncated: boolean };
 };
 
-/** The figure, or an em dash. Never a zero nobody earned. */
+/** The figure, or nothing — the reason prints right under it. Never a zero nobody earned. */
 function rateText(r: ScorecardRate): string {
   return r.known ? `${r.pct}%` : "";
 }
 
-/** Why a figure is missing — the sentence goes under the dash so the reader is
+/** Why a figure is missing — the sentence goes under the empty figure so the reader is
  *  never left guessing whether the supplier is perfect or unmeasured. */
 function rateWhy(r: ScorecardRate): string | null {
   return r.known ? null : SCORECARD_UNKNOWN_TEXT[r.reason];
@@ -128,7 +129,7 @@ export default function OperationSuppliers() {
               <div>
                 <div className="text-strong font-semibold">{s.name}</div>
                 <div className="text-label text-base-500 mt-[3px]">
-                  {s.contactEmail ?? s.contact ?? ""}
+                  {s.contactEmail ?? s.contact ?? GOODS_ABSENCE_WORDS.notRecorded}
                 </div>
               </div>
               <KindChip kind={s.kind} />
@@ -146,7 +147,7 @@ export default function OperationSuppliers() {
               <Stat label="Received" v={s.receivedPos} />
             </div>
             <div className="mt-3 text-label text-base-500">
-              Covers · {s.catCovered.length ? s.catCovered.join(" · ") : ""}
+              Covers · {s.catCovered.length ? s.catCovered.join(" · ") : GOODS_ABSENCE_WORDS.notRecorded}
             </div>
             <CardScorecard sc={s.scorecard} />
           </button>
@@ -175,7 +176,7 @@ function KindChip({ kind }: { kind: SupplierRow["kind"] }) {
 function Stat({ label, v }: { label: string; v: number | string }) {
   return (
     <div>
-      <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500">
+      <div className="text-label font-semibold text-kit-slate-11">
         {label}
       </div>
       <div className="text-strong font-semibold text-base-900 mt-0.5 tabular-nums">
@@ -231,7 +232,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
             <div className="text-meta text-base-600 mt-1">
               {/* P1 — the free-text lead time is not appended here either;
                   see the card above. */}
-              {supplier.contactEmail ?? supplier.contact ?? ""}
+              {supplier.contactEmail ?? supplier.contact ?? GOODS_ABSENCE_WORDS.notRecorded}
             </div>
           </div>
           <button
@@ -244,7 +245,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
 
         <ScorecardBlock sc={supplier.scorecard} />
 
-        <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500 mb-2">
+        <div className="text-label font-semibold text-kit-slate-11 mb-2">
           Recent POs
         </div>
         <div className="border border-base-200 rounded">
@@ -311,7 +312,7 @@ function ScorecardBlock({ sc }: { sc: SupplierScorecard }) {
 
   return (
     <div className="mb-6">
-      <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500 mb-2">
+      <div className="text-label font-semibold text-kit-slate-11 mb-2">
         Scorecard
       </div>
       <div className="border border-base-200 rounded p-4">
@@ -327,7 +328,7 @@ function ScorecardBlock({ sc }: { sc: SupplierScorecard }) {
         </div>
 
         <div className="mt-4 pt-3 border-t border-base-100">
-          <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500">
+          <div className="text-label font-semibold text-kit-slate-11">
             Claims
           </div>
           <div className="text-meta text-base-800 mt-1 tabular-nums">
@@ -386,7 +387,7 @@ function Measure({
   const why = rateWhy(r);
   return (
     <div>
-      <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-500">
+      <div className="text-label font-semibold text-kit-slate-11">
         {label}
       </div>
       <div className="text-strong font-semibold text-base-900 mt-0.5 tabular-nums">

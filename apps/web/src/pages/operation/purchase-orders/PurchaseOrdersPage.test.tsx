@@ -568,7 +568,8 @@ describe("Purchase Orders Register", () => {
 
     line.identity_mode = "quantity";
     const counted = renderPage();
-    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent(/[—–]/);
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("Counted by quantity");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("—");
     expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("do not send this PO");
     counted.unmount();
 
@@ -610,18 +611,6 @@ describe("Purchase Orders Register", () => {
     expect(work).toHaveTextContent("PO V2 has not been sent");
     expect(work).toHaveTextContent("Issue PO V2 to Hooka");
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
-  });
-
-  it("saves the PO's payment terms, and blank clears them (0530)", () => {
-    renderPage("/operation/procurement?po=PO-20260828-4827");
-    const field = screen.getByLabelText("Terms (days)");
-    const save = screen.getByTestId("po-terms-save");
-    expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "-1" } });
-    expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "45" } });
-    fireEvent.click(save);
-    expect(termsMutate).toHaveBeenCalledWith(45, expect.anything());
   });
 
   it("opens an object from the live register without changing the page's Hook order", () => {
@@ -815,12 +804,14 @@ describe("Purchase Order object", () => {
     expect(cell.queryByText("incoming")).not.toBeInTheDocument();
   });
 
-  it("a quantity-scoped line's Unit ID cell draws nothing, never `Not allocated`", () => {
+  it("says `Counted by quantity` for a quantity-scoped line — never a dash, never `Not allocated`", () => {
     queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "quantity";
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const cell = within(screen.getByTestId("po-line-units-line-1"));
-    expect(screen.getByTestId("po-line-units-line-1")).not.toHaveTextContent(/[—–]/);
+    /* Owner ruling 2026-09-27: no dash — the cell says why it holds nothing. */
+    expect(cell.getByText("Counted by quantity")).toBeInTheDocument();
+    expect(cell.queryByText("—")).toBeNull();
     expect(cell.queryByText("Not allocated")).not.toBeInTheDocument();
     expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
     expect(cell.queryByRole("alert")).not.toBeInTheDocument();
@@ -890,9 +881,13 @@ describe("Purchase Order object", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const facts = screen.getByTestId("po-document-panes").firstElementChild!;
     const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    /* Same card as the Sales Order: the mono, tracked heading face. */
+    /* Same card as the Sales Order: the blue, sentence-case title over a rule
+       (owner, 2026-09-26 — one card grammar for every Purchasing page). */
     const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
-    expect(po.className).toContain("font-mono");
+    /* ONE KIT LAW (Jess, 2026-09-27): black bold, never blue. */
+    expect(po.className).toContain("text-kit-slate-12");
+    expect(po.className).not.toContain("text-kit-blue-11");
+    expect(po.className).not.toContain("font-mono");
     /* Receiving, then Claims and returns, each a row of its own. No Unit IDs
        card: a unit is a row of its Goods line. */
     const order = ["Receiving", "Claims and returns"].map((t) => heads.indexOf(t));

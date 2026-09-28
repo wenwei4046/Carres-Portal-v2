@@ -899,10 +899,34 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
  * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
  * as changeable as the phone number beside it (reviewer finding 16).
  */
-function Fact({ label, value, own = true, framed = own }: { label: string; value: React.ReactNode; own?: boolean; framed?: boolean }) {
-  const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
-  return (
-    <FieldFrame id={id} label={label}>
+export function Fact({
+  label,
+  value,
+  own = true,
+  framed = own,
+  idPrefix = "so-fact",
+  testId,
+  hint,
+  wide = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  own?: boolean;
+  framed?: boolean;
+  /** The id/testid family — `so-fact` here, `po-fact` / `mp-fact` on the
+   *  Purchasing pages that share this ONE fact grammar (owner, 2026-09-26). */
+  idPrefix?: string;
+  /** A page that already pins its own test id keeps it. */
+  testId?: string;
+  /** One quiet line under the value (`Provisional. The date is recorded when
+   *  issued.`) through FieldFrame's own hint slot — never a second markup. */
+  hint?: string;
+  /** Spans the whole fact grid row — a free-text reason or requirement. */
+  wide?: boolean;
+}) {
+  const id = `${idPrefix}-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  const field = (
+    <FieldFrame id={id} label={label} hint={hint}>
       <div
         id={id}
         role="textbox"
@@ -910,7 +934,7 @@ function Fact({ label, value, own = true, framed = own }: { label: string; value
         aria-label={label}
         data-kit={framed ? "readonly-field" : "plain-fact"}
         data-editable={own ? "yes" : "no"}
-        data-testid={id}
+        data-testid={testId ?? id}
         className={
           framed
             ? `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
@@ -921,6 +945,9 @@ function Fact({ label, value, own = true, framed = own }: { label: string; value
       </div>
     </FieldFrame>
   );
+  /* The kit owns one field and takes no className; the grid span is the
+     caller's layout, drawn here around it. */
+  return wide ? <div className="col-span-full">{field}</div> : field;
 }
 
 /** The 0219 custom fields of one tab, rendered from the SAME contract the POS
@@ -2827,7 +2854,7 @@ function SalesOrderWorkspaceBody() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="SO info">
+      <Block title="SO info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact own={false} label="SO Doc Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
           {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
@@ -3043,7 +3070,6 @@ function SalesOrderWorkspaceBody() {
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
       <Block
-        titleTone="sales-order"
         title="Customer"
         headerSlot={
           !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
@@ -3198,7 +3224,7 @@ function SalesOrderWorkspaceBody() {
           a working line and charged once in GOODS. */}
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="Delivery">
+      <Block title="Delivery">
           {/* Merged from the retired `Delivery address` card (Jess,
               2026-08-26). Same fields, same ids, same one-address fact — it
               simply stopped being a separate card two sections away from the
@@ -3519,7 +3545,7 @@ function SalesOrderWorkspaceBody() {
           other cards use is what keeps that promise; without it the boxes on a
           locked order accepted keystrokes. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="Items">
+      <Block title="Items">
         {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
             `data-pos-field` the POS-parity contract test string-matches, with
             no control behind it — so the page passed a completeness test it
@@ -3633,7 +3659,6 @@ function SalesOrderWorkspaceBody() {
           navigates to the desk that owns collection, already scoped to this
           order, which is the one thing Law C lets a summary add. */}
       <Block
-        titleTone="sales-order"
         title="Payment"
         headerSlot={
           !isNew && order ? (
@@ -3727,7 +3752,7 @@ function SalesOrderWorkspaceBody() {
           work: a section that says "nothing" on every order is a section the
           operator learns to skip. */}
       {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
-        <Block titleTone="sales-order" title="What this change started elsewhere">
+        <Block title="What this change started elsewhere">
           <CorrectionWorkList
             work={correctionWorkQ.data?.work ?? []}
             canClose={false}
@@ -3861,7 +3886,7 @@ function SalesOrderWorkspaceBody() {
               is a 15px blue title over a 1px rule. It is now that same `Block`,
               so padding, title and gap come from one place. */}
           <div className="mx-auto max-w-5xl">
-          <Block titleTone="sales-order" title={objectView}>
+          <Block title={objectView}>
             {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
                 guards a 403 or a 500 falls straight through to the ledger's
                 governed EMPTY sentences (`No revisions recorded` / `No history

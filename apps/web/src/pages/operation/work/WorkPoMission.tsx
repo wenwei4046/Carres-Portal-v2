@@ -115,7 +115,7 @@ export default function WorkPoMission({
             <RouteStop key={act.key} label={act.stop === "supplier" ? "SUPPLIER" : act.stop === "receiving" ? "RECEIVING" : "PURCHASING"} tone={act.missed ? "missed" : "due"} last={i === acts.length - 1}>
               <Block
                 title={act.title}
-                titleTone="sales-order"
+               
                 why={act.why ? { text: act.why, tone: act.missed ? "missed" : "due" } : null}
                 headerSlot={
                   act.kind === "other" && item ? (

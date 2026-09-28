@@ -636,12 +636,26 @@ function Node({
         /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
            with the owner as a chip rather than a name inside the sentence. */
         <div
-          className="flex items-center gap-1.5 text-label"
-          style={{ height: ACTION_H }}
+          className="flex items-start gap-1.5 text-label"
           data-testid={`route-action-${node.id}`}
         >
-          {person && <OwnerChip person={person} />}
-          <span className="truncate text-label text-base-600">{node.action.label}</span>
+          {person && (
+            <span className="grid shrink-0 place-items-center" style={{ height: ACTION_H }}>
+              <OwnerChip person={person} />
+            </span>
+          )}
+          {/* A long instruction wraps under the chip; it never ends in "…". */}
+          <span className="text-label text-base-600">
+            {wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).map((row, i) => (
+              <span
+                key={i}
+                className="block whitespace-nowrap"
+                style={{ height: i === 0 ? ACTION_H : CONTEXT_H, lineHeight: `${i === 0 ? ACTION_H : CONTEXT_H}px` }}
+              >
+                {row}{" "}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 

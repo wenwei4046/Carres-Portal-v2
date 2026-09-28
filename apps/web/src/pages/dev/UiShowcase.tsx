@@ -958,7 +958,7 @@ export default function UiShowcase() {
             <RouteStop label="{Stop}" tone="missed" data-testid="ui-route-stop-missed">
               <Block
                 title="{What to do}"
-                titleTone="sales-order"
+               
                 why={{ text: "{Why it is owed now}", tone: "missed" }}
                 headerSlot={<Button size="touch">{"{Owning form}"}</Button>}
               >
@@ -970,7 +970,7 @@ export default function UiShowcase() {
               </Block>
             </RouteStop>
             <RouteStop label="{Stop}" tone="due">
-              <Block title="{What to do}" titleTone="sales-order" why={{ text: "{Why}", tone: "due" }}>
+              <Block title="{What to do}" why={{ text: "{Why}", tone: "due" }}>
                 <ChecklistRow mark="due" step="{Step that is the act}" value="{state}" />
                 <ChecklistRow mark="none" step="{A fact}" value="{Opens date}" />
               </Block>

@@ -306,7 +306,7 @@ must touch the edges — a table, an empty state.
 **Purpose.** The ONE card (ONE KIT LAW, 2026-09-27; moved into the kit 2026-09-28). Sales Order,
 Purchase Orders, Manual Purchase, the Warehouse Unit and Work draw every card with it.
 
-**Anatomy.** `titleTone="sales-order"`: white · 1px `slate-5` · card radius · 12/16 padding · black
+**Anatomy.** One chrome (no tone, #1672): white · 1px `slate-5` · card radius · 12/16 padding · black
 `text-strong` title over a 1px rule · `headerSlot` (one door or the card's own button, never a
 writer) · optional `why` line (13/400, red missed / amber due / slate-11) · body with one 12px gap.
 

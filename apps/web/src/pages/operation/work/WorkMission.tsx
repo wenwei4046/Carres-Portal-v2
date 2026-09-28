@@ -127,7 +127,7 @@ export default function WorkMission({
       <div key={c.key} className="min-w-0" data-testid={`work-card-${c.key}`} onFocus={() => (act ? onPickAct(act) : undefined)}>
         <Block
           title={c.title}
-          titleTone="sales-order"
+         
           why={c.why ? { text: c.why, tone: c.whyTone } : null}
           headerSlot={
             doorItem ? (

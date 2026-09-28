@@ -30,9 +30,9 @@ const serviceLine = (): GoodsMiniLine => ({
   key: "addon-0",
   category: "Service",
   unitIds: [],
-  unitAbsence: "—",
+  unitAbsence: "Created when PO is issued",
   deliverTo: [],
-  deliverToAbsence: "—",
+  deliverToAbsence: "No purchase needed",
   sku: "disposal_service",
   qty: 1,
   item: "disposal service",
@@ -105,11 +105,13 @@ describe("GoodsMiniTable", () => {
       expect(within(header).queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
-    it("prints a dash for a line nothing can be bought for", () => {
+    it("draws no box and no dash for a line nothing can be bought for", () => {
       withSelection();
       const service = screen.getAllByRole("row")[2];
       expect(within(service).queryByRole("checkbox")).not.toBeInTheDocument();
-      expect(within(service).getAllByText("—")[0]).toHaveAttribute("data-absence", "true");
+      /* Owner ruling 2026-09-27: no dash — the reason is written. */
+      expect(within(service).queryByText("—")).not.toBeInTheDocument();
+      expect(within(service).getAllByText("Nothing to buy")[0]).toHaveAttribute("data-absence", "true");
     });
 
     it("reports a tick to the page that owns the selection", () => {
@@ -279,8 +281,8 @@ describe("Card 02-B · optional Supplier and PO Default Delivery Date", () => {
             sku: "B1201S-Q",
             orderedQty: 0,
             orderedQtyAbsence: "Not ordered yet",
-            supplierAbsence: "—",
-            poDeliveryDateAbsence: "—",
+            supplierAbsence: "Supplier not set",
+            poDeliveryDateAbsence: "No PO yet",
           },
         ]}
       />,
