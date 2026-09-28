@@ -259,10 +259,13 @@ describe("Purchasing → Settings", () => {
     render(wrap(<OperationPurchasingSettings />));
     // Mon/Wed/Fri are on; turning Thursday on makes four.
     fireEvent.click(screen.getByTestId("po-days-4"));
-    fireEvent.click(screen.getByTestId("po-days-save"));
+    /* The PO windows card has ONE Save; it stores whichever fact moved. */
+    fireEvent.click(screen.getByTestId("po-windows-save"));
     await waitFor(() =>
       expect(setPoDays).toHaveBeenCalledWith({ days: [1, 3, 5, 4] }),
     );
+    /* The times did not move, so their door is not called. */
+    expect(setPoWindows).not.toHaveBeenCalled();
   });
 
   it("saves one of the single numbers by key", async () => {
@@ -327,7 +330,7 @@ describe("Purchasing → Settings", () => {
     render(wrap(<OperationPurchasingSettings />));
     expect(screen.getByTestId("production-days-sofa")).toBeDisabled();
     expect(screen.queryByTestId("production-save-sofa")).toBeNull();
-    expect(screen.queryByTestId("po-days-save")).toBeNull();
+    expect(screen.queryByTestId("po-windows-save")).toBeNull();
   });
 
   it("every visible label comes from the standards — no banned word appears", () => {

@@ -381,13 +381,7 @@ export default function OperationPurchasingSettings({
             onPoDays={setPoDraft}
             savingPoDays={setPoDays.isPending}
             onSavePoDays={() =>
-              setPoDays
-                .mutateAsync({ days: poDays })
-                .then(() => {
-                  setPoDraft(null);
-                  toast.success("Saved");
-                })
-                .catch(fail)
+              setPoDays.mutateAsync({ days: poDays }).then(() => setPoDraft(null))
             }
             onFail={fail}
           />
@@ -1124,7 +1118,7 @@ function PoWindowsSection({
   poDirty: boolean;
   onPoDays: (days: number[]) => void;
   savingPoDays: boolean;
-  onSavePoDays: () => void;
+  onSavePoDays: () => Promise<unknown>;
   onFail: (e: unknown) => void;
 }) {
   const saved = settings.poWindows;
@@ -1170,16 +1164,7 @@ function PoWindowsSection({
                 /* Jess, 2026-08-01: the Carres OFFICE does not work Saturday. */
                 days={WEEKDAYS.filter((w) => w.day <= 5)}
               />
-              {canEdit && (
-                <Button
-                  size="sm"
-                  disabled={!poDirty || poDays.length === 0 || savingPoDays}
-                  onClick={onSavePoDays}
-                  data-testid="po-days-save"
-                >
-                  Save
-                </Button>
-              )}
+
             </div>
           </div>
         </div>
@@ -1201,6 +1186,15 @@ function PoWindowsSection({
                 onChange={(e) => patch({ first: e.target.value })}
               />
               <div className="flex flex-col gap-2">
+                {/* The switch sits on the second window it governs, above its
+                    time: decide whether there IS one, then give it a time. */}
+                <Checkbox
+                  id="po-window-second-on"
+                  label="Use a second PO window"
+                  checked={current.secondEnabled}
+                  disabled={!canEdit}
+                  onCheckedChange={(on) => patch({ secondEnabled: on, second: current.second || (saved.second ?? "16:00") })}
+                />
                 <Input
                   id="po-window-second"
                   type="time"
@@ -1210,34 +1204,38 @@ function PoWindowsSection({
                   disabled={!canEdit || !current.secondEnabled}
                   onChange={(e) => patch({ second: e.target.value })}
                 />
-                <Checkbox
-                  id="po-window-second-on"
-                  label="Use a second PO window"
-                  checked={current.secondEnabled}
-                  disabled={!canEdit}
-                  onCheckedChange={(on) => patch({ secondEnabled: on, second: current.second || (saved.second ?? "16:00") })}
-                />
               </div>
             </div>
             <ChangeLine settings={settings} settingKey="po_windows" />
             {canEdit && (
               <div className="mt-3 flex items-center gap-3">
+                {/* ONE Save for the card: it stores whichever of the two facts
+                    moved, PO Days first, each through its own audited door. */}
                 <Button
                   size="sm"
-                  disabled={!dirty || problem != null || setWindows.isPending}
-                  onClick={() =>
-                    setWindows
-                      .mutateAsync({
-                        first: current.first,
-                        second: current.second === "" ? null : current.second,
-                        secondEnabled: current.secondEnabled,
-                      })
-                      .then(() => {
-                        setDraft(null);
-                        toast.success("Saved");
-                      })
-                      .catch(onFail)
+                  disabled={
+                    (!dirty && !poDirty) ||
+                    (dirty && problem != null) ||
+                    (poDirty && poDays.length === 0) ||
+                    setWindows.isPending ||
+                    savingPoDays
                   }
+                  onClick={async () => {
+                    try {
+                      if (poDirty) await onSavePoDays();
+                      if (dirty) {
+                        await setWindows.mutateAsync({
+                          first: current.first,
+                          second: current.second === "" ? null : current.second,
+                          secondEnabled: current.secondEnabled,
+                        });
+                        setDraft(null);
+                      }
+                      toast.success("Saved");
+                    } catch (e) {
+                      onFail(e);
+                    }
+                  }}
                   data-testid="po-windows-save"
                 >
                   Save
