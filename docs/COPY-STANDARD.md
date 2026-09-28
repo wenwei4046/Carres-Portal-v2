@@ -4444,6 +4444,8 @@ matched payments to add up to the day's Sales total, and no matched payment may 
   `Approve day: Recorded in Carres is {RM} short` · `Approve day: Recorded in Carres is {RM} over`.
   A day with a sale not matched keeps the approved line `{n} sales are not matched yet. Match every
   sale before you approve the day.`
+- A matched day with a voided payment, or whose Recorded in Carres does not add up, keeps the
+  status `To check` and counts in `{n} to check` (no new word).
 - Matched row whose payment was voided since, in red:
   `{matched word} · Payment voided · {RM} · {date} · {receipt} · SO-{n} · Approval code {typed}`
 - Refusals (database): `A matched payment on this day was voided. Take off its match before you

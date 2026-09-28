@@ -275,6 +275,8 @@ describe("Card settlement", () => {
     const over = day({ group_key: "900000000064 / 90000064", row_count: 3, matched_count: 3, recorded: 425.5 });
     net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [short, over], rows: [] };
     show();
+    // a day that cannot be approved is a day to check, not "Matched"
+    expect(await screen.findByTestId("card-settlement-summary")).toHaveTextContent("2 days · 2 to check");
     for (const title of await screen.findAllByTitle("Check the sales")) fireEvent.click(title);
 
     const a = await screen.findByTestId("card-day-PBB|2026-09-18|900000000063 / 90000063");
@@ -297,6 +299,7 @@ describe("Card settlement", () => {
       payments: [{ ...REVIEW.payments[0]!, voided: true }],
     };
     show();
+    expect(await screen.findByTestId("card-settlement-summary")).toHaveTextContent("1 day · 1 to check");
     fireEvent.click((await screen.findAllByTitle("Check the sales"))[0]!);
     const pbb = await screen.findByTestId("card-day-PBB|2026-09-18|900000000001 / 90000001");
     expect(within(pbb).getByTestId("card-row-2")).toHaveTextContent("Matched by approval code · Payment voided · RM 100.00");

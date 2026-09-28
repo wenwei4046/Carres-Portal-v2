@@ -66,7 +66,8 @@ const suggestionWord = (how: CardSuggestionHow, days: number) =>
 function dayStatus(d: CardSettlementDay) {
   if (d.payout_status === "approved") return { word: "Payout approved", tone: "success" as const };
   if (d.payout_status === "prepared") return { word: "Payout prepared", tone: "info" as const };
-  if (d.matched_count < d.row_count) return { word: "To check", tone: "warning" as const };
+  // 0595: a matched day with a voided payment or a gap in Recorded in Carres is still to check
+  if (d.matched_count < d.row_count || d.voided_count > 0 || dayRecordedGap(d) !== 0) return { word: "To check", tone: "warning" as const };
   return { word: "Matched", tone: "neutral" as const };
 }
 
@@ -259,7 +260,7 @@ export default function CardSettlementPage() {
             }}
             statusSummary={(visible) => (
               <span data-testid="card-settlement-summary">
-                {visible.length} {visible.length === 1 ? "day" : "days"} · {visible.filter((d) => d.matched_count < d.row_count).length} to check
+                {visible.length} {visible.length === 1 ? "day" : "days"} · {visible.filter((d) => dayStatus(d).word === "To check").length} to check
               </span>
             )}
           />
