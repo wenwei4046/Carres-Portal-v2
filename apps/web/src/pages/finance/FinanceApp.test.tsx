@@ -173,7 +173,7 @@ describe("Finance routing", () => {
     expect(screen.queryByTestId("finance-settings-destination-header")).not.toBeInTheDocument();
     auth.role = "finance";
   });
-  it("the principal keeps Invite dealer, Suspend and Reactivate on /finance/dealers; Finance does not (0543)", () => {
+  it("the principal keeps Invite dealer on /finance/dealers; Finance does not (0543)", () => {
     show("/finance/dealers");
     expect(screen.getByTestId("dealers-page")).toHaveTextContent("finance view");
     cleanup();

@@ -629,22 +629,59 @@ describe("0543 — finance keeps the dealer master", () => {
     expect(body.message).not.toContain("dealers_code_unique");
   });
 
-  it("finance cannot invite a dealer or change its status", async () => {
+  it("finance cannot invite a dealer", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("finance");
-    for (const path of ["invite", `${DEALER_ID}/status`]) {
-      const res = await app.fetch(
-        new Request(`http://t/api/principal/dealers/${path}`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "suspended", name: "X Y", region: "R", contact: "c" }),
-        }),
-        env,
-      );
-      expect(res.status).toBe(403);
+    const res = await app.fetch(
+      new Request("http://t/api/principal/dealers/invite", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "X Y", region: "R", contact: "c" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("0593 — finance may suspend and reactivate a dealer (YH, 28 Sep)", () => {
+  async function postStatus(role: string, status: string) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}/status`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      }),
+      env,
+    );
+  }
+
+  it("finance suspends and reactivates through dealer_set_status", async () => {
+    for (const status of ["suspended", "active"]) {
+      const { sb, rpcCalls } = buildSb({
+        rpcResults: { dealer_set_status: { data: { id: DEALER_ID, status } } },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await postStatus("finance", status);
+      expect(res.status).toBe(200);
+      expect(rpcCalls[0]).toEqual({
+        name: "dealer_set_status",
+        args: { p_dealer_id: DEALER_ID, p_new_status: status, p_reason: null },
+      });
     }
+  });
+
+  it("operation is refused before the database is asked", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const res = await postStatus("operation", "suspended");
+    expect(res.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
 });

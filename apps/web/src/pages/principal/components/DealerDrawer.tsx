@@ -47,11 +47,9 @@ import DealerStatusPill from "./DealerStatusPill";
 interface Props {
   dealerId: string;
   onClose: () => void;
-  /** 0543 — false under Finance: suspend / reactivate stay principal-only. */
-  canSetStatus?: boolean;
 }
 
-export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }: Props) {
+export default function DealerDrawer({ dealerId, onClose }: Props) {
   const { data, isLoading } = usePrincipalDealer(dealerId);
   const setStatus = useDealerSetStatus(dealerId);
   const update = useUpdateDealer(dealerId);
@@ -377,7 +375,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
           </div>
         </div>
 
-        {canSetStatus && (
+        {/* 0593 (YH, 28 Sep) — principal and Finance both suspend / reactivate. */}
         <div className="pt-[18px] border-t border-base-100 flex gap-2">
           {dealer.status === "active" && (
             <button
@@ -411,7 +409,6 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
             </div>
           )}
         </div>
-        )}
       </div>
     </div>
   );

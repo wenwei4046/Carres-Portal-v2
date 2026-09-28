@@ -115,9 +115,9 @@ export default function FinanceApp() {
           <Route path="money-moves" element={financeOnly(<MoneyMovesPage />)} />
           {/* 0572 — card settlement files matched to the recorded card payments. */}
           <Route path="card-settlement" element={financeOnly(<CardSettlementPage />)} />
-          {/* The principal also reaches this page from the Finance rail, and
-              keeps Invite dealer, Suspend and Reactivate here (0543: those
-              stay principal-only, not off for everyone on this address). */}
+          {/* The principal also reaches this page from the Finance rail and
+              keeps Invite dealer here: inviting stays principal-only (0543),
+              not off for everyone on this address. */}
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />

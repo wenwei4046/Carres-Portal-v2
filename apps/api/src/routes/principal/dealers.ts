@@ -21,7 +21,7 @@ import type { AppEnv } from "../../types";
  *   client-side from embedded `order_lines/order_addons` (no extra RPC).
  *
  * POST /invite — idempotent dealer creation + new_dealer approval.
- * POST /:id/status — suspend/reactivate (active|suspended only).
+ * POST /:id/status — suspend/reactivate (active|suspended only). Principal or finance (0593).
  *
  * Error contract mirrors approvals.ts: SQLSTATE → HTTP status with stable
  * `code` in the body the frontend can branch on. Shared mapPgError +
@@ -30,10 +30,12 @@ import type { AppEnv } from "../../types";
 const principalDealersRouter = new Hono<AppEnv>();
 
 // 0543 — Finance may view the list and detail and edit the master fields
-// (PATCH). Inviting a dealer and changing its status stay principal-only.
+// (PATCH). 0593 (YH, 28 Sep) — Finance may also suspend and reactivate a
+// dealer (POST /:id/status). Inviting a dealer stays principal-only.
 principalDealersRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  const financeMayUse = role === "finance" && c.req.method !== "POST";
+  const financeMayUse =
+    role === "finance" && (c.req.method !== "POST" || /\/dealers\/[^/]+\/status$/.test(c.req.path));
   if (role !== "principal" && !financeMayUse) {
     throw new HTTPException(403, { message: "Principal only" });
   }

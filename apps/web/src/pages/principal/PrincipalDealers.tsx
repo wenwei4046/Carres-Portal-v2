@@ -35,8 +35,9 @@ import InviteDealerModal from "./components/InviteDealerModal";
 type StatusFilter = "all" | "active" | "pending" | "suspended" | "rejected";
 
 // 0543 — `financeView`: the same list mounted under Finance. Finance edits
-// the master fields of existing dealers; inviting and suspending stay with
-// the principal, so the create button and the status actions are hidden.
+// the master fields of existing dealers, and (0593, YH 28 Sep) suspends and
+// reactivates them in the drawer. Inviting stays with the principal, so the
+// create button is hidden.
 export default function PrincipalDealers({
   channel,
   financeView = false,
@@ -218,11 +219,7 @@ export default function PrincipalDealers({
       )}
 
       {openId && (
-        <DealerDrawer
-          dealerId={openId}
-          onClose={() => setOpenId(null)}
-          canSetStatus={!financeView}
-        />
+        <DealerDrawer dealerId={openId} onClose={() => setOpenId(null)} />
       )}
       {/* Dealer page only — the showroom CTA navigates to Accounts instead. */}
       {showInvite && (
