@@ -215,16 +215,16 @@ export default function OperationServiceCases() {
                         {r.caseTypeLabel}
                       </span>
                     ) : (
-                      <span className="text-base-400 text-meta">—</span>
+                      null
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-base-900 text-body">{r.customerName || "—"}</div>
+                    <div className="text-base-900 text-body">{r.customerName || ""}</div>
                     {r.refNo && <div className="text-meta text-base-500 font-mono">{r.refNo}</div>}
                   </td>
                   <td className="px-3 py-2 max-w-xs">
                     <p className="text-body text-base-700 line-clamp-2">
-                      {r.whatHappened || <span className="text-base-400">—</span>}
+                      {r.whatHappened || null}
                     </p>
                   </td>
                   <td className="px-3 py-2 max-w-[15rem]">
@@ -326,7 +326,7 @@ function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock })
  * count on a finished case would be a number nobody can act on.
  */
 function DeadlineCell({ clock }: { clock: CaseSlaClock }) {
-  if (!clock.dueIso) return <span className="text-base-400 text-meta">—</span>;
+  if (!clock.dueIso) return null;
   const count = caseSlaCountLabel(clock);
 
   return (
@@ -352,7 +352,7 @@ function DeadlineCell({ clock }: { clock: CaseSlaClock }) {
  *  the edit modal, which asks no usability question) has none, and says so
  *  rather than inventing a middle value. */
 function PriorityCell({ priority }: { priority: CasePriority | null }) {
-  if (!priority) return <span className="text-base-400 text-meta">—</span>;
+  if (!priority) return null;
   if (priority === "high") {
     return (
       <span className="inline-flex items-center gap-1.5">

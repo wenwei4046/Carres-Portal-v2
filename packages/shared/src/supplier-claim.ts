@@ -69,7 +69,7 @@ export const SUPPLIER_CLAIM_TYPE_KEYS = SUPPLIER_CLAIM_TYPES.map((t) => t.key) a
 ];
 
 export function supplierClaimTypeLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return SUPPLIER_CLAIM_TYPES.find((t) => t.key === key)?.label ?? key;
 }
 
@@ -132,7 +132,7 @@ export const SUPPLIER_CLAIM_STATUSES = [
 ] as const satisfies readonly CaseOption<SupplierClaimStatus>[];
 
 export function supplierClaimStatusLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return SUPPLIER_CLAIM_STATUSES.find((s) => s.key === key)?.label ?? key;
 }
 
@@ -193,7 +193,7 @@ export const SUPPLIER_CLAIM_REQUEST_KEYS = SUPPLIER_CLAIM_REQUESTS.map((r) => r.
 ];
 
 export function supplierClaimRequestLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return SUPPLIER_CLAIM_REQUESTS.find((r) => r.key === key)?.label ?? key;
 }
 
@@ -223,7 +223,7 @@ export const SUPPLIER_CLAIM_RESPONSE_KEYS = SUPPLIER_CLAIM_RESPONSES.map((r) => 
 ];
 
 export function supplierClaimResponseLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return SUPPLIER_CLAIM_RESPONSES.find((r) => r.key === key)?.label ?? key;
 }
 
@@ -342,7 +342,7 @@ export const CUSTOMER_RESOLUTION_KEYS = CUSTOMER_RESOLUTIONS.map((r) => r.key) a
 ];
 
 export function customerResolutionLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return CUSTOMER_RESOLUTIONS.find((r) => r.key === key)?.label ?? key;
 }
 
@@ -450,7 +450,7 @@ export const CARRES_EXECUTION_KEYS = CARRES_EXECUTIONS.map((e) => e.key) as [
 ];
 
 export function carresExecutionLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return CARRES_EXECUTIONS.find((e) => e.key === key)?.label ?? key;
 }
 
@@ -614,7 +614,7 @@ export function claimMoveOwnerLabel(
   owner: SupplierClaimMoveOwner | null,
   supplierName?: string | null,
 ): string {
-  if (owner === null) return "—";
+  if (owner === null) return "";
   return owner === "carres" ? "Carres" : party(supplierName);
 }
 

@@ -26,7 +26,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(itemsBlock(multi)).toBe(
       "2× Lumi FirmCare-L1201F-K\n3× Essential Memory Pillow(L)",
     );
-    expect(itemsBlock([])).toBe("—");
+    expect(itemsBlock([])).toBe("");
   });
 
   it("rmAmount — thousands-separated, no prefix", () => {

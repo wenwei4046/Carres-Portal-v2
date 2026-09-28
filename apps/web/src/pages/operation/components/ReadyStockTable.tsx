@@ -242,7 +242,7 @@ export default function ReadyStockTable({
                           onChange={() => selection.onToggle(u.itemId)}
                         />
                       ) : (
-                        <Absence>—</Absence>
+                        null
                       )}
                     </td>
                   ) : null}
@@ -280,7 +280,7 @@ export default function ReadyStockTable({
                     <SecondLine>
                       {/* 0453: a counted row's key is not a Unit ID and never
                           prints as one — what the goods ARE takes its place. */}
-                      {u.identityScope === "unit" && u.unitCode ? u.unitCode : (blocked ?? "—")}
+                      {u.identityScope === "unit" && u.unitCode ? u.unitCode : (blocked ?? "")}
                     </SecondLine>
                     {/* ⭐ AND A ROW THAT LOST ITS CHECKBOX SAYS WHY. The approved
                         six columns hold no `why` column, and a Unit that cannot
@@ -384,7 +384,7 @@ export default function ReadyStockTable({
                         onChange={() => selection.onToggle(u.itemId)}
                       />
                     ) : (
-                      <Absence>—</Absence>
+                      null
                     )}
                   </td>
                 ) : null}
@@ -396,7 +396,7 @@ export default function ReadyStockTable({
                   {u.identityScope === "unit" && u.unitCode ? (
                     u.unitCode
                   ) : (
-                    <Absence>—</Absence>
+                    null
                   )}
                 </td>
                 <td className="px-2">

@@ -34,7 +34,7 @@ export function useSkuFilter(catalog: CatalogResponse) {
         sku,
         model,
         category: model?.category,
-        productName: model?.name ?? "—",
+        productName: model?.name ?? "",
       };
     });
   }, [catalog.models, catalog.skus]);

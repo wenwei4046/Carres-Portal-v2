@@ -3451,17 +3451,12 @@ row, no dash for tax and no "tax included / excluded" claim appears.
 ## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
 
 **⭐ NO DASH ANYWHERE ON A SCREEN — OWNER RULING 2026-09-26 (Jess: *"i don't want UI got dash — this bad
-UI"*), portal-wide, APPROVED TARGET / NOT BUILT.** A dash (`—` or `–`) never stands for a value, an
+UI"*), portal-wide, VALUES AND RANGES BUILT 2026-09-28 (Orders MASTER §0.0 Scope D).** A dash (`—` or `–`) never stands for a value, an
 empty cell, an unknown or a placeholder, on any page, in any register, table, card, route node,
 PDF or prepared message. An empty cell draws nothing (UI MASTER §6.0); a missing fact prints its
 word (`Not recorded`, `No PO yet`, `No {field word}`); a fact that is zero prints `0` / `RM 0.00`;
-a control's placeholder is its label's word. **Measured 2026-09-26: 154 source files in `apps/web`
-and `packages/shared` still print a dash as a value** — the register engine's empty cell
-(`DataGrid.tsx:2580, :2592`) and its filter placeholders (`:3536, :3552`), `fmt-date.ts` fallbacks,
-every PDF template's empty cell (`do-template`, `po-template`, `invoice-template`,
-`pickup-event-template`, `extension-agreement-template`), the WhatsApp templates' `REF: —`, the
-Guarantee strip, and page-local literals such as the Sales Order Items `Disc (RM)` cell. The sweep
-is one BUILD scope across the portal, not per module. Punctuation inside an owner-approved sentence
+a control's placeholder is its label's word; a prepared message leaves out a line whose value is
+missing; a range reads `to` (`Mon to Fri`, `09:00 to 17:00`). Punctuation inside an owner-approved sentence
 (`Reconstructed copy — original issued document unavailable.`) is a sentence, not a value, and is
 untouched.
 

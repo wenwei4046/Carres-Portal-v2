@@ -667,8 +667,8 @@ describe("payables words and sums", () => {
   it("never shows a raw value or a fake zero", () => {
     expect(word(VOUCHER_STATUS_WORD, "approved")).toBe("Approved");
     expect(word(VOUCHER_STATUS_WORD, "released")).toBe("Not known");
-    expect(money(null)).toBe("—");
-    expect(money("abc")).toBe("—");
+    expect(money(null)).toBe("");
+    expect(money("abc")).toBe("");
     expect(priceDiffWord(-2.5)).toBe("RM 2.50 below PO price");
     expect(priceDiffWord(null)).toBe("No PO price");
     expect(refusal({ body: { code: "not_finance_approver" }, message: "x" })).toBe("Only a finance approver can do this.");

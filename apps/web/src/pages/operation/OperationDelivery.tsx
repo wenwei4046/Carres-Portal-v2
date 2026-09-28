@@ -1561,7 +1561,7 @@ export default function OperationDelivery() {
       ? fmtDate(selectedDate)
       : calendarView === "month"
         ? fmtMonth(selectedDate.slice(0, 7))
-        : `${fmtDate(visibleDays[0]!)} – ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
+        : `${fmtDate(visibleDays[0]!)} to ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
 
   /* Previous/next REPLACES the whole displayed window: one operating day in
      Day, the three-day half-week on a tablet, the whole operating week on the

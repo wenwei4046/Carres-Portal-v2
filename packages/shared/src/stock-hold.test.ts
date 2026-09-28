@@ -86,7 +86,7 @@ describe("R4 · which statuses can be sold", () => {
 
   it("an unknown status prints itself rather than a blank", () => {
     expect(opsStockStatusLabel("brand_new_thing")).toBe("brand_new_thing");
-    expect(opsStockStatusLabel(null)).toBe("—");
+    expect(opsStockStatusLabel(null)).toBe("");
   });
 });
 
@@ -101,7 +101,7 @@ describe("R4 · why a unit is held", () => {
   it("labels are words, not keys", () => {
     expect(stockHoldReasonLabel("damaged")).toBe("Arrived damaged");
     expect(stockHoldReasonLabel("wrong_item")).toBe("Wrong item");
-    expect(stockHoldReasonLabel(null)).toBe("—");
+    expect(stockHoldReasonLabel(null)).toBe("");
   });
 });
 
@@ -136,7 +136,7 @@ describe("R4 · how a hold ends", () => {
     for (const o of STOCK_HOLD_OUTCOMES) {
       expect(stockHoldOutcomeLabel(o.key)).toBe(o.label);
     }
-    expect(stockHoldOutcomeLabel(null)).toBe("—");
+    expect(stockHoldOutcomeLabel(null)).toBe("");
   });
 });
 

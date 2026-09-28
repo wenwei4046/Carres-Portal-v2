@@ -609,7 +609,7 @@ const SkuRowView = memo(function SkuRowView({
   const descriptionCell = inlineEdit ? (
     <input
       defaultValue={sku.description ?? ""}
-      placeholder="—"
+      placeholder=""
       onBlur={(e) => commitDescription(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -619,7 +619,7 @@ const SkuRowView = memo(function SkuRowView({
     />
   ) : (
     <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
-      {sku.description || <span className="text-base-400">—</span>}
+      {sku.description || null}
     </div>
   );
 
@@ -767,7 +767,7 @@ const SkuRowView = memo(function SkuRowView({
           </select>
         ) : (
           <div className="text-meta text-base-600">
-            {category ? CATEGORY_LABEL[category] : "—"}
+            {category ? CATEGORY_LABEL[category] : ""}
           </div>
         )}
         {inlineEdit ? (
@@ -810,7 +810,7 @@ const SkuRowView = memo(function SkuRowView({
             className={`${INPUT_CLS} text-body text-meta w-full min-w-0`}
           />
         ) : (
-          <div className="text-body text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
+          <div className="text-body text-base-700">{sizeless ? "" : sku.variant || ""}</div>
         ))}
 
       {/* Price */}
@@ -843,7 +843,7 @@ const SkuRowView = memo(function SkuRowView({
             min={0.01}
             step="0.01"
             defaultValue={sku.pwpPrice ? String(sku.pwpPrice) : ""}
-            placeholder="—"
+            placeholder=""
             onBlur={(e) => commitPwpPrice(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -867,7 +867,7 @@ const SkuRowView = memo(function SkuRowView({
       {/* Margin */}
       <div className="text-right" data-testid={`sku-margin-${sku.sku}`}>
         {margin === null ? (
-          <span className="text-meta text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
+          null
         ) : (
           <span
             className={`t-num text-meta ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
@@ -961,7 +961,7 @@ function CompartmentSizeCells({
                 min={0}
                 step="0.01"
                 value={draft[s] ?? ""}
-                placeholder={sku.price > 0 ? String(sku.price) : "—"}
+                placeholder={sku.price > 0 ? String(sku.price) : ""}
                 onChange={(e) => setDraft((d) => ({ ...d, [s]: e.target.value }))}
                 onBlur={commit}
                 onKeyDown={(e) => {
@@ -980,7 +980,7 @@ function CompartmentSizeCells({
                 ({fmtRm(sku.price)})
               </span>
             ) : (
-              <span className="text-meta text-base-400 italic">—</span>
+              null
             )}
           </div>
         );

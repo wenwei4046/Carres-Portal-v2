@@ -12,7 +12,7 @@
  * Owner rulings folded in (this chat, 2026-08-09):
  * - Venue and Status never print (status removed 2026-05-22 stays removed).
  * - Discount column and Expected deposit STAY on the layout, data-driven —
- *   no schema field carries either today, so they print "—" / not at all
+ *   no schema field carries either today, so they print nothing
  *   until the portal sends figures.
  * - The SO does not talk tax: no Tax row, no "incl. SST" claim — the totals
  *   are "Items total / Paid to date / BALANCE DUE". The invoice owns SST.
@@ -477,7 +477,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
      never a figure the reader cannot check. */
   const hasAddons = addons.length > 0;
 
-  const dash = "—";
   const money = (v: number) => formatMoney(v, currency);
 
   // The table's own footer sums the rows it printed (round 24).
@@ -560,7 +559,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             </View>
             <View style={[styles.bDisc, styles.gridV]}>
               <Text style={[styles.cellMoney, styles.colDisc]}>
-                {line.discount && line.discount > 0 ? moneyDigits(line.discount) : dash}
+                {moneyDigits(line.discount && line.discount > 0 ? line.discount : 0)}
               </Text>
             </View>
             <View style={[styles.bAmount, styles.gridV]}>
@@ -601,7 +600,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <View style={[styles.bPrice, styles.gridV]}>
               <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(a.unit_price)}</Text>
             </View>
-            <View style={[styles.bDisc, styles.gridV]}><Text style={[styles.cellMoney, styles.colDisc]}>{dash}</Text></View>
+            <View style={[styles.bDisc, styles.gridV]}><Text style={[styles.cellMoney, styles.colDisc]}>{moneyDigits(0)}</Text></View>
             <View style={[styles.bAmount, styles.gridV]}>
               <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(a.line_total)}</Text>
             </View>
@@ -822,7 +821,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <View style={[styles.bPrice, styles.gridV]}><Text style={[styles.cellMoney, styles.colPrice]}> </Text></View>
           <View style={[styles.bDisc, styles.gridV]}>
             <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
-              {totalDiscount > 0 ? money(totalDiscount) : dash}
+              {money(totalDiscount > 0 ? totalDiscount : 0)}
             </Text>
           </View>
           <View style={[styles.bAmount, styles.gridV]}><Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text></View>
@@ -871,10 +870,10 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             {payments.map((p, i) => (
               <View key={i} style={[styles.row, styles.rowHair]}>
                 <ColumnRules xs={PAY_RULE_X} />
-                <View style={styles.bDate}><Text style={styles.payCell}>{p.date ? (niceDate(p.date) ?? p.date) : dash}</Text></View>
+                <View style={styles.bDate}><Text style={styles.payCell}>{p.date ? (niceDate(p.date) ?? p.date) : " "}</Text></View>
                 <View style={[styles.bMethod, styles.gridV]}><Text style={styles.payCell}>{p.label}</Text></View>
-                <View style={[styles.bApproval, styles.gridV]}><Text style={styles.payCell}>{p.approval_code ?? p.reference ?? dash}</Text></View>
-                <View style={[styles.bBy, styles.gridV]}><Text style={styles.payCell}>{p.collected_by ?? dash}</Text></View>
+                <View style={[styles.bApproval, styles.gridV]}><Text style={styles.payCell}>{p.approval_code ?? p.reference ?? " "}</Text></View>
+                <View style={[styles.bBy, styles.gridV]}><Text style={styles.payCell}>{p.collected_by ?? " "}</Text></View>
                 <View style={[styles.bPayAmt, styles.gridV]}><Text style={[styles.payCell, styles.payColAmount, { fontWeight: 600 }]}>{moneyDigits(p.amount)}</Text></View>
               </View>
             ))}

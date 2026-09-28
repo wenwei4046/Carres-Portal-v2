@@ -432,7 +432,7 @@ describe("SofaConfigurePage", () => {
 
   it("Customize header LIVE total shows a placeholder while the canvas is empty", () => {
     renderPage({ combos: [] }); // straight onto an empty Customize canvas
-    expect(screen.getByTestId("sofa-cust-total").textContent).toContain("—");
+    expect(screen.getByTestId("sofa-cust-total").textContent).not.toMatch(/[—–]/);
   });
 
   it("Create combo: the button is hidden for a non-principal in Customize", () => {

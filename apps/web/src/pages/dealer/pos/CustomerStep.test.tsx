@@ -214,8 +214,8 @@ describe("CustomerStep — 2990s Image-#4 parity", () => {
     expect(screen.getByTestId("pos-customer-race")).toBeTruthy();
     expect(screen.getByTestId("pos-customer-gender")).toBeTruthy();
     expect(screen.getByTestId("pos-customer-birthday")).toBeTruthy();
-    // Probe idle (no phone) → em-dash placeholder.
-    expect((screen.getByTestId("pos-customer-type") as HTMLInputElement).value).toBe("—");
+    // Probe idle (no phone) → empty, never a dash.
+    expect((screen.getByTestId("pos-customer-type") as HTMLInputElement).value).toBe("");
     expect(screen.getByTestId("pos-order-summary")).toBeTruthy();
     expect(screen.getByText(/Phase 1 of 2/i)).toBeTruthy();
   });

@@ -548,7 +548,7 @@ export function StorageExtensionRow({
         ? `${reasonLabel} — ${control.extension_note}`
         : reasonLabel;
       const blob = await renderExtensionAgreementPdf({
-        order_code: meta?.orderCode ?? "—",
+        order_code: meta?.orderCode ?? "",
         issue_date: (control?.extension_acknowledged_at ?? control?.extended_at ?? "").slice(0, 10),
         customer: { name: meta?.customerName ?? "", phone: meta?.customerPhone ?? "" },
         original_date: control?.extension_original_date ?? "",
@@ -585,7 +585,7 @@ export function StorageExtensionRow({
           month: "short",
           year: "2-digit",
         })
-      : "—";
+      : "";
 
   // Already extended → readout. A principal can still record a further one.
   if (extended && !open) {

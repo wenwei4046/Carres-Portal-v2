@@ -205,7 +205,7 @@ export default function GuaranteeScopeFields({
                 <option value="">Pick a combo…</option>
                 {combos.map((cb) => (
                   <option key={cb.id} value={cb.id}>
-                    {cb.label ?? "Combo"} · {modelName(cb.modelId) ?? "—"}
+                    {cb.label ?? "Combo"} · {modelName(cb.modelId) ?? ""}
                   </option>
                 ))}
               </select>

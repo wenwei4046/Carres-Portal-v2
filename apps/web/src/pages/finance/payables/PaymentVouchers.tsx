@@ -765,7 +765,7 @@ function BillPicks({ rows, picks, onChange, billChecks }: {
                 <td className="py-1 pr-2">{b.due_date ? fmtDate(b.due_date) : "No due date"}</td>
                 <td className="py-1 pr-2 text-right">{money(b.total_amount)}</td>
                 <td className="py-1 pr-2 text-right">{money(b.available)}</td>
-                <td className="py-1 pr-2" data-testid={`price-check-${b.bill_id}`}>{billChecks[b.bill_id] ? priceCheckWord(billChecks[b.bill_id]!) : "—"}</td>
+                <td className="py-1 pr-2" data-testid={`price-check-${b.bill_id}`}>{billChecks[b.bill_id] ? priceCheckWord(billChecks[b.bill_id]!) : ""}</td>
                 <td className="py-1">
                   <input aria-label={`Amount for ${b.bill_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}

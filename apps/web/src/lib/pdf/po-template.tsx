@@ -419,7 +419,8 @@ export function PoTemplate(data: PoTemplateData) {
       if (a.fabric_name) bits.push(`Fabric ${a.fabric_name}`);
       const showVariant = line.description && line.description !== line.sku;
       /* COPY-STANDARD: an exact-unit line with no Unit IDs is a defect the
-         operator must see before sending; a quantity line's `—` is the law. */
+         operator must see before sending; a quantity line's Unit ID cell draws nothing
+         (no dash anywhere, owner ruling 2026-09-26). */
       const missingUnits = !draft && line.identity_mode === "exact_unit" && units.length === 0;
       const stacked = Math.max(so.length, runs.length, missingUnits ? 3 : 1, 1 + (bits.length > 0 ? 1 : 0));
       blocks.push({
@@ -435,7 +436,7 @@ export function PoTemplate(data: PoTemplateData) {
               {missingUnits ? (
                 <Text style={styles.unitWarn}>Unit IDs missing on this line — do not send this PO</Text>
               ) : runs.length === 0 ? (
-                <Text style={styles.cell}>—</Text>
+                <Text style={styles.cell}> </Text>
               ) : (
                 runs.map((r) => (
                   <Text key={r.first} style={styles.cell}>

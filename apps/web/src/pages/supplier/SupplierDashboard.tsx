@@ -230,7 +230,7 @@ export default function SupplierDashboard() {
               <div className="text-body font-semibold text-foreground">
                 {me.data.cat_covered.length > 0
                   ? me.data.cat_covered.join(" · ")
-                  : "—"}
+                  : ""}
               </div>
             </div>
             <div>
@@ -238,7 +238,7 @@ export default function SupplierDashboard() {
                 Lead time
               </div>
               <div className="text-body font-semibold text-foreground">
-                {me.data.lead_time ?? "—"}
+                {me.data.lead_time ?? ""}
               </div>
             </div>
             <div>
@@ -246,7 +246,7 @@ export default function SupplierDashboard() {
                 Contact
               </div>
               <div className="text-body text-foreground truncate">
-                {me.data.contact_email ?? me.data.contact ?? "—"}
+                {me.data.contact_email ?? me.data.contact ?? ""}
               </div>
             </div>
             <div className="text-right">

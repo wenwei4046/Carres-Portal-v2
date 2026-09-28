@@ -288,7 +288,7 @@ describe("buildPoReport — a line the catalog cannot place", () => {
     const r = buildPoReport(rows, {});
     expect(r.total.ordered).toBe(5);
     expect(r.total.pos).toBe(2);
-    expect(r.rows.find((x) => x.key === "")!.label).toBe("—");
+    expect(r.rows.find((x) => x.key === "")!.label).toBe("No category");
   });
 });
 
@@ -314,7 +314,7 @@ describe("the words", () => {
 
   it("the rail and the grid read ONE category spelling", () => {
     expect(poReportCategoryLabel("sofa")).toBe("Sofa");
-    expect(poReportCategoryLabel("")).toBe("—");
+    expect(poReportCategoryLabel("")).toBe("No category");
     const r = buildPoReport([{ ...line({ poId: "PO-1" }) }], {});
     expect(r.rows[0]!.label).toBe(poReportCategoryLabel("sofa"));
   });

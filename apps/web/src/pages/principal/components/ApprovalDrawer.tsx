@@ -153,7 +153,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
             <ApprovalStatusPill status={approval.status} />
           </div>
           <div className="text-base-500 text-label">By</div>
-          <div>{approval.actor ?? "—"}</div>
+          <div>{approval.actor ?? ""}</div>
           <div className="text-base-500 text-label">When</div>
           <div>{new Date(approval.created_at).toLocaleString()}</div>
           {approval.refers_to && (
@@ -184,7 +184,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
               Decision
             </div>
             <div className="text-body">
-              <strong>{approval.decided_by ?? "—"}</strong> ·{" "}
+              <strong>{approval.decided_by ?? ""}</strong> ·{" "}
               {new Date(approval.decided_at).toLocaleString()}
             </div>
             {approval.decision_note && (

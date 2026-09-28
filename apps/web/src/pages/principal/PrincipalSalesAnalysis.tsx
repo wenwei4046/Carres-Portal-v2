@@ -124,7 +124,7 @@ export default function PrincipalSalesAnalysis() {
             <Kpi label="Avg delivery fee" value={rm(kpis.avgDeliveryFee)} />
             <Kpi
               label="Gross margin"
-              value={kpis.grossMarginPct === null ? "—" : `${kpis.grossMarginPct.toFixed(1)}%`}
+              value={kpis.grossMarginPct === null ? "" : `${kpis.grossMarginPct.toFixed(1)}%`}
               hint={
                 kpis.grossMarginPct === null
                   ? "No orders with full costing yet"
@@ -210,7 +210,7 @@ export default function PrincipalSalesAnalysis() {
                     <td className="text-body py-2 text-right font-mono">{p.units}</td>
                     <td className="text-body py-2 text-right font-mono">{rm(p.revenue)}</td>
                     <td className="text-body py-2 text-right font-mono">
-                      {p.marginPct === null ? "—" : `${p.marginPct.toFixed(1)}%`}
+                      {p.marginPct === null ? "" : `${p.marginPct.toFixed(1)}%`}
                     </td>
                   </tr>
                 ))}

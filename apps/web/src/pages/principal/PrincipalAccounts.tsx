@@ -308,7 +308,7 @@ export function EmailChangeRequestsPanel() {
           >
             <div className="min-w-0 text-body">
               <div className="font-medium">
-                {r.dealerName ?? "—"}
+                {r.dealerName ?? ""}
                 <span className="ml-2 text-label text-muted-foreground font-normal">
                   by {r.requestedByName ?? "Store owner"} ·{" "}
                   {new Date(r.createdAt).toLocaleDateString("en-MY", {
@@ -422,13 +422,13 @@ function UserRow({ user }: { user: AccountRow }) {
           <div className="text-label text-base-500 mt-[3px]">{user.orgName}</div>
         )}
       </td>
-      <td className="px-4 py-2.5 text-base-700">{user.title || "—"}</td>
+      <td className="px-4 py-2.5 text-base-700">{user.title || ""}</td>
       <td className="px-4 py-2.5"><StatusPill status={user.status} /></td>
       <td className="px-4 py-2.5 font-mono text-label text-base-600">
-        {user.createdAt?.slice(0, 10) ?? "—"}
+        {user.createdAt?.slice(0, 10) ?? ""}
       </td>
       <td className="px-4 py-2.5 text-label text-base-500">
-        {user.lastSeenAt ? user.lastSeenAt.slice(0, 10) : "—"}
+        {user.lastSeenAt ? user.lastSeenAt.slice(0, 10) : ""}
       </td>
       <td className="px-4 py-2.5 text-right whitespace-nowrap">
         {canManageStaff && (

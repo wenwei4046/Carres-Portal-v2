@@ -374,14 +374,14 @@ export function DoTemplate(data: DoTemplateData) {
                     <Text style={styles.cellCode}>{line.sku}</Text>
                     {hasUnits ? (
                       <Text style={styles.cellUnit}>
-                        {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
+                        {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : " "}
                       </Text>
                     ) : null}
                     <View style={styles.desc}>
                       <Text style={styles.descMain}>{line.description}</Text>
                     </View>
                     <Text style={styles.cellPo}>
-                      {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
+                      {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : " "}
                     </Text>
                     <Text style={styles.cellQty}>
                       {line.qty}
@@ -429,7 +429,7 @@ export function DoTemplate(data: DoTemplateData) {
               <Text style={styles.cellCode}>{model}</Text>
               {hasUnits ? (
                 <Text style={styles.cellUnit}>
-                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || "—"}
+                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || " "}
                 </Text>
               ) : null}
               <View style={styles.desc}>
@@ -441,7 +441,7 @@ export function DoTemplate(data: DoTemplateData) {
                 ))}
               </View>
               <Text style={styles.cellPo}>
-                {[...new Set(modules.flatMap((m) => m.source_po ?? []))].join("\n") || "—"}
+                {[...new Set(modules.flatMap((m) => m.source_po ?? []))].join("\n") || " "}
               </Text>
               <Text style={styles.cellQty}>1</Text>
             </View>

@@ -312,7 +312,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
                   method === "cheque"
                     ? "Cheque number"
                     : method === "cash"
-                      ? "—"
+                      ? ""
                       : "Txn ID / last 4 digits"
                 }
                 className="w-full px-3 py-2.5 border border-base-300 rounded text-sm bg-white outline-none focus:border-primary"

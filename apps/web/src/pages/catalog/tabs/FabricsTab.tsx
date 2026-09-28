@@ -760,13 +760,13 @@ function FabricsPanel({
                 <CodeChip>{f.fabricCode}</CodeChip>
               </div>
               <div className="text-body text-base-700 truncate">
-                {f.series || <span className="text-base-300">—</span>}
+                {f.series || null}
               </div>
               <div className="text-body text-base-800 truncate" title={f.description ?? ""}>
-                {f.description || <span className="text-base-300">—</span>}
+                {f.description || null}
               </div>
               <div className="text-body text-base-700 truncate">
-                {f.supplierCode || <span className="text-base-300">—</span>}
+                {f.supplierCode || null}
               </div>
               <div data-testid={`fabric-sofa-tier-${f.fabricCode}`}>
                 {isPrincipal ? (
@@ -843,7 +843,7 @@ function FabricsPanel({
               <input
                 value={r.description}
                 onChange={(e) => patchRow(i, { description: e.target.value })}
-                placeholder="—"
+                placeholder=""
                 className={INPUT_CLS}
                 aria-label={`row ${i + 1} description`}
               />

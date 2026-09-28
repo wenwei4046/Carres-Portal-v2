@@ -108,7 +108,7 @@ export default function WarehouseMyReceipts() {
                 <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
                   {r.po_id}
                   <div className="font-normal text-label text-base-600 mt-0.5">
-                    {r.supplier_name ?? "—"}
+                    {r.supplier_name ?? ""}
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap font-mono text-meta">

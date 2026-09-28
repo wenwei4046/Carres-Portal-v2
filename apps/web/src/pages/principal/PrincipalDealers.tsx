@@ -180,7 +180,6 @@ export default function PrincipalDealers({
 
       {filtered.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500">
-          <div className="text-page mb-2 text-base-300">—</div>
           <div className="font-display text-strong">{t.empty}</div>
           <div className="text-meta mt-1">{t.emptyHint}</div>
         </div>

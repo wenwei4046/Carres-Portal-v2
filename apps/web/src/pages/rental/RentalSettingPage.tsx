@@ -381,7 +381,7 @@ function OfferRow({
       ? "no monthly price yet"
       : fees.length === 1 || Math.min(...fees) === Math.max(...fees)
         ? `${rm(fees[0]!)} / mo`
-        : `${rm(Math.min(...fees))}–${rm(Math.max(...fees))} / mo`;
+        : `${rm(Math.min(...fees))} to ${rm(Math.max(...fees))} / mo`;
 
   function toggleActive() {
     patch.mutate(
@@ -443,7 +443,7 @@ function OfferRow({
           <span className="text-meta text-base-400 ml-2">{model?.modelKey}</span>
         </div>
         <div className="text-meta text-base-500 truncate">
-          {model?.category ?? "—"}
+          {model?.category ?? ""}
           {offer.rentEnabled && ` · Rent ${feeLabel}`}
           {offer.rentEnabled && plans.length > 0 && (
             <>
@@ -750,7 +750,7 @@ function PackageRow({ pkg, isPrincipal }: { pkg: ServicePackage; isPrincipal: bo
         {pkg.visitsPerYear} / yr · {serviceVisitsTotal(pkg.durationMonths, pkg.visitsPerYear)} total
       </div>
       <div className="text-right t-num text-meta">{rm(pkg.price)}</div>
-      <div className="text-meta text-base-500 truncate">{pkg.sku ?? "—"}</div>
+      <div className="text-meta text-base-500 truncate">{pkg.sku ?? ""}</div>
       <div>
         {isPrincipal ? (
           <input

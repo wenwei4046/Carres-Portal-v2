@@ -280,11 +280,11 @@ function ProductAddonsPanel({
                 </div>
               </div>
               <span className="text-meta text-base-500 truncate">
-                {a.categories.map((c) => CATEGORY_LABEL[c as ProductCategory] ?? c).join(", ") || "—"}
+                {a.categories.map((c) => CATEGORY_LABEL[c as ProductCategory] ?? c).join(", ") || ""}
               </span>
               <span className="text-body text-right tabular-nums">{fmtRm(a.sellingPrice)}</span>
               <span className="text-meta text-right text-base-500">
-                {a.optionGroups.length === 0 ? "—" : `${a.optionGroups.length}`}
+                {a.optionGroups.length === 0 ? "" : `${a.optionGroups.length}`}
               </span>
               <span>
                 {a.active ? (

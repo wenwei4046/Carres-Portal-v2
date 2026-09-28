@@ -251,9 +251,8 @@ describe("OperationRental", () => {
     expect(
       within(screen.getByTestId("rental-tile-Units in rental")).getByText("1"),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("rental-tile-Visits due")).getByText("—"),
-    ).toBeInTheDocument();
+    // No tile for a figure the portal does not compute (no dash, owner ruling 2026-09-26).
+    expect(screen.queryByTestId("rental-tile-Visits due")).not.toBeInTheDocument();
   });
 
   it("shows the skeleton while either hook is pending", () => {

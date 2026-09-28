@@ -93,7 +93,7 @@ function PersonRow({
       </span>
 
       <span className="font-mono text-meta font-semibold text-base-600">
-        {p.staffCode ?? "—"}
+        {p.staffCode ?? ""}
       </span>
 
       <span className="min-w-0">

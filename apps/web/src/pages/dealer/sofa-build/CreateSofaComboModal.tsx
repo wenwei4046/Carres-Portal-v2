@@ -215,7 +215,7 @@ export default function CreateSofaComboModal({
                       inputMode="decimal"
                       value={rows[h]?.price ?? ""}
                       onChange={(e) => setCell(h, "price", e.target.value)}
-                      placeholder="—"
+                      placeholder=""
                       className="rounded-[6px] border border-base-300 bg-white px-2 py-1 t-small font-mono"
                       data-testid={`create-combo-price-${h}`}
                     />
@@ -223,7 +223,7 @@ export default function CreateSofaComboModal({
                       inputMode="decimal"
                       value={rows[h]?.pwp ?? ""}
                       onChange={(e) => setCell(h, "pwp", e.target.value)}
-                      placeholder="—"
+                      placeholder=""
                       className="rounded-[6px] border border-base-300 bg-white px-2 py-1 t-small font-mono"
                       data-testid={`create-combo-pwp-${h}`}
                     />

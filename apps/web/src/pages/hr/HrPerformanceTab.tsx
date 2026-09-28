@@ -114,7 +114,7 @@ function ScoreRow({
         )}
       </div>
       <div className="w-[52px] shrink-0 text-right text-strong font-semibold t-num">
-        {row.pct === null ? <span className="text-base-400">—</span> : `${row.pct}%`}
+        {row.pct === null ? null : `${row.pct}%`}
       </div>
       <div className="w-[86px] shrink-0 text-right">
         <span className={PILL[tone]}>{STATE_LABEL[row.state]}</span>
@@ -465,13 +465,13 @@ export default function HrPerformanceTab({
         />
         <StatTile
           label="Target"
-          value={s.totals.target === null ? "—" : fmt(kpiKey, s.totals.target)}
+          value={s.totals.target === null ? "" : fmt(kpiKey, s.totals.target)}
           sub={s.totals.target === null ? "no store target set" : `${s.stores.length} store`}
           muted={s.totals.target === null}
         />
         <StatTile
           label="Attainment"
-          value={s.totals.pct === null ? "—" : `${s.totals.pct}%`}
+          value={s.totals.pct === null ? "" : `${s.totals.pct}%`}
           sub={
             s.totals.target === null
               ? "set a target to see this"
@@ -568,7 +568,7 @@ export default function HrPerformanceTab({
                 {targetRows.map((t) => (
                   <tr key={t.id} className="hover:bg-hovertint">
                     <td className="px-2.5 h-11 text-body">
-                      {t.subjectName ?? "—"}
+                      {t.subjectName ?? ""}
                       {t.staffCode && (
                         <span className="text-meta text-base-400 t-num"> {t.staffCode}</span>
                       )}
@@ -581,7 +581,7 @@ export default function HrPerformanceTab({
                     </td>
                     <td className="px-2.5 h-11 text-body t-num">{t.effectiveFrom}</td>
                     <td className="px-2.5 h-11 text-body text-base-500">
-                      {t.setByName ?? "—"}
+                      {t.setByName ?? ""}
                     </td>
                   </tr>
                 ))}

@@ -444,7 +444,7 @@ function ReceiptQty({
   value: number | null | undefined;
   tone?: "issue" | "extra";
 }) {
-  if (value == null) return <Absence>—</Absence>;
+  if (value == null) return null;
   const ink =
     value > 0 && tone === "issue"
       ? "text-kit-red-11"
@@ -1019,30 +1019,30 @@ export default function GoodsMiniTable({
                   return line.status ? (
                     <span data-testid={`goods-status-${line.key}`}>{line.status}</span>
                   ) : (
-                    <Absence>—</Absence>
+                    null
                   );
                 case "fromStock":
                   /* THE PAGE DRAWS THIS CELL WHEN IT CAN ACT ON IT. Absent =
                      the plain figure, exactly as every other caller has it. */
                   if (line.fromStockNode != null) return line.fromStockNode;
                   return !line.fromStock ? (
-                    <Absence>—</Absence>
+                    null
                   ) : (
                     <span className="tabular-nums">{line.fromStock}</span>
                   );
                 case "orderBy":
-                  return <span className="tabular-nums">{line.orderBy ? fmtDate(line.orderBy) : line.orderByAbsence ?? "—"}</span>;
+                  return <span className="tabular-nums">{line.orderBy ? fmtDate(line.orderBy) : line.orderByAbsence ?? ""}</span>;
                 case "toBuy":
                   /* ⭐ A NUMBER ONLY WHERE THERE IS ONE TO ACT ON, and the note
                      belongs to BOTH branches (owner correction 2026-09-11).
                      The absence used to return early, so a row whose figure had
-                     deliberately been withheld printed a bare `—` with nothing
+                     deliberately been withheld printed a bare "" with nothing
                      saying why — which is the same silence the page spent this
                      whole card removing. */
                   return (
                     <span title={line.toBuyNoteWhy}>
                       {line.toBuy == null || line.toBuy <= 0 ? (
-                        <Absence>—</Absence>
+                        null
                       ) : (
                         <span className="tabular-nums font-medium">{line.toBuy}</span>
                       )}
@@ -1065,7 +1065,7 @@ export default function GoodsMiniTable({
                      orders are named once, in the read-only details table
                      below; a collection of them never sets this row's height. */
                   const qty = line.orderedQty ?? 0;
-                  if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? "—"}</Absence>;
+                  if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? ""}</Absence>;
                   return onOpenPoDetails ? (
                     <button
                       type="button"
@@ -1102,7 +1102,7 @@ export default function GoodsMiniTable({
                   return line.supplier ? (
                     line.supplier
                   ) : (
-                    <Absence>{line.supplierAbsence ?? "—"}</Absence>
+                    <Absence>{line.supplierAbsence ?? ""}</Absence>
                   );
                 case "poUnit":
                   /* ⭐ ONE IDENTITY, TWO LINES. The document first, at the
@@ -1118,7 +1118,7 @@ export default function GoodsMiniTable({
                       <span className="font-mono">
                         {line.poNos?.length
                           ? line.poNos.map((po) => <span key={po} className="block">{poLink(po)}</span>)
-                          : <Absence>{line.poNoAbsence ?? "—"}</Absence>}
+                          : <Absence>{line.poNoAbsence ?? ""}</Absence>}
                       </span>
                       <span className="font-mono text-meta text-kit-slate-11">
                         {line.unitNode != null ? line.unitNode : line.unitIds.length ? (
@@ -1139,7 +1139,7 @@ export default function GoodsMiniTable({
                   return line.poNos?.length ? (
                     line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
                   ) : (
-                    <Absence>{line.poNoAbsence ?? "—"}</Absence>
+                    <Absence>{line.poNoAbsence ?? ""}</Absence>
                   );
                 case "sourceUnit":
                   /* THE SOURCE NUMBER LEADS, the exact Units follow beneath
@@ -1151,7 +1151,7 @@ export default function GoodsMiniTable({
                       {line.sourceNo ? (
                         <div className="font-medium">{line.sourceNo}</div>
                       ) : (
-                        <Absence>{line.sourceNoAbsence ?? "—"}</Absence>
+                        <Absence>{line.sourceNoAbsence ?? ""}</Absence>
                       )}
                       {line.unitIds.length ? (
                         line.unitIds.map((id) => (
@@ -1178,7 +1178,7 @@ export default function GoodsMiniTable({
                   return line.poDeliveryDate ? (
                     line.poDeliveryDate
                   ) : (
-                    <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
+                    <Absence>{line.poDeliveryDateAbsence ?? ""}</Absence>
                   );
                 default:
                   return null;
@@ -1212,7 +1212,7 @@ export default function GoodsMiniTable({
                         onChange={() => selection.onToggle(line.key)}
                       />
                     ) : (
-                      <Absence>—</Absence>
+                      null
                     )}
                   </td>
                 ) : null}

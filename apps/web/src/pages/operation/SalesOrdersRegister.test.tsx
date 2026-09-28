@@ -976,7 +976,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(within(goods).queryByText("Not recorded")).toBeNull();
   });
 
-  it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {
+  it("draws nothing for Service Unit ID and routing, never a dash and never an invented non-applicable state", () => {
     listHookState.data = {
       orders: [order({ order_lines: [], order_addons: [{ addon_key: "disposal_service", qty: 1, unit_price: 0 }] })],
     };
@@ -984,7 +984,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(goods).not.toHaveTextContent("Not applicable");
-    expect(within(goods).getAllByText("—")).toHaveLength(2);
+    expect(goods).not.toHaveTextContent(/[—–]/);
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {

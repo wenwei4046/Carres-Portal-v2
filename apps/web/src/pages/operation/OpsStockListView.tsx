@@ -730,11 +730,11 @@ function RowItem({
   return (
     <tr className="border-t border-base-200 hover:bg-base-50">
       {/* Unit ID = the permanent Carres identity, `U1-000-001`. Counted goods
-          have none and print `—`: their row still needs a database key, but a
+          have none and print "": their row still needs a database key, but a
           key is not an identity and never appears here (0453). Grandfathered
           `id-…` codes print exactly as stored — they are on real labels. */}
       <td className="px-3 py-2 font-mono text-label text-base-900 whitespace-nowrap">
-        {unitIdOf(row) ?? <span className="text-base-400">—</span>}
+        {unitIdOf(row) ?? null}
       </td>
       <td className="px-3 py-2 font-mono text-base-700">
         {row.sku}
@@ -781,12 +781,12 @@ function RowItem({
           {opsStockStatusLabel(row.status)}
         </span>
       </td>
-      <td className="px-3 py-2 text-base-700">{row.reservedRef ?? "—"}</td>
+      <td className="px-3 py-2 text-base-700">{row.reservedRef ?? ""}</td>
       <td className="px-3 py-2 text-meta text-base-500">
-        {row.refHistory.length > 0 ? row.refHistory.join(", ") : "—"}
+        {row.refHistory.length > 0 ? row.refHistory.join(", ") : ""}
       </td>
-      <td className="px-3 py-2 text-meta text-base-600 font-mono">{row.poNo ?? "—"}</td>
-      <td className="px-3 py-2 text-meta text-base-500 font-mono">{row.sourceRef ?? "—"}</td>
+      <td className="px-3 py-2 text-meta text-base-600 font-mono">{row.poNo ?? ""}</td>
+      <td className="px-3 py-2 text-meta text-base-500 font-mono">{row.sourceRef ?? ""}</td>
       <td className="px-3 py-2 text-meta text-base-500">{fmtDate(row.dateIn)}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-wrap gap-1 justify-end items-center">

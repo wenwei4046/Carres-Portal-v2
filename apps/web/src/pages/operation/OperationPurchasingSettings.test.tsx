@@ -415,9 +415,9 @@ describe("P20.4 · a work week reads as days", () => {
     const { container } = render(wrap(<OperationPurchasingSettings />));
     const text = container.textContent ?? "";
     // `{0}` = off Sunday only → the factory works Monday to Saturday.
-    expect(text).toContain("was Mon–Sat");
+    expect(text).toContain("was Mon to Sat");
     // `{0,6}` = off Sunday and Saturday.
-    expect(text).toContain("was Mon–Fri");
+    expect(text).toContain("was Mon to Fri");
     // PO days stores the days the office SENDS, the other way round, and must
     // still read as days.
     expect(text).toContain("was Mon Wed Fri");
