@@ -221,7 +221,9 @@ production walk owed.** Each is a read-only fact filter: Delivery asks the one g
 committed unit sold; a service-only order is under All only); Date reads the chosen field (Proceed
 Date by default) with the engine's `Today` · `This week` · `This month`; a row clicked again is
 deselected; nothing carries between the two views.
-**Not built in F:** Export of the matrix; the Order list's `Obligations` and `Service Cases` groups
+**Monthly demand Export BUILT 2026-09-28:** the view's own Row 2 carries `Export` alone (no Search, no
+Columns) and writes the `By month` table as on screen (`Monthly demand {first} to {last} {date}.xlsx`;
+`Unavailable` stays a word). **Not built in F:** the Order list's `Obligations` and `Service Cases` groups
 (they need the server's completion and case facts per order, so the list does not guess them); a
 custom date range; search and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
 SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
