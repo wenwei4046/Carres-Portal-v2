@@ -943,6 +943,21 @@ route stops `Issue` · `Supplier received RO` · `Picked up` · `Returned` · `I
 `Damaged` · `Missing component` · `Something else` with `What did you see?` and
 `What happened, in one sentence`.
 
+**Repair Orders slice A build words — added 2026-09-28 with migration 0602 (Purchasing MASTER §9.7
+"Build state").** Block titles `Route` · `Current action` · `Repair order` · `Goods` · `Supplier reply` ·
+`Owner consent` · `History` (create page adds `Locations`). Header state `Not issued` · `Issued` ·
+`Cancelled`. Door buttons on the stops that open another owner: `Outbound` (the pickup, Stock) ·
+`Receiving` (the return inspection). Form labels `Channel` (`WhatsApp` · `Email` · `Print` · `Phone`) ·
+`Recipient` · `Note` · `Received at` · `Time` · `Reply reference` · `Reason` (the eight governed PO delay
+reasons, reused) · `Consent given` · `Consent refused` · `Cancel repair order` · `Add Units` · `Find Unit`
+· `Remove` · `Optional`. Refusal words on the Add Units row and from the create door: `Reserved for
+{SO No}` · `On {DO No}` · `Delivered` · `On {Claim No}` · `Not received` · `This Unit is on the road` ·
+`Waiting inspection` · `Already on {RO No}` · `Counted stock` · `Not in stock`. Empty and failure words:
+`Nothing to do for this Repair Order.` · `Repair Order not found` · `Units could not be loaded` ·
+`Search Repair Orders`. History titles: `Created` · `Repair order issued to {supplier}` · `Supplier
+received RO` · `Supplier reply` · `Owner consent` · `Picked up` · `Returned` · `Cancelled`.
+`Repair Quotation` prints `Recorded` or `Not recorded`; `Price` prints `RM {amount}` or `Not recorded`.
+
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 
 `Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom

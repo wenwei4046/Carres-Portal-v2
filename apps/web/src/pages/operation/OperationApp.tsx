@@ -59,6 +59,7 @@ import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
+import OperationRepairOrders from "./OperationRepairOrders";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 // Q3 (Loo, 2026-08-04) — Purchasing → Report: the "look at the numbers" layer.
 import OperationPurchasingReport from "./OperationPurchasingReport";
@@ -424,6 +425,8 @@ export default function OperationApp() {
              production walk, like every one before it; the test below now
              catches the whole CLASS instead of waiting for the next walk. */
           tab !== "purchase-returns" &&
+          /* §9.7 Repair Orders draws PurchasingTabs (its own ModuleHeader). */
+          tab !== "repair-orders" &&
           /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
              live rail destination that draws its own ModuleHeader and has been
              showing two top rows. The class test above found it the minute it
@@ -604,6 +607,7 @@ export default function OperationApp() {
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and
                 the RPCs refuse the write regardless. */}

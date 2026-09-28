@@ -120,13 +120,16 @@ function useOptions(
   claim: string | null = null,
   caseId: string | null = null,
   search = "",
+  ro: string | null = null,
 ) {
   const p = new URLSearchParams();
   if (claim) p.set("claim", claim);
   if (caseId) p.set("case", caseId);
+  // 0602: a repair pickup offers only its Repair Order's own Units.
+  if (ro) p.set("ro", ro);
   if (search) p.set("q", search);
   return useQuery({
-    queryKey: ["arrival-options", claim, caseId, search],
+    queryKey: ["arrival-options", claim, caseId, search, ro],
     queryFn: () =>
       apiFetch<Options>(`/api/operation/arrival-sources/options?${p}`),
   });
@@ -136,9 +139,11 @@ function CreateArrival() {
   const navigate = useNavigate();
   const kind = params.get("kind") ?? "transfer",
     claim = params.get("claim"),
-    caseId = params.get("case");
+    caseId = params.get("case"),
+    // 0602: `Hand {n} Units to {Supplier}` on a Repair Order opens here.
+    ro = params.get("ro");
   const [search, setSearch] = useState("");
-  const q = useOptions(claim, caseId, search);
+  const q = useOptions(claim, caseId, search, ro);
   const [selected, setSelected] = useState<Unit[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -169,7 +174,9 @@ function CreateArrival() {
     <div className="mx-auto max-w-4xl space-y-4">
       <Link
         to={
-          claim
+          ro
+            ? `/operation?tab=repair-orders&ro=${ro}`
+            : claim
             ? `/operation?tab=claims&claim=${claim}`
             : caseId
               ? `/operation?tab=service-notes&case=${caseId}`
@@ -202,8 +209,9 @@ function CreateArrival() {
             const p = arrivalSourceCreateInput.safeParse({
               id: key,
               kind,
-              claim_id: claim,
+              claim_id: ro ? null : claim,
               case_id: caseId,
+              ...(ro ? { repair_order_id: ro } : {}),
               ...(caseId
                 ? {
                     case_approval: {

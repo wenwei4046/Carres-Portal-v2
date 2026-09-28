@@ -4901,7 +4901,22 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. APPROVED TARGET / NOT BUILT.**
+**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. SLICE A BUILT ON BRANCH (see "Build state" below); the rest APPROVED TARGET / NOT BUILT.**
+
+#### Build state — slice A, 2026-09-28 (branch `build/repair-orders-foundation`; migration 0602 NOT APPLIED; not deployed)
+
+| Built on the branch | Where |
+|---|---|
+| `repair_orders` (RO No minted at CREATE through `allocate_formal_document_code('RO', id)`; RO Doc Date = KL business date, immutable; supplier, optional Claim, Cost Responsibility word, optional price where NULL is unknown, pickup and return Site, evidenced Supplier receipt with the snapshotted target, period and calendar, cancel facts) · `repair_order_units` (one exact Unit per row, problem from `unitProblemChoices`, sentence ≤300, Repair Requirement, evidence by path; a partial unique index is the "no duplicate active repair" rule) · append-only `repair_order_supplier_replies` and `repair_order_owner_consents` · `purchasing_settings.repair_return_working_days` (default 14). Internal read RLS, no write policy | `supabase/migrations/0602_…sql` |
+| Doors (operation/principal): `repair_order_create` (refuses BY NAME: `Reserved for {SO No}` · `On {DO}` · `Delivered` · `On {Claim No}` · `Not received` · `This Unit is on the road` · `Waiting inspection` · `Already on {RO No}`; Carres Sites only, PJ Showroom included; idempotent on request id) · `repair_order_issue` · `repair_order_record_supplier_receipt` · `repair_order_record_supplier_reply` · `repair_order_record_owner_consent` · `repair_order_cancel` (before pickup only; a planned pickup is cancelled in Stock first) · `repair_order_eligible_units` (the Add Units list with the same refusal words) | 0602 |
+| 🟢 Conflict 1 resolved: a `repair-return` arrival source may name `repair_order_id`; it then WEARS the RO's `ro_no` and mints no second number. 0490's physical checks are unchanged; the legacy Claim/Case path keeps minting (existing identities are permanent) | 0602 `arrival_source_create` (rebuilt from the 0560 body, verified identical to production) |
+| 🟢 Conflict 2 resolved for RO: `document_sends` (kind · id · version · recipient · channel · actor · time · confirmed). **PO keeps `po_sends`; PO, PRTN and CO move onto `document_sends` in their own scopes** | 0602 |
+| Carres return target = 14 OFFICE working days (Mon–Fri + the shared Malaysian holiday set) from the KL date of evidenced Supplier receipt, computed once by `repairOrderReturnTarget` (shared working-day engine); the door refuses a target outside the governed period and snapshots period + calendar name | `packages/shared/src/repair-order.ts`, 0602 |
+| API `/api/operation/repair-orders`: register, `/:id` (id or RO No), `/options`, `/eligible-units`, `/:id/evidence` (signed on open), create, issue, supplier-receipt, supplier-reply, owner-consent, cancel | `apps/api/src/routes/operation/repair-orders.ts` |
+| Web: live sidebar row; the 17-column register, ▸ per-Unit inspector, five-group rail, footer and states; the RO object page (route, CURRENT ACTION with one door per stop in the approved words, Repair order, Goods, Supplier reply, Owner consent, History); Create Repair Order (Carres Sites + disabled `Dealer`, Add Units drawer with refusal words on the row, per-Unit problem/photo/sentence/requirement, Supplier, Cost Responsibility, optional Price, grey automatic RO Doc Date and pickup location). Evidence opens the kit `SavedEvidenceViewer` | `OperationRepairOrders.tsx`, `RepairOrderObject.tsx`, `RepairOrderCreate.tsx` |
+| Pickup: the `Hand {n} Units` door opens Stock's arrival-source form with `?ro=`; the pickup itself is Stock's existing `arrival_source_handover` (the ONE custody writer) and the return is Receiving's `receiving_arrival_post` with a GRN — proven end to end on a replayed chain | `ArrivalSourceWorkspace.tsx`, integration test |
+
+**Remaining, in dependency order:** the RO PDF (`Reason` box + photo page, DOCUMENT-KIT §3 rules 11–12) and the `Open PDF` / 50/50 Issue preview · Work cards for each stop (Workspace §6) · a PDF-capable upload door for `Repair Quotation` (the column and door field exist; the shared upload door takes photos/video only) · releasing a Unit from its RO after the authorised completion (inspection result), which today keeps `Already on {RO No}` after return · Stock's supplier party for the pickup (`arrival_sources.party_id` must be a Stock operating party; a repair Supplier is not one yet, so staff pick the carrier) · Dealer as a Site (Stock §12.9) · the Settings row for the 14-day period · PO/PRTN/CO onto `document_sends`.
 This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
 ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
 The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
@@ -5083,7 +5098,7 @@ governed 50/50 preview. The CURRENT ACTION block walks the route, one primary bu
 Workspace path: each stop is the same fact projected as a Work card for the RO follow-up Duty;
 the card opens this page; completion is the owning fact (evidenced Supplier receipt, Outbound
 handover, Receiving GRN, recorded inspection) — never a manual tick and never a Supplier reply.
-The photo/video viewer is still a kit request (UI MASTER §6.8) and must join the kit first.
+Photos and video open the kit `SavedEvidenceViewer` (the same one Supplier Claims and Receiving use).
 
 #### Create Repair Order — owner approved 2026-09-28 (Jess "yes"). APPROVED TARGET / NOT BUILT.
 
@@ -5315,17 +5330,13 @@ pending financial decision without a placement gate, duplicate active repair, pa
 failed inspection, replacement identity and receipt-source compatibility.
 This document authorises the target, not a migration, build-card creation or production rollout.
 
-**🔴 TWO MEASURED STRUCTURAL CONFLICTS — found 2026-09-20 on `61ccf39`, named before any build.**
-
-| Conflict | Measured evidence | Consequence for build |
-|---|---|---|
-| **`RO No` is minted today by the RETURN LEG, not by the repair commission.** `arrival_sources` allocates it for a `repair-return` — a table that carries no supplier, price, cost responsibility, approval or sent version, and that requires a Claim or Case | `supabase/migrations/0490_…sql:136` (`allocate_formal_document_code('RO', v_id::text)`), with the source constraint at `:31` | One `RO-…` cannot name both the commission and its inbound leg — ownership Law A, and Law C's "a door, never a duplicate". The commission must mint `RO No` and the arrival source must REFERENCE it. Extend 0490's `repair-return` source check from "Claim or Case" to "an authorised RO", in a NEW migration; keep its physical checks at `:148` (Units at the recorded origin Site, status `free`/`reserved`/`on_hold`) — those are physical truth, not a source restriction. Never edit an applied migration, fabricate a Claim, or relax the checks globally |
-| **There is no shared formal-document Issue engine; the only one is PO-specific.** §9.7 says Issue "uses the shared formal-document flow" — that flow does not exist | `supabase/migrations/0377_…sql`: `po_sends` keys every send on `po_id` + `po_version`, with the `confirmed_sent` unique index on that pair | Version/recipient/channel/actor/time evidence must be lifted into a document-agnostic component that RO, PRTN, CO and CRTN share, before RO Issue is built. Do not draw a second set of send controls on this page (§8.2, ONE COMMUNICATION AREA PER DOCUMENT) |
+**The two structural conflicts named on 2026-09-20 (RO No minted by the return leg in 0490; no
+document-agnostic send ledger) are resolved by 0602 on the branch — see "Build state" above.**
 
 **Also measured 2026-09-20, and not defects — recorded so the next chat does not re-derive them:**
 the outbound leg has no owning record (`apps/web/src/pages/operation/warehouse-schedule-view.ts:69`
-states `repair-pickup` and `supplier-return` render nothing today); `Repair Orders` is
-`soon: true` in `portal-nav.ts:373`; `OperationOpsRepair.tsx` is the legacy Stock `needs_repair`
+states `repair-pickup` and `supplier-return` render nothing today); `Repair Orders` is a live
+sidebar row since slice A; `OperationOpsRepair.tsx` is the legacy Stock `needs_repair`
 queue and is NOT this register; `ops_stock_items.ownership` admits only `carres_owned` and
 `supplier_consignment` (`0366_…sql:117`), so the screen has exactly two ownership words and
 `Dealer` is a LOCATION; and `warehouse_kind` is only `own` / `logistics_partner` (`0027`), so
