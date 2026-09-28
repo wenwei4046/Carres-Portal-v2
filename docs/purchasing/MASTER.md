@@ -5361,10 +5361,26 @@ never RM0. Retain previous quotations and the history of revisions; neither a re
 nor a later Catalog price overwrites the historical arrangement. Reuse the recorded product facts
 for governed Catalog entry rather than asking staff to retype them, without bypassing Catalog's
 write authority. Existing commercial and Manual Purchase approval remains in force.
-This approves recording and responsibility only: whether price appears on the supplier-facing CO
-PDF, and whether an unconfirmed quotation blocks CO issue, remain unresolved business policy.
+This quotation-recording ruling does not settle whether price appears on the supplier-facing CO
+PDF; that presentation/business boundary remains under review. CO operational progression follows
+the price-nonblocking ruling below.
 No screen labels, new approval role, automatic quotation extraction or application build is
 approved by this ruling.
+
+**PRICE DOES NOT BLOCK CONSIGNMENT ARRANGEMENTS — APPROVED TARGET / NOT BUILT;
+Jess, 2026-09-28 ("price wont stop operation arrange first").** For a confirmed consignment
+placement or swap, a missing supplier quotation, unrecorded price or price awaiting Sales
+confirmation does not block Operation from issuing the CO and arranging the agreed incoming or
+outgoing goods. The supplier, goods/identity, supplier ownership, location and agreed movement
+scope must still be sufficiently established for the governed action; this is not permission to
+invent missing goods facts or bypass physical/permission controls. An absent price remains
+unknown, never RM0. Issuing/sending the CO, receiving the goods or handing back the old goods
+neither accepts an unconfirmed quotation nor creates a payable or price approval. The original
+negotiating Sales person retains the outstanding commercial follow-up until attributable
+confirmation resolves it; operational progress cannot silently mark that follow-up complete.
+Do not include an unconfirmed price as an accepted supplier-document term. Price visibility on
+the CO PDF remains a separate unresolved decision. Existing Carres-purchase MPR/PO approvals
+are unchanged; this ruling is scoped to the consignment arrangement, not a portal-wide bypass.
 
 **Commercial and physical connections:** Carres purchases follow Manual Purchase approval → PO;
 supplier-owned placement follows CO; consignment swap connects incoming goods and an outgoing
@@ -5395,7 +5411,9 @@ Workspace. Existing approvals, custody evidence, permissions and supplier-docume
 
 ### 9.9 Consignment Orders
 
-**Commercial evidence:** use the quotation-recording and Sales-confirmation rule in §9.8.
+**Commercial evidence and Issue:** use the quotation-recording, Sales-confirmation and
+price-nonblocking consignment rules in §9.8. Missing or unconfirmed price does not block
+issuing the CO or arranging its agreed goods movements; commercial follow-up remains separate.
 The supplier-facing PDF price policy remains under review; do not infer it from the absence of
 a payable at receipt or from Catalog's current cost.
 
