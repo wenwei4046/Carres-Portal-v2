@@ -42,7 +42,7 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
               <span className="t-num font-semibold">{row.pctUsed}%</span> rate
             </>
           )}
-          {" — earns "}
+          {" and earns "}
           <span className="t-num font-semibold">
             {rm(row.directCommission)}
           </span>
@@ -58,7 +58,7 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
           <ul className="space-y-0.5">
             {row.overrideDetail.map((d) => (
               <li key={d.fromStaffId} className="text-meta text-base-700">
-                From {d.fromStaffName} —{" "}
+                From {d.fromStaffName}:{" "}
                 <span className="t-num font-semibold">{rm(d.amount)}</span>
               </li>
             ))}
@@ -74,7 +74,7 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
           <ul className="space-y-0.5">
             {row.perModel.map((m) => (
               <li key={m.modelId} className="text-meta text-base-700">
-                {m.modelName} — {m.units} unit{m.units === 1 ? "" : "s"} ×{" "}
+                {m.modelName}: {m.units} unit{m.units === 1 ? "" : "s"} ×{" "}
                 <span className="t-num">{rm(m.perUnitAmount)}</span> each ={" "}
                 <span className="t-num font-semibold">
                   {rm(m.unitCommission)}
@@ -104,7 +104,7 @@ function StaffBreakdown({ row }: { row: StaffCommissionResult }) {
             {row.milestones.map((m, i) => (
               <li key={i} className="text-meta text-base-700">
                 {m.units} unit{m.units === 1 ? "" : "s"} of{" "}
-                {m.category ?? "all items"} sold — passed the {m.thresholdQty}
+                {m.category ?? "all items"} sold, passed the {m.thresholdQty}
                 -unit milestone, bonus{" "}
                 <span className="t-num font-semibold">{rm(m.bonusAmount)}</span>
               </li>
@@ -138,7 +138,7 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
           <ul className="space-y-0.5">
             {row.portfolio.map((p) => (
               <li key={p.dealerId} className="text-meta text-base-700">
-                {p.dealerName} — {p.orderCount} order
+                {p.dealerName}: {p.orderCount} order
                 {p.orderCount === 1 ? "" : "s"},{" "}
                 <span className="t-num">{rm(p.amount)}</span> sold
                 {p.commission > 0 && (
@@ -163,7 +163,7 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
           <ul className="space-y-0.5">
             {row.overrideDetail.map((d) => (
               <li key={d.fromStaffId} className="text-meta text-base-700">
-                Override from {d.fromStaffName} —{" "}
+                Override from {d.fromStaffName}:{" "}
                 <span className="t-num font-semibold">{rm(d.amount)}</span>
               </li>
             ))}
@@ -179,7 +179,7 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
           <ul className="space-y-0.5">
             {row.perModel.map((m) => (
               <li key={m.modelId} className="text-meta text-base-700">
-                {m.modelName} — {m.units} unit{m.units === 1 ? "" : "s"} ×{" "}
+                {m.modelName}: {m.units} unit{m.units === 1 ? "" : "s"} ×{" "}
                 <span className="t-num">{rm(m.perUnitAmount)}</span> each ={" "}
                 <span className="t-num font-semibold">
                   {rm(m.unitCommission)}
@@ -209,7 +209,7 @@ function BdBreakdown({ row }: { row: BdCommissionResult }) {
             {row.milestones.map((m, i) => (
               <li key={i} className="text-meta text-base-700">
                 {m.units} unit{m.units === 1 ? "" : "s"} of{" "}
-                {m.category ?? "all items"} sold — passed the {m.thresholdQty}
+                {m.category ?? "all items"} sold, passed the {m.thresholdQty}
                 -unit milestone, bonus{" "}
                 <span className="t-num font-semibold">{rm(m.bonusAmount)}</span>
               </li>
@@ -435,7 +435,7 @@ export default function HrCommissionTab({
       {/* 0250 — BD commission: paid by what their assigned dealers sell. */}
       <div className="pt-2">
         <div className="text-body font-semibold text-base-900">
-          BD commission — paid by dealer sales
+          BD commission: paid by dealer sales
         </div>
         <div className="text-meta text-base-500">
           {bdReport.method === "per_model"
@@ -454,7 +454,7 @@ export default function HrCommissionTab({
           <span>
             {bdReport.unassignedDealers.length} dealer
             {bdReport.unassignedDealers.length === 1 ? " has" : "s have"} no BD
-            owner — their sales pay nobody.
+            owner. Their sales pay nobody.
           </span>
           <Link
             to="/hr?tab=setup"
