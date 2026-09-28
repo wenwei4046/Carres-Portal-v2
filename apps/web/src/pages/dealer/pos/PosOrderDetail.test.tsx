@@ -660,7 +660,7 @@ describe("line edit (0255)", () => {
     fireEvent.click(screen.getByTestId("stub-emit-down"));
     await waitFor(() => expect(screen.getByTestId("pos-od-items-err")).toBeTruthy());
     expect(screen.getByTestId("pos-od-items-err").textContent).toContain(
-      "edits can only upgrade the order",
+      "Edits can only upgrade the order",
     );
     expect(h.replaceMutateAsync).not.toHaveBeenCalled();
   });

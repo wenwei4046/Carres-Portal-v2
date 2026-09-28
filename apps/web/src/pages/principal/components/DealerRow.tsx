@@ -55,7 +55,7 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
           }`}
           // 0 outlets is worth flagging: the store cannot take an order until
           // one exists (the POS outlet picker would sit empty).
-          title={d.outletCount === 0 ? "No outlet yet — this dealer cannot take an order" : undefined}
+          title={d.outletCount === 0 ? "No outlet yet. This dealer cannot take an order" : undefined}
         >
           {d.outletCount}
         </td>

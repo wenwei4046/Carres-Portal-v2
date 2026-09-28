@@ -561,7 +561,7 @@ export default function PosConfigurePage({
     }
     if (!(customerPhone ?? "").trim()) {
       setPwpErr(
-        "Enter the customer's phone (step 02) first to redeem a saved voucher — or apply it from the cart.",
+        "Enter the customer's phone (step 02) first to redeem a saved voucher, or apply it from the cart.",
       );
       return;
     }
@@ -589,7 +589,7 @@ export default function PosConfigurePage({
       setPwpApplied({ ruleId: rule.id, code: v.code, crossOrder: true });
       setQty(1);
     } catch {
-      setPwpErr("Couldn't check that voucher — please retry.");
+      setPwpErr("Couldn't check that voucher. Please retry.");
     } finally {
       setPwpBusy(false);
     }
@@ -1115,7 +1115,7 @@ export default function PosConfigurePage({
                         style={{ margin: 0, fontSize: 12, color: "var(--c-burnt, #A6471E)" }}
                         data-testid="cfg-pwp-ready"
                       >
-                        A PWP code from this cart is ready — tap Auto Fill.
+                        A PWP code from this cart is ready. Tap Auto Fill.
                       </p>
                     )}
                     <div style={{ display: "flex", gap: 8 }}>

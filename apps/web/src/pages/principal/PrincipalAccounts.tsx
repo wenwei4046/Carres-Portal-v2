@@ -263,7 +263,7 @@ export function EmailChangeRequestsPanel() {
     if (
       !confirm(
         `Approve changing ${r.dealerName ?? "this store"}'s login email to ${r.requestedEmail}?\n` +
-          `(Currently ${r.currentEmail} — the store signs in with the new email once approved.)`,
+          `(Currently ${r.currentEmail}. The store signs in with the new email once approved.)`,
       )
     ) {
       return;
@@ -271,7 +271,7 @@ export function EmailChangeRequestsPanel() {
     decide.mutate(
       { id: r.id, action: "approve" },
       {
-        onSuccess: () => toast.success(`Approved — ${r.requestedEmail} is now the login`),
+        onSuccess: () => toast.success(`Approved: ${r.requestedEmail} is now the login`),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not approve"),
       },
     );
@@ -279,13 +279,13 @@ export function EmailChangeRequestsPanel() {
 
   function reject(r: (typeof pending)[number]) {
     const note = prompt(
-      `Reject ${r.dealerName ?? "this store"}'s email change — note for the store (optional):`,
+      `Reject ${r.dealerName ?? "this store"}'s email change. Note for the store (optional):`,
     );
     if (note === null) return; // cancelled the dialog
     decide.mutate(
       { id: r.id, action: "reject", note: note.trim() || undefined },
       {
-        onSuccess: () => toast.success("Rejected — the store will see your note"),
+        onSuccess: () => toast.success("Rejected. The store will see your note"),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not reject"),
       },
     );
@@ -533,7 +533,7 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
           </h2>
           {/* min-w-0 + break-words: long emails must wrap, never clip/overlap. */}
           <div className="text-meta text-base-600 mt-1 min-w-0 break-words leading-relaxed">
-            {user.name} (<span className="break-all">{user.email}</span>) — type the new
+            {user.name} (<span className="break-all">{user.email}</span>). Type the new
             password, then give it to them directly. We don&apos;t email it.
           </div>
         </div>
@@ -875,7 +875,7 @@ function CreateAccountModal({
             New account
           </h2>
           <div className="text-meta text-base-600 mt-1">
-            Store credentials only — dealers and our showrooms. Every other
+            Store credentials only: dealers and our showrooms. Every other
             user (staff, supplier, partner) is added in HR → Team.
           </div>
         </div>
@@ -942,7 +942,7 @@ function CreateAccountModal({
               </div>
               <Field
                 label="Store"
-                hint="Company / SSM / address stay untouched — you're only adding a staff identity + PIN"
+                hint="Company / SSM / address stay untouched. You're only adding a staff identity + PIN"
                 error={errors.existingDealer}
               >
                 <select
@@ -951,7 +951,7 @@ function CreateAccountModal({
                   data-testid="acct-existing-store"
                   className="w-full px-3 py-2.5 border border-base-200 rounded text-body bg-white cursor-pointer"
                 >
-                  <option value="">— pick a store —</option>
+                  <option value="">Pick a store</option>
                   {/* Grouped so our own showrooms never read as dealerships
                       (Loo 2026-07-19). Partitioned with the shared helper, not
                       `=== 'showroom'` per group, so an unexpected channel value
@@ -1140,7 +1140,7 @@ function CreateAccountModal({
               )}
               <div className="text-label text-base-500 leading-relaxed">
                 {isShowroom
-                  ? "Carres' own store — no company registration or contact person needed. The email above becomes its login."
+                  ? "Carres' own store. No company registration or contact person needed. The email above becomes its login."
                   : `A new ${draft.role} record will be created and this user will be the owner.`}
               </div>
             </div>
@@ -1216,7 +1216,7 @@ function CreateAccountModal({
                     data-testid="acct-staff-gender"
                     className="w-full px-3 py-2 border border-base-200 rounded text-body bg-white cursor-pointer"
                   >
-                    <option value="">— select —</option>
+                    <option value="">Select</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>

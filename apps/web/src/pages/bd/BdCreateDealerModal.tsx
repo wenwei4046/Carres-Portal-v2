@@ -132,7 +132,7 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
     };
     create.mutate(input, {
       onSuccess: () => {
-        toast.success(`Dealer account created — ${companyName.trim()} can sign in now`);
+        toast.success(`Dealer account created. ${companyName.trim()} can sign in now`);
         onClose();
       },
       onError: (e) =>
@@ -144,7 +144,7 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
     <ModalShell
       wide
       title="New dealer account"
-      subtitle="Opens the dealership: company profile, the store login (dealership principal), and its first staff sign-in PIN — same as the HQ door."
+      subtitle="Opens the dealership: company profile, the store login (dealership principal), and its first staff sign-in PIN. Same as the HQ door."
       onClose={onClose}
       footer={
         <>
@@ -352,7 +352,7 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
             data-testid="bd-cd-staff-gender"
             className={inputCls}
           >
-            <option value="">— select —</option>
+            <option value="">Select</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>

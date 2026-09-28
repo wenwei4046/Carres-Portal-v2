@@ -44,7 +44,7 @@ export default function StaffManagePage({ onClose }: { onClose: () => void }) {
             Staff &amp; PINs
           </h1>
           <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--fg-muted)" }}>
-            Add a staff member — their 6-digit PIN is set in the same step, so they appear on the
+            Add a staff member. Their 6-digit PIN is set in the same step, so they appear on the
             sign-in screen right away.
           </p>
           <StaffSection />

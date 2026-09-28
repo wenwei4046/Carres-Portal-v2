@@ -119,7 +119,7 @@ function ReauthStep({
       <h2 className="staff-gate__title">Set up staff sign-in</h2>
       <p className="staff-gate__sub">
         Confirm your store password to begin. After this, everyone signs in with a quick 6-digit
-        PIN — no more sharing the store password.
+        PIN. No more sharing the store password.
       </p>
       <div className="staff-wiz__field">
         <label className="staff-wiz__label">Store password</label>
@@ -135,7 +135,7 @@ function ReauthStep({
       {reauth.isError && (
         <div className="staff-gate__err">
           {reauth.error instanceof ApiError && reauth.error.status === 401
-            ? "Wrong password — try again."
+            ? "Wrong password. Try again."
             : reauth.error?.message ?? "Could not verify"}
         </div>
       )}
@@ -203,7 +203,7 @@ function IdentityStep({
       <div className="staff-gate__eyebrow">First-time setup · 2 of 3</div>
       <h2 className="staff-gate__title">You're the {TIER_LABEL[ownerTier]}</h2>
       <p className="staff-gate__sub">
-        This is your own sign-in tile. Pick a colour and a 6-digit PIN — you'll tap your name and
+        This is your own sign-in tile. Pick a colour and a 6-digit PIN. You'll tap your name and
         enter this PIN to open the POS.
       </p>
 
@@ -299,7 +299,7 @@ function ExistingStaffStep({
       <h2 className="staff-gate__title">Set your team's PINs</h2>
       <p className="staff-gate__sub">
         Give each salesperson a PIN so they can sign in. You can also do this later from the
-        POS Staff button — skip if you're not ready.
+        POS Staff button. Skip if you're not ready.
       </p>
 
       <div className="staff-outlets">
