@@ -179,7 +179,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
-| Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
+| Team Work true empty | `No open work. Every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
 | Work applied filters | `Clear all` | Reset · Clear everything |
 | Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
@@ -685,7 +685,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | `Payment`, authoritative COD | **`Collect RM {amount}`** over **`Cash on delivery`** |
 | A required Sales fact missing on a Monitor row | **`Order details incomplete`** as the status word; the panel names the fact, for example `Building type not recorded`; the row's `SO No` opens the order to change |
 | The expanded panels, in order | `Customer, Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock` |
-| Delivery Dates edit state | `Update date and time` · `Scheduled date` · `Scheduled time (optional)` · `Information received from` · `WhatsApp proof` · `Save scheduled delivery` · disabled form `Save scheduled delivery — upload the WhatsApp reply` |
+| Delivery Dates edit state | `Update date and time` · `Scheduled date` · `Scheduled time (optional)` · `Information received from` · `WhatsApp proof` · `Save scheduled delivery` · disabled form `Save scheduled delivery: upload the WhatsApp reply` |
 | `Information received from` choices | `{partner}` · `Customer` · `Operation on behalf of {partner}` |
 | Items panel grid | `Item` · `Qty` · `Source` · `Status` · `Location` |
 | Items panel Source | the Unit ID on line one; the clickable PO No, or `Counted stock`, on line two; never an invented PO number |
@@ -868,7 +868,7 @@ question, the answers are locked strings like any other:
 
 | Action | The question | The answers | The queue tooltip |
 |---|---|---|---|
-| `Delay planning` | can the promised date still be met? | `We can still make the promised date` · `We cannot make the promised date` | `Supplier date lands after the promised date — decide before anyone calls (Delay planning)` |
+| `Delay planning` | can the promised date still be met? | `We can still make the promised date` · `We cannot make the promised date` | `Supplier date lands after the promised date. Decide before anyone calls (Delay planning)` |
 | `Confirm tomorrow's delivery` | is it coming on the day we expect it? | `It arrives on {date}` · `It arrives later than {date}` | — (none: the tile's own label is already the whole instruction, and this file's tooltip rule says delete a tooltip that would restate the label) |
 
 Both answers name **the promised date** rather than "yes" and "no", because the reader must
@@ -2354,7 +2354,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | A Schedule card's door into work | **`Open receiving work`** · **`Open loading work`** (tooltip + accessible name). The door OPENS filtered work; it never posts a receipt, a loading result, a driver acceptance or a stock change | Receive · Load · Complete · Done · an action verb on a summary card |
 | A Schedule date with genuinely nothing on it | **`Nothing arriving.`** (Arrival Schedule) · **`Nothing for pickup.`** (Pickup Schedule) | No arrivals or pickups on {date} (retired with the split) · No handovers · Empty |
 | A Schedule date whose FEED FAILED | **`The schedule could not be read for this date.`** — a broken read may NEVER print an empty-day sentence. `cards: []` with a non-empty `errors` is a failure, not a clear day | `Nothing arriving` while a feed is down · `0 arrangements` · a silent blank column |
-| Schedule work the board cannot place | **`{n} with no date yet — not shown on any column.`** — an undated arrangement is reported, never dropped and never quietly parked on today | hiding undated work · placing it on today |
+| Schedule work the board cannot place | **`{n} with no date yet. Not shown on any column.`** — an undated arrangement is reported, never dropped and never quietly parked on today | hiding undated work · placing it on today |
 | A Schedule fact the source never recorded | **`Party not recorded`** · **`Model not recorded`** | an empty cell · `Unknown` · `N/A` |
 | Outbound's pickup-status filter group | **`PICKUP STATUS`** | OUTBOUND SCHEDULE (retired with the Monitor split) · Status |
 | Warehouse rails' governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
@@ -2866,7 +2866,7 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Negative decision | **Reject** |
 | Positive decision that atomically creates the next revision | **Approve and apply** |
 | Re-propose a complete historical version as a new governed change | **Propose this version again** |
-| Stale proposal state/action | **Out of date — propose again** |
+| Stale proposal state/action | **Out of date. Propose again** |
 | The customer's recorded basis for a commercial change (0564) | The screen words are governed by § "Customer agreement evidence — screen wording" below and are **PROPOSAL / NOT LAW**. There is no free-text evidence field and no tick box: a governed KIND always names a pointer outside the record. |
 | Add a catalogue service to the SO object draft (0564) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | The SO `Delivery` field listing the order's services (same rows as Items, no money) | **Services** — the approved services-footer word above, reused |
@@ -3327,10 +3327,10 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Waiting for the customer's answer` · `Prepare the loan Unit` · `Record the customer's answer` · `Lend out the loan Unit` | the Order Route LOAN node's second line and action while an offer is open or accepted and no item is out yet | **RULED 2026-09-13** (Card 15) |
 | `Loan {Unit ID} · collect back on delivery day` | printed with the EXACT Unit ID on Monitor panel 4 (one line per loan Unit out) and on the DO object's Loan collection | **RULED 2026-09-12**, Unit ID **BUILT 2026-09-13** (Card 15) |
 | `Delivery Order` · `Delivery history` · `Warehouse handover` · `Evidence` · `Exceptions` · `History` · `Related records` | the DO object's seven governed sections (`delivery/MASTER.md` §9), one scroll of kit `Panel`s, no tab strip; `Loan collection` renders between Evidence and Exceptions only while a loan exists | **RULED 2026-09-13** (Card 16) |
-| `Goods on this trip` · `The document` · `Rendering the document…` · `The document could not be rendered here — Print opens the same document.` | inside section one: the trip's lines, and the live document rendered by the governed DO renderer (the same bytes `Print` opens), its loading word and its failure | **RULED 2026-09-13** (Card 16) |
+| `Goods on this trip` · `The document` · `Rendering the document…` · `The document could not be rendered here. Print opens the same document.` | inside section one: the trip's lines, and the live document rendered by the governed DO renderer (the same bytes `Print` opens), its loading word and its failure | **RULED 2026-09-13** (Card 16) |
 | `Warehouse` · `ETA` · `Building type` · `Floor` · `Lift` · `No lift` · `Stairs` · `Access` · `Customer request` · `Instruction for logistics` · `No warehouse recorded` · `None recorded` | section one's site and arrangement facts and their absences (`Not recorded` remains the plain absence) | **RULED 2026-09-13** (Card 16) |
 | `Delivery on {day} · {result}` · `Goods: {location}` | the Delivery history entry and its second line | **RULED 2026-09-13** (Card 16) |
-| `No open problems` · `Hold delivery · Finance hold · {reason}` · `Payment approval requested — {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
+| `No open problems` · `Hold delivery · Finance hold · {reason}` · `Payment approval requested: {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
 | `SO-{n}` · `Order Route` · `Payments` · `Unit {Unit ID}` · `Case {Case No}` · `{DO No}` · `No exact Units recorded on this document` · `Service Cases could not be read` · `No Service Case on this order` · `No other delivery order on this Sales Order` | Related records' doors are the record's own number or name — never `Open … →` (owner ruling 2026-09-25) — and their absences | **RULED 2026-09-13**, doors re-worded **2026-09-25** |
 | `Opening SO-{n}` · `Sales Order not found.` · `Back to Sales Orders` | the Sales Order object page opened by its NUMBER (`/operation/orders/so/SO-1362`): the one-moment loading word while the number resolves to the id, the absence when no order carries that number (the existing Unknown-SO word, reused), and its door | **REGISTERED 2026-09-13** (Delivery Card 19 — a number and an id open the same page; the owner may re-word) |
 | `Check the delivery proof` / `Accept it, ask for more, or reject it` · `Delivery proof not reviewed` | the Work sentence (act / required result) and the Work problem word of the `check_delivery_proof` rule, Delivery Duty's | **RULED 2026-09-13** |
@@ -3400,7 +3400,7 @@ the words that panel may use, and no others:
 | Word | What it names | Why not the alternatives |
 |---|---|---|
 | **`Before you call`** | the panel heading — the facts to have in hand before the phone rings | It is the only heading that says WHEN it is for. `Call brief` · `Pre-call` · `Summary` are jargon (rule 9) and none of them tells a new hire the panel is about a call that has not happened yet |
-| **`Call by {date}`** | the day the conversation is due, from `logistics_call_working_days` | `Due {date}` alone does not say *do what*. The late spelling is the portal's existing **`Late — was due {date}`**, unchanged, so this step reads like every other late step |
+| **`Call by {date}`** | the day the conversation is due, from `logistics_call_working_days` | `Due {date}` alone does not say *do what*. The late spelling is the portal's existing **`Late: was due {date}`**, unchanged, so this step reads like every other late step |
 | **`Not in yet`** | committed goods the register does not hold — the ruling's *"what is / is not expected in"* | `Waiting` alone is already banned; `Outstanding` is the money word; `Short` is warehouse jargon |
 | **`Everything is on hand`** | the whole commitment is allocated, so no arrival is pending | States the fact positively so the row is not a blank. `On hand` is the Stock word law's own word, reused rather than re-coined |
 | **`Expected arrival`** | the latest supplier ready date among the lines still short | The portal's existing column word (`Check Expected Arrival`). **`Stock ETA` may not reach the screen** — `ETA` is an abbreviation, and rule 9 bans those even when the ruling itself uses one internally |
@@ -3548,8 +3548,8 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
 | The tally — page, staff group and rail row | **{n} actions to do · {n} late** | **{n} open · {n} overdue** (superseded) · Total · Outstanding |
 | A row's due date, on line 2 | **due {fmtDate}** (`due Wed, 20 Aug`) | Today · Tomorrow · a bare date |
-| A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
-| The clear state | **No open work — every track is clear.** | All done · Empty |
+| A late row's line 2 | **Late: was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
+| The clear state | **No open work. Every track is clear.** | All done · Empty |
 | Empty My Work while the team has work (owner review 2026-09-25) | header **`0 for you · {n} for the team`** · list door **`See Team Work`** | a bare `0 actions to do` |
 | The cover filter — RETIRED (Jess, 2026-09-26): cover is a fact on the row (`Covered for {name}` / `Covered by {name}`), never a toolbar button | — | Covering · Covered (alone) · Covering for others |
 | The page filter (owner review 2026-09-25 item 17) | rail section **Page** · **All pages** | Module · All modules |
@@ -3708,7 +3708,7 @@ The one Warehouse configuration surface (`stock/MASTER.md` §11). Two words here
   object page and in the `⚠ {n} changes` bar, whose spelling is still `Discard` · `Save`. The
   difference is real: those name an act inside a form that is already typeable; this one names
   the page's single commit, and the page has no other Save. It obeys the Receiving button law —
-  a disabled Save NAMES its gap: `Save changes — say why this date is different`.
+  a disabled Save NAMES its gap: `Save changes: say why this date is different`.
 - **`Not configured`** is a SETTING nobody has recorded. It is not `Not recorded`, which stays
   the one word for an empty REGISTER cell. A register cell is a fact about a record; a settings
   row is a rule the business has not decided yet, and `Configure it` is the next act.
@@ -3889,7 +3889,7 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | The ledger account a payment method's money lands in (Settings → Payment → Payment methods) | **`Money account`** · `Money account: {code} · {name}` | GL account · Posting account · Clearing |
 | A method with no money account yet (reuses the Warehouse Settings word for an unrecorded setting) | **`Money account: Not configured`** | Not set · None · a blank |
 | The door that adds a method | **`Add a payment method`** | New method · + Method · Create |
-| The method form's Save, naming its gap while disabled | **`Save method`** · `Save method — type a name` · `Save method — choose a money account` | Save changes · Submit |
+| The method form's Save, naming its gap while disabled | **`Save method`** · `Save method: type a name` · `Save method: choose a money account` | Save changes · Submit |
 | The account picker's empty state | **`Choose a money account`** | Select · Pick one |
 | The saved toast / the failed read | **`Payment method saved`** · `Payment methods could not be loaded. Try again.` | Success! · Error |
 | The proof a manager-added method asks for (the six governed methods keep their §16 words) | **`Payment proof`** | Attachment · Upload · Evidence file |

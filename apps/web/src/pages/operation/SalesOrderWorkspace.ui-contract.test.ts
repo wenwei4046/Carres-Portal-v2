@@ -361,7 +361,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('delivery_date_tbd: "Delivery date to be confirmed"');
     expect(workspace).toContain("<WaitingRequest");
     expect(panels).toContain("Waiting for management");
-    expect(panels).toContain("Out of date — propose again");
+    expect(panels).toContain("Out of date. Propose again");
   });
 
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —

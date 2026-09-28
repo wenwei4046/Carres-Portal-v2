@@ -1499,7 +1499,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
     const save = screen.getByTestId("delivery-brief-save-dates");
     /* The button names its gap while disabled — the governed sentence. */
-    expect(save.textContent).toBe("Save scheduled delivery — upload the WhatsApp reply");
+    expect(save.textContent).toBe("Save scheduled delivery: upload the WhatsApp reply");
     expect(save).toBeDisabled();
     /* `Information received from` offers the partner, the customer, and
        Operation on behalf of the partner — nothing else. */
@@ -1704,7 +1704,7 @@ describe("Call customer — the contact week", () => {
     seedContacts();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&date=2026-09-08");
     const strip = screen.getByTestId("delivery-monitor-contact-week");
-    expect(within(strip).getByText("Contact deadlines — not supplier or delivery dates")).toBeTruthy();
+    expect(within(strip).getByText("Contact deadlines, not supplier or delivery dates")).toBeTruthy();
 
     cleanup();
     seedContacts();

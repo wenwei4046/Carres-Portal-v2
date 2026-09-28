@@ -1481,7 +1481,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // purchasing act's, and the second no longer says a retired verb either.
     const verbTitles = [
       "Nothing ordered and no purchase order covers these goods — issue one, which mints the PO number and the document the supplier receives",
-      "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
+      "PO issued but goods not in yet. Call the supplier for the ready date (red once inside the stock window)",
     ];
     const row = verbTitles.map((t) => screen.queryByTitle(t)).find((b) => !!b);
     expect(row).toBeTruthy();
@@ -1525,7 +1525,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // C8 — the tooltip used to end "call the customer now", which is the one
     // thing Law 4 rung 2 forbids. The queue is the DECISION now.
     const row = screen.getByTitle(
-      "Supplier date lands after the promised date — decide before anyone calls (Delay planning)",
+      "Supplier date lands after the promised date. Decide before anyone calls (Delay planning)",
     );
     expect(Number((row.textContent ?? "").replace(/[^0-9]/g, ""))).toBe(1);
     fireEvent.click(row);
@@ -1999,7 +1999,7 @@ describe("orders export", () => {
     // Option B: counterparty menus, not verb buttons — open Logistics ⋮ first.
     fireEvent.click(screen.getByRole("button", { name: "Logistics" }));
     fireEvent.click(
-      screen.getByRole("menuitem", { name: /Call logistics — confirm delivery date/ }),
+      screen.getByRole("menuitem", { name: /Call logistics: confirm delivery date/ }),
     );
     expect(screen.getByTestId("chase-partner-review")).toBeInTheDocument();
   });
@@ -2009,7 +2009,7 @@ describe("orders export", () => {
     fireEvent.click(screen.getByLabelText("Select all on this page"));
     fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
     fireEvent.click(
-      screen.getByRole("menuitem", { name: /Call suppliers — confirm ready date/ }),
+      screen.getByRole("menuitem", { name: /Call suppliers: confirm ready date/ }),
     );
     expect(screen.getByTestId("chase-supplier-review")).toBeInTheDocument();
   });
@@ -2020,7 +2020,7 @@ describe("orders export", () => {
     fireEvent.click(screen.getByRole("button", { name: "Supplier" }));
     expect(screen.queryByRole("menuitem", { name: /Raise PO|Issue PO/i })).toBeNull();
     expect(
-      screen.getByRole("menuitem", { name: /Call suppliers — confirm ready date/ }),
+      screen.getByRole("menuitem", { name: /Call suppliers: confirm ready date/ }),
     ).toBeInTheDocument();
   });
 

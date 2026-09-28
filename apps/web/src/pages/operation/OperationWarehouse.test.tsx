@@ -656,7 +656,7 @@ describe("OperationWarehouse page", () => {
     // Queen row has no threshold yet — title hints at empty state.
     expect(
       screen.getByTestId(`warehouse-threshold-${SKU_MATTRESS_QUEEN}`).getAttribute("title"),
-    ).toBe("No threshold set — click to configure");
+    ).toBe("No threshold set. Click to configure");
     // Click opens the dialog (Modal renders inline — header text is the
     // SetThresholdDialog title prefix).
     fireEvent.click(threshBtn);

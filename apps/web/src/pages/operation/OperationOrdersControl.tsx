@@ -184,7 +184,7 @@ const TABS: { key: ControlTab; label: string }[] = [
 /** Tooltip for the "All" meta tab — the five pipeline stages get theirs from
  *  TAB_DESC below. */
 const STATUS_META_DESC: Partial<Record<ControlTab, string>> = {
-  all: "Every order — live work first, completed history at the bottom",
+  all: "Every order. Live work first, completed history at the bottom",
 };
 
 type SettledTab = Exclude<ControlTab, "all">;
@@ -202,9 +202,9 @@ const TAB_LABEL: Record<SettledTab, string> = {
  *  "Proceed" means. */
 const TAB_DESC: Record<SettledTab, string> = {
   placed: "New order, not processed yet (a salesperson placed it)",
-  proceed: "Confirmed — being arranged. Every AutoCount-imported order starts here.",
+  proceed: "Confirmed and being arranged. Every AutoCount-imported order starts here.",
   pending:
-    "The customer has not confirmed a delivery date yet — the Actions column says who to call",
+    "The customer has not confirmed a delivery date yet. The Actions column says who to call",
   scheduled: "The customer confirmed a delivery date + time slot",
   completed: "Delivered and closed",
 };
@@ -627,13 +627,13 @@ const STOCK_QUEUE_KEYS = [
 const NEXT_QUEUE_VERBS = STOCK_QUEUE_KEYS.map(orderActionQueue);
 const NEXT_QUEUE_DESC: Record<string, string> = {
   [orderActionQueue("confirm_ready_date")]:
-    "PO issued but goods not in yet — call the supplier for the ready date (red once inside the stock window)",
+    "PO issued but goods not in yet. Call the supplier for the ready date (red once inside the stock window)",
   // C8 — this tooltip used to read "call the customer now", which is the exact
   // thing Law 4 rung 2 forbids. Carres does not phone a customer about a delay.
   [orderActionQueue("delay_planning")]:
-    "Supplier date lands after the promised date — decide before anyone calls (Delay planning)",
+    "Supplier date lands after the promised date. Decide before anyone calls (Delay planning)",
   [orderActionQueue("arrange_new_delivery_date")]:
-    "The promised date cannot be met — logistics arranges the new date with the customer",
+    "The promised date cannot be met. Logistics arranges the new date with the customer",
 };
 
 /** A stored timestamp as the operator's OWN calendar date.
@@ -768,40 +768,40 @@ export function rowDotsOf(
   // reserved for genuinely UNKNOWN money — an order nobody has priced.
   const m = moneyOf(o);
   const money: RowDot = !m.known
-    ? { state: "grey", title: "Money — no order value on record" }
+    ? { state: "grey", title: "Money: no order value on record" }
     : m.owing
-      ? { state: "red", title: `Money — ${fmtMoney(m.outstanding)} outstanding` }
-      : { state: "green", title: "Money — settled" };
+      ? { state: "red", title: `Money: ${fmtMoney(m.outstanding)} outstanding` }
+      : { state: "green", title: "Money: settled" };
   // 货 — red only for the true blockers (No PO / supplier ETA late-or-overdue).
   let goods: RowDot;
-  if (completed) goods = { state: "green", title: "Stock — done (delivered)" };
+  if (completed) goods = { state: "green", title: "Stock: done (delivered)" };
   else if (se.state === "ready" || stock.state === "ready" || stock.state === "in_stock")
-    goods = { state: "green", title: "Stock — all in" };
+    goods = { state: "green", title: "Stock: all in" };
   else if (stock.state === "unknown")
-    goods = { state: "red", title: "Stock — no PO raised yet" };
+    goods = { state: "red", title: "Stock: no PO raised yet" };
   else if (se.state === "overdue" || se.state === "late")
-    goods = { state: "red", title: "Stock — supplier ETA late vs the deadline" };
-  else goods = { state: "amber", title: "Stock — waiting arrival" };
+    goods = { state: "red", title: "Stock: supplier ETA late vs the deadline" };
+  else goods = { state: "amber", title: "Stock: waiting arrival" };
   // 送 — guardrail #2: a delivered order never alarms. T1 (0277): green is
   // reserved for the CUSTOMER's confirmation; a provisional logistics date stays
   // amber (never green); red only past deadline while unconfirmed.
   let delivery: RowDot;
-  if (completed) delivery = { state: "green", title: "Delivery — delivered" };
+  if (completed) delivery = { state: "green", title: "Delivery: delivered" };
   else if (logi.key === "confirmed")
-    delivery = { state: "green", title: "Delivery — customer confirmed" };
+    delivery = { state: "green", title: "Delivery: customer confirmed" };
   else if (logi.key === "unassigned")
-    delivery = { state: "grey", title: "Delivery — no logistics picked yet" };
+    delivery = { state: "grey", title: "Delivery: no logistics picked yet" };
   else {
     const dd = daysToDue(o);
     const late = dd !== null && dd < 0;
     delivery =
       logi.key === "provisional"
         ? late
-          ? { state: "red", title: "Delivery — past deadline, customer not confirmed" }
-          : { state: "amber", title: "Delivery — logistics date only, customer not confirmed" }
+          ? { state: "red", title: "Delivery: past deadline, customer not confirmed" }
+          : { state: "amber", title: "Delivery: logistics date only, customer not confirmed" }
         : late
-          ? { state: "red", title: "Delivery — past deadline, no booking" }
-          : { state: "amber", title: "Delivery — customer has not confirmed a date" };
+          ? { state: "red", title: "Delivery: past deadline, no booking" }
+          : { state: "amber", title: "Delivery: customer has not confirmed a date" };
   }
   return [goods, delivery, money];
 }
@@ -2368,7 +2368,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [owingOnly, setOwingOnly] = useState(false);
   const assignStaffMut = useAssignOrderStaff({
     onSuccess: () => toast.success("Reassigned"),
-    onError: (e) => toast.error(`Reassign failed — ${e.message}`),
+    onError: (e) => toast.error(`Reassign failed: ${e.message}`),
   });
 
   // Bulk-action mutations: assign-logistics loops the Inbox ops-assign endpoint;
@@ -3142,7 +3142,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       clearSel();
       void refetch();
     } catch (e) {
-      toast.error(`Bulk assign failed — ${(e as Error).message}`);
+      toast.error(`Bulk assign failed: ${(e as Error).message}`);
     }
   }
 
@@ -3152,7 +3152,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       await Promise.all(
         rows.map((o) =>
           taskMut.mutateAsync({
-            title: `Follow up SO-${o.so}${o.customer_name ? ` — ${o.customer_name}` : ""}`,
+            title: `Follow up SO-${o.so}${o.customer_name ? ` · ${o.customer_name}` : ""}`,
             relatedOrderId: o.id,
           }),
         ),
@@ -3161,7 +3161,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       qc.invalidateQueries({ queryKey: ["ops", "tasks"] });
       clearSel();
     } catch (e) {
-      toast.error(`Bulk task create failed — ${(e as Error).message}`);
+      toast.error(`Bulk task create failed: ${(e as Error).message}`);
     }
   }
 
@@ -3170,7 +3170,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   async function bulkMarkCompleted() {
     const ids = [...selected];
     const ok = window.confirm(
-      `Mark ${ids.length} order${ids.length === 1 ? "" : "s"} completed?\n\nOnly AutoCount-imported orders are completed — anything else is skipped.`,
+      `Mark ${ids.length} order${ids.length === 1 ? "" : "s"} completed?\n\nOnly AutoCount-imported orders are completed. Anything else is skipped.`,
     );
     if (!ok) return;
     try {
@@ -3185,7 +3185,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       clearSel();
       void refetch();
     } catch (e) {
-      toast.error(`Bulk complete failed — ${(e as Error).message}`);
+      toast.error(`Bulk complete failed: ${(e as Error).message}`);
     }
   }
 
@@ -3211,7 +3211,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       clearSel();
       void refetch();
     } catch (e) {
-      toast.error(`Bulk No-storage failed — ${(e as Error).message}`);
+      toast.error(`Bulk No-storage failed: ${(e as Error).message}`);
     }
   }
 
@@ -3383,7 +3383,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           background: avatarColor(poDutyHolderShown.userId).bg,
           color: avatarColor(poDutyHolderShown.userId).fg,
         }}
-        title={`${personLabel(poDutyHolderShown.name, poDutyHolderShown.email)}'s queue — PO duty this month`}
+        title={`${personLabel(poDutyHolderShown.name, poDutyHolderShown.email)}'s queue. PO duty this month`}
       >
         {personInitials(poDutyHolderShown.name, poDutyHolderShown.email)}
       </span>
@@ -3577,7 +3577,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       label: "Follow-up",
       headerContent: <KitIcon name="flag" size={14} />,
       width: FOLLOW_UP_WIDTH,
-      headerTitle: "Flag an order for follow-up — amber while open, red once overdue",
+      headerTitle: "Flag an order for follow-up. Amber while open, red once overdue",
       cell: (r) => <FollowUpFlag order={r.o} tasks={r.tasks} onFlag={openFollowUp} />,
     },
     {
@@ -3605,7 +3605,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       label: dataLabel("deadline"),
       width: dataWidth("deadline"),
       headerTitle:
-        "Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before.",
+        "Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2 to 3 days before.",
       cell: (r) => <DeadlineCell o={r.o} completed={r.completed} />,
     },
     {
@@ -3624,7 +3624,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       key: "pic",
       label: dataLabel("pic"),
       width: dataWidth("pic"),
-      headerTitle: "Person in charge — who's watching this order",
+      headerTitle: "Person in charge: who's watching this order",
       cell: (r) => (
         <OwnerChip
           o={r.o}
@@ -3686,7 +3686,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         testId="orders-header"
         icon={History}
         word="Old Orders (temporary)"
-        docTitle="Old Orders (temporary) — Carres"
+        docTitle="Old Orders (temporary) · Carres"
         right={
           /* The sync SENTENCE is read once a week; the FACT rides the ⟳'s
              hover instead of spending header width on it (Loo 2026-08-02:
@@ -3695,7 +3695,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <button
               type="button"
               onClick={() => void refetch()}
-              title={`Synced ${fmtDate(latestIn)} — click to refresh`}
+              title={`Synced ${fmtDate(latestIn)}. Click to refresh`}
               aria-label="Refresh orders"
               className="p-0.5 rounded text-base-400 hover:text-base-900 hover:bg-hovertint transition-colors"
             >
@@ -3741,7 +3741,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               type="button"
               onClick={() => setEtaImportOpen(true)}
               className="btn-secondary text-meta whitespace-nowrap rounded-xl"
-              title="Import from Master — fill each order line's Stock ETA + status from your Master sheet"
+              title="Import from Master: fill each order line's Stock ETA + status from your Master sheet"
             >
               + Master
             </button>
@@ -3852,7 +3852,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 <span data-testid="orders-archive-note" className="truncate">
                   {archiveCount} imported archive order
                   {archiveCount === 1 ? " is" : "s are"} not counted in the
-                  queues — they came from the old system.
+                  queues. They came from the old system.
                 </span>
               )}
             </span>
@@ -3907,7 +3907,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     tone="danger"
                     active={dueFilter.has("Overdue")}
                     chip={emptyQueueChip}
-                    title="Past the delivery date and not delivered yet — who to call = the row's Actions cell"
+                    title="Past the delivery date and not delivered yet. Who to call = the row's Actions cell"
                     onClick={() => setDueFilter((p) => toggleInSet(p, "Overdue"))}
                   />
                 )}
@@ -3985,7 +3985,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     tone="danger"
                     active={supplierLateOnly}
                     chip={dutyQueueChip}
-                    title="The goods ETA misses or has passed the customer promise — the supplier is the problem, not the customer"
+                    title="The goods ETA misses or has passed the customer promise. The supplier is the problem, not the customer"
                     onClick={() => setSupplierLateOnly((v) => !v)}
                   />
                 )}
@@ -4005,7 +4005,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     count={escalateCount}
                     active={escalateOnly}
                     chip={emptyQueueChip}
-                    title="Escalated — orders that need a manager's decision before anyone else can act"
+                    title="Escalated: orders that need a manager's decision before anyone else can act"
                     onClick={() => setEscalateOnly((v) => !v)}
                   />
                 )}
@@ -4038,7 +4038,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       count={unassignedCount}
                       active={logisticFilter.has(NO_CARRIER)}
                       chip={picQueueChip}
-                      title="No logistics company picked yet — the Actions cell says Assign logistics once the stock is in"
+                      title="No logistics company picked yet. The Actions cell says Assign logistics once the stock is in"
                       onClick={() => setLogisticFilter((p) => toggleInSet(p, NO_CARRIER))}
                     />
                   )}
@@ -4098,10 +4098,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     // PO duty badge (0236) — the month's PO controller.
                     const isDuty = poDutyHolderShown?.userId === s.user_id;
                     const baseTitle = !s.available
-                      ? `${s.email} — marked away (planned leave); their orders shift to the others`
+                      ? `${s.email}: marked away (planned leave); their orders shift to the others`
                       : !seenTodayMYT(s.last_seen_at)
-                        ? `${s.email} — not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
-                        : `${s.email} — in today`;
+                        ? `${s.email}: not in yet today; from 10:00 their orders auto-shift to whoever is in, and flow back when they show up`
+                        : `${s.email}: in today`;
                     return (
                       <KanbanRow
                         key={s.user_id}
@@ -4127,7 +4127,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         )}
                         title={
                           isDuty
-                            ? `${baseTitle} — controls POs this month (PO duty)`
+                            ? `${baseTitle}. Controls POs this month (PO duty)`
                             : baseTitle
                         }
                         onClick={() =>
@@ -4165,7 +4165,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                             {staffInitials(s)}
                           </span>,
                         )}
-                        title={`${s.email} — account ready; her first login auto-joins the pool and deals her a share (no admin step)`}
+                        title={`${s.email}: account ready; her first login auto-joins the pool and deals her a share (no admin step)`}
                         onClick={() =>
                           setStaffFilter((f) => (f === s.user_id ? null : s.user_id))
                         }
@@ -4371,7 +4371,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       label="No region"
                       count={regionEntries.find((e) => e.region === OTHERS_LABEL)?.count ?? 0}
                       active={regionFilter.has(OTHERS_LABEL)}
-                      title="Delivery region couldn't be read from the address — fix the address"
+                      title="Delivery region couldn't be read from the address. Fix the address"
                       onClick={() => setRegionFilter((p) => toggleInSet(p, OTHERS_LABEL))}
                     />
                   )}
@@ -4380,7 +4380,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                       label="No PO"
                       count={stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0}
                       active={stockFilter === "No PO"}
-                      title="No purchase order raised yet — open the order to raise it"
+                      title="No purchase order raised yet. Open the order to raise it"
                       onClick={() => setStockFilter((r) => (r === "No PO" ? null : "No PO"))}
                     />
                   )}
@@ -4641,7 +4641,7 @@ function OrdersBulkBar({
             />
             <BulkMenuItem
               icon={MessageCircle}
-              label="Call suppliers — confirm ready date"
+              label="Call suppliers: confirm ready date"
               hint="overdue"
               tone="wa"
               onClick={() => onChaseSupplier("chase")}
@@ -4682,7 +4682,7 @@ function OrdersBulkBar({
             />
             <BulkMenuItem
               icon={MessageCircle}
-              label="Call logistics — confirm delivery date"
+              label="Call logistics: confirm delivery date"
               hint="overdue"
               tone="wa"
               onClick={() => onChasePartner("chase")}
@@ -4944,7 +4944,7 @@ function TeamPopover({
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
   const mut = useUpdateStaffSetting({
-    onError: (e) => toast.error(`Team update failed — ${e.message}`),
+    onError: (e) => toast.error(`Team update failed: ${e.message}`),
     // Any pool change re-splits IMMEDIATELY (Jess round-2: never wait for a
     // login) — Add Li Ching tonight, she owns her share tonight.
     onSuccess: () => {
@@ -4976,7 +4976,7 @@ function TeamPopover({
       <button
         type="button"
         aria-label="Manage team"
-        title="Manage team — who receives auto-assigned orders"
+        title="Manage team: who receives auto-assigned orders"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {
@@ -5024,7 +5024,7 @@ function TeamPopover({
                   type="button"
                   className="btn-ghost text-label py-0.5 px-2 text-base-500"
                   disabled={mut.isPending}
-                  title="She joins automatically the first time she logs in — click only to deal her a share before that"
+                  title="She joins automatically the first time she logs in. Click only to deal her a share before that"
                   onClick={() => mut.mutate({ userId: s.user_id, pooled: true })}
                 >
                   joins on first login
@@ -5033,7 +5033,7 @@ function TeamPopover({
                 <>
                   <label
                     className="flex items-center gap-1 text-label text-base-600 cursor-pointer"
-                    title="Planned leave — orders shift to the others while checked (day-to-day MC is automatic, no click needed)"
+                    title="Planned leave. Orders shift to the others while checked (day-to-day MC is automatic, no click needed)"
                   >
                     <input
                       type="checkbox"
@@ -5194,9 +5194,7 @@ function OwnerChip({
       <span
         className="shrink-0 w-[20px] h-[20px] rounded-full border border-dashed border-base-300 flex items-center justify-center text-label text-base-300 leading-none"
         title="No PIC yet"
-      >
-        —
-      </span>
+      />
     );
   }
   return (
@@ -5206,8 +5204,8 @@ function OwnerChip({
         aria-label={member ? `Assigned to ${staffLabel(member)}` : "Assign PIC"}
         title={
           member
-            ? `PIC: ${member.name ?? member.email} — click to reassign`
-            : "No PIC — click to assign"
+            ? `PIC: ${member.name ?? member.email}. Click to reassign`
+            : "No PIC. Click to assign"
         }
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
@@ -5411,7 +5409,7 @@ function OrderCell({ row }: { row: OrdersGridRow }) {
         {row.hasPendingChange && (
           <span
             className="ml-1 inline-block align-middle rounded-full px-1.5 py-0.5 text-label font-semibold bg-warning-soft text-base-800 border border-warning"
-            title="Product change awaiting approval — open the order to decide"
+            title="Product change awaiting approval. Open the order to decide"
             data-testid="oc-change-badge"
           >
             Change
@@ -5450,7 +5448,7 @@ function CustomerCell({ o }: { o: operationOrderListRow }) {
         className="t4-caption truncate"
         title={
           loc.area === "Outstation"
-            ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
+            ? "Outstation: no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
             : loc.label ?? undefined
         }
       >
@@ -5818,11 +5816,11 @@ function StockDot({
         break;
       case "unknown":
         key = "no_po";
-        title = "No PO raised yet — open the order to reserve stock or raise a PO";
+        title = "No PO raised yet. Open the order to reserve stock or raise a PO";
         break;
       default: // awaiting / need_po → Waiting (Partial merged in)
         key = "waiting";
-        title = "Core stock not all in yet — PO open / awaiting arrival";
+        title = "Core stock not all in yet. PO open / awaiting arrival";
         break;
     }
   }
@@ -5834,13 +5832,13 @@ function StockDot({
     if (key === "ready") return { text: "Ready", tip: title };
     if (key === "no_po") return { text: "No PO", tip: title };
     if (se.state === "no_eta" || !se.etaIso)
-      return { text: "ETA —", tip: "Waiting on stock — no supplier ETA entered yet" };
+      return { text: "No confirmed date", tip: "Waiting on stock. No supplier ETA entered yet" };
     const d = fmtDate(se.etaIso);
     if (se.state === "overdue")
       return { text: `ETA ${d}`, tip: "Supplier ETA has passed and the goods still aren't in" };
     if (se.state === "late")
       return { text: `ETA ${d}`, tip: "Supplier ETA is later than the deadline − 3 days" };
-    return { text: `ETA ${d}`, tip: "Supplier arrival ETA — on track" };
+    return { text: `ETA ${d}`, tip: "Supplier arrival ETA on track" };
   })();
 
   return (
