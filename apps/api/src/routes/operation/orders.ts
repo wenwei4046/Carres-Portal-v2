@@ -792,6 +792,130 @@ operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
  * Declared BEFORE `/:id`, which would otherwise read the word as an order id.
  */
 const MONTHLY_DEMAND_PAGE = 1000;
+/**
+ * GET /register-facts — the Order list's two server-owned fact filters
+ * (Orders MASTER §Left rail, owner approved 2026-09-22):
+ *
+ *   obligations  `outstanding` | `none` — CARD 8's derived completion through
+ *                the ONE composition the object page calls (`completionOfOrder`):
+ *                goods, money in (with storage), money out, loan.
+ *   cases        `open` | `closed` | `none` — Service's own truth
+ *                (`service_case_statuses.is_closed`); an unreadable read is
+ *                `null`, never `none`.
+ *
+ * Same population as the Register (`salesOrderRegisterPopulation`). Read-only;
+ * a fact this reader could not establish is left out, never guessed.
+ */
+operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  type OrderRow = CompletionOrderRow;
+  const orders: OrderRow[] = [];
+  for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+    const { data, error } = await salesOrderRegisterPopulation(
+      sb
+        .from("orders")
+        .select(
+          "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+        ),
+    )
+      .order("id", { ascending: true })
+      .range(from, from + MONTHLY_DEMAND_PAGE - 1);
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    const page = (data ?? []) as unknown as OrderRow[];
+    orders.push(...page);
+    if (page.length < MONTHLY_DEMAND_PAGE) break;
+  }
+  const ids = orders.map((o) => o.id);
+  const idBySoRef = new Map(orders.map((o) => [`SO-${o.so}`, o.id]));
+
+  /* Every row of a batched `.in()` read, paged so no cap hides a row. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const readAll = async <T,>(query: (batch: string[]) => any, keys: string[]): Promise<T[] | null> => {
+    const out: T[] = [];
+    for (const batch of chunk(keys, 100)) {
+      if (batch.length === 0) continue;
+      for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+        const { data, error } = await query(batch).order("id", { ascending: true }).range(from, from + MONTHLY_DEMAND_PAGE - 1);
+        if (error) return null;
+        const page = (data ?? []) as T[];
+        out.push(...page);
+        if (page.length < MONTHLY_DEMAND_PAGE) break;
+      }
+    }
+    return out;
+  };
+  const UNIT_FIELDS = "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at, reserved_ref, sold_order_id";
+  type UnitRow = CompletionUnitRow & { reserved_ref: string | null; sold_order_id: string | null };
+  const [reserved, sold, refunds, loans, invoices, cases] = await Promise.all([
+    readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "reserved").in("reserved_ref", b), [...idBySoRef.keys()]),
+    readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "sold").in("sold_order_id", b), ids),
+    readAll<{ order_id: string; status: CompletionReads["refunds"][number]["status"] }>((b) => sb.from("order_refunds").select("id, order_id, status").in("order_id", b), ids),
+    readAll<{ order_id: string } & CompletionReads["loans"][number]>((b) => sb.from("ops_sofa_loans").select("id, order_id, status, source, returned_to_supplier_at").in("order_id", b), ids),
+    readAll<{ order_id: string } & NonNullable<CompletionReads["invoices"]>[number]>((b) => sb.from("invoices").select("id, order_id, kind, status, amount, tax_amount, voided_at").in("order_id", b), ids),
+    readAll<{ order_id: string; status: { is_closed: boolean | null } | Array<{ is_closed: boolean | null }> | null }>(
+      (b) => sb.from("service_cases").select("id, order_id, status:service_case_statuses(is_closed)").in("order_id", b),
+      ids,
+    ),
+  ]);
+
+  const byOrder = <T,>(rows: T[] | null, key: (r: T) => string | null | undefined) => {
+    const map = new Map<string, T[]>();
+    for (const r of rows ?? []) {
+      const id = key(r);
+      if (!id) continue;
+      map.set(id, [...(map.get(id) ?? []), r]);
+    }
+    return map;
+  };
+  /* Completion needs all five of its reads; one that failed leaves
+     `obligations` unknown for every order rather than half-computed. */
+  const completionReadable = reserved && sold && refunds && loans && invoices;
+  const unitsBy = byOrder([...(reserved ?? []), ...(sold ?? [])], (u) =>
+    u.status === "sold" ? u.sold_order_id : idBySoRef.get(u.reserved_ref ?? ""),
+  );
+  const refundsBy = byOrder(refunds, (r) => r.order_id);
+  const loansBy = byOrder(loans, (r) => r.order_id);
+  const invoicesBy = byOrder(invoices, (r) => r.order_id);
+  const casesBy = byOrder(cases, (r) => r.order_id);
+  const storageCats = completionReadable
+    ? await storageSkuCategories(sb, orders.flatMap((o) => (o.order_lines ?? []).map((l) => String(l.sku))))
+    : new Map<string, string>();
+  const asOf = todayIsoMYT();
+
+  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }> = {};
+  for (const o of orders) {
+    const obligations = completionReadable
+      ? completionOfOrder({
+          ord: o,
+          commitmentLines: (o.order_lines ?? []).map((l) => ({ sku: l.sku, qty: Number(l.qty) || 0 })),
+          units: unitsBy.get(o.id) ?? [],
+          refunds: refundsBy.get(o.id) ?? [],
+          loans: loansBy.get(o.id) ?? [],
+          invoices: (invoicesBy.get(o.id) ?? []) as CompletionReads["invoices"],
+          storageCategories: storageCats,
+          asOf,
+        }).noActionRequired
+        ? "none"
+        : "outstanding"
+      : null;
+    let caseFact: "open" | "closed" | "none" | null = null;
+    if (cases) {
+      const mine = casesBy.get(o.id) ?? [];
+      const closed = mine.map((row) => (Array.isArray(row.status) ? row.status[0]?.is_closed : row.status?.is_closed));
+      caseFact =
+        mine.length === 0
+          ? "none"
+          : closed.some((v) => v === false)
+            ? "open"
+            : closed.every((v) => v === true)
+              ? "closed"
+              : null;
+    }
+    facts[o.id] = { obligations, cases: caseFact };
+  }
+  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null } });
+});
+
 operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   type Row = {
