@@ -21,9 +21,17 @@ alter table public.dealers
   add column if not exists bank_account_no     text,
   add column if not exists bank_account_holder text;
 
-alter table public.dealers
-  add constraint dealers_bank_account_no_format
-    check (bank_account_no ~ '^[0-9]{6,20}$');
+-- Guarded so the file can be run a second time without failing.
+do $$
+begin
+  if not exists (select 1 from pg_constraint
+                  where conname = 'dealers_bank_account_no_format'
+                    and conrelid = 'public.dealers'::regclass) then
+    alter table public.dealers
+      add constraint dealers_bank_account_no_format
+        check (bank_account_no ~ '^[0-9]{6,20}$');
+  end if;
+end $$;
 
 create or replace function public.dealer_save_master(
   p_dealer_id uuid,
