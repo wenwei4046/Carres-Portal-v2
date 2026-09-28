@@ -36,6 +36,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
+import { rpcWithArrivalTime } from "../../lib/receiving-time";
 
 /**
  * /api/operation/pos — Phase 4 backend procurement subsystem.
@@ -1801,7 +1802,7 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, officeReceiveInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("office_receive_post", {
+  const { data, error } = await rpcWithArrivalTime((args) => sb.rpc("office_receive_post", args), {
     p_po_id: c.req.param("id"),
     p_do_number: parsed.data.doNumber,
     p_do_file_path: parsed.data.doFilePath,
@@ -1832,7 +1833,7 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
         note: u.note ?? null,
       })),
     })),
-  });
+  }, parsed.data.goodsReceivedTime);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

@@ -33,6 +33,8 @@ vi.mock("@/lib/queries", async () => {
       data: { sessions: [], events: [], expected_units: [] },
       isLoading: false,
     }),
+    // 0601 — the grey automatic `Received by` asks the server; none here.
+    useReceivingReceiver: () => ({ data: { receiver: null }, isLoading: false }),
     useOfficeReceiveMutation: (
       _poId: string,
       opts?: { onError?: (e: Error) => void; onSuccess?: (d: unknown) => void },

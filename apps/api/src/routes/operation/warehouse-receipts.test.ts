@@ -1053,6 +1053,7 @@ describe("POST /:id/amend", () => {
       {
         reason: "DO number was mistyped at the gate",
         saveKey: SAVE_KEY,
+        basedOnRevision: 3,
         goodsReceivedAt: "2026-09-01",
         doNumber: "DO-9001",
         actualSiteId: SITE,
@@ -1065,6 +1066,7 @@ describe("POST /:id/amend", () => {
       p_receipt_id: RECEIPT,
       p_reason: "DO number was mistyped at the gate",
       p_changes: {
+        based_on_revision: 3,
         goods_received_at: "2026-09-01",
         do_number: "DO-9001",
         actual_site_id: SITE,
@@ -1082,12 +1084,12 @@ describe("POST /:id/amend", () => {
       `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
       "POST",
       await makeJwt("operation"),
-      { reason: "wrong DO number only", doNumber: "DO-9002" },
+      { reason: "wrong DO number only", doNumber: "DO-9002", basedOnRevision: 0 },
     );
     expect(sb.rpc).toHaveBeenCalledWith("receiving_amend", {
       p_receipt_id: RECEIPT,
       p_reason: "wrong DO number only",
-      p_changes: { do_number: "DO-9002" },
+      p_changes: { based_on_revision: 0, do_number: "DO-9002" },
       p_save_key: null,
     });
   });
@@ -1106,7 +1108,7 @@ describe("POST /:id/amend", () => {
       `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
       "POST",
       await makeJwt("operation"),
-      { reason: "correcting the received count" },
+      { reason: "correcting the received count", basedOnRevision: 0 },
     );
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string; message: string };
@@ -1311,6 +1313,7 @@ describe("POST /:id/amend — the paper's evidence (0427)", () => {
       await makeJwt("operation"),
       {
         reason: "clerk photographed the wrong DO",
+        basedOnRevision: 1,
         doFilePath: "PO-1001/corrected-do.jpg",
         arrivalEvidenceAdd: [{ path: "PO-1001/arrival-2.jpg", kind: "photo" }],
       },
@@ -1320,6 +1323,7 @@ describe("POST /:id/amend — the paper's evidence (0427)", () => {
       p_receipt_id: RECEIPT,
       p_reason: "clerk photographed the wrong DO",
       p_changes: {
+        based_on_revision: 1,
         do_file_path: "PO-1001/corrected-do.jpg",
         arrival_evidence_add: [
           { path: "PO-1001/arrival-2.jpg", kind: "photo" },
@@ -1344,3 +1348,285 @@ describe("the Warehouse boundary — it counts; it never posts, amends or voids"
     }
   });
 });
+
+/* ═══ 0601 — Receiving closure (owner rulings 2026-09-17 / 09-25 / 09-28) ══ */
+
+describe("POST /:id/amend — named Units, arrival time, first save wins (0601)", () => {
+  const UNIT_A = "55555555-5555-5555-5555-555555555555";
+  const UNIT_B = "66666666-6666-6666-6666-666666666666";
+
+  it("422 before the database when the correction does not say which version it starts from", async () => {
+    const sb = makeSb(opsTables());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      { reason: "wrong DO number only", doNumber: "DO-9002" },
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps named Units and the arrival time onto p_changes — the system never picks a Unit", async () => {
+    const sb = makeSb(opsTables(), { data: { status: "posted", revision: 2 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "the wrong Unit was scanned",
+        basedOnRevision: 1,
+        goodsReceivedTime: "2026-09-28T09:15:00+08:00",
+        units: [
+          { stockItemId: UNIT_A, outcome: "received" },
+          { stockItemId: UNIT_B, outcome: "not_received" },
+        ],
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("receiving_amend", {
+      p_receipt_id: RECEIPT,
+      p_reason: "the wrong Unit was scanned",
+      p_changes: {
+        based_on_revision: 1,
+        goods_received_time: "2026-09-28T09:15:00+08:00",
+        units: [
+          { stock_item_id: UNIT_A, outcome: "received" },
+          { stock_item_id: UNIT_B, outcome: "not_received" },
+        ],
+      },
+      p_save_key: null,
+    });
+  });
+
+  it("refuses an outcome other than Received or Not received before the database", async () => {
+    const sb = makeSb(opsTables());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "damaged after all",
+        basedOnRevision: 0,
+        units: [{ stockItemId: UNIT_A, outcome: "received_with_issue" }],
+      },
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a stale version comes back as 409 with the governed sentence", async () => {
+    const sb = makeSb(opsTables(), {
+      error: { code: "40001", message: "Someone changed this GRN. Check it again.", details: "receipt_changed" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      { reason: "wrong DO number only", doNumber: "DO-9002", basedOnRevision: 0 },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: "receipt_changed",
+      message: "Someone changed this GRN. Check it again.",
+    });
+  });
+
+  it("locked Units come back one by one, each with its own reason", async () => {
+    const locked = [
+      { unit_code: "U1-000-064", reason: "reserved", words: "Reserved for SO2609-4827" },
+      { unit_code: "U1-000-065", reason: "on_delivery_order", words: "On DO2609-1234" },
+    ];
+    const sb = makeSb(opsTables(), {
+      error: {
+        code: "P0001",
+        message: "U1-000-064 cannot change. Reserved for SO2609-4827 U1-000-065 cannot change. On DO2609-1234",
+        details: "units_locked",
+        hint: JSON.stringify(locked),
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "recount",
+        basedOnRevision: 0,
+        units: [{ stockItemId: UNIT_A, outcome: "not_received" }],
+      },
+    );
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "units_locked", units: locked });
+  });
+});
+
+describe("GET /:id — the receipt reads the Catalog category (owner 2026-09-28)", () => {
+  it("prints Not recorded when the Catalog cannot answer, never Other goods or a SKU-text guess", async () => {
+    const tables = {
+      warehouse_receipts: {
+        single: {
+          data: {
+            ...RECEIPT_ROW,
+            lines: [{ ...RECEIPT_ROW.lines[0], sku: "SMOKE King Mattress" }],
+            status: "posted",
+            grn_no: "GRN-20260904-1064",
+          },
+          error: null,
+        },
+      },
+      receiving_unit_results: { list: { data: [], error: null } },
+      receiving_events: { list: { data: [], error: null } },
+      purchase_orders: {
+        single: {
+          data: { id: "PO-1001", supplier_id: "s1", warehouse_id: WH, suppliers: { name: "Ohana" }, purchase_order_lines: [] },
+          error: null,
+        },
+      },
+      app_users: { list: { data: [], error: null } },
+      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+      product_skus: { list: { data: [], error: null } },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { line_info: Record<string, { category: string }> };
+    expect(body.line_info["SMOKE King Mattress"]!.category).toBe("Not recorded");
+  });
+
+  it("reads the arrival time, receiver and version, and still opens on a schema without them", async () => {
+    const row = { ...RECEIPT_ROW, status: "posted", grn_no: "GRN-20260928-0001" };
+    const withNew = {
+      ...row,
+      goods_received_time: "2026-09-28T01:15:00+00:00",
+      received_by_kind: "company",
+      received_by_name: "NETS",
+      revision: 2,
+    };
+    const selects: string[] = [];
+    const base = {
+      receiving_unit_results: { list: { data: [], error: null } },
+      receiving_events: { list: { data: [], error: null } },
+      purchase_orders: {
+        single: {
+          data: { id: "PO-1001", supplier_id: "s1", warehouse_id: WH, suppliers: { name: "Ohana" }, purchase_order_lines: [] },
+          error: null,
+        },
+      },
+      app_users: { list: { data: [], error: null } },
+      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+    };
+    const sb = makeSb({ ...base, warehouse_receipts: { single: { data: withNew, error: null } } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const origFrom = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const b = origFrom(table) as Record<string, unknown> & { select: (c: string) => unknown };
+      if (table === "warehouse_receipts") {
+        const orig = b.select;
+        b.select = (c: string) => {
+          selects.push(c);
+          return orig(c);
+        };
+      }
+      return b;
+    };
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(selects[0]).toContain("goods_received_time");
+    expect(selects[0]).toContain("received_by_name");
+    expect(selects[0]).toContain("revision");
+    const body = (await res.json()) as { receipt: Record<string, unknown> };
+    expect(body.receipt).toMatchObject({ received_by_kind: "company", received_by_name: "NETS", revision: 2 });
+
+    // Before 0601 is applied the new columns do not exist: the record still opens.
+    const selects2: string[] = [];
+    const sb2 = makeSb(base);
+    const from2 = sb2.from.bind(sb2);
+    sb2.from = (table: string) => {
+      const b = from2(table) as Record<string, unknown>;
+      if (table === "warehouse_receipts") {
+        b.select = (c: string) => {
+          selects2.push(c);
+          return b;
+        };
+        b.maybeSingle = () =>
+          Promise.resolve(
+            c0601(selects2[selects2.length - 1]!)
+              ? { data: null, error: { code: "42703", message: "column warehouse_receipts.goods_received_time does not exist" } }
+              : { data: row, error: null },
+          );
+      }
+      return b;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb2 as any);
+    const res2 = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res2.status).toBe(200);
+    expect(selects2.length).toBeGreaterThan(1);
+  });
+});
+
+function c0601(select: string) {
+  return select.includes("goods_received_time");
+}
+
+describe("GET /receiver — who the GRN will name, before saving (0601)", () => {
+  it("asks the one SQL rule for this Site and the signed-in saver", async () => {
+    const sb = makeSb({}, { data: { kind: "company", party_id: "p1", user_id: null, name: "NETS" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/receiver?site=${SITE}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("receiving_receiver_preview", { p_site_id: SITE });
+    expect(await res.json()).toEqual({ receiver: { kind: "company", name: "NETS" } });
+  });
+
+  it("answers no receiver when the database does not know the rule yet", async () => {
+    const sb = makeSb({}, { error: { code: "PGRST202", message: "Could not find the function" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/receiver?site=${SITE}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ receiver: null });
+  });
+
+  it("422 for a site that is not an id", async () => {
+    const res = await req(`/api/operation/warehouse-receipts/receiver?site=klang`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("GET /duty — posting and amend/void are two answers (0601)", () => {
+  it("passes may_amend through beside allowed", async () => {
+    const sb = makeSb({ app_users: { list: { data: [], error: null } } }, {
+      data: { allowed: true, may_amend: false, source: "assignment" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/warehouse-receipts/duty", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ allowed: true, may_amend: false });
+  });
+
+  it("a void by someone who is not GRN Duty comes back as 403 with the duty refusal", async () => {
+    const sb = makeSb(opsTables(), {
+      error: { code: "42501", message: "only GRN duty may amend or void a receiving", details: "not_grn_duty" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}/void`, "POST", await makeJwt("operation"), { reason: "never existed" });
+    expect(res.status).toBe(403);
+  });
+});
+

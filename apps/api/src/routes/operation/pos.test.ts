@@ -1033,6 +1033,61 @@ describe("the Office has exactly ONE receiving door", () => {
   });
 });
 
+describe("POST /api/operation/pos/:id/office-receive — the arrival time (0601)", () => {
+  const OFFICE_LINE = "33333333-3333-4333-8333-333333333333";
+  function mocks(rpc: ReturnType<typeof vi.fn>) {
+    const from = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+  }
+  const send = async (body: Record<string, unknown>) =>
+    app.fetch(
+      new Request("http://t/api/operation/pos/PO-2050/office-receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ doNumber: "DO-1234", doFilePath: "x/y.pdf", lines: [{ id: OFFICE_LINE, receivedNow: 1 }], ...body }),
+      }),
+      env,
+    );
+
+  it("passes the Goods Received Date time point to the RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { receipt_id: "r1" }, error: null });
+    mocks(rpc);
+    const res = await send({ goodsReceivedTime: "2026-09-28T09:15:00+08:00" });
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("office_receive_post");
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_goods_received_time: "2026-09-28T09:15:00+08:00" });
+  });
+
+  it("refuses a time that is not an ISO time point before the database", async () => {
+    const rpc = vi.fn();
+    mocks(rpc);
+    const res = await send({ goodsReceivedTime: "28/09/2026 9am" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("on a database without 0601 it still posts, with the KL date and no invented clock", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function public.office_receive_post" } })
+      .mockResolvedValueOnce({ data: { receipt_id: "r1" }, error: null });
+    mocks(rpc);
+    const res = await send({ goodsReceivedTime: "2026-09-27T17:30:00Z" });
+    expect(res.status).toBe(200);
+    const retry = rpc.mock.calls[1][1] as Record<string, unknown>;
+    expect(retry).not.toHaveProperty("p_goods_received_time");
+    expect(retry.p_goods_received_at).toBe("2026-09-28");
+  });
+});
+
 describe("POST /api/operation/pos/:id/cancel", () => {
   const PO_ID = "PO-2030";
 

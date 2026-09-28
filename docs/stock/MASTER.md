@@ -632,7 +632,8 @@ is a gate. The UI offers the `Receive` control on exactly the same global answer
 server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
 decision and is not assumed here.**
 
-**EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT.**
+**EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25. The SQL gate is BUILT ON BRANCH
+`build/receiving-closure` (migration 0601, not applied); the Warehouse Settings `Access` row is not built.**
 Receiving is never blocked because the GRN Duty holder is on MC or busy: every active Carres
 Operation staff member (and the Principal) sees `Receive` on the row and may post a receipt. GRN Duty
 still OWNS the Work card (`Receive the goods`) and its lateness; the actual receiver is recorded on
@@ -642,8 +643,8 @@ and capability are different facts). `Not your duty today` is retired as a refus
 only refusals left are `No Site linked` and a Site that is not a Carres or transit Site. Warehouse
 Settings → `Access` shows this as `Receive goods · Everyone in Operation` by default, with the option
 to narrow it later. The database gate `receiving_require_post_authority` (GRN Duty · cover ·
-Operations Superuser) is overwritten by this ruling and must widen to active Operation staff in the
-same build.
+Operations Superuser) is overwritten by this ruling for posting; 0601 widens it to active Operation
+staff and the principal. Amend and Void Receiving keep the GRN Duty authority.
 
 **SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
 BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres

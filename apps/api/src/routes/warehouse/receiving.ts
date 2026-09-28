@@ -4,6 +4,7 @@ import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { rpcWithArrivalTime } from "../../lib/receiving-time";
 
 /**
  * /api/warehouse — R6 of the receiving & claim queue
@@ -76,7 +77,7 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
   const body = parsed.data;
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("warehouse_submit_receipt", {
+  const { data, error } = await rpcWithArrivalTime((args) => sb.rpc("warehouse_submit_receipt", args), {
     p_po_id: body.poId,
     p_do_number: body.doNumber,
     p_do_file_path: body.doFilePath,
@@ -103,7 +104,7 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
         note: u.note ?? null,
       })),
     })),
-  });
+  }, body.goodsReceivedTime);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

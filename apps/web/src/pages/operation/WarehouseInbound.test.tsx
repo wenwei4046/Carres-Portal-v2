@@ -426,13 +426,14 @@ describe("Inbound · receiving happens here", () => {
     expect(screen.queryByTestId("inbound-receive-denied-PO-1")).toBeNull();
   });
 
-  it("refuses the door to an operator whose duty it is not", async () => {
+  it("offers no door to a viewer who is not Operation staff — and never says Not your duty today (0601)", async () => {
     h.duty = { allowed: false, loading: false };
     mount("&site=w");
     await screen.findByTestId("inbound-row-PO-1");
     expect(screen.getByTestId("inbound-receive-denied-PO-1")).toHaveTextContent(
-      "Not your duty today",
+      "Only Operation staff may save a receiving.",
     );
+    expect(screen.queryByText("Not your duty today")).toBeNull();
     expect(screen.queryByTestId("inbound-receive-PO-1")).toBeNull();
   });
 });

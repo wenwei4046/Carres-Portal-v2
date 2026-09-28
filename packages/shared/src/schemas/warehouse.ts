@@ -25,6 +25,9 @@ export const warehouseSubmitReceiptInput = z
     doNumber: z.string().trim().min(3, "DO number is required").max(64),
     doFilePath: z.string().trim().min(1, "A photo of the signed DO is required").max(500),
     note: z.string().trim().max(500).optional(),
+    /** 0601 — when the goods physically arrived (ISO with offset), captured
+     *  at the count. Omitted = now. Never in the future. */
+    goodsReceivedTime: z.string().datetime({ offset: true }).optional(),
     /** 0426 — arrival photo/video evidence beside the signed DO. */
     arrivalEvidence: z
       .array(

@@ -373,4 +373,23 @@ describe("the count form — per-unit scanning (0426)", () => {
       { unitCode: "U-260904-0002", outcome: "received" },
     ]);
   });
+
+  it("the count carries when the goods arrived — a KL date AND time, now by default (0601)", async () => {
+    await openUnitForm();
+    const when = screen.getByLabelText("Goods Received Date *");
+    expect(when).toHaveAttribute("type", "datetime-local");
+    expect((when as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    fireEvent.change(when, { target: { value: "2026-09-04T08:40" } });
+    fireEvent.change(screen.getByLabelText("DO number *"), { target: { value: "DO-9001" } });
+    fireEvent.click(screen.getByTestId("mock-do-upload"));
+    const save = screen.getByRole("button", { name: "Return count to Carres" });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(apiFetchMock.mock.calls.some((c) => c[0] === "/api/warehouse/receipts")).toBe(true),
+    );
+    const call = apiFetchMock.mock.calls.find((c) => c[0] === "/api/warehouse/receipts")!;
+    const body = JSON.parse((call[1] as { body: string }).body);
+    expect(body.goodsReceivedTime).toBe("2026-09-04T08:40:00+08:00");
+  });
 });

@@ -11,6 +11,7 @@ import {
   type WarehouseReceiptLineDraft,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appDateTimeInput, appDateTimeInputToIso } from "@/lib/fmt-date";
 import { useWarehouseSubmitReceiptMutation } from "@/lib/queries";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
@@ -81,6 +82,10 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
   const [wrongType, setWrongType] = useState<Record<string, string>>({});
   const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>({});
   const [doNumber, setDoNumber] = useState("");
+  /** 0601 · when the goods physically arrived — captured HERE, at the count,
+   *  never derived from when Carres files it. Seeded with now in Kuala
+   *  Lumpur; the server refuses a future time. */
+  const [receivedAt, setReceivedAt] = useState(() => appDateTimeInput());
   const [note, setNote] = useState("");
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [arrivalEvidence, setArrivalEvidence] = useState<
@@ -238,6 +243,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         poId: po.po_id,
         doNumber: doNumber.trim(),
         doFilePath,
+        ...(receivedAt ? { goodsReceivedTime: appDateTimeInputToIso(receivedAt) } : {}),
         note: note.trim() || undefined,
         ...(arrivalEvidence.length > 0 ? { arrivalEvidence } : {}),
         lines: draftLines
@@ -560,6 +566,19 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
       </div>
 
       <div className="grid gap-3 mb-4">
+        <div>
+          <label className="label mb-1.5 block" htmlFor="wh-received-at">
+            Goods Received Date *
+          </label>
+          <input
+            id="wh-received-at"
+            type="datetime-local"
+            value={receivedAt}
+            max={appDateTimeInput()}
+            onChange={(e) => setReceivedAt(e.target.value)}
+            className={INPUT_CLS}
+          />
+        </div>
         <div>
           <label className="label mb-1.5 block" htmlFor="wh-do-number">
             DO number *

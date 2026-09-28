@@ -73,6 +73,12 @@ const h = vi.hoisted(() => ({
   amend: [] as Array<[string, Record<string, unknown>]>,
   voided: [] as Array<[string, Record<string, unknown>]>,
   review: [] as Array<[string, Record<string, unknown>]>,
+  /** 0601 — the server's refusal the next amendment save answers with. */
+  amendError: null as null | { message: string; body: unknown },
+  /** 0601 — may amend / void (GRN Duty authority), apart from posting. */
+  mayAmend: true,
+  /** 0601 — who the form's grey automatic `Received by` names. */
+  receiver: null as null | { kind: "company" | "staff"; name: string | null },
 }));
 
 vi.mock("@/lib/queries", async () => {
@@ -83,7 +89,7 @@ vi.mock("@/lib/queries", async () => {
   return {
     ...actual,
     useReceivingDuty: () => ({
-      data: { allowed: h.dutyAllowed },
+      data: { allowed: h.dutyAllowed, may_amend: h.mayAmend },
       isLoading: false,
       isError: false,
     }),
@@ -191,9 +197,23 @@ vi.mock("@/lib/queries", async () => {
       isError: h.sessionDetail == null,
       refetch: () => Promise.resolve(),
     }),
-    useReceivingAmendMutation: (id: string) => ({
-      mutate: (body: Record<string, unknown>) => h.amend.push([id, body]),
+    useReceivingAmendMutation: (
+      id: string,
+      opts?: { onError?: (e: unknown) => void },
+    ) => ({
+      mutate: (body: Record<string, unknown>) => {
+        h.amend.push([id, body]);
+        if (h.amendError) {
+          const e = Object.assign(new Error(h.amendError.message), { body: h.amendError.body });
+          opts?.onError?.(e);
+        }
+      },
       isPending: false,
+    }),
+    useReceivingReceiver: () => ({
+      data: { receiver: h.receiver },
+      isLoading: false,
+      isError: false,
     }),
     useReceivingVoidMutation: (id: string) => ({
       mutate: (body: Record<string, unknown>) => h.voided.push([id, body]),
@@ -558,6 +578,9 @@ beforeEach(() => {
   h.sessionDetail = null;
   h.officeReceive.length = 0;
   h.amend.length = 0;
+  h.amendError = null;
+  h.mayAmend = true;
+  h.receiver = null;
   h.voided.length = 0;
   h.review.length = 0;
   apiFetchMock.mockClear();
@@ -1084,6 +1107,16 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(ask.to).toBeNull();
   });
 
+  it("Goods Received Date carries its KL clock, or says Time not recorded on an older GRN (0601)", () => {
+    h.receipts = [
+      { ...(REGISTER_ROWS[0] as Record<string, unknown>), goods_received_time: "2026-09-01T01:15:00+00:00" },
+      REGISTER_ROWS[2],
+    ];
+    renderPage();
+    expect(screen.getByTestId("grn-received-r-posted")).toHaveTextContent("09:15");
+    expect(screen.getByTestId("grn-received-r-voided")).toHaveTextContent("Time not recorded");
+  });
+
   it("the cells speak the server-resolved facts, in the governed words", () => {
     renderPage();
     // The GRN paper's own item words, and the governed supplier answer.
@@ -1206,13 +1239,13 @@ describe("ReceivingWorkspace — the pre-start object", () => {
     expect(await screen.findByTestId("receiving-mode")).toBeInTheDocument();
   });
 
-  it("without GRN duty the button is replaced by the refusal sentence", () => {
+  it("a viewer who is not Operation staff gets the refusal sentence, never the button", () => {
     renderWithProviders(
       <WorkspaceHarness poRow={PRE_START} dutyAllowed={false} />,
     );
     expect(screen.queryByTestId("start-receiving")).not.toBeInTheDocument();
     expect(screen.getByTestId("receiving-duty-refusal")).toHaveTextContent(
-      "Only GRN duty may save a receiving.",
+      "Only Operation staff may save a receiving.",
     );
   });
 
@@ -1368,6 +1401,32 @@ describe("ReceivingWorkspace — the active Session", () => {
     expect(bf.units).toBeUndefined();
   });
 
+  it("Goods Received Date is a date AND time, starting now in Kuala Lumpur, and travels as a time point (0601)", async () => {
+    startSession();
+    const when = screen.getByTestId("goods-received-at");
+    expect(when).toHaveAttribute("type", "datetime-local");
+    // The fixed business clock: 6 Sep 2026 12:00 in Kuala Lumpur.
+    expect(when).toHaveValue("2026-09-06T12:00");
+    fireEvent.change(when, { target: { value: "2026-09-06T09:15" } });
+    fireEvent.change(screen.getByTestId("do-number"), { target: { value: "DO-5512" } });
+    fireEvent.click(screen.getByTestId("mock-do-upload"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
+    await waitFor(() => expect(screen.getByTestId("receiving-save")).toHaveTextContent("Save Receiving"));
+    fireEvent.click(screen.getByTestId("receiving-save"));
+    const [, body] = h.officeReceive[0]!;
+    expect(body.goodsReceivedTime).toBe("2026-09-06T09:15:00+08:00");
+    expect(body.goodsReceivedAt).toBeUndefined();
+  });
+
+  it("names who received it as a grey automatic fact — nobody types it (0601)", () => {
+    h.receiver = { kind: "company", name: "NETS" };
+    startSession();
+    const box = screen.getByTestId("received-by");
+    expect(box).toHaveTextContent("NETS");
+    expect(box.getAttribute("data-kit")).toBe("automatic-field");
+    expect(box.tagName).not.toBe("INPUT");
+  });
+
   it("says what saving will do — Inventory in, extra goods never available stock", () => {
     startSession();
     const consequences = screen.getByTestId("posting-consequences");
@@ -1512,7 +1571,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     ]);
   });
 
-  it("without GRN duty the review offers the refusal sentence instead of buttons", () => {
+  it("a viewer who is not Operation staff gets the refusal sentence instead of review buttons", () => {
     h.dutyAllowed = false;
     h.sessionDetail = postedDetail({
       receipt: { status: "submitted", grn_no: null, posted_at: null },
@@ -1523,7 +1582,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("return-count-door")).not.toBeInTheDocument();
     expect(screen.getByTestId("review-duty-refusal")).toHaveTextContent(
-      "Only GRN duty may save a receiving.",
+      "Only Operation staff may save a receiving.",
     );
   });
 
@@ -1590,6 +1649,95 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     const [, body] = h.amend[0];
     expect(body.actualSiteId).toBe("wh-setia");
     expect(body.doFilePath).toBe("dos/PO-2001/do.pdf");
+  });
+
+  it("an Operation staff member who may post but is not GRN Duty sees no Amend or Void (0601)", () => {
+    h.dutyAllowed = true;
+    h.mayAmend = false;
+    h.sessionDetail = postedDetail();
+    renderRecord();
+    expect(screen.queryByTestId("amend-receiving-door")).toBeNull();
+    expect(screen.queryByTestId("grn-more-menu")).toBeNull();
+  });
+
+  it("while the same person may still save a submitted count (0601)", () => {
+    h.dutyAllowed = true;
+    h.mayAmend = false;
+    h.sessionDetail = postedDetail({ receipt: { status: "submitted", grn_no: null, posted_at: null } });
+    renderRecord();
+    expect(screen.getByTestId("save-receiving-review")).toBeInTheDocument();
+  });
+
+  it("prints the arrival clock in Kuala Lumpur and names who received it (0601)", () => {
+    h.sessionDetail = postedDetail({ receipt: {
+      goods_received_at: "2026-09-01",
+      goods_received_time: "2026-09-01T01:15:00+00:00",
+      received_by_kind: "company",
+      received_by_name: "NETS",
+    } });
+    renderRecord();
+    expect(screen.getByTestId("record-goods-received")).toHaveTextContent("Tue, 1 Sep 09:15");
+    expect(screen.getByTestId("record-goods-received")).not.toHaveTextContent("Time not recorded");
+    expect(screen.getByTestId("record-received-by")).toHaveTextContent("NETS");
+  });
+
+  it("an older GRN says Time not recorded and Not recorded — never a guess (0601)", () => {
+    h.sessionDetail = postedDetail({ receipt: { goods_received_at: "2026-09-01" } });
+    renderRecord();
+    expect(screen.getByTestId("record-goods-received")).toHaveTextContent("Time not recorded");
+    expect(screen.getByTestId("record-received-by")).toHaveTextContent("Not recorded");
+  });
+
+  it("Amend names each Unit — Received ↔ Not received — and saves from the version it read (0601)", async () => {
+    h.sessionDetail = postedDetail({ receipt: { revision: 3 } });
+    renderRecord();
+    fireEvent.click(screen.getByTestId("amend-receiving-door"));
+    fireEvent.change(screen.getByTestId("amend-reason"), { target: { value: "Wrong Unit scanned" } });
+    // A Unit received with an issue is corrected through its claim, not here.
+    expect(screen.queryByTestId("amend-unit-si2")).toBeNull();
+    fireEvent.change(screen.getByTestId("amend-unit-si1"), { target: { value: "not_received" } });
+    const save = screen.getByTestId("amend-save");
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    const [, body] = h.amend[0]!;
+    expect(body.basedOnRevision).toBe(3);
+    expect(body.units).toEqual([{ stockItemId: "si1", outcome: "not_received" }]);
+    expect(body.lines).toBeUndefined();
+  });
+
+  it("Amend corrects the arrival time as a KL time point (0601)", async () => {
+    h.sessionDetail = postedDetail({ receipt: { goods_received_time: "2026-09-01T01:15:00+00:00" } });
+    renderRecord();
+    fireEvent.click(screen.getByTestId("amend-receiving-door"));
+    const when = screen.getByTestId("amend-received-at");
+    expect(when).toHaveAttribute("type", "datetime-local");
+    expect(when).toHaveValue("2026-09-01T09:15");
+    fireEvent.change(screen.getByTestId("amend-reason"), { target: { value: "Clock was wrong" } });
+    fireEvent.change(when, { target: { value: "2026-09-01T10:30" } });
+    const save = screen.getByTestId("amend-save");
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    const [, body] = h.amend[0]!;
+    expect(body.goodsReceivedTime).toBe("2026-09-01T10:30:00+08:00");
+    expect(body.basedOnRevision).toBe(0);
+  });
+
+  it("a locked Unit is refused on its own row with its own reason (0601)", async () => {
+    h.sessionDetail = postedDetail();
+    h.amendError = {
+      message: "U-0001 cannot change. Reserved for SO2609-4827",
+      body: { code: "units_locked", units: [{ unit_code: "U-0001", reason: "reserved", words: "Reserved for SO2609-4827" }] },
+    };
+    renderRecord();
+    fireEvent.click(screen.getByTestId("amend-receiving-door"));
+    fireEvent.change(screen.getByTestId("amend-reason"), { target: { value: "Wrong Unit scanned" } });
+    fireEvent.change(screen.getByTestId("amend-unit-si1"), { target: { value: "not_received" } });
+    const save = screen.getByTestId("amend-save");
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    expect(await screen.findByTestId("amend-unit-locked-si1")).toHaveTextContent(
+      "cannot change. Reserved for SO2609-4827",
+    );
   });
 
   it("Void Receiving hides in More ▾ — not a normal primary action — and walks impact → reason → void", () => {

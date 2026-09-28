@@ -3280,11 +3280,8 @@ Supplier and `Supplier DO No`; the linked source PO/version where applicable; in
 is creation time; `Goods Received Date` is physical receipt time. Follow the shared date
 and time-zone dictionary, not the pasted sample's older labels.
 
-The receiving person is the actual person evidenced for this receipt, never today's
-`GRN Duty` holder substituted into historical paper. Do not infer a physical receiver
-from the data-entry actor when those differ; preserve the recorded distinction and
-state missing evidence rather than inventing a person. Exact person-label presentation
-must use COPY; this ruling approves the fact, not a newly invented label.
+The receiver is the party ruled in `WHO RECEIVED THE GOODS` below, never today's
+`GRN Duty` holder substituted into historical paper; missing evidence prints `Not recorded`.
 
 Keep item and its exact Unit IDs together. Separate accepted `Received Qty`,
 `Damaged Qty`, `Wrong Item Qty` and `Pending Delivery Qty`. `Physical arrived Qty`
@@ -3381,17 +3378,28 @@ and `U1-000-` regular. Order 1 / Received 0 / Damaged 1 / Pending 1 and the sepa
 remained. This one-Unit live record does not prove consecutive-range grouping;
 that boundary is covered by local actual-PDF mixed-outcome tests. No receipt was changed.
 
-**Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
-evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
-posting evidence; resolve the authoritative receiver before claiming the complete GRN
-target. Actual arrival time remains a separate schema gap under §9.3; never derive it
-from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
-other GRN document requirements remain open; the implemented composition and linkage
-do not claim the complete document target. The authenticated historical SMOKE item
-also printed `Other goods`: the receipt reader calls the shared
-`goodsCategoryWordOf` fallback. This is a measured category-convergence gap, not proof
-that the Catalog recorded that category; do not silently replace Catalog facts or
-infer a missing-row result from an unsuccessful read.
+**WHO RECEIVED THE GOODS — owner ruling 2026-09-28 (Jess). BUILT ON BRANCH `build/receiving-closure`
+(migration 0601, NOT YET APPLIED).**
+The GRN names the party that physically received the goods, not a person's name. At a
+partner-run warehouse the receiver is the operating company (NETS today; its PIC changes, so a
+name is not recorded and never asked) and the signed Supplier DO photo is the proof. At a
+Carres-run site (Office direct receiving, a Carres showroom) the receiver is the Carres staff
+member who saved the receipt, shown as a system-filled grey `Fact automatic` box. The paper prints
+`Received by {company or staff name}`. Posting evidence (normal holder · dated cover · actual
+actor) stays separate and is never relabelled as the receiver.
+Built: one SQL rule (`receiving_receiver_of`) reads the Site's `Operated by` party
+(`warehouse_site_profiles.operating_party_id`). An outside operator (not the Carres party, not a
+showroom) is the receiver; otherwise the saver is, by name only when the account is a person. A
+trigger stamps it when any door posts. The form shows it before saving as a grey automatic fact.
+Older GRNs print `Received by Not recorded`.
+
+**Remaining document boundary.** Arrival time and category are BUILT ON BRANCH (0601, not
+applied). `Goods Received Date` is stored as a time point (`goods_received_time`), captured on
+Office receiving and on the Warehouse count (default now in Kuala Lumpur, never in the future), and
+printed in KL time on the register, record and GRN. Older records keep their date and `Time not
+recorded`. The receipt reader prints the Catalog category (`catalogCategoryWordOf`), or `Not
+recorded`; never `Other goods` or a SKU-text guess. Still open: physical/cumulative quantity
+presentation and historical source-version evidence.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
@@ -3527,9 +3535,9 @@ Warehouse submits count                (or Operation enters goods directly)
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods Received Date` = the physical arrival date and time, stored as a time point with time
-  zone and shown in `Asia/Kuala_Lumpur` on screen and PDF (APPROVED / NOT BUILT, 2026-09-17; the
-  column is date-only today). An older record keeps its date and shows `Time not recorded`; it is
-  never back-filled to midnight or to the save time. `Actual Site`, `Delivery Location`
+  zone and shown in `Asia/Kuala_Lumpur` on screen and PDF (Jess 2026-09-17; BUILT ON BRANCH, 0601
+  not applied: `goods_received_time`, the old date column kept in step). An older record keeps its
+  date and shows `Time not recorded`; it is never back-filled to midnight or to the save time. `Actual Site`, `Delivery Location`
   and `Goods Received At` are retired from every Receiving surface, filter, table, export, GRN
   and report; `Delivery Location` stays reserved for the customer's delivery address.
 - **The formal GRN document (owner correction §4).** Every GRN renders as a real official A4
@@ -3559,15 +3567,21 @@ Warehouse submits count                (or Operation enters goods directly)
 - **One engine, three doors, one authority.** Office direct receiving (`office_receive_post`),
   the external Warehouse two-step (`warehouse_submit_receipt` → GRN Duty review), and the review
   doors (`warehouse_receipt_check_in` / `_return`) all pass `warehouse_receipt_validate_lines`
-  and `operation_receive_po_with_do`. Every posting/review door is gated on
-  `receiving_actor_context()` (0425): **GRN Duty, its dated cover, or an Operations Superuser** —
-  at page, API and SQL. The posting stores the duty-evidence trio (normal holder · dated cover ·
+  and `operation_receive_po_with_do`. **Who may post (owner ruling 2026-09-25, recorded in §7.3):** every
+  active Operation staff member may post a receipt; receiving is never blocked because the GRN
+  Duty holder is absent. GRN Duty keeps the Work card; the GRN records the actual actor. The
+  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten for POSTING only. BUILT ON BRANCH (0601, not
+  applied): `allowed` means an active Operation staff member or the principal; a non-duty saver is
+  labelled `Operation staff`. **Amend Receiving and Void Receiving authority is unchanged:** GRN
+  Duty, its dated cover or an Operations Superuser (`may_amend`, `receiving_require_amend_authority`,
+  refusals `no_grn_duty_holder` / `not_grn_duty`), in page, API and SQL. The Warehouse role still
+  cannot post, amend or void. The posting stores the duty-evidence trio (normal holder · dated cover ·
   actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
   Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
   into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
-  so plainly and protected posting refuses (`no_grn_duty_holder`); the manager assigns the holder
-  in `Workspace → Staff & Duties`.
+  so plainly and the Work card is unassigned; posting is not refused. The manager assigns the
+  holder in `Workspace → Staff & Duties`.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
   formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
@@ -3610,17 +3624,20 @@ Warehouse submits count                (or Operation enters goods directly)
   available stock. `Goods Received Date` is the physical arrival date and time (see above).
 - **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) corrects a recording
   mistake only; damage or returns found later go to Supplier Claims / returns, never rewritten as
-  "not received". **APPROVED / NOT BUILT (Jess, 2026-09-17):**
+  "not received". **Jess 2026-09-17 — BUILT ON BRANCH (0601, not applied):**
   - The person names each exact Unit in both directions (`Received` ↔ `Not received`); the system
     never picks another Unit (today the function picks the newest free or oldest incoming Unit —
     that behaviour is retired). Received Qty is counted from the named Unit outcomes — the `Received` ones only; a `Received with issue` Unit is a physical arrival that counts in `Damaged Qty`, never in `Received Qty` (COPY-STANDARD, correction 2026-09-23). Quantity lines
     keep quantity edits.
   - Checks follow what changes. A change to a Unit outcome or to `Goods arrived at` is refused per
     affected Unit that is reserved, on a DO, delivered or on a Supplier Claim (the Claim check is
-    added), naming the reason on that Unit. Corrections to Supplier DO No and evidence are not
-    blocked by other locked Units, but still pass permission and audit.
+    added), naming the reason on that Unit. A Unit bound by `Use this PO` while still incoming is a
+    normal arrival, not a lock: marking it Received makes it reserved for its line (0600 trigger). Corrections to Supplier DO No and evidence are not
+    blocked by other locked Units, but still pass permission and audit. A changed `Goods arrived
+    at` moves this GRN's arrived Units and counted stock to the new Site.
   - Concurrency: the first save wins; a later save based on an older version is refused as a whole
-    with `Someone changed this GRN. Check it again.` Nothing is partly saved.
+    with `Someone changed this GRN. Check it again.` Nothing is partly saved. Built with
+    `warehouse_receipts.revision`; every save states the revision it read.
   - Every amendment keeps reason, before/after, actor and time in the append-only history and prints
     on the GRN.
   `Void Receiving` (`receiving_void`) is only for a GRN that should never have existed: full exact

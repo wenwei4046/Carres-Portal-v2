@@ -335,7 +335,7 @@ export default function WarehouseInbound() {
                 className="text-meta text-base-500"
                 data-testid={`inbound-receive-denied-${r.id}`}
               >
-                Not your duty today
+                Only Operation staff may save a receiving.
               </span>
             );
           return (
