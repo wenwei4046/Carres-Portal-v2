@@ -760,13 +760,13 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("the GRN Doc Date group lists weeks, months and Choose dates — and a week's arrow only OPENS it", async () => {
     renderPage();
     const rail = within(screen.getByTestId("receiving-rail"));
-    // Two weeks, each counting the GRNs CREATED in it — 31 Aug – 6 Sep holds
-    // the Tuesday record, 24 – 30 Aug holds the SUNDAY one.
+    // Two weeks, each counting the GRNs CREATED in it — 31 Aug to 6 Sep holds
+    // the Tuesday record, 24 to 30 Aug holds the SUNDAY one.
     const week = rail.getByTestId("rail-grn-week-2026-08-31");
-    expect(week).toHaveTextContent("31 Aug – 6 Sep");
+    expect(week).toHaveTextContent("31 Aug to 6 Sep");
     expect(week).toHaveTextContent("1");
     expect(rail.getByTestId("rail-grn-week-2026-08-24")).toHaveTextContent(
-      "24 – 30 Aug",
+      "24 to 30 Aug",
     );
     // Months and Choose dates… are the coarser and the free choice.
     expect(rail.getByTestId("rail-grn-month-2026-09")).toHaveTextContent("Sep 2026");
@@ -1069,7 +1069,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // says what it does — not a decorative caret.
     expect(arrow.tagName).toBe("BUTTON");
     expect(arrow).toHaveAttribute("aria-expanded", "false");
-    expect(arrow).toHaveAccessibleName("Show the days in 24 – 30 Aug");
+    expect(arrow).toHaveAccessibleName("Show the days in 24 to 30 Aug");
     arrow.focus();
     expect(document.activeElement).toBe(arrow);
     fireEvent.keyDown(arrow, { key: "Enter" });

@@ -258,7 +258,7 @@ function seedTwoScopes() {
   };
   docsState.data = {
     deliveryOrders: [
-      doc({ id: "do-row-1", do_number: "DO-040926-0001", delivery_date: "2026-09-04", time_slot: "11:00–13:00" }),
+      doc({ id: "do-row-1", do_number: "DO-040926-0001", delivery_date: "2026-09-04", time_slot: "11:00 to 13:00" }),
     ],
     attempts: [],
     handoverEvents: [],
@@ -270,7 +270,7 @@ function seedTwoScopes() {
         partner_id: "p-nets",
         partner_name: "NETS",
         confirmed_date: "2026-09-05",
-        confirmed_time: "14:00–16:00",
+        confirmed_time: "14:00 to 16:00",
         expected_arrival: "15:00",
       }),
     ],
@@ -303,7 +303,7 @@ describe("the shape", () => {
     expect(within(control).getByRole("tab", { name: "Day" })).toBeTruthy();
     expect(within(control).getByRole("tab", { name: "Month" })).toBeTruthy();
     // The toolbar states the range in the governed date spelling.
-    expect(screen.getByText(/Mon, 31 Aug\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+    expect(screen.getByText(/Mon, 31 Aug\s*to\s*Sat, 5 Sep/)).toBeTruthy();
   });
 
   it("draws one 50px Destination Header saying Monitor, with no page-owned control in it", () => {
@@ -628,7 +628,7 @@ describe("one card", () => {
     expect(within(card).getByText("DO-040926-0001")).toBeTruthy();
     expect(within(card).queryByText("Kong Chai Yin")).toBeNull();
     expect(within(card).getByText("Klang, Selangor")).toBeTruthy();
-    expect(within(card).getByText("11:00–13:00")).toBeTruthy();
+    expect(within(card).getByText("11:00 to 13:00")).toBeTruthy();
     expect(within(card).getByRole("link").getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
 
@@ -820,7 +820,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
   it("a fully booked card keeps its window and its confirmed pill", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=week");
     const card = screen.getByTestId("delivery-monitor-card-a");
-    expect(within(card).getByText("11:00–13:00")).toBeTruthy();
+    expect(within(card).getByText("11:00 to 13:00")).toBeTruthy();
     expect(within(card).queryByText("No time agreed")).toBeNull();
     expect(within(card).queryByTestId("delivery-monitor-card-act-a")).toBeNull();
   });
@@ -1344,7 +1344,7 @@ describe("tablet Week is a fixed three-day window", () => {
       expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
     }
     expect(screen.queryByTestId("delivery-monitor-day-2026-08-31")).toBeNull();
-    expect(screen.getByText(/Thu, 3 Sep\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+    expect(screen.getByText(/Thu, 3 Sep\s*to\s*Sat, 5 Sep/)).toBeTruthy();
   });
 
   it("previous/next replaces the visible three-day window", () => {
@@ -1553,7 +1553,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
           confirmed_date: "2026-09-04",
           /* BOTH halves — a day AND a window. A day alone keeps the row in the
              contact queue (owner ruling 2026-09-11). */
-          confirmed_time: "09:00–11:00",
+          confirmed_time: "09:00 to 11:00",
         }),
       ],
     };

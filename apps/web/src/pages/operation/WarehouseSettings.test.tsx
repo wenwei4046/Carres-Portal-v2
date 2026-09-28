@@ -289,7 +289,7 @@ describe("Working Hours", () => {
     });
     wrap("working-hours");
     await screen.findByTestId("warehouse-working-hours");
-    expect(screen.getByTestId("hours-1-receiving").textContent).toBe("09:00–17:00");
+    expect(screen.getByTestId("hours-1-receiving").textContent).toBe("09:00 to 17:00");
     expect(screen.getByTestId("hours-1-collection").textContent).toBe("Closed");
   });
 
