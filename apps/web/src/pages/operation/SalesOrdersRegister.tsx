@@ -45,7 +45,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GOODS_CATEGORY_WORDS,
   MONTHLY_DEMAND_CATEGORIES,
+  REGISTER_DELIVERY_CONDITIONS,
   goodsCategoryWordOf,
+  registerDeliveryConditionOf,
+  type RegisterDeliveryCondition,
   monthlyDemandOf,
   monthlyDemandWindowOf,
   type MonthlyDemandCategory,
@@ -55,6 +58,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   DataGrid,
+  dateMatchesPreset,
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
@@ -98,6 +102,7 @@ import {
   NO_PO_YET,
   NOT_IN_CATALOG,
   REGISTER_FIELDS,
+  salesLocationOf,
   type RegisterField,
   type RegisterRow,
 } from "./sales-order-columns";
@@ -391,6 +396,25 @@ function useNarrowCanvas(): [(node: HTMLDivElement | null) => void, boolean] {
  * that view and never carry into the Order list.
  */
 const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"] as const;
+/* The Order list's own rail (Orders MASTER §Left rail, owner approved
+   2026-09-22). Read-only FACT filters: none is a status or a work queue. */
+const LIST_PARAMS = ["dealer", "state", "city", "date", "range", "delivery", "requested"] as const;
+const LIST_DATE_FIELDS = [
+  { key: "proceed", label: "Proceed Date" },
+  { key: "doc", label: "SO Doc Date" },
+  { key: "requested", label: "Customer Requested Delivery Date" },
+] as const;
+type ListDateField = (typeof LIST_DATE_FIELDS)[number]["key"];
+const LIST_RANGES = [
+  { key: "today", label: "Today" },
+  { key: "thisWeek", label: "This week" },
+  { key: "thisMonth", label: "This month" },
+] as const;
+type ListRange = (typeof LIST_RANGES)[number]["key"];
+const listDateOf = (r: RegisterRow, field: ListDateField): string | null =>
+  field === "doc" ? r.ordered : field === "requested" ? r.customerDelivery : r.proceeded;
+const distinctWords = (values: Iterable<string | null | undefined>) =>
+  [...new Set([...values].map((v) => v?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b));
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DEFAULT_MONTHS = 6;
 
@@ -658,8 +682,9 @@ export default function SalesOrdersRegister() {
       writeParams((params) => {
         if (next === "monthly") {
           params.set("view", "monthly");
-          /* The Order list's narrowing is the Order list's. */
-          params.delete("requested");
+          /* The Order list's narrowing is the Order list's: nothing carries
+             over between the two views. */
+          for (const key of LIST_PARAMS) params.delete(key);
         } else {
           params.delete("view");
           for (const key of MONTHLY_PARAMS) params.delete(key);
@@ -730,6 +755,36 @@ export default function SalesOrdersRegister() {
     [navigate],
   );
   const requested = view === "list" ? requestedNarrowingOf(urlParams.get("requested")) : null;
+  /* The Order list's rail facts, read only in that view. */
+  const listDealer = monthly ? null : urlParams.get("dealer");
+  const listState = monthly ? null : urlParams.get("state");
+  const listCity = monthly ? null : urlParams.get("city");
+  const listDateField: ListDateField =
+    LIST_DATE_FIELDS.find((f) => f.key === urlParams.get("date"))?.key ?? "proceed";
+  const listRange: ListRange | null = monthly
+    ? null
+    : LIST_RANGES.find((r) => r.key === urlParams.get("range"))?.key ?? null;
+  const listDelivery: RegisterDeliveryCondition | null = monthly
+    ? null
+    : REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === urlParams.get("delivery"))?.key ?? null;
+  /* A facet row clicked again is deselected (no Clear button in the rail). */
+  const toggleParam = useCallback(
+    (key: string, value: string) =>
+      writeParams((params) => {
+        if (params.get(key) === value) params.delete(key);
+        else params.set(key, value);
+      }),
+    [writeParams],
+  );
+  const chooseListState = useCallback(
+    (next: string | null) =>
+      writeParams((params) => {
+        if (next) params.set("state", next);
+        else params.delete("state");
+        params.delete("city");
+      }),
+    [writeParams],
+  );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
@@ -788,22 +843,46 @@ export default function SalesOrdersRegister() {
       [...all]
         /* A month door's narrowing, on the customer's requested date. */
         .filter((r) => !requested || inRequestedNarrowing(r.customerDelivery, requested))
+        /* The Order list rail: read-only facts, each answered by its owner's
+           one arithmetic. */
+        .filter((r) => !listDealer || salesLocationOf(r.o) === listDealer)
+        .filter((r) => !listState || r.o.customer_address_state?.trim() === listState)
+        .filter((r) => !listCity || r.o.customer_address_city?.trim() === listCity)
+        .filter((r) => !listRange || dateMatchesPreset(listDateOf(r, listDateField), listRange))
+        .filter(
+          (r) =>
+            !listDelivery ||
+            registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []) === listDelivery,
+        )
         .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, requested?.kind, requested?.month],
+    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listRange, listDateField, listDelivery],
   );
-  const activeConditions = useMemo(
-    () =>
-      requested
-        ? [{
-            key: "requested",
-            label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
-            onClear: () => setParam("requested", null),
-          }]
-        : undefined,
+  const activeConditions = useMemo(() => {
+    const dateLabel = LIST_DATE_FIELDS.find((f) => f.key === listDateField)!.label;
+    const list = [
+      requested && {
+        key: "requested",
+        label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
+        onClear: () => setParam("requested", null),
+      },
+      listDealer && { key: "dealer", label: `Dealer / Sales Location: ${listDealer}`, onClear: () => setParam("dealer", null) },
+      listState && { key: "state", label: `State: ${listState}`, onClear: () => chooseListState(null) },
+      listCity && { key: "city", label: `City: ${listCity}`, onClear: () => setParam("city", null) },
+      listRange && {
+        key: "range",
+        label: `${dateLabel}: ${LIST_RANGES.find((r) => r.key === listRange)!.label}`,
+        onClear: () => setParam("range", null),
+      },
+      listDelivery && {
+        key: "delivery",
+        label: REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === listDelivery)!.label,
+        onClear: () => setParam("delivery", null),
+      },
+    ].filter((c): c is { key: string; label: string; onClear: () => void } => Boolean(c));
+    return list.length > 0 ? list : undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requested?.kind, requested?.month, setParam],
-  );
+  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listRange, listDateField, listDelivery]);
   /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
      read (rentals excluded, search not applied), carried on every list answer,
      so a search answered before any unsearched load still has it and a created
@@ -994,7 +1073,78 @@ export default function SalesOrdersRegister() {
             />
           </FilterRailGroup>
         </>
-      ) : null}
+      ) : (
+        <>
+          <FilterRailGroup title="Dealer / Sales Location" icon="people">
+            <RailFieldWords supporting="Where the order was sold" />
+            <FilterRailSelect
+              label="Dealer / Sales Location"
+              value={listDealer}
+              options={distinctWords([...all.map((r) => salesLocationOf(r.o)), listDealer]).map((name) => ({ value: name, label: name }))}
+              onChange={(next) => setParam("dealer", next)}
+              testId="sales-orders-rail-dealer"
+              allLabel="All dealers"
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title="Delivery State / City" icon="delivery">
+            <RailFieldWords supporting="Where the goods go" label="State" />
+            <FilterRailSelect
+              label="State"
+              value={listState}
+              options={distinctWords([...all.map((r) => r.o.customer_address_state), listState]).map((name) => ({ value: name, label: name }))}
+              onChange={chooseListState}
+              testId="sales-orders-rail-state"
+              allLabel="All states"
+            />
+            <RailFieldWords label="City" />
+            <FilterRailSelect
+              label="City"
+              value={listCity}
+              options={distinctWords([
+                ...all
+                  .filter((r) => !listState || r.o.customer_address_state?.trim() === listState)
+                  .map((r) => r.o.customer_address_city),
+                listCity,
+              ]).map((name) => ({ value: name, label: name }))}
+              onChange={(next) => setParam("city", next)}
+              testId="sales-orders-rail-city"
+              allLabel="All cities"
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title="Date" icon="date">
+            <RailFieldWords supporting="Which date to read" />
+            <FilterRailSelect
+              label="Date"
+              value={listDateField === "proceed" ? null : listDateField}
+              options={LIST_DATE_FIELDS.filter((f) => f.key !== "proceed").map((f) => ({ value: f.key, label: f.label }))}
+              onChange={(next) => setParam("date", next)}
+              testId="sales-orders-rail-date-field"
+              allLabel="Proceed Date"
+            />
+            {LIST_RANGES.map((r) => (
+              <FilterRailRow
+                key={r.key}
+                label={r.label}
+                active={listRange === r.key}
+                testId={`sales-orders-rail-range-${r.key}`}
+                onClick={() => toggleParam("range", r.key)}
+              />
+            ))}
+          </FilterRailGroup>
+          <FilterRailGroup title="Delivery" icon="goods">
+            <RailFieldWords supporting="What has been delivered" />
+            {REGISTER_DELIVERY_CONDITIONS.map((c) => (
+              <FilterRailRow
+                key={c.key}
+                label={c.label}
+                active={listDelivery === c.key}
+                testId={`sales-orders-rail-delivery-${c.key}`}
+                onClick={() => toggleParam("delivery", c.key)}
+              />
+            ))}
+          </FilterRailGroup>
+        </>
+      )}
     </FilterRail>
   );
 

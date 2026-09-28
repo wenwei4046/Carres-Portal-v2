@@ -215,8 +215,15 @@ counts; an unread SO Batch prints `Unavailable`, never zero. The kit admits `Doc
 3, its first column fixed while the rest scroll) and `TotalsSummary` (recipe 4), each with a `/ui`
 example. Measured at 1440 / 1180 / 820 / 743 / 390: no sideways page scroll, no dash, the table
 scrolls inside its own frame.
-**Not built in F:** Export of the matrix; the Order list's own filter groups (Dealer, State / City,
-Date, Delivery, Obligations, Service Cases); a search box in the Dealer group. **Measured gaps:**
+**Order list rail — Dealer / Sales Location · Delivery State / City · Date · Delivery BUILT 2026-09-28,
+production walk owed.** Each is a read-only fact filter: Delivery asks the one goods arithmetic
+(`registerDeliveryConditionOf` over `resolveUnitAllocation`: nothing sold · some sold · every
+committed unit sold; a service-only order is under All only); Date reads the chosen field (Proceed
+Date by default) with the engine's `Today` · `This week` · `This month`; a row clicked again is
+deselected; nothing carries between the two views.
+**Not built in F:** Export of the matrix; the Order list's `Obligations` and `Service Cases` groups
+(they need the server's completion and case facts per order, so the list does not guess them); a
+custom date range; search and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
 SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
 `To buy` is `0` for an Accessory or a `Not in catalog` line; a Unit sold before 0471 names no line
 and is matched to the first line of its SKU.
