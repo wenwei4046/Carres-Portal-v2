@@ -82,7 +82,7 @@ export function num(v: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Money for the screen. An absent or unreadable figure is a dash, never RM 0.00. */
+/** Money for the screen. An absent or unreadable figure is an empty cell, never RM 0.00. */
 export function money(v: number | string | null | undefined): string {
   const n = num(v);
   return n === null ? "" : rm(n);

@@ -150,6 +150,15 @@ describe("Money moves", () => {
     expect(net.calls.some((c) => c.key === "POST /api/finance/money-moves")).toBe(false);
   });
 
+  it("F3 or Ctrl+S presses Prepare money move", async () => {
+    show();
+    await screen.findByText("MM-20260917-1111");
+    fireEvent.click(screen.getByRole("button", { name: /New money move/ }));
+    fireEvent.change(await screen.findByLabelText(/^Amount/), { target: { value: "500" } });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    expect(await screen.findByTestId("money-move-refusal")).toHaveTextContent("Choose where the money came from.");
+  });
+
   it.each([
     ["Bank charge", "Goes to 902-0000 BANK CHARGES.", { to_account_code: "902-0000" }, "Paid into"],
     ["Bank credit", "Goes to 580-0000 OTHER INCOME. Money from a customer is recorded as a payment, not here.",

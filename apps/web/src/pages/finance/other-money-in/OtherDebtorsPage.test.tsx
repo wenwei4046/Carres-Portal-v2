@@ -125,6 +125,16 @@ describe("Other debtors — one invoice", () => {
     });
   });
 
+  it("F3 or Ctrl+S saves the draft, never issues it", async () => {
+    net.routes[`PUT /invoices/${I_DRAFT}`] = { id: I_DRAFT };
+    show(`/finance/other-debtors?invoice=${I_DRAFT}`);
+    await screen.findByTestId("other-debtor-invoice-form");
+    await waitFor(() => expect(screen.getByTestId("invoice-total")).toHaveTextContent("Total RM 1,500.00"));
+    fireEvent.keyDown(window, { key: "F3" });
+    await waitFor(() => expect(sent(`PUT /invoices/${I_DRAFT}`)).toHaveLength(1));
+    expect(sent(`PUT /invoices/${I_DRAFT}`)[0].body).toMatchObject({ issue: false });
+  });
+
   it("Issue invoice asks first, names the amount and the party, then issues", async () => {
     net.routes[`PUT /invoices/${I_DRAFT}`] = { id: I_DRAFT };
     show(`/finance/other-debtors?invoice=${I_DRAFT}`);

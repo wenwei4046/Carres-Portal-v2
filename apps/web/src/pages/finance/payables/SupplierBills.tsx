@@ -51,6 +51,7 @@ import {
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
 import { AdvanceModal, AmountField } from "./VoucherAdvance";
+import { useSaveKey } from "../save-key";
 
 /**
  * Finance → Bills (migration 0477). A supplier's invoice, entered once:
@@ -590,13 +591,15 @@ function BillForm() {
     });
   };
 
+  const gap = billSaveGap({ supplierId, invoiceNo, billDate, lines });
+  // An existing bill saves by key only once it has loaded and is still a draft.
+  useSaveKey(submit, gap === null && !save.isPending && (!id || existing.data?.can.edit === true));
+
   if (id && existing.isError) return <ReadFailed what="This bill" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading bill…</div>;
   if (id && existing.data && !existing.data.can.edit) {
     return <div className="p-6 text-body">Only a draft bill can be changed. <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${id}`}>Back to the bill</Link></div>;
   }
-
-  const gap = billSaveGap({ supplierId, invoiceNo, billDate, lines });
 
   return (
     <div className="flex h-full min-h-0 flex-col">

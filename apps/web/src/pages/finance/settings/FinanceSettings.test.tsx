@@ -345,4 +345,23 @@ describe("Finance Settings — the chart of accounts", () => {
     expect(addAccountSaveGap({ ...f, isHeading: false, firstCode: "" })).toBeNull();
     expect(addAccountSaveGap(f)).toBeNull();
   });
+
+  it("Add account: F3 or Ctrl+S saves, and does nothing while Save names a gap", async () => {
+    show("/finance/settings?tab=chart");
+    await screen.findByText("2130 Accrued expenses");
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "F3" });
+    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
+    expect(writes()).toHaveLength(0);
+
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "2100 Payables" }));
+    fireEvent.change(within(dialog).getByLabelText(/^Number/), { target: { value: "2140" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: "Deposits held" } });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({ key: "POST /api/finance/ledger/accounts", body: { parentCode: "2100", code: "2140", name: "Deposits held" } });
+  });
 });

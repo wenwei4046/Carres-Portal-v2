@@ -48,6 +48,7 @@ import { VoucherAdvanceCard } from "./VoucherAdvance";
 import { paymentVoucherPrint } from "./voucher-print";
 import { paysOut } from "@carres/shared/money-accounts";
 import { useMoneyAccounts } from "../settings/api";
+import { useSaveKey } from "../save-key";
 
 /**
  * Finance → Payment Vouchers (migration 0477). The ONE door money leaves
@@ -585,6 +586,10 @@ function VoucherForm() {
     });
   };
 
+  const gap = voucherSaveGap({ purpose, supplierId, payee, voucherDate, payFrom, picks, advance, lines, total });
+  // An existing voucher saves by key only once it has loaded and is still a draft.
+  useSaveKey(submit, gap === null && !save.isPending && (!id || existing.data?.can.edit === true));
+
   if (id && existing.isError) return <ReadFailed what="This payment voucher" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading payment voucher…</div>;
   if (id && existing.data && !existing.data.can.edit) {
@@ -596,7 +601,6 @@ function VoucherForm() {
   }
 
   const advanceOk = advance.trim() === "" || (num(advance) ?? -1) >= 0;
-  const gap = voucherSaveGap({ purpose, supplierId, payee, voucherDate, payFrom, picks, advance, lines, total });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
