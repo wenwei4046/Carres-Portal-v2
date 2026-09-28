@@ -212,7 +212,7 @@ export default function OperationWork() {
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3">
         <SearchInput id="work-search" toolbar placeholder={WORK_PAGE_COPY.search} value={search} onChange={(e) => set({ q: e.target.value || null })} data-testid="work-search" />
         {railDates ? (
-          <div className="mt-3" data-testid="work-rail-month">
+          <div className="mt-3" data-testid="work-rail-month" data-focus-day={focusDay}>
             <div className="flex h-8 items-center gap-1">
               <button type="button" aria-label={WORK_PAGE_COPY.previousMonth} title={WORK_PAGE_COPY.previousMonth} onClick={() => set({ month: railDates.previousMonth })} className="grid h-8 w-8 place-items-center rounded-control border border-kit-slate-5 text-kit-slate-11 hover:bg-kit-slate-3">
                 <Icon name="previous" size={16} />
