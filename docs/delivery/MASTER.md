@@ -37,7 +37,7 @@ append-only history.
 | product identity, category and stock identity mode | Catalog |
 | the loan obligation and the customer's loan decision | Sales Orders (Order Route) |
 | repair, replacement, refund, compensation, claim or complaint | the owning downstream module |
-| every action owner | the Shared Duty Resolver through `Workspace → Staff & Duties` |
+| every action owner | the Shared Duty Resolver through `Settings → Staff & Duties` |
 
 Delivery never creates a second commercial-order, stock, money, duty, calendar, Service or
 Guarantee editor. It records what happened and links the owner that must decide a remedy.
@@ -1672,7 +1672,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 | `Logistics` (the Settings rail row reads `Logistics`, never `Logistics Partners` — `Partner` is a banned UI word) | one row per company opening its object: `Company details` (owner ruling 2026-09-26; `Partner details` retired) (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Transit points` (the Logistics company's own points — `AL Sungai Buloh`, `HOUZS Balakong`, `HOUZS Penang` — registered once in Warehouse Settings → Sites as kind `Logistics transit point`; never a Carres warehouse; owner correction 2026-09-25, Stock §5) and the two-leg handover locations · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
 | `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
-| `Access` | which People hold Delivery capabilities; a link to `Workspace → Staff & Duties`, never a copy |
+| `Access` | which People hold Delivery capabilities; a link to `Settings → Staff & Duties`, never a copy |
 
 **Current governed calendars (owner ruling 2026-09-01):** TEOW picks up from KL on Monday,
 Wednesday and Friday, delivers to Melaka on Monday, Wednesday and Friday and to JB on Tuesday,
@@ -1689,7 +1689,7 @@ Per-DO dates, partner, ETA, single-event handling, personal Columns and personal
 not Settings. Historical objects retain the rule and version in force when their event occurred.
 Delivery Settings stores only the `delivery_charge_approver` Duty key used by its approval action.
 Routine Delivery ownership reads the Sales Order PIC; `delivery_duty` is retained only as the
-explicit no-PIC fallback through `Workspace → Staff & Duties`.
+explicit no-PIC fallback through `Settings → Staff & Duties`.
 
 ## 12 · Reports
 
@@ -1736,7 +1736,7 @@ handover changes the Sales Order PIC and its append-only responsibility evidence
 
 Delivery Duty is no longer the routine owner. It is used only when the Sales Order has no PIC so
 the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody holds
-Delivery Duty.` with `Set the holder in Workspace → Staff & Duties`. Once a PIC exists, every open
+Delivery Duty.` with `Set the holder in Settings → Staff & Duties`. Once a PIC exists, every open
 and future routine Delivery action resolves to that PIC and cover. Governed delivery-charge
 exceptions continue to route to `delivery_charge_approver`. Corrections of saved facts,
 exceptional proof and refusal closure without an approved action definition enter no engine and

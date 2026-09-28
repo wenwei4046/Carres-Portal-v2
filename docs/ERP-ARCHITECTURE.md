@@ -137,7 +137,7 @@ collect customer balance          → Sales Order PIC, with Buddy cover
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
-employment/account eligibility facts only; **Workspace → Staff & Duties** is the ONE company-wide
+employment/account eligibility facts only; **Settings → Staff & Duties** is the ONE company-wide
 Duty assignment door. An Owner Rule may reference a stable object owner such as the Sales Order PIC
 or a governed Duty key; modules never keep a second staff list. The shared resolver applies the
 governed Buddy cover so absence changes who sees today's work without changing the underlying
@@ -154,7 +154,7 @@ complete resolution chain is:
 
 ```
 People — individual staff identity, active/access, last working date and leave facts
-→ owning object or Workspace → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
+→ owning object or Settings → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
 → Shared Owner Resolver — date + active staff + leave/cover rules
 → Work Engine — resolves the owner of each action from its Owner rule
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
@@ -185,7 +185,7 @@ Each Duty has exactly one active Primary holder and may have one governed Buddy 
 Order has one PIC and may resolve the same governed Buddy cover for absence. When the
 Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
 it does not rewrite the normal owner. Changing staff or approval ownership happens once in
-`Workspace → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
+`Settings → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
 No action sentence, module setting or permission check hard-codes `Jess`, `Manager` or another
 person's name.
 

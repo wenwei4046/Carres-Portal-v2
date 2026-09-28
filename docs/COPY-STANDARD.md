@@ -174,7 +174,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
+| Workspace destinations | `Work` · `Issue Tracker` (left bar) · `Staff & Duties` (Settings → Workspace group, owner ruling 2026-09-28) | Workspace Dashboard · Tasks · Duty roster · Service Notes · `Workspace → Staff & Duties` (retired 2026-09-28) |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
 | Work header search (Jess reverted the `Search` rename, 2026-09-26) | `Jump to…` beside its keyboard hint | Search · Find · Go to |
 | Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
@@ -222,7 +222,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
 | Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
-| Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Workspace → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
+| Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Settings → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
 | Rail Customers door (owner-confirmed 2026-09-26, UI MASTER §5) | `Customers` · `Customers you can see` · `Name, phone or order number` · `Back to results` · `Matched by phone` · `Possible match` · `Orders` · `History` | Customer 360 · CRM · Contacts · merging a name-only match into one customer |
 | Rail Calendar day rows (owner-confirmed 2026-09-25, UI MASTER §5) | `{n} scheduled deliveries` · `{n} {company} contact deadline(s)` · `{n} arriving` · `{n} pickups` · `Pickup By {company}` · `{n} return pickup(s)` · `{n} promised payment(s)` · `{n} free storage ends` · `{n} service visit(s)`; zero prints nothing; a failed source says it could not be loaded | `supplier arrival` · `pickups by logistics` · `{n} jobs` · `0` for a failed source |
 | Right Rail healthy clear — **retires with the rail My Work slot (UI MASTER §5, owner 2026-09-24)** | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
@@ -231,6 +231,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |
 | Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
 | Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
+| Staff & Duties detail and history (owner ruling 2026-09-28; workspace/MASTER.md §4.2) | fact `Next holder` → `{name} from {date}` · gap `Nobody holds {Duty} from {date}.` · section `Planned` → `{n} assignments until {date}` · `Show` · catalogue `Ends {date}` only when nobody follows | Upcoming · Coming up · Future · `Ends {date}` on a continuous rota |
 | Duty no match | `No duties match this search` · `Clear search` | No duties |
 | Duty read failure | `Staff & Duties could not be opened` · `Try again` | No duties · Error |
 | Duty unassigned | `Not assigned` · `Nobody holds {Duty}.` | Unowned · Available · — |
@@ -693,7 +694,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | Items panel Status | `Ready` · `Arriving {date}` · `Arriving after the requested date` · `No purchase order raised yet` · `Not received yet` |
 | Items panel Location | the place: `Carres Klang` · `With NETS Delivery` · `PJ Showroom`; never `Ready at Carres Klang Warehouse` |
 | Logistics Details pickup fact | `Handed over {date} {time} · {n} of {m} Units` · `Received by {partner} {time}` · `Pickup not recorded` |
-| No Delivery Duty holder | `Nobody holds Delivery Duty.` · `Set the holder in Workspace → Staff & Duties` |
+| No Delivery Duty holder | `Nobody holds Delivery Duty.` · `Set the holder in Settings → Staff & Duties` |
 
 **Do NOT use on Monitor:** `Paid in full` (that is the Sales Orders register's money word) ·
 `Payment pending` · `Needs attention` · `Attention` · `Alert` · `Checklist` · `Due` · `Next
@@ -1423,7 +1424,7 @@ These stock-picker words do not rename every Warehouse screen.
 | The History titles (stored facts only) | `Purchase requested` · `Purchase approved` · `Purchase refused` · `Marked not going ahead` · `Purchase order issued` · `Sent back for changes` · `Sent again for approval` · `Withdrawn` — three-rank grammar, grouped `Today · Yesterday · Earlier`; an event with no stored individual reads `Staff identity not recorded`. Rank 3 of a resubmission: `Round {n}` and each change — `{sku} · Qty {old} → {new}` · `{sku} added · Qty {n}` · `{sku} removed` · `Deliver To: {old} → {new}` · `Delivery Date: {old} → {new}` · `What is this for? {new}` · `For changed`. A line removed while editing is stored with the reason `Removed before sending again`. |
 | The object's loading / failure states | `Opening the Manual Purchase Request` · `This Manual Purchase Request could not be opened` + `Try again` |
 | The round refusals — Round 2, two lines, fact then act | `This request was withdrawn.` + `Raise a new request if the goods are still needed.` — `This request was sent back for changes.` + `Wait for the requester to edit it and send it again.` — `Only the person who asked for this purchase may do this.` + `Ask {requester} to do it.` — `This request was not sent back for changes.` + `Reload the Manual Purchase Request to see where it is now.` — `This request already has a purchase order.` + `Reload the Manual Purchase Request. It can no longer be withdrawn.` — `The request has no items.` + `Add at least one item, then send it again.` — `The Delivery Date is missing.` + `Pick a Delivery Date, then send it again.` |
-| The decision refusals — two lines, fact then act | `Only the approver may decide this purchase.` + `Ask {approver} to approve or refuse it.` — `Nobody holds Purchasing Approver.` + `Set the holder in Workspace → Staff & Duties.` (0533; also the object's approver line when unheld) — `You cannot decide a purchase you raised.` + `Withdraw it if the goods are no longer needed.` (0533, `own_request`) — `This purchase was already decided.` + `Reload the Manual Purchase Request to see the decision.` — `The decision reason is missing.` + `Type why this purchase is not going ahead.` — `The approved quantity is not valid.` + `Enter a whole number from 0 to {requested quantity}.` — `The decision was not recorded.` + `Reload the Manual Purchase Request and try again. Tell IT if it happens again.` |
+| The decision refusals — two lines, fact then act | `Only the approver may decide this purchase.` + `Ask {approver} to approve or refuse it.` — `Nobody holds Purchasing Approver.` + `Set the holder in Settings → Staff & Duties.` (0533; also the object's approver line when unheld) — `You cannot decide a purchase you raised.` + `Withdraw it if the goods are no longer needed.` (0533, `own_request`) — `This purchase was already decided.` + `Reload the Manual Purchase Request to see the decision.` — `The decision reason is missing.` + `Type why this purchase is not going ahead.` — `The approved quantity is not valid.` + `Enter a whole number from 0 to {requested quantity}.` — `The decision was not recorded.` + `Reload the Manual Purchase Request and try again. Tell IT if it happens again.` |
 | Retired from this surface, never to return | the object's own `Issue PO` / `Issue as one PO?` consolidation offer and every other issuance, PO Duty, price-edit or Receive control — PO issuance lives ONLY in the Register's selected action (`Issue PO` beside PO Duty); physical arrival lives only in `Receiving` |
 
 
@@ -1954,7 +1955,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `No GRN yet` | `Reports → Receiving & Inbound` cell for an unposted session | The formal GRN exists only from the posted session (purchasing/MASTER.md §7.3) — an honest absence, never `—`. The GRN REGISTER never needs it: a Register row exists only once the GRN does (owner correction 2026-09-06). |
 | `Find PO or CO` | the Start Receiving entrance | Receiving starts from the exact source. The search is CONTROLLED: an unknown delivery may record evidence but never invents a supplier, an order, a Session, a GRN or Inventory. |
 | `Only GRN duty may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0425/0426): GRN Duty, its dated cover, or an Operations Superuser. |
-| `Staff & Duties` | Workspace rail row + page | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
+| `Staff & Duties` | Settings rail row under the `Workspace` group + page (owner ruling 2026-09-28; APPROVED TARGET / NOT BUILT — the left-bar row retires when built) | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
 | `GRN Duty` | duty label | The receiving duty's name everywhere — pages, history, work rows. |
 | `Nobody holds GRN Duty.` | Staff & Duties resolution · unassigned states | The honest unassigned answer (owner correction 2026-09-04): no rota recommendation is ever shown as if it were an assignment. Protected posting refuses until the manager assigns. |
 | `{acting} covering for {holder}` | duty resolution while a cover runs | Both names, both facts — the cover never erases the normal holder. |

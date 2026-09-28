@@ -24,13 +24,35 @@ Dashboard
 
 WORKSPACE
   Work
-  Staff & Duties
   Issue Tracker
+
+Settings (header gear → All System Settings)
+  WORKSPACE
+    Staff & Duties
 ```
 
 `Workspace` is the left-bar section label for coordination destinations, not a landing page and not
 another Dashboard. Selecting `Work` opens My Work by default for staff and managers. Dashboard may
 drill into filtered Work, while Work never becomes a Dashboard tab.
+
+**STAFF & DUTIES LIVES IN SETTINGS — APPROVED / LOCKED, owner ruling (Jess) 2026-09-28. APPROVED
+TARGET / NOT BUILT.** Staff & Duties leaves the left-bar `WORKSPACE` group and becomes the
+`Staff & Duties` row under a `Workspace` group in the one Settings Workspace
+(`/operation/settings/staff-duties`), first in the Settings rail. The Workspace module still OWNS
+the page, the Duty catalogue, assignments, cover and the Shared Duty Resolver; only the door moved.
+The old address `?tab=staff-duties` forwards to the new one with its `duty` parameter, so every
+deep link — Work `Not assigned`, the module Settings `Access` sections — keeps landing on the exact
+Duty. Every governed sentence reads `Settings → Staff & Duties`. Read access is unchanged: whoever
+may open Staff & Duties today still may, and the Settings rail shows them this row even when they
+own no other Settings section; write stays with the duty manager.
+
+**Why (measured 2026-09-28):** production held 29 assignment rows written on only 3 days
+(2026-09-07 to 2026-09-18, a year of monthly rota pre-loaded), zero covers ever, and no write in
+the 10 days since — configuration behaviour, not daily work (test data; evidence of use shape, not
+volume). One manager writes; nine roles saw a rail row they could only read. Delivery, Warehouse
+and Payment Settings each already sent their reader out of Settings to reach it.
+**Falsifier:** if cover or holder changes become routine daily work (several per week measured in
+`workspace_duty_covers` / `workspace_duty_assignments`), the page returns to the left bar.
 
 ### 1.1 · Three-destination relationship
 
@@ -48,7 +70,7 @@ drill into filtered Work, while Work never becomes a Dashboard tab.
 Browser Back returns to the same scope, saved view, search, filters, selected owner/Duty and scroll
 position where technically safe. A cross-page door never changes business state merely by opening.
 
-`Workspace → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
+`Settings → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
 actually acted. Workspace does not own module records or their completion facts.
 
 Carres has one cross-module Work coordination surface. Module Registers, queues and action views
@@ -112,7 +134,7 @@ future routing everywhere but never rewrites history.
 
 ## 4 · Staff & Duties
 
-`Workspace → Staff & Duties` is the only assignment surface. An authorised manager assigns one
+`Settings → Staff & Duties` is the only assignment surface. An authorised manager assigns one
 Primary holder and optional effective-dated Buddy cover to each named Duty and can see immutable
 assignment history.
 
@@ -136,7 +158,7 @@ order, customer, delivery and ordinary collection work. The Work Engine routes t
 that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
 Duty is no longer the routine owner. It remains only the explicit fallback when a Sales Order has
 no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
-and `Set the holder in Workspace → Staff & Duties`. Delivery Settings never holds a roster or a
+and `Set the holder in Settings → Staff & Duties`. Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
 
 **Reason for the ruling:** the PIC sweep shares open orders between the two active operators,
@@ -148,7 +170,7 @@ rulings 2026-09-18, 0533). Its pickers list Principal people; the doors refuse e
 account — Shasha and Yu Jun included — as holder (`invalid_holder`) or cover (`invalid_cover`).
 Deciding a Manual Purchase admits only today's resolved actor — the holder, or their dated Principal
 cover — and never the principal role alone, the `ops_manager` position or an email list. Unheld
-answers `Nobody holds Purchasing Approver.` · `Set the holder in Workspace → Staff & Duties.` Nobody
+answers `Nobody holds Purchasing Approver.` · `Set the holder in Settings → Staff & Duties.` Nobody
 decides a Manual Purchase they raised (`own_request`), and the principal role no longer raises one.
 **Bootstrap:** no door can name the first holder (self-assignment is refused and the shared login
 may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` NULL, note `Bootstrap
@@ -185,36 +207,67 @@ combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
 
-Desktop uses one catalogue and one selected-duty detail. It does not repeat two large forms and a
-full history beneath every Duty.
+**APPROVED / LOCKED, owner ruling (Jess) 2026-09-28 — APPROVED TARGET / NOT BUILT** (the
+catalogue + selected-duty split is BUILT, #1388; the history split, `Next holder` and the `Ends`
+rule below are not). The page sits in the Settings content area (§1) under the Settings section
+header. One catalogue and one selected-duty detail; never two large forms and a full history
+beneath every Duty.
 
 ```text
-┌ Staff & Duties ──────────────────────────────────────────────────────────────┐
-│ Who holds each company duty today and who covers an absence.   Search duties│
-├ DUTIES ──────────────────────────┬ SELECTED DUTY ────────────────────────────┤
-│ PO Duty                          │ PO Duty                                   │
-│ [YJ] Yu Jun                      │ Normal owner  [YJ] Yu Jun                 │
-│                                  │ Acting today [SH] Shasha                  │
-│ GRN Duty                         │ Cover         15–17 Sep · Annual leave    │
-│ [SH] Shasha                      │                                            │
-│                                  │ [Assign holder] [Add cover]               │
-│ Delivery Duty                    ├ ASSIGNMENT & COVER HISTORY ───────────────┤
-│ Not assigned                     │ 15 Sep · Shasha covering for Yu Jun       │
-│                                  │ 01 Sep · Yu Jun assigned by Jess          │
-│ …                                │                                            │
-└──────────────────────────────────┴────────────────────────────────────────────┘
+Workspace
+Staff & Duties
+Who holds each company duty today and who covers an absence.
+[Search duties        ]  [State  All duties ˅]
+┌ DUTIES ───────────────────┬ {Duty} ────────────────────────────────────────┐
+│▌{Duty}                    │ Normal owner   [AB] {name}                      │
+│ {holder name}             │ Acting today   [CD] {name}      (cover only)    │
+│ {Duty}                    │ Effective      {date} to {date}                 │
+│ Not assigned              │ Next holder    [EF] {name} from {date}          │
+│ {Duty}                    │ Cover          {date} to {date} · {reason}      │
+│ Covered today             │                                                  │
+│ …                         │ [Assign holder]  [Add cover]    (manager only)  │
+│                           ├ PLANNED ────────────────────────────────────────┤
+│                           │ {n} assignments until {date}             Show ˅ │
+│                           ├ ASSIGNMENT & COVER HISTORY ─────────────────────┤
+│                           │ {name} holds {Duty}                              │
+│                           │ {date} to {date} · Assigned by {name}            │
+│                           │ {note}                                           │
+└───────────────────────────┴──────────────────────────────────────────────────┘
 ```
 
-The left catalogue follows the shared Duty catalogue order and shows Duty label, current normal
-holder and exceptional state: `Covered today`, `Starts {date}`, `Ends {date}` or `Not assigned`.
-It never shows workload, performance, a recommended person or a copied module roster. Search matches
-Duty label and authorised current/historical person names; `State` may narrow to `All duties`,
-`Covered today`, `Cover scheduled` and `Not assigned`.
+**Catalogue.** Follows the shared Duty catalogue order. Each row is the Duty label plus ONE
+supporting line: the current normal holder's name, replaced by the exceptional state when one
+applies, in this precedence: `Not assigned` → `Covered today` → `Starts {date}` (a scheduled
+cover) → `Ends {date}`. **`Ends {date}` appears only when no assignment begins the day after the
+current one ends** — a continuous monthly rota is not an ending and prints the holder's name. The
+row never shows workload, performance, a recommended person or a copied module roster. The
+selected row uses the governed rail active treatment (`blue-3` wash, 2px `blue-9` line inset
+left). Search matches Duty label and authorised current/historical person names; `State` narrows
+to `All duties` · `Covered today` · `Cover scheduled` · `Not assigned`.
 
-The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
-`Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
-carry a full-name accessible label and never replace the printed name. Selecting a Work
+**Selected detail — separate labelled facts, each printed only when it has a value:**
+
+| Fact | Source | When shown |
+|---|---|---|
+| `Normal owner` | Shared Duty Resolver | Always when held |
+| `Acting today` | covers + resolver | Only while a cover acts today; the same person is never repeated as acting |
+| `Effective` | current assignment | Always when held · `{date} to {date}`, or `From {date}` with no end |
+| `Next holder` | the next future assignment | Only when one exists · `{name} from {date}` |
+| `Cover` | the active or next scheduled cover | Only when one exists · dates and reason |
+| gap sentence | resolver + assignments | Replaces `Next holder` when the current term ends with nobody after it: `Nobody holds {Duty} from {date}.` |
+
+Avatar initials carry a full-name accessible label and never replace the printed name. A Work
 configuration failure may deep-link directly to the required Duty while preserving this layout.
+
+**Planned.** Future assignments (starting after today) leave the history and sit in one
+`PLANNED` section between the actions and the history, collapsed by default to
+`{n} assignments until {date}` with `Show`; expanded, they list nearest first in the history row
+format. With no future assignment the section does not render.
+
+**Assignment & cover history.** Only assignments and covers that have started on or before today,
+newest first, append-only. Each row: `{name} holds {Duty}` or the cover sentence, then
+`{date} to {date} · Assigned by {name}`, then the factual note when present. Dates follow the
+governed year rule (`Fri, 15 Jan 27` outside the current year).
 
 ### 4.3 · Change-holder contract
 
@@ -289,10 +342,15 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
+| Planned empty | The `PLANNED` section does not render |
+| Term ends with nobody after | Catalogue `Ends {date}` · detail `Nobody holds {Duty} from {date}.` in place of `Next holder` |
+| Refresh failed | Keep the last good catalogue and detail on screen with `Staff & Duties could not be opened` · `Try again` above them; never blank a good read |
 
-At 1440px and above use the catalogue/detail split. At 1024–1439px retain the split with a narrower
-catalogue. Below 1024px show the catalogue first and open the selected Duty as a full-width detail
-with an explicit Back door; forms are single-column and dates/names never truncate. Keyboard order is
+The split follows the CONTENT width inside Settings, never the viewport, because the Settings rail
+(240px, hideable) sits beside it. Content ≥ 720px: catalogue/detail split, catalogue 280px (240px
+when the content is under 960px). Content < 720px: the catalogue alone; selecting a Duty opens the
+detail full width with an explicit `Back`; forms are single-column. Names and dates wrap and never
+truncate. Acceptance measures 1440 · 1180 · 820 · 743 · 390px. Keyboard order is
 search/filter → Duty list → selected facts → authorised actions → history. Focus returns to the
 originating Duty after a modal closes.
 
@@ -695,9 +753,9 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
 | Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
 | Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
-| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Workspace → Staff & Duties`; do not falsely say the Duty has no holder |
+| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Settings → Staff & Duties`; do not falsely say the Duty has no holder |
 | Blocked | Stays in its own working-day group (no `Blocked` group) · `Blocked by {dependency}` plus the door that can resolve it; retain original working day and missed age; the `Blocked` filter narrows to these rows |
-| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
+| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Settings → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
 | Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
 | Source failed | Isolate and name the source; never omit its possible work or convert failure to zero |
@@ -2235,7 +2293,7 @@ honest Work for admitted modules.
   recorded provenance; the Sales Orders `verifiedUnitIds` reader is evidence for display, not a new
   Unit assignment or Work source.
 - Migration 0425's shared Duty registry/resolver, effective primary assignment, dated cover,
-  audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
+  audit evidence, guarded API and the one `Settings → Staff & Duties` UI are production-proven
   for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
   module consumers remain implementation evidence until each module is production-verified.
 - **Staff & Duties §4.2 composition — DEPLOYED to production 2026-09-16 (`56e52d0e`, PR #1388);

@@ -124,7 +124,7 @@ for an action's owner rule and never written into the action sentence.
 **DUTY EVIDENCE IS THREE FACTS, NEVER ONE OVERWRITTEN NAME — owner ruling 2026-09-03.** A
 Duty-owned action and its completion/approval record preserve: (1) the normal Primary holder,
 (2) today's resolved Buddy cover when different, and (3) the actual authenticated actor. The shared
-resolver supplies them from `Workspace → Staff & Duties`; modules store the Duty key, not a local
+resolver supplies them from `Settings → Staff & Duties`; modules store the Duty key, not a local
 staff list. Reassigning a Duty changes open and future routing only. It never rewrites historical
 evidence or turns the Cover/actor into the former Primary holder.
 

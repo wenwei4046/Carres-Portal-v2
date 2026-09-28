@@ -889,7 +889,7 @@ Current implementation differences from the above target are build gaps, not a c
   deliberately selected and visible; removing it restores the prior permitted scope.
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
-  `../ERP-ARCHITECTURE.md` Law F.1. Only `Workspace → Staff & Duties` edits Duty assignments and
+  `../ERP-ARCHITECTURE.md` Law F.1. Only `Settings → Staff & Duties` edits Duty assignments and
   Buddy cover; People supplies
   active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
   Team Work and Quick Rail may change display density, but they may not query the rota, calculate
@@ -1205,6 +1205,15 @@ Special Dates · Access` — not five module settings pages, and they sit as fiv
 `Warehouse` group heading. The rail treatment is unchanged: 240px, flush left, one straight right
 divider, `blue-3` wash with a 2px `blue-9` line inset left on the active row. A group may still not
 invent a second Settings home, and a section that opens nothing may not appear.
+
+**STAFF & DUTIES IS THE FIRST SETTINGS GROUP — APPROVED / LOCKED, owner ruling (Jess) 2026-09-28.
+APPROVED TARGET / NOT BUILT.** The Settings rail opens with a `Workspace` group holding one row,
+`Staff & Duties`; the module groups follow in their current order. The left-bar `WORKSPACE` group
+keeps only `Work` and `Issue Tracker`. The page keeps its own catalogue + selected-duty composition
+(`../workspace/MASTER.md` §4.2) inside the Settings content area and draws the Settings section
+header (`Workspace` kicker, `Staff & Duties` h1). It is the one Settings section a reader without
+write capability may still see, because every user who can open it today keeps read access;
+write stays with the duty manager.
 
 **A SETTINGS PAGE MAY CARRY ONE HEADER `Save changes` — APPROVED / LOCKED, owner card 2026-09-09.
 BUILT.** This narrows, and does not repeal, the 2026-08-14 SETTINGS TEMPLATE rule that raw config
