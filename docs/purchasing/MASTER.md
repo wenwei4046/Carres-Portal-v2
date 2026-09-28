@@ -1422,9 +1422,20 @@ Need PO                                        No PO needed
   second choice.
 - Every `{PO No}` and quantity is read from the real PO; nothing is guessed. A PO whose free
   quantity cannot be read prints the existing `Coverage not checked` instead of a number.
-- Law A: the reservation is one record owned by Purchasing's demand/coverage engine; Stock and
-  Sales Orders read it. It replaces, never sits beside, the current anonymous pool coverage that
-  produced `Already on a PO`.
+- Law A: the reservation is the SAME exact-Unit reservation Ready Stock uses, owned by Stock.
+  Every furniture Unit is born with its official PO (§6.2), so `Use this PO` binds that PO's
+  `incoming` Unit ID(s) to the Sales Order line through the Ready Stock door family
+  (`so_batch_save_ready_units` → `ops_stock_pool_draw` / `ops_stock_release`), never a
+  quantity-only promise (Stock MASTER rejects those). Receiving turns a bound incoming Unit into
+  `reserved` for that line instead of `free`. Purchasing's coverage engine reads the binding as
+  exact lineage; the anonymous per-SKU pool netting that produced `Already on a PO` (and could
+  move the cover to another customer on refresh, `packages/shared/src/to-order.ts` T6) no longer
+  decides a bound line.
+- **Measured build boundary (2026-09-28):** `ops_stock_pool_draw` (0546) refuses any Unit whose
+  status is not `free`; the reserve/release doors, the receipt posting and the coverage engine
+  each need the incoming case. 🟡 COPY REQUIRED — the pattern exists, no new invention; needs one
+  governed migration. Accessory lines counted by quantity (no Unit ID) keep today's behaviour
+  until a separate ruling.
 - Reference: NetSuite and SAP allow incoming PO supply to be committed/pegged to a sales order.
 
 **THE TWO-LINE STATUS RULE — same ruling, both SO Batch and Manual Purchase.** `Status` keeps its
