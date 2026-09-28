@@ -593,7 +593,9 @@ function BillForm() {
 
   const gap = billSaveGap({ supplierId, invoiceNo, billDate, lines });
   // An existing bill saves by key only once it has loaded and is still a draft.
-  useSaveKey(submit, gap === null && !save.isPending && (!id || existing.data?.can.edit === true));
+  // It waits while the GRN picker or Add other creditor is open over the form.
+  useSaveKey(submit, gap === null && !save.isPending && !grnOpen && !creditorOpen
+    && (!id || existing.data?.can.edit === true));
 
   if (id && existing.isError) return <ReadFailed what="This bill" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading bill…</div>;

@@ -346,6 +346,27 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(writes()[0]).toMatchObject({ url: `${B}/bills`, method: "POST" });
   });
 
+  it("F3 or Ctrl+S never saves the bill behind an open dialog", async () => {
+    show(`/finance/bills/new?supplier=${LANDLORD}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LANDLORD));
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "RENT-08" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
+    fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "3000" } });
+    await pickDept("Line 1 department", "OFFICE");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add other creditor" }));
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByTestId("convert-grn"));
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "F3" });
+    expect(writes()).toHaveLength(0);
+  });
+
   it("a line with no qty or unit price shows an empty cell, never a dash", async () => {
     api.routes[`${B}/bills/${BILL1}`] = {
       bill: { id: BILL1, bill_no: "BILL-4XK2", status: "draft", supplier_id: LANDLORD, supplier_name: "Bayview Properties",
