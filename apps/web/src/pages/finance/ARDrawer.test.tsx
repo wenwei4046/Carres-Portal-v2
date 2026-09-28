@@ -179,10 +179,13 @@ describe("ARDrawer", () => {
     expect(receiptBodies()[2].idempotencyKey).not.toBe(first.idempotencyKey);
   });
 
-  it("a changed amount after a failure is a new payment, with a new key", async () => {
+  it("a changed amount after a lost answer keeps the key, so the server refuses a second payment", async () => {
+    // If the first try was recorded, the server refuses the same key on a
+    // different amount (idempotency_conflict). If it was not, the key is free.
+    // Either way the money is never recorded twice.
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("/payment-settings/methods")) throw new Error("down");
-      if (url.includes("/order-receipt")) throw new Error("refused");
+      if (url.includes("/order-receipt")) throw new Error("network");
       return [];
     });
     openForm();
@@ -192,7 +195,23 @@ describe("ARDrawer", () => {
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(receiptBodies()).toHaveLength(2));
-    expect(receiptBodies()[1].idempotencyKey).not.toBe(receiptBodies()[0].idempotencyKey);
+    expect(receiptBodies()[1].idempotencyKey).toBe(receiptBodies()[0].idempotencyKey);
+
+    // Cancel ends the draft: the next form is a new payment.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "MBB-3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(3));
+    expect(receiptBodies()[2].idempotencyKey).not.toBe(receiptBodies()[0].idempotencyKey);
+  });
+
+  it("a trailing point while typing is not refused", () => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("down"));
+    openForm();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1200." } });
+    expect(screen.queryByText("Type the amount in numbers, like 1500.00.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm" })).not.toBeDisabled();
   });
 
   it("reads 1,200.00 as RM 1,200.00, never RM 1.00", async () => {

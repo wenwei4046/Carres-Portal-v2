@@ -61,15 +61,17 @@ export default function ARDrawer({
   const soWord = balance.so !== null ? `SO-${balance.so}` : "SO not available";
   const amount = readAmount(recAmt);
 
-  // One key per draft: a retry of the same receipt (lost answer, timeout)
-  // sends the same key, so the server records it once. A changed draft, a
-  // success or Cancel starts a new one.
-  const draft = useRef<{ sig: string; key: string } | null>(null);
+  // One key per open form, kept across retries and edits. If a try was
+  // recorded but its answer was lost, a retry with the same amount returns
+  // that payment, and one with a changed amount is refused by the server
+  // (idempotency_conflict). A try that was not recorded leaves the key free.
+  // Success or Cancel ends the form; the next one gets a new key.
+  const receiptKey = useRef<string | null>(null);
 
   const recordReceipt = useRecordReceipt({
     onSuccess: (_row, sent) => {
       toast.success(`Recorded ${rm(sent.amount)} for ${soWord}`);
-      draft.current = null;
+      receiptKey.current = null;
       setRecAmt("");
       setRecRef("");
       setRecPanelOpen(false);
@@ -83,15 +85,14 @@ export default function ARDrawer({
       toast.error(`Enter the ${refWord.toLowerCase()}`);
       return;
     }
-    const input = {
+    receiptKey.current ??= crypto.randomUUID();
+    recordReceipt.mutate({
       orderId:   balance.orderId,
       amount:    amount.value,
       method:    recMethod,
       reference: recRef || null,
-    };
-    const sig = JSON.stringify(input);
-    if (draft.current?.sig !== sig) draft.current = { sig, key: crypto.randomUUID() };
-    recordReceipt.mutate({ ...input, idempotencyKey: draft.current.key });
+      idempotencyKey: receiptKey.current,
+    });
   }
 
   return (
@@ -161,7 +162,7 @@ export default function ARDrawer({
                     disabled={amount.value === null}>
                     {recordReceipt.isPending ? "Recording…" : "Confirm"}
                   </Button>
-                  <Button variant="ghost" onClick={() => { draft.current = null; setRecPanelOpen(false); }}>Cancel</Button>
+                  <Button variant="ghost" onClick={() => { receiptKey.current = null; setRecPanelOpen(false); }}>Cancel</Button>
                 </div>
               </div>
             )}
@@ -197,9 +198,10 @@ export default function ARDrawer({
 }
 
 /** The typed amount, read the way the other finance forms read it: commas are
- *  thousands, anything else that is not a number is refused, never guessed. */
+ *  thousands, anything else that is not a number is refused, never guessed.
+ *  A trailing point (`12.`) is the number typed so far. */
 function readAmount(typed: string): { value: number | null; error?: string } {
-  const n = parseTypedAmount(typed);
+  const n = parseTypedAmount(typed.replace(/\.\s*$/, ""));
   if (n === null) return { value: null, error: "Type the amount." };
   if (Number.isNaN(n)) return { value: null, error: "Type the amount in numbers, like 1500.00." };
   if (n <= 0) return { value: null, error: "The amount must be more than RM 0.00." };

@@ -310,6 +310,12 @@ financePaymentsRouter.post("/order-receipt", requireFinance, async (c) => {
     p_reference: body.data.reference ?? null,
     p_idempotency_key: body.data.idempotencyKey ?? null,
   });
+  // The AR form keeps one key while it is open. A retry with a changed amount
+  // after a lost answer is refused here, so the money is never recorded twice.
+  if (error?.details === "idempotency_conflict") {
+    return c.json({ error: "conflict", code: "idempotency_conflict",
+      message: "This receipt is already recorded with another amount. Cancel, then check Payment history." }, 409);
+  }
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
