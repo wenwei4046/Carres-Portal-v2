@@ -463,6 +463,15 @@ describe("OperationApp — the retired Purchase Demands address", () => {
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 
+  it("the legacy /operation/purchasing address lands on SO Batch Purchase, never the old dashboard", () => {
+    /* Owner ruling 2026-09-28 (Purchasing §9.1): the address rendered the old
+       Operation dashboard and its banned words. It now redirects. */
+    renderApp("/operation/purchasing");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/operation?tab=purchase");
+  });
+
   it("SO Batch Purchase mounts its own page at its own address", () => {
     renderApp("/operation?tab=purchase");
     expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();

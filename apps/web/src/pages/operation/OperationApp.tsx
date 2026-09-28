@@ -196,6 +196,12 @@ export default function OperationApp() {
      a new route joins BOTH lists in the same commit. Measured live 2026-09-03
      on /operation/stock/unit/id-aam135002 before the fix. */
   const isStockUnitUrl = location.pathname.startsWith("/operation/stock/unit");
+  /* The legacy `/operation/purchasing` address rendered the old Operation
+     dashboard (owner ruling 2026-09-28, Purchasing §9.1). It is a real route
+     now — a redirect to SO Batch Purchase — so it joins this gate too. */
+  const isLegacyPurchasingUrl =
+    location.pathname === "/operation/purchasing" ||
+    location.pathname.startsWith("/operation/purchasing/");
   const isUrlDriven =
     isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
     /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
@@ -204,7 +210,8 @@ export default function OperationApp() {
        the production walk, invisible to a component test that never mounts the
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
-    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl;
+    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl ||
+    isLegacyPurchasingUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -493,6 +500,8 @@ export default function OperationApp() {
                 Batch Purchase component. Query params (`?so=` plus its rail
                 filters) remain component-owned; no second mode or engine. */}
             <Route path="to-order" element={<OperationToOrder />} />
+            {/* Legacy address (owner ruling 2026-09-28): SO Batch Purchase. */}
+            <Route path="purchasing/*" element={<Navigate to="/operation?tab=purchase" replace />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
             <Route
               path="procurement/:slug"

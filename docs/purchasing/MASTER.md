@@ -1445,6 +1445,7 @@ step: `Need approval first` · `SKU not found` with `[Fix in Catalog]` · `{PO N
 available.` with `[Use this PO]`. The reason is no longer printed only in a neighbouring column or
 a tooltip. Manual Purchase's coloured status pill is retired to the SO Batch plain text (ONE KIT
 LAW). The legacy `/operation/purchasing` address redirects to SO Batch Purchase.
+BUILT on branch build/purchasing-so-batch-mp-closure (slice 1).
 
 **Correction recorded the same day:** the planner's first list proposed replacing `Need PO` with
 the blocker and unifying the two ORDER TIMING rail vocabularies; both contradicted standing

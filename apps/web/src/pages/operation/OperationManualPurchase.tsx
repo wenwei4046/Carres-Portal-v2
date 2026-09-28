@@ -88,6 +88,7 @@ import Loading from "@/components/kit/Loading";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   DataGrid,
   type DataGridColumn,
@@ -1042,8 +1043,11 @@ export default function OperationManualPurchase() {
          */
         key: "status",
         label: MW.colStatus,
-        width: 116,
+        /* The shared Purchasing field width (UI MASTER §6.8) — SO Batch reads
+           the same one. Line two wraps (the inline second line exception). */
+        width: REGISTER_FIELD_WIDTH.status,
         minWidth: 92,
+        wrap: true,
         sortable: true,
         chooserGroup: "Buying",
         accessor: (r) => {
@@ -1053,10 +1057,25 @@ export default function OperationManualPurchase() {
               <Absent title={MW.remainderNotCheckedWhy}>{MW.remainderNotChecked}</Absent>
             );
           }
+          /* ⭐ THE TWO-LINE STATUS RULE (owner ruling 2026-09-28): plain text
+             exactly like SO Batch, never a coloured pill (ONE KIT LAW). A
+             `Need PO` request still waiting on its decision says so on line
+             two, so the reason is not only in the neighbouring column. */
+          const waitsForApproval =
+            need === "need_po" &&
+            (r.approval.kind === "need_approval" || r.approval.kind === "sent_back");
           return (
-            <StatusPill tone={need === "need_po" ? "info" : "neutral"}>
-              {MANUAL_PURCHASE_NEED_STATUS_WORDS[need]}
-            </StatusPill>
+            <span className="block" data-testid={`mp-status-${r.id}`}>
+              <span className="block">{MANUAL_PURCHASE_NEED_STATUS_WORDS[need]}</span>
+              {waitsForApproval ? (
+                <span
+                  className="block text-meta text-kit-slate-11"
+                  data-testid={`mp-status-why-${r.id}`}
+                >
+                  {MW.statusNeedApprovalFirst}
+                </span>
+              ) : null}
+            </span>
           );
         },
         searchValue: (r) => needStatusWordOf(r),
