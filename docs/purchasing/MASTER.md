@@ -1399,6 +1399,49 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
+**RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). APPROVED TARGET / NOT BUILT.**
+Measured on production `b5e959d6`: SO-1358 (Ohana Fenrir King, qty 1) printed five
+contradicting facts on one row — `Need PO` · `Already on a PO` · `Not ordered yet` · `No purchase
+needed` · tick refused with `Nothing to buy` — because an open PO carried an unreserved quantity of
+the same goods that was not linked to this order. The operator could neither buy nor reserve.
+
+The ruling: **goods on an open PO that no order holds may be reserved for a Sales Order line
+exactly like Ready Stock.** SO Batch therefore has three answers per line — reserve Ready Stock ·
+reserve goods already on a PO · issue a new PO.
+
+```text
+not reserved                                   reserved
+Need PO                                        No PO needed
+{PO No} has {n} {Item} available.  [Use this PO]    {n} {Item} on {PO No} is reserved for this order.
+```
+
+- `Use this PO` reserves; the reservation is cancellable exactly like a Ready Stock choice and
+  returns the quantity to the PO's free balance. The operator may ignore it and tick the row to
+  issue a new PO instead; the second line never blocks buying.
+- When that PO's goods are received, the reserved quantity belongs to this order without a
+  second choice.
+- Every `{PO No}` and quantity is read from the real PO; nothing is guessed. A PO whose free
+  quantity cannot be read prints the existing `Coverage not checked` instead of a number.
+- Law A: the reservation is one record owned by Purchasing's demand/coverage engine; Stock and
+  Sales Orders read it. It replaces, never sits beside, the current anonymous pool coverage that
+  produced `Already on a PO`.
+- Reference: NetSuite and SAP allow incoming PO supply to be committed/pegged to a sales order.
+
+**THE TWO-LINE STATUS RULE — same ruling, both SO Batch and Manual Purchase.** `Status` keeps its
+governed first line (`Need PO` · `No PO needed`, independent of `Approval Status`). Whenever that row
+or line cannot be ticked, a second line in plain words says WHY and, where a door exists, the next
+step: `Need approval first` · `SKU not found` with `[Fix in Catalog]` · `{PO No} has {n} {Item}
+available.` with `[Use this PO]`. The reason is no longer printed only in a neighbouring column or
+a tooltip. Manual Purchase's coloured status pill is retired to the SO Batch plain text (ONE KIT
+LAW). The legacy `/operation/purchasing` address redirects to SO Batch Purchase.
+
+**Correction recorded the same day:** the planner's first list proposed replacing `Need PO` with
+the blocker and unifying the two ORDER TIMING rail vocabularies; both contradicted standing
+rulings (COPY `Need PO` definition; the lane-specific rail words) and were withdrawn before any
+change. The Manual Purchase request with `MPR No` `Not recorded` predates migration 0546 and is not
+a defect.
+
+
 **Disabled selection explanation — DEPLOYED + AUTHENTICATED READBACK, 2026-09-24 (#1589).**
 The shared grid's optional refusal description names the same existing facts used by
 SO Batch eligibility/planning and Manual Purchase approval/remainder. It is attached
