@@ -301,6 +301,27 @@ must touch the edges — a table, an empty state.
 
 ---
 
+## Block
+
+**Purpose.** The ONE card (ONE KIT LAW, 2026-09-27; moved into the kit 2026-09-28). Sales Order,
+Purchase Orders, Manual Purchase, the Warehouse Unit and Work draw every card with it.
+
+**Anatomy.** `titleTone="sales-order"`: white · 1px `slate-5` · card radius · 12/16 padding · black
+`text-strong` title over a 1px rule · `headerSlot` (one door or the card's own button, never a
+writer) · optional `why` line (13/400, red missed / amber due / slate-11) · body with one 12px gap.
+
+---
+
+## RouteStop · ChecklistRow · QuietRouteRow
+
+**Purpose.** The Work route (Workspace MASTER §5.10): one stop per Sales Order Order Route node, its
+cards' checklists, and the one-line fold of a stop with no work now. Values: UI MASTER "THE WORK
+ROUTE KIT". Every mark is a RECORDED fact; staff never tick a checklist.
+
+**Used by.** Workspace Work (the Mission and the PO view).
+
+---
+
 ## ScheduleCard
 
 Below 768px, embedded button and link targets have a 40px minimum height; product buttons

@@ -1055,15 +1055,34 @@ approved:** Route stop · Checklist row · Quiet route row · `Block` moved into
 joins the kit with its `/ui` example and its UI MASTER entry in the build that first draws it.
 **Reference (evidence, not authority):** `docs/workspace/work-reference/prototype.html` and
 `work-1440.png` · `work-1440-form-open.png` · `work-1023.png` (SO-1333, test data, 2026-09-28).
+**Still owed after the 2026-09-28 build:** (a) Purchasing question — the feed raises
+`purchasing.confirm_tomorrows_delivery` for a PO whose current version has no send mark, while
+Purchasing §5.7 says the supplier-answer section is absent until the PO is sent (so the act's own form
+cannot record it); Purchasing owns the answer. (b) A PO window row still draws the earlier PO window
+panel (its send form is the card layout with recorded channels only, no free text); moving it onto
+the stop-card grammar is the next Work slice. (c) The Warehouse tab has no governed message yet
+(`Message not available`). (d) The A3 PO view's related-order line prints SO No · customer ·
+Requested date; its `Scheduled` date and delivery status are not yet read.
 **Still owed, not locked:** the rail group titles' 11px supporting lines (words need owner approval);
 the phone layout below 900px (its own round); the Sales Orders Order Route conflicts (`Waiting for purchase`,
 `Confirm ready date`) are agreed and fixed in PR #1695 by the Sales Orders chat — the Route now reads
 `po_sends`, acts `Send {PO No} to {Supplier}` until the current version is sent, and SUPPLIER's day-before
 act is `Ask {Supplier} for the Supplier DO for {PO No}`; the build re-tallies once #1695 is on main.
-**READY FOR CARD — Workspace Work page (desktop).** Build the §5.10 page for real orders from the
-Work feed and the owning modules' components; acceptance = the BUILD SHEET values measured at 1440 /
-1180 / 1023 / 919, the three SO-1333 acts on the first screen, no free-text send record, no page
-scaling, only Save blue, every word in COPY-STANDARD.
+**BUILT 2026-09-28 (branch `build/work-listing-table`; NOT merged, NOT deployed — merge waits for
+the owner's OK in the build chat).** The desktop page for real orders from the Work feed and the
+owning modules' components. **Acceptance, re-stated from real data (the build found the SO-1333
+example false, agreed with the spec chat 2026-09-28):** SO-1333's two POs are SHARED —
+`PO-20260903-4316` serves 9 Sales Orders and `PO-20260903-7907` serves 14 (SO Batch lineage, read
+2026-09-28) — so by A3 no PO act belongs on SO-1333. The acceptance is therefore: (1) acts first,
+measured on the real feed acts of the signed-in owner; (2) one order that carries an order-level act
+(SO-1333, `Assign logistics`, Team Work); (3) one shared PO in the A3 PO view with `Related orders ·
+{n}`; plus the BUILD SHEET values at 1440 / 1180 / 1023 / 919, no free-text send record, no page
+scaling, only the owning form's primary button blue, every word in COPY-STANDARD ("The Work page
+words"). **Measured 2026-09-28 on the SO-1333 replay preview (the real reads, test data):** columns
+280·804·340 (1440) · 240·624·300 (1180) · 220·507·280 (1023) · 220·403·280 (919); no sideways scroll;
+body 13px; buttons 36px; column title rows 64px; quiet rows 48px; card title 15/600; rail rows
+14/400; the act's card on the first screen at every width; the four Communication tabs on one row
+at every width; no status cut (a quiet row wraps below 1100px).
 
 
 **Why this section exists.** Four days of Work design were done by rebuilding the live page round
@@ -1200,9 +1219,19 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      | `delivery.deliver_today` | `Deliver on {weekday, date}` | — | `Record Delivery Result` |
      | `payment.collect_customer_balance` (only once a Scheduled delivery sets the deadline) | `Collect RM {amount} from {customer}` | `Payment must be complete by {date}` | `Record payment` |
 
-   - **Verified on SO-1333 (2026-09-28):** two `supplier_date_passed` cards (Ohana 14 Sep, Nice
-     Future 15 Sep), one `confirm_delivery_date` card due today (NETS). Receiving has no act
-     (neither PO carries a send mark). Payment has no act (no Scheduled delivery). `To do 3`.
+   - **Measured on real data 2026-09-28 (overwrites the earlier SO-1333 example):** the live feed
+     holds `purchasing.confirm_tomorrows_delivery` on both SO-1333 POs (owned by the PO Duty holder)
+     and `assign_logistics` on SO-1333 (its PIC). Both POs are shared (9 and 14 orders), so their
+     acts show in the A3 PO view, never on SO-1333. `assign_logistics` was an engine defect —
+     the feed read only the order row's legacy company columns while Delivery's leg-0 arrangement
+     names NETS; fixed in the same build (the feed now reads the arrangement's `partner_id`), so
+     after deploy SO-1333 carries no act and shows its Route facts only.
+   - **Placement rules for the build (spec chat, 2026-09-28):** (1) counts count OCCURRENCES, never
+     POs — a PO window with two unsent POs for one order is ONE task on that order's row;
+     (2) an act shows under a Sales Order only when its PO is sourced from that order ALONE (SO
+     Batch lineage); a PO serving two or more orders (or stock) opens the A3 PO view, and a PO
+     window with demand left to buy keeps its own row. The send act's words are Purchasing's own
+     builder (`Send {PO No} to {Supplier}`, the ruled PO No with its version).
    - **REVISION 13 · STOPS = THE SALES ORDER ORDER ROUTE NODES, ONE CHECKLIST FORMAT (Jess,
      2026-09-28: "yes. direction is correct … split to supplier, receiving, etc, what order route from
      sales order do"; "every module step checklist progress is the same").** The
@@ -1216,11 +1245,9 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      the second line says why. Every card carries its checklist: a square box per step, ✓ filled when
      done, empty when not yet, red or amber `!` for the step that is the act now, and `{n} of {m} done`.
      A fact (a date that is not a step) is never a checklist row. The DELIVERY ORDER card lists the
-     gate's five requirements as its checklist. SO-1333 (resolver run on origin/main 2026-09-28):
-     Payment IS due today — the one shared `paymentDeadlineOf` anchors on the Scheduled delivery,
-     else the Customer Requested Delivery Date (Wed 30 Sep → Mon 28 Sep); revision 11's "no deadline
-     until Scheduled delivery" is withdrawn. To do 4: two supplier answers, `Call NETS`,
-     `Collect RM 2,284.00 from 12341234` (`Record payment`). UI/UX skill rules applied: stop label
+     gate's five requirements as its checklist. The payment deadline is the one shared
+     `paymentDeadlineOf` (Scheduled delivery, else the Customer Requested Delivery Date); revision
+     11's "no deadline until Scheduled delivery" is withdrawn. UI/UX skill rules applied: stop label
      and card title are two ranks; grey text at least 4.5:1 (slate-11); buttons 36px; only Save blue.
    - **Review corrections applied 2026-09-28 (Jess "可以", eight items; verified against authority).**
      (1) A PO whose current version has no send mark shows `Sending not confirmed` and its act is
@@ -1272,8 +1299,13 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      do").** Stops holding an open act come first, in Route order among themselves, with their full
      cards; every other stop follows in Route order as one quiet line. Measured on SO-1333 at 1440,
      1023 and 919: all three acts are on the first screen.
-   - **BUILD SHEET — exact values for the build chat (every number is a token; measured on the
-     prototype 2026-09-28).** Reference files: `output/prototype/index.html` (evidence, not authority).
+   - **BUILD SHEET — exact values (every number is a token; measured on the prototype 2026-09-28,
+     BUILT 2026-09-28).** Reference files: `docs/workspace/work-reference/` (evidence, not authority).
+     Built deviations, each for a kit or document law: the card and the quiet row use the kit CARD
+     radius (10px), not the prototype's 6 (token values are locked); the header's `Proceed Date` is
+     the Sales Order document's own Proceed Date (A7), not the hand-off time the prototype printed;
+     the Communication tabs are the kit `Tabs` (its selected tab carries the kit's blue indicator);
+     the calendar is the Work rail's existing Monday-to-Saturday month grid with each day's count.
 
      | Part | Kit component (exists) | Exact values |
      |---|---|---|
@@ -1288,8 +1320,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      | Communication | `Tabs` + `Select` + `Button` + `Icon` (`message`, `mail`) | four tabs on one row; To (recorded channels only) · Template · Message · icons · Copy · `History {n}` folded |
      | Document number | link + `PdfPreview` sheet | underlined 12/400 ink; opens the official PDF over the page |
 
-     **MISSING FROM THE KIT — needs owner approval to join the kit before the build (Constitution §2:
-     "a component that does not exist: STOP and ask"):**
+     **ADMITTED TO THE KIT 2026-09-28 (Jess "kit ok") and BUILT the same day — values now live in UI
+     MASTER "THE WORK ROUTE KIT":**
      1. **Route stop** — the vertical line with a 24px dot (red `!` missed · amber due · dark ✓ all
         done · grey otherwise), the stop label 11/500 uppercase slate-11 letter-spacing .06em, and
         `Missed` / `Due` beside it; line 1.5px dashed slate-6, solid once done.

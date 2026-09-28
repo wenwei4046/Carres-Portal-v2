@@ -4624,3 +4624,17 @@ Not screen words (a direct database change only, never raised by a screen): the 
 **Workspace Module order row — owner correction 2026-09-28:** show only `{SO No}` and a right-aligned numeric count of tasks in the selected Attention/day and module scope. Do not repeat the customer name, `actions`, `Missed`, or `No date` on that row. Example: `SO-1333` with `2`.
 
 Workspace message availability: `Message not available` replaces a placeholder draft when no governed message is available. Disable `Copy message` in that state; never report success when clipboard copying fails.
+
+## The Work page words — Workspace MASTER §5.10 · APPROVED / LOCKED 2026-09-28 · BUILT 2026-09-28
+
+| Where | Use exactly | Do not use |
+|---|---|---|
+| Page and scope | page title `Workspace` · `My Task` · `Team Work` | `My Work` on this page |
+| Rail | `Search work…` · `Attention`: `Broken commitment` · `Missed` · `Waiting for answer` · `No date` · `Module`: `All modules`, then the module names · one row per order: `{SO No}` and its task count (a PO view row: `{PO No}`; a PO window row: `{time} PO window` over its date) | a customer name, `actions`, `Missed` or `No date` on an order row |
+| Order header | `{SO No}` over the customer · `Proceed Date` · `Customer Requested Delivery Date` · a missing value `Not recorded` | `Order Route · To do {n}` · band words `GOODS` / `DELIVERY` |
+| Stops | the Order Route node labels (`PURCHASING` · `SUPPLIER` · `RECEIVING` · `STOCK` · `LOAN` · `LOGISTICS` · `DELIVERY DATE` · `PAYMENT` · `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`) with `Missed` / `Due` only · `{n} of {m} done` (only steps with completion evidence count) | a second count on the stop · `T1` / `T2` / `T3` |
+| Checklist steps | `PO issued` · `PO sent to supplier` / `Sending not confirmed` · `Supplier Confirmed Delivery Date` · `GRN posted` · `Units ready` · `Logistics assigned` · the Logistics check labels · `Scheduled delivery` · `Customer paid in full` · `Delivered` · `Delivery photo` · the DELIVERY ORDER card lists the gate's own requirement sentences | a fact (a date that is not a step) as a checklist row |
+| Act buttons | the owning form's own word: `PO sent to supplier` · `Record supplier answer` · `Record balance date` · `Update date and time` · `Assign logistics` · an act with no in-place form yet: `Open {object}` | a Workspace-invented button |
+| PO view (a PO serving two or more orders) | `{PO No} · {Supplier}` over `PO Delivery Date {date} · Expected arrival {date} · Related orders · {n}` · a related order line `{SO No} · {customer} · Requested {date}` · on the order it opens: `Back to {PO No}` | copying the PO's act onto each order |
+| Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · Email`) · `Template` · `Message` · `Message not available` · `Copy message` · `History {n}` | a typed recipient · a message with a missing field · a dash |
+| Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Missed` · `No missed work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |

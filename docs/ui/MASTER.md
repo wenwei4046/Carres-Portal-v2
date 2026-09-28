@@ -1686,6 +1686,22 @@ table styling. A fifth table does not exist until it joins the kit.
 | 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
 
 
+**THE WORK ROUTE KIT — admitted by Jess 2026-09-28 ("kit ok"; Workspace MASTER §5.10) · BUILT 2026-09-28.**
+Four pieces joined the kit with the Work page; each has its `/ui` example (section `route`) and a
+page imports it, never draws it:
+
+| Piece | File | Locked values |
+|---|---|---|
+| `Block` — the ONE card | `components/kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
+| `RouteStop` | `components/kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
+| `ChecklistRow` | `components/kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
+| `QuietRouteRow` | `components/kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
+
+Two opt-in props came with them, and no other page moves: `Tabs fill` (tabs share a narrow bar by
+their own length with no gap, so Work's four Communication tabs stay on one row at 280px) and
+`FilterRailRow tone="workspace"` (14/400 rows with the count on the right; the chosen row is the
+`blue-3` wash with the 3px blue edge; `indent` for a record row under its module row).
+
 **Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
 PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
 no other page moves until its own round. First adopter: Sales Orders (Card 12, NOT BUILT). The four pages
