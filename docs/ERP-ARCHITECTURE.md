@@ -82,6 +82,14 @@ identities and write no completion. Module filter rails do not copy those action
 
 ---
 
+**SHOWROOM DOCUMENT PRESENTATION — APPROVED TARGET / NOT BUILT, Jess 2026-09-28.**
+Purchasing exposes Display Requests, Consignment Notes and Consignment Sale Notices. One sourced
+Consignment Note presents supplier-owned placement/return/swap; internal incoming and return
+records retain distinct identities and physical obligations (Purchasing §§9.9–9.10). No extra
+manual note writer or separate staff Order/Return selection. Stock retains site-to-site Transfer
+and custody, Receiving retains receipt, and Finance retains supplier billing. Naming never changes
+stock, historical documents or existing number families. Current application navigation may lag.
+
 # §1 · The five ownership laws
 
 ### Law A · One record, one owner
@@ -286,8 +294,7 @@ SUPPLY CHAIN
 │   │   └── Repair Orders
 │   └── SHOWROOM
 │       ├── Display Requests
-│       ├── Consignment Orders
-│       ├── Consignment Returns
+│       ├── Consignment Notes
 │       └── Consignment Sale Notices
 ├── Warehouse
 │   ├── Arrival Schedule

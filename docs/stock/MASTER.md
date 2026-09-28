@@ -1805,6 +1805,13 @@ Owned. These are test rows (Constitution §6, no backfill); the go-live opening 
 `Supplier Consignment` and the supplier for every other supplier's display Unit. Measured the same
 day: one purchase order carries `is_consignment`.
 
+**Showroom document presentation — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Purchasing §§9.9–9.10 expose one Consignment Note for supplier-owned incoming/return/swap work;
+its underlying incoming/return records keep their identity. Existing Stock references to those
+record roles do not require separate staff-facing documents. A showroom-to-Carres-warehouse move
+remains Stock Transfer, not a completed supplier return. Receipt/handover facts and Unit ownership
+remain governed independently of printing, issuing or sending the note.
+
 **Showroom handoff connection — APPROVED TARGET / NOT BUILT, Jess 2026-09-28.**
 Purchasing MASTER §9.8 owns the display-arrangement handoff: replacement/removal starts by selecting
 this register's existing showroom Units; new placement may have no outgoing Unit. Sales supplies

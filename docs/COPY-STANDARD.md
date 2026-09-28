@@ -1038,23 +1038,26 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
-### Showroom document names — owner instruction 2026-09-28
+### Showroom document names and supplier note — owner ruling 2026-09-28
 
-Use full document names in explanatory copy and action context: `Display Request`,
-`Consignment Order`, `Consignment Return`, `Consignment Sale Notice`. Do not substitute bare
-`DR`, `CO`, `CRTN` or `CSN` as names the operator must decode. Keep the existing plural navigation
-labels and official document-number prefixes unchanged; this does not rename identifiers,
-numbering, stored fields or previously governed column labels. In owner discussions, give the
-full English name with a Chinese explanation when useful; this does not change Portal language.
+**APPROVED TARGET / NOT BUILT.** Staff-facing names: `Display Request`, `Consignment Note`,
+`Consignment Sale Notice`; plural destinations: `Display Requests`, `Consignment Notes`,
+`Consignment Sale Notices`. Use full names in explanatory copy and actions, not bare DR/CO/CRTN/CSN.
+Consignment Note is the shared supplier-facing screen/PDF name for placement, return and swap.
+Internal Consignment Order and Consignment Return roles preserve existing source identities and
+number prefixes; these are not separate staff creation choices or target sidebar pages. Historical
+PDF titles and numbers remain as issued. Owner discussion may add Chinese explanations; Portal
+language is unchanged. Purchasing MASTER §§9.9–9.10 own the business mapping.
 
-### Consignment Order document content — owner ruling 2026-09-28
-
-**APPROVED TARGET / NOT BUILT.** `COMING IN` and `GOING BACK` are the combined CO PDF's goods
-section labels (Purchasing MASTER §7.6, §9.9); omit `GOING BACK` for placement without outgoing
-goods. This does not approve a new on-screen card style or an independent return notice for a
-paired swap. The CO PDF prints no price or price total. Supplier quotation versions and Sales
-commercial confirmation remain linked internal records; no zero or invented acceptance wording
-stands in for missing price/confirmation. Actual dates remain separate for the two directions.
+Supplier PDF title: `CONSIGNMENT NOTE`. Direction headings: `COMING IN` and `GOING BACK`.
+Placement prints the first; standalone return prints the second; same-supplier swap prints both
+on one instruction. Omit unused directions. The note is price-free and keeps actual-versus-planned
+quantities/dates/evidence distinct. Neither issuing nor sending the note moves stock. No customer
+invoice or sale-notification title is replaced by this name. No new number family is introduced.
+Shared issue action: `Issue consignment note`; contextual `Issue consignment note to {supplier}`;
+result `Consignment note issued to {supplier}`. Source and permissions remain governed; this is
+not an independent blank-create action. Exact register columns and other new copy remain subject
+to their design closure; no new component/style is admitted by this naming ruling.
 
 ### Purchasing navigation words — owner ruling 2026-08-22
 
@@ -1067,7 +1070,7 @@ do not create a second business status, work queue or source of truth.
 | BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
-| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
+| SHOWROOM pages | `Display Requests` · `Consignment Notes` · `Consignment Sale Notices` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
@@ -1171,7 +1174,7 @@ these copy retirements do not delete business facts or ban their words on other 
 | `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} to confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
-| `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
+| `Issue consignment note` | `Issue consignment note to {supplier}` | `Issue consignment note` | `Consignment note issued to {supplier}` | `No consignment notes to issue.` |
 | `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
 | `Issue repair order` | `Issue repair order to {supplier}` | `Issue repair order` | `Repair order issued to {supplier}` | `Nothing is out for repair.` |
 | `Confirm collection date` | `Call {supplier} — confirm collection date` | `Record collection date` | `Collection date recorded` | `Nobody is waiting to be collected.` |
