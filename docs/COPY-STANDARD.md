@@ -3479,9 +3479,26 @@ PDF or prepared message. An empty cell draws nothing (UI MASTER §6.0), except o
 goods table, where the cell says why (§ "A goods cell with nothing in it says why", Jess 2026-09-27); a missing fact prints its
 word (`Not recorded`, `No PO yet`, `No {field word}`); a fact that is zero prints `0` / `RM 0.00`;
 a control's placeholder is its label's word; a prepared message leaves out a line whose value is
-missing; a range reads `to` (`Mon to Fri`, `09:00 to 17:00`). Punctuation inside an owner-approved sentence
-(`Reconstructed copy — original issued document unavailable.`) is a sentence, not a value, and is
-untouched.
+missing; a range reads `to` (`Mon to Fri`, `09:00 to 17:00`).
+
+**⭐ NO DASH AS A SEPARATOR EITHER — OWNER RULING 2026-09-28 (Jess: *"dash shouldn't have — which we
+use 2 lines if needed or 1 line write clear"*), APPROVED TARGET / NOT BUILT.** A dash never joins two
+facts or two halves of a sentence on any screen, PDF or prepared message, including words approved
+before this ruling. Two facts become **two lines** where the surface has room for a second line;
+otherwise the text is **rewritten as one clear line** that needs no dash:
+
+```
+✔  Unit IDs missing on this line.        ✘  Unit IDs missing on this line — do not send this PO
+   Do not send this PO.
+✔  Reconstructed copy. The original issued document is unavailable.
+                                         ✘  Reconstructed copy — original issued document unavailable.
+✔  Total unchanged                       ✘  Total — unchanged
+✔  Save changes: {what is missing}       ✘  Save changes — {what is missing}
+```
+
+A second line uses the surface's own second-line grammar (the kit's inline second line, a new
+paragraph in a message); a rewritten line keeps the dictionary's words and adds none. A dash inside
+stored data (a catalog description, a supplier's own document) is data and is printed as stored.
 
 
 **A boolean's missing before-value prints `Not recorded → No` / `Not recorded → Yes` (owner ruling
