@@ -5378,12 +5378,16 @@ occupancy or an 11-Unit stock limit: a set may consist of multiple tracked Units
 change the 36 imported Unit records or establish their verified ownership. No production data
 change is authorised by this ruling.
 
-**PROPOSAL / NOT LAW — capacity-aware coordination.** Show existing occupied sofa sets and the
-planned arrival/removal effect together so Operation can arrange space before arrival. Preserve
-the approved either-movement-first rule; do not silently assume two new sofas equal two outgoing
-sets, a current occupancy of 11, or introduce an unconditional receipt block. Confirm the relevant
-set composition and timing in the arrangement. Falsifier: if operational set grouping cannot
-reliably measure occupied display space, do not present a computed free-capacity figure as fact.
+**CAPACITY-AWARE COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Show current occupied sofa sets, planned incoming sets and planned outgoing sets together against
+PJ Showroom's current 11-set display capacity. When full, prompt Operation to coordinate removal
+timing and actual space before the incoming placement. Preserve the approved either-movement-first
+rule; this is a planning prompt, not an unconditional receipt block. Do not assume two new sofas
+equal two outgoing sets or that current occupancy is 11. Confirm relevant set composition and
+movement timing; planned movements do not change actual occupancy until evidenced physical events.
+If set grouping or current occupancy is unverified, make that uncertainty explicit rather than
+presenting a computed free-capacity figure as fact. Exact UI composition and new screen wording
+remain subject to the shared kit and copy authority; this ruling does not authorise application build.
 
 **SUPPLIER QUOTATION RECORDING — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
 Operation may upload a supplier quotation and transcribe its model/specification, prices and terms
