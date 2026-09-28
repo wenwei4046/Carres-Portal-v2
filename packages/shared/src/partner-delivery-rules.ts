@@ -198,13 +198,13 @@ export function partnerBookingWarnings({
   if (weekdayOf(date) !== 0 && rules.offDays.includes(weekdayOf(date))) {
     out.push({
       key: "off_day",
-      message: `${partnerName} does not deliver on ${WEEKDAY_NAMES[weekdayOf(date)]} — pick another day or call them`,
+      message: `${partnerName} does not deliver on ${WEEKDAY_NAMES[weekdayOf(date)]}. Pick another day or call them`,
     });
   }
   if (rules.blackoutDates.some((b) => b.slice(0, 10) === date)) {
     out.push({
       key: "blackout",
-      message: `${partnerName} is not running on ${dmy(date)} — pick another day`,
+      message: `${partnerName} is not running on ${dmy(date)}. Pick another day`,
     });
   }
   if (rules.bookingLeadDays > 0 || date < today) {
@@ -216,7 +216,7 @@ export function partnerBookingWarnings({
           : `${partnerName} cannot take a date in the past`;
       out.push({
         key: "lead_time",
-        message: `${notice} — the earliest it can take is ${dmy(earliest)}. Call them if this date is already agreed.`,
+        message: `${notice}. The earliest it can take is ${dmy(earliest)}. Call them if this date is already agreed.`,
       });
     }
   }
@@ -227,7 +227,7 @@ export function partnerBookingWarnings({
   ) {
     out.push({
       key: "capacity",
-      message: `${partnerName} already has ${bookedOnDate} deliver${bookedOnDate === 1 ? "y" : "ies"} on ${dmy(date)} — its limit is ${rules.dailyCapacity} a day. Call them before promising this date.`,
+      message: `${partnerName} already has ${bookedOnDate} deliver${bookedOnDate === 1 ? "y" : "ies"} on ${dmy(date)}. Its limit is ${rules.dailyCapacity} a day. Call them before promising this date.`,
     });
   }
   return out;

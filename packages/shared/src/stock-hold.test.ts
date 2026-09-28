@@ -189,7 +189,7 @@ describe("R4 · the sentence the panel shows", () => {
     const line = heldUnitsLine(2, "damaged");
     expect(line).toContain("2 units on hold");
     expect(line).toContain("Arrived damaged");
-    expect(line).toContain("cannot be sold, reserved or delivered");
+    expect(line).toContain("Cannot be sold, reserved or delivered");
   });
 
   it("counts one unit as one unit", () => {
@@ -201,7 +201,7 @@ describe("R4 · the sentence the panel shows", () => {
     // A late-delivery claim, or a partner warehouse that keeps no per-unit
     // register: 0 means "there is nothing here", never "still loading".
     expect(heldUnitsLine(0)).toBe(
-      "Nothing on hold — these units are not in the register.",
+      "Nothing on hold. These units are not in the register.",
     );
   });
 });

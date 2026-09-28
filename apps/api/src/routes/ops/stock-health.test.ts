@@ -179,7 +179,7 @@ describe("GET /api/ops/stock/health", () => {
 
     expect(body.counts).toMatchObject({ unrated: 2, healthy: 0, critical: 0 });
     expect(body.headline).toBe(
-      "Nothing is watched yet — 2 items still need a number.",
+      "Nothing is watched yet. 2 items still need a number.",
     );
     expect(body.slowMovers).toEqual([]);
     expect(body.slowWindows.every((w) => !w.ready)).toBe(true);

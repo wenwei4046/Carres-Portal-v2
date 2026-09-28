@@ -620,7 +620,7 @@ const tryAgain = (owner: UnreadableOwner): RouteDoor => ({
   href: UNREADABLE[owner].retry,
 });
 
-const NO_PRICE = "No price yet — money does not hold this delivery";
+const NO_PRICE = "No price yet. Money does not hold this delivery";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Geometry. Fixed node width, height derived from content, so a connector can
@@ -1365,10 +1365,10 @@ function refusedDayLine(
   holidays: ReadonlyArray<string>,
 ): string | null {
   if (!confirmed) return null;
-  if (holidays.includes(confirmed)) return "Date falls on a public holiday — pick another day";
+  if (holidays.includes(confirmed)) return "Date falls on a public holiday. Pick another day";
   const day = new Date(`${confirmed}T00:00:00Z`);
   if (Number.isNaN(day.getTime())) return null;
-  return day.getUTCDay() === WEEKDAY_SUNDAY ? "Date falls on a Sunday — pick another day" : null;
+  return day.getUTCDay() === WEEKDAY_SUNDAY ? "Date falls on a Sunday. Pick another day" : null;
 }
 
 interface GoodsTotals {

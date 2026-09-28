@@ -224,7 +224,7 @@ export const READY_STOCK_REFUSAL_WORDS: Record<string, string> = {
   /* The release half of a replacement. A Unit that will not come back keeps
      the whole act from happening, so nothing is half-applied. */
   unit_not_reserved_here: "That Unit is no longer reserved to this item line.",
-  unit_cannot_be_released: "That Unit cannot be given back — it has already left the shelf.",
+  unit_cannot_be_released: "That Unit cannot be given back. It has already left the shelf.",
   order_line_not_in_order: "That item line is no longer on this Sales Order.",
   too_many_units: "Choose at most 50 Units at a time.",
   no_reference: "This Sales Order has no number yet.",

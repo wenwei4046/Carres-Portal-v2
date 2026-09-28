@@ -232,7 +232,7 @@ describe("Warehouse Outbound — the unified Register", () => {
     // The two evidence records live in the arrangement's own detail.
     fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
     expect(screen.getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
-      "Warehouse loaded — nothing yet",
+      "Warehouse loaded nothing yet",
     );
     expect(screen.getByTestId("wo-collected-DO-2609-019")).toHaveTextContent(
       "NETS Delivery has not confirmed collection yet",

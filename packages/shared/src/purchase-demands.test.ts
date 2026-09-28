@@ -222,7 +222,7 @@ describe("the state words — every category, no banned word", () => {
     const words = purchaseDemandStateWords(14);
     expect(words.can_order_early).toBe("Can order early");
     expect(words.safety_days_full).toBe("14 safety days left");
-    expect(words.safety_days_low).toBe("1–13 safety days left");
+    expect(words.safety_days_low).toBe("1 to 13 safety days left");
     expect(words.safety_days_none).toBe("No safety days left");
     /* Card 02-C (2026-08-27): `days`, never `time` — the unit the arithmetic
        itself counts in. */
@@ -232,7 +232,7 @@ describe("the state words — every category, no banned word", () => {
   it("the safety words follow the governed value, so the screen cannot lie", () => {
     const words = purchaseDemandStateWords(10);
     expect(words.safety_days_full).toBe("10 safety days left");
-    expect(words.safety_days_low).toBe("1–9 safety days left");
+    expect(words.safety_days_low).toBe("1 to 9 safety days left");
   });
 
   it("every state has a fact word; the rail words are the timing rows plus the one setup row", () => {

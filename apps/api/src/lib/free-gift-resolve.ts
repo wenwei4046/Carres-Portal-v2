@@ -304,7 +304,7 @@ export async function validateFreeItemClaims(
     if (attrs && attrs.sofa_build) {
       return {
         status: "bad_request",
-        message: "A sofa build cannot be made free — free items apply to flat products only.",
+        message: "A sofa build cannot be made free. Free items apply to flat products only.",
       };
     }
     const fi = (attrs as { free_item?: { campaignId?: unknown } } | null)?.free_item;

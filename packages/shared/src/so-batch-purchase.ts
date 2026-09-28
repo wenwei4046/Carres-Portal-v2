@@ -242,7 +242,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * to be exact, in the words the API would have answered with.
    */
   toBuyAlreadyOnPoWhy:
-    "An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.",
+    "An open purchase order already covers this line. Nothing to buy here. Check the covering purchase order instead. Issue PO refuses it.",
 
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,

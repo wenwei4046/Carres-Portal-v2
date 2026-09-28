@@ -303,7 +303,7 @@ describe("Order Route — the gate", () => {
       }),
     );
     expect(nodeEl("delivery-order")).toHaveTextContent(
-      "Date falls on a Sunday — pick another day",
+      "Date falls on a Sunday. Pick another day",
     );
   });
 });

@@ -229,7 +229,7 @@ export const TO_ORDER_WORDS = {
   clearSalesOrderScope: "Clear Sales Order scope",
   scopeNotFound: "Sales Order not found.",
   scopeBlockedProductionDays: "Set a number before this demand can be issued.",
-  scopeBlockedDeliveryDate: "No delivery date — this demand cannot be issued.",
+  scopeBlockedDeliveryDate: "No delivery date. This demand cannot be issued.",
   scopeUnresolved: "Purchasing cannot resolve this demand from the catalog.",
   scopeAlreadyCovered: "Demand is already covered by an open Purchase Order.",
   scopeAlreadyIssued: "Purchase Order already issued.",
@@ -1804,7 +1804,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           ),
           title:
             (nameCount.get(named) ?? 0) > 1
-              ? `${unitLabel(category, 1)} ${i} — ${named}`
+              ? `${unitLabel(category, 1)} ${i}: ${named}`
               : named,
           spec: buildSpec(members),
           codes: members.map((m) => m.sku).join(" · "),

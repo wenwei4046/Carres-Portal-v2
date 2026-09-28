@@ -239,7 +239,7 @@ export function composeCaseSummary(a: CaseIntakeAnswers): string {
     .filter(Boolean)
     .join(" · ");
 
-  parts.push(product ? `${caseIssueLabel(a.issueType)} — ${product}.` : `${caseIssueLabel(a.issueType)}.`);
+  parts.push(product ? `${caseIssueLabel(a.issueType)}: ${product}.` : `${caseIssueLabel(a.issueType)}.`);
 
   if (a.reportedBy) {
     const r = CASE_REPORTERS.find((x) => x.key === a.reportedBy);

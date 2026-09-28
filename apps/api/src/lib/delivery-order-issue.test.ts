@@ -217,7 +217,7 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
       "operation_add_annotation",
       expect.objectContaining({
         p_order_id: ORDER_ID,
-        p_content: `${orderActionDone("issue_delivery_order")} — ${DO_NUMBER}`,
+        p_content: `${orderActionDone("issue_delivery_order")}: ${DO_NUMBER}`,
       }),
     );
   });

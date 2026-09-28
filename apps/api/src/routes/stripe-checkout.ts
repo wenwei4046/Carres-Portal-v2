@@ -73,7 +73,7 @@ function shape(row: SessionRow) {
 function requireConfigured(c: { env: AppEnv["Bindings"] }) {
   if (!stripeConfigured(c.env)) {
     throw new HTTPException(503, {
-      message: "Stripe is not set up yet — ask the principal to add the Stripe keys.",
+      message: "Stripe is not set up yet. Ask the principal to add the Stripe keys.",
     });
   }
 }
@@ -165,7 +165,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   const order = await fetchOrderScoped(c, idCheck.data);
   if (order.status === "delivered" || order.status === "cancelled") {
     return c.json(
-      { error: "stripe_checkout_blocked", code: "wrong_status", message: "Order is closed — no balance to collect." },
+      { error: "stripe_checkout_blocked", code: "wrong_status", message: "Order is closed. No balance to collect." },
       422,
     );
   }

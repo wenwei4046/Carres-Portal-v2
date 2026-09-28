@@ -88,11 +88,11 @@ export function financeExceptionReason(
   const open = openFinanceExceptions(exceptions);
   if (open.length === 0) return null;
   if (open.length === 1) {
-    return `Finance is holding this delivery: ${open[0]!.reason} — Finance clears it.`;
+    return `Finance is holding this delivery: ${open[0]!.reason}. Finance clears it.`;
   }
   return `Finance is holding this delivery for ${open.length} reasons: ${open
     .map((e) => e.reason)
-    .join(" · ")} — Finance clears them.`;
+    .join(" · ")}. Finance clears them.`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
