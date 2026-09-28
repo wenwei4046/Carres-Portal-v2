@@ -774,6 +774,107 @@ operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
 });
 
 // ----- GET /:id detail -----
+/**
+ * ⭐ MONTHLY DEMAND'S FACTS — owner rulings 2026-09-22 / 2026-09-26 (Orders
+ * MASTER § Monthly demand).
+ *
+ * The Register's list stops at 500 rows, newest first, so a month-by-month
+ * sum built from it silently drops the OLDEST orders — the `Before` row, the
+ * goods owed longest. This read pages until a page comes back short and
+ * returns only the facts the arithmetic needs; `monthlyDemandOf`
+ * (packages/shared) does the arithmetic in the browser.
+ *
+ * ONE population: `salesOrderRegisterPopulation`, the Register's own.
+ * Delivered = Stock's Units SOLD against the order. A failed read of them
+ * fails the read: an unread delivery is not zero delivered.
+ *
+ * Declared BEFORE `/:id`, which would otherwise read the word as an order id.
+ */
+const MONTHLY_DEMAND_PAGE = 1000;
+operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  type Row = {
+    id: string;
+    so: number | null;
+    delivery_date: string | null;
+    delivery_date_tbd: boolean | null;
+    customer_address_state: string | null;
+    customer_address_city: string | null;
+    outlets?: { name?: string | null } | null;
+    dealers?: { name?: string | null } | null;
+    order_lines?: Array<{ id: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }> | null;
+  };
+  const rows: Row[] = [];
+  for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+    const { data, error } = await salesOrderRegisterPopulation(
+      sb
+        .from("orders")
+        .select(
+          "id, so, delivery_date, delivery_date_tbd, customer_address_state, customer_address_city, outlets(name), dealers(name), order_lines(id, sku, qty, attrs)",
+        ),
+    )
+      .order("id", { ascending: true })
+      .range(from, from + MONTHLY_DEMAND_PAGE - 1);
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    const page = (data ?? []) as unknown as Row[];
+    rows.push(...page);
+    if (page.length < MONTHLY_DEMAND_PAGE) break;
+  }
+
+  /* The catalog's category, through the ONE category reader. It fails open: a
+     line it cannot place reads null, which the arithmetic counts as
+     `Not in catalog` — never dropped. */
+  const categoryBySku = await skuCategories(
+    sb,
+    rows.flatMap((o) => (o.order_lines ?? []).map((l) => l.sku).filter(Boolean)),
+  );
+
+  const delivered = new Map<string, Array<{ orderLineId: string | null; sku: string; qty: number }>>();
+  /* An order id is a 36-character UUID; 100 of them is a 4KB URL. */
+  for (const batch of chunk(rows.map((o) => o.id), 100)) {
+    if (batch.length === 0) continue;
+    for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+      const { data, error } = await sb
+        .from("ops_stock_items")
+        .select("sku, qty, sold_order_id, reserved_order_line_id")
+        .eq("status", "sold")
+        .in("sold_order_id", batch)
+        .order("id", { ascending: true })
+        .range(from, from + MONTHLY_DEMAND_PAGE - 1);
+      if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+      const page = (data ?? []) as Array<{ sku: string | null; qty: number | null; sold_order_id: string | null; reserved_order_line_id?: string | null }>;
+      for (const unit of page) {
+        if (!unit.sold_order_id || !unit.sku) continue;
+        delivered.set(unit.sold_order_id, [
+          ...(delivered.get(unit.sold_order_id) ?? []),
+          { orderLineId: unit.reserved_order_line_id ?? null, sku: unit.sku, qty: unit.qty ?? 1 },
+        ]);
+      }
+      if (page.length < MONTHLY_DEMAND_PAGE) break;
+    }
+  }
+
+  return c.json({
+    orders: rows.map((o) => ({
+      id: o.id,
+      so: o.so,
+      deliveryDate: o.delivery_date,
+      deliveryDateTbd: Boolean(o.delivery_date_tbd),
+      salesLocation: o.outlets?.name?.trim() || o.dealers?.name?.trim() || null,
+      state: o.customer_address_state,
+      city: o.customer_address_city,
+      lines: (o.order_lines ?? []).map((l) => ({
+        id: l.id,
+        sku: l.sku,
+        qty: Number(l.qty),
+        category: categoryBySku.get(l.sku) ?? null,
+        attrs: l.attrs ?? null,
+      })),
+      delivered: delivered.get(o.id) ?? [],
+    })),
+  });
+});
+
 operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);

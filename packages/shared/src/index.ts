@@ -45,6 +45,16 @@ export {
   type SalesOrderRouteMap,
   type StationOwnerKey,
 } from "./sales-order-route";
+export {
+  MONTHLY_DEMAND_CATEGORIES,
+  monthlyDemandOf,
+  monthlyDemandWindowOf,
+  type MonthlyDemandCategory,
+  type MonthlyDemandFilters,
+  type MonthlyDemandOrder,
+  type MonthlyDemandRow,
+  type MonthlyDemandView,
+} from "./monthly-demand";
 export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
 export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";

@@ -177,6 +177,31 @@ with the Operation permission boundary kept. **Not removed yet:** the page's own
 (`mode === "create"` in `SalesOrderWorkspace.tsx`) is now unreachable and still in the file; the
 `sales_order_create` database function is untouched.
 
+**Scope F · Monthly demand — BUILT 2026-09-28, production walk owed.** The Sales Orders page has
+the shared 240px rail with a fixed `View` group (`Order list` · `Monthly demand`, kept in the URL as
+`?view=monthly`). Monthly demand's groups are `Period` (`Starting month` · `Months` 1 to 6, the
+resolved window printed beneath) · `Dealer / Sales Location` · `Delivery State / City` · `Product
+category`, all single choice, no `Clear filters`; they live in the URL and never carry into the
+Order list. The page is two blocks: `This month · {Mon YYYY}` (`Total Qty` · `Delivered` · `Not
+delivered`, ONE month) and one table, one row per month (`Before` · six months · `After` · `No
+delivery date` · `Total`), columns `Month` · the four categories · `Not in catalog` (only when a
+line has no catalog row) · `Total Qty` · `Delivered` · `Not delivered` · `To buy`. A month is a door:
+the Order list narrowed on the Customer Requested Delivery Date (`?requested=`), shown as an active
+condition. `Open SO Batch Purchase →` sits under the table.
+**Sources, and the arithmetic's one home:** `GET /api/operation/orders/monthly-demand` reads the
+Register's ONE population past the list's 500-row cap (it pages), with Stock's Units sold against
+each order; `monthlyDemandOf` (`packages/shared`) arranges them. `To buy` is SO Batch Purchase's
+`soBatchOrderLineOutstandingQty` per LINE, so a Product category narrows it with the lines it
+counts; an unread SO Batch prints `Unavailable`, never zero. The kit admits `DocumentTable` (recipe
+3, its first column fixed while the rest scroll) and `TotalsSummary` (recipe 4), each with a `/ui`
+example. Measured at 1440 / 1180 / 820 / 743 / 390: no sideways page scroll, no dash, the table
+scrolls inside its own frame.
+**Not built in F:** Export of the matrix; the Order list's own filter groups (Dealer, State / City,
+Date, Delivery, Obligations, Service Cases); a search box in the Dealer group. **Measured gaps:**
+SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
+`To buy` is `0` for an Accessory or a `Not in catalog` line; a Unit sold before 0471 names no line
+and is matched to the first line of its SKU.
+
 **Intentional rejects / deferred (unchanged):** `Request Delivery Order` on any Sales Order surface
 (Delivery's door) · `Copy to new Sales Order` · `Preview` · a stacked mobile Route · a `partial`
 node mark · the direct-to-customer goods lane (Purchasing records the route first) · `Guarantee`
