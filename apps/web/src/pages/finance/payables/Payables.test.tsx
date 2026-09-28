@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SupplierBills, { billSaveGap, lineAmount } from "./SupplierBills";
-import PaymentVouchers, { voucherTotal } from "./PaymentVouchers";
+import PaymentVouchers, { voucherSaveGap, voucherTotal } from "./PaymentVouchers";
 import ApOutstanding from "./ApOutstanding";
 import { money, priceDiffWord, refusal, word, VOUCHER_STATUS_WORD } from "./payables-words";
 
@@ -373,8 +373,8 @@ describe("Payment voucher form", () => {
     expect(await screen.findByTestId(`price-check-${BILL1}`)).toHaveTextContent("1 line differs from PO");
 
     fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
-    // 0536: a line without a description cannot be saved.
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    // 0536: a line without a description cannot be saved, and Save says so.
+    expect(screen.getByRole("button", { name: "Save — type the description on line 1" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Line 1 description"), { target: { value: "Transfer fee" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
@@ -387,6 +387,29 @@ describe("Payment voucher form", () => {
     });
     expect(w.body).not.toHaveProperty("amount");
     expect(w.body).toMatchObject({ advanceAmount: 0 });
+  });
+
+  it("a disabled Save names the first thing still missing, top to bottom", async () => {
+    show("/finance/payment-vouchers/new");
+    expect(await screen.findByRole("button", { name: "Save — pick the supplier" })).toBeDisabled();
+
+    const base = {
+      purpose: "SUPPLIER_BILLS" as const, supplierId: SUP, payee: "", voucherDate: "2026-09-10", payFrom: "1120",
+      picks: { b1: { on: true, amount: "100" } }, advance: "", lines: [], total: 100,
+    };
+    const line = { accountCode: "6500", description: "Fee", amount: "5", departmentType: "OFFICE" as const };
+    expect(voucherSaveGap({ ...base, purpose: "DIRECT", supplierId: "" })).toBe("Save — type the payee");
+    expect(voucherSaveGap({ ...base, voucherDate: "" })).toBe("Save — pick the voucher date");
+    expect(voucherSaveGap({ ...base, payFrom: "" })).toBe("Save — pick Paid from");
+    expect(voucherSaveGap({ ...base, picks: { b1: { on: true, amount: "" } } })).toBe("Save — type the Pay now amount on each ticked bill");
+    expect(voucherSaveGap({ ...base, advance: "abc" })).toBe("Save — type the advance in numbers");
+    expect(voucherSaveGap({ ...base, picks: {} })).toBe("Save — tick a bill or type an advance");
+    expect(voucherSaveGap({ ...base, lines: [{ ...line, accountCode: "" }] })).toBe("Save — pick the account on line 1");
+    expect(voucherSaveGap({ ...base, lines: [line, { ...line, amount: "0" }] })).toBe("Save — type the amount on line 2");
+    expect(voucherSaveGap({ ...base, lines: [{ ...line, departmentType: null }] })).toBe("Save — pick the department on line 1");
+    expect(voucherSaveGap({ ...base, purpose: "DIRECT", picks: {}, payee: "Tenaga" })).toBe("Save — add a line");
+    expect(voucherSaveGap({ ...base, total: 0 })).toBe("Save — the total must be above RM 0.00");
+    expect(voucherSaveGap(base)).toBeNull();
   });
 
   it("Paid from offers cash and banks in use, never a holding account (0512)", async () => {

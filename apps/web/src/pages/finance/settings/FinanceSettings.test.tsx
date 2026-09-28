@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FinanceSettings from "./FinanceSettings";
+import { addAccountSaveGap } from "./ChartOfAccounts";
 
 type Code = { code: string };
 const net = vi.hoisted(() => ({
@@ -326,5 +327,22 @@ describe("Finance Settings — the chart of accounts", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toEqual({ key: "PATCH /api/finance/ledger/accounts/2130", body: { name: "Accruals" } });
+  });
+
+  it("Add account: a disabled Save names the first field still missing (YH, 25 Sep)", async () => {
+    show("/finance/settings?tab=chart");
+    await screen.findByText("2130 Accrued expenses");
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
+    expect(within(dialog).getByRole("button", { name: "Save — pick Under" })).toBeDisabled();
+
+    const f = { parent: "2000", code: "2140", name: "Deposits held", isHeading: true, firstCode: "2141", firstName: "Hall deposits" };
+    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save — type the number");
+    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save — type the name");
+    expect(addAccountSaveGap({ ...f, firstCode: "" })).toBe("Save — type the first account number");
+    expect(addAccountSaveGap({ ...f, firstName: "" })).toBe("Save — type the first account name");
+    expect(addAccountSaveGap({ ...f, isHeading: false, firstCode: "" })).toBeNull();
+    expect(addAccountSaveGap(f)).toBeNull();
   });
 });
