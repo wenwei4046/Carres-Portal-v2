@@ -88,9 +88,9 @@ export default function ChasePartnerReview({
   async function copyMsg(msg: string, partnerName: string) {
     try {
       await navigator.clipboard.writeText(msg);
-      toast.success(`Message copied — ${partnerName}`);
+      toast.success(`Message copied: ${partnerName}`);
     } catch {
-      toast.error("Couldn't copy — select the text and copy manually");
+      toast.error("Couldn't copy. Select the text and copy manually");
     }
   }
 
@@ -112,7 +112,7 @@ export default function ChasePartnerReview({
         <div className="flex items-center gap-2 px-5 h-12 border-b border-base-200">
           <MessageCircle size={16} className="text-base-500" strokeWidth={2} />
           <span className="text-body font-semibold">
-            Confirm delivery date — one message per logistics company
+            Confirm delivery date: one message per logistics company
           </span>
           <span className="text-meta text-base-500 tabular-nums">
             {orders.length} order{orders.length === 1 ? "" : "s"} · {totalUnits} unit
@@ -146,21 +146,21 @@ export default function ChasePartnerReview({
           </div>
           <span className="text-meta text-base-500">
             {mode === "remind"
-              ? "Gentle — before the delivery deadline."
-              : "Firmer — the deadline is close or already passed."}
+              ? "Gentle: before the delivery deadline."
+              : "Firmer: the deadline is close or already passed."}
           </span>
         </div>
 
         {unassigned > 0 && (
           <div className="px-5 py-2 text-meta text-base-500 border-b border-base-100">
             {unassigned} order{unassigned === 1 ? "" : "s"} have no logistics company
-            yet — assign one first, then call.
+            yet. Assign one first, then call.
           </div>
         )}
 
         {cards.length === 0 && (
           <div className="px-5 py-8 text-body text-base-500">
-            No calls to make — no order in the selection has a logistics company.
+            No calls to make. No order in the selection has a logistics company.
           </div>
         )}
 

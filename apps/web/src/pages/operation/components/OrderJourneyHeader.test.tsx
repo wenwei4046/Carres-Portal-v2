@@ -160,7 +160,7 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
       }),
     );
     expect(j.stages.every((s) => s.state === "done")).toBe(true);
-    expect(j.owner).toBe("Nobody — this order is closed");
+    expect(j.owner).toBe("Nobody: this order is closed");
   });
 
   it("does not call a delivered order Done while its photo ledger is empty", () => {
@@ -209,7 +209,7 @@ describe("deriveOrderJourney — the stage strip agrees with the ladder", () => 
       }),
     );
     expect(stateOf(j, "Goods")).toBe("current");
-    expect(j.owner).toBe("Operations — check this order");
+    expect(j.owner).toBe("Operations: check this order");
   });
 
   it("passes the ladder's verb through untouched — never a synonym", () => {
@@ -244,9 +244,9 @@ describe("deriveOrderJourney — owner", () => {
       const j = deriveOrderJourney(
         input({ signals: sig({ next: { label, tone: "info" } }) }),
       );
-      expect(j.owner).not.toBe("Operations — check this order");
+      expect(j.owner).not.toBe("Operations: check this order");
       // COPY-STANDARD: the party, then why — and short enough to read at once.
-      expect(j.owner).toContain(" — ");
+      expect(j.owner).toContain(": ");
       expect(j.owner.split(/\s+/).length).toBeLessThanOrEqual(10);
     }
   });
@@ -260,7 +260,7 @@ describe("deriveOrderJourney — owner", () => {
         holdAmountLabel: "1,200",
       }),
     );
-    expect(j.owner).toBe("Customer — balance not paid");
+    expect(j.owner).toBe("Customer: balance not paid");
     expect(j.nextLocked).toBe(true);
   });
 });
@@ -286,7 +286,7 @@ describe("deriveOrderJourney — health", () => {
       }),
     );
     expect(j.health[0]).toMatchObject({ key: "hold", tone: "danger" });
-    expect(j.health[0].text).toBe("Delivery on hold — RM 1,200 to collect");
+    expect(j.health[0].text).toBe("Delivery on hold. RM 1,200 to collect");
   });
 
   it("still states the hold when the amount is not on file", () => {
@@ -297,7 +297,7 @@ describe("deriveOrderJourney — health", () => {
         }),
       }),
     );
-    expect(j.health[0].text).toBe("Delivery on hold — balance not collected");
+    expect(j.health[0].text).toBe("Delivery on hold. Balance not collected");
   });
 
   it("raises the delay radar from the ladder's own verb, not a second ETA read", () => {
@@ -362,7 +362,7 @@ describe("deriveOrderJourney — health", () => {
       }),
     );
     expect(many.health.at(-1)?.text).toBe(
-      "2 documents missing — Invoice, Delivery photo",
+      "2 documents missing: Invoice, Delivery photo",
     );
   });
 
@@ -407,7 +407,7 @@ describe("OrderJourneyHeader — the strip", () => {
     ]);
     expect(screen.getByTestId("journey-next")).toHaveTextContent("Confirm delivery date");
     expect(screen.getByTestId("journey-owner")).toHaveTextContent(
-      "Logistics — customer has not confirmed a date",
+      "Logistics: customer has not confirmed a date",
     );
   });
 

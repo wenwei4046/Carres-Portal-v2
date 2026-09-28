@@ -65,7 +65,7 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
       onClose={onClose}
     >
       <div className="text-meta text-base-600 mb-3.5 font-body">
-        Stock has been allocated. Pick a delivery partner — they&rsquo;ll be
+        Stock has been allocated. Pick a delivery partner. They&rsquo;ll be
         notified to collect from{" "}
         <strong>{warehouse?.name ?? "the source warehouse"}</strong>.
       </div>
@@ -76,7 +76,7 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
         <div className="text-meta text-base-500 mb-3.5">Loading partners…</div>
       ) : partnersQ.isError ? (
         <div className="text-meta text-destructive mb-3.5">
-          Couldn&rsquo;t load partners — try again later.
+          Couldn&rsquo;t load partners. Try again later.
         </div>
       ) : partners.length === 0 ? (
         <div className="text-meta text-warning mb-3.5">

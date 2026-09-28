@@ -251,7 +251,7 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-customer-balances">
-        <Head note={`Today's facts — a balance has no month. Settled orders are excluded.${unpricedCount > 0 ? ` ${unpricedCount} order${unpricedCount === 1 ? "" : "s"} with no recorded value cannot say a balance and ${unpricedCount === 1 ? "is" : "are"} excluded.` : ""}`}>
+        <Head note={`Today's facts. A balance has no month. Settled orders are excluded.${unpricedCount > 0 ? ` ${unpricedCount} order${unpricedCount === 1 ? "" : "s"} with no recorded value cannot say a balance and ${unpricedCount === 1 ? "is" : "are"} excluded.` : ""}`}>
           Customer balances</Head>
         <div className="space-y-1">
           {owing.map((b) => <Row key={b.orderId} to={`/finance/invoices?invoice=${b.doorId}`}>
@@ -267,7 +267,7 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-storage">
-        <Head note="Money is recorded against the order, never one paper — each SO's remaining across every kind is under Customer balances. Drafts ask for nothing yet and are excluded.">
+        <Head note="Money is recorded against the order, never one paper. Each SO's remaining across every kind is under Customer balances. Drafts ask for nothing yet and are excluded.">
           Storage charged and collected</Head>
         <div className="space-y-1">
           {storageInvoices.map((r) => <Row key={r.id} to={`/finance/invoices?invoice=${r.id}`}>
@@ -302,7 +302,7 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-corrections">
-        <Head note="A void keeps the payment and reverses its money — nothing is deleted.">
+        <Head note="A void keeps the payment and reverses its money. Nothing is deleted.">
           Payment corrections</Head>
         <div className="space-y-1">
           {corrections.map((p) => <Row key={p.id} to={`/finance/payments?payment=${p.id}`}>
@@ -319,7 +319,7 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-needs-review">
-        <Head note="Money past every recorded obligation. Review the allocation — never auto-create a credit or refund.">
+        <Head note="Money past every recorded obligation. Review the allocation. Never auto-create a credit or refund.">
           Money needing review</Head>
         <div className="space-y-1">
           {needsReview.map((b) => <Row key={b.orderId} to={`/finance/invoices?invoice=${b.doorId}`}>

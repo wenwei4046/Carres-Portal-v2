@@ -399,7 +399,7 @@ export default function OperationWork() {
 
   return (
     <>
-      <ModuleHeader destinationHeader testId="work-destination-header" word={WORK_PAGE_COPY.title} docTitle="Workspace — Carres" />
+      <ModuleHeader destinationHeader testId="work-destination-header" word={WORK_PAGE_COPY.title} docTitle="Workspace · Carres" />
       <ListPageShell register testId="operation-work">
         <div ref={areaRef} className="min-h-0 min-w-0 flex-1 overflow-x-auto" data-testid="work-area" data-band={layout.band}>
           <div className="grid h-full min-h-0" style={{ gridTemplateColumns: layout.cols }}>

@@ -239,7 +239,7 @@ function ProductAddonsPanel({
           <p className="text-meta text-base-500 mt-0.5 max-w-[520px]">
             Per-model surcharges with optional follow-up questions. Attach them to a
             model in the Modular tab.
-            {!isPrincipal && " Master Admin only — read-only for your role."}
+            {!isPrincipal && " Master Admin only. Read-only for your role."}
           </p>
         </div>
         {isPrincipal && (
@@ -462,7 +462,7 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
               + Question
             </button>
           </div>
-          {d.optionGroups.length === 0 && <p className="text-meta text-base-400">No follow-up questions — the base surcharge applies as-is.</p>}
+          {d.optionGroups.length === 0 && <p className="text-meta text-base-400">No follow-up questions. The base surcharge applies as-is.</p>}
           <div className="flex flex-col gap-3">
             {d.optionGroups.map((g, gi) => (
               <div key={gi} className="border border-base-200 rounded-[4px] p-2.5 bg-base-50" data-testid={`special-group-${gi}`}>

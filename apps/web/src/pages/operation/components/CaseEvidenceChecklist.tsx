@@ -48,7 +48,7 @@ export default function CaseEvidenceChecklist({
   if (checklist.length === 0) {
     return (
       <p className="text-body text-base-500">
-        Answer what is wrong first — it decides which photos to take.
+        Answer what is wrong first. It decides which photos to take.
       </p>
     );
   }

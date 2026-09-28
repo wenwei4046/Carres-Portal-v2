@@ -135,10 +135,10 @@ it("compresses only consecutive Units with the same outcome, never hiding a gap 
   const content = await (await doc.getPage(1)).getTextContent();
   const text = content.items.flatMap((item) => "str" in item ? [item.str] : []).join(" ")
     .replace(/\s+/g, " ").replace(/(U\d+-\d{3}-)\s+(\d{3})/g, "$1$2");
-  expect(text).toContain("U1-000-001 to U1-000-003 — Received");
-  expect(text).toContain("U1-000-005 — Received");
-  expect(text).toContain("U1-000-004 — Received with issue · damaged");
+  expect(text).toMatch(/U1-000-001 to U1-000-003 ?: Received/);
+  expect(text).toMatch(/U1-000-005 ?: Received/);
+  expect(text).toMatch(/U1-000-004 ?: Received with issue · damaged/);
   expect(text).not.toContain("U1-000-001 to U1-000-005");
-  expect(text).toContain("U1-000-099 — Not received");
+  expect(text).toMatch(/U1-000-099 ?: Not received/);
   await doc.destroy();
 });

@@ -3109,7 +3109,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
         error: "rule_violation",
         code: "do_missing",
         message:
-          "No delivery order for this trip yet — the system issues it when the goods, logistics and date are ready.",
+          "No delivery order for this trip yet. The system issues it when the goods, logistics and date are ready.",
       },
       422,
     );
@@ -3162,7 +3162,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
 
   // customer_address may be null (customer_address_unknown=true on TBD/showroom orders);
   // template requires a string so coerce to "—" placeholder.
-  const customerAddress: string = ord.customer_address ?? "—";
+  const customerAddress: string = ord.customer_address ?? "";
 
   // Dealer block: inject warehouse address line if present, since the DO ships
   // FROM the dealer-affiliated HQ warehouse — useful as a "ship from" hint

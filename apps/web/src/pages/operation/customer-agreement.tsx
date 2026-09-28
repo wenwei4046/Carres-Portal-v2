@@ -36,12 +36,12 @@ export const AGREEMENT_KINDS: ReadonlyArray<{ value: CustomerAgreementKind; labe
   {
     value: "customer_confirmation",
     label: "Customer confirmation",
-    hint: "Where the customer's own message can be found — for example WhatsApp, the date and the number",
+    hint: "Where the customer's own message can be found. For example WhatsApp, the date and the number",
   },
   {
     value: "original_agreement",
     label: "Original agreement",
-    hint: "The revision whose signed agreement already covers this — for example Rev 1",
+    hint: "The revision whose signed agreement already covers this. For example Rev 1",
   },
 ];
 
@@ -72,7 +72,7 @@ export function AgreementOnRecord(props: {
   return (
     <>
       <p className="mt-1.5 break-words text-meta text-kit-slate-11">
-        {agreementKindLabel(props.kind)} — {props.reference}
+        {agreementKindLabel(props.kind)}: {props.reference}
       </p>
       {props.detail && <p className="mt-1 break-words text-meta text-kit-slate-11">{props.detail}</p>}
       {props.coversProposal === false && (

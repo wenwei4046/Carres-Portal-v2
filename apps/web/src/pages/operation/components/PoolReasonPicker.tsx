@@ -140,7 +140,7 @@ export default function PoolReasonPicker({
               <span>
                 Only{" "}
                 <span className="font-mono tabular-nums">{w.freeAfter}</span> of{" "}
-                {w.sku} left after this — keep at least{" "}
+                {w.sku} left after this. Keep at least{" "}
                 <span className="font-mono tabular-nums">{w.reserveLevel}</span>.
               </span>
             </div>

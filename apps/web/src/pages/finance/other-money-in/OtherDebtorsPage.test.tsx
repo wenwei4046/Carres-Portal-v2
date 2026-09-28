@@ -67,7 +67,7 @@ describe("Other debtors — the invoice Register", () => {
     for (const label of ["Invoice No", "Invoice Date", "Party", "What for", "Total", "Outstanding", "Due Date", "Status"]) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
-    expect(screen.getByText("Draft — no number yet")).toBeInTheDocument();
+    expect(screen.getByText("Draft, no number yet")).toBeInTheDocument();
     expect(screen.getByText("Not issued yet")).toBeInTheDocument();
     expect(screen.getByText("RM 900.00")).toBeInTheDocument();
     expect(screen.getByText("Paid in full")).toBeInTheDocument();

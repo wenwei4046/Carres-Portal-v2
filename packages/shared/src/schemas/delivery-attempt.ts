@@ -49,7 +49,7 @@ export const deliveryAttemptRecordInputSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["result"],
-          message: "A full success walks the delivery door — only a Journey leg records its arrival here",
+          message: "A full success walks the delivery door. Only a Journey leg records its arrival here",
         });
       }
       if (v.deliveredItemIds.length > 0 || v.returned.length > 0) {
@@ -78,7 +78,7 @@ export const deliveryAttemptRecordInputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["deliveredItemIds"],
-        message: "A failed attempt delivered nothing — record partial instead",
+        message: "A failed attempt delivered nothing. Record partial instead",
       });
     }
   });

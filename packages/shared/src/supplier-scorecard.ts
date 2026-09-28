@@ -152,7 +152,7 @@ export type ScorecardUnknownReason = "no_records" | "too_few";
  *  teaches; it never says "No data".) */
 export const SCORECARD_UNKNOWN_TEXT: Record<ScorecardUnknownReason, string> = {
   no_records: "No delivery on file yet",
-  too_few: `Not enough deliveries yet — ${MIN_JUDGED_POS} needed`,
+  too_few: `Not enough deliveries yet: ${MIN_JUDGED_POS} needed`,
 };
 
 export type ScorecardRate =

@@ -164,7 +164,7 @@ export default function WarehouseWorkspace({
       <ModuleHeader
         testId={`warehouse-${direction}-schedule-header`}
         word={word}
-        docTitle={`${word} · Warehouse — Carres`}
+        docTitle={`${word} · Warehouse · Carres`}
         destinationHeader
       />
 

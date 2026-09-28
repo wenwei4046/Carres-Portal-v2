@@ -188,7 +188,7 @@ jumpRouter.get("/", requireOperation, async (c) => {
           goods_received_at: row.goods_received_at ?? undefined,
           submitted_at: row.submitted_at ?? undefined,
         });
-      if (number === "—") continue;
+      if (!number) continue;
       /* The number carries its own `GRN-` prefix, so the raw query matches it
        * whether or not the operator typed one. */
       if (!number.includes(needle) && !number.includes(docNumberSafe(parsed.raw))) continue;

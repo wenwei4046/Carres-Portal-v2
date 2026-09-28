@@ -115,10 +115,10 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
         `/api/orders/${invoice.order_id}/stripe/checkout`,
         { method: "POST", body: JSON.stringify({ amount }) }),
     onSuccess: () => {
-      toast.success("Payment link created — waiting for payment");
+      toast.success("Payment link created. Waiting for payment");
       void qc.invalidateQueries({ queryKey: ["finance", "stripe-links", invoice.order_id] });
     },
-    onError: (e: Error) => toast.error(`The payment link was not created — ${e.message}`),
+    onError: (e: Error) => toast.error(`The payment link was not created: ${e.message}`),
   });
 
   // §16 — the message is template-driven ONLY. New link after expiry is
@@ -167,12 +167,12 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
       void qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
       onClose();
     },
-    onError: (e: Error) => toast.error(`The message was not recorded — ${e.message}`),
+    onError: (e: Error) => toast.error(`The message was not recorded: ${e.message}`),
   });
   const acceptFile = (f: File | undefined | null) => {
     if (!f) return;
     if (!/^image\//.test(f.type)) { toast.error("The sent screenshot must be a photo."); return; }
-    if (f.size > 10 * 1024 * 1024) { toast.error("The screenshot is too large — 10 MB at most."); return; }
+    if (f.size > 10 * 1024 * 1024) { toast.error("The screenshot is too large: 10 MB at most."); return; }
     setFile(f);
   };
   async function recordSent() {
@@ -184,7 +184,7 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
       .from(ATTACHMENTS_BUCKET)
       .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
     setSaving(false);
-    if (error) { toast.error(`Screenshot upload failed — ${error.message}`); return; }
+    if (error) { toast.error(`Screenshot upload failed: ${error.message}`); return; }
     record.mutate({
       kind: "payment_request",
       messageText: shown.trim(),
@@ -208,9 +208,9 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
     const wa = waLink(order?.customer_phone ?? null);
     if (wa) {
       window.open(`${wa}?text=${encodeURIComponent(body)}`, "_blank", "noopener");
-      toast.success("WhatsApp opened — sending is not recorded yet");
+      toast.success("WhatsApp opened. Sending is not recorded yet");
     } else {
-      toast.success("No phone on file — message copied, paste it into WhatsApp");
+      toast.success("No phone on file. Message copied, paste it into WhatsApp");
     }
   };
 
@@ -275,8 +275,8 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
                 </option>)}
               </select>
             </label> : <p className="text-label font-normal" data-testid="link-no-template">
-              No payment link template yet. The approved wording must come from its owner —
-              a manager can add it in Settings. The bare link can still be copied.</p>}
+              No payment link template yet. The approved wording must come from its owner.
+              A manager can add it in Settings. The bare link can still be copied.</p>}
             {activeHeads.length > 0 && <label className="block">
               <span className="text-label">Message</span>
               <textarea value={shown}

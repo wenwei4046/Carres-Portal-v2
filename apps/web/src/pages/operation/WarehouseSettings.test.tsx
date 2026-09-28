@@ -267,7 +267,7 @@ describe("Save changes", () => {
       target: { value: "08:00" },
     });
     await waitFor(() => expect(save()).toBeDisabled());
-    expect(save().textContent).toContain("Save changes — Monday receiving hours must close");
+    expect(save().textContent).toContain("Save changes: Monday receiving hours must close");
     expect(screen.getByRole("alert").textContent).toContain(
       "The closing time must be later than the opening time",
     );

@@ -67,7 +67,7 @@ function LegArrivalForm({
     <Modal title={`Arrived${destination ? ` at ${destination}` : ""}`} onClose={onClose}>
       <div className="grid gap-3">
         <p className="text-meta text-base-600">
-          This records that the goods reached the named warehouse. The customer has not received them — the next leg carries its own result.
+          This records that the goods reached the named warehouse. The customer has not received them. The next leg carries its own result.
         </p>
         <label className="grid gap-1 text-meta font-medium text-base-700">
           Note

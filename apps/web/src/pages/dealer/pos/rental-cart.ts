@@ -93,8 +93,8 @@ export function cartAccepts(lines: ReadonlyArray<DraftLine>, kind: "rental" | "o
 /** The one sentence a store operator is shown when the rule bites. */
 export function mixRefusalMessage(kind: "rental" | "outright"): string {
   return kind === "rental"
-    ? "This cart is a normal sale. A rental needs its own order — finish or clear this one first."
-    : "This cart is a rental. Items bought outright need their own order — finish or clear this one first.";
+    ? "This cart is a normal sale. A rental needs its own order. Finish or clear this one first."
+    : "This cart is a rental. Items bought outright need their own order. Finish or clear this one first.";
 }
 
 /** Monthly total of a rental cart (each line is one agreement, qty always 1). */

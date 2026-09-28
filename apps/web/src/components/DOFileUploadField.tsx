@@ -140,7 +140,7 @@ export default function DOFileUploadField({
             ? "Enter the handover evidence reference first."
             : arrivalSourceId
               ? "Enter the handover document number first."
-              : "Enter the supplier DO number first — the file is named after it."}
+              : "Enter the supplier DO number first. The file is named after it."}
         </p>
       )}
       {previewName && (

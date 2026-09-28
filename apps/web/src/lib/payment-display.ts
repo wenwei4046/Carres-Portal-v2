@@ -39,7 +39,7 @@ export async function viewSlip(p: Pick<OrderPaymentRow, "receipt_url">) {
     .from(ATTACHMENTS_BUCKET)
     .createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) {
-    toast.error(`Couldn't open slip — ${error?.message ?? "no URL"}`);
+    toast.error(`Couldn't open slip: ${error?.message ?? "no URL"}`);
     return;
   }
   window.open(data.signedUrl, "_blank", "noopener");

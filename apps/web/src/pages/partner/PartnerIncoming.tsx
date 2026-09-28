@@ -114,9 +114,9 @@ function IncomingRow({ order, onReject }: IncomingRowProps) {
       if (e instanceof ApiError) {
         const body = readErrorBody(e);
         if (body.code === "already_accepted") {
-          toast.error("Already accepted — refresh");
+          toast.error("Already accepted. Refresh");
         } else if (body.code === "order_rejected") {
-          toast.error("Order is rejected state — refresh");
+          toast.error("Order is rejected state. Refresh");
         } else {
           toast.error(e.message || "Accept failed");
         }

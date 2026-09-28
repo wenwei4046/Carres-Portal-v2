@@ -52,7 +52,7 @@ import { lineName } from "./sales-order-facts";
 /** ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section). */
 export const DOR_COPY = {
   page: "Delivery Orders",
-  docTitle: "Delivery Orders — Carres",
+  docTitle: "Delivery Orders · Carres",
   search: "Search delivery orders…",
   railWork: "Work to do",
   railStatus: "Document status",
@@ -99,7 +99,7 @@ export const DOR_COPY = {
   mediaFailed: "The driver submission could not be loaded",
   loading: "Loading…",
   emptyRegister:
-    "No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.",
+    "No delivery orders yet. The system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.",
   emptyFiltered: "No matching delivery orders.",
 } as const;
 

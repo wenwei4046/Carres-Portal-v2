@@ -886,7 +886,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
   if (later && !input.replyProofPath) {
     return c.json(
       {
-        error: "Save scheduled delivery — upload the WhatsApp reply",
+        error: "Save scheduled delivery: upload the WhatsApp reply",
         code: "later_date_needs_reply_proof",
       },
       409,
@@ -1117,7 +1117,7 @@ deliveryArrangementsRouter.post("/:orderId/cannot-deliver", requireOperationOrPr
   }
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,
-    text: `${partner.name} cannot deliver — ${parsed.data.reason}${
+    text: `${partner.name} cannot deliver. ${parsed.data.reason}${
       parsed.data.note ? `: ${parsed.data.note}` : ""
     } (recorded by Operation on behalf of ${partner.name})`,
     by_role: "operation",

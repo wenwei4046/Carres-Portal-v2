@@ -1106,7 +1106,7 @@ catalogRouter.post("/import-skus", async (c) => {
       failureByRow[i] = {
         row: i + 1,
         key: code,
-        reason: `code ${code} already belongs to another model — pick a distinct model_key`,
+        reason: `code ${code} already belongs to another model. Pick a distinct model_key`,
       };
       continue;
     }
@@ -2599,7 +2599,7 @@ function fabricDuplicate() {
   return {
     error: "conflict",
     code: "duplicate_fabric_code",
-    message: "Duplicate fabric codes — each fabric code must be unique.",
+    message: "Duplicate fabric codes. Each fabric code must be unique.",
   } as const;
 }
 

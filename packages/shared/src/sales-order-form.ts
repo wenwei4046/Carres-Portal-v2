@@ -40,11 +40,11 @@ export const CUSTOMER_GENDER_OPTIONS = ["Female", "Male"] as const;
  * words). Monitor's `Order details incomplete` line is left to legacy rows.
  */
 export const DELIVERY_FACT_REFUSALS = {
-  address: "Delivery address — ask the customer for the address before you save the order",
-  state: "Delivery address — pick the State",
-  buildingType: "Building type — pick the building the goods go to",
-  floor: "Floor — enter the floor the goods go to",
-  lift: "Lift — say whether the building has a lift",
+  address: "Delivery address: ask the customer for the address before you save the order",
+  state: "Delivery address: pick the State",
+  buildingType: "Building type: pick the building the goods go to",
+  floor: "Floor: enter the floor the goods go to",
+  lift: "Lift: say whether the building has a lift",
   date: "Delivery date is required. Ask the customer for the date before you save the order.",
 } as const;
 

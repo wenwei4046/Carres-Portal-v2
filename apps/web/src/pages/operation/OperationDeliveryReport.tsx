@@ -312,7 +312,7 @@ export default function OperationDeliveryReport() {
                 {/* 2 · First Delivery Success */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-first-delivery">
-                    <Head note="Source: each Delivery Order's FIRST recorded visit — actual delivery events only, never a plan. Month: the day of that first visit. Journey legs before the last are excluded.">
+                    <Head note="Source: each Delivery Order's FIRST recorded visit. Actual delivery events only, never a plan. Month: the day of that first visit. Journey legs before the last are excluded.">
                       {DR.firstDelivery}
                     </Head>
                     <p className="text-body font-semibold mb-2">{firstDeliveryLine(firstVisits)}</p>
@@ -358,7 +358,7 @@ export default function OperationDeliveryReport() {
                 {/* 4 · Logistics Partner Performance */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-partners">
-                    <Head note="Source: customer-leg results by the partner named on the Delivery Order, and the partner's own Cannot Deliver records. Month: the day each was recorded. Journey legs before the last are warehouse trips and are excluded. NETS has no acceptance-speed measure — NETS is responsible without Accept. Warehouse work is measured apart, even when both are NETS.">
+                    <Head note="Source: customer-leg results by the partner named on the Delivery Order, and the partner's own Cannot Deliver records. Month: the day each was recorded. Journey legs before the last are warehouse trips and are excluded. NETS has no acceptance-speed measure. NETS is responsible without Accept. Warehouse work is measured apart, even when both are NETS.">
                       {DR.partners}
                     </Head>
                     <div className="space-y-1">
@@ -385,7 +385,7 @@ export default function OperationDeliveryReport() {
                 {/* 5 · Warehouse Performance */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-warehouse">
-                    <Head note={`Source: the handover chain — Ready · Handed over · Received by logistics — against the trip's confirmed delivery day. Month: the day of the handover. Warehouse is measured apart from Logistics.${untimedHandovers > 0 ? ` ${untimedHandovers} with no confirmed delivery day ${untimedHandovers === 1 ? "is" : "are"} listed but not counted.` : ""}`}>
+                    <Head note={`Source: the handover chain (Ready, Handed over, Received by logistics) against the trip's confirmed delivery day. Month: the day of the handover. Warehouse is measured apart from Logistics.${untimedHandovers > 0 ? ` ${untimedHandovers} with no confirmed delivery day ${untimedHandovers === 1 ? "is" : "are"} listed but not counted.` : ""}`}>
                       {DR.warehouse}
                     </Head>
                     <p className="text-body font-semibold mb-2">{warehouseLine(warehouse)}</p>
@@ -459,7 +459,7 @@ export default function OperationDeliveryReport() {
                 {/* 8 · Customer Contact Performance */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-contacts">
-                    <Head note={`Source: every contact record — the customer or the partner, by Operation or recorded on a partner's behalf. Month: the day of the contact. Today's fact: ${overdueContacts} ${DR.contactsOverdueToday.toLowerCase()} on Monitor.`}>
+                    <Head note={`Source: every contact record with the customer or the partner, by Operation or recorded on a partner's behalf. Month: the day of the contact. Today's fact: ${overdueContacts} ${DR.contactsOverdueToday.toLowerCase()} on Monitor.`}>
                       {DR.contacts}
                     </Head>
                     <p className="text-body font-semibold mb-2">{contactLine(contactRows)}</p>
@@ -510,7 +510,7 @@ export default function OperationDeliveryReport() {
                 {/* 10 · Exception Ageing */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-ageing">
-                    <Head note="Today's facts — an exception has no month. The same three queues Monitor counts as Exceptions (Overdue · Failed Delivery · proof missing), aged from the day the fact became true.">
+                    <Head note="Today's facts. An exception has no month. The same three queues Monitor counts as Exceptions (Overdue · Failed Delivery · proof missing), aged from the day the fact became true.">
                       {DR.ageing}
                     </Head>
                     <Counts items={ageingBuckets(ageing).map((b) => ({ word: b.bucket, count: b.count }))} />

@@ -219,7 +219,7 @@ describe("carrierDayLoads — who is carrying what on the day", () => {
     const [load] = carrierDayLoads([booking(), booking()], MON, rules);
     expect(load!.atLimit).toBe(true);
     expect(carrierDayNote(load!)).toBe(
-      "NETS is at its limit of 2 deliveries a day — call them before promising more",
+      "NETS is at its limit of 2 deliveries a day. Call them before promising more",
     );
   });
 
@@ -229,7 +229,7 @@ describe("carrierDayLoads — who is carrying what on the day", () => {
     const [load] = carrierDayLoads([booking({ date: SAT })], SAT, rules);
     expect(load!.runs).toBe(false);
     expect(carrierDayNote(load!)).toBe(
-      "NETS is not running on this day — call them or move these",
+      "NETS is not running on this day. Call them or move these",
     );
   });
 

@@ -43,7 +43,7 @@ export default function FinanceSubscriptionMonth() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="subscription-month-destination-header" word="Subscriptions"
-        docTitle="Subscriptions — Carres" />
+        docTitle="Subscriptions · Carres" />
       <div className="grid grid-cols-3 gap-3.5 px-4 pt-4" data-testid="subscription-month-summary">
         <FinanceKpi label="Due" value={figure(q.data?.due)} noValue="" />
         <FinanceKpi label="Collected" value={figure(q.data?.collected)} noValue="" />

@@ -79,7 +79,7 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
               <FactRow label="Money back">{money(adv.money_back_total)}</FactRow>
               <FactRow label="Advance left">
                 <span data-testid="voucher-advance-left">
-                  {open === null ? "Not paid yet — approving the payment pays it" : money(open)}
+                  {open === null ? "Not paid yet. Approving the payment pays it" : money(open)}
                 </span>
               </FactRow>
             </>
@@ -105,7 +105,7 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
                     <td className="py-1 pr-3">{fmtDate(a.created_at, { time: true })} · {a.created_by_name ?? "Name not available"}</td>
                     <td className="py-1 pr-3">
                       {word(ADVANCE_APPLICATION_STATUS_WORD, a.status)}
-                      {a.status === "cancelled" && a.cancel_reason ? ` — ${a.cancel_reason}` : ""}
+                      {a.status === "cancelled" && a.cancel_reason ? `: ${a.cancel_reason}` : ""}
                     </td>
                     <td className="py-1 pr-3 text-right">{money(a.amount)}</td>
                     <td className="py-1 text-right">
@@ -140,7 +140,7 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
                     <td className="py-1 pr-3">{m.money_account_code} {m.money_account_name ?? ""}</td>
                     <td className="py-1 pr-3">
                       {word(MONEY_BACK_STATUS_WORD, m.status)}
-                      {m.status === "voided" && m.void_reason ? ` — ${m.void_reason}` : ""}
+                      {m.status === "voided" && m.void_reason ? `: ${m.void_reason}` : ""}
                     </td>
                     <td className="py-1 pr-3 text-right">{money(m.amount)}</td>
                     <td className="py-1 text-right">

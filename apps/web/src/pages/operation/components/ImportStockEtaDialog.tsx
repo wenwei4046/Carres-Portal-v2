@@ -241,7 +241,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
             Ready · Pending → Waiting · No Stock → No PO).
           </p>
           <p className="text-meta text-base-500">
-            Orders are matched by Ref (idempotent — existing orders are updated, not duplicated).
+            Orders are matched by Ref (idempotent: existing orders are updated, not duplicated).
             Discount / service-charge lines are skipped. You'll see the counts before anything is
             written.
           </p>
@@ -365,7 +365,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2.5">
             {ordersResult && (
               <div className="text-body text-base-700 mb-1">
-                Orders — <span className="font-semibold text-green-700">{ordersResult.created} created</span>{" "}
+                Orders: <span className="font-semibold text-green-700">{ordersResult.created} created</span>{" "}
                 · {ordersResult.updated} updated
               </div>
             )}
@@ -410,13 +410,13 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
           {stockResult.unmatched > 0 && stockResult.sampleUnmatched.length > 0 && (
             <details className="text-meta text-base-600">
               <summary className="cursor-pointer text-amber-700">
-                {stockResult.unmatched} unmatched — why (first {stockResult.sampleUnmatched.length})
+                {stockResult.unmatched} unmatched: why (first {stockResult.sampleUnmatched.length})
               </summary>
               <ul className="mt-1 space-y-0.5 max-h-40 overflow-y-auto">
                 {stockResult.sampleUnmatched.map((u, i) => (
                   <li key={`${u.po}-${i}`}>
                     <span className="font-mono">{u.po}</span>{" "}
-                    <span className="text-base-500">{u.sku}</span> — {u.reason}
+                    <span className="text-base-500">{u.sku}</span>: {u.reason}
                   </li>
                 ))}
               </ul>
@@ -428,14 +428,14 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
               data-testid="append-missing-section"
             >
               <div className="text-body font-semibold text-base-900 mb-1">
-                Sheet has it — portal doesn't ({candidates.length})
+                Sheet has it, portal doesn't ({candidates.length})
               </div>
               {appendedCount === null ? (
                 <>
                   <p className="text-meta text-base-500 mb-2">
                     These sheet lines carry a PO that exists on no line of their order.
                     Ticked = safe to append. Unticked rows: the order also holds a line
-                    the sheet doesn't have (model changed / PO re-raised?) — check before
+                    the sheet doesn't have (model changed / PO re-raised?). Check before
                     ticking.
                   </p>
                   <ul className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -494,7 +494,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                 </>
               ) : (
                 <p className="text-body text-green-700" data-testid="append-missing-done">
-                  {appendedCount} line(s) appended — the orders now match the Master.
+                  {appendedCount} line(s) appended. The orders now match the Master.
                 </p>
               )}
             </div>

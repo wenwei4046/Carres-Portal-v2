@@ -518,8 +518,8 @@ describe("Build name + quantity", () => {
   it("earns the ordinal back when a sibling would read identically", () => {
     const [p] = run([mattress(), mattress({ lineId: "x2" })]);
     expect(p.rows[0].builds.map((b) => b.title)).toEqual([
-      "Mattress 1 — B1201S King",
-      "Mattress 2 — B1201S King",
+      "Mattress 1: B1201S King",
+      "Mattress 2: B1201S King",
     ]);
   });
 

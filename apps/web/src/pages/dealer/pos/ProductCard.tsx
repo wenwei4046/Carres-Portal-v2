@@ -36,7 +36,7 @@ export default function ProductCard({
       onClick={() => !locked && onConfigure()}
       disabled={locked}
       aria-disabled={locked}
-      title={locked ? "Locked — this order already has a conflicting product family" : undefined}
+      title={locked ? "Locked. This order already has a conflicting product family" : undefined}
       data-testid={`pos-card-${model.modelKey}`}
       className={["prod-card", inCart ? "is-in-cart" : ""].filter(Boolean).join(" ")}
       style={locked ? { opacity: 0.45, cursor: "not-allowed" } : undefined}

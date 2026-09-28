@@ -259,7 +259,7 @@ describe("ConfiguratorForModel — sofa", () => {
         onAdd={vi.fn()}
       />,
     );
-    expect(screen.getByText(/pick preset/i)).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Preset" })).toBeTruthy();
   });
 });
 
@@ -293,7 +293,7 @@ describe("ConfigureDrawer — service model", () => {
         onClose={() => {}}
       />,
     );
-    expect(screen.getByText(/pick option/i)).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Option" })).toBeTruthy();
     fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "sv2" } });
     fireEvent.click(screen.getByText("+ Add"));
     const ln = onAdd.mock.calls[0][0] as DraftLine;

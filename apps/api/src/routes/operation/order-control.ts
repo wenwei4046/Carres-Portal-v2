@@ -101,7 +101,7 @@ function bookingGateWarnings(gate: BookingGateResult): string[] {
   const out: string[] = [];
   if (!gate.goodsReady)
     out.push(
-      `Goods not reserved to this order yet: ${gate.notReadySkus.join(", ")} — the delivery order cannot be issued until they are.`,
+      `Goods not reserved to this order yet: ${gate.notReadySkus.join(", ")}. The delivery order cannot be issued until they are.`,
     );
   if (!gate.balanceReady) {
     // C9 — name WHICH money is missing. "RM 150 outstanding" on an order the
@@ -109,10 +109,10 @@ function bookingGateWarnings(gate: BookingGateResult): string[] {
     const goods = gate.holding - gate.storageOwing;
     out.push(
       goods > 0 && gate.storageOwing > 0
-        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected — collection is still open.`
+        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected. Collection is still open.`
         : gate.storageOwing > 0
-          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collection is still open.`
-          : `RM ${gate.holding.toFixed(2)} outstanding — collection is still open.`,
+          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected. Collection is still open.`
+          : `RM ${gate.holding.toFixed(2)} outstanding. Collection is still open.`,
     );
   }
   return out;
@@ -290,7 +290,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
       {
         error: "booking_sunday",
         code: "booking_sunday",
-        message: "Sunday is not a delivery working day — pick another date",
+        message: "Sunday is not a delivery working day. Pick another date",
       },
       422,
     );
@@ -312,7 +312,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         message:
           `Cannot confirm the booking: this order has ` +
           `${gate.groups.length > 0 ? gate.groups.map((g) => deliveryGroupLabel(g.key)).join(" + ") : "no goods to deliver"}` +
-          ` — it cannot be delivered as ${(deliverGroups ?? []).map(deliveryGroupLabel).join(" + ") || "nothing"}`,
+          `. It cannot be delivered as ${(deliverGroups ?? []).map(deliveryGroupLabel).join(" + ") || "nothing"}`,
       },
       422,
     );
@@ -354,8 +354,8 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         error: "booking_no_logistics",
         code: "booking_no_logistics",
         message:
-          "Assign a logistics company before confirming the delivery date — " +
-          "a booking has to name who is delivering it",
+          "Assign a logistics company before confirming the delivery date. " +
+          "A booking has to name who is delivering it",
       },
       422,
     );
@@ -436,7 +436,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   if (sentence) {
     await sb.rpc("operation_add_annotation", {
       p_order_id: idCheck.data,
-      p_content: `Delivery split — ${sentence}`,
+      p_content: `Delivery split: ${sentence}`,
       p_tag: null,
     });
   }
@@ -636,8 +636,8 @@ orderControlRouter.post(
         message:
           `This order has no supplier ready date of ${supplierEta}` +
           (known.size > 0
-            ? ` — it holds ${[...known].sort().join(", ")}. Reload the order and decide again.`
-            : ` — no supplier has given a ready date yet. Record the ready date first.`),
+            ? `. It holds ${[...known].sort().join(", ")}. Reload the order and decide again.`
+            : `. No supplier has given a ready date yet. Record the ready date first.`),
       },
       422,
     );
@@ -670,8 +670,8 @@ orderControlRouter.post(
     p_order_id: idCheck.data,
     p_content:
       decision === "keep"
-        ? `Delay planning — supplier ready ${supplierEta}, we can still make the promised date${note ? ` (${note})` : ""}`
-        : `Delay planning — supplier ready ${supplierEta}, we cannot make the promised date${note ? ` (${note})` : ""}`,
+        ? `Delay planning: supplier ready ${supplierEta}, we can still make the promised date${note ? ` (${note})` : ""}`
+        : `Delay planning: supplier ready ${supplierEta}, we cannot make the promised date${note ? ` (${note})` : ""}`,
     p_tag: null,
   });
 
@@ -2071,7 +2071,7 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     const { error: holdErr } = await sb.rpc("ops_stock_hold_unit", {
       p_item_id: loan.item_id as string,
       p_reason: "inspection",
-      p_note: "Loan recovered from customer — inspect before resale",
+      p_note: "Loan recovered from customer. Inspect before resale",
     });
     if (holdErr) return fail(c, holdErr);
   }

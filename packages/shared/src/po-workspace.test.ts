@@ -608,7 +608,7 @@ describe("the disabled Save NAMES its gap, first gap wins", () => {
         nothingChanged: true,
         reasonEmpty: true,
       }),
-    ).toBe("Save — below received");
+    ).toBe("Save: below received");
   });
   it("an unchanged document cannot mint a version", () => {
     expect(
@@ -617,7 +617,7 @@ describe("the disabled Save NAMES its gap, first gap wins", () => {
         nothingChanged: true,
         reasonEmpty: true,
       }),
-    ).toBe("Save — nothing changed");
+    ).toBe("Save: nothing changed");
   });
   it("a change without a why is refused by name", () => {
     expect(
@@ -626,7 +626,7 @@ describe("the disabled Save NAMES its gap, first gap wins", () => {
         nothingChanged: false,
         reasonEmpty: true,
       }),
-    ).toBe("Save — say why");
+    ).toBe("Save: say why");
   });
   it("nothing missing → Save runs", () => {
     expect(

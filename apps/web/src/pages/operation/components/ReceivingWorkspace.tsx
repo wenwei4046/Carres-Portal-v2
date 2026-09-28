@@ -425,11 +425,11 @@ export function eventSentence(e: ReceivingEvent): string {
         .filter(Boolean)
         .join(" · ");
     case "returned":
-      return `Sent back by ${who}${p.reason ? ` — ${p.reason}` : ""}`;
+      return `Sent back by ${who}${p.reason ? `: ${p.reason}` : ""}`;
     case "voided":
-      return `Voided by ${who}${p.reason ? ` — ${p.reason}` : ""}`;
+      return `Voided by ${who}${p.reason ? `: ${p.reason}` : ""}`;
     case "amended":
-      return `Amended by ${who}${p.reason ? ` — ${p.reason}` : ""}`;
+      return `Amended by ${who}${p.reason ? `: ${p.reason}` : ""}`;
     default:
       return who;
   }
@@ -608,7 +608,7 @@ function ReceivingMode({
     counted,
     overCounted,
     claimProblems,
-  }) ?? (resultsConfirmed ? null : "Save — confirm receiving results");
+  }) ?? (resultsConfirmed ? null : "Save: confirm receiving results");
 
   function submit() {
     if (blocker || !doFilePath || save.isPending) return;
@@ -924,7 +924,7 @@ function ReceivingMode({
                     doNumber={doNumber}
                     paths={c.damagedPhotos}
                     onChange={(paths) => setCount(l.id, { damagedPhotos: paths })}
-                    label={`Damage photo — ${l.sku}`}
+                    label={`Damage photo: ${l.sku}`}
                     testId={`damaged-photos-${l.id}`}
                   />
                 </div>
@@ -959,7 +959,7 @@ function ReceivingMode({
                     onChange={(paths) =>
                       setCount(l.id, { wrongItemPhotos: paths })
                     }
-                    label={`Wrong-item photo — ${l.sku}`}
+                    label={`Wrong-item photo: ${l.sku}`}
                     testId={`wrong-photos-${l.id}`}
                   />
                 </div>
@@ -974,8 +974,8 @@ function ReceivingMode({
              PO/CO (owner instruction §6). */}
       <Section title="Extra goods">
         <p className="text-label text-kit-slate-9">
-          Goods that are not on this purchase order. Check another PO first —
-          extra goods never enter Inventory.
+          Goods that are not on this purchase order. Check another PO first.
+          Extra goods never enter Inventory.
         </p>
         {extraLines.map((x, i) => (
           <div key={i} className="mt-1 flex items-center gap-2" data-testid={`extra-line-${i}`}>

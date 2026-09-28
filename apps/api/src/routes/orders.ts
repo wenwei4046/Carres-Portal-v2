@@ -489,7 +489,7 @@ ordersRouter.post("/", async (c) => {
     (ORDER_CREATE_INTERNAL_ROLES.has(auth.role) ? parsed.data.dealerId ?? null : null);
   if (!effectiveDealerId) {
     throw new HTTPException(403, {
-      message: "An order needs a dealer to place it under — pick a dealer first",
+      message: "An order needs a dealer to place it under. Pick a dealer first",
     });
   }
 
@@ -1662,7 +1662,7 @@ ordersRouter.post("/import", async (c) => {
       .limit(1)
       .single();
     if (dealerErr || !dealerRow) {
-      throw new HTTPException(500, { message: "No dealer account found — create one first." });
+      throw new HTTPException(500, { message: "No dealer account found. Create one first." });
     }
     dealerId = dealerRow.id as string;
   }
@@ -2433,7 +2433,7 @@ async function computeAddLinesWriteSet(
           error: "rule_violation",
           code: "pwp_voucher_add_not_supported",
           message:
-            "A voucher-coded PWP claim can't ride an added line — apply the voucher on a new order.",
+            "A voucher-coded PWP claim can't ride an added line. Apply the voucher on a new order.",
         },
         409,
       );
@@ -2491,7 +2491,7 @@ async function computeAddLinesWriteSet(
         error: "add_lines_blocked",
         code: "existing_build_unsupported",
         message:
-          "This order carries a raw (un-exploded) sofa build — products can't be added to it. Place a new order.",
+          "This order carries a raw (un-exploded) sofa build. Products can't be added to it. Place a new order.",
       },
       422,
     );
@@ -2515,7 +2515,7 @@ async function computeAddLinesWriteSet(
         error: "rule_violation",
         code: "pwp_add_conflict",
         message:
-          "This order already has a promo applied — place a new order to claim another promo price.",
+          "This order already has a promo applied. Place a new order to claim another promo price.",
       },
       409,
     );
@@ -2925,7 +2925,7 @@ async function computeReplaceWriteSet(
       {
         error: errorTag,
         code: "line_not_found",
-        message: "The item is no longer on this order — refresh and retry.",
+        message: "The item is no longer on this order. Refresh and retry.",
       },
       422,
     );
@@ -3019,7 +3019,7 @@ async function computeReplaceWriteSet(
         code: "downsell_blocked",
         message:
           `The new configuration totals RM ${newTotal.toFixed(2)}, below the original ` +
-          `RM ${oldTotal.toFixed(2)} — edits can only upgrade the order.`,
+          `RM ${oldTotal.toFixed(2)}. Edits can only upgrade the order.`,
         oldTotal,
         newTotal,
       },
@@ -3259,7 +3259,7 @@ function submitLineMarkerGates(
           error: "rule_violation",
           code: "pwp_voucher_add_not_supported",
           message:
-            "A voucher-coded PWP claim can't ride a submitted line — apply the voucher on a new order.",
+            "A voucher-coded PWP claim can't ride a submitted line. Apply the voucher on a new order.",
         },
         409,
       );
@@ -3575,7 +3575,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
         {
           error: "decide_blocked",
           code: "invalid_payload",
-          message: "The stored request payload is malformed — reject it and ask for a resubmission",
+          message: "The stored request payload is malformed. Reject it and ask for a resubmission",
         },
         422,
       );
@@ -3593,7 +3593,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
           error: "decide_blocked",
           code: "line_in_production",
           message:
-            "This item already has a live procurement thread — reject the request and handle the change manually.",
+            "This item already has a live procurement thread. Reject the request and handle the change manually.",
         },
         422,
       );
@@ -3635,7 +3635,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
         {
           error: "decide_blocked",
           code: "invalid_payload",
-          message: "The stored request payload is malformed — reject it and ask for a resubmission",
+          message: "The stored request payload is malformed. Reject it and ask for a resubmission",
         },
         422,
       );
@@ -3659,7 +3659,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
       {
         error: "decide_blocked",
         code: "invalid_payload",
-        message: "The stored request payload is malformed — reject it and ask for a resubmission",
+        message: "The stored request payload is malformed. Reject it and ask for a resubmission",
       },
       422,
     );
@@ -4270,7 +4270,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   // Golden SO (STAGE 2, BUILD-QUEUE): the canonical format is `SO-1256` —
   // NO zero-padding, no second format, header · ORDER DETAILS · footer alike.
   const so_number = `SO-${o.so}`;
-  const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "—";
+  const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "";
   const statusLabel =
     o.status === "place"
       ? "Awaiting fulfilment"
@@ -4300,8 +4300,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     status_label: statusLabel,
     channel,
     customer: {
-      name: String(o.customer_name ?? "—"),
-      address: String(o.customer_address ?? "—"),
+      name: String(o.customer_name ?? ""),
+      address: String(o.customer_address ?? ""),
       phone: o.customer_phone ?? null,
       email: o.customer_email ?? null,
       emergency: o.customer_emergency ?? null,
@@ -4316,7 +4316,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
       salesperson_phone: o.salespersons?.phone ?? null,
     },
     delivery: {
-      date: o.delivery_date_tbd ? "To be confirmed" : String(o.delivery_date ?? "—"),
+      date: o.delivery_date_tbd ? "To be confirmed" : String(o.delivery_date ?? ""),
       floor: Number(o.delivery_floor ?? 1),
       has_lift: Boolean(o.delivery_has_lift),
     },
@@ -4379,7 +4379,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const ord: any = order;
   if (!ord.invoice_no) {
     throw new HTTPException(422, {
-      message: "Invoice not yet issued (auto-issued at dispatch — wait until operation_stage='dispatched')",
+      message: "Invoice not yet issued (auto-issued at dispatch, wait until operation_stage='dispatched')",
     });
   }
 
@@ -4394,7 +4394,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const i: any = inv;
   if (i.voided_at) {
-    throw new HTTPException(422, { message: "Invoice has been voided — re-issue first" });
+    throw new HTTPException(422, { message: "Invoice has been voided. Re-issue first" });
   }
 
   const { data: lines, error: linErr } = await sb
@@ -4434,7 +4434,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
-      address: String(ord.customer_address ?? "—"),
+      address: String(ord.customer_address ?? ""),
       phone: ord.customer_phone ?? null,
     },
     dealer: {

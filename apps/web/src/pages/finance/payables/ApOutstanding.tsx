@@ -56,7 +56,7 @@ export default function ApOutstanding() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="ap-outstanding-destination-header" word="Unpaid by Supplier"
-        docTitle="Unpaid by Supplier — Carres" />
+        docTitle="Unpaid by Supplier · Carres" />
       {query.isError ? <ReadFailed what="What is owed to suppliers" onRetry={() => void query.refetch()} /> : (
         <ListPageShell register>
           <DataGrid

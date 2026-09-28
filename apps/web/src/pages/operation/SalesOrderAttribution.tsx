@@ -167,7 +167,7 @@ export default function SalesOrderAttribution({
   const applyMut = useApplyAttributionChange(orderId, {
     onSuccess: (r) => {
       /* A second Apply is a no-op and says so — it never claims a new revision. */
-      toast.success(r.already_applied ? "Already applied — nothing changed" : `Applied · Rev ${r.revision}`);
+      toast.success(r.already_applied ? "Already applied. Nothing changed" : `Applied · Rev ${r.revision}`);
       void liveQ.refetch();
       onApplied();
     },
@@ -209,7 +209,7 @@ export default function SalesOrderAttribution({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-label font-semibold tracking-wide text-base-700 uppercase">
-              {request.status === "pending" ? "Waiting for approval" : "Approved — not applied yet"}
+              {request.status === "pending" ? "Waiting for approval" : "Approved. Not applied yet"}
             </span>
             <span className="text-meta text-base-500">
               Asked {fmtDate(request.created_at, { time: true })}
@@ -224,7 +224,7 @@ export default function SalesOrderAttribution({
           </div>
 
           {request.reason && (
-            <p className="text-meta text-base-700 mt-2 break-words">Reason — {request.reason}</p>
+            <p className="text-meta text-base-700 mt-2 break-words">Reason: {request.reason}</p>
           )}
           <p className="text-meta text-base-500 mt-1">{approverWord(request.approver)}</p>
 
@@ -312,7 +312,7 @@ export default function SalesOrderAttribution({
               letting the operator assume the approval was the act. */}
           <p className="text-meta text-base-500 mt-2">
             {request.status === "pending"
-              ? "Approving records the decision only — the sales order does not change until it is applied."
+              ? "Approving records the decision only. The sales order does not change until it is applied."
               : "The sales order has not changed yet. Applying writes it and mints a revision."}
           </p>
         </div>

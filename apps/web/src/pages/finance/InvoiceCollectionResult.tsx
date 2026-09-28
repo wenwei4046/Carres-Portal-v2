@@ -48,7 +48,7 @@ export default function InvoiceCollectionResult({ invoice, onClose }: {
       void qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
       onClose();
     },
-    onError: (e: Error) => toast.error(`The result was not recorded — ${e.message}`),
+    onError: (e: Error) => toast.error(`The result was not recorded: ${e.message}`),
   });
 
   const needsDate = outcome === "will_pay_on_date";

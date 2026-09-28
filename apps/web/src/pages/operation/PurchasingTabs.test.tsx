@@ -39,7 +39,7 @@ describe("PurchasingTabs — the destination word", () => {
     /* Exact text, so the bare word cannot pass as the new one. */
     expect(screen.getByText("Manual Purchase Request")).toBeInTheDocument();
     expect(screen.queryByText("Manual Purchase")).toBeNull();
-    expect(document.title).toBe("Manual Purchase Request · Purchasing — Carres");
+    expect(document.title).toBe("Manual Purchase Request · Purchasing · Carres");
   });
 
   it("`Receiving` — and the retired `Goods Receipts` is gone from the header", () => {
@@ -85,11 +85,11 @@ describe("PurchasingTabs — the destination word", () => {
     expect(header.querySelector("svg")).toBeNull();
     // It did NOT fall through to the default page.
     expect(screen.queryByText("Purchase Demands")).not.toBeInTheDocument();
-    expect(document.title).toBe("SO Batch Purchase · Purchasing — Carres");
+    expect(document.title).toBe("SO Batch Purchase · Purchasing · Carres");
   });
 
   it("the browser tab says the same word", () => {
     renderAt("/operation?tab=receiving");
-    expect(document.title).toBe("Receiving · Purchasing — Carres");
+    expect(document.title).toBe("Receiving · Purchasing · Carres");
   });
 });

@@ -1035,7 +1035,7 @@ function PickupDrawer({
                 <ThreadGroup
                   title="Producing"
                   count={producingThreads.length}
-                  hint="Supplier still making — not ready to collect"
+                  hint="Supplier still making. Not ready to collect"
                   testId={`drawer-producing-threads-${po.id}`}
                 >
                   {producingThreads.map((t) => (

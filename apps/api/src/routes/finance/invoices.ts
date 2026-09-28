@@ -869,7 +869,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
       {
         error: "rule_violation",
         code: "not_fully_paid",
-        message: `Customer paid RM ${orderPaid.toFixed(2)} of RM ${invoiceAmt.toFixed(2)} — invoice PDF gates on full payment`,
+        message: `Customer paid RM ${orderPaid.toFixed(2)} of RM ${invoiceAmt.toFixed(2)}. Invoice PDF gates on full payment`,
       },
       422,
     );
@@ -944,7 +944,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     order_code: `SO-${ord.so}`,
     customer: {
       name:    String(ord.customer_name ?? ""),
-      address: String(ord.customer_address ?? "—"),
+      address: String(ord.customer_address ?? ""),
       phone:   ord.customer_phone ?? null,
     },
     dealer: {

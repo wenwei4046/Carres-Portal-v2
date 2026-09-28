@@ -122,7 +122,7 @@ describe("the health ladder", () => {
     const counts = stockHealthCounts(rows);
     expect(counts).toMatchObject({ unrated: 3, healthy: 0, critical: 0 });
     expect(stockHealthHeadline(counts)).toBe(
-      "Nothing is watched yet — 3 items still need a number.",
+      "Nothing is watched yet. 3 items still need a number.",
     );
   });
 

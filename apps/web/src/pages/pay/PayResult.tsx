@@ -23,8 +23,8 @@ export function PaySuccess() {
       </h1>
       <p className="max-w-sm text-body leading-relaxed text-muted-foreground">
         {ra
-          ? `Thank you — your rent-to-own plan ${ra} is set up. The first month is collected and your card is saved for the monthly auto-debit. You may close this page.`
-          : `Thank you${so ? ` — your payment for order #${so} is confirmed` : ""}. It has been recorded automatically; no further action is needed. You may close this page.`}
+          ? `Thank you. Your rent-to-own plan ${ra} is set up. The first month is collected and your card is saved for the monthly auto-debit. You may close this page.`
+          : `Thank you${so ? `. Your payment for order #${so} is confirmed` : ""}. It has been recorded automatically; no further action is needed. You may close this page.`}
       </p>
     </Shell>
   );

@@ -126,7 +126,7 @@ export default function OperationImport() {
         </h1>
         <p className="text-body text-base-600 mt-2">
           Drop the AutoCount listing CSV here. The portal will create any new
-          orders. Orders already in the portal are left untouched — once a sale
+          orders. Orders already in the portal are left untouched. Once a sale
           is imported, the portal is the source of truth.
         </p>
       </div>
@@ -193,7 +193,7 @@ export default function OperationImport() {
                 )}
               </ul>
               <p className="mt-2 text-label text-warning-700">
-                These rows are silently dropped — the import will only create / update the {usableRows.length} usable row(s).
+                These rows are silently dropped. The import will only create / update the {usableRows.length} usable row(s).
                 Fix the cell in AutoCount and re-export if you want them included.
               </p>
             </div>
@@ -281,7 +281,7 @@ export default function OperationImport() {
           </div>
           <p className="text-meta text-base-600 mb-4">
             AutoCount only <strong>creates</strong> new orders. Any order already
-            in the portal is left untouched — the portal is the source of truth
+            in the portal is left untouched. The portal is the source of truth
             once a sale is imported.
           </p>
           {submitMut.data.errored > 0 ? (
@@ -308,7 +308,7 @@ export default function OperationImport() {
               <div className="font-semibold mb-1">Unmatched SKUs</div>
               <p className="mb-2">
                 These core items (mattress / bedframe / sofa) didn&apos;t match a
-                SKU in product_skus — they were imported with the raw
+                SKU in product_skus. They were imported with the raw
                 description. Fix the description in AutoCount or add the SKU
                 in the catalog, then re-import.
               </p>

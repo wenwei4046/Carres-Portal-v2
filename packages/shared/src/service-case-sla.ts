@@ -352,7 +352,7 @@ export function caseSlaAction(
   customerName?: string | null,
 ): string | null {
   if (!clock.noticeOwed) return null;
-  return `Call ${customerOf(customerName)} — say why it is taking longer`;
+  return `Call ${customerOf(customerName)} to say why it is taking longer`;
 }
 
 /**

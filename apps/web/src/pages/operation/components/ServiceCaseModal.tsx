@@ -115,9 +115,9 @@ export default function ServiceCaseModal({
         setCustomerPhone(res.order.customerPhone ?? "");
         setCustomerAddress(res.order.customerAddress ?? "");
         if (res.order.refNos.length && !refNo) setRefNo(res.order.refNos[0]);
-        setLookupMsg(`✓ Matched ${res.order.so} — customer auto-filled.`);
+        setLookupMsg(`✓ Matched ${res.order.so}. Customer auto-filled.`);
       } else if (res.matches > 1) {
-        setLookupMsg(`⚠ ${res.matches} orders matched — ambiguous. Fill customer manually.`);
+        setLookupMsg(`⚠ ${res.matches} orders matched, ambiguous. Fill customer manually.`);
       } else {
         setLookupMsg("⚠ No order matched. Fill customer manually.");
       }
@@ -255,7 +255,7 @@ export default function ServiceCaseModal({
             <Field label="Case Type">
               <select value={caseTypeId} onChange={(e) => setCaseTypeId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">— select —</option>
+                <option value="">Case Type</option>
                 {configQ.data?.types.map((t) => (
                   <option key={t.id} value={t.id}>{t.label}</option>
                 ))}
@@ -269,7 +269,7 @@ export default function ServiceCaseModal({
                   option: the gate is the transition, not a lock on the row. */}
               <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">— select —</option>
+                <option value="">Status</option>
                 {configQ.data?.statuses.map((s) => (
                   <option key={s.id} value={s.id} disabled={s.isClosed && !canClose}>
                     {s.label}

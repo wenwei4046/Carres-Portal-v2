@@ -595,7 +595,7 @@ describe("the settled nine column words", () => {
   it("the form's date words and the lead-days Send gap are governed", () => {
     expect(MANUAL_PURCHASE_WORDS.proceedDate).toBe("Proceed Date");
     expect(MANUAL_PURCHASE_WORDS.deliveryDate).toBe("Delivery Date");
-    expect(MANUAL_PURCHASE_WORDS.sendNeedsLeadDays).toBe("Send — lead days are not set");
+    expect(MANUAL_PURCHASE_WORDS.sendNeedsLeadDays).toBe("Send: lead days are not set");
     expect(MANUAL_PURCHASE_WORDS.notRecorded).toBe("Not recorded");
     expect(MANUAL_PURCHASE_WORDS.orderDatePassed).toBe("Order date passed");
   });

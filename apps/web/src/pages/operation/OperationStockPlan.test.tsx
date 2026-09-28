@@ -330,7 +330,7 @@ describe("the handover to Operations", () => {
     );
     renderPage();
     const list = await screen.findByTestId("plan-po-list");
-    expect(list.textContent).toContain("nothing to order");
+    expect(list.textContent).toContain("Nothing to order");
   });
 });
 

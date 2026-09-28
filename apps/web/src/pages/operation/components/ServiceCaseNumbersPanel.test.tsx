@@ -148,7 +148,7 @@ describe("the rankings — the card's one glance", () => {
     onTime: { measured: 2, unmeasured: 0, onTime: 1, late: 1, pct: 50, withheldReason: null },
     byResponsibility: { supplier: 2, carres: 1, customer: 0 },
     delayReasonsRecorded: 3,
-    headline: "4 cases reported. Damaged is the most common problem — 3 of 4. Ohana carries the most: 3.",
+    headline: "4 cases reported. Damaged is the most common problem: 3 of 4. Ohana carries the most: 3.",
   });
 
   it("shows the leading problem with its per-category split", async () => {

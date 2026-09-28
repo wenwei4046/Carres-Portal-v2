@@ -99,7 +99,8 @@ export function buildCustomerFinalReminder(
 ): string {
   return (
     `Hi ${i.salutation},\n` +
-    `Final reminder — your delivery is arranged for ${i.when} and the balance below is still outstanding.\n` +
+    `Final reminder.\n` +
+    `Your delivery is arranged for ${i.when} and the balance below is still outstanding.\n` +
     `\n` +
     factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
@@ -113,7 +114,8 @@ export function buildCustomerFinalReminder(
 export function buildCustomerChase(i: CustomerChaseInput): string {
   return (
     `Hi ${i.salutation},\n` +
-    `Following up on your order — the balance below is still outstanding.\n` +
+    `Following up on your order.\n` +
+    `The balance below is still outstanding.\n` +
     `\n` +
     factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
@@ -139,7 +141,8 @@ export interface LogisticChaseInput {
 export function buildLogisticReminder(i: LogisticChaseInput): string {
   return (
     `Hi ${i.logistic ?? "team"},\n` +
-    `Friendly reminder — this delivery still needs an arrangement.\n` +
+    `Friendly reminder.\n` +
+    `This delivery still needs an arrangement.\n` +
     `\n` +
     factLine("REF", i.ref) +
     factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
@@ -154,12 +157,13 @@ export function buildLogisticReminder(i: LogisticChaseInput): string {
 export function buildLogisticChase(i: LogisticChaseInput): string {
   return (
     `Hi ${i.logistic ?? "team"},\n` +
-    `Following up — this delivery is still not booked${i.overdue ? " and the deadline has passed" : ""}.\n` +
+    `Following up.\n` +
+    `This delivery is still not booked${i.overdue ? " and the deadline has passed" : ""}.\n` +
     `\n` +
     factLine("REF", i.ref) +
     factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
     factLine("Item", itemsBlock(i.lines)) +
-    `Deadline: ${i.deadline}${i.overdue ? " — overdue" : ""}\n` +
+    `Deadline: ${i.deadline}${i.overdue ? " (overdue)" : ""}\n` +
     `\n` +
     `Please confirm the delivery date + time slot with the customer today. Thank you!`
   );
@@ -178,7 +182,8 @@ export interface SupplierChaseInput {
 export function buildSupplierReminder(i: SupplierChaseInput): string {
   return (
     `Hi,\n` +
-    `Friendly reminder — checking the stock ETA for this PO.\n` +
+    `Friendly reminder.\n` +
+    `Checking the stock ETA for this PO.\n` +
     `\n` +
     factLine("PO", i.poNo) +
     factLine("Our ref", i.ref) +
@@ -193,7 +198,8 @@ export function buildSupplierReminder(i: SupplierChaseInput): string {
 export function buildSupplierChase(i: SupplierChaseInput): string {
   return (
     `Hi,\n` +
-    `Following up — we still need the stock ETA for this PO.\n` +
+    `Following up.\n` +
+    `We still need the stock ETA for this PO.\n` +
     `\n` +
     factLine("PO", i.poNo) +
     factLine("Our ref", i.ref) +
@@ -230,7 +236,7 @@ export function buildSupplierGroupMessage(
 ): string {
   const opener =
     mode === "chase"
-      ? `Hi ${supplierName} 👋 following up — we still need the ready date for these, customers are waiting:`
+      ? `Hi ${supplierName} 👋 following up.\nWe still need the ready date for these, customers are waiting:`
       : `Hi ${supplierName} 👋 please confirm the ready date for these:`;
   const closer =
     mode === "chase"
@@ -296,7 +302,7 @@ export function buildSupplierClaimMessage(i: SupplierClaimMessageInput): string 
   return [
     `Hi ${i.supplierName} 👋 we have a problem with ${doc}:`,
     ``,
-    `*${i.sku}* ×${i.qty} — ${i.problemLabel}`,
+    `*${i.sku}* ×${i.qty}: ${i.problemLabel}`,
     ``,
     `Please *${i.requestLabel.toLowerCase()}* for the ${units}.`,
     `Photos are attached. Kindly confirm what you will do and by when. Thank you!`,
@@ -330,7 +336,7 @@ export function buildPartnerGroupMessage(
 ): string {
   const opener =
     mode === "chase"
-      ? `Hi ${partnerName} 👋 following up — these deliveries still need a booked slot with the customer:`
+      ? `Hi ${partnerName} 👋 following up.\nThese deliveries still need a booked slot with the customer:`
       : `Hi ${partnerName} 👋 please confirm the delivery date + time slot for these:`;
   const closer =
     mode === "chase"
@@ -339,9 +345,9 @@ export function buildPartnerGroupMessage(
   const body = rows
     .map((r) => {
       const who = r.customer ? `${r.customer}${r.region ? ` (${r.region})` : ""}` : "";
-      const head = [r.ref ? `_${r.ref}_` : "", who].filter(Boolean).join(" — ");
+      const head = [r.ref ? `_${r.ref}_` : "", who].filter(Boolean).join(" · ");
       const items = itemsBlock(r.items);
-      const when = `by ${r.deadline}${r.overdue ? " — overdue" : ""}`;
+      const when = `by ${r.deadline}${r.overdue ? " (overdue)" : ""}`;
       return [head, items, when].filter(Boolean).join("\n");
     })
     .join("\n\n");

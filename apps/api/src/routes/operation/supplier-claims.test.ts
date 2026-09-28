@@ -348,7 +348,7 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(damaged.next_move).toEqual({
       key: "ask",
       owner: "carres",
-      label: "Call Ohana — agree the fix",
+      label: "Call Ohana to agree the fix",
     });
     expect(late.next_move.owner).toBe("supplier");
     expect(late.line_pending).toBe(true);

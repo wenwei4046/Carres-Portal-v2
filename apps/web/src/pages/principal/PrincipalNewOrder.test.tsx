@@ -521,7 +521,7 @@ describe("PrincipalNewOrder — single-page raw form", () => {
        delivery fact is missing, and names it in the governed words. */
     expect(screen.getByTestId("raw-submit")).toHaveProperty("disabled", true);
     expect(screen.getByTestId("raw-first-issue")).toHaveTextContent(
-      "Building type — pick the building the goods go to",
+      "Building type: pick the building the goods go to",
     );
     fireEvent.change(screen.getByTestId("raw-building-type"), { target: { value: "Condo" } });
     expect(screen.getByTestId("raw-first-issue")).toHaveTextContent(

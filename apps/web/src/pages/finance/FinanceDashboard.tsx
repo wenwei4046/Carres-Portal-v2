@@ -106,7 +106,7 @@ export default function FinanceDashboard() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="finance-dashboard-destination-header" word="Dashboard"
-        docTitle="Dashboard — Carres" />
+        docTitle="Dashboard · Carres" />
       <div className="flex-1 overflow-auto">
         <div className="mx-auto max-w-[1400px] p-4 md:p-9">
           <MonthEndPack today={today} goLive={goLive} ready={!chart.isPending} />

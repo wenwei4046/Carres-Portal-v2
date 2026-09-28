@@ -395,7 +395,7 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
           <Text style={styles.disclaimer}>
             {isTaxInvoice
               ? "Tax invoice · SST 8% included in unit prices (LHDN inclusive)."
-              : "Payment request — not a tax invoice."}
+              : "Payment request. Not a tax invoice."}
           </Text>
         </View>
 

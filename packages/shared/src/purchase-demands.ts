@@ -136,7 +136,7 @@ export function purchaseDemandStateWords(
   return {
     can_order_early: "Can order early",
     safety_days_full: `${safetyDays} safety days left`,
-    safety_days_low: `1–${Math.max(safetyDays - 1, 1)} safety days left`,
+    safety_days_low: `1 to ${Math.max(safetyDays - 1, 1)} safety days left`,
     safety_days_none: "No safety days left",
     /* Card 02-C (owner ruling 2026-08-27): `days`, never `time` — the same
        unit the arithmetic itself counts in. The state KEY keeps its wire

@@ -31,16 +31,16 @@ export const MANUAL_PURCHASE_WORDS = {
   /** The disabled Send NAMES its gap (the Receiving law: a grey button that
    *  will not say why is banned). The FIRST missing header fact wins, in the
    *  form's own top-to-bottom order — lead days first (Card 06). */
-  sendNeedsLeadDays: "Send — lead days are not set",
-  sendNeedsDate: "Send — pick a date",
+  sendNeedsLeadDays: "Send: lead days are not set",
+  sendNeedsDate: "Send: pick a date",
   /** 0422 — the chosen date is before the earliest Delivery Date a Manual
    *  Purchase may ask for (Proceed Date + the Purchasing Settings number);
    *  the sentence under the field says so. */
-  sendNeedsLaterDate: "Send — pick a later date",
-  sendNeedsWhy: "Send — say what it is for",
-  sendNeedsServiceCase: "Send — pick the Service Case",
-  sendNeedsStaff: "Send — pick the staff member",
-  sendNeedsSubsidiary: "Send — name the subsidiary",
+  sendNeedsLaterDate: "Send: pick a later date",
+  sendNeedsWhy: "Send: say what it is for",
+  sendNeedsServiceCase: "Send: pick the Service Case",
+  sendNeedsStaff: "Send: pick the staff member",
+  sendNeedsSubsidiary: "Send: name the subsidiary",
   /**
    * ⭐ THE RECORDED INTENT, ASKED AT CREATION (0549) — and the reason it is a
    * QUESTION rather than a derivation.
@@ -61,9 +61,9 @@ export const MANUAL_PURCHASE_WORDS = {
    * two dialects.
    */
   canStockAnswer: "Can stock answer this?",
-  canStockAnswerYes: "Yes — existing stock can answer this",
-  canStockAnswerNo: "No — this buys extra stock",
-  sendNeedsStockAnswer: "Send — say whether stock can answer this",
+  canStockAnswerYes: "Yes, existing stock can answer this",
+  canStockAnswerNo: "No, this buys extra stock",
+  sendNeedsStockAnswer: "Send: say whether stock can answer this",
   cancel: "Cancel",
   /** The Deliver To door on an existing request (0421): the text button that
    *  opens the choice, and the act that closes it. */
@@ -356,7 +356,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * as a contradiction. Reference stock never reduces the request.
    */
   skuReferenceNote:
-    "For each SKU across Carres — free stock and open purchase orders. This request's own purchase orders are listed below. Stock shown here does not reduce what this request asks for.",
+    "For each SKU across Carres: free stock and open purchase orders. This request's own purchase orders are listed below. Stock shown here does not reduce what this request asks for.",
   /** Approval — the decision facts and controls. */
   approve: "Approve",
   refuse: "Refuse",

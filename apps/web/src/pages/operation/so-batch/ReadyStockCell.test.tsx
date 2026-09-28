@@ -649,7 +649,7 @@ describe("a refusal", () => {
     fireEvent.click(screen.getByTestId(`ready-stock-save-${LINE_A}`));
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith(
-        "That Unit cannot be given back — it has already left the shelf.",
+        "That Unit cannot be given back. It has already left the shelf.",
       ),
     );
   });

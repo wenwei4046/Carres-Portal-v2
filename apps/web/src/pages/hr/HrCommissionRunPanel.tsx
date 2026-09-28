@@ -114,7 +114,7 @@ function AdjustmentDialog({
         <div className="px-6 pt-5">
           <h3 className="text-strong mb-1 font-semibold">Add an adjustment</h3>
           <p className="text-body text-base-500">
-            A correction that should be paid — or taken back — in {monthLabel(year, month)}.
+            A correction that should be paid, or taken back, in {monthLabel(year, month)}.
           </p>
         </div>
 
@@ -188,7 +188,7 @@ function AdjustmentDialog({
 
         <p className="text-meta mx-6 mt-3 rounded-lg border border-base-200 bg-base-50 px-3 py-2.5 leading-relaxed text-base-500">
           Goes on <b className="text-base-900">{monthLabel(year, month)}</b>, which is
-          still open. An already-approved month is never edited — the statement someone
+          still open. An already-approved month is never edited. The statement someone
           has already seen does not change under them.
         </p>
 
@@ -307,7 +307,7 @@ export default function HrCommissionRunPanel({
     tone = "border-l-danger";
     icon = <Ban size={19} />;
     iconCls = "bg-danger-soft text-danger";
-    title = `${monthLabel(year, month)} can't be closed yet — ${blockers.length} of ${checks.length} checks failed`;
+    title = `${monthLabel(year, month)} can't be closed yet: ${blockers.length} of ${checks.length} checks failed`;
     sub =
       blockers[0]!.key === "rates"
         ? "Closing now would freeze RM 0 for people who sold, and lock the month against fixing it."
@@ -345,7 +345,7 @@ export default function HrCommissionRunPanel({
                 approve.mutate(
                   { runId: run.id },
                   {
-                    onSuccess: () => toast.success("Approved — the month is now locked"),
+                    onSuccess: () => toast.success("Approved. The month is now locked"),
                     onError: (e) => toast.error(e.message || "Could not approve"),
                   },
                 )
@@ -387,7 +387,7 @@ export default function HrCommissionRunPanel({
                 reopen.mutate(
                   { runId: run.id, reason },
                   {
-                    onSuccess: () => toast.success("Reopened — the month is editable again"),
+                    onSuccess: () => toast.success("Reopened. The month is editable again"),
                     onError: (e) => toast.error(e.message || "Could not reopen"),
                   },
                 );
@@ -406,7 +406,7 @@ export default function HrCommissionRunPanel({
                 close.mutate(
                   { year, month, program: "staff" },
                   {
-                    onSuccess: () => toast.success("Month closed — waiting for approval"),
+                    onSuccess: () => toast.success("Month closed. Waiting for approval"),
                     onError: (e) => toast.error(e.message || "Could not close the month"),
                   },
                 )

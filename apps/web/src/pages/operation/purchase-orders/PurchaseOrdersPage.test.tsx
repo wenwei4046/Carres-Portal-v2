@@ -576,7 +576,7 @@ describe("Purchase Orders Register", () => {
     line.identity_mode = "exact_unit";
     const missing = renderPage();
     expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1))
-      .toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+      .toHaveTextContent("Unit IDs missing on this line. Do not send this PO");
     missing.unmount();
 
     /* A read that has not answered is not the same fact as a Unit that is
@@ -666,13 +666,13 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     expect(document.body).not.toHaveTextContent("Supplier has not confirmed the PO date");
     expect(document.body).not.toHaveTextContent("to confirm the PO delivery date");
     open();
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — answer a line or record the Supplier DO");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: answer a line or record the Supplier DO");
     kind("new_date");
     fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-15" } });
     expect(screen.getByTestId("po-answer-reason-line-1")).toHaveValue("");
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — choose why the supplier moved the date");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: choose why the supplier moved the date");
     fireEvent.change(screen.getByTestId("po-answer-reason-line-1"), { target: { value: "Material unavailable" } });
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — add a WhatsApp screenshot");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: add a WhatsApp screenshot");
     fireEvent.click(screen.getByText("Upload Evidence"));
     who();
     expect(screen.getByTestId("po-answer-save")).toHaveTextContent(/^Save$/);
@@ -696,7 +696,7 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     expect(supplierDateMutate.mock.calls[0]![0].lines[0]).toEqual({ poLineId: "line-1", answer: "new_date", date: "2026-09-05" });
     fireEvent.change(screen.getByTestId("po-answer-date-input-line-1"), { target: { value: "2026-09-20" } });
     fireEvent.change(screen.getByTestId("po-answer-reason-line-1"), { target: { value: "Other" } });
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — write why the supplier moved the date");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: write why the supplier moved the date");
     fireEvent.change(screen.getByTestId("po-answer-note-line-1"), { target: { value: "Fabric mill closed" } });
     expect(screen.getByTestId("po-answer-save")).toHaveTextContent(/^Save$/);
   });
@@ -710,7 +710,7 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     expect(screen.getByTestId("po-answer-total-line-1")).toHaveTextContent("Total 2 of 2");
     fireEvent.change(screen.getByTestId("po-answer-batch-qty-line-1-0"), { target: { value: "1" } });
     expect(screen.getByTestId("po-answer-total-line-1")).toHaveTextContent("Total 1 of 2");
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — the batches must total 2");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: the batches must total 2");
     fireEvent.click(screen.getByTestId("po-answer-add-batch-line-1"));
     expect(screen.getByTestId("po-answer-batch-qty-line-1-1")).toHaveValue(1);
     fireEvent.change(screen.getByTestId("po-answer-batch-date-line-1-0"), { target: { value: "2026-09-10" } });
@@ -729,9 +729,9 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     open();
     fireEvent.click(screen.getByTestId("po-answer-do-received"));
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — record the Supplier DO number");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: record the Supplier DO number");
     fireEvent.change(screen.getByTestId("po-answer-do-number"), { target: { value: "DO-2251" } });
-    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save — upload the Supplier DO");
+    expect(screen.getByTestId("po-answer-save")).toHaveTextContent("Save: upload the Supplier DO");
     fireEvent.click(screen.getByText("Upload DO file")); who();
     fireEvent.click(screen.getByTestId("po-answer-save"));
     expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
@@ -822,7 +822,7 @@ describe("Purchase Order object", () => {
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const cell = within(screen.getByTestId("po-line-units-line-1"));
-    expect(cell.getByRole("alert")).toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+    expect(cell.getByRole("alert")).toHaveTextContent("Unit IDs missing on this line. Do not send this PO");
     expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
   });
 

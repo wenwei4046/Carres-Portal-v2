@@ -64,9 +64,9 @@ export const PAYMENT_STATUSES = [
  *  "delivery date + time slot"). Stored as free text (column is `text`) so the
  *  operator can record a bespoke window via the remark fields if needed. */
 export const DELIVERY_TIME_SLOTS = [
-  "Morning (9am–12pm)",
-  "Afternoon (12pm–3pm)",
-  "Late afternoon (3pm–6pm)",
+  "Morning (9am to 12pm)",
+  "Afternoon (12pm to 3pm)",
+  "Late afternoon (3pm to 6pm)",
   "Evening (after 6pm)",
   "Anytime",
 ] as const;
