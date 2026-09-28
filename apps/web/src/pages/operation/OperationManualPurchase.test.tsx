@@ -1091,6 +1091,17 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-proceed-date").querySelector("input")).toBeNull();
   });
 
+  it("Proceed Date is never a blank box: before the plan answers it reads the server's own date (owner 2026-09-28)", async () => {
+    /* The plan read never answers here. The Register's `todayIso` is the
+       server's Malaysia date, and the form prints it rather than an empty box. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) return new Promise(() => {});
+      return Promise.resolve(respond(url, init));
+    });
+    await openWorkspace({ answerStockQuestion: false });
+    expect(screen.getByTestId("mp-proceed-date").textContent).toBe("Sun, 30 Aug");
+  });
+
   it("Card 06 · complete lead facts DEFAULT Delivery Date from the slowest line — Send goes live", async () => {
     await openWorkspace();
     // Ready Stock is the default purpose — there is NO Why field to fill.
