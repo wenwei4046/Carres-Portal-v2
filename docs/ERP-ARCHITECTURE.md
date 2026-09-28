@@ -201,7 +201,9 @@ does not manually enter each routine assignment. The authoritative assignment re
 Workspace Duty model, never independent page-level rotation. This does not auto-grant approver
 permissions or change object PIC ownership. Owner-approved joiner/leaver timing (2026-09-28 /
 NOT BUILT, Workspace §4): newly eligible staff enter monthly rotation on the first day of the next
-month; departure exclusion takes effect immediately on its effective date. A
+month; departure exclusion takes effect immediately on its effective date. The owner
+subsequently clarified that newcomers must not start on PO merely through joining/rotation;
+PO-readiness admission remains under review (Workspace §4). A
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and

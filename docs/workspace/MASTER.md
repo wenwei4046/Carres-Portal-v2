@@ -151,6 +151,15 @@ month. Re-resolve the affected current/future routine allocation through the one
 preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
 change source-owned task completion or decide the remaining multi-person rotation/cover details.
 
+**NEWCOMER PO LIMIT — OWNER CORRECTION 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+A newcomer must not start on PO Duty merely because they joined staff or reached a monthly rotation
+boundary: Purchasing is too complex for that default. The next-month entry ruling does not mean
+new staff are eligible for every Duty. The proposed generic three-person PO/GRN cycle is NOT
+APPROVED and must not be implemented. How PO readiness is confirmed and how a newcomer first
+participates in GRN remain proposals pending owner review; do not invent a probation duration,
+automatic promotion date or new receiving-posting permission gate.
+
+
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,
 current/future eligible pickers and Duty routing; preserve historical names, acts and records.

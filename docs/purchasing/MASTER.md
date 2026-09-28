@@ -358,6 +358,11 @@ the current month. Departure excludes the person on its effective date and immed
 affected current/future allocation. Workspace §4 owns this shared rule; it does not grant approval
 capability or rewrite completed Purchasing/Receiving evidence.
 
+**NEWCOMER LIMIT — OWNER CORRECTION 2026-09-28 / NOT BUILT:** a newcomer must not start with
+PO Duty because Purchasing is too complex for that default. Joining staff/rotation is not automatic
+PO eligibility. The suggested generic three-person PO/GRN cycle remains unapproved; PO readiness
+and initial GRN participation require the remaining Blueprint review (Workspace §4).
+
 ### 5.4 Deliver To
 
 The destination comes from the source PO/CO `Supplier Deliver To`. When a new buy needs a default, use the

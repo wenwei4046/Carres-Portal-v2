@@ -83,6 +83,8 @@ against a real session.
   enters routine monthly Duty rotation on the first day of the next month after acquiring the
   required People-owned eligibility. Account creation alone does not enrol them. Departure exclusion
   takes effect immediately on its effective date, not the next month (Workspace §4).
+  Owner correction 2026-09-28: newcomers must not start on PO simply because they join staff or
+  enter rotation; the PO-readiness admission process is not yet approved.
 - **Checklists are a shared constant, not a config table.**
 - **Departure visibility — owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT:** after
   departure is effective, omit the person from default active staff views and current/future Duty
