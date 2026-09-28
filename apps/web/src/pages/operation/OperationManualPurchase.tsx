@@ -2994,15 +2994,18 @@ function CreateRequestWorkspace({
           a Manual Purchase has no price. What stacks under a line (a lead
           gap, WHAT WE ALREADY HAVE, the picker) takes its own row across the
           table. `+ Add line` follows the table, where the eye ends. */}
+      {/* The floors fit the half-width form of the 50/50 page (owner
+          2026-09-28 put the draft PO paper beside it): 28 + 170 + 120 + 88 + 72
+          plus cell padding stays inside ~590px, so `Qty` never scrolls away. */}
       <div className="flex flex-col gap-3" data-testid="mp-lines">
         <div className="overflow-x-auto">
           <table className={SO_TABLE} data-testid="mp-lines-table">
             <thead>
               <tr className={SO_HEAD_ROW}>
                 <th className={`${SO_TH} mp-line-head text-left`} style={{ width: 28 }}>#</th>
-                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 220 }}>Item Code</th>
-                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 200 }}>Description</th>
-                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 120 }}>{W.supplierLabel}</th>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 170 }}>Item Code</th>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 120 }}>Description</th>
+                <th className={`${SO_TH} mp-line-head text-left`} style={{ minWidth: 88 }}>{W.supplierLabel}</th>
                 <th className={`${SO_TH} mp-line-head text-center`} style={{ width: 72 }}>{W.itemsColQty}</th>
               </tr>
             </thead>
