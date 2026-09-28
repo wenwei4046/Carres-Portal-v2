@@ -24,7 +24,7 @@ import DocumentTable, { type DocumentTableColumn, type DocumentTableRow } from "
 import EmptyState from "@/components/kit/EmptyState";
 import Loading from "@/components/kit/Loading";
 import TotalsSummary from "@/components/kit/TotalsSummary";
-import { fmtMonth } from "@/lib/fmt-date";
+import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 
 /** `Oct 2026`. The months here come from the window, so they are always real. */
 const fmtMonthYear = (month: string | null) => (month ? fmtMonth(month) : "");
@@ -39,6 +39,44 @@ export function monthlyDemandRowLabel(row: Pick<MonthlyDemandRow, "kind" | "mont
   if (row.kind === "no-date") return "No delivery date";
   if (row.kind === "total") return "Total";
   return fmtMonthYear(row.month);
+}
+
+/**
+ * What `Export` writes: exactly the `By month` table on screen — the same
+ * rows, columns and words (`Unavailable` stays a word, never a zero).
+ */
+export function monthlyDemandSheet(view: MonthlyDemandView): { headers: string[]; rows: Array<Array<string | number>> } {
+  const categories = [...MONTHLY_DEMAND_CATEGORIES];
+  const headers = [
+    "Month",
+    ...categories,
+    ...(view.hasNotInCatalog ? ["Not in catalog"] : []),
+    "Total Qty",
+    "Delivered",
+    "Not delivered",
+    "To buy",
+  ];
+  const rows = view.rows.map((row) => [
+    monthlyDemandRowLabel(row),
+    ...categories.map((category) => row.categories[category] ?? 0),
+    ...(view.hasNotInCatalog ? [row.notInCatalog] : []),
+    row.totalQty,
+    row.delivered,
+    row.notDelivered,
+    row.toBuy === null ? "Unavailable" : row.toBuy,
+  ]);
+  return { headers, rows };
+}
+
+async function exportMonthlyDemand(view: MonthlyDemandView) {
+  const { headers, rows } = monthlyDemandSheet(view);
+  const XLSX = await import("xlsx");
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = headers.map((h) => ({ wch: Math.max(8, h.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Monthly demand");
+  const span = `${fmtMonthYear(view.window.first)} to ${fmtMonthYear(view.window.last)}`;
+  XLSX.writeFile(wb, `Monthly demand ${span} ${appTodayIso()}.xlsx`);
 }
 
 function statusOf(error: unknown): number | null {
@@ -147,6 +185,19 @@ export default function SalesOrderMonthlyDemand({
       className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto bg-white p-4"
       data-testid="monthly-demand"
     >
+      {/* Row 2 of this view: Search and Columns do not apply (the columns are
+          months), so Export stands alone and writes the matrix. */}
+      <div className="-mx-4 -mt-4 flex justify-end border-b border-kit-slate-5 px-4 py-2" data-testid="monthly-demand-toolbar">
+        <Button
+          variant="neutral"
+          icon="download"
+          disabled={empty}
+          onClick={() => void exportMonthlyDemand(view)}
+          data-testid="monthly-demand-export"
+        >
+          Export
+        </Button>
+      </div>
       <section aria-label={thisMonth} className="w-full max-w-[360px]" data-testid="monthly-demand-this-month">
         <h2 className={`${HEADING} px-2 pb-2`}>{thisMonth}</h2>
         <TotalsSummary
