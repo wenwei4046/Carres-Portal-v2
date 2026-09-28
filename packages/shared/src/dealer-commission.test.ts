@@ -48,6 +48,38 @@ describe("dealer commission", () => {
     expect(orderCommission(o, at25, 1200)).toEqual({ earned: 250, full: 250 });
   });
 
+  // 0597: a refund HQ has paid out is money that was not kept.
+  const sofa1000 = (payments: DcOrder["payments"], refunds: DcOrder["refunds"]): DcSource => ({
+    settings: { defaultRate: 25 }, rates: [], models: [], outlets: [],
+    dealers: [{ id: "d1", name: "Dealer" }],
+    quotas: [{ dealerId: "d1", quota: 1000, rebateRate: 5, startsOn: "2026-01-01" }],
+    orders: [order({ lines: [{ modelId: null, category: "sofa", value: 1000 }], payments, refunds })],
+  });
+
+  it("RM1000 paid then RM400 refunded earns on 600 at most", () => {
+    const src = sofa1000([{ paidOn: "2026-09-03", amount: 1000 }], [{ paidOn: "2026-09-20", amount: 400 }]);
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 150, stillToCollect: 100, rebate: 30 });
+  });
+
+  it("a refund paid in October reduces October, not September", () => {
+    const src = sofa1000([{ paidOn: "2026-09-03", amount: 1000 }], [{ paidOn: "2026-10-02", amount: 400 }]);
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 250, stillToCollect: 0, rebate: 50 });
+    expect(dealerCommissionReport(src, "2026-10")[0]).toMatchObject({ earned: -100, stillToCollect: 100, rebate: -20 });
+  });
+
+  it("collected never goes below zero", () => {
+    const src = sofa1000([{ paidOn: "2026-09-03", amount: 300 }], [{ paidOn: "2026-09-04", amount: 500 }]);
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 0, stillToCollect: 250, rebate: 0 });
+  });
+
+  it("a refund after the rebate hit the cap takes back only what was paid", () => {
+    // 1200 collected at 5% is 60, capped at 45. A 400 refund leaves 800, worth 40: take back 5, not 20.
+    expect(rebateByMonth(45, 5, [["2026-09", 1200], ["2026-10", -400]])).toEqual([
+      { month: "2026-09", rebate: 45, quotaLeft: 0 },
+      { month: "2026-10", rebate: -5, quotaLeft: 5 },
+    ]);
+  });
+
   it("caps the rebate at the quota left", () => {
     // Quota left 45: a month that earns 25, then a month that earns 60, pays 25 then only the 20 left.
     expect(rebateByMonth(45, 5, [["2026-09", 500], ["2026-10", 1200]])).toEqual([

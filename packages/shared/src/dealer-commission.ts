@@ -11,8 +11,12 @@
  *      add-ons, which are part of the bill but earn nothing.
  *   3. Only collected money earns: each line earns rate × its share of what was
  *      collected, shared by value. The rest is "still to collect".
- * Rebate, per dealer: each month rate × collected that month, capped at the
- * quota left. The quota left is never stored; it is worked out here.
+ *   Collected is payments less refunds HQ has paid out, up to the cut off, never
+ *   below zero (0597). A refund lowers the month it was paid in, so that month
+ *   can show a negative earned figure.
+ * Rebate, per dealer: rate × everything collected so far, capped at the quota;
+ * each month's rebate is the rise since last month. The quota left is never
+ * stored; it is worked out here.
  */
 import { z } from "zod";
 
@@ -34,6 +38,8 @@ export interface DcOrder {
   addons: number; cashback?: number;
   lines: DcLine[];
   payments: { paidOn: string; amount: number }[] | null;
+  /** Refunds HQ has paid to the customer, by the day paid (0597). */
+  refunds?: { paidOn: string; amount: number }[] | null;
 }
 export interface DcSource {
   settings: { defaultRate: number };
@@ -46,6 +52,13 @@ export interface DcSource {
 }
 
 const cents = (n: number) => Math.round(n * 100) / 100;
+
+/** What HQ kept on an order over the days `upTo` accepts: payments less paid refunds, never below zero. */
+function kept(o: DcOrder, upTo: (day: string) => boolean) {
+  const sum = (xs: { paidOn: string; amount: number }[] | null | undefined) =>
+    (xs ?? []).filter((x) => upTo(x.paidOn)).reduce((s, x) => s + Number(x.amount), 0);
+  return Math.max(0, sum(o.payments) - sum(o.refunds));
+}
 
 /** Commission an order earns on `collected`, and what it would earn when paid in full. */
 export function orderCommission(order: DcOrder, rateOf: (modelId: string | null) => number, collected: number) {
@@ -62,13 +75,20 @@ export function orderCommission(order: DcOrder, rateOf: (modelId: string | null)
   return { earned: full * share, full };
 }
 
-/** Month by month from the first month: rebate = rate × collected, capped at the quota left. */
+/**
+ * Month by month from the first month: the rebate due so far is rate × collected so far,
+ * capped at the quota and never below zero; a month's rebate is what that month adds.
+ * A month of refunds is negative and takes back only rebate that was actually given.
+ */
 export function rebateByMonth(quota: number, rate: number, collectedByMonth: [string, number][]) {
-  let left = quota;
-  return collectedByMonth.map(([month, collected]) => {
-    const rebate = cents(Math.min((collected * rate) / 100, left));
-    left = cents(left - rebate);
-    return { month, rebate, quotaLeft: left };
+  let collected = 0;
+  let given = 0;
+  return collectedByMonth.map(([month, c]) => {
+    collected += c;
+    const due = cents(Math.max(0, Math.min((collected * rate) / 100, quota)));
+    const rebate = cents(due - given);
+    given = due;
+    return { month, rebate, quotaLeft: cents(quota - due) };
   });
 }
 
@@ -91,14 +111,21 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: { d
   for (const o of src.orders) {
     const row = rows.get(o.dealerId);
     if (!row) continue;
-    const pays = o.payments ?? [];
-    const before = pays.filter((p) => p.paidOn.slice(0, 7) < month).reduce((s, p) => s + Number(p.amount), 0);
-    const through = pays.filter((p) => p.paidOn.slice(0, 7) <= month).reduce((s, p) => s + Number(p.amount), 0);
-    for (const p of pays) {
-      const m = monthly.get(o.dealerId) ?? new Map<string, number>();
-      m.set(p.paidOn, (m.get(p.paidOn) ?? 0) + Number(p.amount));
-      monthly.set(o.dealerId, m);
+    const before = kept(o, (d) => d.slice(0, 7) < month);
+    const through = kept(o, (d) => d.slice(0, 7) <= month);
+    // Day by day, what this order adds to the dealer's collections: the rise in
+    // what HQ kept, so a refund is a fall and the order never goes below zero.
+    // ponytail: a refund of money paid before a quota's startsOn still lowers
+    // collections after it; rebateByMonth stops the total going below zero.
+    const m = monthly.get(o.dealerId) ?? new Map<string, number>();
+    const days = [...new Set([...(o.payments ?? []), ...(o.refunds ?? [])].map((x) => x.paidOn))].sort();
+    let prev = 0;
+    for (const day of days) {
+      const k = kept(o, (d) => d <= day);
+      m.set(day, (m.get(day) ?? 0) + k - prev);
+      prev = k;
     }
+    monthly.set(o.dealerId, m);
     if (filter.outletId && o.outletId !== filter.outletId) continue;
     const now = orderCommission(o, rateOf, through);
     row.earned += now.earned - orderCommission(o, rateOf, before).earned;
