@@ -1038,23 +1038,26 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
-### Showroom document names — owner instruction 2026-09-28
+### Showroom document names and supplier note — owner ruling 2026-09-28
 
-Use full document names in explanatory copy and action context: `Display Request`,
-`Consignment Order`, `Consignment Return`, `Consignment Sale Notice`. Do not substitute bare
-`DR`, `CO`, `CRTN` or `CSN` as names the operator must decode. Keep the existing plural navigation
-labels and official document-number prefixes unchanged; this does not rename identifiers,
-numbering, stored fields or previously governed column labels. In owner discussions, give the
-full English name with a Chinese explanation when useful; this does not change Portal language.
+**APPROVED TARGET / NOT BUILT.** Staff-facing names: `Display Request`, `Consignment Note`,
+`Consignment Sale Notice`; plural destinations: `Display Requests`, `Consignment Notes`,
+`Consignment Sale Notices`. Use full names in explanatory copy and actions, not bare DR/CO/CRTN/CSN.
+Consignment Note is the shared supplier-facing screen/PDF name for placement, return and swap.
+Internal Consignment Order and Consignment Return roles preserve existing source identities and
+number prefixes; these are not separate staff creation choices or target sidebar pages. Historical
+PDF titles and numbers remain as issued. Owner discussion may add Chinese explanations; Portal
+language is unchanged. Purchasing MASTER §§9.9–9.10 own the business mapping.
 
-### Consignment Order document content — owner ruling 2026-09-28
-
-**APPROVED TARGET / NOT BUILT.** `COMING IN` and `GOING BACK` are the combined CO PDF's goods
-section labels (Purchasing MASTER §7.6, §9.9); omit `GOING BACK` for placement without outgoing
-goods. This does not approve a new on-screen card style or an independent return notice for a
-paired swap. The CO PDF prints no price or price total. Supplier quotation versions and Sales
-commercial confirmation remain linked internal records; no zero or invented acceptance wording
-stands in for missing price/confirmation. Actual dates remain separate for the two directions.
+Supplier PDF title: `CONSIGNMENT NOTE`. Direction headings: `COMING IN` and `GOING BACK`.
+Placement prints the first; standalone return prints the second; same-supplier swap prints both
+on one instruction. Omit unused directions. The note is price-free and keeps actual-versus-planned
+quantities/dates/evidence distinct. Neither issuing nor sending the note moves stock. No customer
+invoice or sale-notification title is replaced by this name. No new number family is introduced.
+Shared issue action: `Issue consignment note`; contextual `Issue consignment note to {supplier}`;
+result `Consignment note issued to {supplier}`. Source and permissions remain governed; this is
+not an independent blank-create action. Exact register columns and other new copy remain subject
+to their design closure; no new component/style is admitted by this naming ruling.
 
 ### Purchasing navigation words — owner ruling 2026-08-22
 
@@ -1067,7 +1070,7 @@ do not create a second business status, work queue or source of truth.
 | BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
-| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
+| SHOWROOM pages | `Display Requests` · `Consignment Notes` · `Consignment Sale Notices` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
@@ -1171,7 +1174,7 @@ these copy retirements do not delete business facts or ban their words on other 
 | `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} to confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
-| `Issue consignment order` | `Issue consignment order to {supplier}` | `Issue consignment order` | `Consignment order issued to {supplier}` | `No showroom is waiting for stock.` |
+| `Issue consignment note` | `Issue consignment note to {supplier}` | `Issue consignment note` | `Consignment note issued to {supplier}` | `No consignment notes to issue.` |
 | `Issue purchase return` | `Issue purchase return to {supplier}` | `Issue purchase return` | `Purchase return issued to {supplier}` | `Nothing is going back.` |
 | `Issue repair order` | `Issue repair order to {supplier}` | `Issue repair order` | `Repair order issued to {supplier}` | `Nothing is out for repair.` |
 | `Confirm collection date` | `Call {supplier} — confirm collection date` | `Record collection date` | `Collection date recorded` | `Nobody is waiting to be collected.` |
@@ -4519,12 +4522,12 @@ changes, already written into the list below (built in migration 0576 and the we
 | A cell whose source could not be read | **`Unavailable`** | `0` · a blank · a dash |
 | The three this-month numbers (owner correction 2026-09-26, second round: one month, three numbers, no repetition of the table) | heading **`This month · {Mon YYYY}`** · **`Total Qty`** · **`Delivered`** · **`Not delivered`**; the table's last columns **`Total Qty`** · **`Delivered`** · **`Not delivered`** · **`To buy`** (SO Batch Purchase's word); `Reserved` and `Pending Delivery Qty` do not appear on this view | `Still owed` · `Reserved from stock` · `On purchase orders` · `Still to buy` · `Supplier may be late` · `Arrival not known` · `{n} pieces have no delivery date` (all retired 2026-09-26 — words the owner did not understand) · Demand · Allocated · Covered · Shortage |
 | Its door | **`Open SO Batch Purchase →`** | Buy now · Create PO |
-| The rail groups' titles (owner ruling 2026-09-28: no description under a group) | Order list: `Dealer / Sales Location` · `Customer Delivery Location` · `Date` · `Delivery` · `Obligations` · `Service Cases`; Monthly demand: `Period` · `Dealer / Sales Location` · `Customer Delivery Location` · `Product category`; the two views are the tabs `Order list` · `Monthly demand` | a description line under a title · `View` as a group · `Delivery State / City` (the dictionary word is `Customer Delivery Location`) |
-| The Order list's own rail groups (owner approved 2026-09-22; BUILT 2026-09-28) | `Dealer / Sales Location` · `All dealers` · `Customer Delivery Location` · `All states` · `All cities` · `Date` · `Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date` · `Today` · `This week` · `This month` · `Delivery` · **`Not delivered`** · **`Partially delivered`** · **`Fully delivered`** · `Obligations` · **`Outstanding obligations`** · **`No action required`** · `Service Cases` · **`Has open cases`** · **`Closed cases only`** · **`No cases`**; an unreadable server fact reads **`Could not read what the orders still owe.`** / **`Could not read the Service Cases.`**; an active filter reads `{group}: {value}` (`SO Doc Date: Today`) | `Clear filters` inside the rail · a status word · `Delivered` alone |
+| The rail groups' titles (owner ruling 2026-09-28: no description under a group) | Order list: `Sales Location` · `Customer Delivery Location` · `Delivery` · `Obligations` · `Service Cases` (no `Date` group: a date filters on its own column's ▽, owner ruling 2026-09-28); Monthly demand: `Period` · `Sales Location` · `Customer Delivery Location` · `Product category`; the two views are the tabs `Order list` · `Monthly demand` | a description line under a title · `View` as a group · `Delivery State / City` (the dictionary word is `Customer Delivery Location`) |
+| The Order list's own rail groups (owner approved 2026-09-22; BUILT 2026-09-28) | `Sales Location` · `All sales locations` · `Customer Delivery Location` · `All states` · `All cities` · `Delivery` · **`Not delivered`** · **`Partially delivered`** · **`Fully delivered`** · `Obligations` · **`Outstanding obligations`** · **`No action required`** · `Service Cases` · **`Has open cases`** · **`Closed cases only`** · **`No cases`**; an unreadable server fact reads **`Could not read what the orders still owe.`** / **`Could not read the Service Cases.`**; an active filter reads `{group}: {value}` (`Sales Location: {name}`) | `Dealer / Sales Location` (renamed 2026-09-28) · a `Date` group in the rail · `Clear filters` inside the rail · a status word · `Delivered` alone |
 | The table's one-line heading | **`By month · Customer Requested Delivery Date · {Mon YYYY} – {Mon YYYY}`** and under the table **`Click a month to open its Sales Orders`** · **`Open SO Batch Purchase →`** | a sentence of invented words · a legend |
 | Filtered empty | **`No Sales Orders in these months`** | `No confirmed demand in these months` (retired) · No data · No results |
 | Failed | **`Monthly demand could not be loaded`** + **`Try again`** | an API error string |
-| The Order list rail groups and rows | `Dealer / Sales Location` · `Customer Delivery Location` · `Date` (`Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date`; `All dates` · `Today` · `This week` · `This month` · `Custom`) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations` (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open cases` · `Closed cases only` · `No cases`) | Status · Stage · Progress |
+| The Order list rail groups and rows | `Sales Location` · `Customer Delivery Location` · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations` (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open cases` · `Closed cases only` · `No cases`) | Status · Stage · Progress |
 
 The 2026-09-22 ruling's `Today` / `This week` / `This month` are the names of RANGE CHOICES in a select,
 which the NO RELATIVE DATE WORDS rule permits; a printed date is still `fmtDate`.

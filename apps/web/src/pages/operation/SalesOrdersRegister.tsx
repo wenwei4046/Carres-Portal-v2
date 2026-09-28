@@ -58,7 +58,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   DataGrid,
-  dateMatchesPreset,
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
@@ -400,7 +399,10 @@ function useNarrowCanvas(): [(node: HTMLDivElement | null) => void, boolean] {
 const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"] as const;
 /* The Order list's own rail (Orders MASTER §Left rail, owner approved
    2026-09-22). Read-only FACT filters: none is a status or a work queue. */
-const LIST_PARAMS = ["dealer", "state", "city", "date", "range", "delivery", "obligations", "cases", "requested"] as const;
+/* No Date group (Jess, 2026-09-28): a date is narrowed on its own column's ▽
+   (Today · This week · This month · From/To), so the rail carries no second
+   date filter and no field picker. */
+const LIST_PARAMS = ["dealer", "state", "city", "delivery", "obligations", "cases", "requested"] as const;
 const LIST_OBLIGATIONS = [
   { key: "outstanding", label: "Outstanding obligations" },
   { key: "none", label: "No action required" },
@@ -412,20 +414,6 @@ const LIST_CASES = [
   { key: "none", label: "No cases" },
 ] as const;
 type ListCases = (typeof LIST_CASES)[number]["key"];
-const LIST_DATE_FIELDS = [
-  { key: "proceed", label: "Proceed Date" },
-  { key: "doc", label: "SO Doc Date" },
-  { key: "requested", label: "Customer Requested Delivery Date" },
-] as const;
-type ListDateField = (typeof LIST_DATE_FIELDS)[number]["key"];
-const LIST_RANGES = [
-  { key: "today", label: "Today" },
-  { key: "thisWeek", label: "This week" },
-  { key: "thisMonth", label: "This month" },
-] as const;
-type ListRange = (typeof LIST_RANGES)[number]["key"];
-const listDateOf = (r: RegisterRow, field: ListDateField): string | null =>
-  field === "doc" ? r.ordered : field === "requested" ? r.customerDelivery : r.proceeded;
 const distinctWords = (values: Iterable<string | null | undefined>) =>
   [...new Set([...values].map((v) => v?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b));
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -769,11 +757,6 @@ export default function SalesOrdersRegister() {
   const listDealer = monthly ? null : urlParams.get("dealer");
   const listState = monthly ? null : urlParams.get("state");
   const listCity = monthly ? null : urlParams.get("city");
-  const listDateField: ListDateField =
-    LIST_DATE_FIELDS.find((f) => f.key === urlParams.get("date"))?.key ?? "proceed";
-  const listRange: ListRange | null = monthly
-    ? null
-    : LIST_RANGES.find((r) => r.key === urlParams.get("range"))?.key ?? null;
   const listDelivery: RegisterDeliveryCondition | null = monthly
     ? null
     : REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === urlParams.get("delivery"))?.key ?? null;
@@ -868,7 +851,6 @@ export default function SalesOrdersRegister() {
         .filter((r) => !listDealer || salesLocationOf(r.o) === listDealer)
         .filter((r) => !listState || r.o.customer_address_state?.trim() === listState)
         .filter((r) => !listCity || r.o.customer_address_city?.trim() === listCity)
-        .filter((r) => !listRange || dateMatchesPreset(listDateOf(r, listDateField), listRange))
         .filter(
           (r) =>
             !listDelivery ||
@@ -879,24 +861,18 @@ export default function SalesOrdersRegister() {
         .filter((r) => !listCases || registerFacts?.[r.id]?.cases === listCases)
         .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listRange, listDateField, listDelivery, listObligations, listCases, registerFacts],
+    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listDelivery, listObligations, listCases, registerFacts],
   );
   const activeConditions = useMemo(() => {
-    const dateLabel = LIST_DATE_FIELDS.find((f) => f.key === listDateField)!.label;
     const list = [
       requested && {
         key: "requested",
         label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
         onClear: () => setParam("requested", null),
       },
-      listDealer && { key: "dealer", label: `Dealer / Sales Location: ${listDealer}`, onClear: () => setParam("dealer", null) },
+      listDealer && { key: "dealer", label: `Sales Location: ${listDealer}`, onClear: () => setParam("dealer", null) },
       listState && { key: "state", label: `State: ${listState}`, onClear: () => chooseListState(null) },
       listCity && { key: "city", label: `City: ${listCity}`, onClear: () => setParam("city", null) },
-      listRange && {
-        key: "range",
-        label: `${dateLabel}: ${LIST_RANGES.find((r) => r.key === listRange)!.label}`,
-        onClear: () => setParam("range", null),
-      },
       listDelivery && {
         key: "delivery",
         label: REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === listDelivery)!.label,
@@ -915,7 +891,7 @@ export default function SalesOrdersRegister() {
     ].filter((c): c is { key: string; label: string; onClear: () => void } => Boolean(c));
     return list.length > 0 ? list : undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listRange, listDateField, listDelivery, listObligations, listCases]);
+  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listDelivery, listObligations, listCases]);
   /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
      read (rentals excluded, search not applied), carried on every list answer,
      so a search answered before any unsearched load still has it and a created
@@ -1016,8 +992,10 @@ export default function SalesOrdersRegister() {
       ariaLabel="Sales Orders filters"
       onHide={() => setRailOpen(false)}
       header={(
-        <div className="pr-8">
-          {/* Two views of the same orders: a tab bar, not a collapsible group. */}
+        /* Two views of the same orders: a tab bar, not a collapsible group.
+           Edge to edge on the rail's own divider, so there is ONE line and the
+           active underline sits on it (the bar's line overlays the region's). */
+        <div className="-mx-3 -mb-[13px] -mt-3 pl-2 pr-11 [&_[data-kit=tab]]:whitespace-nowrap">
           <Tabs
             fill
             label="Sales Orders view"
@@ -1033,7 +1011,9 @@ export default function SalesOrdersRegister() {
     >
       {monthly ? (
         <>
-          <FilterRailGroup title="Period" icon="date">
+          {/* The window is printed in the group and on the table's own heading; a
+              bare month count (`1`) on the header said nothing (Jess, 2026-09-28). */}
+          <FilterRailGroup title="Period" icon="date" chosen={null}>
             <RailFieldWords label="Starting month" />
             <FilterRailSelect
               label="Starting month"
@@ -1058,14 +1038,14 @@ export default function SalesOrdersRegister() {
                 : `${fmtMonth(demandWindow.first)} to ${fmtMonth(demandWindow.last)}`}
             </p>
           </FilterRailGroup>
-          <FilterRailGroup title="Dealer / Sales Location" icon="people">
+          <FilterRailGroup title="Sales Location" icon="people">
             <FilterRailSelect
-              label="Dealer / Sales Location"
+              label="Sales Location"
               value={dealer}
               options={[...new Set([...(demandView?.choices.salesLocations ?? []), ...(dealer ? [dealer] : [])])].map((name) => ({ value: name, label: name }))}
               onChange={(next) => setParam("dealer", next)}
               testId="monthly-demand-dealer"
-              allLabel="All dealers"
+              allLabel="All sales locations"
             />
           </FilterRailGroup>
           <FilterRailGroup title="Customer Delivery Location" icon="delivery">
@@ -1101,14 +1081,14 @@ export default function SalesOrdersRegister() {
         </>
       ) : (
         <>
-          <FilterRailGroup title="Dealer / Sales Location" icon="people">
+          <FilterRailGroup title="Sales Location" icon="people">
             <FilterRailSelect
-              label="Dealer / Sales Location"
+              label="Sales Location"
               value={listDealer}
               options={distinctWords([...all.map((r) => salesLocationOf(r.o)), listDealer]).map((name) => ({ value: name, label: name }))}
               onChange={(next) => setParam("dealer", next)}
               testId="sales-orders-rail-dealer"
-              allLabel="All dealers"
+              allLabel="All sales locations"
             />
           </FilterRailGroup>
           <FilterRailGroup title="Customer Delivery Location" icon="delivery">
@@ -1135,25 +1115,6 @@ export default function SalesOrdersRegister() {
               testId="sales-orders-rail-city"
               allLabel="All cities"
             />
-          </FilterRailGroup>
-          <FilterRailGroup title="Date" icon="date">
-            <FilterRailSelect
-              label="Date"
-              value={listDateField === "proceed" ? null : listDateField}
-              options={LIST_DATE_FIELDS.filter((f) => f.key !== "proceed").map((f) => ({ value: f.key, label: f.label }))}
-              onChange={(next) => setParam("date", next)}
-              testId="sales-orders-rail-date-field"
-              allLabel="Proceed Date"
-            />
-            {LIST_RANGES.map((r) => (
-              <FilterRailRow
-                key={r.key}
-                label={r.label}
-                active={listRange === r.key}
-                testId={`sales-orders-rail-range-${r.key}`}
-                onClick={() => toggleParam("range", r.key)}
-              />
-            ))}
           </FilterRailGroup>
           <FilterRailGroup title="Delivery" icon="goods">
             {REGISTER_DELIVERY_CONDITIONS.map((c) => (
