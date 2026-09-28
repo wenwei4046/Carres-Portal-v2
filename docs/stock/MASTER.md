@@ -282,6 +282,14 @@ only before collection, leaving Units at origin. After collection, cancel cannot
 back; a governed return or redirect journey records the next handover while `Who has it` continues
 to state the actual current holder.
 
+**SHOWROOM TRANSPORT COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+For display moves without a Sales Order, Delivery Duty coordinates transport under Delivery
+MASTER §13.1 and Workspace's shared owner/cover rules. PO Duty retains supplier commitments.
+This is coordination only: Stock retains the Transfer and custody facts, and physical handlers
+retain their evidence/permission requirements. No fake Sales Order, new Stock owner list or
+automatic assignment to the request recorder. Missing assignment and action-admission gaps remain
+explicit; this ruling is not proof that the Transfer/Work target is implemented.
+
 The requesting module explains why the movement is needed. Stock owns the Transfer and Unit-holder
 truth; origin operator, NETS Delivery and destination operator own their own physical evidence. The
 COO handles only major unexplained difference/Adjustment. No one changes location through a status

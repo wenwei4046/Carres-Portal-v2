@@ -1688,8 +1688,9 @@ numbers are entered by a manager in this surface, never typed into code.
 Per-DO dates, partner, ETA, single-event handling, personal Columns and personal Saved Views are
 not Settings. Historical objects retain the rule and version in force when their event occurred.
 Delivery Settings stores only the `delivery_charge_approver` Duty key used by its approval action.
-Routine Delivery ownership reads the Sales Order PIC; `delivery_duty` is retained only as the
-explicit no-PIC fallback through `Workspace → Staff & Duties`.
+Routine customer Delivery ownership reads the Sales Order PIC; `delivery_duty` serves the
+explicit no-PIC fallback and no-Sales-Order display transport coordination (§13.1), through
+`Workspace → Staff & Duties`.
 
 ## 12 · Reports
 
@@ -1734,7 +1735,7 @@ Order PIC remains the normal owner in Team Work and history. A shared or manager
 authorised evidence but never becomes the order owner; managers are never dealt orders. A formal
 handover changes the Sales Order PIC and its append-only responsibility evidence together.
 
-Delivery Duty is no longer the routine owner. It is used only when the Sales Order has no PIC so
+For customer-order work, Delivery Duty is not the routine owner. It is used when the Sales Order has no PIC so
 the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody holds
 Delivery Duty.` with `Set the holder in Workspace → Staff & Duties`. Once a PIC exists, every open
 and future routine Delivery action resolves to that PIC and cover. Governed delivery-charge
@@ -1745,6 +1746,16 @@ remain named in §15.1.
 This replaces the 2026-09-13 routine Delivery Duty ruling. The PIC sweep shares orders between
 Shasha and Yu Jun at roughly 50/50; the former single-Duty rule left 101 routine Delivery actions
 unowned in production.
+
+**DISPLAY TRANSPORT WITHOUT A SALES ORDER — APPROVED TARGET / NOT BUILT; Jess,
+2026-09-28.** Delivery Duty coordinates transport company, contacts and movement dates for a
+Showroom display arrangement without a Sales Order (Purchasing MASTER §9.13). Resolve the active
+holder and cover through Workspace; do not create a customer order or reuse an unrelated order's
+PIC. Supplier commitments/documents remain with PO Duty; Stock owns Site-to-Site Transfer and
+custody, and actual handlers/receivers own physical evidence. Duty coordination neither completes
+those facts nor grants their permissions. Missing holder or date remains explicit. Existing
+customer-order routing remains PIC-first. Detailed Work admission and non-customer journey
+presentation still need their governing contracts before implementation.
 
 ### 13.2 · Permissions
 

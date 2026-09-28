@@ -5673,8 +5673,7 @@ snapshot, so these are separate observations. This audit is not responsive/visua
   36 imported records: the broad display filter is not an exact PJ selector. Stock §12.9 owns
   the 36-row test-import/incorrect ownership caveat. No new count or ownership backfill approved.
 - **REAL GAP / CONTRADICTION:** detailed document amendment controls and post-sale commercial reversal;
-  commercial successor routing when the original Sales person is inactive; no-Sales-Order movement
-  coordination admission; opening-stock provenance and display-set/individual-Unit reconciliation;
+  admission of approved Sales-successor and no-Sales-Order Delivery Duty action rules (§9.13); opening-stock provenance and display-set/individual-Unit reconciliation;
   exact Showroom UI/copy and Work rules. Existing generic controls resolve many mechanics but not
   all domain consequences below.
 
@@ -5714,9 +5713,9 @@ The Oracle distinction is a research lesson, not financial advice or adopted pos
 | Direct showroom receipt / label / wrong or short goods | Stock/Receiving target; delivery proof incomplete | One Receiving engine, exact issued identities, receiver label rule, observable outcomes/claim evidence. Source page must not require supplier-applied labels; physical rollout needs receiving-side identity proof |
 | Goods already arrive without formal instruction | Real exception gap | Record physical observation and source-resolution work, not invented prior sending/arrival dates or freely available stock. Formal acceptance must use existing controlled Receiving authority |
 | Old/new goods either direction first | Approved independent facts | Separate collection and arrival dates/parties; one side never implicitly completes the other; partial quantity keeps remaining work |
-| No Sales Order transport coordinator | Work admission gap | Recommend existing operational duty-backed responsibility for the arrangement, exact logistics party/contact for execution; do not fabricate customer Sales Order or inherit unrelated customer PIC. Confirm compatible existing Duty scope before naming a new one |
+| No Sales Order transport coordinator | Owner rule approved §9.13; Work admission not built | Delivery Duty coordinates transport; PO Duty retains supplier work. Exact logistics party/contact and physical evidence remain distinct; no fabricated Sales Order or unrelated PIC |
 | Quotation, cost change, transport charge | Price/recording resolved; liability unresolved | Preserve evidence and accepted version; no automatic Catalog overwrite. Missing price does not stop agreed consignments. Who pays exceptional transport/damage and approval for any resulting expense must follow Finance/commercial authority, not guessed defaults |
-| Sales absence / departure | Workspace active-person/cover rule; successor gap | Preserve original negotiator in history; route today's work through governed cover/reassignment. No inactive recipient or generic WhatsApp hunt; no self-appointed replacement |
+| Sales absence / departure | Successor rule approved §9.13; assignment action admission remains | Preserve original negotiator; authorised management designates active Sales successor on permanent departure. Temporary absence uses cover. No inactive recipient, automatic Operation takeover or self-appointed replacement |
 | Sending, revision, missing contact | Shared communication authority | Record exact version/channel/recipient/actor; mark is sending declaration, not supplier acceptance. Check external conversation before resending a missing mark; no duplicate send block |
 | Customer sale / partial failure / retry | Resolved §§7.7,9.11; Delivery MASTER §6 | Auto-notice only successful exact supplier-owned Units per supplier/delivery visit; retry deduplicates; pending/failed Units excluded |
 | Customer returns after sale notice | Real cross-module policy gap | Service owns customer remedy, Stock actual return/inspection, Purchasing corrected supplier communication, Finance invoice/credit consequence. Preserve original notice; do not assume return automatically restores consignment ownership or cancels supplier liability |
@@ -5791,13 +5790,17 @@ confirmed holder, including partial collection/arrival. Consignment instructions
 incoming/outgoing dates and follow governed document revision/sending rules. These existing
 constraints need no fresh owner approval.
 
-#### Recommended Carres Showroom Blueprint — complete review proposal
+### 9.13 Showroom Blueprint — approved operating model and remaining design closure
 
-**PROPOSAL / NOT LAW, 2026-09-28.** This is the integrated owner-review recommendation for the
-Showroom domain. Approved rules in §§9.8–9.11 remain authoritative; recommendations below fill
-composition and unresolved boundaries without silently approving them. The reference capability
-matrix and lifecycle audit above supply the evidence, not a second set of laws. No Card, build,
-external cutover or PLAN MISSION COMPLETE follows from writing this proposal.
+**OPERATING MODEL APPROVED / TARGET NOT BUILT; Jess, 2026-09-28.** Owner approved the
+integrated operating journey presented for review and the two assignment rulings below: Delivery
+Duty coordinates display transport without a Sales Order, and authorised management designates a
+Sales successor for a departed negotiator. §§9.8–9.11 remain the detailed business authority.
+Register/object copy and exact composition, the existing Consignment Note mapping, verified
+opening/set identity and Finance matching/ownership details remain closure items, not implicitly
+approved by this operating-model acceptance. Section 3's detailed UI and section 6's detailed
+Finance recommendations remain PROPOSAL / NOT LAW where not already governed. The preceding
+research matrix is evidence. No Card, application build, cutover or PLAN MISSION COMPLETE is authorised.
 
 **Current → problem → recommendation → trade-off.** Current Stock has Site/Unit/ownership facts,
 and source inspection still finds the four Showroom destinations marked `soon: true`. Staff's
@@ -5916,22 +5919,24 @@ arrangements, PO Duty owns supplier-document/follow-up actions, GRN Duty/eligibl
 own receipt actions, physical handlers own their evidence, and Finance owns invoice/credit/payment.
 Workspace resolves active people and dated covers. No arrangement gains one universal owner.
 
-**New recommendation requiring owner review:** let the existing Delivery Duty coordinate display
-transport when no Sales Order exists. This extends its current fallback boundary; it is not already
-law. The alternative is extending PO Duty to own transport coordination as well as supplier work.
-Recommend Delivery Duty because carrier/date coordination belongs to Delivery while PO Duty retains
-supplier commitments. Existing customer transport stays with its Sales Order PIC; no fake order,
-new roster or automatic assignment to the recording person. Warehouse/Delivery and Workspace must
-admit the resulting action contract before it is considered usable. A missing eligible holder stays
-visible; never silently select a staff member.
+**NO-SALES-ORDER DISPLAY TRANSPORT — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Existing Delivery Duty coordinates carrier/date/contact arrangements for display transport that
+has no Sales Order, through the Shared Duty Resolver and governed cover. PO Duty retains supplier
+commitments and documents. Routine customer transport remains with its Sales Order PIC. Do not
+create a fake Sales Order, new roster or automatic assignment to the request recorder. This
+coordination role does not grant Stock/Receiving/physical-handover write permissions. Warehouse,
+Delivery and Workspace retain their owning action and admission contracts; unknown dates and
+missing eligible holders stay visible. Delivery MASTER §13.1 and Workspace MASTER §4 carry the
+same assignment boundary. This is an approved role rule, not proof of implemented Work admission.
 
-**New recommendation requiring owner review:** when the original negotiating Sales person leaves
-permanently, authorised management designates an active Sales successor for unresolved commercial
-work with reason/effective date. Preserve the original negotiator and historical actor; temporary
-absence uses existing governed cover. The alternative is management retaining those commercial
-follow-ups itself. Recommend a Sales successor to preserve commercial responsibility without
-turning Operation into the negotiator. This requires an admitted person-assignment rule; no local
-Showroom rota or invented manager role.
+**DEPARTED SALES NEGOTIATOR — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Authorised
+management designates an active Sales successor for unresolved commercial follow-up when the
+original negotiating Sales person leaves permanently, recording reason/effective date and actual
+assigner. Retain the original negotiator and historical actors as separate facts. Temporary
+absence follows governed cover, and a missing successor remains an explicit assignment gap;
+Operation never inherits negotiation or acceptance authority. Workspace owns the person-assignment
+contract; no Showroom-local rota, invented manager role or self-assignment bypass. This ruling
+does not grant additional price, Catalog or approval permissions.
 
 Settings remains distributed by ownership: Warehouse Sites/addresses, Catalog products/suppliers
 and identity mode, supplier contacts/terms in their existing authority, Workspace Staff & Duties,
@@ -5970,12 +5975,12 @@ This is acceptance intent only: no rendered Showroom mockup or responsive valida
 for this proposal, so no visual score or production readiness is claimed. New words/components
 need their existing governance; do not implement a local substitute.
 
-Whole-domain scope now has an integrated proposal plus the research/lifecycle matrix above.
-Owner review must address the two assignment recommendations and the complete operating journey.
-Exact register/object copy/composition, current Consignment Note purpose, Finance matching/ownership
-consequences and verified opening/set identity remain explicit closure items. These are not new
-serial questionnaire prompts or permission to hand incomplete truth to build. The planner must
-close applicable authority/design gaps and persist the reviewed result before PLAN MISSION COMPLETE.
+The integrated operating journey and the two assignment rules have owner approval. Exact
+register/object copy/composition, current Consignment Note purpose, Finance matching/ownership
+consequences and verified opening/set identity remain explicit closure items. The planner owns
+further authority/design checking; these are not permission to hand incomplete truth to build.
+Persist the remaining reviewed result before PLAN MISSION COMPLETE. No rendered UI, complete
+Finance integration or production migration is certified by this approval.
 
 ---
 

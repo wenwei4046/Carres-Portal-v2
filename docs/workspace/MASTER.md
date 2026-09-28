@@ -127,17 +127,31 @@ person calendar with the module calendar for the resolved actor; Staff & Duties 
 but does not become a second People calendar editor.
 
 Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing Approver, Delivery
-Charge Approver, Stock Adjustment Approver, Service Case Approver and the fallback-only Delivery
-Duty. There is no fake `ERP Owner`.
+Charge Approver, Stock Adjustment Approver, Service Case Approver and Delivery Duty
+(customer-order fallback and no-Sales-Order display transport coordination). There is no fake `ERP Owner`.
 
 **Routine Delivery work belongs to the Sales Order's PIC** (owner ruling 2026-09-17). When an
 order enters Operations, `ops_order_control.assigned_staff` names the one normal owner for its
 order, customer, delivery and ordinary collection work. The Work Engine routes today's action to
 that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
-Duty is no longer the routine owner. It remains only the explicit fallback when a Sales Order has
-no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
+Duty is not the routine customer-order owner. For customer-order work it is the explicit fallback
+when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
 and `Set the holder in Workspace → Staff & Duties`. Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
+
+**SHOWROOM ASSIGNMENTS — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** For display
+transport without a Sales Order, Delivery Duty owns transport coordination under Delivery MASTER
+§13.1; existing Shared Duty Resolver, active-person and dated-cover rules apply. Supplier work
+stays PO Duty, and physical actions keep their own permissions/completion. No fake Sales Order,
+local roster or request-recorder assignment is introduced. Missing eligible holder remains visible.
+This does not change PIC-first customer work or prove that the new action is admitted/built.
+
+For unresolved Showroom commercial work whose original Sales negotiator permanently departs,
+authorised management designates an active Sales successor with assigner, reason and effective
+date. Preserve original negotiator and previous actors; temporary absence uses governed cover.
+Workspace owns the assignment contract; Purchasing reads it and retains commercial evidence.
+Do not silently route it to Operation or grant Catalog/price/approval powers. The exact governing
+person-assignment action remains to be admitted before build; no local Showroom staff list.
 
 **Reason for the ruling:** the PIC sweep shares open orders between the two active operators,
 Shasha and Yu Jun, at roughly 50/50. A single Delivery Duty instead left 101 routine Delivery
