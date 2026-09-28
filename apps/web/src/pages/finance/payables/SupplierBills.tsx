@@ -114,7 +114,7 @@ function BillRegister() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="bills-destination-header" word="Bills" docTitle="Bills — Carres" />
+      <ModuleHeader destinationHeader testId="bills-destination-header" word="Bills" docTitle="Bills · Carres" />
       {query.isError ? <ReadFailed what="Bills" onRetry={() => void query.refetch()} /> : (
         <ListPageShell register>
           <DataGrid
@@ -178,7 +178,7 @@ function BillDetail() {
   if (query.isError) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <ModuleHeader destinationHeader testId="bills-destination-header" word="Bills" docTitle="Bills — Carres" />
+        <ModuleHeader destinationHeader testId="bills-destination-header" word="Bills" docTitle="Bills · Carres" />
         <ReadFailed what="This bill" onRetry={() => void query.refetch()} />
       </div>
     );
@@ -203,7 +203,7 @@ function BillDetail() {
         customer={b.supplier_name}
         backTo="/finance/bills"
         backLabel="Bills"
-        docTitle={`${b.bill_no ?? "Draft bill"} — Carres`}
+        docTitle={`${b.bill_no ?? "Draft bill"} · Carres`}
         status={<span data-testid="bill-status">{word(BILL_STATUS_WORD, b.status)}</span>}
         right={
           <span className="flex items-center gap-2">
@@ -231,7 +231,7 @@ function BillDetail() {
             <FactRow label="Unpaid">{b.status === "confirmed" ? money(doc.unpaid) : "Not confirmed"}</FactRow>
             {b.narration && <FactRow label="Note">{b.narration}</FactRow>}
             <FactRow label="Ledger entry">
-              {b.entry_no ?? "None yet — confirming the bill makes it"}
+              {b.entry_no ?? "None yet. Confirming the bill makes it"}
               {b.reversal_entry_no ? ` · reversed by ${b.reversal_entry_no}` : ""}
             </FactRow>
             {b.status === "cancelled" && (

@@ -84,7 +84,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
       lines: multi,
     });
     expect(t).toContain(
-      "Following up on your order — the balance below is still outstanding.",
+      "Following up on your order.\nThe balance below is still outstanding.",
     );
     expect(t).toContain("REF: CR0902\nOutstanding: RM 1,749");
     expect(t).toContain(
@@ -110,7 +110,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
       when: "tomorrow",
     });
     expect(t).toContain(
-      "Final reminder — your delivery is arranged for tomorrow and the balance below is still outstanding.",
+      "Final reminder.\nYour delivery is arranged for tomorrow and the balance below is still outstanding.",
     );
     expect(t).toContain("REF: CR0902\nOutstanding: RM 1,749");
     expect(t).toContain(
@@ -151,7 +151,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(r).toContain("Friendly reminder");
     expect(r).not.toContain("overdue");
     expect(c).toContain("the deadline has passed");
-    expect(c).toContain("Deadline: 6 Jul 26 — overdue");
+    expect(c).toContain("Deadline: 6 Jul 26 (overdue)");
   });
 
   it("supplier Reminder + Chase — PO-led, never SO", () => {
@@ -210,7 +210,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     }
     // The overdue delivery is tagged only on that block.
     expect(r).toContain("by 6 Jul 26\n");
-    expect(c).toContain("by 2 Jul 26 — overdue");
+    expect(c).toContain("by 2 Jul 26 (overdue)");
     expect(r).toContain("please confirm the delivery date");
     expect(c).toContain("following up");
   });

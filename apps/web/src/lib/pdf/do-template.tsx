@@ -433,10 +433,10 @@ export function DoTemplate(data: DoTemplateData) {
                 </Text>
               ) : null}
               <View style={styles.desc}>
-                <Text style={styles.descMain}>{setName(modules)} — 1 set · {modules.length} modules</Text>
+                <Text style={styles.descMain}>{setName(modules)} · 1 set · {modules.length} modules</Text>
                 {modules.map((m, mi) => (
                   <Text key={mi} style={styles.descSub}>
-                    · {moduleCodeOf(m)} — {moduleSpec(m)}
+                    · {moduleCodeOf(m)}: {moduleSpec(m)}
                   </Text>
                 ))}
               </View>

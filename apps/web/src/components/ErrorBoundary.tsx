@@ -78,7 +78,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             This page hit a problem
           </h1>
           <p className="text-body text-muted-foreground mt-2 leading-relaxed">
-            Nothing you just did was lost — anything already saved is safe. Try again, and if
+            Nothing you just did was lost. Anything already saved is safe. Try again, and if
             it keeps happening, send this screen to the team.
           </p>
 

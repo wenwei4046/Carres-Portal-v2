@@ -84,7 +84,7 @@ describe("InvoiceCalendar view", () => {
   });
   it("shows one fixed workweek with the highlighted SO", () => {
     show();
-    expect(screen.getByTestId("calendar-week-word")).toHaveTextContent("Mon, 14 Sep – Sun, 20 Sep");
+    expect(screen.getByTestId("calendar-week-word")).toHaveTextContent("Mon, 14 Sep to Sun, 20 Sep");
     const highlight = screen.getByTestId("calendar-highlight");
     expect(highlight).toHaveTextContent("SO-1319");
     expect(highlight).toHaveTextContent("Customer Delivery · selected");

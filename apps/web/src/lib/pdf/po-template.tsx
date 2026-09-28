@@ -434,7 +434,10 @@ export function PoTemplate(data: PoTemplateData) {
             </View>
             <View style={styles.bUnit}>
               {missingUnits ? (
-                <Text style={styles.unitWarn}>Unit IDs missing on this line — do not send this PO</Text>
+                <>
+                  <Text style={styles.unitWarn}>Unit IDs missing on this line.</Text>
+                  <Text style={styles.unitWarn}>Do not send this PO.</Text>
+                </>
               ) : runs.length === 0 ? (
                 <Text style={styles.cell}> </Text>
               ) : (
@@ -449,7 +452,7 @@ export function PoTemplate(data: PoTemplateData) {
             <View style={styles.bDesc}>
               <Text style={styles.descMain}>
                 {line.sku}
-                {showVariant ? ` — ${line.description}` : ""}
+                {showVariant ? ` · ${line.description}` : ""}
               </Text>
               {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
             </View>

@@ -55,9 +55,9 @@ describe("ageOf / ageBandOf", () => {
   });
   it("bands correctly and returns null for missing/garbage", () => {
     expect(ageBandOf("2005-01-01", AT)).toBe("<25");
-    expect(ageBandOf("1995-01-01", AT)).toBe("25–34");
-    expect(ageBandOf("1985-01-01", AT)).toBe("35–44");
-    expect(ageBandOf("1975-01-01", AT)).toBe("45–54");
+    expect(ageBandOf("1995-01-01", AT)).toBe("25 to 34");
+    expect(ageBandOf("1985-01-01", AT)).toBe("35 to 44");
+    expect(ageBandOf("1975-01-01", AT)).toBe("45 to 54");
     expect(ageBandOf("1960-01-01", AT)).toBe("55+");
     expect(ageBandOf(null, AT)).toBeNull();
     expect(ageBandOf("not-a-date", AT)).toBeNull();

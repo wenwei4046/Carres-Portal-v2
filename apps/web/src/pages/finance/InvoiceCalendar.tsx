@@ -214,7 +214,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
             <button className="btn-secondary" aria-label="Previous week"
               onClick={() => onPickDate(isoAddDays(monday, -7))}>‹ Previous week</button>
             <span className="text-body font-semibold" data-testid="calendar-week-word">
-              {fmtDate(monday)} – {fmtDate(isoAddDays(monday, 6))}
+              {fmtDate(monday)} to {fmtDate(isoAddDays(monday, 6))}
             </span>
             <button className="btn-secondary" aria-label="Next week"
               onClick={() => onPickDate(isoAddDays(monday, 7))}>Next week ›</button>

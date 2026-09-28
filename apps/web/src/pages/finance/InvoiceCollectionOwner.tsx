@@ -112,7 +112,7 @@ function HandoverForm({ orderId, current, onClose }: {
       void qc.invalidateQueries({ queryKey: qk.operation.work() });
       onClose();
     },
-    onError: (e: Error) => toast.error(`The handover was not recorded — ${e.message}`),
+    onError: (e: Error) => toast.error(`The handover was not recorded: ${e.message}`),
   });
   const ready = newOwner !== "" && reason.trim().length >= 3 && effectiveFrom >= appTodayIso();
   return <div className="mt-2 space-y-2" data-testid="collection-owner-handover">

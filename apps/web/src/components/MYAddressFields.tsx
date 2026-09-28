@@ -67,7 +67,7 @@ export default function MYAddressFields({ data, onChange }: Props) {
             onChange={(e) => setState(e.target.value)}
             className={ACTIVE_CLASS}
           >
-            <option value="">— select state —</option>
+            <option value="">Select state</option>
             {MY_STATES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -82,7 +82,7 @@ export default function MYAddressFields({ data, onChange }: Props) {
             disabled={cityDisabled}
             className={cityDisabled ? LOCKED_CLASS : ACTIVE_CLASS}
           >
-            <option value="">{cityDisabled ? "Select state first" : "— select city —"}</option>
+            <option value="">{cityDisabled ? "Select state first" : "Select city"}</option>
             {cities.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -104,7 +104,7 @@ export default function MYAddressFields({ data, onChange }: Props) {
               ? data.addressState
                 ? "Select city first"
                 : "Select state first"
-              : "— select postcode —"}
+              : "Select postcode"}
           </option>
           {postcodes.map((p) => (
             <option key={p} value={p}>
