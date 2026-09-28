@@ -87,7 +87,7 @@ export default function MaintenanceTab({
             pool="bedframe_size"
             variant="size"
             title="Bedframe Sizes"
-            description="Bedframe sizes — code · label · dimensions (e.g. K · 6FT · 183X190CM). Used in generated SKU names; each model's active sizes stay authoritative."
+            description="Bedframe sizes: code · label · dimensions (e.g. K · 6FT · 183X190CM). Used in generated SKU names; each model's active sizes stay authoritative."
             entries={byPool("bedframe_size")}
             isPrincipal={isPrincipal}
           />
@@ -97,7 +97,7 @@ export default function MaintenanceTab({
             pool="mattress_size"
             variant="size"
             title="Mattress Sizes"
-            description="Mattress sizes — code · label · dimensions. Feeds the per-model size picker as curated suggestions."
+            description="Mattress sizes: code · label · dimensions. Feeds the per-model size picker as curated suggestions."
             entries={byPool("mattress_size")}
             isPrincipal={isPrincipal}
           />
@@ -110,7 +110,7 @@ export default function MaintenanceTab({
             pool="supplier_category"
             variant="plain"
             title="Supplier Categories"
-            description="Curated list of the product categories a supplier can cover. Reference only — supplier coverage is still set per supplier."
+            description="Curated list of the product categories a supplier can cover. Reference only. Supplier coverage is still set per supplier."
             entries={byPool("supplier_category")}
             isPrincipal={isPrincipal}
           />
@@ -153,12 +153,12 @@ function SofaCompartmentsSection({
         )}
       </div>
       <p className="text-meta text-base-500 mb-3">
-        The compartment pool (1A(LHF), 1NA, 2A(RHF), …) — a foundation catalog
+        The compartment pool (1A(LHF), 1NA, 2A(RHF), …) is a foundation catalog
         only. A sofa is assembled from these; each sofa model ticks which it
         offers in the Modular tab, and prices live on the per-model compartment
         SKUs in SKU Master (no price here). The photo shows in the sofa
         builder&apos;s cell box.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {adding && isPrincipal && <SofaCompartmentAddForm onDone={() => setAdding(false)} />}

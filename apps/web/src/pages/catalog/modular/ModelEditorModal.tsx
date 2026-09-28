@@ -469,7 +469,7 @@ export default function ModelEditorModal({
                 </div>
                 <p className="text-meta text-base-400 mt-1.5">
                   Ticking a compartment creates its SKU in SKU Master and puts the model
-                  live in POS — set the selling price there (it starts at RM0). Unticking
+                  live in POS. Set the selling price there (it starts at RM0). Unticking
                   hides it from the builder.
                 </p>
               </div>
@@ -611,9 +611,9 @@ export default function ModelEditorModal({
               <div className="text-body font-semibold text-base-900">Activate in POS</div>
               <div className="text-meta text-base-500 mt-0.5">
                 {showInPos
-                  ? "On — sales staff can add this to an order."
-                  : "Off — hidden from the POS catalog."}
-                {liveSkus.length === 0 && " (No SKUs yet — add one in SKU Master first.)"}
+                  ? "On: sales staff can add this to an order."
+                  : "Off: hidden from the POS catalog."}
+                {liveSkus.length === 0 && " (No SKUs yet. Add one in SKU Master first.)"}
               </div>
             </div>
             <button

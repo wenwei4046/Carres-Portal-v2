@@ -61,7 +61,7 @@ export default function OperationCatalogPage() {
               real fault rather than a gap in the explaining — so each one now
               answers its own question on screen instead of in a conversation. */}
           <p className="text-body text-base-600 mt-1">
-            The product list, from the buying side — what each item costs us and who supplies it.
+            The product list, from the buying side: what each item costs us and who supplies it.
             Selling prices are shown for reference; only the Master Admin can change them.
           </p>
         </div>
@@ -71,7 +71,7 @@ export default function OperationCatalogPage() {
       {catalogQ.isLoading && <div className="text-body text-base-500">Loading catalog…</div>}
       {catalogQ.isError && !catalogQ.isLoading && (
         <div className="text-body text-danger">
-          Failed to load the catalog. Try refreshing — your session may have expired.
+          Failed to load the catalog. Try refreshing. Your session may have expired.
         </div>
       )}
 

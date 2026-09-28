@@ -295,7 +295,7 @@ function ManagerCard({ source }: { source: KpiSource }) {
                       manager set
                     </div>
                     <div className="text-meta text-base-500">
-                      Set it on the Team tab — it climbs the chart on its own.
+                      Set it on the Team tab. It climbs the chart on its own.
                     </div>
                   </div>
                 </div>
@@ -590,7 +590,7 @@ export default function HrPerformanceTab({
           </div>
         )}
         <p className="text-meta text-base-500 px-3 py-2 border-t border-base-200">
-          A target is never edited in place — changing it writes a new row from a date
+          A target is never edited in place. Changing it writes a new row from a date
           you choose, so last month keeps the number it was actually judged on. A
           person's own target wins over their store's; with no personal target the
           store's is <b>not</b> split across heads, the person simply reads “no target”.

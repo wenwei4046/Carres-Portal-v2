@@ -86,7 +86,7 @@ export default function OperationFabricCostTab({ catalog }: { catalog: CatalogRe
         {visible.length === 0 && (
           <div className="text-body text-base-500 px-3 py-6 text-center">
             {fabrics.length === 0
-              ? "No fabrics yet — the principal adds them in Product & Maintenance."
+              ? "No fabrics yet. The principal adds them in Product & Maintenance."
               : "No fabrics match the search."}
           </div>
         )}

@@ -211,7 +211,7 @@ export default function GuaranteeScopeFields({
               </select>
               {combos.length === 0 && (
                 <p className="text-meta text-base-500 mt-1">
-                  No combos authored yet — add one under Sofa Combos first.
+                  No combos authored yet. Add one under Sofa Combos first.
                 </p>
               )}
             </label>
