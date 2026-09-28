@@ -346,6 +346,12 @@ monthly PO/GRN rotation. The two duties remain opposite in every month so the pe
 does not receive it. September 2026 is PO Duty = Yu Jun and GRN Duty = Shasha; October reverses.
 Khor Yee retains only historical actor/assignment evidence and receives no current or future Work.
 
+**OWNER CORRECTION 2026-09-28 / APPROVED TARGET / NOT BUILT:** routine allocation follows the
+governed rotation automatically as People eligibility changes; the owner does not maintain monthly
+PO/GRN assignment rows. Workspace §4 owns the one authoritative assignment model. Existing monthly
+rows are not proof of a general joiner/leaver automation. Approval capability, source-owned
+completion and historical actual-actor evidence remain separate.
+
 ### 5.4 Deliver To
 
 The destination comes from the source PO/CO `Supplier Deliver To`. When a new buy needs a default, use the
@@ -3581,7 +3587,11 @@ Warehouse submits count                (or Operation enters goods directly)
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
   into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
   so plainly and the Work card is unassigned; posting is not refused. The manager assigns the
-  holder in `Settings → Staff & Duties`.
+  holder in `Settings → Staff & Duties` only through a governed exception. Owner correction
+  2026-09-28 / APPROVED TARGET / NOT BUILT: routine PO/GRN assignments are maintained automatically
+  from the governed rotation and eligible active People pool (Workspace §4), not manually entered
+  month by month. Automation must establish the authoritative assignment; a page must still never
+  display a recommendation as a recorded holder.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
   formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.

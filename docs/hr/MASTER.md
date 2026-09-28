@@ -77,7 +77,7 @@ against a real session.
   among the remaining active staff, including two-person and one-person operation. Historical actor,
   avatar, receipt, handover, approval and cover evidence remain unchanged. HR/People does not store
   a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
-  `../purchasing/MASTER.md` §2.2 and its one edit door is Settings → Staff & Duties
+  `../purchasing/MASTER.md` §5.3 and its one edit door is Settings → Staff & Duties
   (approved placement / NOT BUILT; Workspace §4).
 - **Checklists are a shared constant, not a config table.**
 - **Departure visibility — owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT:** after
