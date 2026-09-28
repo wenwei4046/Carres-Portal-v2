@@ -3483,7 +3483,8 @@ a control's placeholder is its label's word; a prepared message leaves out a lin
 missing; a range reads `to` (`Mon to Fri`, `09:00 to 17:00`).
 
 **⭐ NO DASH AS A SEPARATOR EITHER — OWNER RULING 2026-09-28 (Jess: *"dash shouldn't have — which we
-use 2 lines if needed or 1 line write clear"*), APPROVED TARGET / NOT BUILT.** A dash never joins two
+use 2 lines if needed or 1 line write clear"*), BUILT 2026-09-28 (#1709).** A select's empty option reads its
+control's label (`Gender`, `Logistics`, `Store`), never `Select` or `Pick ...`. A dash never joins two
 facts or two halves of a sentence on any screen, PDF or prepared message, including words approved
 before this ruling. Two facts become **two lines** where the surface has room for a second line;
 otherwise the text is **rewritten as one clear line** that needs no dash:
