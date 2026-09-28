@@ -5361,9 +5361,8 @@ never RM0. Retain previous quotations and the history of revisions; neither a re
 nor a later Catalog price overwrites the historical arrangement. Reuse the recorded product facts
 for governed Catalog entry rather than asking staff to retype them, without bypassing Catalog's
 write authority. Existing commercial and Manual Purchase approval remains in force.
-This quotation-recording ruling does not settle whether price appears on the supplier-facing CO
-PDF; that presentation/business boundary remains under review. CO operational progression follows
-the price-nonblocking ruling below.
+The supplier-facing CO PDF follows §9.9: no prices; commercial evidence and confirmation remain
+in the linked arrangement. CO operational progression follows the price-nonblocking ruling below.
 No screen labels, new approval role, automatic quotation extraction or application build is
 approved by this ruling.
 
@@ -5378,8 +5377,8 @@ unknown, never RM0. Issuing/sending the CO, receiving the goods or handing back 
 neither accepts an unconfirmed quotation nor creates a payable or price approval. The original
 negotiating Sales person retains the outstanding commercial follow-up until attributable
 confirmation resolves it; operational progress cannot silently mark that follow-up complete.
-Do not include an unconfirmed price as an accepted supplier-document term. Price visibility on
-the CO PDF remains a separate unresolved decision. Existing Carres-purchase MPR/PO approvals
+The CO PDF contains no price, confirmed or unconfirmed (§9.9); commercial evidence stays in the
+linked quotation and Sales confirmation. Existing Carres-purchase MPR/PO approvals
 are unchanged; this ruling is scoped to the consignment arrangement, not a portal-wide bypass.
 
 **CO FACTS AND ROLE-SCOPED WORK — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
@@ -5429,8 +5428,20 @@ Workspace. Existing approvals, custody evidence, permissions and supplier-docume
 **Commercial evidence and Issue:** use the quotation-recording, Sales-confirmation and
 price-nonblocking consignment rules in §9.8. Missing or unconfirmed price does not block
 issuing the CO or arranging its agreed goods movements; commercial follow-up remains separate.
-The supplier-facing PDF price policy remains under review; do not infer it from the absence of
-a payable at receipt or from Catalog's current cost.
+**CO PDF — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** The supplier-facing CO is a goods
+movement instruction and contains no prices, customer selling prices, price totals or settlement
+amounts. Keep the supplier quotation/version and attributable Sales confirmation in linked records
+under §9.8; do not discard them or substitute Catalog's later cost for the historical agreement.
+The PDF carries CO number/date, supplier and showroom; incoming model/specification, quantity,
+issued Unit IDs, destination and confirmed date; outgoing exact Unit IDs/model/quantity, collection
+location and confirmed date where applicable; and confirmed operational instructions. Pure new
+placement omits the outgoing section. Incoming and outgoing dates are separate, with no implied
+same-trip requirement. Unconfirmed dates must not be presented as confirmed. A price-only
+confirmation or quotation revision does not require a new goods instruction when its operational
+content is unchanged. Operational changes still follow governed document revision/sending rules.
+For swaps, the single combined CO remains the external instruction and links the internal CRTN;
+do not automatically attach a second return instruction or an unconfirmed quotation as accepted
+terms. This is the approved document-content boundary, not a completed PDF implementation.
 
 **Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
 no blank `+ New`.

@@ -1038,6 +1038,15 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
+### Consignment Order document content — owner ruling 2026-09-28
+
+**APPROVED TARGET / NOT BUILT.** `COMING IN` and `GOING BACK` are the combined CO PDF's goods
+section labels (Purchasing MASTER §7.6, §9.9); omit `GOING BACK` for placement without outgoing
+goods. This does not approve a new on-screen card style or an independent return notice for a
+paired swap. The CO PDF prints no price or price total. Supplier quotation versions and Sales
+commercial confirmation remain linked internal records; no zero or invented acceptance wording
+stands in for missing price/confirmation. Actual dates remain separate for the two directions.
+
 ### Purchasing navigation words — owner ruling 2026-08-22
 
 These are the exact visible words for the Purchasing sidebar tree. They name doors only; they
