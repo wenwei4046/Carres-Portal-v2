@@ -5529,6 +5529,114 @@ invoice/settlement.
 
 ---
 
+### 9.12 Showroom completeness audit and recommended completion — 2026-09-28
+
+**FACT / RESEARCH + PROPOSAL / NOT LAW.** This is the current whole-domain completeness audit,
+not an approved replacement for §§9.8–9.11, a build Card or PLAN MISSION COMPLETE. User requested
+proactive omissions research before further local approvals. Measured Carres source snapshot:
+`6182980aa82c1a825045558add40c6c7f5897f1e`. Local 2990 checkout HEAD:
+`a600b8d7417120d25bbd021820fc6b3ec4f92081`; inspected working-tree source, not a certified 2990
+production deployment. Authenticated Carres read-only browser inspection on 2026-09-28 confirmed
+the four Purchasing SHOWROOM destinations still say Coming soon. No production transaction or
+configuration was changed. The live page SHA was not independently verified against the source
+snapshot, so these are separate observations. This audit is not responsive/visual acceptance.
+
+#### Authority resolution and measured boundaries
+
+- **RESOLVED FROM AUTHORITY:** §§9.8–9.11 handoff, proxy entry, Sales price responsibility,
+  Operation quotation transcription, nonblocking consignment price, price-free CO PDF, exact
+  outgoing Units, one combined swap instruction, independent physical/commercial completion,
+  successful-delivery-only sale notice and privacy. Do not re-ask these.
+- **APPROVED TARGET / NOT BUILT:** source-linked Display Request and formal consignment objects;
+  embedded owner-module actions; full physical handover/receiving integration and sale-notice
+  generation/correction. `portal-nav.ts:402–405` still marks all four pages soon. A legal ownership
+  enum and a PO consignment flag are not these complete objects.
+- **BUILT / VERIFIED (bounded):** source supports `supplier_consignment` and supplier identity;
+  `warehouse-receipts.ts:1095–1100` still resolves `purchase_orders` through the receipt's PO id
+  and reads `is_consignment`; migration 0570 refuses payable billing of a consignment receipt.
+  Live Inventory can select Showroom Display and shows actual PJ rows (including U1-000-321 and
+  U1-000-297) plus older Carres Klang display rows. Its Showroom Display count was 102, not PJ's
+  36 imported records: the broad display filter is not an exact PJ selector. Stock §12.9 owns
+  the 36-row test-import/incorrect ownership caveat. No new count or ownership backfill approved.
+- **REAL GAP / CONTRADICTION:** detailed amendment/cancellation and post-sale commercial reversal;
+  commercial successor routing when the original Sales person is inactive; no-Sales-Order movement
+  coordination admission; opening-stock provenance and display-set/individual-Unit reconciliation;
+  exact Showroom UI/copy and Work rules. Existing generic controls resolve many mechanics but not
+  all domain consequences below.
+
+#### Reference-to-Carres capability matrix
+
+| Reference capability and inspected evidence | Carres owner/current equivalent | Disposition and dependency |
+|---|---|---|
+| 2990 supplier-side Purchase Consignment Order, linked receives/returns; `apps/api/src/routes/purchase-consignment-orders.ts` | Purchasing and Receiving; formal Carres Consignment Order not built | ADAPT source/child links and ordered/received/remaining facts; no blank Carres order creation |
+| 2990 shared PO PDF renderer with `docTitle: PURCHASE CONSIGNMENT ORDER`; `PurchaseConsignmentOrderDetail.tsx:307–311` | Shared document kit | COPY PRINCIPLE, NOT READY for direct migration: Carres's combined incoming/outgoing layout and price exclusion differ |
+| 2990 separate supplier-side route/tables; create/edit line/cancel/delete operations | Shared Carres source-owned document/receipt capabilities | REJECT cloned business writers; sharing a PDF does not prove one common transaction engine |
+| 2990 receive/return remaining-quantity guards and downstream edit lock; `purchase-consignment-receives.ts:270–380` | Receiving/Stock exact Units | ADAPT prevent over-receipt/over-return and inspect downstream effects; Carres amendments preserve actual receipt history |
+| 2990 return creation books inventory OUT and cancellation reconciles it back; `purchase-consignment-returns.ts:1–65` | Stock physical handover | REJECT document-status-driven custody changes: Carres needs actual handover, not cancel-to-teleport |
+| 2990 Consignment Note sends goods to customer/showroom, `consignment-notes.ts:1–80`; outward Consignment Order uses sales tables | Delivery/Stock, NOT Carres Consignment Sale Notice | RELOCATE reference meaning; no evidence here that the named note auto-notifies supplier after customer success |
+| Odoo owner dimension and ownership-based stock moves (official consignment documentation) | Stock Unit ownership | KEEP owner separate from Site; documentation search corroborated concept, full page fetch timed out |
+| Oracle returns before/after consumption advice and invoice (official return examples) | Service, Purchasing and Finance | ADAPT need to distinguish unsold return from post-sale customer return; REJECT importing Oracle ownership/accounting policy as Carres law |
+| Dynamics supplier-owned receipt without accounting posting (official consignment process) | Receiving consignment flag and Finance bill guard | KEEP proven separation of receipt and payable; Carres successful-customer-delivery trigger remains its own law |
+
+Primary references: [Oracle return scenarios](https://docs.oracle.com/en/cloud/saas/supply-chain-and-manufacturing/25c/famml/examples-of-consigned-inventory-returns.html),
+[Dynamics consignment](https://learn.microsoft.com/en-us/dynamics365/supply-chain/inventory/consignment),
+[Odoo consignment](https://www.odoo.com/documentation/18.0/applications/inventory_and_mrp/inventory/shipping_receiving/daily_operations/owned_stock.html).
+The Oracle distinction is a research lesson, not financial advice or adopted posting policy.
+
+#### Complete relevant lifecycle coverage and recommendation
+
+| Surface / case | Resolution | Recommended Carres treatment / dependency |
+|---|---|---|
+| Create, source, duplicate, proxy entry | Approved target + safeguard gap | Reuse existing Units and negotiating Sales; warn on overlapping active arrangements, revalidate exact scope before commitment; repeat save/issue cannot duplicate documents |
+| New model without SKU | Resolved; Catalog dependency | Capture evidence first, continue original request when SKU/supplier/identity mode is governed; never invent SKU or make price confirmation a consignment gate |
+| Display set vs individual physical Units | Real measurement gap | Keep set/model readability but select and prove each governed physical Unit/module. Reconcile PJ set-level import against Catalog identity mode before physical rollout; do not silently split or mint IDs |
+| Missing historical supplier order | Partial authority: §6.2 opening stock | Preserve verified opening-count provenance/supplier/ownership. Recommend support without a fabricated backdated Consignment Order; exact allowed provenance on sale/return still needs explicit closure |
+| Multiple suppliers / Sites | Real composition gap | One arrangement may link supplier-specific instructions; no supplier sees another supplier's goods/conditions. A cross-supplier replacement is separate incoming/outgoing obligations, not one combined supplier document |
+| Edit before issuance | Ordinary mechanics | Preserve actual actor/history; do not mint official Units for drafts; warn against concurrent stale changes |
+| Amendment after sending | General version law; consignment detail gap | Preserve number, old PDF and sent evidence; revise only unfulfilled scope; send changed instruction once. Changes to received/handed-over facts use owning corrections, not silent edits |
+| Cancellation before/after partial movement | General Stock law; consignment detail gap | Stop only unexecuted scope with reason; completed movements remain true. If one leg happened, resolve the other explicitly; never erase a receipt or move stock back via Cancel |
+| Copy/duplicate arrangement | Not required for first completion | Do not offer blank copy of live Units, price acceptance or sent evidence. Search/reuse source avoids accidental second commitment; optional prefilled draft only if later justified |
+| Reserved / damaged / missing outgoing Unit | Stock rules resolved | Revalidate eligibility at action, respect Sales Order reservation/protective control; Sales/Purchasing cannot silently release it. Report stock issue with evidence; retain unresolved movement |
+| Direct showroom receipt / label / wrong or short goods | Stock/Receiving target; delivery proof incomplete | One Receiving engine, exact issued identities, receiver label rule, observable outcomes/claim evidence. Source page must not require supplier-applied labels; physical rollout needs receiving-side identity proof |
+| Goods already arrive without formal instruction | Real exception gap | Record physical observation and source-resolution work, not invented prior sending/arrival dates or freely available stock. Formal acceptance must use existing controlled Receiving authority |
+| Old/new goods either direction first | Approved independent facts | Separate collection and arrival dates/parties; one side never implicitly completes the other; partial quantity keeps remaining work |
+| No Sales Order transport coordinator | Work admission gap | Recommend existing operational duty-backed responsibility for the arrangement, exact logistics party/contact for execution; do not fabricate customer Sales Order or inherit unrelated customer PIC. Confirm compatible existing Duty scope before naming a new one |
+| Quotation, cost change, transport charge | Price/recording resolved; liability unresolved | Preserve evidence and accepted version; no automatic Catalog overwrite. Missing price does not stop agreed consignments. Who pays exceptional transport/damage and approval for any resulting expense must follow Finance/commercial authority, not guessed defaults |
+| Sales absence / departure | Workspace active-person/cover rule; successor gap | Preserve original negotiator in history; route today's work through governed cover/reassignment. No inactive recipient or generic WhatsApp hunt; no self-appointed replacement |
+| Sending, revision, missing contact | Shared communication authority | Record exact version/channel/recipient/actor; mark is sending declaration, not supplier acceptance. Check external conversation before resending a missing mark; no duplicate send block |
+| Customer sale / partial failure / retry | Resolved §§7.7,9.11; Delivery MASTER §6 | Auto-notice only successful exact supplier-owned Units per supplier/delivery visit; retry deduplicates; pending/failed Units excluded |
+| Customer returns after sale notice | Real cross-module policy gap | Service owns customer remedy, Stock actual return/inspection, Purchasing corrected supplier communication, Finance invoice/credit consequence. Preserve original notice; do not assume return automatically restores consignment ownership or cancels supplier liability |
+| Damage/loss in display and supplier dispute | Stock/Claim owners resolved; liability decision may remain | Evidence and protective Stock state first; Purchasing Supplier Claim for supplier issue, Service only for customer remedy. No automatic write-off, charge or supplier ownership conversion |
+| Completion, archives, reopening | Partly resolved | Physical, sending, commercial and Finance obligations finish separately; no single manual Done. Later correction/reply reopens only affected work. Completed records remain searchable with historical documents |
+| Reports, export, reconciliation | Existing §12 target | Supplier × Site × exact Unit movement/remaining stock, outstanding sends and unresolved commercial confirmation; snapshots/read-only totals from owners, not a settlement spreadsheet |
+| Search/filter/columns/bulk/context | Shared UI authority; detailed showroom review owed | Full names, exact identity doors, scoped export; no bulk physical completion or second personal-layout engine. Old §9.9–9.11 columns/rail are not a fresh measured visual acceptance |
+| Permissions, retry, concurrent action, read/save error | Shared controls; not end-to-end built | One authoritative writer and current-version check; no double issue/handover; keep last good read with error, preserve unsaved draft, explain refusals, never turn failed reads into zero |
+| Settings and external partners | Existing authority | Contacts in Supplier Master, Site in Stock Settings, duties/covers in Workspace, product facts in Catalog. No new supplier portal, account provisioning or external cutover authorised |
+| Responsive, keyboard, loading/empty/error | UI verification outstanding | Use admitted kit; verify 1440/1180/820/743/390 and 200% zoom, focus/return context and long goods/multi-receipt cases. No numerical visual-quality score without rendered evidence |
+
+#### Recommended whole solution and remaining owner boundary
+
+**PROPOSAL / NOT LAW:** morning Work shows admitted physical/document actions and commercial
+follow-up separately. Staff open the existing arrangement or exact Unit, resolve only the current
+missing fact, use the owning action in place, and see source completion refresh that occurrence.
+Registers support lookup/history/export; no Showroom dashboard, stock ledger or settlement ledger.
+One Display Request connects supplier-specific formal instructions, actual incoming/outgoing
+movements, evidence and commercial versions. Formal objects keep historic versions and source
+lineage. Existing approved normal flow is retained; the recommendations above add its exception
+and dependency closure, not a wholesale redesign.
+
+Before final Blueprint approval, resolve only genuinely absent business consequences after further
+authority checking: customer return after supplier notification/invoicing (ownership and liability),
+exceptional charges where no existing approval rule resolves them, and permanent successor for
+Sales-owned commercial work. Opening-stock provenance and no-Sales-Order transport must be closed
+with their owning modules rather than delegated back to Jess as database or component questions.
+The recommendations are falsified if current owner authority already supplies a different result;
+replace the gap with that authority instead of asking again. Existing migration/kit/bug work is
+engineering-owned, not an owner decision. Whole-domain planning is not complete and no build
+scope/Card is handed off from this audit.
+
+---
+
 ## 10 · Work, Quick Rail and Calendar
 
 | Trigger | Owner rule | Action example | Completion fact |
