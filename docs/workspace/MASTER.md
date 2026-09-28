@@ -1226,14 +1226,16 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      them carry NO icon ("Do not add decorative icons to every filter row"). Style C's one 11px
      supporting line under each title is owed: its words need owner approval before they reach the
      screen.
-   - **To do first, then the Route (Jess 2026-09-28: "i have to scroll to check one by one … can it
-     move to top which require to do").** Under the order header, `To do` holds the full cards of the
-     acts that are open now (missed first, then due), each with its button and in-card form; each act
-     appears ONCE. Below, `Order Route` keeps the vertical line with ONE LINE PER STOP (node · its
-     status, never the act's title again · `{n} of {m} done` · chevron); a stop holding an act is
-     tinted red/amber and pressing it opens that act's card at the top. A stop that cannot start yet
-     (SUPPLIER before the PO send is confirmed) shows its status only and, when opened, its facts with
-     NO empty checkboxes; a box appears only beside a step that has, or awaits, completion evidence.
+   - **The layout stays Claude's stop-card version (Jess 2026-09-28: "i want your version … content can
+     improve like chatgpt advise, but not bad ui from chatgpt").** No separate `To do` block on top and
+     no route of outlined one-liners. The vertical line keeps one stop per node; a stop with an act (or
+     facts that matter now) draws its white cards IN PLACE, the act's button on the card and its form
+     opening inside it; a stop with no act now (`SUPPLIER` before the send is confirmed, `RECEIVING`,
+     `STOCK`, `DELIVER`, `DELIVERY PHOTO` on SO-1333) is one quiet line (node · status · progress ·
+     chevron) that opens to its facts, and a stop that cannot start yet shows no empty checkboxes.
+     ChatGPT's CONTENT corrections are kept (send-not-confirmed act, no early collection act,
+     undetermined route, `Waiting for receiving`, honest progress, drafts, clean messages, channels
+     from Supplier Master, no desktop scaling, contrast).
    - **No free text in a send record (Jess: "what is recipient? no free text").** `Channel` lists
      only the channels the Supplier Master records for that supplier (SO-1333: Ohana WhatsApp group
      and email; Nice Future WhatsApp group) and `Recipient` is the fact that follows from it
