@@ -2280,8 +2280,10 @@ honest Work for admitted modules.
   audit evidence, guarded API and the one Staff & Duties UI are production-proven
   for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
   module consumers remain implementation evidence until each module is production-verified.
-- **Staff & Duties §4.2 composition — DEPLOYED to production 2026-09-16 (`56e52d0e`, PR #1388);
-  owner acceptance under §4.7 still open.** Deploy run 35075197322 passed its repeated
+- **Existing Staff & Duties catalogue/detail implementation — DEPLOYED 2026-09-16
+  (`56e52d0e`, PR #1388); owner acceptance under §4.7 still open.** This proves the shipped
+  catalogue and focused actions only; §4’s Settings relocation and §4.2’s 2026-09-28 structure
+  remain APPROVED TARGET / NOT BUILT. Deploy run 35075197322 passed its repeated
   authoritative checks and deployment proof; an independent `verify-production.mjs` run then read
   `56e52d0e` from carres-portal Pages, carres-pos Pages, erp.carresofficial.com,
   pos.carresofficial.com and the API Worker. The stacked 720px document is replaced by one catalogue
