@@ -42,7 +42,15 @@
 // filters, chooser and footer; ListPageShell would wrap a second chrome
 // around the one the engine already draws.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
+import {
+  GOODS_CATEGORY_WORDS,
+  MONTHLY_DEMAND_CATEGORIES,
+  goodsCategoryWordOf,
+  monthlyDemandOf,
+  monthlyDemandWindowOf,
+  type MonthlyDemandCategory,
+  type MonthlyDemandRow,
+} from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -58,8 +66,10 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
   useCatalog,
+  useMonthlyDemandFacts,
   useOperationOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
@@ -67,6 +77,16 @@ import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import ConnectedSections, { CONNECT_AT_TABLE_HEADER } from "./components/ConnectedSections";
 import GoodsMiniTable, { UnitEvidence, goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import {
+  FILTER_RAIL_FLOAT_BELOW_PX,
+  FilterRail,
+  FilterRailGroup,
+  FilterRailRow,
+  FilterRailSelect,
+  ShowFiltersButton,
+  useFilterRailOpen,
+} from "./components/workspace-rail";
+import SalesOrderMonthlyDemand from "./SalesOrderMonthlyDemand";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -345,11 +365,12 @@ function useCatalogNames(): Map<string, { name: string; variant: string }> {
  * UI MASTER §6.7 rule 2 pins identity alone. Measured on the page's work
  * surface, not the window, because the shell's nav and rail take their share.
  */
-function useNarrowCanvas(): [React.RefObject<HTMLDivElement>, boolean] {
-  const ref = useRef<HTMLDivElement>(null);
+function useNarrowCanvas(): [(node: HTMLDivElement | null) => void, boolean] {
+  /* A callback ref: the list's canvas is absent while Monthly demand shows,
+     and must be measured when the operator returns to the Order list. */
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
-    const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     /* The work surface's 8px padding each side is not grid canvas. */
     const measure = () => setNarrow(el.clientWidth > 0 && el.clientWidth - 16 < 768);
@@ -357,8 +378,72 @@ function useNarrowCanvas(): [React.RefObject<HTMLDivElement>, boolean] {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-  return [ref, narrow];
+  }, [el]);
+  return [setEl, narrow];
+}
+
+/**
+ * ── THE RAIL AND ITS TWO VIEWS — owner rulings 2026-09-22 / 26 / 27 ─────────
+ * (Orders MASTER, Monthly demand; COPY-STANDARD, Monthly demand words.)
+ *
+ * The chosen view and Monthly demand's filters live in the URL, so a link
+ * reproduces what the operator saw. Monthly demand's filters are read only in
+ * that view and never carry into the Order list.
+ */
+const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"] as const;
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DEFAULT_MONTHS = 6;
+
+/** `YYYY-MM` moved by a number of months. */
+function shiftMonth(month: string, by: number): string {
+  const at = Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7)) - 1 + by;
+  return `${Math.floor(at / 12)}-${String((at % 12) + 1).padStart(2, "0")}`;
+}
+
+/** The Order list narrowed by a month door: one month, or beyond a window edge. */
+type RequestedNarrowing = { kind: "month" | "before" | "after"; month: string };
+
+function requestedNarrowingOf(value: string | null): RequestedNarrowing | null {
+  if (!value) return null;
+  const match = /^(?:(before|after):)?(\d{4}-(?:0[1-9]|1[0-2]))$/.exec(value);
+  if (!match) return null;
+  return { kind: (match[1] as "before" | "after" | undefined) ?? "month", month: match[2]! };
+}
+
+function requestedNarrowingWord(n: RequestedNarrowing): string {
+  const month = fmtMonth(n.month);
+  return n.kind === "before" ? `Before ${month}` : n.kind === "after" ? `After ${month}` : month;
+}
+
+function inRequestedNarrowing(iso: string | null, n: RequestedNarrowing): boolean {
+  const month = iso?.slice(0, 7) ?? "";
+  if (!MONTH_RE.test(month)) return false;
+  return n.kind === "before" ? month < n.month : n.kind === "after" ? month > n.month : month === n.month;
+}
+
+/** Whether the work area is narrower than the width below which the rail floats. */
+function useFloatingRail(ref: React.RefObject<HTMLDivElement>): boolean {
+  const [floats, setFloats] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setFloats(el.clientWidth > 0 && el.clientWidth < FILTER_RAIL_FLOAT_BELOW_PX);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return floats;
+}
+
+/** A select's visible name and, for a group's first control, its supporting line. */
+function RailFieldWords({ supporting, label }: { supporting?: string; label?: string }) {
+  return (
+    <>
+      {supporting ? <p className="px-2 pb-1 text-meta text-kit-slate-11">{supporting}</p> : null}
+      {label ? <p className="px-2 pt-1 text-meta text-kit-slate-11">{label}</p> : null}
+    </>
+  );
 }
 
 function ExpandedLines({ row }: { row: RegisterRow }) {
@@ -538,9 +623,114 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
 
 export default function SalesOrdersRegister() {
   const navigate = useNavigate();
-  const [urlParams] = useSearchParams();
+  const [urlParams, setUrlParams] = useSearchParams();
   const seededSearch = urlParams.get("search") ?? "";
   const role = useAuth((s) => s.role);
+
+  /* ── THE RAIL: ONE VIEW SELECTOR, EACH VIEW ITS OWN GROUPS ─────────────── */
+  const view: "list" | "monthly" = urlParams.get("view") === "monthly" ? "monthly" : "list";
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [railOpen, setRailOpen] = useFilterRailOpen("carres.salesOrders.rail", areaRef);
+  const railFloats = useFloatingRail(areaRef);
+  const writeParams = useCallback(
+    (change: (next: URLSearchParams) => void) => {
+      setUrlParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          change(next);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setUrlParams],
+  );
+  const setParam = useCallback(
+    (key: string, value: string | null) =>
+      writeParams((next) => {
+        if (value == null || value === "") next.delete(key);
+        else next.set(key, value);
+      }),
+    [writeParams],
+  );
+  const chooseView = useCallback(
+    (next: "list" | "monthly") =>
+      writeParams((params) => {
+        if (next === "monthly") {
+          params.set("view", "monthly");
+          /* The Order list's narrowing is the Order list's. */
+          params.delete("requested");
+        } else {
+          params.delete("view");
+          for (const key of MONTHLY_PARAMS) params.delete(key);
+        }
+      }),
+    [writeParams],
+  );
+
+  /* Monthly demand's own filters — read only in that view. */
+  const monthly = view === "monthly";
+  const currentMonth = appTodayIso().slice(0, 7);
+  const startParam = monthly ? urlParams.get("start") : null;
+  const startMonth = startParam && MONTH_RE.test(startParam) ? startParam : currentMonth;
+  const monthsParam = monthly ? Number(urlParams.get("months")) : NaN;
+  const monthCount = Number.isInteger(monthsParam) && monthsParam >= 1 && monthsParam <= 6 ? monthsParam : DEFAULT_MONTHS;
+  const dealer = monthly ? urlParams.get("dealer") : null;
+  const deliveryState = monthly ? urlParams.get("state") : null;
+  const deliveryCity = monthly ? urlParams.get("city") : null;
+  const categoryParam = monthly ? urlParams.get("category") : null;
+  const category = (MONTHLY_DEMAND_CATEGORIES as readonly string[]).includes(categoryParam ?? "")
+    ? (categoryParam as MonthlyDemandCategory)
+    : null;
+  const demandWindow = useMemo(() => monthlyDemandWindowOf(startMonth, monthCount), [startMonth, monthCount]);
+  const focusMonth = demandWindow.months.includes(currentMonth) ? currentMonth : demandWindow.first;
+  const demandQ = useMonthlyDemandFacts(monthly);
+  const demandView = useMemo(
+    () =>
+      demandQ.data
+        ? monthlyDemandOf({
+            orders: demandQ.data.orders,
+            startMonth,
+            months: monthCount,
+            toBuyByOrder: demandQ.data.toBuyByOrder,
+            filters: { salesLocation: dealer, state: deliveryState, city: deliveryCity, category },
+            focusMonth,
+          })
+        : null,
+    [demandQ.data, startMonth, monthCount, dealer, deliveryState, deliveryCity, category, focusMonth],
+  );
+  /* The current month, the twelve before it and the eleven after it. */
+  const startChoices = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, i) => shiftMonth(currentMonth, i - 12))
+        .filter((month) => month !== currentMonth)
+        .map((month) => ({ value: month, label: fmtMonth(month) })),
+    [currentMonth],
+  );
+  const chooseState = useCallback(
+    (next: string | null) =>
+      writeParams((params) => {
+        if (next) params.set("state", next);
+        else params.delete("state");
+        const city = params.get("city");
+        const stillThere = !next || (demandQ.data?.orders ?? []).some(
+          (o) => o.state?.trim() === next && o.city?.trim() === city,
+        );
+        if (city && !stillThere) params.delete("city");
+      }),
+    [writeParams, demandQ.data],
+  );
+  /* A month is a door: the Order list, narrowed to that month. */
+  const openMonth = useCallback(
+    (row: MonthlyDemandRow) => {
+      if (!row.month) return;
+      const value = row.kind === "month" ? row.month : `${row.kind}:${row.month}`;
+      navigate(`/operation/orders?requested=${encodeURIComponent(value)}`);
+    },
+    [navigate],
+  );
+  const requested = view === "list" ? requestedNarrowingOf(urlParams.get("requested")) : null;
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
      the SAME words go to the API (`?search=`), so a match beyond the loaded
@@ -594,8 +784,25 @@ export default function SalesOrdersRegister() {
      WITHIN it. Newest first — the engine applies its own sort on top when a
      header is clicked. */
   const rows = useMemo(
-    () => [...all].sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
-    [all],
+    () =>
+      [...all]
+        /* A month door's narrowing, on the customer's requested date. */
+        .filter((r) => !requested || inRequestedNarrowing(r.customerDelivery, requested))
+        .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [all, requested?.kind, requested?.month],
+  );
+  const activeConditions = useMemo(
+    () =>
+      requested
+        ? [{
+            key: "requested",
+            label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
+            onClear: () => setParam("requested", null),
+          }]
+        : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [requested?.kind, requested?.month, setParam],
   );
   /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
      read (rentals excluded, search not applied), carried on every list answer,
@@ -691,6 +898,105 @@ export default function SalesOrdersRegister() {
     [],
   );
 
+  const rail = (
+    <FilterRail
+      testId="sales-orders-rail"
+      ariaLabel="Sales Orders filters"
+      onHide={() => setRailOpen(false)}
+      header={(
+        <div className="pr-8">
+          <FilterRailGroup title="View" icon="modules" chosen={null}>
+            <FilterRailRow
+              label="Order list"
+              supportingText="Order list or Monthly demand"
+              active={view === "list"}
+              testId="sales-orders-view-list"
+              onClick={() => chooseView("list")}
+            />
+            <FilterRailRow
+              label="Monthly demand"
+              active={view === "monthly"}
+              testId="sales-orders-view-monthly"
+              onClick={() => chooseView("monthly")}
+            />
+          </FilterRailGroup>
+        </div>
+      )}
+    >
+      {monthly ? (
+        <>
+          <FilterRailGroup title="Period" icon="date">
+            <RailFieldWords supporting="Which months to show" label="Starting month" />
+            <FilterRailSelect
+              label="Starting month"
+              value={startMonth === currentMonth ? null : startMonth}
+              options={startChoices}
+              onChange={(next) => setParam("start", next)}
+              testId="monthly-demand-start"
+              allLabel={fmtMonth(currentMonth)}
+            />
+            <RailFieldWords label="Months" />
+            <FilterRailSelect
+              label="Months"
+              value={monthCount === DEFAULT_MONTHS ? null : String(monthCount)}
+              options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
+              onChange={(next) => setParam("months", next)}
+              testId="monthly-demand-months"
+              allLabel={String(DEFAULT_MONTHS)}
+            />
+            <p className="px-2 pt-1 text-label text-base-600" data-testid="monthly-demand-window">
+              {demandWindow.first === demandWindow.last
+                ? fmtMonth(demandWindow.first)
+                : `${fmtMonth(demandWindow.first)} – ${fmtMonth(demandWindow.last)}`}
+            </p>
+          </FilterRailGroup>
+          <FilterRailGroup title="Dealer / Sales Location" icon="people">
+            <RailFieldWords supporting="Where the order was sold" />
+            <FilterRailSelect
+              label="Dealer / Sales Location"
+              value={dealer}
+              options={[...new Set([...(demandView?.choices.salesLocations ?? []), ...(dealer ? [dealer] : [])])].map((name) => ({ value: name, label: name }))}
+              onChange={(next) => setParam("dealer", next)}
+              testId="monthly-demand-dealer"
+              allLabel="All dealers"
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title="Delivery State / City" icon="delivery">
+            <RailFieldWords supporting="Where the goods go" label="State" />
+            <FilterRailSelect
+              label="State"
+              value={deliveryState}
+              options={[...new Set([...(demandView?.choices.states ?? []), ...(deliveryState ? [deliveryState] : [])])].map((name) => ({ value: name, label: name }))}
+              onChange={chooseState}
+              testId="monthly-demand-state"
+              allLabel="All states"
+            />
+            <RailFieldWords label="City" />
+            <FilterRailSelect
+              label="City"
+              value={deliveryCity}
+              options={[...new Set([...(demandView?.choices.cities ?? []), ...(deliveryCity ? [deliveryCity] : [])])].map((name) => ({ value: name, label: name }))}
+              onChange={(next) => setParam("city", next)}
+              testId="monthly-demand-city"
+              allLabel="All cities"
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title="Product category" icon="goods">
+            <RailFieldWords supporting="Which kind of goods" />
+            <FilterRailSelect
+              label="Product category"
+              value={category}
+              options={MONTHLY_DEMAND_CATEGORIES.map((word) => ({ value: word, label: word }))}
+              onChange={(next) => setParam("category", next)}
+              testId="monthly-demand-category"
+              allLabel="All categories"
+            />
+          </FilterRailGroup>
+        </>
+      ) : null}
+    </FilterRail>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
@@ -710,8 +1016,30 @@ export default function SalesOrdersRegister() {
         />
       )}
 
-      {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
-      <div ref={canvasRef} className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
+      {/* The rail runs from the header to the bottom, beside the chosen view.
+          Below 896px of work area it floats over the content; hidden, it
+          leaves the 44px strip that brings it back. */}
+      <div ref={areaRef} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="sales-orders-area">
+      {railOpen ? (
+        railFloats ? <div className="absolute inset-y-0 left-0 z-20 flex shadow-lg">{rail}</div> : rail
+      ) : (
+        <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="sales-orders-rail-collapsed">
+          <ShowFiltersButton onShow={() => setRailOpen(true)} testId="sales-orders-show-filters" />
+          <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
+        </aside>
+      )}
+      {monthly ? (
+        <SalesOrderMonthlyDemand
+          view={demandView}
+          focusMonth={focusMonth}
+          onOpenMonth={openMonth}
+          loading={demandQ.isLoading}
+          error={demandQ.isError ? demandQ.error : undefined}
+          onRetry={() => void demandQ.refetch()}
+        />
+      ) : (
+      /* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */
+      <div ref={canvasRef} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="register-column">
           <DataGrid<RegisterRow>
             appearance="reference"
             palette="slate"
@@ -731,6 +1059,8 @@ export default function SalesOrdersRegister() {
             }
             rows={rows}
             columns={columns}
+            activeConditions={activeConditions}
+            onClearConditions={() => setParam("requested", null)}
             storageKey={storageKey}
             rowKey={(r) => r.id}
             exportName="Sales Orders"
@@ -817,6 +1147,8 @@ export default function SalesOrdersRegister() {
               />
             )}
           />
+      </div>
+      )}
       </div>
     </div>
   );
