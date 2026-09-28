@@ -1193,8 +1193,10 @@ Settings navigation opens on demand; never force a third narrow-screen column. T
 detail (Workspace §4.2), with no token change. Remaining interaction
 review is still open. Workspace §4.3 also carries the owner-approved 2026-09-28 / NOT BUILT
 assignment form: current read-only facts above the focused inputs, one confirmation, preserved
-input on failure, and single-column narrow-screen layout. Date-conflict policy is not approved by
-that presentation ruling. This ruling changes no
+input on failure, and single-column narrow-screen layout. Owner correction later on 2026-09-28 makes routine assignment automatic; this form is only
+conditional manual presentation, not the default journey. Effective departures disappear from
+active staff views/choices; historical evidence remains. Workspace §4 owns the target. Date-conflict
+policy and final manual-action availability are not approved by that presentation ruling. This ruling changes no
 colour, spacing, typography, icon or other token value.
 
 **THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The

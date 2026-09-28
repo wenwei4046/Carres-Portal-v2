@@ -195,8 +195,11 @@ it does not rewrite the normal owner. Changing staff or approval ownership happe
 No action sentence, module setting or permission check hard-codes `Jess`, `Manager` or another
 person's name.
 
-Automatic rotation may supply a recommended Primary/Cover for operational rotas such as PO Duty and
-GRN Duty, but the authoritative assignment is the effective-dated record in `Staff & Duties`. A
+Owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT: routine operational Duties such as
+PO Duty and GRN Duty follow governed automatic allocation over eligible active staff; the owner
+does not manually enter each routine assignment. The authoritative assignment remains in the one
+Workspace Duty model, never independent page-level rotation. This does not auto-grant approver
+permissions or change object PIC ownership. A
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and

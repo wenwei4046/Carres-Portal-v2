@@ -80,6 +80,10 @@ against a real session.
   `../purchasing/MASTER.md` §2.2 and its one edit door is Settings → Staff & Duties
   (approved placement / NOT BUILT; Workspace §4).
 - **Checklists are a shared constant, not a config table.**
+- **Departure visibility — owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT:** after
+  departure is effective, omit the person from default active staff views and current/future Duty
+  choices/routing; retain historical evidence. The authorised People/account owner records the
+  departure/access change once. Workspace does not add an independent employment switch.
 - **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
   personal account, active/disabled, last working date and membership of the eligible Carres staff
   rotation pool. A last-working-date change removes the person from future resolution; People does

@@ -133,9 +133,26 @@ approved capability contracts below remain in force. The relocation must preserv
 links and return context; it must fit the Settings shell without forcing three simultaneous columns
 on a narrow screen. No new token is approved or required by this placement ruling.
 
-`Settings → Staff & Duties` is the only assignment surface. An authorised manager assigns one
-Primary holder and optional effective-dated Buddy cover to each named Duty and can see immutable
-assignment history.
+**OWNER CORRECTION — 2026-09-28 / APPROVED TARGET / NOT BUILT.** Routine operational Duty
+assignment follows the governed automatic rotation and active/eligible People pool; Jess must not
+maintain each routine assignment manually. Staff & Duties shows the resulting responsibility and
+exceptions. The previously reviewed `Assign holder` form is a conditional manual action surface,
+not approval to make manual assignment the normal operating journey. Its final availability must
+follow the automatic-assignment/exception review. Do not treat the prior form approval as a complete
+Blueprint or permission to Build.
+
+When a person resigns, the authorised People/account owner records the last working date and
+access change once. When departure is effective, omit that person from default active staff views,
+current/future eligible pickers and Duty routing; preserve historical names, acts and records.
+This is not deletion, a second employment switch in Workspace, or permission for ordinary staff to
+disable other accounts. Settings may link to the owning People/account action. The exact entry
+presentation remains under review.
+
+`Settings → Staff & Duties` is the only Duty assignment/cover surface and shows immutable history.
+Automatic operational allocation does not grant approval capability or randomly rotate Principal/
+Finance approval duties. Existing approval qualifications, object PIC ownership and dated-cover
+rules remain in force. How automation represents its authoritative assignments, handles a changed
+eligible pool and exposes genuine exceptions remains a measured target gap, not a claim of delivery.
 
 Modules store only `rule → required Duty`. They never store another staff list, local approver,
 hard-coded Jess/Manager identity or page-level cover calculation. People/HR supplies active,
