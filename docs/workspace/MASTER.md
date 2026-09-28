@@ -1055,10 +1055,11 @@ approved:** Route stop · Checklist row · Quiet route row · `Block` moved into
 joins the kit with its `/ui` example and its UI MASTER entry in the build that first draws it.
 **Reference (evidence, not authority):** `docs/workspace/work-reference/prototype.html` and
 `work-1440.png` · `work-1440-form-open.png` · `work-1023.png` (SO-1333, test data, 2026-09-28).
-**Still owed after the 2026-09-28 build:** (a) Purchasing question — the feed raises
-`purchasing.confirm_tomorrows_delivery` for a PO whose current version has no send mark, while
-Purchasing §5.7 says the supplier-answer section is absent until the PO is sent (so the act's own form
-cannot record it); Purchasing owns the answer. (b) A PO window row still draws the earlier PO window
+**Still owed after the 2026-09-28 build:** (a) The feed raised `purchasing.confirm_tomorrows_delivery`
+for a PO whose current version has no send mark, while Purchasing §5.7 hides the supplier-answer
+section until the PO is sent — FIXED at source by the Purchasing chat in PR #1707 (2026-09-28: the
+day-before check derives nothing until the current version is marked sent); once #1707 is on main,
+SO-1333's POs owe only the PO window's send line. (b) A PO window row still draws the earlier PO window
 panel (its send form is the card layout with recorded channels only, no free text); moving it onto
 the stop-card grammar is the next Work slice. (c) The Warehouse tab has no governed message yet
 (`Message not available`). (d) The A3 PO view's related-order line prints SO No · customer ·
