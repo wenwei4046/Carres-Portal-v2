@@ -1132,7 +1132,7 @@ export default function SalesOrdersRegister() {
             ))}
           </FilterRailGroup>
           <FilterRailGroup title="Delivery" icon="goods">
-            <RailFieldWords supporting="How much has reached the customer" />
+            <RailFieldWords supporting="What has been delivered" />
             {REGISTER_DELIVERY_CONDITIONS.map((c) => (
               <FilterRailRow
                 key={c.key}
