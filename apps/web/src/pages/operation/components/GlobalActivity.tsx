@@ -159,7 +159,7 @@ function FeedRow({ d, onOpen }: { d: Decorated; onOpen: (orderId: string | null)
           <span className={category === "exception" ? "font-medium text-red-700" : "font-medium"}>
             {title}
           </span>
-          {body ? <span className="text-base-600"> — {body}</span> : null}
+          {body ? <span className="text-base-600">: {body}</span> : null}
         </div>
         <div className="text-label text-base-500 truncate">
           {/* An event with no order is a portal-wide event, and saying so in

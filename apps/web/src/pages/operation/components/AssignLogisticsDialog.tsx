@@ -277,7 +277,7 @@ export default function AssignLogisticsDialog({
               {ready.map((r) => (
                 <p key={r.so}>
                   {scopes.length > 1 ? `SO ${r.so} · ` : ""}
-                  {AL_WORDS.pickupOn(chosenRow.name, fmtDate(r.pickupDay))} —{" "}
+                  {AL_WORDS.pickupOn(chosenRow.name, fmtDate(r.pickupDay))}.{" "}
                   {AL_WORDS.readyBy}: <span className="font-semibold">{fmtDate(r.readyBy)}</span>
                 </p>
               ))}

@@ -210,7 +210,7 @@ export default function AssignPickupDialog({
         <div className="text-meta text-base-500 mb-3.5">Loading partners…</div>
       ) : partnersQ.isError ? (
         <div className="text-meta text-destructive mb-3.5">
-          Couldn&rsquo;t load partners — try again later.
+          Couldn&rsquo;t load partners. Try again later.
         </div>
       ) : partners.length === 0 ? (
         <div className="text-meta text-warning mb-3.5">
@@ -311,7 +311,7 @@ export default function AssignPickupDialog({
         </div>
       ) : warehousesQ.isError ? (
         <div className="text-meta text-destructive mb-3.5">
-          Couldn&rsquo;t load warehouses — try again later.
+          Couldn&rsquo;t load warehouses. Try again later.
         </div>
       ) : warehouses.length === 0 ? (
         <div className="text-meta text-warning mb-3.5">

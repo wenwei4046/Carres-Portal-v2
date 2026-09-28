@@ -109,11 +109,11 @@ export default function DeliveryChain({
 
   const setChain = useSetDeliveryChain(orderId, {
     onSuccess: () => toast.success("Delivery chain updated"),
-    onError: (e) => toast.error(`Couldn't update chain — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't update chain: ${e.message}`),
   });
   const patchStop = usePatchDeliveryStop(orderId, {
     onSuccess: () => toast.success("Leg updated"),
-    onError: (e) => toast.error(`Couldn't update leg — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't update leg: ${e.message}`),
   });
 
   const [showAddLeg, setShowAddLeg] = useState(false);
@@ -457,7 +457,7 @@ function AddLegForm({
         value={partnerId}
         onChange={(e) => setPartnerId(e.target.value)}
       >
-        <option value="">— pick partner —</option>
+        <option value="">Pick partner</option>
         {partners.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}

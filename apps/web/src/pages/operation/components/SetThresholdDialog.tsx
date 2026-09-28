@@ -143,7 +143,7 @@ export default function SetThresholdDialog({
 
   return (
     <Modal
-      title={`Set thresholds — ${sku} @ ${warehouseName}`}
+      title={`Set thresholds: ${sku} @ ${warehouseName}`}
       onClose={handleCancel}
     >
       <div className="text-meta text-base-600 mb-3.5 font-body">

@@ -83,7 +83,7 @@ export function doorsForIssuedPo(po: IssuedPo, message?: string | null): PoOutbo
         : null,
     mailto: po.contactEmail
       ? `mailto:${encodeURIComponent(po.contactEmail)}?subject=${encodeURIComponent(
-          `${po.id} — Carres Purchase Order`,
+          `Carres Purchase Order ${po.id}`,
         )}`
       : null,
     message: message ?? null,

@@ -107,7 +107,7 @@ function spell(iso: string) {
 /** A due date's words: `due 24 Oct` · missed keeps the day it missed. */
 function dueText(action: LogisticsAction): string | null {
   if (!action.dueIso) return null;
-  return action.timing === "missed" ? `Late — was due ${spell(action.dueIso)}` : `due ${spell(action.dueIso)}`;
+  return action.timing === "missed" ? `Late. Was due ${spell(action.dueIso)}` : `due ${spell(action.dueIso)}`;
 }
 
 function StateIcon({ row }: { row: LogisticsCheckRow }) {

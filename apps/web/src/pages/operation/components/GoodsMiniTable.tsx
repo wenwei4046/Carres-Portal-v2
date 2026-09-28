@@ -1075,7 +1075,7 @@ export default function GoodsMiniTable({
                       type="button"
                       className="tabular-nums text-kit-blue-11 underline-offset-2 hover:underline"
                       data-testid={`goods-ordered-qty-${line.key}`}
-                      title={`${qty} ordered on purchase orders — show the details`}
+                      title={`${qty} ordered on purchase orders. Show the details`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onOpenPoDetails();

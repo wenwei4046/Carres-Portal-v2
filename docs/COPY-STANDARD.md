@@ -919,7 +919,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |
 | — *(no queue: the §4 chain lives on the Delivery page's detail, one next act at a time)* | — *(same)* | `Mark ready for handover` | `Ready for handover recorded` | — *(the block renders only once a DO exists — no DO, no handover, no empty queue)* |
 | — *(same)* | — *(same)* | `Record handover` | `Handed over to {logistics}` | — *(same)* |
-| — *(same)* | — *(same)* | `Confirm logistics receipt` | `Received by logistics — out for delivery` | — *(same)* |
+| — *(same)* | — *(same)* | `Confirm logistics receipt` | `Received by logistics. Out for delivery` | — *(same)* |
 
 **The handover chain's FACT words** (delivery MASTER §4, slice 1 shipped 2026-08-19): on screen a
 recorded fact reads `Ready for handover` · `Handed over` · `Received by logistics`, sentence case,
@@ -1101,7 +1101,7 @@ Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · G
 | Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
 | Multiple physical receipts | `{n} receipt dates` |
 | Manual source in `SO No / MPR No` | the request's stored `MPRYYMMDD-NNNN`; `Manual Purchase Request` ONLY where no number is stored (owner ruling 2026-09-18, overwriting the 2026-09-04 MPR retirement). Never a UUID, never a minted number |
-| Exact-unit PO line with no Unit IDs | `Unit IDs missing on this line — do not send this PO` |
+| Exact-unit PO line with no Unit IDs | `Unit IDs missing on this line. Do not send this PO` |
 | Quantity-managed PO line's Unit ID cell | `—` |
 | The Unit ID read has not answered / failed | `Reading Unit IDs…` · `Unit IDs could not be read` — "we have not looked" is not "they are missing" |
 | The list behind `{n} receipt dates` / `{n} GRNs` | title `Receipts on {PO No}`; columns `Goods Received Date` · `GRN No` · `Received Qty` |
@@ -1216,7 +1216,7 @@ with an absence word that implies one is owed.
 |---|---|---|
 | The goods-line column of an opened PO, and the PO PDF heading | **`Unit ID`** (screen) · **`UNIT ID`** (paper) | Item ID · Unit IDs · Serial · Code |
 | A quantity-scoped goods line — it has no Unit ID by law (owner ruling 2026-09-27: no dash, the cell says why) | **`Counted by quantity`** | `—` · Not allocated · No Unit ID · Not created yet · Pending |
-| An exact-unit line with no Unit IDs after official issue — an integrity failure, never an ordinary empty state | **`Unit IDs missing on this line — do not send this PO`** | No Unit ID · a blank cell · Not allocated |
+| An exact-unit line with no Unit IDs after official issue — an integrity failure, never an ordinary empty state | **`Unit IDs missing on this line. Do not send this PO`** | No Unit ID · a blank cell · Not allocated |
 | Catalog's per-SKU answer to *how does Stock count this?* | **`Stock identity`** with the values **`Unit ID`** · **`Quantity`**, and **`Not set`** while Catalog has not said | Tracking mode · Serialised · Bulk · Traceable flag |
 | Official PO issue refused because Catalog has not said | **`Set the stock identity (Unit ID or Quantity) for {sku} in Catalog before issuing a PO`** | Unknown mode · Configuration missing · Contact admin |
 | Receiving refuses a quantity-only count on a traced line | **`line {sku} is traced by Unit ID — record one result for each expected Unit`** | Units required · Invalid submission |
@@ -3337,7 +3337,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
 | `DELIVERY STATUS` | Monitor's operational-status filter group, a kit dropdown over the §8.4 status words of `delivery/MASTER.md` | **RULED 2026-09-07**, words re-ruled **2026-09-13** |
 | `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's words (`Arrived` joined 2026-09-13, Card 20), each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
-| `Arrived` over `{partner warehouse}` · `This leg ends at a partner warehouse. It owes no delivery proof — the customer leg's document carries it.` | an intermediate Journey leg's document: its pill word and line two on the register, Monitor and the DO header; and the Evidence section's one sentence on such a document | **BUILT 2026-09-13** (Card 20 — the word is Card 14's ruled `Arrived`) |
+| `Arrived` over `{partner warehouse}` · `This leg ends at a partner warehouse. It owes no delivery proof. The customer leg's document carries it.` | an intermediate Journey leg's document: its pill word and line two on the register, Monitor and the DO header; and the Evidence section's one sentence on such a document | **BUILT 2026-09-13** (Card 20 — the word is Card 14's ruled `Arrived`) |
 | `Driver submission` | the Delivery Orders register's column for what came back from THIS delivery order's trip. It replaces the default `Proof Status` column (retired 2026-09-11) | **RULED 2026-09-11** |
 | `Photos {n}` · `Videos {n}` | the two count buttons inside `Driver submission`. The number is the ledger's own count of files stamped with THIS document; a count is NEVER printed when the answer is unknown, and no button is offered for a kind with no files. **No video is not a shortage** — video is not required, so an absent video prints nothing at all | **RULED 2026-09-11** |
 | `Signed Delivery Order` | the viewing link to the signed paper on file, on the second line of `Driver submission`. Already the governed proof name; here it is a door | **REUSED 2026-09-11** |
@@ -3400,7 +3400,7 @@ the words that panel may use, and no others:
 | Word | What it names | Why not the alternatives |
 |---|---|---|
 | **`Before you call`** | the panel heading — the facts to have in hand before the phone rings | It is the only heading that says WHEN it is for. `Call brief` · `Pre-call` · `Summary` are jargon (rule 9) and none of them tells a new hire the panel is about a call that has not happened yet |
-| **`Call by {date}`** | the day the conversation is due, from `logistics_call_working_days` | `Due {date}` alone does not say *do what*. The late spelling is the portal's existing **`Late — was due {date}`**, unchanged, so this step reads like every other late step |
+| **`Call by {date}`** | the day the conversation is due, from `logistics_call_working_days` | `Due {date}` alone does not say *do what*. The late spelling is the portal's existing **`Late. Was due {date}`**, unchanged, so this step reads like every other late step |
 | **`Not in yet`** | committed goods the register does not hold — the ruling's *"what is / is not expected in"* | `Waiting` alone is already banned; `Outstanding` is the money word; `Short` is warehouse jargon |
 | **`Everything is on hand`** | the whole commitment is allocated, so no arrival is pending | States the fact positively so the row is not a blank. `On hand` is the Stock word law's own word, reused rather than re-coined |
 | **`Expected arrival`** | the latest supplier ready date among the lines still short | The portal's existing column word (`Check Expected Arrival`). **`Stock ETA` may not reach the screen** — `ETA` is an abbreviation, and rule 9 bans those even when the ruling itself uses one internally |
@@ -3548,7 +3548,7 @@ weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
 | Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
 | The tally — page, staff group and rail row | **{n} actions to do · {n} late** | **{n} open · {n} overdue** (superseded) · Total · Outstanding |
 | A row's due date, on line 2 | **due {fmtDate}** (`due Wed, 20 Aug`) | Today · Tomorrow · a bare date |
-| A late row's line 2 | **Late — was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
+| A late row's line 2 | **Late. Was due {fmtDate}** (the original due never moves) | Overdue by · Delayed |
 | The clear state | **No open work — every track is clear.** | All done · Empty |
 | Empty My Work while the team has work (owner review 2026-09-25) | header **`0 for you · {n} for the team`** · list door **`See Team Work`** | a bare `0 actions to do` |
 | The cover filter — RETIRED (Jess, 2026-09-26): cover is a fact on the row (`Covered for {name}` / `Covered by {name}`), never a toolbar button | — | Covering · Covered (alone) · Covering for others |
@@ -3593,7 +3593,7 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 | Progress | `Checks {n} of 3` |
 | The three checks | ⭐ `3 working days before · {date}` · ⭐ `2 working days before · {date}` · ⭐ `1 working day before · {date}`; not yet due `Opens {date}`; a check whose date was already behind the start `Passed before this delivery started` |
 | Check facts | `{company} has the delivery details` · `Details not received yet` · `Scheduled {date}` · `Not scheduled yet` · `No answer` · `Requested another date · {date}` · `Cannot deliver · {reason}` · `Nothing missing` |
-| Current action (line 1 · line 2) | `Assign logistics` · `Choose the company that carries this delivery` — ⭐ `Contact logistics today` (on or after the 3-day check; before it `Contact logistics`) · `Share the delivery details with {company}` — `Call {company}` · `Get the scheduled delivery date` — `Call the customer` · `Agree {date} with the customer, then record it` — `Decide the next step for this delivery` · `Keep {company} with a new date, or change logistics` — `Ask {company}` · `Record the driver and vehicle` / `Record the condo registration`; due `due {date}` · `Late — was due {date}` |
+| Current action (line 1 · line 2) | `Assign logistics` · `Choose the company that carries this delivery` — ⭐ `Contact logistics today` (on or after the 3-day check; before it `Contact logistics`) · `Share the delivery details with {company}` — `Call {company}` · `Get the scheduled delivery date` — `Call the customer` · `Agree {date} with the customer, then record it` — `Decide the next step for this delivery` · `Keep {company} with a new date, or change logistics` — `Ask {company}` · `Record the driver and vehicle` / `Record the condo registration`; due `due {date}` · `Late. Was due {date}` |
 | Day-before gaps (exceptions only) | `Goods not ready · {n of m}` · `Delivery Order not issued yet` · `Not received at {site} yet` · `Driver and vehicle not recorded` · `Condo registration not recorded` · `Hold delivery · RM {amount} unpaid` (only once money affects this delivery; the owner re-ruled the 2026-09-24 ⭐ `still to collect` to `unpaid` on 2026-09-25) · `Hold delivery · Finance hold · {reason}` |
 | Expanded section headings, in order | `Current action` · `Checks` · `Scheduled delivery` · `Assignment` · `Stock route` · `External link` · `Communication` · `Evidence and recent history` |
 | Stock route | ⭐ `Pickup from Carres Klang Warehouse` · ⭐ `Pickup from supplier` · ⭐ `Supplier sends directly to logistics` · `Supplier delivers to the customer` (the separate Ohana flow) · `Stock route not known yet`; lines `{PO No} · {supplier} · PO Delivery Date {date} · Received {date}` / `Not received yet` · `{n} Units reserved at {site}`; door `Open Purchasing` |

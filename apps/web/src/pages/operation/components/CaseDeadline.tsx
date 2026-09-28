@@ -104,7 +104,7 @@ export default function CaseDeadline({
           {extension && (
             <li className="rounded border border-base-200 bg-white px-2.5 py-1.5">
               <span className="block text-body text-base-800">
-                Deadline moved once — {fmtDate(clock.baseDueIso ?? "")} to{" "}
+                Deadline moved once: {fmtDate(clock.baseDueIso ?? "")} to{" "}
                 {fmtDate(extension.until ?? "")}
               </span>
               <span className="text-meta block text-base-500">
@@ -281,7 +281,7 @@ function RecordDeadlineForm({
           className="mt-1 block w-full rounded border border-base-300 bg-white px-2 py-1 text-body"
         >
           {/* No default — a silent default records a reason nobody chose. */}
-          <option value="">— pick one —</option>
+          <option value="">Pick one</option>
           {CASE_DELAY_REASONS.map((r) => (
             <option key={r} value={r}>
               {CASE_DELAY_REASON_LABEL[r]}
@@ -304,7 +304,7 @@ function RecordDeadlineForm({
 
       {kind === "extension" && movedUntil && movedUntil !== until && (
         <p className="text-meta text-base-600">
-          {fmtDate(until)} is not a working day — the deadline lands on {fmtDate(movedUntil)}.
+          {fmtDate(until)} is not a working day. The deadline lands on {fmtDate(movedUntil)}.
         </p>
       )}
 

@@ -254,7 +254,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       toast.error(
         first?.reason instanceof ApiError
           ? first.reason.message
-          : "Could not reserve — units may have been grabbed already",
+          : "Could not reserve. Units may have been grabbed already",
       );
     }
   }
@@ -313,7 +313,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       {/* Scope row — the same-model note + the sofa loan toggle. */}
       <div className="px-1.5 pt-1.5 pb-1 flex items-center justify-between gap-2 shrink-0">
         <span className="text-meta text-base-400 truncate">
-          {loanMode ? "any sofa — loan" : "same model + size"}
+          {loanMode ? "any sofa (loan)" : "same model + size"}
         </span>
         {isSofa && (
           <button
@@ -461,8 +461,8 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 : loanMode
                   ? "No free sofas in stock to loan."
                   : isSofa
-                    ? "No same-model sofa ready — try “Loan any sofa”."
-                    : "No same-model free stock — raise a PO."}
+                    ? "No same-model sofa ready. Try “Loan any sofa”."
+                    : "No same-model free stock. Raise a PO."}
             </div>
           )}
         </div>

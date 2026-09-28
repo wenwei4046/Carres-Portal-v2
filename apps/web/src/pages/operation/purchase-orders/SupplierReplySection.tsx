@@ -333,7 +333,7 @@ export default function SupplierReplySection({
         <button type="button" onClick={cancel} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3" data-testid="po-answer-cancel">Cancel</button>
         <button type="button" disabled={!ready} onClick={save} data-testid="po-answer-save"
           className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11">
-          {record.isPending ? "Saving…" : gap ? `Save — ${gap}` : "Save"}
+          {record.isPending ? "Saving…" : gap ? `Save: ${gap}` : "Save"}
         </button>
       </div>
       <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
