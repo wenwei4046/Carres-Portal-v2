@@ -202,7 +202,7 @@ with the Operation permission boundary kept. **Not removed yet:** the page's own
 **Scope F · Monthly demand — BUILT 2026-09-28, production walk owed.** The Sales Orders page has
 the shared 240px rail with a fixed `View` group (`Order list` · `Monthly demand`, kept in the URL as
 `?view=monthly`). Monthly demand's groups are `Period` (`Starting month` · `Months` 1 to 6, the
-resolved window printed beneath) · `Dealer / Sales Location` · `Delivery State / City` · `Product
+resolved window printed beneath) · `Dealer / Sales Location` · `Customer Delivery Location` · `Product
 category`, all single choice, no `Clear filters`; they live in the URL and never carry into the
 Order list. The page is two blocks: `This month · {Mon YYYY}` (`Total Qty` · `Delivered` · `Not
 delivered`, ONE month) and one table, one row per month (`Before` · six months · `After` · `No
@@ -218,7 +218,7 @@ counts; an unread SO Batch prints `Unavailable`, never zero. The kit admits `Doc
 3, its first column fixed while the rest scroll) and `TotalsSummary` (recipe 4), each with a `/ui`
 example. Measured at 1440 / 1180 / 820 / 743 / 390: no sideways page scroll, no dash, the table
 scrolls inside its own frame.
-**Order list rail — Dealer / Sales Location · Delivery State / City · Date · Delivery BUILT 2026-09-28,
+**Order list rail — Dealer / Sales Location · Customer Delivery Location · Date · Delivery BUILT 2026-09-28,
 production walk owed.** Each is a read-only fact filter: Delivery asks the one goods arithmetic
 (`registerDeliveryConditionOf` over `resolveUnitAllocation`: nothing sold · some sold · every
 committed unit sold; a service-only order is under All only); Date reads the chosen field (Proceed
@@ -667,17 +667,17 @@ operating model above is unchanged; this fixes how it is drawn and where every n
 
 - **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (Search · Export · Columns;
   no create button — owner 2026-09-27). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
-  top region with the view selector `Order list` · `Monthly demand`; the scrolling region shows only
+  top region with the kit `Tabs` bar `Order list` · `Monthly demand` (owner ruling 2026-09-28: a tab bar, not a collapsible group; every group closed until clicked, no description under a title); the scrolling region shows only
   the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
   months) and Export produces the matrix.
-- **Order list groups:** `Dealer / Sales Location` (multi-select with search) · `Delivery State /
-  City` (two selects) · `Date` (field select `Proceed Date` · `SO Doc Date` · `Customer Requested
+- **Order list groups:** `Dealer / Sales Location` (multi-select with search) · `Customer Delivery
+  Location` (two selects) · `Date` (field select `Proceed Date` · `SO Doc Date` · `Customer Requested
   Delivery Date` + range select `All dates` · `Today` · `This week` · `This month` · `Custom`) ·
   `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
   (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
   cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
   select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
-  `Dealer / Sales Location` · `Delivery State / City` · `Product category` (multi-select, no
+  `Dealer / Sales Location` · `Customer Delivery Location` · `Product category` (multi-select, no
   search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
 - **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +

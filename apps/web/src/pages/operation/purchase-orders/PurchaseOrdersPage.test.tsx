@@ -253,9 +253,17 @@ vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: vi.fn() }));
 
 import PurchaseOrdersPage from "./PurchaseOrdersPage";
 import { apiFetch } from "@/lib/api";
+import { openRailGroups } from "@/test/rail";
+
+/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 
 function renderPage(path = "/operation/procurement") {
-  return render(
+  return renderOpen(
     <MemoryRouter initialEntries={[path]}>
       <PurchaseOrdersPage />
     </MemoryRouter>,

@@ -25,6 +25,14 @@ import type {
   DeliveryOrderRow,
   DeliveryOrdersRegisterPayload,
 } from "@/lib/queries";
+import { openRailGroups } from "@/test/rail";
+
+/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 
 let hookState: {
   data: DeliveryOrdersRegisterPayload | undefined;
@@ -102,7 +110,7 @@ function mount(
     return null;
   }
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  renderOpen(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <LocationTap />

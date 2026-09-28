@@ -58,7 +58,7 @@ On a conflict, Business wins.
   (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
   recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
   **card titles are black bold `text-strong`, never blue** · **column separators by column
-  count** · **rail = icon + title + one supporting line** · **header filter icons on hover only**.
+  count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28, overwrites 2026-09-27)** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's

@@ -505,7 +505,7 @@ function postedDetail(over?: {
 
 function renderWithProviders(ui: React.ReactElement, entry = "/operation?tab=receiving") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return renderOpen(
     <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
     </MemoryRouter>,
@@ -1647,6 +1647,14 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
 /* ═══ THE RETIRED WORDS — a source scan across every Receiving surface ═════ */
 
 import { visibleStrings } from "../../test/banned-words";
+import { openRailGroups } from "@/test/rail";
+
+/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 
 /**
  * Owner correction 2026-09-06 §3: `Actual Site`, `Delivery Location` and
