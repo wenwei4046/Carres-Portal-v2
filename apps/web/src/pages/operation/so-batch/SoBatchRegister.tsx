@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ApiError, apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import {
@@ -20,6 +23,8 @@ import {
   soBatchOrderUnselectableReason,
   soBatchOrderStatusWhy,
   soBatchLeafStatusWhy,
+  soBatchLineReservedWhy,
+  readyStockRefusalWord,
   soBatchOrderSafetyDays,
   soBatchOrderStatusWord,
   soBatchOrderByAbsenceWord,
@@ -221,12 +226,60 @@ function Absent({ children }: { children: string }) {
 }
 
 /** Where each Status line-two door leads — the existing Operation destinations. */
-const STATUS_DOOR_PATH: Record<SoBatchStatusDoor, string> = {
+const STATUS_DOOR_PATH: Record<Exclude<SoBatchStatusDoor, "use_po">, string> = {
   /* The Operation costing Catalog (SKU, supplier, cost) — `portal-nav.ts` `op-catalog`. */
   catalog: "/operation?tab=op-catalog",
   /* Purchasing Settings owns production days and collection. */
   settings: "/operation/settings/purchasing",
 };
+
+/** The kit link-style door on Status line two (slice 1's `Fix in Catalog`). */
+const STATUS_DOOR_CLASS =
+  "text-kit-blue-11 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
+
+/**
+ * ⭐ `Use this PO` — owner ruling 2026-09-28 (Purchasing §9.1). Reserves the
+ * named PO's incoming Unit IDs for the named item line through the one door
+ * (`/ready-stock/use-po`, 0600). Disabled while the act is in flight; a
+ * refusal prints the door's own governed sentence. The Register is re-read,
+ * never edited in place.
+ */
+function UseThisPoButton({ orderId, usePo }: { orderId: string; usePo: { orderLineId: string; poId: string } }) {
+  const queryClient = useQueryClient();
+  const reserve = useMutation({
+    mutationFn: () =>
+      apiFetch<unknown>("/api/operation/purchase/demands/ready-stock/use-po", {
+        method: "POST",
+        body: JSON.stringify({ orderId, orderLineId: usePo.orderLineId, poId: usePo.poId }),
+      }),
+    onError: (e: Error) => {
+      const code = e instanceof ApiError ? ((e.body as { code?: string } | null)?.code ?? null) : null;
+      toast.error(readyStockRefusalWord(code));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void queryClient.invalidateQueries({ queryKey: ["so-batch-ready-stock", orderId] });
+      void queryClient.invalidateQueries({ queryKey: ["operation", "orders", orderId, "expansion"] });
+    },
+  });
+  return (
+    <button
+      type="button"
+      className={STATUS_DOOR_CLASS}
+      disabled={reserve.isPending}
+      aria-busy={reserve.isPending || undefined}
+      data-testid={`so-batch-use-po-${usePo.orderLineId}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        reserve.mutate();
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {W.statusUseThisPo}
+    </button>
+  );
+}
 
 /**
  * ⭐ STATUS LINE TWO — owner ruling 2026-09-28 (Purchasing §9.1).
@@ -237,20 +290,24 @@ const STATUS_DOOR_PATH: Record<SoBatchStatusDoor, string> = {
 function StatusWhy({
   why,
   testId,
+  orderId,
   onDoor,
 }: {
   why: SoBatchStatusWhy;
   testId: string;
-  onDoor: (door: SoBatchStatusDoor) => void;
+  orderId: string;
+  onDoor: (door: Exclude<SoBatchStatusDoor, "use_po">) => void;
 }) {
   const door = why.door;
   return (
     <span className="block text-meta text-kit-slate-11" data-testid={testId}>
       <span className="block">{why.text}</span>
-      {door ? (
+      {door === "use_po" && why.usePo ? (
+        <UseThisPoButton orderId={orderId} usePo={why.usePo} />
+      ) : door && door !== "use_po" ? (
         <button
           type="button"
-          className="text-kit-blue-11 underline-offset-2 hover:underline"
+          className={STATUS_DOOR_CLASS}
           onClick={(e) => {
             e.stopPropagation();
             onDoor(door);
@@ -755,6 +812,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
                 <StatusWhy
                   why={why}
                   testId={`so-batch-status-why-${o.orderId}`}
+                  orderId={o.orderId}
                   onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
                 />
               ) : null}
@@ -1744,16 +1802,22 @@ function SoBatchOrderExpansion({
       /* Line two (owner ruling 2026-09-28): the leaf's own refusal, only
          beside `Need PO`, from the facts the refused tick reads. */
       ...(() => {
+        /* Beside `Need PO`, the leaf's refusal, where a pool-covered line reads
+           the `Use this PO` offer; beside `No PO needed`, the goods reserved
+           on a PO for this line (owner ruling 2026-09-28). */
         const why =
-          leaf && soBatchOrderLineOutstandingQty(l) > 0
-            ? soBatchLeafStatusWhy(leaf, order.status, stateWords)
-            : null;
+          soBatchOrderLineOutstandingQty(l) > 0
+            ? leaf
+              ? soBatchLeafStatusWhy(leaf, order.status, stateWords, l)
+              : null
+            : soBatchLineReservedWhy(l);
         return why
           ? {
               statusNote: (
                 <StatusWhy
                   why={why}
                   testId={`so-batch-line-status-why-${l.orderLineId}`}
+                  orderId={order.orderId}
                   onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
                 />
               ),

@@ -21,6 +21,7 @@ import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import {
+  buildMayBuyOverPool,
   loadToOrder,
   readFreeStock,
   todayIso,
@@ -405,7 +406,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
        purchase order every time. Production carries the proof: six open POs,
        each sourcing the SAME 1-unit order line of SO-1340 (2026-09-04/05).
        The door now refuses the receipt BY NAME, whatever the screen showed. */
-    if (hit.build.fullyOnPo) {
+    /* ⭐ Owner ruling 2026-09-28 (Purchasing §9.1): a build covered ONLY by
+       the anonymous pool — no exact lineage from this Sales Order line, a
+       `Use this PO` offer standing — may be bought instead. Exact lineage and
+       bound Units are still refused here, which is what 0430 protects. */
+    if (hit.build.fullyOnPo && !buildMayBuyOverPool(hit.build, res.data)) {
       return refuse(c, 422, "already_on_po", {
         po: hit.build.coveredByOpenPoPos?.[0] ?? null,
       });

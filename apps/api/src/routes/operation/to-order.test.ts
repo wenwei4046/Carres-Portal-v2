@@ -307,6 +307,10 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
         error: null,
       };
     }
+    /* 0600 · the `Use this PO` offer — none unless a test names one. */
+    if (fn === "purchasing_po_free_units") {
+      return (tables.__poFree as { data: unknown; error: unknown } | undefined) ?? { data: [], error: null };
+    }
     if (fn === "purchasing_issue_pos_batch") {
       const pos = (args.p_pos as unknown[]) ?? [];
       const ids = pos.map(() => `PO-${(poSeq += 1)}`);
@@ -1346,6 +1350,60 @@ describe("the batch issue refuses before it creates anything", () => {
     expect(res.status).toBe(422);
     expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  /* ⭐ Owner ruling 2026-09-28 (Purchasing §9.1): "the operator may ignore
+     [the Use this PO offer] and tick the row to issue a new PO instead; the
+     second line never blocks buying". 0430 still refuses exact lineage. */
+  function poolCovered(lineage: boolean) {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.purchase_order_lines = {
+      data: [{ id: "pol-2051", po_id: "PO-2051", sku: "5539-1A(LHF)", qty: 5, received_qty: 0, purchase_orders: { status: "open" } }],
+      error: null,
+    };
+    t.__poFree = {
+      data: [{ po_id: "PO-2051", po_line_id: "pol-2051", sku: "5539-1A(LHF)", free_units: 5 }],
+      error: null,
+    };
+    if (lineage) {
+      t.po_line_sources = {
+        data: [{ order_line_id: "e1", qty: 1, purchase_orders: { status: "open" } }],
+        error: null,
+      };
+    }
+    return t;
+  }
+  async function issueO2(t: Record<string, { data: unknown; error: unknown }>) {
+    const sb = makeSb(t as never);
+    const demands = await readyDemands(sb);
+    const receipt = demands.find((d) => d.orderId === "o2")!;
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [{ demandId: receipt.demandId, allocations: [{ destinationId: KLANG, qty: receipt.qty }] }],
+      documentDecisions: pricedAll([receipt], KLANG),
+    });
+    return { res, sb };
+  }
+
+  it("a line covered ONLY by the anonymous pool, with a Use this PO offer, is bought instead", async () => {
+    const { res, sb } = await issueO2(poolCovered(false));
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("a line covered by EXACT lineage from this Sales Order line is still refused (0430)", async () => {
+    const { res, sb } = await issueO2(poolCovered(true));
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a pool-covered line with NO free goods on any PO is still refused", async () => {
+    const t = poolCovered(false);
+    t.__poFree = { data: [], error: null };
+    const { res } = await issueO2(t);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
   });
 
   it("an allocation total that does not equal the server's own remainder", async () => {

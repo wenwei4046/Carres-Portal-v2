@@ -194,6 +194,11 @@ export interface SoRegisterLineFact {
   qty: number;
   /** Units already committed out of ready stock for this line. */
   stockTaken: number;
+  /**
+   * 0600 — Unit IDs still `incoming` on an open PO that `Use this PO` bound to
+   * this line, per PO. They cover the line beside `stockTaken`.
+   */
+  poReserved?: Array<{ poId: string; qty: number }>;
   modelName: string | null;
   variant: string | null;
   category: string | null;
@@ -238,7 +243,43 @@ export type Loaded = {
    * To Order response is byte-identical with or without them.
    */
   registerFacts: RegisterFacts;
+  /**
+   * 0600 — per `stockMatchKey`, the open POs whose incoming Unit IDs no order
+   * holds (`purchasing_po_free_units`), merged per PO and sorted by PO No.
+   * `null` = the balance could not be read; absent = nothing was demanded.
+   */
+  poFreeByKey?: Map<string, { poId: string; qty: number }[]> | null;
+  /**
+   * Exact PO lineage per Sales Order item line: Σ `po_line_sources.qty` on
+   * non-cancelled POs (the same rows `so_line_remaining_requirement` reads).
+   */
+  lineageByLine?: Map<string, number>;
 };
+
+/**
+ * ⭐ THE ONE RULE for "may this pool-covered build still be bought?" — owner
+ * ruling 2026-09-28 (Purchasing §9.1): the operator may ignore the `Use this
+ * PO` offer and issue a new PO; the second line never blocks buying.
+ *
+ * TRUE only when the engine says `fullyOnPo`, NO line of the build has exact
+ * PO lineage (a PO already sourced from that Sales Order line — the 0430
+ * duplicate-PO shape stays refused), and every line's goods have a free-PO
+ * offer (`purchasing_po_free_units`). Bound Units are already netted out of
+ * the build before the engine sees it. The Register's tick and the issue
+ * door both ask THIS (Law D).
+ */
+export function buildMayBuyOverPool(
+  build: { fullyOnPo?: boolean; lines: readonly { lineId: string; sku: string }[] },
+  data: Pick<Loaded, "poFreeByKey" | "lineageByLine">,
+): boolean {
+  if (build.fullyOnPo !== true || build.lines.length === 0) return false;
+  if (!data.poFreeByKey || !data.lineageByLine) return false;
+  return build.lines.every(
+    (l) =>
+      (data.lineageByLine!.get(l.lineId) ?? 0) === 0 &&
+      (data.poFreeByKey!.get(stockMatchKey(l.sku))?.some((o) => o.qty > 0) ?? false),
+  );
+}
 
 /**
  * P10 — the ONE reference a drawn unit is committed to, for a row of this
@@ -815,6 +856,41 @@ export async function loadToOrder(
    * refresh name a different purchase order for the same unit.
    */
   const openPoRefs: Record<string, { poId: string; qty: number }[]> = {};
+  /**
+   * ⭐ 0600 · GOODS RESERVED ON A PO (owner ruling 2026-09-28, §9.1). A Unit ID
+   * still `incoming` that `Use this PO` bound to a Sales Order line is EXACT
+   * lineage for that line and no longer part of the anonymous pool: the PO
+   * line's remaining quantity stops counting it (Law D — the SQL twin is
+   * `so_line_remaining_requirement` / `purchasing_po_line_free_units`), and
+   * the line it answers is netted below exactly like a Ready Stock binding.
+   * A failed read refuses the response rather than cover a line twice.
+   */
+  const boundIncomingByPoLine = new Map<string, number>();
+  const boundIncomingByLine = new Map<string, Map<string, number>>();
+  {
+    const read = await readAllPages<Record<string, unknown>>((a, b) => sb
+      .from("ops_stock_items")
+      .select("id, qty, status, po_no, po_line_id, reserved_order_line_id")
+      .eq("status", "incoming")
+      .not("reserved_order_line_id", "is", null)
+      .order("id", { ascending: true })
+      .range(a, b));
+    if ("error" in read || !("rows" in read)) {
+      return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
+    }
+    for (const r of read.rows) {
+      /* The SQL narrows it; this keeps the rule true under a permissive read. */
+      if (r.status !== "incoming" || !r.reserved_order_line_id) continue;
+      const n = Math.max(1, Number(r.qty ?? 1));
+      const poLine = (r.po_line_id as string | null) ?? null;
+      if (poLine) boundIncomingByPoLine.set(poLine, (boundIncomingByPoLine.get(poLine) ?? 0) + n);
+      const lineId = r.reserved_order_line_id as string;
+      const poNo = (r.po_no as string | null) ?? "";
+      const per = boundIncomingByLine.get(lineId) ?? new Map<string, number>();
+      per.set(poNo, (per.get(poNo) ?? 0) + n);
+      boundIncomingByLine.set(lineId, per);
+    }
+  }
   {
     // Paged and fail-closed. Read once with no `.range()` this was the same
     // unbounded read the Finance department filter shipped twice: past 1000
@@ -824,7 +900,7 @@ export async function loadToOrder(
     // miss or repeat a row across two pages.
     const read = await readAllPages<Record<string, unknown>>((a, b) => sb
       .from("purchase_order_lines")
-      .select("po_id, sku, qty, received_qty, purchase_orders!inner(status)")
+      .select("id, po_id, sku, qty, received_qty, purchase_orders!inner(status)")
       .eq("purchase_orders.status", "open")
       .order("id", { ascending: true })
       .range(a, b));
@@ -840,7 +916,9 @@ export async function loadToOrder(
       };
     }
     for (const r of read.rows) {
-      const remaining = Number(r.qty ?? 0) - Number(r.received_qty ?? 0);
+      const remaining =
+        Number(r.qty ?? 0) - Number(r.received_qty ?? 0) -
+        (boundIncomingByPoLine.get(r.id as string) ?? 0);
       if (remaining <= 0) continue;
       const sku = r.sku as string;
       openPoBySku[sku] = (openPoBySku[sku] ?? 0) + remaining;
@@ -916,13 +994,17 @@ export async function loadToOrder(
   try {
     const { data: boundRows, error: boundErr } = await sb
       .from("ops_stock_items")
-      .select("id, unit_code, qty, reserved_order_line_id")
+      .select("id, unit_code, qty, status, reserved_order_line_id")
       .not("reserved_order_line_id", "is", null)
       .in("status", ["reserved", "sold"]);
     if (boundErr) throw new Error(boundErr.message);
     for (const r of (boundRows ?? []) as Record<string, unknown>[]) {
       const lineId = r.reserved_order_line_id as string;
       if (!lineId) continue;
+      /* 0600 — a Unit reserved on its PO (still `incoming`) is not Ready
+         Stock; it is netted by the PO binding above. The SQL narrows it; this
+         keeps the split true under a permissive read. */
+      if (r.status != null && r.status !== "reserved" && r.status !== "sold") continue;
       boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + Math.max(1, Number(r.qty ?? 1)));
       boundUnitIds.add(r.id as string);
       const code = (r.unit_code as string | null) ?? null;
@@ -1014,6 +1096,17 @@ export async function loadToOrder(
       // A typed demand's `qty` IS `remaining_qty` and is already net.
       if (!l.readyStock) l.qty = Math.max(0, l.qty - take);
     }
+    /* 0600 — Unit IDs reserved on a PO for THIS line cover it next, never
+       beyond what the customer ordered. */
+    const onPo = l.readyStock ? undefined : boundIncomingByLine.get(l.lineId);
+    const poReserved = onPo
+      ? [...onPo].map(([poId, qty]) => ({ poId, qty })).sort((a, b) => a.poId.localeCompare(b.poId))
+      : [];
+    const poTake = Math.max(
+      0,
+      Math.min(poReserved.reduce((n, r) => n + r.qty, 0), ceiling - take),
+    );
+    if (poTake > 0) l.qty = Math.max(0, l.qty - poTake);
     // Nothing left to buy is not a row — the same rule an open purchase order
     // has always had.
     //
@@ -1046,8 +1139,9 @@ export async function loadToOrder(
         lineId: l.lineId,
         orderId: l.orderId,
         sku: l.sku,
-        qty: l.qty + (l.takenFromStock ?? 0),
+        qty: l.qty + (l.takenFromStock ?? 0) + poTake,
         stockTaken: l.takenFromStock ?? 0,
+        ...(poReserved.length > 0 ? { poReserved } : {}),
         modelName: l.modelName,
         variant: l.variant,
         category: l.category,
@@ -1109,6 +1203,72 @@ export async function loadToOrder(
         (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
       ),
       registerFacts: { lines: registerLines, ordersById: registerOrders, soLines },
+      poFreeByKey: await readPoFreeByKey(sb),
+      lineageByLine: await readLineageByLine(sb, orderIds),
     },
   };
+}
+
+/**
+ * Exact lineage per item line. Fails soft to `undefined`: without it no build
+ * is treated as pool-only, so the 0430 refusal stands.
+ */
+async function readLineageByLine(
+  sb: ReturnType<typeof userClient>,
+  orderIds: readonly string[],
+): Promise<Map<string, number> | undefined> {
+  const out = new Map<string, number>();
+  for (const batch of chunk([...orderIds])) {
+    const { data, error } = await sb
+      .from("po_line_sources")
+      .select("order_line_id, qty, purchase_orders!inner(status)")
+      .in("order_id", batch)
+      .neq("purchase_orders.status", "cancelled");
+    if (error) {
+      console.error("PO lineage unavailable", error.message);
+      return undefined;
+    }
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const po = r.purchase_orders as { status?: string } | null;
+      if (po?.status === "cancelled") continue;
+      const id = r.order_line_id as string | null;
+      if (!id) continue;
+      out.set(id, (out.get(id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
+    }
+  }
+  return out;
+}
+
+/**
+ * 0600 — the `Use this PO` offer, read from `purchasing_po_free_units` (the
+ * ONE arithmetic of what an open PO line has that no order holds). Keyed by
+ * `stockMatchKey` like the Ready Stock offer, merged per PO, sorted by PO No.
+ * Fails soft to `null`: the line then prints `Coverage not checked`, never a
+ * number nobody read.
+ */
+async function readPoFreeByKey(
+  sb: ReturnType<typeof userClient>,
+): Promise<Map<string, { poId: string; qty: number }[]> | null> {
+  try {
+    const { data, error } = await sb.rpc("purchasing_po_free_units");
+    if (error) throw new Error(error.message);
+    const byKey = new Map<string, Map<string, number>>();
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const n = Math.max(0, Number(r.free_units ?? 0));
+      if (n <= 0) continue;
+      const key = stockMatchKey(r.sku as string);
+      const per = byKey.get(key) ?? new Map<string, number>();
+      per.set(r.po_id as string, (per.get(r.po_id as string) ?? 0) + n);
+      byKey.set(key, per);
+    }
+    return new Map(
+      [...byKey].map(([key, per]) => [
+        key,
+        [...per].map(([poId, qty]) => ({ poId, qty })).sort((a, b) => a.poId.localeCompare(b.poId)),
+      ]),
+    );
+  } catch (e) {
+    console.error("purchase order free balance unavailable", (e as Error).message);
+    return null;
+  }
 }

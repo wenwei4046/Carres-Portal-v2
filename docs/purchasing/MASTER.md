@@ -1399,7 +1399,7 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). APPROVED TARGET / NOT BUILT.**
+**RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). BUILT on branch build/purchasing-use-this-po (migration 0600 not yet applied).**
 Measured on production `b5e959d6`: SO-1358 (Ohana Fenrir King, qty 1) printed five
 contradicting facts on one row — `Need PO` · `Already on a PO` · `Not ordered yet` · `No purchase
 needed` · tick refused with `Nothing to buy` — because an open PO carried an unreserved quantity of

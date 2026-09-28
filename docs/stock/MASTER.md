@@ -140,7 +140,7 @@ page or integration maintains another available quantity.
 | received, inspected, complete, unreserved and uncontrolled | Available |
 | bound by Sales Order | Reserved / sold |
 | ordered but not received | Incoming |
-| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; APPROVED TARGET / NOT BUILT) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
+| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; BUILT on branch build/purchasing-use-this-po, migration 0600 not yet applied) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
 | between confirmed handovers | In transit |
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |

@@ -10,6 +10,8 @@ vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import {
   addWorkingDays,
   myHolidaySet,
+  soBatchOrderLineOutstandingQty,
+  isSelectableForOrder,
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
@@ -396,6 +398,10 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
         error: null,
       };
     }
+    /* 0600 · the `Use this PO` offer — none unless a test names one. */
+    if (fn === "purchasing_po_free_units") {
+      return tables.__poFree ?? { data: [], error: null };
+    }
     return { data: null, error: null };
   });
   return { from, rpc, writes, filters, rpcCalls };
@@ -744,8 +750,14 @@ describe("the guard, and the promise not to write", () => {
     expect(sb.writes).toEqual([]);
     /* `purchasing_po_actor` is `stable` and writes nothing — it is a READ that
        happens to be a function, because the duty and cover answer is one rule
-       and not two table joins repeated on four surfaces (0379). */
-    expect(sb.rpcCalls).toEqual(["purchasing_po_actor", "purchasing_actor_may_issue"]);
+       and not two table joins repeated on four surfaces (0379).
+       `purchasing_po_free_units` (0600) is `stable` too: the `Use this PO`
+       offer is READ from the one arithmetic, never written. */
+    expect(sb.rpcCalls).toEqual([
+      "purchasing_po_free_units",
+      "purchasing_po_actor",
+      "purchasing_actor_may_issue",
+    ]);
   });
 });
 
@@ -1517,5 +1529,79 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
     expect(body.poWindowsUnavailable).toBe(true);
     expect(body.rows.every((r) => r.poWindow == null)).toBe(true);
     expect(body.rows.length).toBeGreaterThan(0);
+  });
+});
+
+describe("0600 · RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28)", () => {
+  const l7 = (body: SoBatchPurchaseResponse) =>
+    registerRow(body, "o4")!.lines.find((l) => l.orderLineId === "l7")!;
+
+  it("offers the open PO whose incoming Unit IDs no order holds, from the one SQL arithmetic", async () => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.__poFree = {
+      data: [
+        { po_id: "PO-2051", po_line_id: "pol-2051", sku: "COV-K", free_units: 2 },
+        { po_id: "PO-2051", po_line_id: "pol-2051b", sku: "COV-K", free_units: 1 },
+      ],
+      error: null,
+    };
+    const { body } = await rowsOf(t);
+    expect(l7(body).poOffer).toEqual({ poId: "PO-2051", qty: 3 });
+    expect(l7(body).poOfferUnread).toBeUndefined();
+  });
+
+  it("no PO with free goods is `null`, never a guess", async () => {
+    const { body } = await rowsOf();
+    expect(l7(body).poOffer).toBeNull();
+  });
+
+  it("a free balance that cannot be read is stated as unread, never a number", async () => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.__poFree = { data: null, error: { message: "function does not exist" } };
+    const { body } = await rowsOf(t);
+    expect(l7(body).poOfferUnread).toBe(true);
+    expect(l7(body).poOffer).toBeUndefined();
+  });
+
+  it("a line covered ONLY by the pool, with an offer, stays tickable (poolOnly); exact lineage does not", async () => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.__poFree = {
+      data: [{ po_id: "PO-2051", po_line_id: "pol-2051", sku: "COV-K", free_units: 3 }],
+      error: null,
+    };
+    const pool = await rowsOf(t);
+    const covered = bySku(pool.rows, "COV-K")!;
+    expect(covered.fullyOnPo).toBe(true);
+    expect(covered.poolOnly).toBe(true);
+    expect(isSelectableForOrder(covered, "blank")).toBe(true);
+
+    t.po_line_sources = {
+      data: [{ id: "s1", po_id: "PO-2051", po_line_id: "pol-2051", order_id: "o4", order_line_id: "l7", qty: 3,
+        purchase_orders: { status: "open" } }],
+      error: null,
+    };
+    const exact = await rowsOf(t);
+    const lined = bySku(exact.rows, "COV-K")!;
+    expect(lined.poolOnly).toBeUndefined();
+    expect(isSelectableForOrder(lined, "blank")).toBe(false);
+  });
+
+  it("a Unit reserved on its PO covers exactly its line, is not Ready Stock, and leaves the pool", async () => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.ops_stock_items = {
+      data: ["u1", "u2", "u3"].map((id) => ({
+        id, unit_code: null, qty: 1, status: "incoming", po_no: "PO-2051",
+        po_line_id: "pol-2051", reserved_order_line_id: "l7",
+      })),
+      error: null,
+    };
+    const { body } = await rowsOf(t);
+    const line = l7(body);
+    expect(line.poReserved).toEqual([{ poId: "PO-2051", qty: 3 }]);
+    expect(line.stockTaken).toBe(0);
+    expect(line.qty).toBe(3);
+    expect(soBatchOrderLineOutstandingQty(line)).toBe(0);
+    /* Covered by its own binding, the line leaves the buying leaves. */
+    expect(body.rows.some((r) => r.lineIds.includes("l7"))).toBe(false);
   });
 });

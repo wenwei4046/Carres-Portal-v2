@@ -2530,6 +2530,91 @@ describe("the two-line Status rule", () => {
     expect(screen.getByTestId("so-batch-status-why-ob")).toHaveTextContent("Already on a PO");
   });
 
+  /* ⭐ RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28). */
+  function coveredWithOffer(line: Record<string, unknown>) {
+    const base = blockedOrder("can_order_early", { fullyOnPo: true });
+    const order = base.registerRows[0]!;
+    return { ...base, registerRows: [{ ...order, lines: [{ ...order.lines[0]!, ...line }] }] };
+  }
+
+  it("a pool-covered line reads `{PO No} has {n} {Item} available.` with `Use this PO`, never `Already on a PO`", async () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    const cell = screen.getByTestId("so-batch-status-ob");
+    expect(cell).toHaveTextContent("Need PO");
+    const why = within(cell).getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(why).not.toHaveTextContent("Already on a PO");
+    fireEvent.click(within(why).getByRole("button", { name: "Use this PO" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/api/operation/purchase/demands/ready-stock/use-po",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    const call = apiFetch.mock.calls.find((c) => c[0] === "/api/operation/purchase/demands/ready-stock/use-po")!;
+    expect(JSON.parse((call[1] as { body: string }).body)).toEqual({
+      orderId: "ob", orderLineId: "lb1", poId: "PO260924-4827",
+    });
+    /* The door does not also open the row. */
+    expect(screen.queryByTestId("so-batch-inspector-ob")).not.toBeInTheDocument();
+  });
+
+  it("the offer never blocks buying: a pool-only line stays tickable and still shows `Use this PO`", () => {
+    const base = blockedOrder("can_order_early", { fullyOnPo: true, poolOnly: true, orderBy: "2026-10-01" });
+    const order = base.registerRows[0]!;
+    renderRegister({
+      ...base,
+      registerRows: [{ ...order, lines: [{ ...order.lines[0]!, poOffer: { poId: "PO260924-4827", qty: 2 } }] }],
+    });
+    expect(screen.getByTestId("so-batch-select-ob")).not.toBeDisabled();
+    const why = screen.getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(within(why).getByRole("button", { name: "Use this PO" })).toBeInTheDocument();
+  });
+
+  it("a line covered by exact lineage (no poolOnly) stays refused", () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+  });
+
+  it("the item line carries the same offer and door", async () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+    const box = await screen.findByTestId("so-batch-inspector-ob");
+    const why = within(box).getByTestId("so-batch-line-status-why-lb1");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(within(why).getByRole("button", { name: "Use this PO" })).toBeInTheDocument();
+  });
+
+  it("a PO balance that could not be read says `Coverage not checked`, never a number", () => {
+    renderRegister(coveredWithOffer({ poOfferUnread: true }));
+    const why = screen.getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("Coverage not checked");
+    expect(within(why).queryByRole("button")).toBeNull();
+  });
+
+  it("goods reserved on a PO read `No PO needed` · `{n} {Item} on {PO No} is reserved for this order.`", async () => {
+    const order = orderRow({
+      orderId: "or",
+      so: 1501,
+      customer: "RESERVED ONE",
+      status: "blank",
+      lines: [
+        { orderLineId: "lr1", sku: "B1201S-K", qty: 1, stockTaken: 0, item: "Booqit", variant: "King",
+          category: "mattress", pos: [], poReserved: [{ poId: "PO260924-4827", qty: 1 }] },
+      ],
+    });
+    renderRegister({ rows: [], registerRows: [order] });
+    const cell = screen.getByTestId("so-batch-status-or");
+    expect(cell).toHaveTextContent("No PO needed");
+    expect(within(cell).getByTestId("so-batch-status-why-or"))
+      .toHaveTextContent("1 Booqit King on PO260924-4827 is reserved for this order.");
+    fireEvent.click(screen.getByTestId("so-batch-expand-or"));
+    const box = await screen.findByTestId("so-batch-inspector-or");
+    expect(within(box).getByTestId("so-batch-line-status-why-lr1"))
+      .toHaveTextContent("1 Booqit King on PO260924-4827 is reserved for this order.");
+  });
+
   it("a tickable order carries no second line", () => {
     renderRegister();
     expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent(/^Need PO$/);

@@ -171,6 +171,27 @@ export const readyStockSaveInputSchema = z.object({
 });
 export type ReadyStockSaveInput = z.infer<typeof readyStockSaveInputSchema>;
 
+/**
+ * ⭐ `Use this PO` — owner ruling 2026-09-28 (Purchasing §9.1). Binds as many of
+ * ONE open PO's incoming Unit IDs that no order holds as this item line still
+ * needs, all or none (0600 `so_batch_use_po_units`). The browser names the
+ * line and the PO; the door picks the Units and re-derives every number.
+ */
+export const readyStockUsePoInputSchema = z.object({
+  orderId: z.string().min(1),
+  orderLineId: z.string().uuid(),
+  poId: z.string().min(1),
+});
+export type ReadyStockUsePoInput = z.infer<typeof readyStockUsePoInputSchema>;
+
+export const readyStockUsePoResultSchema = z.object({
+  reserved: z.number().int(),
+  poId: z.string(),
+  reference: z.string(),
+  units: z.array(z.object({ itemId: z.string(), orderLineId: z.string() })),
+});
+export type ReadyStockUsePoResult = z.infer<typeof readyStockUsePoResultSchema>;
+
 export const readyStockSaveResultSchema = z.object({
   /** How many Units the line now stands at, after the replacement. */
   reserved: z.number().int(),
@@ -228,6 +249,10 @@ export const READY_STOCK_REFUSAL_WORDS: Record<string, string> = {
   order_line_not_in_order: "That item line is no longer on this Sales Order.",
   too_many_units: "Choose at most 50 Units at a time.",
   no_reference: "This Sales Order has no number yet.",
+  /* 0600 · `Use this PO` (owner ruling 2026-09-28). */
+  po_has_no_free_units: "That PO has no goods left that no order holds.",
+  po_goods_held: "That PO has no goods left that no order holds.",
+  po_not_open: "That PO is no longer open.",
 };
 
 export function readyStockRefusalWord(code: string | null | undefined): string {
