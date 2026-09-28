@@ -5382,6 +5382,21 @@ Do not include an unconfirmed price as an accepted supplier-document term. Price
 the CO PDF remains a separate unresolved decision. Existing Carres-purchase MPR/PO approvals
 are unchanged; this ruling is scoped to the consignment arrangement, not a portal-wide bypass.
 
+**CO FACTS AND ROLE-SCOPED WORK — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+The CO surface separates goods arrangements (incoming destination, delivery party/date, exact
+outgoing Units, collection party/date and actual quantity/evidence) from commercial conditions
+(supplier quotation/version, recorded price and Sales confirmation or unresolved questions).
+Operation sees the admitted document/arrangement actions without a price-confirmation gate;
+the original negotiating Sales person sees outstanding quotation/confirmation work; Warehouse
+sees the exact goods and the receiving/handover work it owns. These are projections of owning
+module records through Workspace, not a second task or status ledger. No new generic owner,
+manual Done control or fabricated deadline is introduced. Actual receipt/handover evidence closes
+only the covered physical obligation; outstanding Sales commercial follow-up remains visible
+until its own attributable confirmation exists. Partial results retain the remaining scope.
+Use the same owning forms inside Workspace and the module surface, preserving existing Duty,
+cover, permission and actual-actor rules. Detailed Work admission follows Workspace authority;
+this approved target is not a claim that any of these projections are implemented.
+
 **Commercial and physical connections:** Carres purchases follow Manual Purchase approval → PO;
 supplier-owned placement follows CO; consignment swap connects incoming goods and an outgoing
 CRTN; removal of Carres-owned goods uses the governed Stock movement, not an invented purchase.
