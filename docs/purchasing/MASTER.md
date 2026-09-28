@@ -5348,6 +5348,24 @@ may not invent the answer or negotiate/set the price. Both paths create the same
 Display Request, not separate queues or duplicate supplier orders. This ruling permits proxy
 entry, not supplier-document issuance, commercial approval or changing Stock through that entry.
 
+**SUPPLIER QUOTATION RECORDING — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Operation may upload a supplier quotation and transcribe its model/specification, prices and terms
+into the same showroom arrangement. Recording a quotation is not negotiation, Sales confirmation,
+purchase approval or a payable. Keep the supplier evidence, quotation version, actual recorder and
+time, and the original negotiating Sales person. A quote consistent with an already evidenced
+Sales agreement may be recorded against that agreement; do not fabricate a new confirmation by
+Operation. A newly received quote without acceptance remains awaiting Sales confirmation. A
+mismatch against Sales's agreement identifies the difference and goes to that Sales person to
+resolve with the supplier; Operation cannot guess which price wins. Missing price is unknown,
+never RM0. Retain previous quotations and the history of revisions; neither a replacement quote
+nor a later Catalog price overwrites the historical arrangement. Reuse the recorded product facts
+for governed Catalog entry rather than asking staff to retype them, without bypassing Catalog's
+write authority. Existing commercial and Manual Purchase approval remains in force.
+This approves recording and responsibility only: whether price appears on the supplier-facing CO
+PDF, and whether an unconfirmed quotation blocks CO issue, remain unresolved business policy.
+No screen labels, new approval role, automatic quotation extraction or application build is
+approved by this ruling.
+
 **Commercial and physical connections:** Carres purchases follow Manual Purchase approval → PO;
 supplier-owned placement follows CO; consignment swap connects incoming goods and an outgoing
 CRTN; removal of Carres-owned goods uses the governed Stock movement, not an invented purchase.
@@ -5376,6 +5394,10 @@ duplicate arrangement, incomplete negotiated terms, and partial incoming/outgoin
 Workspace. Existing approvals, custody evidence, permissions and supplier-document controls remain.
 
 ### 9.9 Consignment Orders
+
+**Commercial evidence:** use the quotation-recording and Sales-confirmation rule in §9.8.
+The supplier-facing PDF price policy remains under review; do not infer it from the absence of
+a payable at receipt or from Catalog's current cost.
 
 **Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
 no blank `+ New`.
