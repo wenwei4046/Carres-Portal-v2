@@ -320,7 +320,7 @@ import {
 } from "@carres/shared";
 import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
 import {
-  soBatchOrderRemainingQty,
+  soBatchOrderLineOutstandingQty,
   soBatchPurchaseResponseSchema,
   type MonthlyDemandOrder,
 } from "@carres/shared";
@@ -5802,7 +5802,9 @@ export function useSalesOrderRouteFacts(
  */
 export interface MonthlyDemandFacts {
   orders: MonthlyDemandOrder[];
-  toBuyByOrder: Map<string, number> | null;
+  /** SO Batch Purchase's still-to-buy quantity per ORDER LINE, so a Product
+   *  category narrows it with the lines it counts. Null = unread. */
+  toBuyByLine: Map<string, number> | null;
 }
 
 export function useMonthlyDemandFacts(enabled: boolean) {
@@ -5811,17 +5813,21 @@ export function useMonthlyDemandFacts(enabled: boolean) {
     enabled,
     staleTime: 30_000,
     queryFn: async () => {
-      const [demand, toBuyByOrder] = await Promise.all([
+      const [demand, toBuyByLine] = await Promise.all([
         apiFetch<{ orders: MonthlyDemandOrder[] }>("/api/operation/orders/monthly-demand"),
         Promise.resolve()
           .then(() => apiFetch<unknown>("/api/operation/purchase/demands"))
           .then((body) => {
             const read = soBatchPurchaseResponseSchema.parse(body);
-            return new Map(read.registerRows.map((row) => [row.orderId, soBatchOrderRemainingQty(row)]));
+            return new Map(
+              read.registerRows.flatMap((row) =>
+                row.lines.map((line) => [line.orderLineId, soBatchOrderLineOutstandingQty(line)] as const),
+              ),
+            );
           })
           .catch(() => null),
       ]);
-      return { orders: demand.orders ?? [], toBuyByOrder };
+      return { orders: demand.orders ?? [], toBuyByLine };
     },
   });
 }

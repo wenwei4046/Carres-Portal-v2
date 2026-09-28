@@ -10,7 +10,8 @@
  *   the quantity       the current effective Revision's `order_lines.qty`
  *   delivered          Stock's Units sold against the order, by the line the
  *                      Unit names (`reserved_order_line_id`)
- *   To buy             SO Batch Purchase's one arithmetic, handed in per order
+ *   To buy             SO Batch Purchase's one arithmetic, handed in per LINE,
+ *                      so a Product category narrows it with the lines it counts
  * A date is never manufactured: an order with no definite date is counted
  * under `No delivery date`. A source that could not be read is `null`, which
  * the page prints as `Unavailable` — never zero.
@@ -146,13 +147,13 @@ export function monthlyDemandOf(input: {
   orders: ReadonlyArray<MonthlyDemandOrder>;
   startMonth: string;
   months: number;
-  /** SO Batch Purchase's still-to-buy quantity per order. Null = unread. */
-  toBuyByOrder: ReadonlyMap<string, number> | null;
+  /** SO Batch Purchase's still-to-buy quantity per order line. Null = unread. */
+  toBuyByLine: ReadonlyMap<string, number> | null;
   filters?: MonthlyDemandFilters;
   focusMonth?: string | null;
 }): MonthlyDemandView {
   const window = monthlyDemandWindowOf(input.startMonth, input.months);
-  const unread = input.toBuyByOrder === null;
+  const unread = input.toBuyByLine === null;
   const blank = unread ? null : 0;
   const rows = new Map<string, MonthlyDemandRow>();
   rows.set("before", emptyRow("before", "before", window.first, blank));
@@ -190,7 +191,6 @@ export function monthlyDemandOf(input: {
     const row = rows.get(key)!;
     const done = deliveredByLine(order);
 
-    let counted = false;
     for (const line of order.lines) {
       const column = columnOf(line);
       if (!column) continue;
@@ -205,12 +205,11 @@ export function monthlyDemandOf(input: {
         if (column === "not-in-catalog") target.notInCatalog += owed;
         else target.categories[column] += owed;
       }
-      counted = true;
-    }
-    if (counted && !unread) {
-      const toBuy = count(input.toBuyByOrder!.get(order.id) ?? 0);
-      row.toBuy = (row.toBuy ?? 0) + toBuy;
-      total.toBuy = (total.toBuy ?? 0) + toBuy;
+      if (!unread) {
+        const toBuy = count(input.toBuyByLine!.get(line.id) ?? 0);
+        row.toBuy = (row.toBuy ?? 0) + toBuy;
+        total.toBuy = (total.toBuy ?? 0) + toBuy;
+      }
     }
   }
 

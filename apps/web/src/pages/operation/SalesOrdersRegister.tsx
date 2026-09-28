@@ -692,7 +692,7 @@ export default function SalesOrdersRegister() {
             orders: demandQ.data.orders,
             startMonth,
             months: monthCount,
-            toBuyByOrder: demandQ.data.toBuyByOrder,
+            toBuyByLine: demandQ.data.toBuyByLine,
             filters: { salesLocation: dealer, state: deliveryState, city: deliveryCity, category },
             focusMonth,
           })
@@ -906,9 +906,10 @@ export default function SalesOrdersRegister() {
       header={(
         <div className="pr-8">
           <FilterRailGroup title="View" icon="modules" chosen={null}>
+            {/* The group's supporting line sits under its heading, as in every group. */}
+            <RailFieldWords supporting="Order list or Monthly demand" />
             <FilterRailRow
               label="Order list"
-              supportingText="Order list or Monthly demand"
               active={view === "list"}
               testId="sales-orders-view-list"
               onClick={() => chooseView("list")}

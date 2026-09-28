@@ -155,3 +155,36 @@ describe("TotalsSummary", () => {
     expect(rows[2]!.className).toContain("font-semibold");
   });
 });
+
+describe("DocumentTable keeps a number with its row", () => {
+  it("pins the first column, header and cells, while the rest scroll", () => {
+    render(
+      <DocumentTable
+        label="By month"
+        columns={[{ key: "m", label: "Month" }, { key: "q", label: "Total Qty", numeric: true }]}
+        rows={[{ key: "r", cells: { m: "Oct 2026", q: 3 }, onOpen: () => undefined, openLabel: "Open Sales Orders for Oct 2026" }]}
+      />,
+    );
+    const [first, second] = screen.getAllByRole("columnheader");
+    expect(first!.className).toContain("sticky");
+    expect(first!.className).toContain("left-0");
+    expect(second!.className).not.toContain("sticky");
+    const cells = screen.getAllByRole("cell");
+    expect(cells[0]!.className).toContain("sticky");
+    expect(cells[0]!.className).toContain("bg-white");
+  });
+
+  it("sets every cell on the row's middle line", () => {
+    render(
+      <DocumentTable
+        label="By month"
+        columns={[{ key: "m", label: "Month" }, { key: "q", label: "Total Qty", numeric: true }]}
+        rows={[{ key: "r", cells: { m: "Oct 2026", q: 3 } }]}
+      />,
+    );
+    for (const cell of screen.getAllByRole("cell")) {
+      expect(cell.className).toContain("align-middle");
+      expect(cell.className).not.toContain("align-top");
+    }
+  });
+});

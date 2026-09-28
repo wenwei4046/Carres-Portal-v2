@@ -53,17 +53,21 @@ beforeEach(() => {
   });
 });
 
+/* L1: 3 ordered, 1 from stock, 1 on a PO → 1 still to buy. L2: fully on a PO
+   → 0. L3: nothing arranged → 4. */
+const EXPECTED_BY_LINE = [["L1", 1], ["L2", 0], ["L3", 4]];
+
 describe("useMonthlyDemandFacts", () => {
   it("does not read until Monthly demand is the chosen view", () => {
     renderHook(() => useMonthlyDemandFacts(false), { wrapper });
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("reads the orders and SO Batch Purchase's still-to-buy quantity per order", async () => {
+  it("reads the orders and SO Batch Purchase's still-to-buy quantity per order line", async () => {
     const { result } = renderHook(() => useMonthlyDemandFacts(true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.orders).toEqual(ORDERS);
-    expect([...result.current.data!.toBuyByOrder!.entries()]).toEqual([["order-1", 1], ["order-2", 4]]);
+    expect([...result.current.data!.toBuyByLine!.entries()]).toEqual(EXPECTED_BY_LINE);
   });
 
   it("a failed SO Batch Purchase read is unread, never zero, and the orders still answer", async () => {
@@ -73,7 +77,7 @@ describe("useMonthlyDemandFacts", () => {
     );
     const { result } = renderHook(() => useMonthlyDemandFacts(true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.toBuyByOrder).toBeNull();
+    expect(result.current.data?.toBuyByLine).toBeNull();
     expect(result.current.data?.orders).toEqual(ORDERS);
   });
 
@@ -84,7 +88,7 @@ describe("useMonthlyDemandFacts", () => {
     );
     const { result } = renderHook(() => useMonthlyDemandFacts(true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.toBuyByOrder).toBeNull();
+    expect(result.current.data?.toBuyByLine).toBeNull();
   });
 
   it("a failed read of the orders fails the query", async () => {

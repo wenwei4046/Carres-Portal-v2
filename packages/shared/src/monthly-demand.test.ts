@@ -12,7 +12,7 @@ const order = (over: Partial<MonthlyDemandOrder> & { id: string }): MonthlyDeman
   ...over,
 });
 
-const base = { startMonth: "2026-10", months: 6 as const, toBuyByOrder: new Map<string, number>() };
+const base = { startMonth: "2026-10", months: 6 as const, toBuyByLine: new Map<string, number>() };
 const rowOf = (view: ReturnType<typeof monthlyDemandOf>, key: string) => view.rows.find((r) => r.key === key)!;
 
 describe("the window is a start month plus a count of months (owner re-ruling 2026-09-26)", () => {
@@ -153,10 +153,10 @@ describe("a cell is the physical pieces still owed to the customer", () => {
 });
 
 describe("To buy is SO Batch Purchase's number, and an unread source is Unavailable", () => {
-  it("adds up what SO Batch says each order still has to buy", () => {
+  it("adds up what SO Batch says each line still has to buy", () => {
     const view = monthlyDemandOf({
       ...base,
-      toBuyByOrder: new Map([["a", 2], ["b", 1]]),
+      toBuyByLine: new Map([["a-l1", 2], ["b-l1", 1]]),
       orders: [order({ id: "a" }), order({ id: "b", deliveryDate: "2026-11-03" }), order({ id: "c" })],
     });
     expect(rowOf(view, "2026-10").toBuy).toBe(2);
@@ -165,8 +165,28 @@ describe("To buy is SO Batch Purchase's number, and an unread source is Unavaila
   });
 
   it("prints nothing as zero when SO Batch could not be read", () => {
-    const view = monthlyDemandOf({ ...base, toBuyByOrder: null, orders: [order({ id: "a" })] });
+    const view = monthlyDemandOf({ ...base, toBuyByLine: null, orders: [order({ id: "a" })] });
     expect(view.rows.every((r) => r.toBuy === null)).toBe(true);
+  });
+});
+
+describe("To buy follows the lines the view counts (found 2026-09-28)", () => {
+  it("a Product category narrows To buy with the lines, never the whole order", () => {
+    const view = monthlyDemandOf({
+      ...base,
+      toBuyByLine: new Map([["m", 2], ["s", 1]]),
+      orders: [
+        order({
+          id: "a",
+          lines: [
+            { id: "m", sku: "MS12 Firmcare 10inch Queen", qty: 2, category: "mattress" },
+            { id: "s", sku: "SF03 Muro 2 Seater", qty: 1, category: "sofa" },
+          ],
+        }),
+      ],
+      filters: { category: "Sofa" },
+    });
+    expect(rowOf(view, "total").toBuy).toBe(1);
   });
 });
 

@@ -34,7 +34,7 @@ const viewOf = (over: Partial<Parameters<typeof monthlyDemandOf>[0]> = {}): Mont
     orders: ORDERS,
     startMonth: "2026-11",
     months: 3,
-    toBuyByOrder: new Map([["o1", 3], ["o3", 0]]),
+    toBuyByLine: new Map([["o1-L1", 3], ["o3-L1", 0]]),
     focusMonth: "2026-11",
     ...over,
   });
@@ -112,7 +112,7 @@ describe("Monthly demand", () => {
   });
 
   it("prints `Unavailable` under To buy when SO Batch Purchase could not be read", () => {
-    mount({ view: viewOf({ toBuyByOrder: null }) });
+    mount({ view: viewOf({ toBuyByLine: null }) });
     for (const cells of rowTexts()) expect(cells[cells.length - 1]).toBe("Unavailable");
   });
 
@@ -184,7 +184,7 @@ describe("Monthly demand", () => {
   });
 
   it("prints no dash anywhere, except the one inside the governed heading", () => {
-    for (const view of [viewOf(), viewOf({ toBuyByOrder: null }), viewOf({ filters: { salesLocation: "{dealer 9}" } })]) {
+    for (const view of [viewOf(), viewOf({ toBuyByLine: null }), viewOf({ filters: { salesLocation: "{dealer 9}" } })]) {
       const { container, unmount } = mount({ view });
       const text = container.textContent ?? "";
       expect(text).not.toContain("—");

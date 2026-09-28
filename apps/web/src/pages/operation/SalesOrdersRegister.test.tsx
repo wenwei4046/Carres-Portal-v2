@@ -68,7 +68,7 @@ const useMonthlyDemandFactsSpy = vi.fn((..._args: unknown[]) => ({
         delivered: [],
       },
     ],
-    toBuyByOrder: new Map([["o-1", 1]]),
+    toBuyByLine: new Map([["l-1", 1]]),
   },
   isLoading: false,
   isError: false,

@@ -19,7 +19,10 @@
  * nothing: an absence is a word the caller chose, never a dash drawn here.
  *
  * The table sits in its own horizontal scroller, so a table wider than its
- * card scrolls inside the card and the page never scrolls sideways.
+ * card scrolls inside the card and the page never scrolls sideways. Its FIRST
+ * column stays put while the rest scroll (the Register's rule), so a number
+ * never loses the row it belongs to. Cells sit on one middle line: a door's
+ * 40px phone target must not lift its row's numbers to the top.
  */
 import type { ReactNode } from "react";
 import {
@@ -49,6 +52,13 @@ export interface DocumentTableRow {
   total?: boolean;
 }
 
+/** The one cell alignment: the recipe's cell, on the row's middle line. */
+const CELL = SO_TD.replace("align-top", "align-middle");
+/** The first column stays while the rest scroll. A sticky cell already paints
+ *  above the plain cells (no z-index: the kit names one ladder); it carries the row's own
+ *  background so scrolled numbers pass under it, never through it. */
+const PINNED = "sticky left-0 bg-white";
+
 const isEmpty = (value: ReactNode) => value == null || value === false || value === "";
 
 export default function DocumentTable({
@@ -70,7 +80,9 @@ export default function DocumentTable({
               <th
                 key={column.key}
                 scope="col"
-                className={`${SO_TH} font-medium ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"}`}
+                className={`${SO_TH} font-medium ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"} ${
+                  column === columns[0] ? PINNED : ""
+                }`}
               >
                 {column.label}
               </th>
@@ -86,7 +98,7 @@ export default function DocumentTable({
               className={[
                 SO_ROW,
                 row.total ? "font-semibold text-kit-slate-12" : "text-kit-slate-12",
-                row.onOpen ? "hover:bg-kit-slate-3" : "",
+                row.onOpen ? "group hover:bg-kit-slate-3" : "",
               ].join(" ")}
             >
               {columns.map((column, index) => {
@@ -96,7 +108,9 @@ export default function DocumentTable({
                 return (
                   <td
                     key={column.key}
-                    className={`${SO_TD} ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"}`}
+                    className={`${CELL} ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"} ${
+                      index === 0 ? `${PINNED} ${row.onOpen ? "group-hover:bg-kit-slate-3" : ""}` : ""
+                    }`}
                   >
                     {door ? (
                       <button
