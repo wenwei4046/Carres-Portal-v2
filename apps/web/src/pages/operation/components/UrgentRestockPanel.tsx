@@ -65,7 +65,7 @@ export default function UrgentRestockPanel() {
             ) : null}
           </div>
           <div className="text-body text-base-600 mt-1">
-            Can&rsquo;t wait for next month. Ask any time, say why — the COO
+            Can&rsquo;t wait for next month. Ask any time, say why. The COO
             answers it directly. These numbers stay out of the monthly plan.
           </div>
         </div>
@@ -311,7 +311,7 @@ function UrgentRow({
               data-testid={`urgent-covered-${row.id}`}
             >
               <TriangleAlert size={14} strokeWidth={2} />
-              The warehouse already has enough free — check before ordering more.
+              The warehouse already has enough free. Check before ordering more.
             </div>
           ) : null}
 

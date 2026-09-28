@@ -304,7 +304,7 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,
     text: `${me.partnerName} saved the delivery arrangement${
-      parsed.data.confirmedDate ? ` — ${parsed.data.confirmedDate}` : ""
+      parsed.data.confirmedDate ? ` for ${parsed.data.confirmedDate}` : ""
     }`,
     by_role: "partner",
   });
@@ -357,7 +357,7 @@ partnerDeliveriesRouter.post("/:orderId/cannot-deliver", async (c) => {
 
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,
-    text: `${me.partnerName} cannot deliver — ${parsed.data.reason}${
+    text: `${me.partnerName} cannot deliver. ${parsed.data.reason}${
       parsed.data.note ? `: ${parsed.data.note}` : ""
     }`,
     by_role: "partner",

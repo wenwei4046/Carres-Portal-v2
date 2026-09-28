@@ -175,8 +175,8 @@ export default function RentalCollectionsPanel({
                   {/* Say plainly that nobody is chasing yet, rather than let a
                       red number imply a process that does not exist. */}
                   <span className="text-muted-foreground">
-                    {" "}
-                    — no automatic reminders yet
+                    {" · "}
+                    no automatic reminders yet
                   </span>
                 </>
               ) : null}
@@ -334,9 +334,9 @@ export default function RentalCollectionsPanel({
 
             <p className="px-6 py-4 text-meta text-muted-foreground leading-relaxed">
               Card payments record themselves when Stripe collects them, and a refused card records
-              itself too — every attempt the bank turns down is kept, so a month that says “Card
+              itself too. Every attempt the bank turns down is kept, so a month that says “Card
               declined” has been asked for and refused, not simply left alone. “Record transfer” is
-              for money that never touched Stripe — a bank transfer or cash at the counter — and it
+              for money that never touched Stripe (a bank transfer or cash at the counter), and it
               goes through the same door, so the supplier and sales split is always worked out the
               same way. Recording the money is also what clears the decline.
             </p>
@@ -376,7 +376,7 @@ function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: 
         documentDataUrl,
         reference: reference.trim() || null,
       });
-      toast.success(`${quote.agreementNo} settled — ${quote.monthsLeft} months closed`);
+      toast.success(`${quote.agreementNo} settled. ${quote.monthsLeft} months closed.`);
       onClose();
     } catch (e) {
       toast.error(String((e as Error)?.message ?? e));

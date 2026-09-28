@@ -53,7 +53,7 @@ export default function SupplierIncoming() {
         </h1>
         <div className="text-body text-muted-foreground">
           Two demand buckets: <strong>committed</strong> (issued POs) and{" "}
-          <strong>pending</strong> (sales orders not yet POed). Aggregated only —
+          <strong>pending</strong> (sales orders not yet POed). Aggregated only,
           no customer-level detail.
         </div>
       </header>

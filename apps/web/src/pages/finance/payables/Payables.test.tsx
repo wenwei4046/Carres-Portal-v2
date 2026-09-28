@@ -524,7 +524,7 @@ describe("Supplier advance (0484–0485)", () => {
     expect(appRows[1]!).toHaveTextContent("BILL-4XK2");
     expect(within(appRows[1]!).getByText("Applied")).toBeInTheDocument();
     expect(within(appRows[1]!).getByRole("button", { name: "Take advance off" })).toBeInTheDocument();
-    expect(appRows[2]!).toHaveTextContent("Taken off — Supplier sent a new invoice");
+    expect(appRows[2]!).toHaveTextContent("Taken off: Supplier sent a new invoice");
     expect(within(appRows[2]!).queryByRole("button", { name: "Take advance off" })).not.toBeInTheDocument();
     expect(screen.getByTestId("voucher-money-back")).toHaveTextContent("SMB-20260912-4821");
     // An approver-only step is not offered to this person.

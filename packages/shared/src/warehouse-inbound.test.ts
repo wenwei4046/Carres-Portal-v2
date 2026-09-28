@@ -626,7 +626,7 @@ describe("An unlinked purchasing destination is a mapping gap, not an empty shel
     const [r] = inboundArrivals(unlinked);
     expect(r.siteMapped).toBe(false);
     expect(r.destinationName).toBe("Ohana");
-    expect(r.site).toBe("Ohana — no Site linked");
+    expect(r.site).toBe("Ohana: no Site linked");
   });
 
   it("belongs to no Site's tab and is reached only by asking for it", () => {

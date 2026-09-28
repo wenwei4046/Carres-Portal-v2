@@ -30,7 +30,7 @@ export default function InvoiceVoidReplace({ invoiceId, invoiceNo }: {
       method: "POST", body: JSON.stringify({ reason: reason.trim() }),
     }),
     onSuccess: () => {
-      toast.success(`${invoiceNo} voided — the replacement draft is ready. Issue it from the order: Generate invoice.`);
+      toast.success(`${invoiceNo} voided. The replacement draft is ready. Issue it from the order: Generate invoice.`);
       setOpen(false);
       setReason("");
       void qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister() });
@@ -54,7 +54,7 @@ export default function InvoiceVoidReplace({ invoiceId, invoiceNo }: {
     <div className="flex gap-2">
       <Button variant="primary" loading={correct.isPending} disabled={gap !== null}
         onClick={() => correct.mutate()}>
-        {gap ? `Void and replace — ${gap}` : "Void and replace"}
+        {gap ? `Void and replace: ${gap}` : "Void and replace"}
       </Button>
       <Button variant="neutral" onClick={() => { setOpen(false); setReason(""); }}>Cancel</Button>
     </div>

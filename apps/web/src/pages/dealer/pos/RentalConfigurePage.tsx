@@ -258,7 +258,7 @@ export default function RentalConfigurePage({
               </div>
               {skus.length === 0 ? (
                 <div className="cfg-empty">
-                  No size of this model is on rental offer yet — author one in Admin → Rental.
+                  No size of this model is on rental offer yet. Author one in Admin → Rental.
                 </div>
               ) : (
                 <div className="cfg-optGrid">
@@ -379,7 +379,7 @@ export default function RentalConfigurePage({
                 </li>
                 <li>A rental cannot share an order with items bought outright.</li>
                 <li>
-                  After checkout, finance approves the credit — <b>no card is charged</b> until
+                  After checkout, finance approves the credit. <b>No card is charged</b> until
                   they do.
                 </li>
                 {plan && (

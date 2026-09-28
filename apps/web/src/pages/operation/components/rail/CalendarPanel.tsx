@@ -409,7 +409,7 @@ function DeliveryRow({ d }: { d: DayDelivery }) {
       title={
         confirmed
           ? "The customer confirmed this date."
-          : "Only logistics have given this date — not confirmed with the customer yet."
+          : "Only logistics have given this date. Not confirmed with the customer yet."
       }
     >
       <span className={`w-1 rounded-full shrink-0 ${confirmed ? "bg-success" : "bg-warning"}`} />

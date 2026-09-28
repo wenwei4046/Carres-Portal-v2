@@ -51,9 +51,9 @@ import DeliveryProofReviewForm from "./DeliveryProofReviewForm";
 export const EVIDENCE_COPY = {
   title: "Evidence",
   deliveryOn: (day: string) => `Delivery on ${day}`,
-  noResult: "No delivery result recorded yet — evidence binds to the delivery it proves.",
+  noResult: "No delivery result recorded yet. Evidence binds to the delivery it proves.",
   /* Card 20 — an intermediate Journey leg's document. */
-  arrivalOnly: "This leg ends at a partner warehouse. It owes no delivery proof — the customer leg's document carries it.",
+  arrivalOnly: "This leg ends at a partner warehouse. It owes no delivery proof. The customer leg's document carries it.",
   arrived: "Arrived",
   noFiles: "No files from this delivery yet",
   driverSubmission: DOR_COPY.driverSubmission,

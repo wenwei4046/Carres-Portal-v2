@@ -65,7 +65,7 @@ export default function FinanceSettings() {
   const tab = params.get("tab") === "chart" ? "chart" : "money";
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings — Carres" />
+      <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings · Carres" />
       <div className="px-6">
         <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "chart" ? { tab: v } : {})} />
       </div>

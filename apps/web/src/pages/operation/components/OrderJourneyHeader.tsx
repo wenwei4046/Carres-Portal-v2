@@ -161,39 +161,39 @@ const VERB_STAGE: Record<string, JourneyStage> = {
 const VERB_OWNER: Record<string, string> = {
   // The verb `Send` is retired; issuing is the one act that produces the
   // document the factory receives.
-  [orderActionQueue("issue_po")]: "Operations — issue the purchase order",
-  [orderActionQueue("confirm_ready_date")]: "Supplier — goods not in yet",
+  [orderActionQueue("issue_po")]: "Operations: issue the purchase order",
+  [orderActionQueue("confirm_ready_date")]: "Supplier: goods not in yet",
   // C8 — this line used to read "agree a new date with the customer", which is
   // exactly what Law 4 rung 2 forbids. Stage 1 is a decision nobody outside is
   // part of; stage 2 is a call to LOGISTICS, who carry the conversation.
   [orderActionQueue("delay_planning")]:
-    "Operations — decide before anyone calls",
+    "Operations: decide before anyone calls",
   [orderActionQueue("arrange_new_delivery_date")]:
-    "Operations — give logistics the new date to arrange",
-  [orderActionQueue("assign_logistics")]: "Operations — pick the logistics company",
+    "Operations: give logistics the new date to arrange",
+  [orderActionQueue("assign_logistics")]: "Operations: pick the logistics company",
   [orderActionQueue("confirm_delivery_date")]:
-    "Logistics — customer has not confirmed a date",
+    "Logistics: customer has not confirmed a date",
   // C7 — one press, and it is ours: the SYSTEM writes the document, nobody
   // outside is waiting on anything.
   [orderActionQueue("issue_delivery_order")]:
-    "Operations — issue the delivery order",
-  [orderActionQueue("deliver_today")]: "Logistics — delivering today",
+    "Operations: issue the delivery order",
+  [orderActionQueue("deliver_today")]: "Logistics: delivering today",
   // C3 — nobody acts before the day, and saying so is the point of retiring the
   // old `Confirm delivery`: this line used to read "everything ready, confirm"
   // over a row no button could close.
-  [orderActionQueue("delivering")]: "Logistics — delivering on the confirmed day",
-  [orderActionQueue("upload_delivery_photo")]: "Operations — upload the delivery photo",
+  [orderActionQueue("delivering")]: "Logistics: delivering on the confirmed day",
+  [orderActionQueue("upload_delivery_photo")]: "Operations: upload the delivery photo",
   // C2 made `collect` a headline in its own right (a delivered order that still
   // owes; a delivery held on the balance). Without this it fell through to
   // "check this order", which tells an operator nothing.
-  [orderActionQueue("collect")]: "Operations — collect the balance",
-  [orderActionQueue("done")]: "Nobody — this order is closed",
+  [orderActionQueue("collect")]: "Operations: collect the balance",
+  [orderActionQueue("done")]: "Nobody: this order is closed",
 };
 /** The money hold reads differently from the plain Confirm: the ladder's 🔒
  *  says the delivery may not happen, and the person who unblocks it is the
  *  customer, not us. */
-const OWNER_HOLD = "Customer — balance not paid";
-const OWNER_UNKNOWN = "Operations — check this order";
+const OWNER_HOLD = "Customer: balance not paid";
+const OWNER_UNKNOWN = "Operations: check this order";
 
 /** Is this stage finished? One signal each. Purchase counts as settled once the
  *  goods are secured: an order filled from shelf stock never needs a PO, and
@@ -271,8 +271,8 @@ export function deriveOrderJourney(input: OrderJourneyInput): OrderJourney {
       key: "hold",
       tone: "danger",
       text: input.holdAmountLabel
-        ? `Delivery on hold — RM ${input.holdAmountLabel} to collect`
-        : "Delivery on hold — balance not collected",
+        ? `Delivery on hold. RM ${input.holdAmountLabel} to collect`
+        : "Delivery on hold. Balance not collected",
     });
   }
   // C8 — one health line for both delay stages. It is a FACT about the goods
@@ -306,7 +306,7 @@ export function deriveOrderJourney(input: OrderJourneyInput): OrderJourney {
       text:
         input.docsMissing === 1
           ? `${names || "1 document"} missing`
-          : `${input.docsMissing} documents missing${names ? ` — ${names}` : ""}`,
+          : `${input.docsMissing} documents missing${names ? `: ${names}` : ""}`,
     });
   }
 

@@ -118,7 +118,7 @@ describe("the partner object — seven sections, ONE Save changes naming its gap
     renderAt(`/operation/settings/delivery/partners/${NETS}`);
     fireEvent.change(screen.getByLabelText("Partner name"), { target: { value: " " } });
     const save = screen.getByTestId("delivery-settings-save");
-    expect(save).toHaveTextContent("Save changes — name the partner");
+    expect(save).toHaveTextContent("Save changes: name the partner");
     expect(save).toBeDisabled();
   });
 

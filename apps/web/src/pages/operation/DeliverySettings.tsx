@@ -125,14 +125,14 @@ const DS = {
   noAccounts: "No portal account",
   visibility: "Data visibility",
   visibilityRule:
-    "A partner account sees only the deliveries assigned to it — never a customer's money, another partner's rows or Carres staff.",
+    "A partner account sees only the deliveries assigned to it. It never sees a customer's money, another partner's rows or Carres staff.",
   /* Rules */
   contactBy: "Who contacts the customer",
   contactByPartner: "The partner",
   contactByOperation: "Operation",
   onBehalf: "Operation may record on the partner's behalf",
   contactLead: "Contact lead days",
-  contactLeadRule: (n: number) => `${n} working days before the requested delivery date — the shared chase setting`,
+  contactLeadRule: (n: number) => `${n} working days before the requested delivery date. This is the shared chase setting.`,
   paymentRule: "Payment clearance",
   paymentRuleWord:
     "Read-only mirror of Payment's clock: the Delivery Order needs Amount needed = RM 0 and no open Finance Exception.",
@@ -569,7 +569,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
   }
   const canEdit = data.canEdit;
   const dirty = changed.size > 0;
-  const saveLabel = !dirty ? DS.saveChanges : gap ? `${DS.saveChanges} — ${gap}` : DS.saveChanges;
+  const saveLabel = !dirty ? DS.saveChanges : gap ? `${DS.saveChanges}: ${gap}` : DS.saveChanges;
   const set = <K extends keyof PartnerDraft>(key: K, value: PartnerDraft[K]) =>
     setDraft((d) => (d ? { ...d, [key]: value } : d));
 

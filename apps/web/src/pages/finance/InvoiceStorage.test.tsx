@@ -68,7 +68,8 @@ describe("the Storage section", () => {
       .toHaveTextContent("today is day 21"));
     const card = screen.getByTestId("storage-case-mattress_bedframe");
     expect(card).toHaveTextContent("Mattress / Bedframe");
-    expect(card).toHaveTextContent("1 charge period started · RM 150.00 — 1 not on a Storage Invoice yet.");
+    expect(card).toHaveTextContent("1 charge period started · RM 150.00");
+    expect(card).toHaveTextContent("1 not on a Storage Invoice yet.");
   });
   it("Record storage start sends both witnessed facts and the note to the door", async () => {
     show();
@@ -115,7 +116,7 @@ describe("the Storage section", () => {
     state.cases = [{ ...CASE, billed_through_period: 1 }];
     show();
     await waitFor(() => expect(screen.getByTestId("storage-case-mattress_bedframe"))
-      .toHaveTextContent("all on a Storage Invoice."));
+      .toHaveTextContent("All on a Storage Invoice."));
     expect(screen.queryByRole("button", { name: "Create Storage Invoice" })).not.toBeInTheDocument();
   });
   it("End storage states its reason and posts to the closing door; a closed case offers no doors", async () => {

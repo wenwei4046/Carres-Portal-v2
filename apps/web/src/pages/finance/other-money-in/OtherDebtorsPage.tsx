@@ -95,7 +95,7 @@ export default function OtherDebtorsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="other-debtors-destination-header" word="Other debtors" docTitle="Other debtors — Carres" />
+      <ModuleHeader destinationHeader testId="other-debtors-destination-header" word="Other debtors" docTitle="Other debtors · Carres" />
       {body}
     </div>
   );

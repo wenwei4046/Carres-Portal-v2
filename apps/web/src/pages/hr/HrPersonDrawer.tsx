@@ -240,7 +240,7 @@ function DisableLoginDialog({
             </h3>
             <p className="text-body text-base-500">
               {disabling
-                ? "They lose the Carres portal straight away — not whenever their session happens to expire."
+                ? "They lose the Carres portal straight away, not whenever their session happens to expire."
                 : "They will be able to sign in again with their existing password."}
             </p>
           </div>
@@ -373,7 +373,7 @@ function ExitBlock({
           {done ? "Update exit" : "Save exit"}
         </Btn>
         <span className="text-meta text-base-400">
-          Recording an exit does not cut access — that is the separate step above.
+          Recording an exit does not cut access. That is the separate step above.
         </span>
       </div>
 
@@ -395,7 +395,7 @@ function ExitBlock({
             <span className="text-base-500">
               {isHq
                 ? "Signed out of every device"
-                : "No sessions to end — they sign in with a PIN, not a portal login"}
+                : "No sessions to end. They sign in with a PIN, not a portal login"}
             </span>
           </li>
         </ul>
@@ -500,7 +500,7 @@ export default function HrPersonDrawer({
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-base-200 bg-base-50 px-3 py-2.5">
             <Lock size={14} className="mt-0.5 shrink-0 text-base-400" />
             <p className="text-meta leading-relaxed text-base-500">
-              Name, seat, manager and login live in <b>Team</b> — this page reads them.
+              Name, seat, manager and login live in <b>Team</b>. This page reads them.
               Change them once there and every screen agrees.
             </p>
           </div>
@@ -603,7 +603,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <p className="text-meta mt-2.5 leading-relaxed text-base-400">
                   Revealing the IC asks the server for it and writes an audit line at the
-                  same moment — the number is never in the list.
+                  same moment. The number is never in the list.
                 </p>
               </Panel>
 
@@ -682,8 +682,8 @@ export default function HrPersonDrawer({
                   />
                 </Row>
                 <p className="text-meta mt-2.5 leading-relaxed text-base-400">
-                  Reference numbers only. Carres never calculates EPF, SOCSO, EIS or PCB —
-                  these ride the monthly export to the payroll service and nothing else.
+                  Reference numbers only. Carres never calculates EPF, SOCSO, EIS or PCB.
+                  These ride the monthly export to the payroll service and nothing else.
                 </p>
               </Panel>
 
@@ -754,7 +754,7 @@ export default function HrPersonDrawer({
                   })}
                 </ul>
                 <p className="text-meta mt-2.5 leading-relaxed text-base-400">
-                  The same list for everyone — tell us what Carres actually hands over and
+                  The same list for everyone. Tell us what Carres actually hands over and
                   it changes for the whole company.
                 </p>
               </Panel>

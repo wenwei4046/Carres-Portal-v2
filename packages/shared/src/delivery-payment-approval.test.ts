@@ -67,7 +67,7 @@ describe("paymentApprovalReason — the governed refusal", () => {
   it("names the figure and the two closers when nothing is raised", () => {
     const r = paymentApprovalReason(2455.5, []);
     expect(r).toContain("RM 2,455.50");
-    expect(r).toContain("collect it in full");
+    expect(r).toContain("Collect it in full");
     expect(r).toContain("request a payment approval");
   });
   it("says the decision is awaited while a request is pending", () => {
@@ -97,7 +97,7 @@ describe("pendingPaymentApproval", () => {
 describe("codInstruction — the DO document's line, owner's words", () => {
   it("spells the amount through the ONE money spelling", () => {
     expect(codInstruction(3200)).toBe(
-      "COLLECT RM 3,200.00 BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.",
+      "COLLECT RM 3,200.00 BY ONLINE TRANSFER BEFORE UNLOADING. NO CASH.",
     );
   });
 });

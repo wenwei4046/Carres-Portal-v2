@@ -72,7 +72,7 @@ describe("order action words — the row line", () => {
       "Issue PO to Ohana",
     );
     expect(orderActionLine("confirm_ready_date", { supplier: "Ohana" })).toBe(
-      "Call Ohana — confirm ready date",
+      "Call Ohana to confirm ready date",
     );
     /* ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
        2026-09-13): the act with its recipient, then the required result —
@@ -164,7 +164,7 @@ describe("order action words — the row line", () => {
 
   it("falls back to the ROLE word, never to an empty gap", () => {
     expect(orderActionLine("confirm_ready_date")).toBe(
-      "Call supplier — confirm ready date",
+      "Call supplier to confirm ready date",
     );
     expect(orderActionLine("confirm_delivery_date", { logistics: "   " })).toBe("Call logistics");
     expect(orderActionLine("arrange_new_delivery_date", { logistics: null })).toBe("Call logistics");
@@ -345,7 +345,7 @@ describe("purchasing action words — the dictionary, verbatim", () => {
       .toBe("Nothing arriving tomorrow.");
 
     expect(purchasingActionLine("confirm_balance_delivery_date", { supplier: "Ohana" }))
-      .toBe("Call Ohana — confirm balance delivery date");
+      .toBe("Call Ohana to confirm balance delivery date");
     expect(purchasingActionButton("confirm_balance_delivery_date"))
       .toBe("Record balance date");
     expect(purchasingActionDone("confirm_balance_delivery_date"))
@@ -358,7 +358,7 @@ describe("purchasing action words — the dictionary, verbatim", () => {
     expect(purchasingActionLine("confirm_tomorrows_delivery"))
       .toBe("Ask the supplier for the Supplier DO for the PO");
     expect(purchasingActionLine("confirm_balance_delivery_date", { supplier: "  " }))
-      .toBe("Call supplier — confirm balance delivery date");
+      .toBe("Call supplier to confirm balance delivery date");
   });
 
   it("the two shared rows are read back, never respelt", () => {

@@ -221,7 +221,7 @@ export default function PrincipalSalesAnalysis() {
           <section className="bg-card border border-base-200 rounded-lg shadow-sm p-6">
             <h2 className="text-strong mb-1">Buyer demographics</h2>
             <p className="text-meta text-base-400 mb-4">
-              Who buys each category — from orders carrying demographics.
+              Who buys each category, from orders carrying demographics.
             </p>
             <div className="flex flex-col gap-6">
               {demographics.map((d) => (
@@ -260,7 +260,7 @@ function CoverageNote({ known, total }: { known: number; total: number }) {
       </p>
       {known < MIN_SAMPLE && (
         <span className="pill pill-neutral text-label">
-          Thin sample — read with care (min {MIN_SAMPLE})
+          Thin sample. Read with care (min {MIN_SAMPLE})
         </span>
       )}
     </div>

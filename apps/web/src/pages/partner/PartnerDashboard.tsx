@@ -309,7 +309,7 @@ export default function PartnerDashboard() {
         >
           {(fleet.data ?? []).length === 0 ? (
             <div className="text-meta text-base-500 py-4 text-center">
-              No vehicles yet — add via Fleet.
+              No vehicles yet. Add via Fleet.
             </div>
           ) : (
             (fleet.data ?? []).map((f) => (

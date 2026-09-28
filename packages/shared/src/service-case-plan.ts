@@ -174,7 +174,7 @@ export function caseFollowUpPlan(input: CaseFollowUpInput): CaseStep[] {
   if (has(wants, WANTS_NEEDING_SUPPLIER)) {
     steps.push({
       key: "supplier_date",
-      label: `Call ${supplier} — confirm the ${supplierAsk(wants)} date`,
+      label: `Call ${supplier} to confirm the ${supplierAsk(wants)} date`,
       done: `${supplier} gave a date`,
       dateLabel: `Date ${supplier} gave`,
       noteRequired: false,
@@ -228,7 +228,7 @@ export function caseFollowUpPlan(input: CaseFollowUpInput): CaseStep[] {
 
   steps.push({
     key: "customer_confirmed",
-    label: `Call ${customer} — confirm the problem is solved`,
+    label: `Call ${customer} to confirm the problem is solved`,
     done: "Customer says it is solved",
     dateLabel: "Date the customer confirmed",
     noteRequired: false,

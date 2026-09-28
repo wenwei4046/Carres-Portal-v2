@@ -250,7 +250,7 @@ describe("Inbound · the Site strip", () => {
     expect(screen.getByTestId("inbound-unmapped-note")).toHaveTextContent(
       "Ohana (1)",
     );
-    expect(screen.getByText("Ohana — no Site linked")).toBeInTheDocument();
+    expect(screen.getByText("Ohana: no Site linked")).toBeInTheDocument();
   });
 
   it("offers no receipt door where Carres never takes the goods in", async () => {
@@ -452,7 +452,7 @@ describe("Inbound · the list itself", () => {
     mount("&site=w&status=all");
     await waitFor(() =>
       expect(screen.getByTestId("inbound-page-range")).toHaveTextContent(
-        "Showing 1–1 of 1 arrangements",
+        "Showing 1 to 1 of 1 arrangements",
       ),
     );
     fireEvent.change(screen.getByLabelText("Arrival date from"), {
@@ -521,7 +521,7 @@ describe("Inbound · the listing fits the screen", () => {
     mount("&site=unmapped");
     await screen.findByRole("link", { name: "PO-2" });
     expect(screen.getByRole("button", { name: "To" })).toBeInTheDocument();
-    expect(screen.getByText("Ohana — no Site linked")).toBeInTheDocument();
+    expect(screen.getByText("Ohana: no Site linked")).toBeInTheDocument();
   });
 
   it("says WHICH date the from/to filter applies to", async () => {

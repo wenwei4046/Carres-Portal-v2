@@ -38,19 +38,23 @@ export default function Tabs({
   value,
   onValueChange,
   label,
+  fill = false,
 }: {
   tabs: readonly TabDef[];
   value: string;
   onValueChange: (value: string) => void;
   /** What the bar switches between, for a screen reader. Never drawn. */
   label: string;
+  /** The tabs share the bar's width by their own length, with no gap — a narrow pane that
+   *  must keep every tab on one row (Work's Communication, Workspace §5.10). */
+  fill?: boolean;
 }) {
   return (
     <RadixTabs.Root value={value} onValueChange={onValueChange}>
       <RadixTabs.List
         aria-label={label}
         data-kit="tabs"
-        className="flex items-center gap-4 border-b border-kit-slate-5"
+        className={`flex items-center border-b border-kit-slate-5 ${fill ? "gap-0" : "gap-4"}`}
       >
         {tabs.map((t) => (
           <RadixTabs.Trigger
@@ -68,7 +72,7 @@ export default function Tabs({
              * forbids the underline — reported to the kit, and built the way
              * that breaks neither. */
             className={
-              "group relative flex items-center gap-2 px-1 py-2 text-body " +
+              `group relative flex items-center gap-2 px-1 py-2 text-body ${fill ? "flex-auto justify-center" : ""} ` +
               "text-kit-slate-11 hover:text-kit-slate-12 " +
               "data-[state=active]:text-kit-slate-12 " +
               "disabled:opacity-40 disabled:cursor-not-allowed " +

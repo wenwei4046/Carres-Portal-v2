@@ -43,7 +43,8 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 /* The Sales Order's card: same heading face, same border, same padding. The
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
-import { Block, Fact } from "../SalesOrderWorkspace";
+import Block from "@/components/kit/Block";
+import { Fact } from "../SalesOrderWorkspace";
 import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
@@ -1203,7 +1204,7 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
         : unitsQ.isLoading
         ? <Absence>Reading Unit IDs…</Absence>
         : unitIds.length === 0
-        ? <span className="text-kit-amber-11">Unit IDs missing on this line — do not send this PO</span>
+        ? <span className="text-kit-amber-11">Unit IDs missing on this line. Do not send this PO</span>
         : undefined,
       unitAbsence: "",
       supplierConfirmedNode: answer ? (
@@ -1707,7 +1708,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                     : unitsOf(line).length
                       ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
-                      ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line — do not send this PO</span>
+                      ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line. Do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
                   }</td>
                   <td className="px-3 py-2.5 align-top text-left">{line.governed_sources?.length ? line.governed_sources.map((source) => {

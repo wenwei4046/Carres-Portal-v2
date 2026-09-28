@@ -89,7 +89,7 @@ export default function StoreAccountSection() {
             {!pending && rejected && (
               <div className="mt-1.5 text-[12px] text-destructive" data-testid="email-change-rejected">
                 Last request ({rejected.requestedEmail}) was rejected by Carres HQ
-                {rejected.decisionNote ? ` — ${rejected.decisionNote}` : ""}
+                {rejected.decisionNote ? `: ${rejected.decisionNote}` : ""}
               </div>
             )}
           </div>
@@ -120,7 +120,7 @@ export default function StoreAccountSection() {
 
         <p className="text-[11.5px] text-muted-foreground mt-3">
           Password changes apply immediately. An email change takes effect only after Carres HQ
-          approves it — keep signing in with the old email until then.
+          approves it. Keep signing in with the old email until then.
         </p>
       </section>
 
@@ -165,7 +165,7 @@ function ChangeStorePasswordModal({ email, onClose }: { email: string; onClose: 
   return (
     <ModalShell
       title="Change store password"
-      subtitle={`${email} — verify the current password first; the change applies immediately.`}
+      subtitle={`${email}: verify the current password first. The change applies immediately.`}
       onClose={onClose}
       footer={
         <>
@@ -280,7 +280,7 @@ function RequestEmailChangeModal({ email, onClose }: { email: string; onClose: (
   return (
     <ModalShell
       title="Change login email"
-      subtitle={`Currently ${email} — the request goes to Carres HQ; the login only changes once approved.`}
+      subtitle={`Currently ${email}. The request goes to Carres HQ. The login only changes once approved.`}
       onClose={onClose}
       footer={
         <>

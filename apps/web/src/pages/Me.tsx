@@ -149,7 +149,7 @@ function ChangePasswordCard({ email }: { email: string }) {
     setSuccess(false);
     const v = validate();
     if (v) { setError(v); return; }
-    if (!email) { setError("Missing session email — sign in again"); return; }
+    if (!email) { setError("Missing session email. Sign in again"); return; }
 
     setBusy(true);
     try {

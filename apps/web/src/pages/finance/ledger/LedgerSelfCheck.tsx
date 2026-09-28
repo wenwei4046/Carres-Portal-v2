@@ -86,7 +86,7 @@ export default function LedgerSelfCheck() {
 
   return <div className="flex h-full min-h-0 flex-col">
     <ModuleHeader destinationHeader testId="self-check-destination-header" word="Self-check"
-      docTitle="Self-check — Carres"
+      docTitle="Self-check · Carres"
       right={<span className="flex items-center gap-3 text-body">
         {checkedAt && <span data-testid="self-check-checked-at">{checkedAt}</span>}
         <button className="btn-secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>

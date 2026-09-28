@@ -213,8 +213,8 @@ export default function GenerateInvoiceOverlay({
     if (!totalSet) {
       toast.error(
         imported
-          ? "Key the outstanding first — a statement needs an amount"
-          : "Set the goods total first — an invoice needs an amount",
+          ? "Key the outstanding first. A statement needs an amount"
+          : "Set the goods total first. An invoice needs an amount",
       );
       return null;
     }
@@ -234,7 +234,7 @@ export default function GenerateInvoiceOverlay({
       return res.invoice_no;
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);
-      toast.error(`Couldn't issue invoice — ${msg}`);
+      toast.error(`Couldn't issue invoice: ${msg}`);
       return null;
     } finally {
       setIssuing(false);
@@ -250,7 +250,7 @@ export default function GenerateInvoiceOverlay({
       window.open(url, "_blank", "noopener");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      toast.error(`Invoice PDF failed — ${(e as Error).message}`);
+      toast.error(`Invoice PDF failed: ${(e as Error).message}`);
     }
   }
 
@@ -267,18 +267,18 @@ export default function GenerateInvoiceOverlay({
       `Total: RM ${rmAmount(invoiceTotal)}`,
       ...(balanceDue > 0
         ? [`Outstanding: RM ${rmAmount(balanceDue)}`]
-        : ["Fully settled — thank you!"]),
+        : ["Fully settled. Thank you!"]),
       "",
       "Do let us know if you need anything. Thank you!",
     ].join("\n");
     await navigator.clipboard.writeText(text);
-    toast.success("WhatsApp message copied — paste it in the chat");
+    toast.success("WhatsApp message copied. Paste it in the chat");
   }
 
   async function outputEmail() {
     const no = await ensureIssued();
     if (!no) return;
-    const subject = `Invoice ${no} — Carres (SO-${so})`;
+    const subject = `Carres Invoice ${no} (SO-${so})`;
     const body = [
       `Hi ${salutationOf(null, customerName)},`,
       "",
@@ -377,7 +377,7 @@ export default function GenerateInvoiceOverlay({
             </div>
             {!totalSet && (
               <div className="mt-2 text-meta text-danger">
-                No goods total set — close this and key the total in the
+                No goods total set. Close this and key the total in the
                 Balance tab first.
               </div>
             )}
@@ -394,7 +394,7 @@ export default function GenerateInvoiceOverlay({
           <div className="min-w-0 bg-base-50 grid place-items-stretch">
             {previewErr ? (
               <div className="place-self-center text-meta text-danger px-6 text-center">
-                Preview failed — {previewErr}
+                Preview failed: {previewErr}
               </div>
             ) : previewUrl ? (
               <iframe
@@ -414,10 +414,10 @@ export default function GenerateInvoiceOverlay({
         <div className="flex items-center gap-2 px-4 h-[52px] border-t border-base-200 shrink-0">
           <span className="text-meta text-base-500 min-w-0 truncate">
             {imported
-              ? "Statement only — the tax invoice for an imported order lives in AutoCount"
+              ? "Statement only. The tax invoice for an imported order lives in AutoCount"
               : isIssued
                 ? `Issued · ${effectiveNo}`
-                : "Not issued yet — the first output issues it and logs to the order history"}
+                : "Not issued yet. The first output issues it and logs to the order history"}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <Btn icon={Mail} disabled={issuing} onClick={() => void outputEmail()}>

@@ -120,7 +120,7 @@ function VoucherRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="vouchers-destination-header" word="Payment Vouchers"
-        docTitle="Payment Vouchers — Carres" />
+        docTitle="Payment Vouchers · Carres" />
       {query.isError ? <ReadFailed what="Payment vouchers" onRetry={() => void query.refetch()} /> : (
         <ListPageShell register>
           <DataGrid
@@ -181,12 +181,12 @@ function advanceCell(r: PaymentVoucherRegisterRow): string {
 const STEP: Record<"prepare" | "check" | "approve", { label: string; done: string; ask: string }> = {
   prepare: {
     label: "Prepare voucher",
-    done: "Voucher prepared — someone else checks it next",
+    done: "Voucher prepared. Someone else checks it next",
     ask: "Prepare this voucher? After this it cannot be changed unless it is returned to draft.",
   },
   check: {
     label: "Check voucher",
-    done: "Voucher checked — it waits for a finance approver",
+    done: "Voucher checked. It waits for a finance approver",
     ask: "Check this voucher? You confirm the bills, the amounts and the payee match the papers attached.",
   },
   approve: {
@@ -210,7 +210,7 @@ function VoucherDetail() {
     return (
       <div className="flex h-full min-h-0 flex-col">
         <ModuleHeader destinationHeader testId="vouchers-destination-header" word="Payment Vouchers"
-          docTitle="Payment Vouchers — Carres" />
+          docTitle="Payment Vouchers · Carres" />
         <ReadFailed what="This payment voucher" onRetry={() => void query.refetch()} />
       </div>
     );
@@ -237,7 +237,7 @@ function VoucherDetail() {
       const { renderPaymentVoucherPdf } = await import("@/lib/pdf/render");
       window.open(URL.createObjectURL(await renderPaymentVoucherPdf(printable)), "_blank", "noopener");
     } catch (e) {
-      toast.error(`The voucher could not be opened — ${(e as Error).message}`);
+      toast.error(`The voucher could not be opened: ${(e as Error).message}`);
     } finally {
       setPrinting(false);
     }
@@ -252,7 +252,7 @@ function VoucherDetail() {
         customer={v.payee_name}
         backTo="/finance/payment-vouchers"
         backLabel="Payment Vouchers"
-        docTitle={`${v.voucher_no ?? "Draft voucher"} — Carres`}
+        docTitle={`${v.voucher_no ?? "Draft voucher"} · Carres`}
         status={<span data-testid="voucher-status">{word(VOUCHER_STATUS_WORD, v.status)}</span>}
         right={
           <span className="flex items-center gap-2">
@@ -295,7 +295,7 @@ function VoucherDetail() {
             <FactRow label="Checked">{stepWho(v.checked_at, v.checked_by_name, "Not checked yet")}</FactRow>
             <FactRow label="Approved">{stepWho(v.approved_at, v.approved_by_name, "Not approved yet")}</FactRow>
             <FactRow label="Ledger entry">
-              {v.entry_no ?? "None yet — approving the payment makes it"}
+              {v.entry_no ?? "None yet. Approving the payment makes it"}
               {v.reversal_entry_no ? ` · reversed by ${v.reversal_entry_no}` : ""}
             </FactRow>
             {v.status === "cancelled" && (

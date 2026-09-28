@@ -180,7 +180,7 @@ export default function SupplierSKU() {
                         </span>
                       ) : (
                         <span className="font-mono text-meta text-muted-foreground">
-                          —
+                          0
                         </span>
                       )}
                     </div>

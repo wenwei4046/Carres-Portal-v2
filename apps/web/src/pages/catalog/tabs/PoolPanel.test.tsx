@@ -126,7 +126,7 @@ describe("PoolPanel — view mode", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("pool-history-bedframe_size"));
-    expect(screen.getByText("History — Bedframe Sizes")).toBeInTheDocument();
+    expect(screen.getByText("History: Bedframe Sizes")).toBeInTheDocument();
     expect(screen.getByText("Baseline — ported from 2990s Portal (0201)")).toBeInTheDocument();
   });
 });

@@ -256,7 +256,7 @@ export function financePartyKindWord(kind: FinancePartyKind): string {
 
 /** An invoice number, or what stands in its place before it has one. */
 export function otherDebtorInvoiceNumberWord(row: Pick<OtherDebtorInvoiceRow, "invoice_no">): string {
-  return row.invoice_no ?? "Draft — no number yet";
+  return row.invoice_no ?? "Draft, no number yet";
 }
 
 /**

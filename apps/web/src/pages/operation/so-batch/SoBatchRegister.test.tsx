@@ -976,7 +976,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     for (const word of [
       "Can order early",
       "14 safety days left",
-      "1–13 safety days left",
+      "1 to 13 safety days left",
       "No safety days left",
       "Not enough production days",
       "All products",

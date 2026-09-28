@@ -375,7 +375,7 @@ export default function PrincipalNewOrder() {
     if (
       stripeCollected <= 0 &&
       !window.confirm(
-        `Customer hasn't paid yet.\n\nOK — keep order SO-${stripeCollect.order.so} (the payment link stays valid for 24h).\nCancel — stay on the QR.`,
+        `Customer hasn't paid yet.\n\nOK: keep order SO-${stripeCollect.order.so} (the payment link stays valid for 24h).\nCancel: stay on the QR.`,
       )
     ) {
       return;
@@ -390,14 +390,14 @@ export default function PrincipalNewOrder() {
     if (!stripeCollect) return;
     if (
       !window.confirm(
-        `Void order SO-${stripeCollect.order.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+        `Void order SO-${stripeCollect.order.so}? The customer hasn't paid. The order is cancelled and you return to editing.`,
       )
     ) {
       return;
     }
     try {
       await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at raw entry" });
-      toast.info(`Order SO-${stripeCollect.order.so} voided — nothing was charged.`);
+      toast.info(`Order SO-${stripeCollect.order.so} voided. Nothing was charged.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not void the order");
       return;
@@ -501,7 +501,7 @@ export default function PrincipalNewOrder() {
         <p className="text-label uppercase tracking-[0.05em] text-base-400">Maintain · New order</p>
         <h1 className="text-page mt-1">New Sales Order</h1>
         <p className="text-body text-base-500 mt-1">
-          Raw creation — no POS gates. Every line, price and date is saved exactly as you
+          Raw creation, no POS gates. Every line, price and date is saved exactly as you
           enter it.
         </p>
       </header>
@@ -555,8 +555,8 @@ export default function PrincipalNewOrder() {
             >
               <option value="">
                 {dealerId && outlets.length === 0
-                  ? `— none under this store —`
-                  : "— optional —"}
+                  ? `None under this store`
+                  : "Optional"}
               </option>
               {outlets.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -574,7 +574,7 @@ export default function PrincipalNewOrder() {
               disabled={!dealerId}
               className={dealerId ? INPUT_CLASS : INPUT_DISABLED}
             >
-              <option value="">— optional —</option>
+              <option value="">Optional</option>
               {salespersons.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -677,7 +677,7 @@ export default function PrincipalNewOrder() {
           </Field>
           <Field
             label="Proceed date · production start"
-            hint="Optional — saved only when a delivery date is set."
+            hint="Optional. Saved only when a delivery date is set."
           >
             <input
               type="date"
@@ -839,7 +839,7 @@ export default function PrincipalNewOrder() {
             data-testid="raw-building-type"
             className={INPUT_CLASS}
           >
-            <option value="">— select —</option>
+            <option value="">Building type</option>
             {BUILDING_TYPE_OPTIONS.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -889,12 +889,12 @@ export default function PrincipalNewOrder() {
       {/* ── Line items ── */}
       <Section
         title={`Line items (${activeLines.length})`}
-        hint="Pick from catalog or type free text — specs follow the product; every price stays editable"
+        hint="Pick from catalog or type free text. Specs follow the product; every price stays editable"
       >
         <div className="flex flex-col gap-2">
           <div className="hidden sm:grid grid-cols-[24px_1fr_180px_70px_110px_100px_64px] gap-2 px-1">
             <span />
-            <span className="text-label uppercase tracking-[0.05em] text-base-400">Product — pick or type</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400">Product (pick or type)</span>
             <span className="text-label uppercase tracking-[0.05em] text-base-400">Remarks</span>
             <span className="text-label uppercase tracking-[0.05em] text-base-400">Qty</span>
             <span className="text-label uppercase tracking-[0.05em] text-base-400">Unit price</span>
@@ -997,7 +997,7 @@ export default function PrincipalNewOrder() {
                       type="button"
                       onClick={() => setEditRowId(l.localId)}
                       aria-label="Edit specs"
-                      title="Optional — open the product configurator for specs"
+                      title="Optional: open the product configurator for specs"
                       data-testid={`raw-edit-${l.localId}`}
                       className="grid place-items-center w-7 h-7 rounded-md text-base-400 hover:text-base-800 hover:bg-base-100"
                     >
@@ -1047,14 +1047,14 @@ export default function PrincipalNewOrder() {
       {/* ── Payment ── */}
       <Section
         title="Payment"
-        hint="Optional — a paid amount posts into the order's payment tracker (Balance ledger); later payments go through Finance / top-up"
+        hint="Optional. A paid amount posts into the order's payment tracker (Balance ledger); later payments go through Finance / top-up"
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
             label={isStripe ? "Amount to collect (RM)" : "Paid (RM)"}
             hint={
               isStripe
-                ? "The Stripe QR / payment link opens after Create — nothing is charged until the customer pays."
+                ? "The Stripe QR / payment link opens after Create. Nothing is charged until the customer pays."
                 : undefined
             }
           >
@@ -1081,7 +1081,7 @@ export default function PrincipalNewOrder() {
               data-testid="raw-payment-method"
               className={INPUT_CLASS}
             >
-              <option value="">— not recorded —</option>
+              <option value="">Not recorded</option>
               {paymentMethods.map((m) => (
                 <option key={m.key} value={m.key}>
                   {m.label}
@@ -1138,7 +1138,7 @@ export default function PrincipalNewOrder() {
                   data-testid={`raw-pay-followup-${fu.key}`}
                   className={INPUT_CLASS}
                 >
-                  <option value="">— select —</option>
+                  <option value="">{fu.label}</option>
                   {fu.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -1156,7 +1156,7 @@ export default function PrincipalNewOrder() {
         )}
         {isStripe && (
           <p className="text-body text-base-600 mt-3" data-testid="raw-stripe-note">
-            No slip or reference code needed — the payment records itself with a Stripe
+            No slip or reference code needed. The payment records itself with a Stripe
             receipt once the customer pays (QR at the counter, or a WhatsApp link).
           </p>
         )}

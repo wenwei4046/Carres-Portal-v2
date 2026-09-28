@@ -137,7 +137,7 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             />
           </Field>
           <p className="text-[11px] text-base-500 mt-1.5">
-            When production should start — pick it deliberately (e.g. ~a month
+            When production should start. Pick it deliberately (e.g. ~a month
             before delivery) so we don't reserve stock too early. Must be on or
             before the delivery date.
           </p>

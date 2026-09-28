@@ -232,8 +232,8 @@ export const STOCK_HOLD_RESOLVE_PROBLEM_TEXT: Record<
  * so it is said out loud rather than left to be inferred from a status word.
  */
 export function heldUnitsLine(heldUnits: number, reason?: string | null): string {
-  if (heldUnits <= 0) return "Nothing on hold — these units are not in the register.";
+  if (heldUnits <= 0) return "Nothing on hold. These units are not in the register.";
   const units = `${heldUnits} unit${heldUnits === 1 ? "" : "s"}`;
   const why = reason ? ` · ${stockHoldReasonLabel(reason)}` : "";
-  return `${units} on hold${why} — cannot be sold, reserved or delivered.`;
+  return `${units} on hold${why}. Cannot be sold, reserved or delivered.`;
 }

@@ -49,7 +49,7 @@ const RM = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFra
 
 const DOT: Record<RouteTone, string> = {
   done: "bg-kit-slate-12 border-kit-slate-12",
-  current: "bg-kit-blue-9 border-kit-blue-9",
+  current: "bg-kit-slate-12 border-kit-slate-12 ring-2 ring-kit-slate-6",
   attention: "bg-kit-amber-11 border-kit-amber-11",
   missed: "bg-kit-red-9 border-kit-red-9",
   future: "bg-white border-kit-slate-9",
@@ -112,9 +112,19 @@ export function useMissionRoute(orderId: string) {
 
 export default function WorkOrderRoute({
   orderId,
+  title,
   onOpenParty,
+  header,
 }: {
+  /** The order's own header, drawn inside the Route's card (one card: the
+   *  order and its mission). */
+  header?: React.ReactNode;
   orderId: string;
+  /** `null` = no title row at all: the Work right panel's own header names
+   *  the order and carries the route's status word (Jess, 2026-09-26: a
+   *  small uppercase label is not a header). Omitted = the governed heading,
+   *  for callers outside the Work right panel. */
+  title?: string | null;
   onOpenParty: (party: "logistics" | "customer" | "supplier") => void;
 }) {
   const { route, lm, supplier, customer, factsQ, loading, failed } = useMissionRoute(orderId);
@@ -145,7 +155,13 @@ export default function WorkOrderRoute({
 
   const firstCurrent = route.points.find((p) => p.tone === "current")?.key ?? null;
   const exceptions: Array<{ text: string; tone: RouteTone }> = [];
-  if (route.paymentLine) exceptions.push(route.paymentLine);
+  /* What threatens this delivery, said under the Route (Jess, 2026-09-27):
+     goods that arrive after the customer's day, and money that holds it. */
+  const customerIso = lm.card?.scope.customerDeliveryIso ?? null;
+  if (supplier?.arrivalRange && customerIso && supplier.arrivalRange.toIso > customerIso && !lm.o?.delivered_at) {
+    exceptions.push({ text: `Goods expected ${spell(supplier.arrivalRange.toIso)}, after ${lm.card?.confirmedDate ? "scheduled" : "requested"} delivery ${spell(lm.card?.confirmedDate ?? customerIso)}`, tone: "missed" });
+  }
+  if (route.paymentLine && route.paymentLine.tone === "attention") exceptions.push({ text: route.paymentLine.text, tone: "attention" });
   if (!lm.partnerName && !lm.o?.delivered_at) exceptions.push({ text: "Logistics not assigned", tone: "attention" });
   else if (lm.facts?.answer?.kind === "cannot_deliver" && lm.model?.exception) exceptions.push({ text: `Logistics · ${lm.model.exception}`, tone: "missed" });
 
@@ -153,14 +169,15 @@ export default function WorkOrderRoute({
 
   return (
     <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
-      <div className="flex h-[14px] items-center justify-between">
-        <SectionTitle>{R.heading}</SectionTitle>
+      {header ? <div className="-mx-3 mb-2 border-b border-kit-slate-4 px-3 pb-2.5 pt-1.5 min-[768px]:-mx-4 min-[768px]:px-4">{header}</div> : null}
+      {title === null ? null : <div className="flex h-[14px] items-center justify-between">
+        <SectionTitle>{title ?? R.heading}</SectionTitle>
         {route.header ? (
           <span className={`text-[11px] font-semibold leading-[14px] ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
             {route.header.text}
           </span>
         ) : null}
-      </div>
+      </div>}
       <div ref={scrollRef} className="-mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="work-route-scroll">
         <ol className="relative flex h-[60px] w-full min-w-max items-stretch px-1" data-testid="work-route-line">
           {route.points.map((point, index) => (

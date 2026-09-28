@@ -253,7 +253,7 @@ describe("step1Valid — Continue gate", () => {
     d.customer.addressPostcode = "";
     d.customer.addressUnknown = true;
     expect(step1Valid(d)).toBe(false);
-    expect(step1FirstIssue(d)).toBe("Address — Line 1 (≥5 chars)");
+    expect(step1FirstIssue(d)).toBe("Address: Line 1 (≥5 chars)");
   });
 
   it("rejects when billing empty and not billingSame", () => {
@@ -738,7 +738,7 @@ describe("cartGoodsIssue — a service never sells alone", () => {
     d.lines = [line("SVC-DISPOSE-MATTRESS")];
     expect(
       cartGoodsIssue(d, catalogOf([["SVC-DISPOSE-MATTRESS", "service"]])),
-    ).toContain("add the product this service belongs to");
+    ).toContain("Add the product this service belongs to");
   });
 
   it("refuses a guarantee sold on its own — the attachment law, generalised", () => {

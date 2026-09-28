@@ -14,7 +14,7 @@ export default function DestinationHeader({ right }: { right?: ReactNode }) {
     <ModuleHeader
       testId="sales-orders-destination-header"
       word="Sales Orders"
-      docTitle="Sales Orders — Carres"
+      docTitle="Sales Orders · Carres"
       destinationHeader
       right={right}
     />

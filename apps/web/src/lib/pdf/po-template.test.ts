@@ -281,7 +281,8 @@ describe("Unit IDs — runs computed from the codes, last three digits bold", ()
     ];
     const text = renderedText(PoTemplate(data));
     expect(leafTexts(PoTemplate(data)).filter((t) => /^\s*[—–]\s*$/.test(t))).toEqual([]);
-    expect(text).toContain("Unit IDs missing on this line — do not send this PO");
+    expect(text).toContain("Unit IDs missing on this line.");
+    expect(text).toContain("Do not send this PO.");
   });
 
   it("QTY is a count — centred, one weight", () => {

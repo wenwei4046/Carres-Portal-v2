@@ -112,7 +112,7 @@ describe("an amendment awaiting management", () => {
     role = "principal";
     live = { ...fresh, stale: true, current_contractual_hash: "changed" };
     draw();
-    expect(screen.getByText(/Out of date — propose again/)).toBeTruthy();
+    expect(screen.getByText(/Out of date\. Propose again/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Approve and apply" })).toBeNull();
   });
 });

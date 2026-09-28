@@ -206,7 +206,7 @@ describe("HrApp", () => {
 
     // 0250 — the BD commission section renders the BD name + commission
     expect(
-      screen.getByText("BD commission — paid by dealer sales"),
+      screen.getByText("BD commission: paid by dealer sales"),
     ).toBeInTheDocument();
     expect(screen.getByText("Herng Lim")).toBeInTheDocument();
     expect(screen.getByText("RM 600.00")).toBeInTheDocument();

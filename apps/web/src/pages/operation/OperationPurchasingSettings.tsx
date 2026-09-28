@@ -363,7 +363,7 @@ export default function OperationPurchasingSettings({
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The settings the ordering engine reads. Change one here and SO Batch Purchase uses it
           the same day.
-          {!canEdit && " Manager only — read-only for your role."}
+          {!canEdit && " Manager only. Read-only for your role."}
         </div>
 
         <div className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
@@ -725,7 +725,7 @@ export default function OperationPurchasingSettings({
             })}
           </div>
           <p className="text-label text-base-500 mt-2">
-            One factory at a time — a PO already sent keeps the date it was sent
+            One factory at a time. A PO already sent keeps the date it was sent
             with.
           </p>
           </Block>

@@ -3305,7 +3305,7 @@ describe("Card 05 · the object detail", () => {
        no number or UUID appears anywhere in the header. */
     expect(within(detail).getByTestId("object-identity")).toHaveTextContent("Display");
     expect(within(detail).getByTestId("object-identity").textContent).not.toContain("REQ-");
-    expect(document.title).toBe("Manual Purchase Request — Carres");
+    expect(document.title).toBe("Manual Purchase Request · Carres");
     expect(within(detail).getByTestId("object-identity-status")).toHaveTextContent(
       "Waiting for approval",
     );

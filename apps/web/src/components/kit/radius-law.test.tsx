@@ -79,7 +79,9 @@ describe("the radius law · a pill is a capsule", () => {
     for (const file of readdirSync(here)) {
       if (!file.endsWith(".tsx") && !file.endsWith(".ts")) continue;
       if (file.includes(".test.")) continue;
-      if (file === "Checkbox.tsx" || file === "tokens.ts") continue;
+      /* ChecklistRow's 16px square mark is the Checkbox's shape shown
+         read-only (Workspace §5.10 kit admission, Jess 2026-09-28). */
+      if (file === "Checkbox.tsx" || file === "ChecklistRow.tsx" || file === "tokens.ts") continue;
       if (readFileSync(join(here, file), "utf8").includes("rounded-pill")) offenders.push(file);
     }
     expect(offenders).toEqual([]);

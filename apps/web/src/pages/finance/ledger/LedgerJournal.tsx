@@ -148,7 +148,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   ].filter(Boolean).join(" · ");
 
   return <div className="flex h-full min-h-0 flex-col">
-    <ModuleHeader destinationHeader testId="journal-destination-header" word="Journal" docTitle="Journal — Carres" />
+    <ModuleHeader destinationHeader testId="journal-destination-header" word="Journal" docTitle="Journal · Carres" />
     {query.isError ? <div role="alert" className="p-6 text-body">
       <p>The Journal could not be loaded. Try again.</p>
       <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>

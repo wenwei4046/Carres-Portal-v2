@@ -203,7 +203,7 @@ publicDeliveryLinkRouter.put("/:token/arrangement", async (c) => {
     if (evErr) throw evErr;
     await sb.from("order_history").insert({
       order_id: r.link.order_id,
-      text: `${LINK_COPY.actor(r.partner.name)} scheduled the delivery — ${parsed.data.scheduledDate}${time ? ` · ${time}` : ""}`,
+      text: `${LINK_COPY.actor(r.partner.name)} scheduled the delivery for ${parsed.data.scheduledDate}${time ? ` · ${time}` : ""}`,
       by_role: "partner",
     });
     await stampOpened(sb, r.link.id);
@@ -240,7 +240,7 @@ publicDeliveryLinkRouter.post("/:token/another-date", async (c) => {
     const reason = ANOTHER_DATE_REASONS.find((x) => x.key === parsed.data.reason)?.label ?? parsed.data.reason;
     await sb.from("order_history").insert({
       order_id: r.link.order_id,
-      text: `${LINK_COPY.actor(r.partner.name)} requested another date — ${parsed.data.proposedDate} · ${reason}`,
+      text: `${LINK_COPY.actor(r.partner.name)} requested another date: ${parsed.data.proposedDate} · ${reason}`,
       by_role: "partner",
     });
     await stampOpened(sb, r.link.id);
@@ -275,7 +275,7 @@ publicDeliveryLinkRouter.post("/:token/cannot-deliver", async (c) => {
     const reason = CANNOT_DELIVER_REASONS.find((x) => x.key === parsed.data.reason)?.label ?? parsed.data.reason;
     await sb.from("order_history").insert({
       order_id: r.link.order_id,
-      text: `${LINK_COPY.actor(r.partner.name)} cannot deliver — ${reason}${parsed.data.note ? `: ${parsed.data.note}` : ""}`,
+      text: `${LINK_COPY.actor(r.partner.name)} cannot deliver. ${reason}${parsed.data.note ? `: ${parsed.data.note}` : ""}`,
       by_role: "partner",
     });
     await stampOpened(sb, r.link.id);

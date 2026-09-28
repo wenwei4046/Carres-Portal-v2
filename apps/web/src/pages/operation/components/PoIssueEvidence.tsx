@@ -4,6 +4,9 @@ import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
+import Button from "@/components/kit/Button";
+import FieldFrame from "@/components/kit/FieldFrame";
+import Select from "@/components/kit/Select";
 
 /**
  * WHAT A PERSON MARKED AS SENT
@@ -83,7 +86,7 @@ export function doorsForIssuedPo(po: IssuedPo, message?: string | null): PoOutbo
         : null,
     mailto: po.contactEmail
       ? `mailto:${encodeURIComponent(po.contactEmail)}?subject=${encodeURIComponent(
-          `${po.id} — Carres Purchase Order`,
+          `Carres Purchase Order ${po.id}`,
         )}`
       : null,
     message: message ?? null,
@@ -176,6 +179,9 @@ export default function PoIssueEvidence({
   doors,
   onOpened,
   onConfirmed,
+  layout = "panel",
+  documentNo,
+  onCancel,
 }: {
   po: IssuedPo;
   /** The version of the document rendered beside this form. */
@@ -187,6 +193,19 @@ export default function PoIssueEvidence({
   /** An external app was OPENED. It records history and completes nothing. */
   onOpened?: (channel: "whatsapp" | "email") => void;
   onConfirmed: () => void;
+  /**
+   * `card` — the Work route card (Workspace MASTER §5.10, Jess 2026-09-28:
+   * "what is recipient? no free text"). The same act and the same write, laid
+   * out as the kit field grid: `PO` · `Channel` · `Recipient`. Channel lists
+   * ONLY the channels the Supplier Master records; Recipient is the fact that
+   * follows from it, never typed. With no recorded channel the form names the
+   * missing contact and cannot save. The doors (WhatsApp, email, message)
+   * live in Work's Communication pane, so the card draws none.
+   */
+  layout?: "panel" | "card";
+  /** The ruled document number (`PO260903-4316`), for the card's PO fact. */
+  documentNo?: string;
+  onCancel?: () => void;
 }) {
   /* The supplier's RECORDED channel is the default — the Work send line says
      `Click Email, send …` for an email-only supplier, so the form must not
@@ -305,6 +324,83 @@ export default function PoIssueEvidence({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (layout === "card") {
+    const group = po.whatsappGroupUrl?.trim() || null;
+    const chat = (po.contact ?? "").trim() || null;
+    const mail = po.contactEmail?.trim() || null;
+    const recorded: Array<{ value: SendChannel; label: string; recipient: string; shown: string }> = [
+      ...(group
+        ? [{ value: "whatsapp" as const, label: "WhatsApp group", recipient: group, shown: `${supplier} WhatsApp group` }]
+        : chat
+          ? [{ value: "whatsapp" as const, label: "WhatsApp", recipient: chat, shown: chat }]
+          : []),
+      ...(mail ? [{ value: "email" as const, label: "Email", recipient: mail, shown: mail }] : []),
+    ];
+    const chosen = recorded.find((c) => c.value === channel) ?? recorded[0] ?? null;
+    const canSave = Boolean(chosen) && !saving && !confirmed;
+    const confirmRecorded = async () => {
+      if (!chosen || !canSave) return;
+      setSaving(true);
+      setError(null);
+      setAction(null);
+      try {
+        await apiFetch(`/api/operation/pos/${encodeURIComponent(po.id)}/confirm-sent`, {
+          method: "POST",
+          body: JSON.stringify({ channel: chosen.value, recipient: chosen.recipient, poVersion: version }),
+        });
+        onConfirmed();
+      } catch (e) {
+        const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
+        const fallback = purchasingRefusal(body?.code, { po: po.id, supplier: po.supplierName, version });
+        setError(body?.message ?? fallback.wrong);
+        setAction(body?.action ?? fallback.todo);
+      } finally {
+        setSaving(false);
+      }
+    };
+    return (
+      <div className="flex flex-col gap-3" data-testid={`po-send-card-${po.id}`}>
+        <div className="grid grid-cols-3 gap-3">
+          <FieldFrame id={`po-send-po-${po.id}`} label="PO">
+            <span id={`po-send-po-${po.id}`} className="flex min-h-8 items-center text-body text-kit-slate-12">{`${documentNo ?? po.id} V${version}`}</span>
+          </FieldFrame>
+          {recorded.length > 0 ? (
+            <Select
+              id={`po-send-channel-${po.id}`}
+              label="Channel"
+              value={chosen?.value}
+              onValueChange={(v) => setChannel(v as SendChannel)}
+              options={recorded.map((c) => ({ value: c.value, label: c.label }))}
+            />
+          ) : (
+            <FieldFrame id={`po-send-channel-${po.id}`} label="Channel">
+              <span id={`po-send-channel-${po.id}`} className="flex min-h-8 items-center text-body text-kit-red-11" data-testid="po-send-no-channel">
+                {`No WhatsApp on file for ${supplier}`}
+              </span>
+            </FieldFrame>
+          )}
+          <FieldFrame id={`po-send-recipient-${po.id}`} label="Recipient">
+            <span id={`po-send-recipient-${po.id}`} className="flex min-h-8 min-w-0 items-center break-all text-body text-kit-slate-12" data-testid="po-send-recipient">
+              {chosen ? chosen.shown : `No email on file for ${supplier}`}
+            </span>
+          </FieldFrame>
+        </div>
+        {error ? (
+          <span className="flex flex-col" data-testid="so-batch-evidence-error">
+            <span className="text-meta text-kit-red-11">{error}</span>
+            {action ? <span className="text-meta text-kit-slate-11">{action}</span> : null}
+          </span>
+        ) : null}
+        <div className="flex items-center gap-2">
+          <Button variant="primary" size="touch" disabled={!canSave} loading={saving} onClick={() => void confirmRecorded()} data-testid="so-batch-evidence-confirm">
+            PO sent to supplier
+          </Button>
+          {onCancel ? <Button size="touch" onClick={onCancel}>Cancel</Button> : null}
+        </div>
+      </div>
+    );
   }
 
   return (

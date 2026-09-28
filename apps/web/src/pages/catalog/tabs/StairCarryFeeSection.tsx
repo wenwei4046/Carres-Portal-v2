@@ -58,8 +58,8 @@ export default function StairCarryFeeSection({
       <p className="text-meta text-base-500 mb-3">
         Free up to a floor, then a per-floor-per-item charge. Carres does not
         stair-carry above floor {MAX_DELIVERY_FLOOR}. Separate from the delivery
-        trip fee — both fold into the order total.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        trip fee. Both fold into the order total.
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
       <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-5 items-end">
         <label className="block">

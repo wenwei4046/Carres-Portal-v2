@@ -179,7 +179,7 @@ describe("pickup identities and the two evidence records", () => {
       "Warehouse loaded 2 of 2 Units",
     );
     expect(warehouseLoadedLine({ handedOver: 0, unitsRequired: 2 })).toBe(
-      "Warehouse loaded — nothing yet",
+      "Warehouse loaded nothing yet",
     );
     expect(
       driverCollectedLine({

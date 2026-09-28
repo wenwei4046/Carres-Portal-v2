@@ -653,7 +653,7 @@ function makeTemplate(over: Partial<Record<string, unknown>> = {}) {
   return {
     id: "tpl-1",
     docKey: "rent_to_own",
-    name: "Rental Agreement — Terms and Conditions (v5)",
+    name: "Rental Agreement: Terms and Conditions (v5)",
     bindsTo: ["mattress", "bedframe", "sofa"],
     version: 1,
     body: [

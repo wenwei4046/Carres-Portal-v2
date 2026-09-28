@@ -71,7 +71,7 @@ describe("step 1 asks for the building type", () => {
     const d = validDraft();
     d.customer.buildingType = "";
     expect(step1Valid(d)).toBe(false);
-    expect(step1FirstIssue(d)).toBe("Address — Building type");
+    expect(step1FirstIssue(d)).toBe("Address: Building type");
   });
 
   it("passes once it is picked", () => {
@@ -86,7 +86,7 @@ describe("step 1 asks for the building type", () => {
     d.customer.addressLine1 = "";
     d.customer.buildingType = "";
     expect(step1Valid(d)).toBe(false);
-    expect(step1FirstIssue(d)).toBe("Address — Line 1 (≥5 chars)");
+    expect(step1FirstIssue(d)).toBe("Address: Line 1 (≥5 chars)");
   });
 
   it("names the building type only AFTER the address parts", () => {
@@ -96,6 +96,6 @@ describe("step 1 asks for the building type", () => {
     const d = validDraft();
     d.customer.addressPostcode = "";
     d.customer.buildingType = "";
-    expect(step1FirstIssue(d)).toBe("Address — Postcode");
+    expect(step1FirstIssue(d)).toBe("Address: Postcode");
   });
 });

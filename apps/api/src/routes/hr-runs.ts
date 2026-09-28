@@ -165,7 +165,7 @@ hrRunsRouter.post("/close", requireHr, async (c) => {
       {
         error: "invalid_input",
         code: "bd_program_not_enabled",
-        message: "BD commission runs are not enabled yet — nobody is enrolled.",
+        message: "BD commission runs are not enabled yet. Nobody is enrolled.",
       },
       422,
     );

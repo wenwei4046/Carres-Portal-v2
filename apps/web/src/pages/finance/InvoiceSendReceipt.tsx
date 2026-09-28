@@ -67,7 +67,7 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
       void qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
       onClose();
     },
-    onError: (e: Error) => toast.error(`The message was not recorded — ${e.message}`),
+    onError: (e: Error) => toast.error(`The message was not recorded: ${e.message}`),
   });
   const copy = () => {
     void navigator.clipboard?.writeText(shown);
@@ -78,9 +78,9 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
     const wa = waLink(order?.customer_phone ?? null);
     if (wa) {
       window.open(`${wa}?text=${encodeURIComponent(shown)}`, "_blank", "noopener");
-      toast.success("WhatsApp opened — sending is not recorded yet");
+      toast.success("WhatsApp opened. Sending is not recorded yet");
     } else {
-      toast.success("No phone on file — message copied, paste it into WhatsApp");
+      toast.success("No phone on file. Message copied, paste it into WhatsApp");
     }
   };
   const acceptFile = (f: File | undefined | null) => {
@@ -90,7 +90,7 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error("The screenshot is too large — 10 MB at most.");
+      toast.error("The screenshot is too large: 10 MB at most.");
       return;
     }
     setFile(f);
@@ -105,7 +105,7 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
       .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
     setSaving(false);
     if (error) {
-      toast.error(`Screenshot upload failed — ${error.message}`);
+      toast.error(`Screenshot upload failed: ${error.message}`);
       return;
     }
     record.mutate({

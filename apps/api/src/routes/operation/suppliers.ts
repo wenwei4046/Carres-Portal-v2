@@ -82,7 +82,7 @@ operationSuppliersRouter.post("/", async (c) => {
       {
         error: "rule_violation",
         code: "unusable_name",
-        message: "That name has no letters or digits in it — give the supplier a readable name.",
+        message: "That name has no letters or digits in it. Give the supplier a readable name.",
       },
       422,
     );
@@ -98,7 +98,7 @@ operationSuppliersRouter.post("/", async (c) => {
       {
         error: "rule_violation",
         code: "supplier_exists",
-        message: `${(clash as { name: string }).name} is already a supplier — pick it from the list instead of adding it twice.`,
+        message: `${(clash as { name: string }).name} is already a supplier. Pick it from the list instead of adding it twice.`,
       },
       422,
     );
