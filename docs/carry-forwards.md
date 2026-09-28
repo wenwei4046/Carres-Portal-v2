@@ -241,7 +241,7 @@ hook — that would mean the budget was never the cause.
 
 **🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
 meets an order with no responsible person still prints `Nobody holds Delivery Duty.` with
-`Set the holder in Workspace → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
+`Set the holder in Settings → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
 and `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
 `apps/web/src/pages/finance/PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and
 `apps/web/src/pages/operation/OperationWork.tsx`).
@@ -439,7 +439,7 @@ each owner should take the one-line change with a test.
   Site), purchasing/MASTER §9.4 flipped to PRODUCTION-VERIFIED, siblings #986/#1000 closed as
   superseded. **What stays true for the next chat:** the rota fallback is GONE from
   `workspace_resolve_duty` (assignment or honest `not_assigned`; unassigned blocks posting with
-  `no_grn_duty_holder`) — GRN Duty awaits Jess's assignment in `Workspace → Staff & Duties`. The
+  `no_grn_duty_holder`) — GRN Duty awaits Jess's assignment in `Settings → Staff & Duties`. The
   probes found and 0426 fixed a live regression: `operation_receive_po_with_do` still carried
   pre-0366 direct `stock_balances` writes (qty AND the aggregate reserve) that the 0366
   derived-only trigger refuses — every stock-posting receive would have errored since
@@ -936,7 +936,7 @@ approval **waits** — by ruling 6 it is never downgraded to Operation. This rep
 fallback is gone.
 
 **Closes when** a second Principal person exists (People/HR creates the account; the person
-marker is set there) and holds a dated cover in `Workspace → Staff & Duties`.
+marker is set there) and holds a dated cover in `Settings → Staff & Duties`.
 **Falsifier:** `select public.workspace_duty_staff(array['principal'])` run as a duty manager
 returns more than one person.
 

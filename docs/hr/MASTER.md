@@ -53,7 +53,7 @@ against a real session.
   locked out.
 - **A residual is accepted and documented:** a token issued BEFORE the disable lives out its
   hour.
-- **Workspace → Staff & Duties is the ONE company-wide Duty assignment door** (owner rulings
+- **Settings → Staff & Duties is the ONE company-wide Duty assignment door** (owner rulings
   2026-09-01 / 2026-09-03). It keeps the Duty catalogue, each Duty's one Primary holder, optional
   Buddy cover and effective dates. `Team` may show staff and workload, but it is not a second Duty
   editor. No module Settings surface keeps another approver list or rota. The Shared Duty Resolver

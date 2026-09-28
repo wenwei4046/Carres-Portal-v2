@@ -449,7 +449,7 @@ day 31+ ordinary free request unavailable
 Sofa day 1–14 automatic; day 15+ ordinary free request unavailable
 ```
 
-`Storage Waiver Approver` is a capability resolved from `Workspace → Staff & Duties`; no name is
+`Storage Waiver Approver` is a capability resolved from `Settings → Staff & Duties`; no name is
 hard-coded in Payment Settings. A pending request says `Free storage is not confirmed · Estimated
 charge RM {amount}`; the Monitor's Storage cell says `Free request waiting for approval ·
 Estimated charge RM {amount}`.
