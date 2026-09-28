@@ -4084,7 +4084,7 @@ windows remain visible and require a decision; they never auto-reject the custom
 | The supplier claim is not issued | Share the claim with Hooka and record the actual message sent | PO Duty; exact request version/recipient/channel/time/proof |
 | Hooka has not replied | Ask Hooka to confirm the claim result | PO Duty; actual evidenced answer for this request/scope |
 | The supplier refused the claim | Decide how Carres will resolve the item problem | Relevant approver; scoped authorised remedy/cost decision |
-| The repair return date has passed | Ask Hooka when the same Unit will return | PO Duty; evidenced new date or authorised changed outcome |
+| The repair return date has passed | Ask Hooka when the same Unit will return | PO Duty; the Unit received back (GRN) or an authorised changed outcome — a new supplier date is recorded but never closes the action (§9.7, 2026-09-28) |
 | One Unit is still waiting for collection | Ask Hooka to confirm collection of the remaining Unit | PO Duty; exact quantity/date agreement; handover itself stays Warehouse work |
 | The returned Unit has not been checked | Check the Unit and record its condition | Stock/inspection duty; accepted inspection result |
 | Supplier credit evidence is missing | Ask Hooka for the credit note for this claim | PO Duty; external document received; Finance acceptance is a separate action |
