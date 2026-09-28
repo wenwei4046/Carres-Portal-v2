@@ -202,6 +202,12 @@ export const MANUAL_PURCHASE_WORDS = {
    * in `To buy`, says so, and cannot be ticked — unknown is never zero and
    * never complete (MASTER §9.2).
    */
+  /**
+   * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28 (§9.1/§9.2). A
+   * request that reads `Need PO` while its approval is still `Need approval`
+   * or `Sent back for changes` says so on Status line two.
+   */
+  statusNeedApprovalFirst: "Need approval first",
   remainderNotChecked: "Remaining quantity not checked",
   remainderNotCheckedWhy:
     "The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.",

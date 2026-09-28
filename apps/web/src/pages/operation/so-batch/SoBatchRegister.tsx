@@ -18,6 +18,8 @@ import {
   soBatchOrderLineOutstandingQty,
   soBatchOrderPlanning,
   soBatchOrderUnselectableReason,
+  soBatchOrderStatusWhy,
+  soBatchLeafStatusWhy,
   soBatchOrderSafetyDays,
   soBatchOrderStatusWord,
   soBatchOrderByAbsenceWord,
@@ -37,8 +39,11 @@ import {
   type SoBatchRailFilter,
   type SoBatchSafetyDaysCell,
   type SoBatchSelection,
+  type SoBatchStatusDoor,
+  type SoBatchStatusWhy,
   GOODS_ABSENCE_WORDS,
 } from "@carres/shared";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   DataGrid,
   type DataGridColumn,
@@ -213,6 +218,51 @@ function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
 /** Governed absence — a muted sentence, never a bare dash. */
 function Absent({ children }: { children: string }) {
   return <span className="text-kit-slate-11">{children}</span>;
+}
+
+/** Where each Status line-two door leads — the existing Operation destinations. */
+const STATUS_DOOR_PATH: Record<SoBatchStatusDoor, string> = {
+  /* The Operation costing Catalog (SKU, supplier, cost) — `portal-nav.ts` `op-catalog`. */
+  catalog: "/operation?tab=op-catalog",
+  /* Purchasing Settings owns production days and collection. */
+  settings: "/operation/settings/purchasing",
+};
+
+/**
+ * ⭐ STATUS LINE TWO — owner ruling 2026-09-28 (Purchasing §9.1).
+ *
+ * Why the row cannot be ticked, in the muted absence text, with the door that
+ * fixes it where one exists. The door never toggles or opens the row.
+ */
+function StatusWhy({
+  why,
+  testId,
+  onDoor,
+}: {
+  why: SoBatchStatusWhy;
+  testId: string;
+  onDoor: (door: SoBatchStatusDoor) => void;
+}) {
+  const door = why.door;
+  return (
+    <span className="block text-meta text-kit-slate-11" data-testid={testId}>
+      <span className="block">{why.text}</span>
+      {door ? (
+        <button
+          type="button"
+          className="text-kit-blue-11 underline-offset-2 hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDoor(door);
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {door === "catalog" ? W.statusFixInCatalog : W.statusOpenSettings}
+        </button>
+      ) : null}
+    </span>
+  );
 }
 
 /**
@@ -685,14 +735,32 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
          */
         key: "status",
         label: "Status",
-        width: 112, minWidth: 96,
+        /* The shared Purchasing field width (UI MASTER §6.8); line two wraps
+           — the inline second line is the one allowed exception. */
+        width: REGISTER_FIELD_WIDTH.status, minWidth: 96,
+        wrap: true,
         sortable: true,
         chooserGroup: "Buying",
-        accessor: (o) => (
-          <span data-testid={`so-batch-status-${o.orderId}`}>
-            {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
-          </span>
-        ),
+        accessor: (o) => {
+          /* ⭐ THE TWO-LINE STATUS RULE (owner ruling 2026-09-28): line one
+             is unchanged; line two is the SAME refusal the disabled tick
+             carries, read from the same projection. */
+          const why = soBatchOrderStatusWhy(o, leafsByOrder.get(o.orderId) ?? [], stateWords);
+          return (
+            <span className="block" data-testid={`so-batch-status-${o.orderId}`}>
+              <span className="block">
+                {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
+              </span>
+              {why ? (
+                <StatusWhy
+                  why={why}
+                  testId={`so-batch-status-why-${o.orderId}`}
+                  onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
+                />
+              ) : null}
+            </span>
+          );
+        },
         filterValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
         sortFn: (a, b) =>
           soBatchOrderStatusWord(orderByFacts.get(a.orderId)!.group).localeCompare(
@@ -1056,7 +1124,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
         },
       },
     ],
-    [orderByFacts, safetyDaysFacts, compareOrderBy,
+    [orderByFacts, safetyDaysFacts, compareOrderBy, stateWords,
       navigate,
       data.destinations,
       leafsByOrder,
@@ -1627,6 +1695,7 @@ function SoBatchOrderExpansion({
     if (leaf) linesPerLeaf.set(leaf.id, (linesPerLeaf.get(leaf.id) ?? 0) + 1);
   }
 
+  const stateWords = purchaseDemandStateWords(safetyDays);
   const lines: GoodsMiniLine[] = order.lines.map((l) => {
     const leaf = leafByLineId.get(l.orderLineId);
     const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);
@@ -1672,6 +1741,25 @@ function SoBatchOrderExpansion({
          need for a document; it grants no permission, and a line that reads
          `Need PO` can still refuse the tick with its own stated reason. */
       status: soBatchOrderLineOutstandingQty(l) > 0 ? W.statusNeedPo : W.statusNoPoNeeded,
+      /* Line two (owner ruling 2026-09-28): the leaf's own refusal, only
+         beside `Need PO`, from the facts the refused tick reads. */
+      ...(() => {
+        const why =
+          leaf && soBatchOrderLineOutstandingQty(l) > 0
+            ? soBatchLeafStatusWhy(leaf, order.status, stateWords)
+            : null;
+        return why
+          ? {
+              statusNote: (
+                <StatusWhy
+                  why={why}
+                  testId={`so-batch-line-status-why-${l.orderLineId}`}
+                  onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
+                />
+              ),
+            }
+          : {};
+      })(),
       /* ⭐ A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY (owner correction
          2026-09-11). `To buy` means *what is left to buy*, so printing the
          engine's covering quantity there on a row nobody may tick presented a
@@ -1805,7 +1893,6 @@ function SoBatchOrderExpansion({
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
   }
 
-  const stateWords = purchaseDemandStateWords(safetyDays);
   /* An `Ordered` order's leaves are not blockers and must not be listed as
      any. They fail `isSelectableForOrder` because the order is FINISHED
      buying, not because something is wrong with them — printing
