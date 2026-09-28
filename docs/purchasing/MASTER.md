@@ -3381,17 +3381,22 @@ and `U1-000-` regular. Order 1 / Received 0 / Damaged 1 / Pending 1 and the sepa
 remained. This one-Unit live record does not prove consecutive-range grouping;
 that boundary is covered by local actual-PDF mixed-outcome tests. No receipt was changed.
 
-**Remaining document boundary.** `ReceivingSessionDetail` carries posting actor/duty
-evidence, but no distinct evidenced physical receiver. Preserve posting evidence as
-posting evidence; resolve the authoritative receiver before claiming the complete GRN
-target. Actual arrival time remains a separate schema gap under §9.3; never derive it
-from the filing timestamp. Physical/cumulative quantity presentation, historical source-version evidence and
-other GRN document requirements remain open; the implemented composition and linkage
-do not claim the complete document target. The authenticated historical SMOKE item
-also printed `Other goods`: the receipt reader calls the shared
-`goodsCategoryWordOf` fallback. This is a measured category-convergence gap, not proof
-that the Catalog recorded that category; do not silently replace Catalog facts or
-infer a missing-row result from an unsuccessful read.
+**WHO RECEIVED THE GOODS — owner ruling 2026-09-28 (Jess). APPROVED TARGET / NOT BUILT.**
+The GRN names the party that physically received the goods, not a person's name. At a
+partner-run warehouse the receiver is the operating company (NETS today; its PIC changes, so a
+name is not recorded and never asked) and the signed Supplier DO photo is the proof. At a
+Carres-run site (Office direct receiving, a Carres showroom) the receiver is the Carres staff
+member who saved the receipt, shown as a system-filled grey `Fact automatic` box. The paper prints
+`Received by {company or staff name}`. Posting evidence (normal holder · dated cover · actual
+actor) stays separate and is never relabelled as the receiver.
+
+**Remaining document boundary.** Actual arrival TIME is a schema gap: `Goods Received Date` must
+be stored as a time point (APPROVED 2026-09-17, NOT BUILT) and captured at the count/receipt, never
+derived from the filing timestamp; older records keep `Time not recorded`. The historical SMOKE
+item printed `Other goods` because the receipt reader falls back in `goodsCategoryWordOf`; the
+reader must read the Catalog category and print `Not recorded` when it cannot, never a guessed
+category. Physical/cumulative quantity presentation and historical source-version evidence remain
+open.
 
 This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
 share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
@@ -3559,15 +3564,16 @@ Warehouse submits count                (or Operation enters goods directly)
 - **One engine, three doors, one authority.** Office direct receiving (`office_receive_post`),
   the external Warehouse two-step (`warehouse_submit_receipt` → GRN Duty review), and the review
   doors (`warehouse_receipt_check_in` / `_return`) all pass `warehouse_receipt_validate_lines`
-  and `operation_receive_po_with_do`. Every posting/review door is gated on
-  `receiving_actor_context()` (0425): **GRN Duty, its dated cover, or an Operations Superuser** —
-  at page, API and SQL. The posting stores the duty-evidence trio (normal holder · dated cover ·
+  and `operation_receive_po_with_do`. **Who may post (owner ruling 2026-09-25, recorded in §7.3):** every
+  active Operation staff member may post a receipt; receiving is never blocked because the GRN
+  Duty holder is absent. GRN Duty keeps the Work card; the GRN records the actual actor. The
+  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten. The posting stores the duty-evidence trio (normal holder · dated cover ·
   actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
   Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
   into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
-  so plainly and protected posting refuses (`no_grn_duty_holder`); the manager assigns the holder
-  in `Workspace → Staff & Duties`.
+  so plainly and the Work card is unassigned; posting is not refused. The manager assigns the
+  holder in `Workspace → Staff & Duties`.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
   formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
