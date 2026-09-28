@@ -455,25 +455,25 @@ export function step1FirstIssue(
   // always apply.
   const cust = resolveFormTab(formCfg ?? null, "customer").builtins;
   const emg = resolveFormTab(formCfg ?? null, "emergency").builtins["emergency"];
-  if (!d.outletId)        return "Sale info — pick an Outlet";
-  if (!d.salespersonId)   return "Sale info — pick a Salesperson";
-  if (c.name.trim().length < 2)   return "Customer — full name (≥2 chars)";
-  if (!PHONE_RE.test(c.phone))    return "Customer — phone (≥8 digits)";
+  if (!d.outletId)        return "Sale info: pick an Outlet";
+  if (!d.salespersonId)   return "Sale info: pick a Salesperson";
+  if (c.name.trim().length < 2)   return "Customer: full name (≥2 chars)";
+  if (!PHONE_RE.test(c.phone))    return "Customer: phone (≥8 digits)";
   // 0200 — POS-parity demographics (2990s: POS-required, server-lenient).
   // Required per config; a NON-required but filled email still needs a valid shape.
-  if (cust["email"]?.required && !EMAIL_RE.test(c.email.trim())) return "Customer — email";
+  if (cust["email"]?.required && !EMAIL_RE.test(c.email.trim())) return "Customer: email";
   if (cust["email"]?.enabled && !cust["email"]?.required && c.email.trim() && !EMAIL_RE.test(c.email.trim())) {
-    return "Customer — email (invalid format)";
+    return "Customer: email (invalid format)";
   }
-  if (cust["race"]?.required && !c.race)         return "Customer — race";
-  if (cust["gender"]?.required && !c.gender)     return "Customer — gender";
-  if (cust["birthday"]?.required && !c.birthday) return "Customer — birthday";
+  if (cust["race"]?.required && !c.race)         return "Customer: race";
+  if (cust["gender"]?.required && !c.gender)     return "Customer: gender";
+  if (cust["birthday"]?.required && !c.birthday) return "Customer: birthday";
   if (emg?.required) {
-    if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
-    if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
-    if (!c.emergencyRelationship)            return "Emergency Contact — relationship";
+    if (c.emergencyName.trim().length < 2)   return "Emergency Contact: name";
+    if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact: phone";
+    if (!c.emergencyRelationship)            return "Emergency Contact: relationship";
     if (c.emergencyRelationship === "__OTHER__" && c.emergencyRelationshipOther.trim().length < 2) {
-      return "Emergency Contact — describe the 'Other' relationship";
+      return "Emergency Contact: describe the 'Other' relationship";
     }
   }
   /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13,
@@ -482,21 +482,21 @@ export function step1FirstIssue(
    * lift and requested date — an address nobody has yet is a Sales conversation
    * still open, not an order Operation can plan. `createOrderInputSchema`
    * refuses the same facts at the door with the governed words. */
-  if (c.addressLine1.trim().length < 5)   return "Address — Line 1 (≥5 chars)";
-  if (!c.addressState)                    return "Address — State";
-  if (!c.addressCity)                     return "Address — City";
-  if (!c.addressPostcode)                 return "Address — Postcode";
+  if (c.addressLine1.trim().length < 5)   return "Address: Line 1 (≥5 chars)";
+  if (!c.addressState)                    return "Address: State";
+  if (!c.addressCity)                     return "Address: City";
+  if (!c.addressPostcode)                 return "Address: Postcode";
   /* 2026-08-21 (Jess) — building type is DELIVERY's fact: stairs, lift
    * access and van parking all hang off it, and Operations was chasing the
    * shop for it after the sale. */
-  if (!c.buildingType)                    return "Address — Building type";
+  if (!c.buildingType)                    return "Address: Building type";
   // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
   // so the gate mirrors the delivery rules field-for-field.
   if (!c.billingSame) {
-    if (c.billingLine1.trim().length < 5) return "Billing — Line 1 (≥5 chars), or tick 'Same as delivery'";
-    if (!c.billingState)                  return "Billing — State, or tick 'Same as delivery'";
-    if (!c.billingCity)                   return "Billing — City, or tick 'Same as delivery'";
-    if (!c.billingPostcode)               return "Billing — Postcode, or tick 'Same as delivery'";
+    if (c.billingLine1.trim().length < 5) return "Billing: Line 1 (≥5 chars), or tick 'Same as delivery'";
+    if (!c.billingState)                  return "Billing: State, or tick 'Same as delivery'";
+    if (!c.billingCity)                   return "Billing: City, or tick 'Same as delivery'";
+    if (!c.billingPostcode)               return "Billing: Postcode, or tick 'Same as delivery'";
   }
   // 0219 — operator-defined REQUIRED custom fields (all 4 tabs share the
   // d.customer.custom bag; target-tab customs gate here too so the shell's
@@ -504,7 +504,7 @@ export function step1FirstIssue(
   for (const tab of ORDER_ENTRY_TABS) {
     for (const f of resolveFormTab(formCfg ?? null, tab).custom) {
       if (f.required && !(c.custom?.[f.key] ?? "").trim()) {
-        return `${f.label} — required`;
+        return `${f.label}: required`;
       }
     }
   }
@@ -556,7 +556,7 @@ export function cartGoodsIssue(
     if (category) categoryBySku.set(s.sku, category);
   }
   if (cartHasGoods(d.lines.map((l) => categoryBySku.get(l.sku)))) return null;
-  return "This order has no product — add the product this service belongs to";
+  return "This order has no product. Add the product this service belongs to";
 }
 
 /** Returns the first failing sized addon's display label, or null when
@@ -569,8 +569,8 @@ export function step2FirstDisposalIssue(d: WizardDraft): string | null {
     const missing = sizes.filter((s) => !s).length;
     if (missing > 0) {
       return a.qty > 1
-        ? `${a.name} — pick a size for each of the ${a.qty} items`
-        : `${a.name} — pick a size`;
+        ? `${a.name}: pick a size for each of the ${a.qty} items`
+        : `${a.name}: pick a size`;
     }
   }
   return null;
@@ -596,12 +596,12 @@ export function step3DateFirstIssue(
   today: Date = new Date(),
 ): string | null {
   if (!d.delivery.date) {
-    return "Delivery date — ask the customer for the date, then pick it";
+    return "Delivery date: ask the customer for the date, then pick it";
   }
   if (minLeadDays > 0) {
     const min = minDeliveryDateISO(minLeadDays, today);
     if (d.delivery.date < min) {
-      return `Delivery — earliest date is ${min} (${minLeadDays}-day lead time)`;
+      return `Delivery: earliest date is ${min} (${minLeadDays}-day lead time)`;
     }
   }
   // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
@@ -609,14 +609,14 @@ export function step3DateFirstIssue(
   // past and can't be after the delivery date (you don't start building after
   // you've promised delivery).
   if (!d.delivery.proceedDate) {
-    return "Proceed date — pick the day production should start";
+    return "Proceed date: pick the day production should start";
   }
   const todayIso = minDeliveryDateISO(0, today);
   if (d.delivery.proceedDate < todayIso) {
-    return `Proceed date — can't be in the past (earliest ${todayIso})`;
+    return `Proceed date: can't be in the past (earliest ${todayIso})`;
   }
   if (d.delivery.proceedDate > d.delivery.date) {
-    return "Proceed date — must be on or before the delivery date";
+    return "Proceed date: must be on or before the delivery date";
   }
   return null;
 }
