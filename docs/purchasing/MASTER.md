@@ -5780,6 +5780,31 @@ composition, not permission to build a new wizard, dashboard, stepper or task le
 any missing kit capability require their governed review. Unknown facts and read/save failures
 remain explicit; a submitted supplier message or printed paper never substitutes for receipt.
 
+#### Opening-stock and current-note evidence check — 2026-09-28
+
+**FACT / RESOLVED FROM AUTHORITY, bounded.** §6.2 already permits legacy showroom Unit identity
+at opening count, with supplier, ownership, model, location, existing serial/label and photographs.
+It says an unlabelled physical Unit remains usable with concrete label work. This resolves the
+need to invent a historical Consignment Order merely to give existing goods an identity; it does
+not prove every sale/return/claim source contract accepts opening stock. §9.5 separately requires
+verified purchase provenance for formal Supplier Claim; until verified, source-search/enquiry
+retains evidence and customer remedy does not wait. Do not infer a blanket Claim exception.
+
+Stock §12.9 and the checked Claude Warehouse conversation (`fe1a3f38-d950-4607-9beb-999ee2dff2ca`)
+corroborate that the 36 PJ imported Units were test rows marked Carres Owned, including goods
+subsequently ruled supplier-consigned. The conversation also contains an earlier 31-row import
+preview; it is not the current 36-row authority or proof of sofa-set occupancy. No new stock read,
+production correction or completed physical set reconciliation is claimed by this check.
+
+**FACT — document meaning, local 2990 source.** `docs/SUPPLY-CHAIN-DOCUMENTS.md` distinguishes
+outbound Consignment Order/Note/Return addressed to the consignee from inbound Purchase
+Consignment Order/Receive/Return. `apps/api/src/routes/consignment-notes.ts:1–23` confirms its note
+is an outbound delivery-like record, not the supplier sale-advice event. Its document-state-driven
+inventory behaviour remains rejected for Carres. This source explains 2990's name only. No Carres
+current Consignment Note form/template was found in the scoped records/available attachments
+checked; the user's note cannot be conclusively mapped by the shared title. Owner clarification
+of its actual issuance stage is pending. Do not rename or delete canonical documents meanwhile.
+
 #### Exception resolution from existing authority
 
 **RESOLVED FROM AUTHORITY — Stock MASTER §5 and Purchasing §9.9, checked 2026-09-28.**
