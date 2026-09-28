@@ -11,6 +11,7 @@ import {
   addWorkingDays,
   myHolidaySet,
   soBatchOrderLineOutstandingQty,
+  isSelectableForOrder,
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
@@ -1560,6 +1561,29 @@ describe("0600 · RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28)", () =
     const { body } = await rowsOf(t);
     expect(l7(body).poOfferUnread).toBe(true);
     expect(l7(body).poOffer).toBeUndefined();
+  });
+
+  it("a line covered ONLY by the pool, with an offer, stays tickable (poolOnly); exact lineage does not", async () => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.__poFree = {
+      data: [{ po_id: "PO-2051", po_line_id: "pol-2051", sku: "COV-K", free_units: 3 }],
+      error: null,
+    };
+    const pool = await rowsOf(t);
+    const covered = bySku(pool.rows, "COV-K")!;
+    expect(covered.fullyOnPo).toBe(true);
+    expect(covered.poolOnly).toBe(true);
+    expect(isSelectableForOrder(covered, "blank")).toBe(true);
+
+    t.po_line_sources = {
+      data: [{ id: "s1", po_id: "PO-2051", po_line_id: "pol-2051", order_id: "o4", order_line_id: "l7", qty: 3,
+        purchase_orders: { status: "open" } }],
+      error: null,
+    };
+    const exact = await rowsOf(t);
+    const lined = bySku(exact.rows, "COV-K")!;
+    expect(lined.poolOnly).toBeUndefined();
+    expect(isSelectableForOrder(lined, "blank")).toBe(false);
   });
 
   it("a Unit reserved on its PO covers exactly its line, is not Ready Stock, and leaves the pool", async () => {

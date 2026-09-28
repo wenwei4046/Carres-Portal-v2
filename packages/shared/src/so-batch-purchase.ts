@@ -1092,7 +1092,10 @@ export function isSelectableForOrder(
        payload reaching this line without it is an older Worker's, and the
        honest answer there is "could not be checked", not "go ahead".
        soBatchToBuyState() prints that answer beside the row. */
-    row.fullyOnPo === false &&
+    /* ⭐ 2026-09-28 — a build covered ONLY by the anonymous pool, with a
+       `Use this PO` offer, may still be bought instead (owner ruling §9.1);
+       the issue door accepts exactly the same builds. */
+    (row.fullyOnPo === false || (row.fullyOnPo === true && row.poolOnly === true)) &&
     isSelectableForBuying(row)
   );
 }
@@ -1133,7 +1136,8 @@ export function soBatchToBuyState(
 ): SoBatchToBuyState {
   if (orderStatus === "ordered") return { kind: "none" };
   if (!isSelectableForBuying(row)) return { kind: "none" };
-  if (row.fullyOnPo === true) return { kind: "covered" };
+  if (row.fullyOnPo === true && row.poolOnly !== true) return { kind: "covered" };
+  if (row.fullyOnPo === true) return { kind: "buy", qty: row.toBuy ?? 0 };
   if (row.fullyOnPo !== false) return { kind: "unchecked" };
   return { kind: "buy", qty: row.toBuy ?? 0 };
 }
@@ -1828,7 +1832,17 @@ export function soBatchOrderStatusWhy(
     return reserved.length > 0 ? { text: reserved.join(" "), door: null } : null;
   }
   const text = soBatchOrderUnselectableReason(order, leaves, stateWords);
-  if (!text) return null;
+  if (!text) {
+    /* Tickable, and a pool-covered leaf carries the `Use this PO` offer: the
+       offer shows, and never blocks buying (owner ruling 2026-09-28). */
+    if (!leaves.some((r) => r.poolOnly === true)) return null;
+    for (const line of order.lines) {
+      if (soBatchOrderLineOutstandingQty(line) <= 0) continue;
+      const offer = poOfferWhy(line);
+      if (offer?.door === "use_po") return offer;
+    }
+    return null;
+  }
   if (plan.absence === "already_on_po") {
     for (const line of order.lines) {
       if (soBatchOrderLineOutstandingQty(line) <= 0) continue;
@@ -1853,7 +1867,16 @@ export function soBatchLeafStatusWhy(
   stateWords: Readonly<Record<PurchaseDemandState, string>>,
   line?: SoBatchOrderLineFact,
 ): SoBatchStatusWhy | null {
-  if (orderStatus === "ordered" || isSelectableForOrder(leaf, orderStatus)) return null;
+  if (orderStatus === "ordered") return null;
+  if (isSelectableForOrder(leaf, orderStatus)) {
+    /* A pool-only build is tickable AND carries the offer (owner ruling
+       2026-09-28: the second line never blocks buying). */
+    if (leaf.poolOnly === true && line) {
+      const offer = poOfferWhy(line);
+      return offer?.door === "use_po" ? offer : null;
+    }
+    return null;
+  }
   if (!isPurchaseDemandTimingState(leaf.state)) {
     return { text: stateWords[leaf.state], door: doorOf([leaf.state]) };
   }

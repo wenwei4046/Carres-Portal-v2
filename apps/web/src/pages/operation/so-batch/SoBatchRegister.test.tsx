@@ -2559,6 +2559,24 @@ describe("the two-line Status rule", () => {
     expect(screen.queryByTestId("so-batch-inspector-ob")).not.toBeInTheDocument();
   });
 
+  it("the offer never blocks buying: a pool-only line stays tickable and still shows `Use this PO`", () => {
+    const base = blockedOrder("can_order_early", { fullyOnPo: true, poolOnly: true, orderBy: "2026-10-01" });
+    const order = base.registerRows[0]!;
+    renderRegister({
+      ...base,
+      registerRows: [{ ...order, lines: [{ ...order.lines[0]!, poOffer: { poId: "PO260924-4827", qty: 2 } }] }],
+    });
+    expect(screen.getByTestId("so-batch-select-ob")).not.toBeDisabled();
+    const why = screen.getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(within(why).getByRole("button", { name: "Use this PO" })).toBeInTheDocument();
+  });
+
+  it("a line covered by exact lineage (no poolOnly) stays refused", () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+  });
+
   it("the item line carries the same offer and door", async () => {
     renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
     fireEvent.click(screen.getByTestId("so-batch-expand-ob"));

@@ -28,6 +28,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import {
+  buildMayBuyOverPool,
   chunk,
   loadToOrder,
   type RegisterFacts,
@@ -636,6 +637,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
              whether `toBuy` is a remainder or the coverage it would buy a
              second time. No new arithmetic. */
           fullyOnPo: q.fullyOnPo,
+          /* ⭐ 2026-09-28 — pool-only cover with a `Use this PO` offer stays
+             buyable; the issue door asks the same rule. */
+          ...(buildMayBuyOverPool(build, res.data) ? { poolOnly: true } : {}),
           poNumbers: build.coveredByOpenPoPos,
           toBuy: q.toBuy,
           goodsMustArrive,

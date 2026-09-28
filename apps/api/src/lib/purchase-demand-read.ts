@@ -249,7 +249,37 @@ export type Loaded = {
    * `null` = the balance could not be read; absent = nothing was demanded.
    */
   poFreeByKey?: Map<string, { poId: string; qty: number }[]> | null;
+  /**
+   * Exact PO lineage per Sales Order item line: Σ `po_line_sources.qty` on
+   * non-cancelled POs (the same rows `so_line_remaining_requirement` reads).
+   */
+  lineageByLine?: Map<string, number>;
 };
+
+/**
+ * ⭐ THE ONE RULE for "may this pool-covered build still be bought?" — owner
+ * ruling 2026-09-28 (Purchasing §9.1): the operator may ignore the `Use this
+ * PO` offer and issue a new PO; the second line never blocks buying.
+ *
+ * TRUE only when the engine says `fullyOnPo`, NO line of the build has exact
+ * PO lineage (a PO already sourced from that Sales Order line — the 0430
+ * duplicate-PO shape stays refused), and every line's goods have a free-PO
+ * offer (`purchasing_po_free_units`). Bound Units are already netted out of
+ * the build before the engine sees it. The Register's tick and the issue
+ * door both ask THIS (Law D).
+ */
+export function buildMayBuyOverPool(
+  build: { fullyOnPo?: boolean; lines: readonly { lineId: string; sku: string }[] },
+  data: Pick<Loaded, "poFreeByKey" | "lineageByLine">,
+): boolean {
+  if (build.fullyOnPo !== true || build.lines.length === 0) return false;
+  if (!data.poFreeByKey || !data.lineageByLine) return false;
+  return build.lines.every(
+    (l) =>
+      (data.lineageByLine!.get(l.lineId) ?? 0) === 0 &&
+      (data.poFreeByKey!.get(stockMatchKey(l.sku))?.some((o) => o.qty > 0) ?? false),
+  );
+}
 
 /**
  * P10 — the ONE reference a drawn unit is committed to, for a row of this
@@ -1174,8 +1204,39 @@ export async function loadToOrder(
       ),
       registerFacts: { lines: registerLines, ordersById: registerOrders, soLines },
       poFreeByKey: await readPoFreeByKey(sb),
+      lineageByLine: await readLineageByLine(sb, orderIds),
     },
   };
+}
+
+/**
+ * Exact lineage per item line. Fails soft to `undefined`: without it no build
+ * is treated as pool-only, so the 0430 refusal stands.
+ */
+async function readLineageByLine(
+  sb: ReturnType<typeof userClient>,
+  orderIds: readonly string[],
+): Promise<Map<string, number> | undefined> {
+  const out = new Map<string, number>();
+  for (const batch of chunk([...orderIds])) {
+    const { data, error } = await sb
+      .from("po_line_sources")
+      .select("order_line_id, qty, purchase_orders!inner(status)")
+      .in("order_id", batch)
+      .neq("purchase_orders.status", "cancelled");
+    if (error) {
+      console.error("PO lineage unavailable", error.message);
+      return undefined;
+    }
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const po = r.purchase_orders as { status?: string } | null;
+      if (po?.status === "cancelled") continue;
+      const id = r.order_line_id as string | null;
+      if (!id) continue;
+      out.set(id, (out.get(id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
+    }
+  }
+  return out;
 }
 
 /**

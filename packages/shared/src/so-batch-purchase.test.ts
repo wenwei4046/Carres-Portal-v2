@@ -1364,3 +1364,23 @@ describe("goods reserved on a PO", () => {
     expect(W.statusUseThisPo).toBe("Use this PO");
   });
 });
+
+describe("the Use this PO offer never blocks buying (owner ruling 2026-09-28)", () => {
+  const base = {
+    id: "b", state: "can_order_early", lineIds: ["l1"], orderId: "o", so: 1, customer: "C",
+    customerDelivery: "2026-12-01", orderBy: "2026-10-01", item: "I", variant: null,
+    category: "mattress", skus: ["S"], supplierId: "s", supplier: "S", qtyNeeded: 1,
+    readyStock: 0, takenFromStock: 0, onPo: 1, poNumbers: ["PO1"], toBuy: 1,
+    goodsMustArrive: null, issueRef: { proposalKey: "p", buildKey: "b" }, parts: [],
+  } as unknown as PurchaseDemandRow;
+
+  it("a pool-only covered build is tickable and buys its quantity; plain covered is not", () => {
+    const pool = { ...base, fullyOnPo: true, poolOnly: true };
+    const covered = { ...base, fullyOnPo: true };
+    expect(isSelectableForOrder(covered, "blank")).toBe(false);
+    expect(soBatchToBuyState(covered, "blank")).toEqual({ kind: "covered" });
+    expect(isSelectableForBuying(pool)).toBe(true);
+    expect(isSelectableForOrder(pool, "blank")).toBe(true);
+    expect(soBatchToBuyState(pool, "blank")).toEqual({ kind: "buy", qty: 1 });
+  });
+});
