@@ -1736,18 +1736,51 @@ problem and reads processing state; cannot change ownership/cost/SO reservation/
 an authorised exact display Unit without moving it. Purchasing manages Consignment Order, exchange,
 Claim, collection and Sold to Settle without editing holder.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inventory rail contains `Showroom Display`, `WHO HAS IT → PJ
-Showroom / Other outlets` and `OWNERSHIP → Carres Owned / Supplier Consignment`. The saved view
-defaults to `Unit ID · Product · Site · Ownership · Stock use · SO No · Display since · Last
-condition check · Who has it · Expected collection · Work`. `Zone A3`, `Position 6`, Rack and other
-unverified placement fields are absent unless future measured outlet operations justify a governed
-extension.
+**UI / PAGE / OBJECT PLACEMENT →** the showroom uses Inventory's own columns and words (§7, owner
+rulings 2026-09-25): the rail row `STOCK → Showroom Display` filters the same eleven-column
+register, `OWNERSHIP → Carres Owned / Supplier Consignment` splits it, and `Stock Location` names
+the showroom (`PJ Showroom`, later the 2nd and 3rd showrooms by their own Site names). No second
+column set, no `Who has it`, no `Stock use`. `Zone A3`, `Position 6`, Rack and other unverified
+placement fields are absent unless future measured outlet operations justify a governed extension.
 
 **CROSS-MODULE CONNECTION →** Purchasing owns Consignment Order/supplier/exchange/Claim/Sold to
 Settle; Stock owns Unit/Site/holder/condition/Count; Showroom owns physical scans and evidence;
 Sales Order owns exact reservation/sale; Delivery owns collection/return/customer handover; Finance
 owns Supplier Invoice/Credit Note/settlement; the `Stock Adjustment Approver` approves major
 unexplained difference/write-off/compensation.
+
+**WHO OWNS WHAT IS ON DISPLAY — owner facts, Jess 2026-09-28 (persisted first in Purchasing §7.4a,
+PR #1725).** Showrooms are Carres's own Sites: PJ Showroom today, a 2nd and 3rd Carres-run
+showroom coming. Hookka and Ohana display goods are bought by Carres (`Carres Owned`). Every other
+supplier places its display goods on consignment (`Supplier Consignment`, the supplier named on the
+Unit, as `ops_stock_items` already enforces). A dealer such as Big Mattress buys from Carres; its
+display is the dealer's own stock, never a Carres Site and never a Unit in this register.
+
+**SHOWROOM SITES ARE A PREREQUISITE — owner fact 2026-09-28; readiness measured on production
+2026-09-28.** Repair Orders for a display Unit (Purchasing §9.7) and Consignment Order placement
+(Purchasing §7.6) both need the display Unit to stand in a governed showroom Site with its true
+ownership. What each side already does:
+
+| Capability | Today | Verdict |
+|---|---|---|
+| PJ Showroom as a Site | `warehouses` row `PJ Showroom`, kind `own`; holder party `PJ Showroom` (kind `showroom`) | 🟢 READY |
+| Ownership on the Unit | `carres_owned` · `supplier_consignment`; consignment requires a supplier (check constraint) | 🟢 READY |
+| A receipt landing at a showroom | receiving authority is not Site-scoped (§7), so a posted receipt can name PJ Showroom | 🟢 READY |
+| Inventory filtered to the showroom | `Showroom Display` rail row, `Stock Location`, `OWNERSHIP` group | 🟢 READY |
+| Adding the 2nd and 3rd showroom | Warehouse Settings `Sites` section | 🔴 APPROVED TARGET / NOT BUILT (§7) |
+| Moving a display Unit between Klang, a showroom and repair with evidence | the `Transfer` form | 🔴 APPROVED TARGET / NOT BUILT (§5) |
+| A personally signed-in showroom person scanning arrival, departure and Count | showroom identity and scan surfaces | 🔴 NOT BUILT |
+
+Purchasing needs nothing further from Stock to write its rules; the three 🔴 rows are Stock's build
+work, and the Settings `Sites` section plus the `Transfer` form come first because a display Unit
+cannot reach a repair or a consignment return without them.
+
+**TEST DATA IS WRONG ON OWNERSHIP, AND THE GO-LIVE IMPORT MUST NOT REPEAT IT.** The 2026-09-26 owner
+test load booked all 36 PJ Showroom Units as `Carres Owned`, including Armani, Dorsettloft, Todern
+and Nice Future goods. Under the 2026-09-28 facts only Hookka and Ohana display goods are Carres
+Owned. These are test rows (Constitution §6, no backfill); the go-live opening import sets
+`Supplier Consignment` and the supplier for every other supplier's display Unit. Measured the same
+day: one purchase order carries `is_consignment`.
 
 ### 12.10 Month-end Stock Confirmation and Finance handoff
 
