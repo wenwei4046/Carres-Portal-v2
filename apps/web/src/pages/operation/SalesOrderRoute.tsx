@@ -918,9 +918,15 @@ export default function SalesOrderRoute({
       )}
 
       <div
-        ref={frame}
         data-testid="route-canvas"
-        className="relative h-[calc(100vh-260px)] min-h-[420px] overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+        className="relative flex h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+      >
+      {/* The map draws only ABOVE the control strip, so `− + ⛶` (bottom-left,
+          always visible) never sits on top of a node (Jess, SO-1365 check). */}
+      <div
+        ref={frame}
+        data-testid="route-viewport"
+        className="relative min-h-0 flex-1 overflow-hidden"
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest("[data-testid^='route-node-']")) return;
           drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
@@ -978,9 +984,12 @@ export default function SalesOrderRoute({
             />
           ))}
         </div>
+      </div>
 
-        {/* `− + ⛶`, bottom-left, always visible and keyboard-operable. */}
-        <div className="absolute bottom-3 left-3 flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
+        {/* `− + ⛶`, bottom-left, always visible and keyboard-operable, on the
+            canvas's own control strip. */}
+        <div className="flex h-11 shrink-0 items-center border-t border-kit-slate-5 bg-white px-3" data-testid="route-controls">
+        <div className="flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
           <button
             type="button"
             onClick={() => zoom(-1)}
@@ -1008,6 +1017,7 @@ export default function SalesOrderRoute({
           >
             <Maximize2 size={14} aria-hidden="true" />
           </button>
+        </div>
         </div>
       </div>
     </div>

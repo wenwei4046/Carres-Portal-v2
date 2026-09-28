@@ -708,3 +708,15 @@ describe("Order Route — loading holds the canvas geometry (Scope E)", () => {
     expect(screen.queryByTestId("route-canvas")).not.toBeInTheDocument();
   });
 });
+
+describe("Order Route — the zoom controls never sit on a node (SO-1365 check)", () => {
+  it("keeps `− + ⛶` bottom-left on the canvas's own strip, outside the drawn map", () => {
+    draw();
+    const viewport = screen.getByTestId("route-viewport");
+    const strip = screen.getByTestId("route-controls");
+    expect(viewport).not.toContainElement(screen.getByTestId("route-zoom-in"));
+    expect(strip).toContainElement(screen.getByTestId("route-zoom-in"));
+    expect(screen.getByTestId("route-canvas")).toContainElement(strip);
+    expect(strip.compareDocumentPosition(viewport) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+});
