@@ -5802,8 +5802,10 @@ Consignment Order/Receive/Return. `apps/api/src/routes/consignment-notes.ts:1–
 is an outbound delivery-like record, not the supplier sale-advice event. Its document-state-driven
 inventory behaviour remains rejected for Carres. This source explains 2990's name only. No Carres
 current Consignment Note form/template was found in the scoped records/available attachments
-checked; the user's note cannot be conclusively mapped by the shared title. Owner clarification
-of its actual issuance stage is pending. Do not rename or delete canonical documents meanwhile.
+checked; the user's note cannot be conclusively mapped by the shared title. The owner subsequently could not identify a fixed issuance stage and suggested recording both
+incoming and outgoing goods. Historical usage remains unverified; the future-facing recommendation
+below resolves the proposed purpose without asking the owner to classify ERP documents. Canonical
+names are not renamed or deleted by this research finding.
 
 #### Exception resolution from existing authority
 
@@ -5907,9 +5909,40 @@ composition; read-only document detail returns to full width. No local component
 Quick Rail reads source/contact/document/Unit facts and links to the owning object. Calendar reads
 confirmed/arranged dates from the owning schedules; an unknown date is not invented to place a row
 on a calendar. Customer information and selling prices stay out of supplier consignment PDFs.
-The term Consignment Note must not silently replace an order, movement proof or sale notice:
-retain canonical names until its actual current form/purpose is mapped. This is not permission to
-add another document or remove one already governed. Use full document names in staff explanations.
+**CONSIGNMENT NOTE PRESENTATION — PROPOSAL / NOT LAW; 2026-09-28.** The owner asks whether
+one note can record both incoming and outgoing goods and does not know the current form's precise
+classification. Recommend one supplier-facing Consignment Note document family for supplier-owned
+placements, standalone returns and swaps. Placement uses COMING IN; return uses GOING BACK; a
+same-supplier swap uses both on one instruction. It is one shared document presentation over the
+governed arrangement and linked incoming/return facts, not a new manual record or second stock
+writer. Recommend this familiar external title instead of asking staff to choose Order versus
+Return. Final replacement of screen/PDF names requires owner approval and consistent COPY/MASTER
+updates; current identifiers and historical documents remain unchanged meanwhile.
+
+The note records supplier, source arrangement, exact goods/quantities, actual pickup/destination
+for each supplier-related direction and separately confirmed dates. It stays price-free under
+§9.9. An issued note records an instruction, not actual stock movement: receipt/handover evidence
+and actual quantities/dates remain attached to the corresponding leg. A planned date or signature
+for one leg never completes another; partial and different-day movements retain remaining scope.
+Preserve the issued version and subsequent evidence, rather than overwriting an old signed copy.
+A later changed instruction follows the governed revision/sending contract. One combined swap
+instruction need not be sent again as a second standalone supplier return document, although actual
+handover evidence may be recorded on separate trips.
+
+For the Dorsettloft example, supplier incoming goods are collected at 2990 for PJ and the supplier
+return is collected from Carres warehouse when confirmed. PJ-to-Carres-warehouse relocation stays
+Stock Transfer linked to the same arrangement; it does not count as supplier return. The record
+therefore remains open for actual supplier collection. This note is neither the customer's Sales
+Invoice nor the supplier sale-notification/settlement event; later sale notification derives from
+successful customer delivery without asking Operation to create another manual sale record.
+
+**Trade-off / falsifier:** one familiar paper reduces document-name decisions, but its direction,
+source and actual-versus-planned facts must remain explicit. If readers cannot tell which goods
+are being placed, collected or still outstanding, the design fails. Do not flatten all movement
+facts into a single signed/done flag, make a universal note for unrelated stock flows or copy
+2990's create-document-means-stock-moved behaviour. The reference proves a delivery-like document
+principle; the two-direction combined presentation is a Carres adaptation of its approved swap.
+
 
 **4. Exceptions and record lifecycle**
 
@@ -6001,7 +6034,7 @@ for this proposal, so no visual score or production readiness is claimed. New wo
 need their existing governance; do not implement a local substitute.
 
 The integrated operating journey and the two assignment rules have owner approval. Exact
-register/object copy/composition, current Consignment Note purpose, Finance matching/ownership
+register/object copy/composition, proposed Consignment Note presentation/naming, Finance matching/ownership
 consequences and verified opening/set identity remain explicit closure items. The planner owns
 further authority/design checking; these are not permission to hand incomplete truth to build.
 Persist the remaining reviewed result before PLAN MISSION COMPLETE. No rendered UI, complete
