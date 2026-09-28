@@ -1220,6 +1220,12 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      (7) An outside message never carries a missing field; each act uses its own template and
      deadline. (8) A stop with no current work and no fact change (`RECEIVING`, `STOCK`, `DELIVER`,
      `DELIVERY PHOTO` on SO-1333) collapses to one line and opens on press. Result on SO-1333: To do 3.
+   - **Rail group titles follow UI MASTER "Rail style C" (Jess asked 2026-09-28 "only title need icon
+     or how we standard ui"):** `Attention` and `Module` are group titles with the kit icon (`late`,
+     `modules`; 16px, Lucide stroke 2, 8px gap) and 13/600 slate-12 normal-case text; the rows under
+     them carry NO icon ("Do not add decorative icons to every filter row"). Style C's one 11px
+     supporting line under each title is owed: its words need owner approval before they reach the
+     screen.
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
