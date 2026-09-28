@@ -255,7 +255,7 @@ export function SpecialAddonsPicker({
                     className={selCls}
                     data-testid={`pick-choice-${def.code}-${gi}`}
                   >
-                    <option value="">Select</option>
+                    <option value="">{g.label}</option>
                     {g.choices.map((c) => (
                       <option key={c.label} value={c.label}>
                         {c.label}

@@ -265,13 +265,13 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
             <div className="grid grid-cols-2 gap-3">
               <Field label="Category">
                 <select className={inp} value={category} onChange={e => setCategory(e.target.value)}>
-                  <option value="">Select</option>
+                  <option value="">Category</option>
                   {SN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
               <Field label="Type">
                 <select className={inp} value={type} onChange={e => setType(e.target.value)}>
-                  <option value="">Select</option>
+                  <option value="">Type</option>
                   {SN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </Field>
@@ -442,7 +442,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
                 </div>
                 <Field label="Logistic Company">
                   <select className={inp} value={sectionA.logisticCompany ?? ""} onChange={e => setSectionA({ ...sectionA, logisticCompany: e.target.value || null })}>
-                    <option value="">Select</option>
+                    <option value="">Logistic Company</option>
                     {SN_LOGISTICS.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </Field>

@@ -255,7 +255,7 @@ export default function ServiceCaseModal({
             <Field label="Case Type">
               <select value={caseTypeId} onChange={(e) => setCaseTypeId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">Select</option>
+                <option value="">Case Type</option>
                 {configQ.data?.types.map((t) => (
                   <option key={t.id} value={t.id}>{t.label}</option>
                 ))}
@@ -269,7 +269,7 @@ export default function ServiceCaseModal({
                   option: the gate is the transition, not a lock on the row. */}
               <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">Select</option>
+                <option value="">Status</option>
                 {configQ.data?.statuses.map((s) => (
                   <option key={s.id} value={s.id} disabled={s.isClosed && !canClose}>
                     {s.label}

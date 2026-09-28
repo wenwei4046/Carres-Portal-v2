@@ -577,7 +577,7 @@ export default function CustomerStep({
                         onChange={(e) => setC({ race: e.target.value })}
                         data-testid="pos-customer-race"
                       >
-                        <option value="">Select</option>
+                        <option value="">Race</option>
                         {RACE_OPTIONS.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -594,7 +594,7 @@ export default function CustomerStep({
                         onChange={(e) => setC({ gender: e.target.value })}
                         data-testid="pos-customer-gender"
                       >
-                        <option value="">Select</option>
+                        <option value="">Gender</option>
                         {GENDER_OPTIONS.map((g) => (
                           <option key={g} value={g}>
                             {g}
@@ -669,7 +669,7 @@ export default function CustomerStep({
                         data-testid="pos-building-type"
                         className="w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary max-w-[260px]"
                       >
-                        <option value="">Select</option>
+                        <option value="">Building type</option>
                         {BUILDING_TYPES.map((b) => (
                           <option key={b} value={b}>
                             {b}
@@ -960,7 +960,7 @@ function CustomFieldsInputs({
           </span>
           {f.type === "select" ? (
             <select value={values[f.key] ?? ""} onChange={(e) => onSet(f.key, e.target.value)}>
-              <option value="">Select</option>
+              <option value="">{f.label}</option>
               {f.options.map((o) => (
                 <option key={o} value={o}>
                   {o}

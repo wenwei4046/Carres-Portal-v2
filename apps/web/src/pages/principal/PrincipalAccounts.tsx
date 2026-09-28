@@ -1216,7 +1216,7 @@ function CreateAccountModal({
                     data-testid="acct-staff-gender"
                     className="w-full px-3 py-2 border border-base-200 rounded text-body bg-white cursor-pointer"
                   >
-                    <option value="">Select</option>
+                    <option value="">Gender</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>

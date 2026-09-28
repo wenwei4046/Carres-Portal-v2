@@ -839,7 +839,7 @@ export default function PrincipalNewOrder() {
             data-testid="raw-building-type"
             className={INPUT_CLASS}
           >
-            <option value="">Select</option>
+            <option value="">Building type</option>
             {BUILDING_TYPE_OPTIONS.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -1138,7 +1138,7 @@ export default function PrincipalNewOrder() {
                   data-testid={`raw-pay-followup-${fu.key}`}
                   className={INPUT_CLASS}
                 >
-                  <option value="">Select</option>
+                  <option value="">{fu.label}</option>
                   {fu.options.map((o) => (
                     <option key={o} value={o}>
                       {o}

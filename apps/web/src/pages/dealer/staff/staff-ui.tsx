@@ -583,7 +583,7 @@ export function AddStaffModal({
             data-testid="staff-add-gender"
             className={inputCls}
           >
-            <option value="">Select</option>
+            <option value="">Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
@@ -805,7 +805,7 @@ export function EditStaffModal({
             data-testid="staff-edit-gender"
             className={inputCls}
           >
-            <option value="">Select</option>
+            <option value="">Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>

@@ -352,7 +352,7 @@ export default function BdCreateDealerModal({ onClose }: { onClose: () => void }
             data-testid="bd-cd-staff-gender"
             className={inputCls}
           >
-            <option value="">Select</option>
+            <option value="">Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
