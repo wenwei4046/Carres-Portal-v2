@@ -2213,7 +2213,7 @@ The three sections, in the SAME reading order on the form and preview, are:
 
 1. **Request Details** — drawn in the Sales Order fact grammar, one title one box,
    three to a row, in this reading order (owner ruling 2026-09-26 — "yes" to the
-   sketch): **row 1** automatic `Requested By` · automatic `Proceed Date` · `Purpose`;
+   sketch): **row 1** automatic `Requested By` · automatic `Proceed Date` (both in the grey automatic box, owner 2026-09-28; UI MASTER one card grammar) · `Purpose`;
    **row 2** the purpose's own second box, whose title changes with the purpose —
    `Service Case` (Service Case) · `Staff member` (Internal Staff Purchase) ·
    `Subsidiary` (Subsidiary Purchase) · `What is this for?` (Other Purchase, required
