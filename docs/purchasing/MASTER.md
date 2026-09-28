@@ -1270,6 +1270,20 @@ The user-facing gate uses two lines:
   move custody. Exact-Unit scan/count, actual collector, time and handover proof create the Stock
   consequence. Partial collection leaves the remaining Units open.
 
+### 7.4a Who owns what is on display — owner facts, Jess 2026-09-28
+
+- **Showrooms are Carres's own.** PJ showroom today; a 2nd and 3rd Carres-run showroom are coming.
+  Each must be a governed Stock Site (Stock §12.9) before display Units can be placed or repaired
+  there.
+- **Hookka and Ohana display goods are BOUGHT by Carres** (Manual Purchase / PO) — §7.5.
+- **Every other supplier places its display goods in Carres showrooms on consignment** — the
+  goods stay the supplier's until sold — §7.6. Consignment is live business today even though no
+  PO has yet been flagged `is_consignment` (measured 2026-09-28): the four Showroom documents are
+  needed, not deferred.
+- **A dealer (e.g. Big Mattress) BUYS from Carres.** Its price is fixed by Sales Development, not
+  Operation. A dealer's display is the dealer's own purchase — a Sales matter, never a Purchasing
+  consignment or a Carres display.
+
 ### 7.5 Purchased showroom display
 
 Hooka/Ohana display goods are Carres purchases, not consignment. A Display Request resolves to Manual
