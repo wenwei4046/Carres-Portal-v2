@@ -5348,6 +5348,43 @@ may not invent the answer or negotiate/set the price. Both paths create the same
 Display Request, not separate queues or duplicate supplier orders. This ruling permits proxy
 entry, not supplier-document issuance, commercial approval or changing Stock through that entry.
 
+**MANUAL ARRANGEMENT AND ACTUAL MOVEMENT ROUTE — APPROVED TARGET / NOT BUILT;
+Jess, 2026-09-28.** Staff may manually initiate the display arrangement from Sales instructions,
+enter supplied facts and select the actual pickup and destination locations. Reuse Catalog for
+new goods; select exact existing Stock Units for goods already held. The arrangement supplies
+the source for governed documents; this does not permit arbitrary standalone receipt, sale or
+completed-handover records. Keep actual pickup location, supplier ownership and final destination
+as separate facts. An external pickup location is not automatically a Carres-controlled Site.
+
+**OWNER-REPORTED OPERATING CASE:** Dorsettloft sent two new display sofas to the wrong location,
+2990. Sales asked Operation to collect them from 2990 for PJ Showroom and move two old display
+sets from PJ back to Carres warehouse. Dorsettloft may collect the old sets from that warehouse
+on a later stock-delivery visit; that visit is not yet a confirmed collection appointment.
+One display arrangement must retain all three movement scopes:
+
+- New goods: actual pickup at 2990 → receipt at PJ Showroom. Verify existing custody/receipt
+  evidence before choosing the source-owned movement; neither assume 2990 is a Carres Site nor
+  fabricate an earlier Carres receipt. Resolve new Catalog identity under the existing rule.
+- Old goods: exact PJ Units → Carres warehouse through Stock Transfer. Preserve supplier
+  ownership; arriving at warehouse does not complete return to Dorsettloft.
+- Supplier collection: those same old Units, now at the warehouse → Dorsettloft through the
+  linked Consignment Return and actual handover evidence. Keep uncollected Units outstanding.
+  A later supplier delivery can coordinate collection on the same visit; incoming receipt and
+  outgoing return remain distinct physical facts. Never create another set of outgoing Units.
+
+**CURRENT PJ DISPLAY CAPACITY — OWNER RULING; Jess, 2026-09-28.** PJ Showroom currently has
+space to display at most 11 sofa sets. This is display capacity, not a statement of current
+occupancy or an 11-Unit stock limit: a set may consist of multiple tracked Units. It does not
+change the 36 imported Unit records or establish their verified ownership. No production data
+change is authorised by this ruling.
+
+**PROPOSAL / NOT LAW — capacity-aware coordination.** Show existing occupied sofa sets and the
+planned arrival/removal effect together so Operation can arrange space before arrival. Preserve
+the approved either-movement-first rule; do not silently assume two new sofas equal two outgoing
+sets, a current occupancy of 11, or introduce an unconditional receipt block. Confirm the relevant
+set composition and timing in the arrangement. Falsifier: if operational set grouping cannot
+reliably measure occupied display space, do not present a computed free-capacity figure as fact.
+
 **SUPPLIER QUOTATION RECORDING — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
 Operation may upload a supplier quotation and transcribe its model/specification, prices and terms
 into the same showroom arrangement. Recording a quotation is not negotiation, Sales confirmation,
