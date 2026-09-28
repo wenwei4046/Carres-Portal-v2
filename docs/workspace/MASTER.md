@@ -1045,7 +1045,24 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
 
-### 5.10 · THE WORK PAGE — ONE SPEC · PROPOSAL / NOT LAW, revision 5 awaiting Jess (2026-09-27)
+### 5.10 · THE WORK PAGE — ONE SPEC · APPROVED / LOCKED (Jess, 2026-09-28: "yes" to 定 and to the four kit admissions)
+
+**LOCK RECORD — 2026-09-28.** Jess answered "yes" to "reply 定 to lock, kit ok to admit the four kit
+pieces". What is locked is the CURRENT truth written in the revision-13 onward bullets of A7 below
+(stop cards, acts first, checklist marks, content from authority, BUILD SHEET values); earlier
+revision paragraphs that those bullets overwrite are history and must not be built. **Kit admissions
+approved:** Route stop · Checklist row · Quiet route row · `Block` moved into `components/kit/`; each
+joins the kit with its `/ui` example and its UI MASTER entry in the build that first draws it.
+**Reference (evidence, not authority):** `docs/workspace/work-reference/prototype.html` and
+`work-1440.png` · `work-1440-form-open.png` · `work-1023.png` (SO-1333, test data, 2026-09-28).
+**Still owed, not locked:** the rail group titles' 11px supporting lines (words need owner approval);
+the phone layout below 900px (its own round); the Sales Orders Order Route still prints `Waiting for
+purchase` and `Confirm ready date` against Purchasing law (sent to the Sales Orders chat 2026-09-28).
+**READY FOR CARD — Workspace Work page (desktop).** Build the §5.10 page for real orders from the
+Work feed and the owning modules' components; acceptance = the BUILD SHEET values measured at 1440 /
+1180 / 1023 / 919, the three SO-1333 acts on the first screen, no free-text send record, no page
+scaling, only Save blue, every word in COPY-STANDARD.
+
 
 **Why this section exists.** Four days of Work design were done by rebuilding the live page round
 after round, with three planners editing at once. Jess agreed (2026-09-27) to stop: one written
@@ -1187,7 +1204,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      (neither PO carries a send mark). Payment has no act (no Scheduled delivery). `To do 3`.
    - **REVISION 13 · STOPS = THE SALES ORDER ORDER ROUTE NODES, ONE CHECKLIST FORMAT (Jess,
      2026-09-28: "yes. direction is correct … split to supplier, receiving, etc, what order route from
-     sales order do"; "every module step checklist progress is the same"; PROPOSAL until 定).** The
+     sales order do"; "every module step checklist progress is the same").** The
      stops are the orders MASTER node map in its order, under its bands: `GOODS` (`PURCHASING` ·
      `SUPPLIER` · `RECEIVING` · `STOCK`), `DELIVERY` (`LOGISTICS` · `DELIVERY DATE`), `PAYMENT`, then
      `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`. No `Order Route · To do {n}` row and no
