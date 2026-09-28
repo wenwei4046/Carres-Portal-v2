@@ -2727,7 +2727,7 @@ what has not happened yet, in the plainest words available:
 | The supplier has not confirmed a ready date | **`Ready date not confirmed`** | ETA unknown · TBC · — |
 | Nothing has been received against the PO | **`Not received yet`** | Not received · GRN: — · Outstanding |
 | Part of the PO arrived | **`{n} of {m} received`** | Partial · {n}/{m} |
-| Units are short on the line | **`{n} of {m} Units ready`** + **`Waiting for purchase`** | Units not created yet · No stock · Not allocated |
+| Units are short on the line | **`Warehouse has {n} of {m} Units ready`** + **`Carres has not ordered the goods`** / **`Warehouse has not received the goods`** | `Waiting for purchase` · Units not created yet · No stock · Not allocated |
 | No company chosen yet | **`Logistics not assigned`** | `No logistics chosen yet` (retired 2026-09-24) · No carrier · Unassigned |
 | Nobody has scheduled a delivery day | **`Not scheduled yet`** | `Date + slot not confirmed` (retired) · Appointment not confirmed · No booking · TBC |
 | Not delivered | **`Not delivered yet`** | Pending · Open · In progress |
@@ -2753,7 +2753,7 @@ what has not happened yet, in the plainest words available:
 | RECEIVING node — partly received, a receipt posted | **`{n} of {m} received`** / **`Latest: {GRN No} · Received: {date}`** | printing the GRN alone as if complete |
 | RECEIVING node — damaged or wrong goods in the receipt | **`{k} damaged or wrong`** (only when k > 0) | Rejected · Claim (the claim is the strip's) |
 | RECEIVING node — complete | **`{GRN No} · Received: {date}`** | Done · Received (alone) |
-| STOCK node — why the Units are short | **`Waiting for purchase`** (no Purchase Order covers it) · **`Waiting for receiving`** (issued, not received) | Not allocated · No stock |
+| STOCK node — why the Units are short | **`Carres has not ordered the goods`** (no Purchase Order covers it) · **`Warehouse has not received the goods`** (issued, not received) | `Waiting for purchase` · `Waiting for receiving` · Not allocated · No stock |
 | STOCK node action — eligible Ready Stock exists for the SKU | **`Choose Ready Unit`**, door **`Open Ready Stock →`** | `Create the Units` (retired 2026-09-26 — Units are minted at PO issue, nobody creates one) · Reserve · Allocate |
 | The goods lane's plate | **`Qty {n}`** · **`Qty {n} · {m} on order`** (covered by an issued PO) · **`Qty {n} · {m} to buy`** (no PO covers it) | `{m} to buy from factory` (retired 2026-09-26 — it said *buy* about goods already bought) |
 | A read failed — the change requests (the banner) | **`Could not read the change requests for this order.`** + **`Try again →`** | drawing no banner as if none were waiting |
@@ -2774,9 +2774,10 @@ the instruction is the short form and never repeats the party or the number.
 | Node | Action line | Where the word comes from |
 |---|---|---|
 | PURCHASING, no PO | **`Issue PO`** | the action dictionary — the ONE act that creates a Purchase Order |
-| SUPPLIER | **`Confirm ready date`** | the action dictionary |
+| PURCHASING, issued but its current version not marked sent | **`Send {PO No} to {Supplier}`** | the Purchasing PO window send line (Purchasing §5.6) |
+| SUPPLIER, only while the day-before check is open | **`Ask {Supplier} for the Supplier DO for {PO No}`** | the day-before Work card (Purchasing §5.7); `Confirm ready date` is retired |
 | RECEIVING | **`Check in`** | the act on arriving GOODS — **never `Receive`**, which this dictionary bans as a verb |
-| STOCK | **`Create the Units`** | the Stock act |
+| STOCK, only when eligible Ready Stock exists | **`Choose Ready Unit`** | the Stock act; `Create the Units` is retired |
 | LOGISTICS | **`Assign logistics`** | the action dictionary |
 | DELIVERY DATE | **`Confirm delivery date`** | the action dictionary |
 | MONEY | **`Collect`** | the action dictionary's queue word; the amount is on the fact line above |
