@@ -1185,8 +1185,11 @@ Saved Views and governed Register layout remains on the owning Register and is n
 main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Settings destination
 and preserves return context; contextual links are not duplicate editors. Preserve existing
 read-only visibility and manager-only writes. Workspace MASTER §4 owns the capability and this
-placement's acceptance boundary. Internal composition remains under review; do not nest the existing
-catalogue/detail into a permanently visible third narrow-screen column. This ruling changes no
+placement's acceptance boundary. Its §4.2 structure is separately owner-approved 2026-09-28 / NOT
+BUILT: current facts → next assignment → collapsed history, with existing authorised actions near
+the current facts. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
+Settings navigation opens on demand; never force a third narrow-screen column. Remaining interaction
+review is still open. This ruling changes no
 colour, spacing, typography, icon or other token value.
 
 **THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The

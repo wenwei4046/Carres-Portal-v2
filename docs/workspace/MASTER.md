@@ -127,7 +127,7 @@ People/HR retains employee identity and eligibility, and modules retain actual w
 
 **Measured implementation boundary:** at review, the shipped page still occupied the main menu and
 Settings had no Staff & Duties section. Moving the destination is not yet BUILT or DEPLOYED. This
-approval does not approve the newly proposed internal page rearrangement, new cover actions or a
+placement approval and the separately approved §4.2 structure do not approve new cover actions or a
 complete Blueprint; continue the section-by-section PLAN review before application work. Existing
 approved capability contracts below remain in force. The relocation must preserve access, exact-Duty
 links and return context; it must fit the Settings shell without forcing three simultaneous columns
@@ -206,25 +206,35 @@ combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
 
-Desktop uses one catalogue and one selected-duty detail. It does not repeat two large forms and a
-full history beneath every Duty.
+**OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** Jess approved the page-structure
+segment and the new `Next assignment` heading. Keep one Duty catalogue and one selected-Duty detail.
+The detail reads in this order: current normal owner and effective period → current/scheduled cover
+when applicable → existing authorised actions → next effective primary assignment → collapsed
+`Assignment & cover history`. Future appointments are not presented as if their terms already ran.
+All authorised assignment/cover records remain reachable; collapsing history never deletes evidence.
 
 ```text
-┌ Staff & Duties ──────────────────────────────────────────────────────────────┐
-│ Who holds each company duty today and who covers an absence.   Search duties│
-├ DUTIES ──────────────────────────┬ SELECTED DUTY ────────────────────────────┤
-│ PO Duty                          │ PO Duty                                   │
-│ [YJ] Yu Jun                      │ Normal owner  [YJ] Yu Jun                 │
-│                                  │ Acting today [SH] Shasha                  │
-│ GRN Duty                         │ Cover         15–17 Sep · Annual leave    │
-│ [SH] Shasha                      │                                            │
-│                                  │ [Assign holder] [Add cover]               │
-│ Delivery Duty                    ├ ASSIGNMENT & COVER HISTORY ───────────────┤
-│ Not assigned                     │ 15 Sep · Shasha covering for Yu Jun       │
-│                                  │ 01 Sep · Yu Jun assigned by Jess          │
-│ …                                │                                            │
-└──────────────────────────────────┴────────────────────────────────────────────┘
+Staff & Duties
+
+Search duties       │ PO Duty
+State: All duties   │ Normal owner  Yu Jun
+                    │ Effective     Mon, 7 Sep to Wed, 30 Sep
+PO Duty             │
+GRN Duty            │ [Assign holder]  [Add cover]
+Purchasing Approver │
+…                   │ Next assignment
+                    │ Shasha · Thu, 1 Oct to Sat, 31 Oct
+                    │
+                    │ ▸ Assignment & cover history
 ```
+
+Names/dates above illustrate the reading order, never hard-coded facts. The next assignment is the
+next effective primary assignment from the authoritative Duty source; it does not replace today's
+normal owner early. It names the person and effective dates and is omitted when no future primary
+assignment exists. Do not infer the next effective owner merely from the first history row. Full
+future arrangements remain reachable in the expanded records, with their future effective periods
+explicit. History distinguishes the recorded event time from the assignment/cover effective dates
+and retains the shared event → who/when → detail grammar. Opening history changes no business fact.
 
 The left catalogue follows the shared Duty catalogue order and shows Duty label, current normal
 holder and exceptional state: `Covered today`, `Starts {date}`, `Ends {date}` or `Not assigned`.
@@ -235,7 +245,16 @@ Duty label and authorised current/historical person names; `State` may narrow to
 The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
 `Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
 carry a full-name accessible label and never replace the printed name. Selecting a Work
-configuration failure may deep-link directly to the required Duty while preserving this layout.
+configuration failure opens the required Duty in this same Settings page and preserves return context.
+Readers see the existing manager-only sentence; only authorised managers see the existing focused
+assignment/cover actions. This composition does not authorise new actions or change their gates.
+
+At 1440px and 1180px retain catalogue/detail. At 820px, 743px and 390px show the catalogue, then a
+full-width selected detail with `Back to duties`. Settings navigation is available on demand and
+must not force a third simultaneous narrow-screen column. §4.5 owns the retained loading, no-match,
+read-failure, unassigned and read-only states; no task-level Waiting/Completed/Missed state is added.
+Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
+or production completion; the remaining list/action/exception details continue in PLAN review.
 
 ### 4.3 · Change-holder contract
 
@@ -311,9 +330,9 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
 
-At 1440px and above use the catalogue/detail split. At 1024–1439px retain the split with a narrower
-catalogue. Below 1024px show the catalogue first and open the selected Duty as a full-width detail
-with an explicit Back door; forms are single-column and dates/names never truncate. Keyboard order is
+Use §4.2’s approved catalogue/detail composition and responsive targets. Below 1024px show the
+catalogue first and open the selected Duty as a full-width detail with `Back to duties`; forms are
+single-column and dates/names never truncate. Keyboard order is
 search/filter → Duty list → selected facts → authorised actions → history. Focus returns to the
 originating Duty after a modal closes.
 
@@ -343,7 +362,9 @@ The page is ready for owner acceptance only when all are demonstrable:
 - assignment and cover overlap/race attempts cannot yield two effective answers;
 - success, known refusal, uncertain response and retry preserve one append-only act and honest UI;
 - search/no-match/read-failure/history-empty states and deep links retain their required meaning;
-- names, dates, action controls and history remain readable and operable at 1440, 1024 and 390px;
+- names, dates, action controls and history remain readable and operable at 1440, 1180, 820, 743 and 390px;
+- the current owner, next effective assignment and collapsed history remain distinct under §4.2;
+  recorded event time is never substituted for the effective period;
 - changing the current holder/cover updates open/future Work routing without rewriting completed
   actor evidence.
 
