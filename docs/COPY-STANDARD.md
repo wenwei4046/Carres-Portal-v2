@@ -930,6 +930,19 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
+**RO object page words — owner approved 2026-09-28 (Purchasing MASTER §9.7 "RO object page").**
+`Send {RO No} to {Supplier}` · `The 14 working days start when {Supplier} receives it.` ·
+`Ask {Supplier} to confirm they received {RO No}` · `Target starts when they confirm.` ·
+`Record Supplier receipt` · `Hand {n} Units to {Supplier}` · `Warehouse records who collected them.` ·
+`Waiting for {Supplier} to return {n} Units` · `Inspect {n} returned Units` ·
+`Available again only after inspection.` · `Owner consent` · `Record owner consent` ·
+route stops `Issue` · `Supplier received RO` · `Picked up` · `Returned` · `Inspected`.
+
+**Create Repair Order words — owner approved 2026-09-28.** `Save repair order` · `Not available yet`
+(a location option Stock does not govern yet) · `Already on {RO No}` · problem choices reuse
+`Damaged` · `Missing component` · `Something else` with `What did you see?` and
+`What happened, in one sentence`.
+
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 
 `Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom
@@ -1024,6 +1037,15 @@ Evidence labels: `Problem evidence` · `Pickup proof` · `Supplier receipt proof
 Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Doc Date` and
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
+
+### Consignment Order document content — owner ruling 2026-09-28
+
+**APPROVED TARGET / NOT BUILT.** `COMING IN` and `GOING BACK` are the combined CO PDF's goods
+section labels (Purchasing MASTER §7.6, §9.9); omit `GOING BACK` for placement without outgoing
+goods. This does not approve a new on-screen card style or an independent return notice for a
+paired swap. The CO PDF prints no price or price total. Supplier quotation versions and Sales
+commercial confirmation remain linked internal records; no zero or invented acceptance wording
+stands in for missing price/confirmation. Actual dates remain separate for the two directions.
 
 ### Purchasing navigation words — owner ruling 2026-08-22
 

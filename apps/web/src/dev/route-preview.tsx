@@ -339,6 +339,8 @@ createRoot(document.getElementById("root")!).render(
           owners={{
             purchasing: { userId: "u-yj", name: "Yu Jun", email: "yujun@carres.my" },
             receiving: { userId: "u-sh", name: "Shasha", email: "shasha@carres.my" },
+            delivery: { userId: "u-sh", name: "Shasha", email: "shasha@carres.my" },
+            payment: { userId: "u-sh", name: "Shasha", email: "shasha@carres.my" },
           }}
           onRetry={() => undefined}
         />
