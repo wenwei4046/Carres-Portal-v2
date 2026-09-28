@@ -116,7 +116,7 @@ describe("the Storage section", () => {
     state.cases = [{ ...CASE, billed_through_period: 1 }];
     show();
     await waitFor(() => expect(screen.getByTestId("storage-case-mattress_bedframe"))
-      .toHaveTextContent("all on a Storage Invoice."));
+      .toHaveTextContent("All on a Storage Invoice."));
     expect(screen.queryByRole("button", { name: "Create Storage Invoice" })).not.toBeInTheDocument();
   });
   it("End storage states its reason and posts to the closing door; a closed case offers no doors", async () => {

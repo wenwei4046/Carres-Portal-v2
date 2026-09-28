@@ -201,8 +201,8 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     for (const t of [r, c]) {
       expect(t).toContain("Hi NETS 👋");
       // Each delivery is its own block — REF-led, never the SO.
-      expect(t).toContain("_CR0902_ — Lee Wei Yang (Puchong)");
-      expect(t).toContain("_TCF0544_ — Tan (Johor)");
+      expect(t).toContain("_CR0902_ · Lee Wei Yang (Puchong)");
+      expect(t).toContain("_TCF0544_ · Tan (Johor)");
       expect(t).toContain("1× L1201F-K");
       expect(t).toContain("2× SOF-3RA");
       expect(t).toContain("2 deliveries.");
