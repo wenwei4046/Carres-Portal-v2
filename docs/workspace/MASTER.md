@@ -1250,6 +1250,41 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      Communication 300 with checklist rows stacking the state under the step; 900–1099 rail 220 ·
      Mission ≥400 · Communication 280. Measured at 1440 / 1180 / 1023 / 919: 13px text, 36px buttons,
      no sideways scroll, the three acts on the first screen. Phone (below 900) is its own round.
+   - **Acts first (Jess 2026-09-28: "make sure need to do put on top, not scroll down to find what to
+     do").** Stops holding an open act come first, in Route order among themselves, with their full
+     cards; every other stop follows in Route order as one quiet line. Measured on SO-1333 at 1440,
+     1023 and 919: all three acts are on the first screen.
+   - **BUILD SHEET — exact values for the build chat (every number is a token; measured on the
+     prototype 2026-09-28).** Reference files: `output/prototype/index.html` (evidence, not authority).
+
+     | Part | Kit component (exists) | Exact values |
+     |---|---|---|
+     | Page columns | `PageShell` + `grid-layout` | ≥1340: rail 280 · Mission ≥460 · Communication 340; 1100–1339: 240 · ≥460 · 300; 900–1099: 220 · ≥400 · 280; never scales; below 900 = phone round |
+     | Column title rows | `SectionHeader` | 64px tall, 15/600 slate-12, one bottom line shared by all three columns |
+     | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; chosen row blue-3 + 3px blue edge |
+     | Order header | `DetailShell` header slots | three blocks of two lines: `SO No` link 15/600 over customer 13/400 · `Proceed Date` 11/500 over date 13 · `Customer Requested Delivery Date` 11/500 over date 13 |
+     | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 6, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
+     | Card button | `Button` secondary | 36px, top right of the card; opens the owning form in the card |
+     | Form in card | `FieldFrame` + `field-recipe` + `Select` / `DatePicker` | three fields per row, gap 12, label 11/500 slate-11 over a 32px field; white; only `Save` is `Button` primary (the one blue) |
+     | Progress | text | `{n} of {m} done` 12/400 slate-11, bottom right of a card; only steps with completion evidence count |
+     | Communication | `Tabs` + `Select` + `Button` + `Icon` (`message`, `mail`) | four tabs on one row; To (recorded channels only) · Template · Message · icons · Copy · `History {n}` folded |
+     | Document number | link + `PdfPreview` sheet | underlined 12/400 ink; opens the official PDF over the page |
+
+     **MISSING FROM THE KIT — needs owner approval to join the kit before the build (Constitution §2:
+     "a component that does not exist: STOP and ask"):**
+     1. **Route stop** — the vertical line with a 24px dot (red `!` missed · amber due · dark ✓ all
+        done · grey otherwise), the stop label 11/500 uppercase slate-11 letter-spacing .06em, and
+        `Missed` / `Due` beside it; line 1.5px dashed slate-6, solid once done.
+     2. **Checklist row** — a 16px square mark, radius 4: filled dark with ✓ (done), empty with a
+        1.5px border (not yet), filled red / amber with `!` (the step that is the act now); then the
+        step 13/400 (13/600 when it is the act), its value 12/400 slate-11 (red/amber for the act), the
+        document link on the right; row ≥30px; below 1340px the value drops under the step. A stop that
+        cannot start yet draws its rows with NO mark.
+     3. **Quiet route row** — one line 48px: stop label · status 13/400 · `{n} of {m} done` · chevron,
+        white with 1px slate-5, radius 6, padding 8/16; outline red / amber when it holds an act;
+        opens to the stop's cards.
+     4. **`Block` itself** lives in `SalesOrderWorkspace.tsx`, not in `components/kit/`; it must be
+        admitted to the kit as the one card so Workspace imports it rather than copying it.
    - **RULING (Jess, 2026-09-27: "workspace is stay here to complete all job"): every act is completed
      inside Workspace; nothing sends the operator to another page.** Each act opens its OWNING
      module's own component in place (Purchasing's supplier answer table, Receiving's receipt,
