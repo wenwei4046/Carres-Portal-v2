@@ -20,14 +20,9 @@ import {
   reselectPartnerInput,
   deliveryQueueLeads,
   myHolidaySet,
-  orderMoney,
   resolveBookingBrief,
   resolveCurrentCustomerCommitment,
-  resolveOrderCompletion,
   resolveUnitAllocation,
-  invoiceStorageSumOf,
-  storageHold,
-  storageObligation,
   salesOrderNumberWord,
   salesOrderParamOf,
   type AllocationUnit,
@@ -56,6 +51,12 @@ import { todayIsoMYT } from "../../lib/today";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import { chunk } from "../../lib/purchase-demand-read";
+import {
+  completionOfOrder,
+  type CompletionOrderRow,
+  type CompletionReads,
+  type CompletionUnitRow,
+} from "../../lib/order-completion";
 import type { AppEnv } from "../../types";
 
 /**
@@ -1781,94 +1782,22 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     }
   }
 
-  const units: AllocationUnit[] = ((unitsRes.data ?? []) as Array<{
-    id: string; unit_code: string | null; sku: string; status: string;
-    condition: string; warehouse_id: string | null; po_no: string | null;
-    qty: number | null; date_in: string | null; sold_at: string | null;
-  }>).map((r) => ({
-    id: r.id,
-    unitCode: r.unit_code,
-    sku: r.sku,
-    status: r.status as AllocationUnit["status"],
-    condition: r.condition,
-    warehouseId: r.warehouse_id,
-    poNo: r.po_no,
-    qty: r.qty ?? 1,
-    dateIn: r.date_in,
-    soldAt: r.sold_at,
-  }));
-
-  const allocation = resolveUnitAllocation({
-    orderId: id,
-    soRef,
-    commitmentLines: commitment.lines.map((l) => ({
-      sku: l.sku,
-      qty: Number(l.qty) || 0,
-    })),
-    units,
-  });
-
-  const lines = (ord.order_lines ?? []) as Array<{ sku: string; qty: number; unit_price: number | string | null }>;
-  const addons = (ord.order_addons ?? []) as Array<{ qty: number; unit_price: number | string | null }>;
-  const ctrl = Array.isArray(ord.ops_order_control)
-    ? (ord.ops_order_control[0] ?? null)
-    : (ord.ops_order_control as Record<string, unknown> | null);
-  const price = (x: { qty: number; unit_price?: number | string | null }) =>
-    Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
-  // CARD-2026-08-28 - the CATALOG owns which rate applies. This handler is
-  // NOT the detail endpoint, so it cannot borrow that one's `categoryBySku`;
-  // it takes its own bounded read through the same one shared reader. A SKU
-  // the catalog does not hold falls back to the parser, per line.
-  const storageCats = await storageSkuCategories(sb, lines.map((l) => String(l.sku)));
-  const hold = storageHold({
-    storageFrom:
-      ((ctrl?.extension_original_date as string | null) ??
-        (ctrl?.storage_from as string | null) ??
-        (ord.delivery_date as string | null)) || null,
-    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
-    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
-    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
-    skus: lines.map((l) => String(l.sku)),
-    categories: storageCats,
+  // CARD-2026-08-28 - the CATALOG owns which rate applies; a SKU the catalog
+  // does not hold falls back to the parser, per line.
+  const storageCats = await storageSkuCategories(
+    sb,
+    ((ord.order_lines ?? []) as Array<{ sku: string }>).map((l) => String(l.sku)),
+  );
+  // The ONE composition the Order list's Obligations filter also calls.
+  const completion = completionOfOrder({
+    ord: ord as unknown as CompletionOrderRow,
+    commitmentLines: commitment.lines.map((l) => ({ sku: l.sku, qty: Number(l.qty) || 0 })),
+    units: (unitsRes.data ?? []) as CompletionUnitRow[],
+    refunds: (refundsRes.data ?? []) as CompletionReads["refunds"],
+    loans: (loansRes.data ?? []) as CompletionReads["loans"],
+    invoices: (invoicesRes.data ?? []) as CompletionReads["invoices"],
+    storageCategories: storageCats,
     asOf: todayIsoMYT(),
-    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
-    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
-  });
-  // Gate convergence (2026-09-07): invoice-backed storage beats legacy C9
-  // when papers exist, netted so `paid` subtracts once (`storageObligation`,
-  // the ONE precedence law) — `owing`, never `fee`, survives on the legacy
-  // path exactly as before (collectedAt clears it; Law D readers agree).
-  const lineSum = lines.reduce((s, l) => s + price(l), 0);
-  const addonSum = addons.reduce((s, a) => s + price(a), 0);
-  const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
-  const storage = storageObligation({
-    invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-    goodsTotal: lineSum + addonSum,
-    paid: ord.paid,
-    legacyOwing: hold.owing,
-    legacyReleased: hold.released,
-  });
-  const money = orderMoney({
-    lineSum,
-    addonSum,
-    paid: ord.paid,
-    controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: storage.owing,
-    storageReleased: storage.released,
-  });
-
-  const completion = resolveOrderCompletion({
-    cancelled: ord.status === "cancelled",
-    allocation,
-    money: { outstanding: money.outstanding, known: money.known },
-    refunds: (refundsRes.data ?? []) as Array<{
-      status: "requested" | "approved" | "rejected" | "paid";
-    }>,
-    loans: (loansRes.data ?? []) as Array<{
-      status: "on_loan" | "returned";
-      source: "warehouse" | "supplier";
-      returned_to_supplier_at: string | null;
-    }>,
   });
 
   return c.json({ completion });
