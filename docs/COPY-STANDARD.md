@@ -231,6 +231,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
 | Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
 | Staff & Duties detail and history (owner ruling 2026-09-28; workspace/MASTER.md §4.2) | fact `Next holder` → `{name} from {date}` · gap `Nobody holds {Duty} from {date}.` · section `Planned` → `{n} assignments until {date}` · `Show` · catalogue `Ends {date}` only when nobody follows | Upcoming · Coming up · Future · `Ends {date}` on a continuous rota |
+| Staff & Duties who can act (owner ruling 2026-09-28; workspace/MASTER.md §3) | fact `Who can act` → `Anyone in {role} can do this work. Carres records who did it.` (operational Duty) · `Only {holder} or the cover can decide.` (approver Duty) · no cover possible `Nobody else can cover {Duty}. Work waits for {name}.` (approver only) | Only the holder can do this · Restricted |
 | Duty no match | `No duties match this search` · `Clear search` | No duties |
 | Duty read failure | `Staff & Duties could not be opened` · `Try again` | No duties · Error |
 | Duty unassigned | `Not assigned` · `Nobody holds {Duty}.` | Unowned · Available · — |

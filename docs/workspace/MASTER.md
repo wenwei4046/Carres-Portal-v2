@@ -132,6 +132,20 @@ future routing everywhere but never rewrites history.
 - Absence is expressed as a dated Buddy cover. With no eligible cover, the action **waits** for its
   normal holder; it is never downgraded to another role, a position rung or an email list.
 
+**ANY STAFF MAY DO THE WORK; CARRES RECORDS WHO WILL DO IT AND WHO DID — APPROVED / LOCKED, owner
+rulings (Jess) 2026-09-28.** A Duty or PIC decides who the work is FOR (the Work owner chip: normal
+owner, or today's cover); it does not decide who is ALLOWED to do operational work. Every active
+staff member of the Duty's role may perform an operational Duty's act (PO Duty, GRN Duty, Delivery
+Duty, Issue Triage Duty and Sales Order PIC work); the owning module records the actual person on
+the completion fact, and the normal owner and cover stay unchanged. **Unplanned absence** (sudden
+MC the system does not know about): a colleague opens `Team Work`, reads the absent person's group
+and does the balance of the work there; each result records the colleague as actual actor. When the
+absence will last, the manager adds a cover from today so the balance moves into the cover's My Work.
+**Approver Duties are not operational work and keep their locked gate** (§4, 0533): only today's
+resolved holder or dated cover decides, and nobody decides their own request.
+**No `I'll do it` claim is added to Work** — the owning module's completion fact closes the item for
+everyone at once. Falsifier: two people measured performing the same Work item's act.
+
 ## 4 · Staff & Duties
 
 `Settings → Staff & Duties` is the only assignment surface. An authorised manager assigns one
@@ -253,6 +267,7 @@ to `All duties` · `Covered today` · `Cover scheduled` · `Not assigned`.
 | `Acting today` | covers + resolver | Only while a cover acts today; the same person is never repeated as acting |
 | `Effective` | current assignment | Always when held · `{date} to {date}`, or `From {date}` with no end |
 | `Next holder` | the next future assignment | Only when one exists · `{name} from {date}` |
+| `Who can act` | Duty kind (catalogue) | Always · operational Duty: `Anyone in {role} can do this work. Carres records who did it.` · approver Duty: `Only {holder} or the cover can decide.` |
 | `Cover` | the active or next scheduled cover | Only when one exists · dates and reason |
 | gap sentence | resolver + assignments | Replaces `Next holder` when the current term ends with nobody after it: `Nobody holds {Duty} from {date}.` |
 
@@ -364,6 +379,7 @@ originating Duty after a modal closes.
 | Current staff picker reads Operation staff but the Blueprint roster is Yu Jun and Shasha | Enforce active/eligible source facts at read and write; never revive Khor Yee or admit external Warehouse accounts |
 | Cover overlap and whole-period holder are refused by the writer (0532); ending/replacing a cover has no governed act yet | Build the append-only end/replace-cover act with reason/actor/time (§4.4) |
 | Current page has loading/read-error and immutable history evidence | Retain; add no-match, catalogue-failure, scheduled-cover and write-success/refusal contracts |
+| `receiving_actor_context()` (0425) still admits only GRN Duty, its cover or an Operations Superuser, against the 2026-09-25 and 2026-09-28 rulings | Admit every active Operation staff member; keep the normal/cover/actual trio as evidence |
 | Current layout has no search/filter, selected Duty or narrow-screen contract | Build the §4.2/§4.5 composition and verify at 1440, 1024 and 390px |
 
 ### 4.7 · Staff & Duties acceptance contract
