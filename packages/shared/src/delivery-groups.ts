@@ -57,7 +57,7 @@ export const DELIVERY_GROUPS = [
     key: "bed",
     label: "Bed set",
     description:
-      "Mattress and bed frame always go together — never send one without the other",
+      "Mattress and bed frame always go together. Never send one without the other.",
   },
   {
     key: "sofa",
