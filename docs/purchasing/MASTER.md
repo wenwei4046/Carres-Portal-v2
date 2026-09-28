@@ -5389,6 +5389,21 @@ One display arrangement must retain all three movement scopes:
   A later supplier delivery can coordinate collection on the same visit; incoming receipt and
   outgoing return remain distinct physical facts. Never create another set of outgoing Units.
 
+**GUIDED ARRANGEMENT JOURNEY — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+Operation opens one display arrangement and follows its current next action: record Sales's
+instruction and negotiator/evidence → choose new Catalog goods and exact existing outgoing Units
+→ record each actual pickup/destination leg → confirm contacts, transport party, dates and
+receiving-showroom space → record each actual receipt/handover through its owning form → retain
+outstanding supplier collection until actual return. Missing goods facts may stay in draft under
+the existing identity rules. Commercial follow-up remains with Sales and does not block the
+approved consignment arrangement. Known facts prefill the linked governed documents; employees
+need not guess a document type or re-enter the same goods and addresses. Partial execution leaves
+the exact remaining scope visible. A supplier's possible future delivery is not a confirmed
+collection booking. Later customer sale uses Sales Order and Sales Invoice; supplier notification
+and invoice follow-up reference the same goods separately. This approves the operational main
+journey, not detailed financial reversals, unresolved exception policies, screen copy/composition,
+the complete Showroom Blueprint or implementation.
+
 **DISPLAY SPACE COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
 For each arrangement, show the actual displayed goods and quantities, planned incoming goods and
 planned outgoing goods. Operation coordinates movement timing and confirms with the receiving
@@ -5724,6 +5739,27 @@ Workspace opens the same owning actions in place and preserves return context. T
 composition, not permission to build a new wizard, dashboard, stepper or task ledger. New copy and
 any missing kit capability require their governed review. Unknown facts and read/save failures
 remain explicit; a submitted supplier message or printed paper never substitutes for receipt.
+
+#### Exception resolution from existing authority
+
+**RESOLVED FROM AUTHORITY — Stock MASTER §5 and Purchasing §9.9, checked 2026-09-28.**
+A planned Transfer date change records reason/history and updates future Work only. Before
+collection, cancellation leaves goods at origin. After collection, Stock requires the next real
+return/redirect handover; Cancel cannot restore the original location. Each Unit retains its last
+confirmed holder, including partial collection/arrival. Consignment instructions retain distinct
+incoming/outgoing dates and follow governed document revision/sending rules. These existing
+constraints need no fresh owner approval.
+
+**PROPOSAL / NOT LAW — apply these constraints to the complete display arrangement.**
+Changing one leg updates only its remaining instructions and work. If new display goods have
+arrived but old goods have not left, keep the new receipt and explicitly continue, revise or stop
+the old-goods arrangement through its owning authority. If old goods are already in the warehouse,
+keep their actual location and outstanding supplier collection even if the new placement changes.
+A stopped unexecuted scope records reason and preserves the prior supplier instruction/sending
+history; any changed supplier commitment requires attributable revised communication, not a local
+status alone. Outstanding commercial/Finance consequences remain with their owners. Falsifier:
+a more specific governing source/commitment rule requires additional approval or treatment; that
+rule wins. This proposal does not decide disputed supplier charges or post-sale ownership/liability.
 
 #### Recommended whole solution and remaining owner boundary
 
