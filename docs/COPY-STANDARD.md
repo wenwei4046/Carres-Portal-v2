@@ -4500,3 +4500,7 @@ Same words, new meaning:
 Not screen words (a direct database change only, never raised by a screen): the flag guards
 `account {code} has accounts under it and stays a heading` and
 `account {code} has {n} posted line(s) and cannot become a header`.
+
+**Workspace Module order row — owner correction 2026-09-28:** show only `{SO No}` and a right-aligned numeric count of tasks in the selected Attention/day and module scope. Do not repeat the customer name, `actions`, `Missed`, or `No date` on that row. Example: `SO-1333` with `2`.
+
+Workspace message availability: `Message not available` replaces a placeholder draft when no governed message is available. Disable `Copy message` in that state; never report success when clipboard copying fails.
