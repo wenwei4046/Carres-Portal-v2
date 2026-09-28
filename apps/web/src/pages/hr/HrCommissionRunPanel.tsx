@@ -295,7 +295,7 @@ export default function HrCommissionRunPanel({
       icon = <CircleDot size={19} />;
       iconCls = "bg-warning-soft text-warning";
       title = "A draft is waiting for approval";
-      sub = `${run.peopleCount} ${run.peopleCount === 1 ? "person" : "people"} · ${rm(run.totalPayable)} · closed by ${run.closedByName ?? "—"}. The figures are captured but the month is still editable.`;
+      sub = `${run.peopleCount} ${run.peopleCount === 1 ? "person" : "people"} · ${rm(run.totalPayable)} · closed by ${run.closedByName ?? ""}. The figures are captured but the month is still editable.`;
     }
   } else if (ready) {
     tone = "border-l-success";

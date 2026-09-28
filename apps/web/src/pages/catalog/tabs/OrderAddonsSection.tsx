@@ -172,7 +172,7 @@ function AddonRow({
         className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-body outline-none bg-transparent"
       />
       {description === null ? (
-        <span className="text-meta text-base-400">—</span>
+        null
       ) : (
         <input
           key={`${addon.key}-desc-${description}`}
@@ -211,7 +211,7 @@ function AddonRow({
         className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-meta text-base-600 outline-none bg-transparent"
         data-testid={`addon-sizes-${addon.key}`}
       />
-      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="text-meta text-base-400">—</span>}</div>
+      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : null}</div>
       <div className="text-right">
         <button
           type="button"

@@ -46,11 +46,12 @@ describe("buildSupplierGroupMessage", () => {
     expect(msg).toContain("Total 2 units.");
   });
 
-  it("a null ref renders '—'", () => {
+  it("a null ref prints no ref line and no dash", () => {
     const msg = buildSupplierGroupMessage("remind", "Ohana", [
       { ref: null, items: [{ sku: "SF02", qty: 1 }] },
     ]);
-    expect(msg).toContain("_—_");
+    expect(msg).toContain("*SF02* ×1\n\nTotal 1 unit.");
+    expect(msg).not.toMatch(/[—–]\S|_[—–]_/);
   });
 
   it("includePo=false (default) shows ref only — no PO", () => {

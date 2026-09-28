@@ -827,7 +827,7 @@ function HoursSection({
                         ? NOT_CONFIGURED
                         : cell.closed
                           ? "Closed"
-                          : `${cell.opensAt}–${cell.closesAt}`}
+                          : `${cell.opensAt} to ${cell.closesAt}`}
                     </td>
                   );
                 }
@@ -870,7 +870,7 @@ function HoursSection({
                               aria-label={`${cellLabel} opens at`}
                               onChange={(e) => patch(weekday, activity, { opensAt: e.target.value })}
                             />
-                            <span aria-hidden>–</span>
+                            <span>to</span>
                             <Input
                               id={`${id}-closes`}
                               type="time"
@@ -1022,7 +1022,7 @@ function HolidaysSection({
                 aria-label="Public-holiday opens at"
                 onChange={(e) => patch({ opensAt: e.target.value })}
               />
-              <span aria-hidden>–</span>
+              <span>to</span>
               <Input
                 id="holiday-closes"
                 type="time"
@@ -1155,7 +1155,7 @@ function SpecialDatesSection({
           {upcoming.map((r) => (
             <li key={r.id} className="text-body">
               <span className="font-semibold">{r.onDate}</span> · {SPECIAL_DATE_WORD[r.kind]}
-              {r.opensAt && r.closesAt ? ` · ${hhmm(r.opensAt)}–${hhmm(r.closesAt)}` : ""} · {r.reason}
+              {r.opensAt && r.closesAt ? ` · ${hhmm(r.opensAt)} to ${hhmm(r.closesAt)}` : ""} · {r.reason}
               <div className="text-meta text-kit-slate-11">
                 {r.updatedByName ?? r.createdByName ?? "Not recorded"} · {fmtDate(r.updatedAt)}
               </div>

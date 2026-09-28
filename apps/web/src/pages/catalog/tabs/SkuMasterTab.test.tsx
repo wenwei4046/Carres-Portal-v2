@@ -282,8 +282,8 @@ describe("SkuMasterTab — cost column removed (Loo 2026-07-06), margin kept", (
   it("shows muted '—' in margin column when cost is null", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_NULL])} />));
     const marginCell = screen.getByTestId("sku-margin-CLOUD-QUEEN");
-    // muted dash; no RM value
-    expect(marginCell.textContent).toContain("—");
+    // empty; no RM value, no dash
+    expect(marginCell.textContent).not.toMatch(/[—–]/);
     expect(marginCell.textContent).not.toMatch(/RM \d/);
   });
 

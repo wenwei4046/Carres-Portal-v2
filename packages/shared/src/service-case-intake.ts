@@ -138,7 +138,7 @@ export function caseIssuesFor(cat: CaseProductCategory): CaseOption<CaseIssueKey
 }
 
 export function caseIssueLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return CASE_ISSUES.find((i) => i.key === key)?.label ?? key;
 }
 
@@ -185,7 +185,7 @@ export function caseNeedsManager(priority: CasePriority | null | undefined): boo
 }
 
 export function caseUsableLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return CASE_USABLE_OPTIONS.find((o) => o.key === key)?.label ?? key;
 }
 

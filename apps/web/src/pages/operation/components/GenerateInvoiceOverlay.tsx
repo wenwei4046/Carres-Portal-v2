@@ -158,7 +158,7 @@ export default function GenerateInvoiceOverlay({
       order_code: `SO-${so}`,
       customer: {
         name: customerName,
-        address: customerAddress ?? "—",
+        address: customerAddress ?? "",
         phone: customerPhone,
       },
       dealer: { name: "Carres", contact: null },

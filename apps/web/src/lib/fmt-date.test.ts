@@ -79,10 +79,10 @@ describe("Carres date formatting", () => {
   });
 
   it("keeps the empty and invalid fallbacks", () => {
-    expect(fmtDate(null)).toBe("—");
-    expect(fmtDate("not-a-date")).toBe("—");
-    expect(fmtDateShort(null)).toBe("—");
-    expect(fmtDateShort("not-a-date")).toBe("—");
+    expect(fmtDate(null)).toBe("");
+    expect(fmtDate("not-a-date")).toBe("");
+    expect(fmtDateShort(null)).toBe("");
+    expect(fmtDateShort("not-a-date")).toBe("");
   });
 
   it("still spells a MONTH with its full year — a period is not a day", () => {

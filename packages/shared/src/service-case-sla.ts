@@ -125,7 +125,7 @@ export function caseDelayNeedsNote(reason: CaseDelayReason): boolean {
 }
 
 export function caseDelayReasonLabel(reason: string | null | undefined): string {
-  if (!reason) return "—";
+  if (!reason) return "";
   return CASE_DELAY_REASON_LABEL[reason as CaseDelayReason] ?? reason;
 }
 

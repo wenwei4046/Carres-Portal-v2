@@ -159,7 +159,7 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
           <div className="col-span-2 rounded-lg bg-base-50 border border-base-200 px-3 py-2">
             <div className="text-label uppercase tracking-[0.05em] text-base-500">Loaded monthly cost</div>
             <div className="t-num text-strong font-semibold" data-testid="comp-loaded-preview">
-              {preview === null ? "—" : rm(preview)}
+              {preview === null ? "" : rm(preview)}
             </div>
             <div className="text-meta text-base-500">
               (base + allowance) × (1 + burden). Burden is an estimate you type —
@@ -330,7 +330,7 @@ export default function HrPeopleCostTab({
                   </td>
                   <td className="px-2.5 h-11 text-body text-right t-num">
                     {g.revenue === null ? (
-                      <span className="text-base-400">—</span>
+                      null
                     ) : (
                       rm(g.revenue)
                     )}
@@ -389,7 +389,7 @@ export default function HrPeopleCostTab({
                     s.costPctOfRevenue === null ? "text-base-400" : ""
                   }`}
                 >
-                  {s.costPctOfRevenue === null ? "—" : `${s.costPctOfRevenue}%`}
+                  {s.costPctOfRevenue === null ? "" : `${s.costPctOfRevenue}%`}
                 </div>
               </div>
             </div>
@@ -461,7 +461,7 @@ export default function HrPeopleCostTab({
                     )}
                   </td>
                   <td className="px-2.5 h-11 text-body text-base-500">
-                    {r.positionName ?? (r.storeName ? r.storeName : "—")}
+                    {r.positionName ?? (r.storeName ? r.storeName : "")}
                   </td>
                   {r.compId === null ? (
                     <td

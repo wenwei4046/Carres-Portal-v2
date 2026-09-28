@@ -95,7 +95,7 @@ describe("Monthly demand", () => {
   it("names one row per month across a year boundary, then the edges, the undated and the total", () => {
     mount();
     expect(screen.getByRole("heading", {
-      name: "By month · Customer Requested Delivery Date · Nov 2026 – Jan 2027",
+      name: "By month · Customer Requested Delivery Date · Nov 2026 to Jan 2027",
     })).toBeInTheDocument();
     expect(rowTexts().map((cells) => cells[0])).toEqual([
       "Before Nov 2026", "Nov 2026", "Dec 2026", "Jan 2027", "After Jan 2027", "No delivery date", "Total",
@@ -188,7 +188,7 @@ describe("Monthly demand", () => {
       const { container, unmount } = mount({ view });
       const text = container.textContent ?? "";
       expect(text).not.toContain("—");
-      const heading = "By month · Customer Requested Delivery Date · Nov 2026 – Jan 2027";
+      const heading = "By month · Customer Requested Delivery Date · Nov 2026 to Jan 2027";
       expect(text.replace(heading, "")).not.toContain("–");
       unmount();
     }

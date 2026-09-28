@@ -47,7 +47,7 @@ const PILL: Record<string, string> = {
 };
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "";
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
@@ -390,7 +390,7 @@ function ExitBlock({
           </li>
           <li className="text-body flex gap-2">
             <span className={person.access === "disabled" && isHq ? "text-success" : "text-base-300"}>
-              {person.access === "disabled" && isHq ? "✓" : "—"}
+              {person.access === "disabled" && isHq ? "✓" : ""}
             </span>
             <span className="text-base-500">
               {isHq
@@ -547,7 +547,7 @@ export default function HrPersonDrawer({
               {[
                 ["Joined", fmtDate(detail.joinDate)],
                 ["Confirmed", fmtDate(detail.confirmDate)],
-                ["Type", detail.employmentType?.replace("_", " ") ?? "—"],
+                ["Type", detail.employmentType?.replace("_", " ") ?? ""],
               ].map(([k, v]) => (
                 <div key={k} className="bg-card px-3.5 py-2.5">
                   <div className="text-label uppercase tracking-[0.05em] mb-1 text-base-400">{k}</div>
@@ -562,7 +562,7 @@ export default function HrPersonDrawer({
                   {person.name} <TeamChip />
                 </Row>
                 <Row label="Staff code">
-                  <span className="font-mono">{person.staffCode ?? "—"}</span> <TeamChip />
+                  <span className="font-mono">{person.staffCode ?? ""}</span> <TeamChip />
                 </Row>
                 <Row label="Seat">
                   {person.positionName ?? "Not set"} <TeamChip />
@@ -594,7 +594,7 @@ export default function HrPersonDrawer({
                     value={val("maritalStatus", "marital_status") ?? ""}
                     onChange={(e) => set("marital_status", e.target.value || null)}
                   >
-                    <option value="">—</option>
+                    <option value="">Marital status</option>
                     <option value="single">Single</option>
                     <option value="married">Married</option>
                     <option value="divorced">Divorced</option>
@@ -609,7 +609,7 @@ export default function HrPersonDrawer({
 
               <Panel title="Contact" defaultOpen>
                 <Row label="Work email">
-                  <span className="font-mono text-meta">{person.workEmail ?? "—"}</span>
+                  <span className="font-mono text-meta">{person.workEmail ?? ""}</span>
                   {person.workEmail && <TeamChip />}
                 </Row>
                 <Row label="Personal email">
@@ -710,7 +710,7 @@ export default function HrPersonDrawer({
                     value={val("employmentType", "employment_type") ?? ""}
                     onChange={(e) => set("employment_type", e.target.value || null)}
                   >
-                    <option value="">—</option>
+                    <option value="">Type</option>
                     <option value="full_time">Full-time</option>
                     <option value="part_time">Part-time</option>
                     <option value="contract">Contract</option>

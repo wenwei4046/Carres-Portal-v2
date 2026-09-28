@@ -871,12 +871,12 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
 
 function UnitRow({ unit }: { unit: DeliveryWarehouseScheduleEvent }) {
   const reason = warehouseUnitPendingReason(unit);
-  const at = (iso: string | null) => (iso ? fmtDate(iso, { time: true }) : "—");
+  const at = (iso: string | null) => (iso ? fmtDate(iso, { time: true }) : "");
   return (
     <tr className="border-t border-kit-slate-5" data-testid={`wo-unit-${unit.unitId}`}>
       <td className="py-1.5 pr-3 font-mono text-base-800">{unit.unitId}</td>
       <td className="py-1.5 pr-3" title={unit.productName ?? unit.sku ?? undefined}>
-        {unit.productName ?? unit.sku ?? "—"}
+        {unit.productName ?? unit.sku ?? ""}
         <div className="text-meta text-base-600">{unit.sku} · Reserved for {unit.source}</div>
       </td>
       <td className="py-1.5 pr-3 text-base-600"><div>Scanned {at(unit.unitScannedAt)}</div><div>Checked {at(unit.unitCheckedAt)}</div><div>Packed {at(unit.unitPackedAt)}</div></td>
@@ -884,7 +884,7 @@ function UnitRow({ unit }: { unit: DeliveryWarehouseScheduleEvent }) {
         <div>Loaded {" "}
         {unit.unitHandedOverAt
           ? `${at(unit.unitHandedOverAt)}${unit.unitDeliveryPerson ? ` · ${unit.unitDeliveryPerson}` : ""}`
-          : "—"}</div>
+          : ""}</div>
         <div data-testid={`wo-unit-confirmed-${unit.unitId}`}>Driver confirmed {at(unit.unitDriverConfirmedAt)}</div>
       </td>
       <td className="py-1.5 text-base-600" data-testid={`wo-unit-reason-${unit.unitId}`}>

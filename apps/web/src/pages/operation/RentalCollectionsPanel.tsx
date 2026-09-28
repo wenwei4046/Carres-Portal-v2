@@ -279,14 +279,14 @@ export default function RentalCollectionsPanel({
                       )}
                     </td>
                     <td className="px-3 py-2 text-meta text-base-600">
-                      {b.method ?? "—"}
+                      {b.method ?? ""}
                       {b.reference ? (
                         <div className="font-mono text-label text-base-400">{b.reference}</div>
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-meta text-base-600 whitespace-nowrap">
                       {b.supplierShare == null ? (
-                        "—"
+                        ""
                       ) : (
                         <>
                           <div>supplier {rm(b.supplierShare)}</div>

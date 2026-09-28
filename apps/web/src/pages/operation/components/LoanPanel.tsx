@@ -887,18 +887,18 @@ export default function LoanPanel({
         // LN-DDMMYY-NNNN — tail derived from the ORDER id so every doc of this
         // order shares it, never a counter (volume stays private), reprint-stable.
         ln_no: docNumber({ prefix: "LN", date: issueDate, seed: orderId, digits: 4 }),
-        order_code: orderCode || "—",
+        order_code: orderCode || "",
         order_ref: orderRef,
         issue_date: issueDate,
         customer: { name: customerName, phone: customerPhone },
         item:
           (isSup ? loan.borrowed_label ?? loan.borrowed_sku : loan.item_sku) ??
-          "—",
+          "",
         condition: isSup
           ? "Borrowed piece"
           : (READY_STOCK_CONDITION_WORDS[loan.item_condition ?? ""] ??
             loan.item_condition ??
-            "—"),
+            ""),
         source: isSup
           ? `Borrowed · ${loan.supplier_name ?? "supplier"}`
           : "Warehouse · Klang",

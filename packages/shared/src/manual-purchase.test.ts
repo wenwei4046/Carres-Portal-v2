@@ -888,7 +888,7 @@ describe("Card 05 · the History record arithmetic", () => {
         sku: "5539-2NA",
         reason: "Found in the showroom store",
       }).detail,
-    ).toEqual(["5539-2NA — Found in the showroom store"]);
+    ).toEqual(["5539-2NA · Found in the showroom store"]);
   });
 });
 
@@ -974,7 +974,7 @@ describe("the document identity — MPR No, and the names still banned", () => {
     ).toBe("Manual Purchase Request");
   });
 
-  it("`PO No` before issue is the bare fact `—`", () => {
+  it("`PO No` before issue reads its word, never a dash", () => {
     expect(manualPurchasePoSummary([])).toBe(MANUAL_PURCHASE_WORDS.poNone);
     expect(manualPurchasePoSummary(["PO-20260904-1234"])).toBe("PO-20260904-1234");
     expect(manualPurchasePoSummary(["PO-1", "PO-2", "PO-1"])).toBe("2 POs");

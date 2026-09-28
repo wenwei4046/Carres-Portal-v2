@@ -138,14 +138,14 @@ export default function OperationInbox() {
                   <td className="px-4 py-3 font-mono text-base-900 whitespace-nowrap">SO-{r.so}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-base-900">
-                      {r.customer_name ?? "—"}
+                      {r.customer_name ?? ""}
                     </div>
                     <div className="text-meta text-base-500">
                       {r.customer_phone ?? ""}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-meta text-base-600 font-mono whitespace-nowrap">
-                    {(r.source_ref ?? []).join(" + ") || "—"}
+                    {(r.source_ref ?? []).join(" + ") || ""}
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <ul className="space-y-0.5">

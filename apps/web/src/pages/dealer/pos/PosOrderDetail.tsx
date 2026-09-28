@@ -1033,7 +1033,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             <div className="os-detail__title">SO-{order.so}</div>
             <div className="os-detail__sub">
               {order.customer.name || "Walk-in"} · placed {daysAgo(order.placedAt)} by{" "}
-              {staffName ?? "—"}
+              {staffName ?? ""}
             </div>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close" data-testid="pos-od-close">

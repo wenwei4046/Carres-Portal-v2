@@ -709,13 +709,13 @@ export const SUNDAY = 0;
  */
 export function weekdayListLabel(days: readonly number[]): string {
   const on = WEEKDAYS.filter((w) => days.includes(w.day));
-  if (on.length === 0) return "—";
+  if (on.length === 0) return "";
   // Contiguous Mon-first runs read as a range; anything else is listed.
   const labels = on.map((w) => w.label);
   const isMonRun =
     on.every((w, i) => (i === 0 ? w.day === 1 : w.day === on[i - 1]!.day + 1)) && on[0]!.day === 1;
   return isMonRun && on.length > 2
-    ? `${labels[0]}–${labels[labels.length - 1]}`
+    ? `${labels[0]} to ${labels[labels.length - 1]}`
     : labels.join(" ");
 }
 

@@ -186,7 +186,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
                     <span className="truncate" title={r.model}>{r.model}</span>
                     <span className="text-base-500">{CATEGORY_LABEL[r.category]}</span>
                     <span className="font-mono">{r.variant}</span>
-                    <span className="text-right tabular-nums">{r.price !== undefined ? r.price.toLocaleString("en-MY") : "—"}</span>
+                    <span className="text-right tabular-nums">{r.price !== undefined ? r.price.toLocaleString("en-MY") : ""}</span>
                   </div>
                 ))}
               </div>

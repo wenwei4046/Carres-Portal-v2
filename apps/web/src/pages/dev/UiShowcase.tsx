@@ -162,7 +162,7 @@ interface DemoRow {
 const DEMO_ROWS: DemoRow[] = [
   { id: "1", ref: "SO-1256", customer: "Tan Wei Ming", owing: "2,000" },
   { id: "2", ref: "SO-1257", customer: "Lim Ah Kaw", owing: "480" },
-  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "—" },
+  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "" },
 ];
 
 const DEMO_COLUMNS: Column<DemoRow>[] = [
@@ -1065,7 +1065,7 @@ export default function UiShowcase() {
                     rows={[]}
                     columns={DEMO_COLUMNS}
                     rowId={(r) => r.id}
-                    totals={{ label: "Totals", cell: () => "—" }}
+                    totals={{ label: "Totals", cell: () => "" }}
                     empty="No demands match this filter"
                   />
                 </div>

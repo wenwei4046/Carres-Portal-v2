@@ -100,11 +100,11 @@ describe("the live state — one case, closed, filed before the questions", () =
     renderPanel();
 
     const avg = await screen.findByTestId("numbers-avg-days");
-    expect(avg.textContent).toContain("—");
+    expect(avg.textContent).not.toMatch(/[—–]/);
     expect(avg.textContent).toContain("closed before the portal recorded");
 
     const onTime = screen.getByTestId("numbers-on-time");
-    expect(onTime.textContent).toContain("—");
+    expect(onTime.textContent).not.toMatch(/[—–]/);
     expect(onTime.textContent).not.toContain("%");
   });
 

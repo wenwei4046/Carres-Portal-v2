@@ -66,7 +66,7 @@ export const OPS_STOCK_STATUS_LABEL: Record<string, string> = {
 };
 
 export function opsStockStatusLabel(status: string | null | undefined): string {
-  if (!status) return "—";
+  if (!status) return "";
   return OPS_STOCK_STATUS_LABEL[status] ?? status;
 }
 
@@ -132,7 +132,7 @@ export const STOCK_HOLD_REASON_KEYS = STOCK_HOLD_REASONS.map((r) => r.key) as [
 ];
 
 export function stockHoldReasonLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return STOCK_HOLD_REASONS.find((r) => r.key === key)?.label ?? key;
 }
 
@@ -162,7 +162,7 @@ export const STOCK_HOLD_OUTCOME_KEYS = STOCK_HOLD_OUTCOMES.map((o) => o.key) as 
 ];
 
 export function stockHoldOutcomeLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return STOCK_HOLD_OUTCOMES.find((o) => o.key === key)?.label ?? key;
 }
 

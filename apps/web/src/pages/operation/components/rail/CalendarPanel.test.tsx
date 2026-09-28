@@ -260,7 +260,7 @@ describe("CalendarPanel — NO RELATIVE DATE WORDS (owner ruling 2026-08-15)", (
 
   it("a SPAN chip keeps its hover — `This week` names no date", () => {
     render(<CalendarPanel />);
-    expect(screen.getByTestId("calendar-range-week").getAttribute("title")).toMatch(/ – /);
+    expect(screen.getByTestId("calendar-range-week").getAttribute("title")).toMatch(/ to /);
   });
 
   it("the day heading prints the weekday + date, never `TODAY ·`", () => {

@@ -197,7 +197,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       <Section title="Customer">
         <div className="rounded border border-base-200 bg-white p-4">
           <div className="font-display text-lg font-semibold leading-tight">
-            {draft.customer.name || <em className="text-base-400">—</em>}
+            {draft.customer.name || null}
           </div>
           <div className="font-mono text-xs text-base-500 mt-0.5">
             {draft.customer.phone}
@@ -754,7 +754,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
         {label}
       </div>
       <div className="text-[13px] text-base-800">
-        {value || <em className="text-base-400">—</em>}
+        {value || null}
       </div>
     </div>
   );

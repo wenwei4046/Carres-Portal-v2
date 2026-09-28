@@ -345,7 +345,7 @@ describe("the selected duty", () => {
     expect(within(detail).getByText("Annual leave")).toBeVisible();
     expect(
       within(detail).getByText(
-        `${fmtDate(COVER_FROM)} – ${fmtDate(COVER_UNTIL)}`,
+        `${fmtDate(COVER_FROM)} to ${fmtDate(COVER_UNTIL)}`,
       ),
     ).toBeVisible();
   });
@@ -764,7 +764,7 @@ describe("adding cover", () => {
     const from = pickDay("cover-from", 10);
     const until = pickDay("cover-until", 12);
     expect(
-      screen.getByText(`${fmtDate(from)} – ${fmtDate(until)}`),
+      screen.getByText(`${fmtDate(from)} to ${fmtDate(until)}`),
     ).toBeVisible();
   });
 
@@ -866,7 +866,7 @@ describe("adding cover", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(
       screen.getByText(
-        `Shasha covers Yu Jun for PO Duty, ${fmtDate(from)}–${fmtDate(until)}`,
+        `Shasha covers Yu Jun for PO Duty, ${fmtDate(from)} to ${fmtDate(until)}`,
       ),
     ).toBeVisible();
   });
@@ -949,7 +949,7 @@ describe("the history", () => {
       "Shasha covering for Yu Jun",
     );
     expect(within(row).getByTestId("record-actor")).toHaveTextContent(
-      `${fmtDate(COVER_FROM)} – ${fmtDate(COVER_UNTIL)}`,
+      `${fmtDate(COVER_FROM)} to ${fmtDate(COVER_UNTIL)}`,
     );
     expect(within(row).getByTestId("record-note")).toHaveTextContent(
       "Annual leave",
@@ -1210,7 +1210,7 @@ describe("S2-A · the success sentence names the server's normal owner", () => {
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(
-      screen.getByText(`Shasha covers Aina for PO Duty, ${fmtDate(from)}–${fmtDate(until)}`),
+      screen.getByText(`Shasha covers Aina for PO Duty, ${fmtDate(from)} to ${fmtDate(until)}`),
     ).toBeVisible();
   });
 });

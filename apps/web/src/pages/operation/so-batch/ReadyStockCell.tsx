@@ -431,7 +431,7 @@ export function useSoBatchReadyStock({
           if (unit?.blocked === "counted_stock") {
             return READY_STOCK_BLOCKED_WORDS.counted_stock;
           }
-          if (!unit) return "—";
+          if (!unit) return "";
           /**
            * ⭐ A REPLACEMENT NEEDS ROOM THE DRAFT HAS ALREADY MADE.
            *

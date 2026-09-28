@@ -568,7 +568,7 @@ describe("Purchase Orders Register", () => {
 
     line.identity_mode = "quantity";
     const counted = renderPage();
-    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("—");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent(/[—–]/);
     expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("do not send this PO");
     counted.unmount();
 
@@ -815,12 +815,12 @@ describe("Purchase Order object", () => {
     expect(cell.queryByText("incoming")).not.toBeInTheDocument();
   });
 
-  it("prints `—` for a quantity-scoped line — intentional, never `Not allocated`", () => {
+  it("a quantity-scoped line's Unit ID cell draws nothing, never `Not allocated`", () => {
     queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "quantity";
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const cell = within(screen.getByTestId("po-line-units-line-1"));
-    expect(cell.getByText("—")).toBeInTheDocument();
+    expect(screen.getByTestId("po-line-units-line-1")).not.toHaveTextContent(/[—–]/);
     expect(cell.queryByText("Not allocated")).not.toBeInTheDocument();
     expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
     expect(cell.queryByRole("alert")).not.toBeInTheDocument();

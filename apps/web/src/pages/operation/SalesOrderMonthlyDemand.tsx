@@ -140,7 +140,7 @@ export default function SalesOrderMonthlyDemand({
   const total = view.rows.find((row) => row.kind === "total");
   const empty = (total?.totalQty ?? 0) === 0;
   const thisMonth = `This month · ${fmtMonthYear(focusMonth || view.focus.month)}`;
-  const byMonth = `By month · Customer Requested Delivery Date · ${fmtMonthYear(view.window.first)} – ${fmtMonthYear(view.window.last)}`;
+  const byMonth = `By month · Customer Requested Delivery Date · ${fmtMonthYear(view.window.first)} to ${fmtMonthYear(view.window.last)}`;
 
   return (
     <div

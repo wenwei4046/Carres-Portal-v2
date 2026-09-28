@@ -2043,7 +2043,7 @@ function RequestExpansion({
       /* The ruled Unit ID column is not drawn here, so these two are unread —
          the shape still requires them, and an honest absence costs nothing. */
       unitIds: [],
-      unitAbsence: "—",
+      unitAbsence: "",
       deliverTo: g.deliverTo ? [g.deliverTo] : [],
       deliverToAbsence: MW.notRecorded,
       supplier: g.supplier || undefined,
@@ -2056,7 +2056,7 @@ function RequestExpansion({
           ? MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead
           : MW.notOrderedYet,
       poDeliveryDate: g.poDeliveryDate ? fmtDate(g.poDeliveryDate) : undefined,
-      poDeliveryDateAbsence: "—",
+      poDeliveryDateAbsence: "",
       sku: g.sku,
       qty: g.qty,
       item: g.item,

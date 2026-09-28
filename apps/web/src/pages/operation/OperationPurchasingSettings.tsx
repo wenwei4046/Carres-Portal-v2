@@ -101,7 +101,7 @@ function ChangeLine({
   const was = settingValueLabel(settingKey, change.oldValue);
   return (
     <div className="text-label text-base-500 mt-1" data-testid="setting-change-line">
-      {change.changedBy ?? "—"} · {fmtDate(change.changedAt)}
+      {change.changedBy ?? ""} · {fmtDate(change.changedAt)}
       {was ? ` · was ${was}` : ""}
     </div>
   );

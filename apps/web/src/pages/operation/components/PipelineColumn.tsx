@@ -109,7 +109,7 @@ export default function PipelineColumn({
       </div>
       <div className="p-2 min-h-[200px]">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-label py-6">—</div>
+          null
         ) : (
           items.map((o) => (
             <PipelineOrderCard
@@ -131,7 +131,7 @@ interface OrderCardProps {
 
 function PipelineOrderCard({ order, onClick }: OrderCardProps) {
   const customerName = order.customer_name;
-  const dealerName = order.dealers?.name ?? "—";
+  const dealerName = order.dealers?.name ?? "";
   const deliveryDate = order.delivery_date ?? "TBD";
 
   // Mirror proto: white card, base-100 border, hover swaps to brand-signature.

@@ -63,7 +63,7 @@ describe("DELIVERY_REASONS (T4 Reason Library v1)", () => {
     // legacy 0196 rows stored the old dropdown words — display as-is
     expect(deliveryReasonLabel("Renovation")).toBe("Renovation");
     expect(deliveryReasonLabel("Others")).toBe("Others");
-    expect(deliveryReasonLabel(null)).toBe("—");
-    expect(deliveryReasonLabel("")).toBe("—");
+    expect(deliveryReasonLabel(null)).toBe("");
+    expect(deliveryReasonLabel("")).toBe("");
   });
 });

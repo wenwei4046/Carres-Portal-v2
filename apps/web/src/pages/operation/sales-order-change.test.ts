@@ -80,7 +80,7 @@ describe("diffRows — Before / After", () => {
     };
     const rows = diffRows({ ...args, before, after });
     expect(rows[0]!.what).toBe("Dispose old mattress");
-    expect(rows[0]!.before).toBe("—");
+    expect(rows[0]!.before).toBe("");
     expect(rows.find((r) => r.what === "Services")!.after).toBe("Delivery fee · Dispose old mattress ×2");
   });
 });

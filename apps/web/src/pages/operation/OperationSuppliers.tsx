@@ -73,7 +73,7 @@ type OverviewResponse = {
 
 /** The figure, or an em dash. Never a zero nobody earned. */
 function rateText(r: ScorecardRate): string {
-  return r.known ? `${r.pct}%` : "—";
+  return r.known ? `${r.pct}%` : "";
 }
 
 /** Why a figure is missing — the sentence goes under the dash so the reader is
@@ -128,7 +128,7 @@ export default function OperationSuppliers() {
               <div>
                 <div className="text-strong font-semibold">{s.name}</div>
                 <div className="text-label text-base-500 mt-[3px]">
-                  {s.contactEmail ?? s.contact ?? "—"}
+                  {s.contactEmail ?? s.contact ?? ""}
                 </div>
               </div>
               <KindChip kind={s.kind} />
@@ -146,7 +146,7 @@ export default function OperationSuppliers() {
               <Stat label="Received" v={s.receivedPos} />
             </div>
             <div className="mt-3 text-label text-base-500">
-              Covers · {s.catCovered.length ? s.catCovered.join(" · ") : "—"}
+              Covers · {s.catCovered.length ? s.catCovered.join(" · ") : ""}
             </div>
             <CardScorecard sc={s.scorecard} />
           </button>
@@ -231,7 +231,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
             <div className="text-meta text-base-600 mt-1">
               {/* P1 — the free-text lead time is not appended here either;
                   see the card above. */}
-              {supplier.contactEmail ?? supplier.contact ?? "—"}
+              {supplier.contactEmail ?? supplier.contact ?? ""}
             </div>
           </div>
           <button
