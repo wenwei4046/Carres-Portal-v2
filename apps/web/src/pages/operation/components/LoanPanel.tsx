@@ -415,7 +415,7 @@ function LoanCard({
                 value={returnRef}
                 autoFocus
                 onChange={(e) => setReturnRef(e.target.value)}
-                placeholder="Returned with… (e.g. Laveo DO-2207) — optional"
+                placeholder="Returned with… (optional, e.g. Laveo DO-2207)"
                 aria-label="Returned with which supplier delivery"
                 className="w-full border border-base-300 rounded-[6px] bg-white px-2 py-1 text-meta focus:border-primary focus:outline-none"
               />
@@ -493,7 +493,7 @@ function LoanCard({
                       type="button"
                       onClick={() => onSetReturnDue(null)}
                       disabled={busy}
-                      title="Clear the override — back to auto"
+                      title="Clear the override. Back to auto"
                       className="text-label text-base-400 border-b border-dashed border-base-300"
                     >
                       clear
@@ -649,7 +649,7 @@ function WarehousePick({
           {safe.length > 0 && (
             <div className="flex items-start gap-1.5 bg-warning-soft/60 border border-warning/30 rounded-[8px] px-2.5 py-1.5 mb-2 text-label text-warning">
               <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-              This is sellable new stock — lend a display unit above when you have one.
+              This is sellable new stock. Lend a display unit above when you have one.
             </div>
           )}
           {sellable.map((g) => (
@@ -787,7 +787,7 @@ function LoanOfferBlock({ orderId, field }: { orderId: string; field: string }) 
             <li key={o.id} className="text-label text-base-500">
               {loanOfferEventLabel(o.event)}
               {o.label ? ` · ${o.label}` : ""}
-              {o.reason ? ` — ${o.reason}` : ""} · {fmtDateShort(o.recorded_at)}
+              {o.reason ? ` · ${o.reason}` : ""} · {fmtDateShort(o.recorded_at)}
             </li>
           ))}
         </ul>
@@ -905,7 +905,7 @@ export default function LoanPanel({
       });
       window.open(URL.createObjectURL(blob), "_blank");
     } catch (e) {
-      toast.error(`Couldn't open loan note — ${(e as Error).message}`);
+      toast.error(`Couldn't open loan note: ${(e as Error).message}`);
     }
   }
 
@@ -926,7 +926,7 @@ export default function LoanPanel({
       },
       {
         onSuccess: () => {
-          toast.success("Borrowed — loaner out, owe the supplier a piece");
+          toast.success("Borrowed. Loaner out, owe the supplier a piece");
           resetLend();
         },
         onError: (e) => toast.error(e.message),
@@ -978,7 +978,7 @@ export default function LoanPanel({
             returnLoan.mutate(
               { loanId: loan.id },
               {
-                onSuccess: () => toast.success("Collected — swap done"),
+                onSuccess: () => toast.success("Collected. Swap done"),
                 onError: (e) => toast.error(e.message),
               },
             )
@@ -987,7 +987,7 @@ export default function LoanPanel({
             returnSupplier.mutate(
               { loanId: loan.id, returnRef },
               {
-                onSuccess: () => toast.success("Returned to supplier — obligation closed"),
+                onSuccess: () => toast.success("Returned to supplier. Obligation closed"),
                 onError: (e) => toast.error(e.message),
               },
             )
@@ -1024,7 +1024,7 @@ export default function LoanPanel({
           {source === "supplier" && (
             <div className="space-y-2">
               <div className="text-label text-base-500 px-0.5">
-                Borrow whatever the supplier currently has — describe the piece.
+                Borrow whatever the supplier currently has. Describe the piece.
               </div>
               <select
                 value={supplierId}
