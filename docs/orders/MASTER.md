@@ -173,8 +173,9 @@ Order and Invoice papers; a quantity line's Unit ID cell on the PO paper and the
 dash, is removed. **Not swept here:** `WarehouseStockRegister`, `WarehouseUnitDetail` and
 `WarehouseUnitProblemReport` belong to the open Inventory change (#1677), which removes their dashes;
 and a dash used as a separator or inside a sentence (`{a} — {b}`, `Total — unchanged`): measured
-752 lines in 226 files, many of them owner-approved words, so it is a separate pass that reads each
-sentence.
+752 lines in 226 files. **Owner ruling 2026-09-28:** these go too, approved words included. Two facts
+become two lines where the surface has room, otherwise one clear line (COPY § NO DASH AS A
+SEPARATOR EITHER). APPROVED TARGET / NOT BUILT; it ships as the Scope D third pass.
 
 **Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
 (`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's
