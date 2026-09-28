@@ -105,7 +105,7 @@ export default function OperationInbox() {
         </h1>
         <p className="text-body text-base-600 mt-2">
           AutoCount-imported orders that still need a logistic partner. Pick
-          NETS / TSDD / AL / HOUZS per order — the order leaves Inbox the
+          NETS / TSDD / AL / HOUZS per order. The order leaves Inbox the
           moment you assign.
         </p>
       </div>
@@ -178,7 +178,7 @@ export default function OperationInbox() {
                         });
                       }}
                     >
-                      <option value="">— pick —</option>
+                      <option value="">Pick</option>
                       {logisticPartners.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}

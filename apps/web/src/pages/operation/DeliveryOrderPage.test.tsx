@@ -668,8 +668,8 @@ describe("DeliveryOrderPage", () => {
       }),
     );
     const exceptions = screen.getAllByTestId("do-exceptions").at(-1)!;
-    expect(exceptions).toHaveTextContent("Finance is holding this delivery — Cheque bounced");
-    expect(exceptions).toHaveTextContent("Payment approval requested — COD by transfer");
+    expect(exceptions).toHaveTextContent("Finance is holding this delivery: Cheque bounced");
+    expect(exceptions).toHaveTextContent("Payment approval requested: COD by transfer");
   });
 
   it("Related records doors to the Sales Order, the Order Route, Payments, each Unit, each Case and each sibling document; an unreadable Case read is stated", () => {

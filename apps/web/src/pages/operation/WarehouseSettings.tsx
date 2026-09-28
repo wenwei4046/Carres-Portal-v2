@@ -359,7 +359,7 @@ export default function WarehouseSettings() {
 
   const canEdit = data.canEdit;
   const dirty = changes.length > 0;
-  const saveLabel = !dirty ? "Save changes" : gap ? `Save changes — ${gap}` : "Save changes";
+  const saveLabel = !dirty ? "Save changes" : gap ? `Save changes: ${gap}` : "Save changes";
   const set = (next: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...next } : d));
 
   return (
@@ -645,7 +645,7 @@ function DetailsSection({
       <h2 className="text-section">Warehouse Details</h2>
       <p className="mt-1 text-body text-kit-slate-11">
         Who runs this site, where it is, and who to call. Operated by is an organisation. Key
-        contact is a person from People — this page never creates one.
+        contact is a person from People. This page never creates one.
       </p>
 
       <div className="mt-4 grid gap-1">

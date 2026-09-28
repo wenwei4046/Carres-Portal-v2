@@ -602,7 +602,7 @@ export default function WarehouseInbound() {
   );
   const context = params.get("date") || params.get("from");
   const dateContext = context
-    ? ` for ${fmtDate(context)}${params.get("to") ? ` — ${fmtDate(params.get("to")!)}` : ""}`
+    ? ` for ${fmtDate(context)}${params.get("to") ? ` to ${fmtDate(params.get("to")!)}` : ""}`
     : params.get("to")
       ? ` through ${fmtDate(params.get("to")!)}`
       : "";
@@ -707,7 +707,7 @@ export default function WarehouseInbound() {
         <ModuleHeader
           testId="inbound-header"
           word="Inbound"
-          docTitle="Inbound · Warehouse — Carres"
+          docTitle="Inbound · Warehouse · Carres"
           destinationHeader
         />
       )}
@@ -953,7 +953,7 @@ export default function WarehouseInbound() {
                 return (
                   <span className="flex items-center gap-3">
                     <span data-testid="inbound-page-range">
-                      Showing {from}–{to} of {page.total} arrangements
+                      Showing {from} to {to} of {page.total} arrangements
                     </span>
                     <button
                       type="button"

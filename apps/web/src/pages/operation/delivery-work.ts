@@ -100,7 +100,7 @@ export const DELIVERY_STATUS_SPELL: DeliveryStatusSpell = {
  */
 export const DW = {
   page: "Delivery",
-  docTitle: "Delivery — Carres",
+  docTitle: "Delivery · Carres",
   search: "Search delivery scopes…",
   empty: "No delivery scopes",
   loadFailed: "Delivery could not be loaded",

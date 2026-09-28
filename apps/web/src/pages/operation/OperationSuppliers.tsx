@@ -362,7 +362,7 @@ function ScorecardBlock({ sc }: { sc: SupplierScorecard }) {
           ))}
           {c.judged > 0 && c.judged < MIN_JUDGED_POS && (
             <div className="mt-0.5">
-              A score needs {MIN_JUDGED_POS} deliveries — one late delivery out
+              A score needs {MIN_JUDGED_POS} deliveries. One late delivery out
               of one is not a record.
             </div>
           )}

@@ -6,7 +6,7 @@ export default function OperationOpsReady() {
       endpoint="/ready"
       kicker="Operation · Carres Klang"
       title="Ready stock"
-      blurb="Free units in good condition. Reserve one against a customer ref — the oldest matching unit is picked automatically (FIFO)."
+      blurb="Free units in good condition. Reserve one against a customer ref. The oldest matching unit is picked automatically (FIFO)."
       actions={["reserve"]}
       cacheKey="ready"
     />

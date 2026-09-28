@@ -92,7 +92,7 @@ export default function SalesOrderAmendDeliveryDate({
           label="New delivery date"
           hint={
             currentDeliveryDate
-              ? `Promised today — ${fmtDate(currentDeliveryDate)}`
+              ? `Promised today: ${fmtDate(currentDeliveryDate)}`
               : "No delivery date promised yet"
           }
           value={newDate}

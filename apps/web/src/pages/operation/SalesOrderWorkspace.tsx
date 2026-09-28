@@ -704,7 +704,7 @@ export function snapshotTemplateData(
        is not made at all by the time it matters. `signature_unknown` uses the
        SAME condition as the `oldrev-signature-unknown` page notice — one fact,
        one test, so the screen and the paper cannot drift. */
-    rebuilt_notice: "Reconstructed copy — original issued document unavailable.",
+    rebuilt_notice: "Reconstructed copy. The original issued document is unavailable.",
     signature_unknown: Boolean(base?.signature_url),
     /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
        snapshot stores none, so this reads the SAME payments ledger Payments
@@ -1605,12 +1605,12 @@ function SalesOrderWorkspaceBody() {
     }
     const printable = printableRef.current.url;
     if (!printable) return;
-    if (dirty) toast.message("You have unsaved changes — printing the saved version");
+    if (dirty) toast.message("You have unsaved changes. Printing the saved version");
     /* A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT — and
        this branch is only reached when no file was ever stored for the
        version, which is the legacy case the notice exists for. */
     if (isReconstruction) {
-      toast.message("Reconstructed copy — original issued document unavailable.");
+      toast.message("Reconstructed copy. The original issued document is unavailable.");
     }
     window.open(printable, "_blank");
   };
@@ -1717,7 +1717,7 @@ function SalesOrderWorkspaceBody() {
      * cannot keep, and the POS has refused it since 2026-05-22 — this door
      * now refuses it too, with the same arithmetic rather than a second one. */
     if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
-      return `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
+      return `Delivery is too soon. The earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
     }
     /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
        The POS has refused an order without one since Phase 11.1; this door did
@@ -1725,7 +1725,7 @@ function SalesOrderWorkspaceBody() {
        whose Proceed date renders read-only as `Not recorded` forever.
        `createOrderInput` and `sales_order_create` (0391) refuse it again. */
     if (needDealer && !draft.proceed_date) {
-      return "Proceed date — pick the day production should start";
+      return "Proceed date: pick the day production should start";
     }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
       return "The proceed date is after the delivery date";
@@ -1734,7 +1734,7 @@ function SalesOrderWorkspaceBody() {
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
      * An unknown address cannot demand one; a known address must say. */
     if (!draft.customer_address_unknown && !draft.building_type) {
-      return "Fill in the building type first — a condominium can only take a half-day delivery.";
+      return "Fill in the building type first. A condominium can only take a half-day delivery.";
     }
     for (const a of draft.addons.filter((row) => !row.removed)) {
       if (SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key)) continue;
@@ -1742,7 +1742,7 @@ function SalesOrderWorkspaceBody() {
       const changed = needDealer || a.added || !original || a.qty !== original.qty || JSON.stringify(a.attrs) !== JSON.stringify(original.attrs);
       const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
       if (changed && addonSizeOptions(pos).length && disposalUnitSizes(pos).some((size) => !size))
-        return `${addonNameByKey.get(a.addon_key) ?? a.addon_key} — Size`;
+        return `Size for ${addonNameByKey.get(a.addon_key) ?? a.addon_key}`;
     }
     return null;
   };
@@ -1841,11 +1841,11 @@ function SalesOrderWorkspaceBody() {
         JSON.stringify(was.attrs ?? null) !== JSON.stringify(l.attrs ?? null);
       if (!changed) continue;
       const name = nameOfSku(l.sku);
-      if (l.added) out.push(`${name}: new goods — Purchasing buys them after approval`);
-      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier — Purchasing settles it with the supplier`);
-      else out.push(`${name}: no PO yet — Purchasing re-counts what to buy`);
+      if (l.added) out.push(`${name}: new goods. Purchasing buys them after approval`);
+      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier. Purchasing settles it with the supplier`);
+      else out.push(`${name}: no PO yet. Purchasing re-counts what to buy`);
       const units = l.id ? unitsOf.get(l.id) ?? [] : [];
-      if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved — Warehouse keeps the Unit until the change is decided`);
+      if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved. Warehouse keeps the Unit until the change is decided`);
     }
     if (after.lines.some((l) => l.removed && !protectedLine(l)) && after.lines.some((l) => protectedLine(l) && !l.removed))
       out.push("Free item: check it is still allowed without the cancelled item");
@@ -1863,8 +1863,8 @@ function SalesOrderWorkspaceBody() {
       /* ⛔ A SUMMARY WITH NO RECORDS BEHIND IT IS NOT A PAID FIGURE (Payments
          MASTER; owner 2026-09-22): no refund or balance is worked out from it. */
       const verified = rows != null && (paid === 0 || rows.some((r) => isLivePayment(r)));
-      if (!verified) out.push("Payments: payment data to check first — no refund or balance is worked out");
-      else if (paid > next) out.push(`Payments: ${fmtMoney(paid - next)} paid more than the new total — Payments reviews a refund`);
+      if (!verified) out.push("Payments: payment data to check first. No refund or balance is worked out");
+      else if (paid > next) out.push(`Payments: ${fmtMoney(paid - next)} paid more than the new total. Payments reviews a refund`);
       else out.push(`Payments: balance due becomes ${fmtMoney(next - paid)}`);
     }
     return out;
@@ -1968,7 +1968,7 @@ function SalesOrderWorkspaceBody() {
       if (r.action === "saved") toast.success(`Saved (${r.revision})`);
       else {
         toast.success("Sent for approval. The order stays as it is until management approves.");
-        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded — record it on the request.");
+        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded. Record it on the request.");
       }
       setDraft(baseline);
       setEditing(false);
@@ -2605,7 +2605,7 @@ function SalesOrderWorkspaceBody() {
                     {!known && <div className="text-meta text-kit-amber-11">{NOT_IN_CATALOG}</div>}
                     {l.added && <div className="text-meta text-kit-blue-11">New line</div>}
                     {l.removed && <div className="text-meta text-danger">Cancelled when approved · Restore to keep it</div>}
-                    {protectedLine(l) && <div className="text-meta text-base-600">Free item — it follows the item it came with</div>}
+                    {protectedLine(l) && <div className="text-meta text-base-600">Free item. It follows the item it came with</div>}
                     {/* ⭐ ONE COMPOSITION, NOT ONE SET OF DOORS (finding 9). The
                         seven-column table is now the document in BOTH states,
                         which is the ruling — but a door that WRITES is an Edit
@@ -2804,7 +2804,7 @@ function SalesOrderWorkspaceBody() {
           )}
           {isReconstruction && (
             <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
-              Reconstructed copy — original issued document unavailable.
+              Reconstructed copy. The original issued document is unavailable.
             </p>
           )}
           {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
@@ -2898,7 +2898,7 @@ function SalesOrderWorkspaceBody() {
               <DatePicker id="so-proceed" label="Proceed Date" value={draft.proceed_date}
                 hint={
                   mode === "object" && !baseline.proceed_date
-                    ? "Never recorded — fill it in once, then it locks"
+                    ? "Never recorded. Fill it in once, then it locks"
                     : undefined
                 }
                 error={
@@ -2916,10 +2916,10 @@ function SalesOrderWorkspaceBody() {
           {mode === "create" || (!formLocked && editing) ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
-                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
+                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} (production lead)` : undefined}
                 error={
                   draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
-                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
+                    ? `Too soon. Earliest is ${fmtDate(earliestPromise)}`
                     : undefined
                 }
                 /* A date changes only into another date: picking one in Edit ends a legacy TBD (owner ruling 2026-09-26). */
@@ -3310,7 +3310,7 @@ function SalesOrderWorkspaceBody() {
             <Select id="so-building-type" label="Building type" required={!formLocked}
               error={
                 !formLocked && !draft.customer_address_unknown && !draft.building_type
-                  ? "Fill in the building type first — a condominium can only take a half-day delivery."
+                  ? "Fill in the building type first. A condominium can only take a half-day delivery."
                   : undefined
               }
               value={draft.building_type || undefined}
@@ -3515,7 +3515,7 @@ function SalesOrderWorkspaceBody() {
               ) : (
                 <>
                   {stairWorking.items} of {stairWorking.itemsTotal} item
-                  {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
+                  {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor},
                   charged{" "}
                 </>
               )}
@@ -3799,7 +3799,7 @@ function SalesOrderWorkspaceBody() {
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
-        docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
+        docTitle={isNew ? "New Sales Order · Carres" : order ? `SO-${order.so} · Carres` : undefined}
         right={headerRight}
         navigation={!isNew ? (
           <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
@@ -4206,7 +4206,7 @@ export function catalogPriceHint(
 ): string | undefined {
   if (!known) return undefined;
   const shown = `Catalog RM ${known.price.toFixed(2)}`;
-  return known.price === unitPrice ? shown : `${shown} — this line differs`;
+  return known.price === unitPrice ? shown : `${shown}, this line differs`;
 }
 
 /**
