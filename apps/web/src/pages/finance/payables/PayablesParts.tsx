@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { SegmentedLinks } from "@/components/Segmented";
 import { toast } from "sonner";
 import type { ApEvent, ApFile } from "@carres/shared/schemas/finance-ap";
 import { SectionCard } from "@/components/SectionPanel";
@@ -10,23 +10,15 @@ import { fmtDate } from "@/lib/fmt-date";
 import { openApFile, useUploadApFile, type ApDocKind } from "@/lib/payables-queries";
 import { EVENT_WORD, refusal, word } from "./payables-words";
 
-/** The three payables views, switched the way Payments ↔ Invoices switch:
- *  words in the toolbar, the current one marked. */
+/** The three payables views, on the app's one segmented control: a grey rail
+ *  with the current view as the white chip, each other view a link. */
 export function PayablesSwitch({ current }: { current: "bills" | "vouchers" | "unpaid" }) {
   const views = [
-    { key: "bills", to: "/finance/bills", label: "Bills" },
-    { key: "vouchers", to: "/finance/payment-vouchers", label: "Payment Vouchers" },
-    { key: "unpaid", to: "/finance/ap-outstanding", label: "Unpaid by Supplier" },
+    { value: "bills", to: "/finance/bills", label: "Bills" },
+    { value: "vouchers", to: "/finance/payment-vouchers", label: "Payment Vouchers" },
+    { value: "unpaid", to: "/finance/ap-outstanding", label: "Unpaid by Supplier" },
   ] as const;
-  return (
-    <span className="flex items-center gap-3 text-body" data-testid="payables-switch">
-      {views.map((v) =>
-        v.key === current
-          ? <span key={v.key} aria-current="page" className="font-semibold">{v.label}</span>
-          : <Link key={v.key} to={v.to}>{v.label}</Link>,
-      )}
-    </span>
-  );
+  return <SegmentedLinks options={views} value={current} ariaLabel="Payables" testId="payables-switch" />;
 }
 
 export function Facts({ title, children, testId, right }: {

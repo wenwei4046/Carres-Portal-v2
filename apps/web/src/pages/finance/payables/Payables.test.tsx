@@ -210,6 +210,21 @@ describe("Bills register", () => {
       .toHaveAttribute("href", "/finance/payment-vouchers");
   });
 
+  it("the switch is one segmented control: the current view is the white chip, the other two are links", async () => {
+    show("/finance/bills");
+    const bar = await screen.findByTestId("payables-switch");
+    expect(bar.tagName).toBe("NAV");
+    expect(bar).toHaveAttribute("aria-label", "Payables");
+    expect(bar).toHaveClass("bg-base-100", "rounded-full");
+    const current = within(bar).getByText("Bills");
+    expect(current).toHaveAttribute("aria-current", "page");
+    expect(current.tagName).toBe("SPAN");
+    expect(current).toHaveClass("bg-white", "text-base-900", "px-3");
+    const links = within(bar).getAllByRole("link");
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/finance/payment-vouchers", "/finance/ap-outstanding"]);
+    for (const a of links) expect(a).toHaveClass("text-base-500", "px-3");
+  });
+
   it("says a failed read failed — never an empty register", async () => {
     api.fail.add(`${B}/bills`);
     show("/finance/bills");
