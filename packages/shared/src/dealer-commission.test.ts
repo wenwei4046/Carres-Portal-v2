@@ -72,6 +72,23 @@ describe("dealer commission", () => {
     expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 0, stillToCollect: 250, rebate: 0 });
   });
 
+  it("a refund of money paid before the quota started takes no rebate from another order", () => {
+    // Order o1 paid 1000 in September, before the quota counts, and earned no rebate.
+    // Its 400 refund in October must not eat the rebate on o2's 1000 paid in October.
+    const src: DcSource = {
+      settings: { defaultRate: 25 }, rates: [], models: [], outlets: [],
+      dealers: [{ id: "d1", name: "Dealer" }],
+      quotas: [{ dealerId: "d1", quota: 1000, rebateRate: 5, startsOn: "2026-10-01" }],
+      orders: [
+        order({ orderId: "o1", lines: [{ modelId: null, category: "sofa", value: 1000 }],
+          payments: [{ paidOn: "2026-09-03", amount: 1000 }], refunds: [{ paidOn: "2026-10-05", amount: 400 }] }),
+        order({ orderId: "o2", lines: [{ modelId: null, category: "sofa", value: 1000 }],
+          payments: [{ paidOn: "2026-10-10", amount: 1000 }] }),
+      ],
+    };
+    expect(dealerCommissionReport(src, "2026-10")[0]).toMatchObject({ rebate: 50, quotaLeft: 950 });
+  });
+
   it("a refund after the rebate hit the cap takes back only what was paid", () => {
     // 1200 collected at 5% is 60, capped at 45. A 400 refund leaves 800, worth 40: take back 5, not 20.
     expect(rebateByMonth(45, 5, [["2026-09", 1200], ["2026-10", -400]])).toEqual([

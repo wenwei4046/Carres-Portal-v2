@@ -14,8 +14,10 @@
  *   Collected is payments less refunds HQ has paid out, up to the cut off, never
  *   below zero (0597). A refund lowers the month it was paid in, so that month
  *   can show a negative earned figure.
- * Rebate, per dealer: rate × everything collected so far, capped at the quota;
- * each month's rebate is the rise since last month. The quota left is never
+ * Rebate, per dealer: rate × everything collected since the quota started,
+ * capped at the quota; each month's rebate is the rise since last month. An
+ * order counts only what it kept since the quota started, so a refund of older
+ * money takes nothing from another order. The quota left is never
  * stored; it is worked out here.
  */
 import { z } from "zod";
@@ -58,6 +60,23 @@ function kept(o: DcOrder, upTo: (day: string) => boolean) {
   const sum = (xs: { paidOn: string; amount: number }[] | null | undefined) =>
     (xs ?? []).filter((x) => upTo(x.paidOn)).reduce((s, x) => s + Number(x.amount), 0);
   return Math.max(0, sum(o.payments) - sum(o.refunds));
+}
+
+/**
+ * Day by day from `from`, what an order adds to the dealer's collections: the rise in
+ * what HQ kept since `from`. A refund is a fall, but never past zero for that order, so a
+ * refund of money paid before `from` takes nothing from another order.
+ */
+function keptByDay(o: DcOrder, from: string): [string, number][] {
+  const days = [...new Set([...(o.payments ?? []), ...(o.refunds ?? [])].map((x) => x.paidOn))]
+    .filter((d) => d >= from).sort();
+  let prev = 0;
+  return days.map((day) => {
+    const k = kept(o, (d) => d >= from && d <= day);
+    const step: [string, number] = [day, k - prev];
+    prev = k;
+    return step;
+  });
 }
 
 /** Commission an order earns on `collected`, and what it would earn when paid in full. */
@@ -107,25 +126,11 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: { d
     if (filter.dealerId && d.id !== filter.dealerId) continue;
     rows.set(d.id, { dealerId: d.id, dealer: d.name, earned: 0, stillToCollect: 0, rebate: null, quotaLeft: null });
   }
-  const monthly = new Map<string, Map<string, number>>();
   for (const o of src.orders) {
     const row = rows.get(o.dealerId);
     if (!row) continue;
     const before = kept(o, (d) => d.slice(0, 7) < month);
     const through = kept(o, (d) => d.slice(0, 7) <= month);
-    // Day by day, what this order adds to the dealer's collections: the rise in
-    // what HQ kept, so a refund is a fall and the order never goes below zero.
-    // ponytail: a refund of money paid before a quota's startsOn still lowers
-    // collections after it; rebateByMonth stops the total going below zero.
-    const m = monthly.get(o.dealerId) ?? new Map<string, number>();
-    const days = [...new Set([...(o.payments ?? []), ...(o.refunds ?? [])].map((x) => x.paidOn))].sort();
-    let prev = 0;
-    for (const day of days) {
-      const k = kept(o, (d) => d <= day);
-      m.set(day, (m.get(day) ?? 0) + k - prev);
-      prev = k;
-    }
-    monthly.set(o.dealerId, m);
     if (filter.outletId && o.outletId !== filter.outletId) continue;
     const now = orderCommission(o, rateOf, through);
     row.earned += now.earned - orderCommission(o, rateOf, before).earned;
@@ -135,9 +140,11 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: { d
     const row = rows.get(q.dealerId);
     if (!row) continue;
     const byMonth = new Map<string, number>();
-    for (const [day, amt] of monthly.get(q.dealerId) ?? []) {
-      if (day < q.startsOn) continue;
-      byMonth.set(day.slice(0, 7), (byMonth.get(day.slice(0, 7)) ?? 0) + amt);
+    for (const o of src.orders) {
+      if (o.dealerId !== q.dealerId) continue;
+      for (const [day, amt] of keptByDay(o, q.startsOn)) {
+        byMonth.set(day.slice(0, 7), (byMonth.get(day.slice(0, 7)) ?? 0) + amt);
+      }
     }
     const months = [...byMonth.entries()].filter(([m]) => m <= month).sort(([a], [b]) => a.localeCompare(b));
     const steps = rebateByMonth(Number(q.quota), Number(q.rebateRate), months);
