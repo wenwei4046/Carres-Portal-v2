@@ -69,6 +69,32 @@ STILL GATED    a NEW business rule · a change to an approved workflow or
 conversation deciding between options, sketch before code (Constitution §10). The gate that
 is gone is the one that parked autonomous production execution on a synchronous approval.
 
+## §1.1.1 · THE PRE-SHOW GATE — owner ruling, Jess 2026-09-26 · APPROVED / LOCKED
+
+**"How can I avoid having to look and check every time before you design my UI?"** The answer
+is a gate the chat runs on its own screenshot BEFORE the owner sees it. A page that fails any line
+is not shown; it is fixed first. The chat states the six results in one line with the screenshot.
+
+```
+1  WORDS      every visible word is in COPY-STANDARD, with its row named; none invented
+2  ONE BLUE   the page has ONE washed/filled blue = the chosen record/row; rail choices are
+              bold + left line; tabs are grey; no blue words; links grey underlined
+3  WIDTH      a card wider than 480px with more than three facts lays them in columns;
+              nothing is a single column of six lines with an empty right half
+4  ICONS      a record door is the kit's `open` icon with its accessible name, not the word
+              `Open …` beside a title (Gmail's reading pane, not a form)
+5  REFERENCE  the surface was put beside its reference (Gmail reading pane · Linear issue ·
+              the Sales Orders Register) and the difference is named or removed
+6  SELF-RATE  the chat rates its own screenshot out of 10 with the 🔴/🟡 list; under 8 it
+              is not shown
+```
+
+**Why:** the owner rated the first Work rebuild 3/10 after ten review rounds she had to lead
+herself ("i need always ask you check, copy who, how how how, rate rate rate"). Every one of the
+faults — invented column words, five blue rows, a six-line card with an empty right half, the word
+`Open` beside a title, a dashed date range — was visible in the chat's own screenshot before she saw
+it. **The owner reviews design; she does not run the checklist.**
+
 ## §1.2 · Plan / Design Research Law — APPROVED / LOCKED, owner ruling 2026-08-11
 
 Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED decisions are not
@@ -1680,6 +1706,22 @@ table styling. A fifth table does not exist until it joins the kit.
 | 3 | a document table inside a card (SO `Items`, `Payment` rows, PO lines) | `DocumentTable` — **admit to the kit** (today `components/so-document-table.ts`, page-local) | header 11/500 slate-11 over a 1px slate-5 line · 13px rows, 8px cell insets, 1px slate-5 line beneath each · NO vertical lines · amounts right, tabular · only the closing total 600 |
 | 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
 
+
+**THE WORK ROUTE KIT — admitted by Jess 2026-09-28 ("kit ok"; Workspace MASTER §5.10) · BUILT 2026-09-28.**
+Four pieces joined the kit with the Work page; each has its `/ui` example (section `route`) and a
+page imports it, never draws it:
+
+| Piece | File | Locked values |
+|---|---|---|
+| `Block` — the ONE card | `components/kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
+| `RouteStop` | `components/kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
+| `ChecklistRow` | `components/kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
+| `QuietRouteRow` | `components/kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
+
+Two opt-in props came with them, and no other page moves: `Tabs fill` (tabs share a narrow bar by
+their own length with no gap, so Work's four Communication tabs stay on one row at 280px) and
+`FilterRailRow tone="workspace"` (14/400 rows with the count on the right; the chosen row is the
+`blue-3` wash with the 3px blue edge; `indent` for a record row under its module row).
 
 **Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
 PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so

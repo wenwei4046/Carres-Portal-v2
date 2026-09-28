@@ -135,7 +135,8 @@ import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 import type { IssuedPo } from "./components/PoIssueEvidence";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { Block, Fact as SharedFact } from "./SalesOrderWorkspace";
+import Block from "@/components/kit/Block";
+import { Fact as SharedFact } from "./SalesOrderWorkspace";
 import {
   RecordRanks,
   groupHistoryChronology,

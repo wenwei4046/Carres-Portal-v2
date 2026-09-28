@@ -120,8 +120,12 @@ function PoSendCard({
           {row.isLoading ? (
             <p className="text-body text-kit-slate-11" role="status">Loading…</p>
           ) : issued && found ? (
+            /* The Work card layout (Workspace §5.10, Jess 2026-09-28: "no free
+               text"): recorded channels only, the recipient follows. */
             <PoIssueEvidence
+              layout="card"
               po={issued}
+              documentNo={po.documentNo.replace(/ V\d+$/, "")}
               version={found.version ?? 1}
               evidence={found.sends ?? []}
               doors={doorsForIssuedPo(issued, row.data?.messageTemplate ?? null)}

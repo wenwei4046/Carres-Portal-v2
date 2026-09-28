@@ -24,6 +24,7 @@ vi.mock("@/lib/queries", () => ({
   useLogisticsCardFacts: () => ({ data: factsState.data, isError: false }),
   useDeliveryPartners: () => ({ data: { partners: [{ id: "p-al", name: "AL Logistics", whatsapp_group_url: "https://chat.whatsapp.com/x" }] } }),
   useDeliveryLinkActs: () => ({ create, revoke }),
+  useCatalog: () => ({ data: undefined }),
 }));
 vi.mock("../components/DeliveryBrief", () => ({
   DeliveryDatesEdit: () => <div data-testid="stub-dates-edit" />,
@@ -80,10 +81,10 @@ function facts(over: Partial<LogisticsCardFacts> = {}): LogisticsCardFacts {
   };
 }
 
-function draw() {
+function draw(props: { moneyOnBalance?: boolean } = {}) {
   return render(
     <MemoryRouter>
-      <LogisticsCard orderId="order-1" />
+      <LogisticsCard orderId="order-1" {...props} />
     </MemoryRouter>,
   );
 }
@@ -104,8 +105,9 @@ describe("collapsed — at most five facts", () => {
     expect(screen.getByTestId("logistics-card-heading").textContent).toBe("Logistics · AL Logistics");
     expect(screen.getByTestId("logistics-card-progress").textContent).toBe("Checks 0 of 3");
     const action = screen.getByTestId("logistics-card-action");
-    expect(action).toHaveTextContent("Contact logistics today");
-    expect(action).toHaveTextContent("Share the delivery details with AL Logistics · due 23 Oct");
+    /* Line 1 the act and its date, line 2 the description (Jess, 2026-09-27). */
+    expect(action).toHaveTextContent("Contact logistics today · due 23 Oct");
+    expect(action).toHaveTextContent("Share the delivery details with AL Logistics");
     expect(screen.queryByTestId("logistics-card-scheduled")).toBeNull();
     expect(screen.queryByTestId("logistics-card-exception")).toBeNull();
     // Money, PO and GRN never sit on the collapsed card.
@@ -133,7 +135,24 @@ describe("collapsed — at most five facts", () => {
     scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
     factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
     draw();
-    expect(screen.getByTestId("logistics-card-exception").textContent).toBe("RM 1,000.00 still to collect");
+    expect(screen.getByTestId("logistics-card-exception").textContent).toBe("Hold delivery · RM 1,000.00 unpaid");
+  });
+
+  it("on the Work right panel the Sales Order card's Balance says the money — the collapsed card does not repeat it", () => {
+    scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
+    factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
+    draw({ moneyOnBalance: true });
+    expect(screen.queryByTestId("logistics-card-exception")).toBeNull();
+    expect(screen.getByTestId("logistics-card-toggle").textContent).not.toMatch(/RM /);
+  });
+
+  it("collapsed it is one row like Customer and Supplier — heading · status · trailing", () => {
+    scopeState.card = card({ confirmedDate: "2026-10-27" }, { paid: 0 });
+    factsState.data = facts({ detailsReceivedAt: "2026-10-22T03:00:00Z" });
+    draw();
+    /* One row in three segments (Jess, 2026-09-27): the heading column, the
+       status column, then the trailing date/button outside the toggle. */
+    expect(screen.getByTestId("logistics-card-status").textContent).toBe("Scheduled delivery · 27 Oct · Hold delivery · RM 1,000.00 unpaid");
   });
 });
 
@@ -218,12 +237,10 @@ describe("the external link", () => {
 describe("density below 768px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
   it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
     draw();
-    const toggle = screen.getByTestId("logistics-card-toggle");
-    expect(toggle.className).toContain("min-h-[72px]");
-    expect(toggle.className).toContain("px-3");
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[15px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[14px]");
     expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-5");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
+    expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-[12px]");
     expect(act.className).toContain("text-[13px]");
     expect(act.className).toContain("leading-[18px]");
     expect(act.className).toContain("font-semibold");
@@ -231,8 +248,8 @@ describe("density below 768px — owner ruling 2026-09-25 (classes only; behavio
     expect(status.className).toContain("leading-4");
     expect(screen.getByTestId("logistics-card-progress").className).toContain("text-[12px]");
     const chevron = screen.getByTestId("logistics-card-chevron");
-    expect(chevron.className).toContain("h-10");
-    expect(chevron.className).toContain("w-10");
+    expect(chevron.className).toContain("h-9");
+    expect(chevron.className).toContain("w-9");
   });
 
   it("expanded: 10px vertical padding and 8px between sections", () => {

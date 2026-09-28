@@ -18,7 +18,7 @@ import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { Block } from "./SalesOrderWorkspace";
+import Block from "@/components/kit/Block";
 import WarehouseUnitProblemReport from "./WarehouseUnitProblemReport";
 
 /**

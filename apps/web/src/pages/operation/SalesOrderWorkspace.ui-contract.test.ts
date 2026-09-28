@@ -6,6 +6,11 @@ import { POS_FORM_BUILTINS } from "@carres/shared";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
+/* `Block` — the one card — lives in the kit since 2026-09-28 (Workspace §5.10
+   admission); its classes are read from there, the page still asks for its tone. */
+const block = readFileSync(join(here, "../../components/kit/Block.tsx"), "utf8");
+/* The Route's input is built by the ONE shared builder (Work reads it too). */
+const routeInput = readFileSync(join(here, "sales-order-route-input.ts"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const panels = readFileSync(join(here, "SalesOrderChangePanels.tsx"), "utf8");
@@ -101,16 +106,17 @@ describe("Sales Order object template contract", () => {
      every page follows the one kit, and the kit's title is `text-strong`
      15/600 slate-12, never blue. The 1px rule under it stays. */
   it("draws card titles black bold, sentence case, over a 1px rule, with no band", () => {
-    expect(workspace).toContain('className="text-strong text-kit-slate-12"');
-    expect(workspace).not.toContain("text-strong text-kit-blue-11");
-    expect(workspace).toContain("border-b border-kit-slate-5 pb-2");
+    expect(block).toContain('className="text-strong text-kit-slate-12"');
+    expect(block).not.toContain("text-strong text-kit-blue-11");
+    expect(block).toContain("border-b border-kit-slate-5 pb-2");
     /* ⭐ AND IT IS THE ONE CHROME. Owner instruction 2026-09-26 "follow sales
        order ui kit … every page of purchasing": `Block` has no second, opt-in
        tone — the mono uppercase title beside a band is retired for every page
        that shares this card. */
     expect(workspace).not.toContain("titleTone");
-    expect(workspace).not.toContain("font-mono text-strong uppercase");
-    expect(workspace).not.toContain("border-l-2 border-base-300");
+    expect(block).not.toContain("titleTone");
+    expect(block).not.toContain("font-mono text-strong uppercase");
+    expect(block).not.toContain("border-l-2 border-base-300");
     /* Six Order-tab cards + the Revisions/History card (kit-sizes card,
        2026-09-23) all draw it. */
     expect(workspace.match(/<Block\s+title=/g)!.length).toBeGreaterThanOrEqual(6);
@@ -1492,7 +1498,7 @@ describe("Sales Order object page — one form grammar", () => {
     /* Two ranks only (orders/MASTER § "Order view"): the in-card label is
        13px/600 slate-11, one rank below the 15px card title. */
     const sub = "text-body font-semibold text-kit-slate-11";
-    expect(workspace, "the card title").toContain(title);
+    expect(block, "the card title").toContain(title);
     expect(workspace, "the subsection heading").toContain(sub);
     /* THE OLD SHAPE: the subsection heading copying the card title's own
        shouting treatment. */
@@ -1564,7 +1570,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   const serviceCode = readFileSync(join(here, "../../lib/service-code.ts"), "utf8");
 
   it("spaces every SO section's groups with ONE 12px body gap — the Block's one body", () => {
-    expect(workspace).toContain('className="mt-3 flex flex-col gap-3 [&>*:empty]:hidden"');
+    expect(block).toContain('className="mt-3 flex flex-col gap-3 [&>*:empty]:hidden"');
     /* The per-group margins it replaced may not return. */
     expect(workspace).not.toContain('<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">');
     expect(workspace).not.toContain('<div className="mt-4 border-t border-kit-slate-5 pt-3">');
@@ -1637,10 +1643,11 @@ describe("Order Route reads its owners only when it is open", () => {
   });
 
   it("hands the resolver the failed reads and the waiting change request", () => {
-    expect(workspace).toContain("unreadable: {");
-    expect(workspace).toContain("delivery: facts.failed.delivery");
-    expect(workspace).toContain("payments: facts.failed.payments");
-    expect(workspace).toContain("amendment: amendmentQ.isError");
+    expect(routeInput).toContain("unreadable: {");
+    expect(routeInput).toContain("delivery: a.facts.failed.delivery");
+    expect(routeInput).toContain("payments: a.facts.failed.payments");
+    expect(workspace).toContain("amendmentFailed: amendmentQ.isError");
+    expect(workspace).toContain("salesOrderRouteInputOf({");
     expect(workspace).toContain("onRetry={retryRouteRead}");
   });
 });

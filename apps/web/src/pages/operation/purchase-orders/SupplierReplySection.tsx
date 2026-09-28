@@ -87,7 +87,7 @@ function AnswerCell({ answer, previousDate, officialDate }: { answer: PoLineSupp
 
 export default function SupplierReplySection({
   poId, version, officialDeliveryDate, supplierName, lines, promises, canRecord,
-  defaultChannel, defaultRecipient, supplierDo, onSaved,
+  defaultChannel, defaultRecipient, supplierDo, onSaved, startEditing = false, onCancel,
 }: {
   poId: string;
   version: number;
@@ -100,6 +100,10 @@ export default function SupplierReplySection({
   defaultRecipient: string;
   supplierDo: { number: string | null; uploadedAt: string | null; file: string | null } | null;
   onSaved: () => void;
+  /** Work's route card opens the form straight away (Workspace MASTER §5.10):
+   *  the card's own `Record supplier answer` button already said which act. */
+  startEditing?: boolean;
+  onCancel?: () => void;
 }) {
   const record = useRecordSupplierAnswers(poId);
   const openLines = lines.filter((l) => stillToDeliver(l) > 0);
@@ -117,7 +121,7 @@ export default function SupplierReplySection({
     return paths.size;
   }, [promises, version]);
 
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [drafts, setDrafts] = useState<Record<string, LineDraft>>({});
   const [doReceived, setDoReceived] = useState(false);
   const [doNumber, setDoNumber] = useState("");
@@ -140,7 +144,7 @@ export default function SupplierReplySection({
     setChannel(defaultChannel); setRecipient(defaultRecipient); setProblem(null); setBulk("");
     setEditing(true);
   }
-  function cancel() { setEditing(false); setProblem(null); }
+  function cancel() { setEditing(false); setProblem(null); onCancel?.(); }
 
   const later = (date: string) => !!date && !!officialDeliveryDate && date > officialDeliveryDate;
 

@@ -190,10 +190,15 @@ function panelCount(label: "Missed" | "Today"): number {
   return row ? Number(/ · (\d+) action/.exec(row.getAttribute("aria-label") ?? "")?.[1]) : 0;
 }
 
+/** The Work page's focus list (Workspace §5.10): its `Missed` row plus the
+ *  focus day's count on the month — one choice at a time on screen, the same
+ *  two numbers the badge adds. */
 function workFocusRows(): number {
-  return within(screen.getByTestId("work-list"))
-    .queryAllByTestId(/^work-row-SO-/)
-    .length;
+  const missed = Number(/(\d+)$/.exec(screen.getByTestId("work-rail-missed").textContent ?? "")?.[1] ?? 0);
+  const focus = screen.getByTestId("work-rail-month").getAttribute("data-focus-day") ?? "";
+  const tile = screen.queryByTestId(`work-rail-day-${focus}`);
+  const today = Number(/ (\d+) actions?$/.exec(tile?.getAttribute("aria-label") ?? "")?.[1] ?? 0);
+  return missed + today;
 }
 
 beforeEach(() => {
@@ -256,7 +261,7 @@ describe("HF-3 · one count definition", () => {
     net.work = response(WEEK, { staffEmail: "me@carres.test" });
     const qc = client();
     const work = mount(<OperationWork />, qc);
-    await waitFor(() => expect(screen.queryByTestId("work-loading")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("work-rail-month")).not.toBeNull());
     expect(screen.queryByText("Nothing assigned to you")).toBeNull();
     expect(workFocusRows()).toBe(2);
     work.unmount();
