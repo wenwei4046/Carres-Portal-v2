@@ -9,7 +9,7 @@ type Code = { code: string };
 const net = vi.hoisted(() => ({
   rows: [] as Array<{ code: string }>,
   routes: [] as Array<{ holding_code: string; channel: string; bank_code: string }>,
-  chart: [] as Array<{ code: string; parent_code: string | null }>,
+  chart: [] as Array<{ code: string; parent_code: string | null; kind: string }>,
   failList: false,
   refuse: null as string | null,
   /** One write refused: its key, the sentence, and the door's tag (sent up as `code`). */
@@ -49,7 +49,8 @@ vi.mock("@/lib/api", () => ({
     }
     // The chart's add door: like the database, the new row is in the next read.
     if (key === "POST /api/finance/ledger/accounts") {
-      net.chart = [...net.chart, acc(body.code, body.name, body.parentCode, body.isHeading === true)];
+      const kind = body.kind ?? net.chart.find((a) => a.code === body.parentCode)?.kind;
+      net.chart = [...net.chart, acc(body.code, body.name, body.parentCode, body.isHeading === true, kind)];
       return { code: body.code };
     }
     return { code: "1125" };
@@ -366,6 +367,47 @@ describe("Finance Settings — the chart of accounts", () => {
     expect(addAccountSaveGap({ ...f, isHeading: false, code: " " })).toBe("Save: type the number");
     expect(addAccountSaveGap({ ...f, isHeading: false, name: "" })).toBe("Save: type the name");
     expect(addAccountSaveGap(f)).toBeNull();
+    expect(addAccountSaveGap({ ...f, parent: "top" })).toBe("Save: pick the kind");
+    expect(addAccountSaveGap({ ...f, parent: "top", kind: "INCOME" })).toBeNull();
+  });
+
+  it("Add account: a heading goes at the top of the chart with the kind Finance picks; an account never does (0608)", async () => {
+    show("/finance/settings?tab=chart");
+    await screen.findByText("2130 Accrued expenses");
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    const dialog = await screen.findByRole("dialog");
+    const openUnder = () => fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
+
+    // An account: no top of the chart, and no Kind.
+    openUnder();
+    await screen.findByRole("option", { name: "2000 Liabilities" });
+    expect(screen.queryByRole("option", { name: "Top of the chart" })).toBeNull();
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    expect(within(dialog).queryByRole("combobox", { name: /Kind/ })).toBeNull();
+
+    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
+    openUnder();
+    fireEvent.click(await screen.findByRole("option", { name: "Top of the chart" }));
+    expect(within(dialog).getByRole("button", { name: "Save: pick the kind" })).toBeDisabled();
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "Income" }));
+    fireEvent.change(within(dialog).getByLabelText(/^Heading number/), { target: { value: "8000" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Heading name/), { target: { value: "Other income" } });
+
+    // Unticking takes the top of the chart away again; ticking brings the choice back.
+    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
+    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
+    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
+    openUnder();
+    fireEvent.click(await screen.findByRole("option", { name: "Top of the chart" }));
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({
+      key: "POST /api/finance/ledger/accounts",
+      body: { parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "INCOME" },
+    });
+    expect(await screen.findByText("8000 Other income")).toBeInTheDocument();
   });
 
   it("Add account: a heading is added on its own, with no first account, and is offered under Under at once (0608)", async () => {

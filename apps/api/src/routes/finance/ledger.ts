@@ -69,7 +69,8 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   POST  /accounts/move    put one account or heading under another heading (gl_account_move,
  *                           0570, headings since 0577) — writes parent and order; never the number or the name.
  *   POST  /accounts         add an account under a heading, or a heading on its own or with
- *                           its first account (gl_account_add, 0577, 0608). The kind follows the heading.
+ *                           its first account (gl_account_add, 0577, 0608). The kind follows the heading;
+ *                           a heading at the top of the chart (parentCode null) carries its own kind.
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
@@ -493,7 +494,8 @@ financeLedgerRouter.post("/accounts/move", requireFinance, async (c) => {
 
 /**
  * Add an account under a heading, or a heading on its own (`isHeading`, 0608) or
- * with its first account (0577).
+ * with its first account (0577). A heading at the top of the chart (0608) has
+ * `parentCode: null` and its own `kind`.
  * The refusals are gl_account_update's sentences, and their tags go up as
  * `code` so the form puts each under its field.
  */
@@ -508,6 +510,7 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
     p_first_code: body.data.first?.code ?? null,
     p_first_name: body.data.first?.name ?? null,
     p_is_heading: body.data.isHeading ?? false,
+    p_kind: body.data.kind ?? null,
   });
   if (error) return accountError(c, error);
   return c.json({ code: String(data) }, 201);

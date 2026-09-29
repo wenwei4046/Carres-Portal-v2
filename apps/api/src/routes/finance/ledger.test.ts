@@ -638,7 +638,7 @@ describe("POST /accounts (0577)", () => {
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual({ code: "900-A001" });
     expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
-      p_parent_code: "6000", p_code: "900-A001", p_name: "Freight", p_first_code: null, p_first_name: null, p_is_heading: false,
+      p_parent_code: "6000", p_code: "900-A001", p_name: "Freight", p_first_code: null, p_first_name: null, p_is_heading: false, p_kind: null,
     });
   });
 
@@ -648,7 +648,7 @@ describe("POST /accounts (0577)", () => {
     expect(res.status).toBe(201);
     expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
       p_parent_code: "1000", p_code: "1400", p_name: "Deposits paid", p_first_code: "1410", p_first_name: "Rental deposits",
-      p_is_heading: false,
+      p_is_heading: false, p_kind: null,
     });
   });
 
@@ -658,8 +658,30 @@ describe("POST /accounts (0577)", () => {
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual({ code: "8000" });
     expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
-      p_parent_code: "6000", p_code: "8000", p_name: "testhead", p_first_code: null, p_first_name: null, p_is_heading: true,
+      p_parent_code: "6000", p_code: "8000", p_name: "testhead", p_first_code: null, p_first_name: null, p_is_heading: true, p_kind: null,
     });
+  });
+
+  it("adds a heading at the top of the chart with its kind (0608)", async () => {
+    const { sb } = fakeClient(() => ok("8000"));
+    const res = await post({ parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "INCOME" });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: null, p_code: "8000", p_name: "Other income", p_first_code: null, p_first_name: null, p_is_heading: true, p_kind: "INCOME",
+    });
+  });
+
+  it("forwards the refusal of an account at the top that is not a heading", async () => {
+    fakeClient(() => refuse("22023", "add_top_account", "Only a heading goes at the top of the chart. Pick the heading this account goes under."));
+    const res = await post({ parentCode: null, code: "8000", name: "Other income" });
+    expect(res.status).toBe(422);
+    expect((await json(res)).code).toBe("add_top_account");
+  });
+
+  it("refuses a kind the chart does not have before the database", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "OTHER" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an isHeading that is not true or false", async () => {
