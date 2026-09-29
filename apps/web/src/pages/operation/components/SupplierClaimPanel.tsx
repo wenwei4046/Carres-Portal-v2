@@ -387,7 +387,10 @@ function SendDialog({ claim, open, onClose }: { claim: SupplierClaimListRow; ope
 export function ReplyForm({ claim, record, wide, onClose }: { claim: SupplierClaimListRow; record: SupplierClaimRecord | null; wide: boolean; onClose: () => void }) {
   const door = useSupplierClaimDoor(claim.id, "response");
   const [response, setResponse] = useState<string | undefined>(undefined);
-  const [scope, setScope] = useState<SupplierClaimReplyScope | undefined>(undefined);
+  // `Whole claim` is the default: a claim-level answer is the common case,
+  // and `These Units` reveals the Unit ticks only when chosen.
+  const [scope, setScope] = useState<SupplierClaimReplyScope | undefined>("claim");
+  const [phone, setPhone] = useState(false);
   const [unitIds, setUnitIds] = useState<string[]>([]);
   const [supplierDate, setSupplierDate] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<Array<{ path: string; kind: string }>>([]);
@@ -447,11 +450,19 @@ export function ReplyForm({ claim, record, wide, onClose }: { claim: SupplierCla
           ariaLabel="Evidence"
           disabled={door.isPending}
         />
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        {/* A phone answer records who spoke and when; its fields show only
+            when the person says the answer came by phone. */}
+        <button type="button" className="mt-2 text-body text-kit-blue-11 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9"
+          aria-expanded={phone} data-testid="claim-reply-phone"
+          onClick={() => {
+            if (phone) { setSpokeWith(""); setSpokenDate(null); setSpokenTime(""); }
+            setPhone(!phone);
+          }}>Phone call</button>
+        {phone && <div className="mt-2 grid gap-3 sm:grid-cols-2" data-testid="claim-reply-phone-fields">
           <Input id="claim-reply-spoke" label="Who spoke" value={spokeWith} onChange={(e) => setSpokeWith(e.target.value)} />
           <DatePicker id="claim-reply-spoken-date" label="When they spoke" value={spokenDate} onChange={setSpokenDate} />
           <Input id="claim-reply-spoken-time" type="time" label="Time" value={spokenTime} onChange={(e) => setSpokenTime(e.target.value)} />
-        </div>
+        </div>}
       </div>
       <Textarea id="claim-reply-note" label="Note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
       {tried && missing.length > 0 && <ul className="text-body text-kit-red-11" data-testid="claim-reply-missing">

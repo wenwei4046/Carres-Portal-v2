@@ -193,9 +193,24 @@ describe("the claim record — where the supplier reply is recorded (§9.5, 2026
     fireEvent.click(screen.getByTestId("claim-record-reply"));
     fireEvent.click(screen.getByTestId("claim-reply-save"));
     expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Choose the supplier's answer.");
-    expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Choose what the answer applies to.");
+    // `Applies to` starts on `Whole claim`, so it never reads as missing.
+    expect(screen.getByTestId("claim-reply-missing")).not.toHaveTextContent("Choose what the answer applies to.");
     expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Add the evidence: a file, or who spoke and when.");
     expect(doorMutate).not.toHaveBeenCalled();
+  });
+  it("opens on Whole claim with no Unit ticks, and shows the phone facts only for a Phone call", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByTestId("claim-record-reply"));
+    const form = screen.getByTestId("claim-reply-form");
+    expect(within(form).getByRole("combobox", { name: "Applies to" })).toHaveTextContent("Whole claim");
+    expect(screen.queryByTestId("claim-reply-units")).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText("Who spoke")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("claim-reply-phone"));
+    expect(within(form).getByLabelText("Who spoke")).toBeInTheDocument();
+    expect(screen.getByTestId("claim-reply-phone-fields")).toHaveTextContent("When they spoke");
+    fireEvent.click(screen.getByTestId("claim-reply-phone"));
+    expect(within(form).queryByLabelText("Who spoke")).not.toBeInTheDocument();
   });
   it("shows the recorded answer as a claim-level fact, never spread across Units", () => {
     claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", supplier_response: "repair", sent: true })] }, isLoading: false });
