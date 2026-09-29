@@ -45,6 +45,7 @@ import {
   unitProblemIntake,
   unitProblemReportInputSchema,
   type UnitProblemUnit,
+  supplierReturnPickupInputSchema,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { stockMovementEvidence } from "../../lib/stock-movement-evidence";
@@ -537,6 +538,92 @@ opsStockRouter.post("/register/:unitCode/count-again", requireOperationOrPrincip
   });
   if (error) throw unitDoorRefusal(error);
   return c.json({ issueId: notFound.id, action: next, result: data ?? null });
+});
+
+// =====================================================================
+// Outbound `Return to supplier` — the supplier collects exact Units of a
+// Purchase Return (Stock MASTER §12.8 · Purchasing §9.6, owner approval
+// 2026-09-29). Migration 0612. Purchasing issues the return; Stock records
+// the physical handover and moves custody; nothing here decides money.
+// =====================================================================
+
+/** GET /supplier-returns — every issued Purchase Return with a Unit still to be
+ *  collected, with its Units, Pickup Location and Confirmed Pickup date. */
+opsStockRouter.get("/supplier-returns", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: units, error } = await sb
+    .from("purchase_return_units")
+    .select("purchase_return_id, stock_item_id, unit_code, item, item_spec, pickup_location, return_to, actual_pickup_date, collected_by_name")
+    .order("unit_code");
+  if (error) throw mapErr(error);
+  const byReturn = new Map<string, Array<Record<string, unknown>>>();
+  for (const u of units ?? []) {
+    const id = u.purchase_return_id as string;
+    byReturn.set(id, [...(byReturn.get(id) ?? []), u]);
+  }
+  const open = [...byReturn.entries()].filter(([, list]) => list.some((u) => !u.actual_pickup_date)).map(([id]) => id);
+  if (open.length === 0) return c.json({ returns: [] });
+  const { data: docs, error: docErr } = await sb
+    .from("purchase_returns")
+    .select("id, pr_no, pr_doc_date, confirmed_pickup_date, supplier_id")
+    .in("id", open);
+  if (docErr) throw mapErr(docErr);
+  const supplierIds = [...new Set((docs ?? []).map((d) => d.supplier_id as string))];
+  const { data: suppliers, error: supErr } = supplierIds.length
+    ? await sb.from("suppliers").select("id, name").in("id", supplierIds)
+    : { data: [], error: null };
+  if (supErr) throw mapErr(supErr);
+  const supplierName = new Map((suppliers ?? []).map((s) => [s.id as string, s.name as string]));
+  const returns = (docs ?? [])
+    .map((d) => ({
+      id: d.id as string,
+      prNo: d.pr_no as string,
+      prDocDate: d.pr_doc_date as string,
+      confirmedPickupDate: (d.confirmed_pickup_date as string | null) ?? null,
+      supplier: supplierName.get(d.supplier_id as string) ?? null,
+      units: (byReturn.get(d.id as string) ?? []).map((u) => ({
+        stockItemId: u.stock_item_id as string,
+        unitCode: u.unit_code as string,
+        item: (u.item as string | null) ?? null,
+        itemSpec: (u.item_spec as string | null) ?? null,
+        pickupLocation: (u.pickup_location as string | null) ?? null,
+        returnTo: (u.return_to as string | null) ?? null,
+        actualPickupDate: (u.actual_pickup_date as string | null) ?? null,
+        collectedByName: (u.collected_by_name as string | null) ?? null,
+      })),
+    }))
+    .sort((a, b) => (a.confirmedPickupDate ?? "9999").localeCompare(b.confirmedPickupDate ?? "9999") || a.prNo.localeCompare(b.prNo));
+  return c.json({ returns });
+});
+
+/** POST /supplier-returns/:id/pickup — ONE door (0612): exact Units, the
+ *  supplier's collector, the actual time and proof; custody moves per Unit. */
+opsStockRouter.post("/supplier-returns/:id/pickup", requireOperationOrPrincipal, async (c) => {
+  const id = c.req.param("id");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HTTPException(404, { message: "Purchase return not found" });
+  const parsed = await parseBody(c, supplierReturnPickupInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("stock_record_supplier_return_pickup", {
+    p_request_id: parsed.requestId,
+    p_purchase_return_id: id,
+    p_unit_ids: parsed.unitIds,
+    p_collector_name: parsed.collectorName,
+    p_picked_up_at: parsed.pickedUpAt,
+    p_evidence: parsed.proof,
+    p_note: parsed.note ?? null,
+  });
+  if (error) {
+    if (error.code === "23505") throw new HTTPException(409, { message: error.message ?? "request already used" });
+    throw mapErr(error);
+  }
+  const r = data as { handover_id: string; units: number; open_units: number; total_units: number; replayed: boolean };
+  return c.json({
+    handoverId: r.handover_id,
+    units: r.units,
+    openUnits: r.open_units,
+    totalUnits: r.total_units,
+    replayed: r.replayed === true,
+  }, r.replayed ? 200 : 201);
 });
 
 // =====================================================================
