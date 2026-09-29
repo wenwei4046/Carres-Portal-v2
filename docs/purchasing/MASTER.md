@@ -4953,9 +4953,14 @@ column `document_sent_at` is kept and no longer written); `Confirmed Pickup` (ap
 **Dependencies still NOT BUILT, named so nobody assumes them:** (1) ~~`suppliers.return_address`
 editor~~ BUILT 2026-09-29 (0611): Settings → Purchasing → `Supplier addresses` records each
 supplier's `Address` (PO / Repair Order PDF) and `Return address` (this `Return To`) one field at a
-time through `purchasing_set_supplier_address`; blank saves nothing recorded, so Issue still refuses
-`Add the return address of {Supplier}` until it is filled, and one address is never copied into the
-other; (2) Stock's Outbound `Return to supplier` handover (Stock §12.8): Stock writer LIVE (0612,
+time through `purchasing_set_supplier_address`; blank saves nothing recorded, and one address is
+never copied into the other. **OWNER RULING (Jess, 2026-09-29, relayed by the Settings lane) —
+BUILT ON BRANCH `build/claim-unit-evidence-received-date`, migration 0614 NOT APPLIED:** `Return To`
+= the supplier's `Return address` when filled, otherwise its `Address`; Issue refuses only when BOTH
+are blank, `Add the address of {Supplier}` (detail `address_missing`). 0614 re-issues
+`purchasing_issue_purchase_return` from the 0609 body applied in production with only that change;
+the resolved value is still snapshotted onto `purchase_return_units.return_to`, and the Issue form
+shows it with `From Return address` / `From Address` under it; (2) Stock's Outbound `Return to supplier` handover (Stock §12.8): Stock writer LIVE (0612,
 `stock_record_supplier_return_pickup`); Outbound screen pending owner design approval. Pickup proof
 files live in the private `issue-evidence` bucket under `purchase_return/<id>/…`; (3) `Supplier
 Received Date` — `Record supplier receipt` BUILT ON BRANCH `build/claim-unit-evidence-received-date`
@@ -4992,8 +4997,8 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
   held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
   (defaults from each Unit's current Stock Location; editing moves nothing) · `Return To` (the
-  supplier's recorded return address from Supplier Master; absent → `Add the return address of
-  {Supplier}`, never the registered address by assumption) · `Confirmed Pickup` (optional at
+  supplier's recorded `Return address`, otherwise its recorded `Address` — owner ruling 2026-09-29;
+  both blank → `Add the address of {Supplier}`; never typed by the caller) · `Confirmed Pickup` (optional at
   issue). Issue writes the PRTN row and its Units and moves no stock. A Unit changed under the
   form is refused by name; `No return was issued.`
 - **Sending** uses the shared document send area (`Return document sent to supplier`; the

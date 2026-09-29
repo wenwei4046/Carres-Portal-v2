@@ -162,17 +162,40 @@ export interface PurchaseReturnIssueSource {
   claim_id: string;
   claim_no: string | null;
   supplier_name: string | null;
-  /** Supplier Master's recorded return address; null = not recorded. */
-  return_address: string | null;
+  /** Return To as the door resolves it (owner ruling 2026-09-29): the
+   *  recorded return address, else the recorded address; null = neither. */
+  return_to: string | null;
+  /** Which Supplier Master field it came from, shown under it. */
+  return_to_from: PurchaseReturnToFrom | null;
   grn_no: string | null;
   units: PurchaseReturnIssueUnit[];
+}
+
+export type PurchaseReturnToFrom = "return_address" | "address";
+
+/** Second line under Return To: which Settings field (`Return address` /
+ *  `Address`, Settings → Purchasing → Supplier addresses) it came from. */
+export const PURCHASE_RETURN_TO_FROM_WORD: Record<PurchaseReturnToFrom, string> = {
+  return_address: "From Return address",
+  address: "From Address",
+};
+
+/** OWNER RULING (Jess, 2026-09-29): Return To = the supplier's return
+ *  address when filled, otherwise its address. The door (0614) computes the
+ *  same `coalesce(nullif(btrim(return_address),''), nullif(btrim(address),''))`. */
+export function purchaseReturnResolvedReturnTo(s: { return_address?: string | null; address?: string | null }): { return_to: string | null; return_to_from: PurchaseReturnToFrom | null } {
+  const ret = s.return_address?.trim();
+  if (ret) return { return_to: ret, return_to_from: "return_address" };
+  const addr = s.address?.trim();
+  if (addr) return { return_to: addr, return_to_from: "address" };
+  return { return_to: null, return_to_from: null };
 }
 
 /** What stops the issue, named, in the form's order. Empty = issuable. */
 export function purchaseReturnIssueMissing(source: PurchaseReturnIssueSource, picked: readonly string[]): string[] {
   const out: string[] = [];
-  if (!source.return_address || !source.return_address.trim()) {
-    out.push(`Add the return address of ${source.supplier_name ?? "the supplier"}`);
+  if (!source.return_to || !source.return_to.trim()) {
+    out.push(`Add the address of ${source.supplier_name ?? "the supplier"}`);
   }
   const eligible = new Set(source.units.filter((u) => !u.refusal).map((u) => u.stock_item_id));
   if (!picked.some((id) => eligible.has(id))) out.push("Tick the Units to return.");

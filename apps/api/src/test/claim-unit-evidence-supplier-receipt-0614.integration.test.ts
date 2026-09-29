@@ -34,6 +34,13 @@ const UNIT_A = uid("b1");
 const UNIT_B = uid("b2");
 const UNIT_C = uid("b3");
 const UNIT_ELSEWHERE = uid("b4");
+// Owner ruling (Jess, 2026-09-29): Return To = return address, else address.
+const ADDR_SUPPLIER = uid("52");
+const BLANK_SUPPLIER = uid("53");
+const ADDR_CLAIM = uid("82");
+const BLANK_CLAIM = uid("83");
+const UNIT_ADDR = uid("b5");
+const UNIT_BLANK = uid("b6");
 const code = (n: number) => `U13${RUN}-${String(n).padStart(3, "0")}-001`;
 const FILE = { path: `purchase_return_receipt/${PR}/it-${HEX}.jpg`, kind: "photo" };
 
@@ -90,6 +97,19 @@ describe.skipIf(!URL)("Claim Unit evidence and Purchase Return supplier receipt 
       await q(
         "insert into ops_stock_items (id, sku, warehouse_id, status, unit_code, hold_claim_id, hold_reason, held_at, identity_scope, qty, po_no) values ($1, 'IT-SKU', $2, 'on_hold', $3, $4, 'damaged', now(), 'unit', 1, $5)",
         [id, WH, code(n), CLAIM, PO],
+      );
+    }
+    await q("insert into suppliers (id, name, kind, slug, address, return_address) values ($1, $2, (select enum_range(null::supplier_kind))[1], $3, 'No 5, Jalan Addr, Batu Pahat', '  ')", [ADDR_SUPPLIER, `IT Addr ${HEX}`, `it-0614a-${HEX}`]);
+    await q("insert into suppliers (id, name, kind, slug, address, return_address) values ($1, $2, (select enum_range(null::supplier_kind))[1], $3, ' ', null)", [BLANK_SUPPLIER, `IT Blank ${HEX}`, `it-0614b-${HEX}`]);
+    for (const [claim, no, supplier, unit, n] of [[ADDR_CLAIM, `SC-IT14A-${HEX}`, ADDR_SUPPLIER, UNIT_ADDR, 5], [BLANK_CLAIM, `SC-IT14B-${HEX}`, BLANK_SUPPLIER, UNIT_BLANK, 6]] as const) {
+      await q(
+        `insert into supplier_claims (id, claim_no, po_id, supplier_id, sku, product_category, claim_type, qty, photos, carres_execution, carres_execution_at)
+         values ($1, $2, $3, $4, 'IT-SKU', 'other', 'damaged', 1, '[{"path":"claims/it.jpg"}]'::jsonb, 'return_to_supplier', now())`,
+        [claim, no, PO, supplier],
+      );
+      await q(
+        "insert into ops_stock_items (id, sku, warehouse_id, status, unit_code, hold_claim_id, hold_reason, held_at, identity_scope, qty, po_no) values ($1, 'IT-SKU', $2, 'on_hold', $3, $4, 'damaged', now(), 'unit', 1, $5)",
+        [unit, WH, code(n), claim, PO],
       );
     }
     await q("insert into purchase_returns (id, pr_no, supplier_claim_id, supplier_id, pr_doc_date) values ($1, $2, $3, $4, '2026-09-01')", [PR, `PR-IT13-${HEX}`, CLAIM, SUPPLIER]);
@@ -169,6 +189,26 @@ describe.skipIf(!URL)("Claim Unit evidence and Purchase Return supplier receipt 
     expect(await receive({ units: [UNIT_A] })).toMatchObject({ ok: false, detail: "already_received", why: `${code(1)}: Already received 5 Sep 2026` });
     const r = await receive({ units: [UNIT_B], evidence: [], by: "Mr Tan (Hooka store)", at: "2026-09-12T03:00:00+08:00", date: "2026-09-12" });
     expect(r.ok).toBe(true);
+  });
+
+  const issue = async (claim: string, unit: string) => {
+    await q("reset role");
+    const seen = String((await q("select updated_at::text as t from ops_stock_items where id = $1", [unit])).rows[0]?.t);
+    await as(OP);
+    return attempt("select public.purchasing_issue_purchase_return($1, $2::jsonb, null) as id", [claim, JSON.stringify([{ stock_item_id: unit, seen }])]);
+  };
+
+  it("Return To falls back to the supplier's address when the return address is blank (owner ruling 2026-09-29)", async () => {
+    const r = await issue(ADDR_CLAIM, UNIT_ADDR);
+    expect(r.ok).toBe(true);
+    await q("reset role");
+    const row = (await q("select return_to from purchase_return_units where purchase_return_id = $1", [r.ok ? r.row.id : null])).rows[0];
+    expect(row?.return_to).toBe("No 5, Jalan Addr, Batu Pahat");
+  });
+
+  it("refuses only when BOTH addresses are blank, in the new words", async () => {
+    const r = await issue(BLANK_CLAIM, UNIT_BLANK);
+    expect(r).toMatchObject({ ok: false, detail: "address_missing", why: `Add the address of IT Blank ${HEX}` });
   });
 
   it("is append-only: signed-in callers cannot write either table, and anon cannot reach the door", async () => {

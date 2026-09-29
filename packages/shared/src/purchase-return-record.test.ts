@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  PURCHASE_RETURN_TO_FROM_WORD,
+  purchaseReturnResolvedReturnTo,
   SUPPLIER_CLAIM_DECISIONS,
   supplierClaimDecision,
   supplierClaimLegacyWords,
@@ -75,15 +77,21 @@ describe("the Purchase Return record states", () => {
 
 describe("the Issue Purchase Return form", () => {
   const source: PurchaseReturnIssueSource = {
-    claim_id: "c1", claim_no: "SC-1", supplier_name: "Hooka", return_address: null, grn_no: null,
+    claim_id: "c1", claim_no: "SC-1", supplier_name: "Hooka", return_to: null, return_to_from: null, grn_no: null,
     units: [{ stock_item_id: "a", unit_code: "U1-000-001", po_no: "PO-1", category: null, item: null, item_spec: null, pickup_location: "Carres Klang", seen: "t", refusal: null }],
   };
-  it("names the missing return address in the approved words", () => {
-    expect(purchaseReturnIssueMissing(source, ["a"])).toEqual(["Add the return address of Hooka"]);
+  it("names the missing address in the approved words only when both addresses are blank (owner ruling 2026-09-29)", () => {
+    expect(purchaseReturnIssueMissing(source, ["a"])).toEqual(["Add the address of Hooka"]);
+  });
+  it("resolves Return To to the return address, else the address, and says which", () => {
+    expect(purchaseReturnResolvedReturnTo({ return_address: " Lot 9 ", address: "No 5" })).toEqual({ return_to: "Lot 9", return_to_from: "return_address" });
+    expect(purchaseReturnResolvedReturnTo({ return_address: "  ", address: " No 5 " })).toEqual({ return_to: "No 5", return_to_from: "address" });
+    expect(purchaseReturnResolvedReturnTo({ return_address: null, address: "" })).toEqual({ return_to: null, return_to_from: null });
+    expect(PURCHASE_RETURN_TO_FROM_WORD).toEqual({ return_address: "From Return address", address: "From Address" });
   });
   it("asks for at least one Unit", () => {
-    expect(purchaseReturnIssueMissing({ ...source, return_address: "Lot 9" }, [])).toEqual(["Tick the Units to return."]);
-    expect(purchaseReturnIssueMissing({ ...source, return_address: "Lot 9" }, ["a"])).toEqual([]);
+    expect(purchaseReturnIssueMissing({ ...source, return_to: "Lot 9", return_to_from: "return_address" }, [])).toEqual(["Tick the Units to return."]);
+    expect(purchaseReturnIssueMissing({ ...source, return_to: "Lot 9", return_to_from: "return_address" }, ["a"])).toEqual([]);
   });
 });
 

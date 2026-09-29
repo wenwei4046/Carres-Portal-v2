@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   goodsCategoryWordOf,
   NO_RETURN_WAS_ISSUED,
+  purchaseReturnResolvedReturnTo,
   type PurchaseReturnDetail,
   type PurchaseReturnEvidenceCount,
   type PurchaseReturnIssueSource,
@@ -306,7 +307,7 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
   if (!claim.data) return { source: null, error: null };
   const row = claim.data as Row;
   const [supplier, grn, units] = await Promise.all([
-    sb.from("suppliers").select("name, return_address").eq("id", row.supplier_id as string).maybeSingle(),
+    sb.from("suppliers").select("name, return_address, address").eq("id", row.supplier_id as string).maybeSingle(),
     row.warehouse_receipt_id
       ? sb.from("warehouse_receipts").select("grn_no").eq("id", row.warehouse_receipt_id as string).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -321,13 +322,14 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
     const model = (Array.isArray(r.product_models) ? (r.product_models as Row[])[0] : r.product_models) as Row | null;
     return [r.sku as string, { item: str(model?.name), category: str(model?.category), spec: str(r.variant) }];
   }));
-  const s = supplier.data as { name?: string | null; return_address?: string | null } | null;
+  const s = supplier.data as { name?: string | null; return_address?: string | null; address?: string | null } | null;
   return {
     source: {
       claim_id: claimId,
       claim_no: str(row.claim_no),
       supplier_name: s?.name ?? null,
-      return_address: str(s?.return_address?.trim()),
+      // Owner ruling 2026-09-29: the door's own resolution, shown with its source.
+      ...purchaseReturnResolvedReturnTo(s ?? {}),
       grn_no: str((grn.data as Row | null)?.grn_no),
       units: unitRows.map((u) => {
         const cat = bySku.get(u.sku as string);

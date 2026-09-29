@@ -27,6 +27,15 @@
 --     `purchase_return_units.supplier_received_date`: the date is read from this
 --     ledger (ERP-ARCHITECTURE law D, one arithmetic).
 --
+-- 3 · RETURN TO FALLS BACK TO THE SUPPLIER'S ADDRESS — OWNER RULING (Jess,
+--     2026-09-29, relayed through the Settings lane). Return To =
+--     `suppliers.return_address` when filled, otherwise `suppliers.address`;
+--     Issue refuses only when BOTH are blank: `Add the address of {Supplier}`
+--     (detail `address_missing`). `purchasing_issue_purchase_return` is
+--     re-issued from the definition APPLIED in production (0609, read with
+--     pg_get_functiondef 2026-09-29) with only that change; the resolved value
+--     is still snapshotted onto `purchase_return_units.return_to`.
+--
 -- Schema only. No row is read for a count, none is written.
 
 -- ── 1 · the claim photo writer keeps an optional Unit ───────────────────────
@@ -223,6 +232,135 @@ $fn$;
 revoke all on function public.purchase_return_record_supplier_receipt(uuid, date, uuid[], jsonb, text, timestamptz, text) from public, anon;
 grant execute on function public.purchase_return_record_supplier_receipt(uuid, date, uuid[], jsonb, text, timestamptz, text) to authenticated;
 
+
+-- ── 3 · Return To = return address, else address (owner ruling 2026-09-29) ──
+
+CREATE OR REPLACE FUNCTION public.purchasing_issue_purchase_return(p_claim_id uuid, p_units jsonb, p_confirmed_pickup_date date DEFAULT NULL::date)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_role        app_role := (select public.app_role());
+  v_claim       public.supplier_claims%rowtype;
+  v_supplier    public.suppliers%rowtype;
+  v_return_to   text;
+  v_return_id   uuid;
+  v_unit        jsonb;
+  v_item        public.ops_stock_items%rowtype;
+  v_refusal     text;
+  v_ids         uuid[] := '{}';
+  v_count       int := 0;
+begin
+  -- 0500's law: a NULL app_role must never fall through a gate.
+  if v_role is null or v_role not in ('operation', 'principal') then
+    raise exception 'operation or principal only'
+      using errcode = '42501', detail = 'not_purchasing';
+  end if;
+
+  select * into v_claim from public.supplier_claims where id = p_claim_id for update;
+  if not found then
+    raise exception 'supplier claim not found'
+      using errcode = 'P0002', detail = 'claim_not_found';
+  end if;
+  if v_claim.status is distinct from 'open' then
+    raise exception 'Claim % is %', v_claim.claim_no, v_claim.status
+      using errcode = '23514', detail = 'claim_not_open';
+  end if;
+
+  -- THE APPROVED OUTCOME, AND NOTHING LOOSER (0548, unchanged).
+  if v_claim.carres_execution is distinct from 'return_to_supplier' then
+    raise exception 'this claim has no agreed Return to Supplier outcome'
+      using errcode = '23514', detail = 'outcome_not_return_to_supplier';
+  end if;
+
+  -- RETURN TO — owner ruling 2026-09-29: the recorded return address, else
+  -- the recorded address. Never typed by the caller; refused only when both
+  -- are blank.
+  select * into v_supplier from public.suppliers where id = v_claim.supplier_id;
+  v_return_to := coalesce(nullif(btrim(v_supplier.return_address), ''), nullif(btrim(v_supplier.address), ''));
+  if v_return_to is null then
+    raise exception 'Add the address of %', coalesce(v_supplier.name, 'the supplier')
+      using errcode = '23514', detail = 'address_missing';
+  end if;
+
+  if p_confirmed_pickup_date is not null
+     and p_confirmed_pickup_date < (timezone('Asia/Kuala_Lumpur', now()))::date then
+    raise exception 'The Confirmed Pickup date has passed'
+      using errcode = '22023', detail = 'pickup_date_passed';
+  end if;
+
+  if jsonb_typeof(p_units) is distinct from 'array' or jsonb_array_length(p_units) = 0 then
+    raise exception 'a purchase return needs at least one Unit'
+      using errcode = '23514', detail = 'no_units';
+  end if;
+
+  insert into public.purchase_returns (
+    supplier_claim_id, supplier_id, warehouse_receipt_id,
+    confirmed_pickup_date, created_by
+  )
+  values (
+    v_claim.id, v_claim.supplier_id, v_claim.warehouse_receipt_id,
+    p_confirmed_pickup_date, auth.uid()
+  )
+  returning id into v_return_id;
+
+  for v_unit in select * from jsonb_array_elements(p_units) loop
+    select * into v_item from public.ops_stock_items
+     where id = nullif(v_unit ->> 'stock_item_id', '')::uuid
+     for update;
+    if not found then
+      raise exception 'that Unit is not a tracked Unit'
+        using errcode = '23514', detail = 'unit_not_tracked';
+    end if;
+    if v_item.id = any (v_ids) then
+      raise exception '%: named twice', coalesce(v_item.unit_code, 'Unit')
+        using errcode = '23514', detail = 'unit_twice';
+    end if;
+    v_ids := v_ids || v_item.id;
+
+    -- REFUSED BY NAME, in the words the form listed it with.
+    v_refusal := public.purchase_return_unit_refusal(v_item, v_claim.id);
+    if v_refusal is not null then
+      raise exception '%: %', coalesce(v_item.unit_code, 'Unit'), v_refusal
+        using errcode = '23514', detail = 'unit_not_eligible', hint = v_refusal;
+    end if;
+    -- A UNIT CHANGED UNDER THE FORM is refused by name; nothing is issued.
+    if coalesce(v_unit ->> 'seen', '') = ''
+       or v_item.updated_at is distinct from (v_unit ->> 'seen')::timestamptz then
+      raise exception '%: Changed since the form opened', v_item.unit_code
+        using errcode = '23514', detail = 'unit_changed';
+    end if;
+
+    -- READ ONLY. The Unit is SNAPSHOT; its status, holder and location are
+    -- not changed. Issuing paper is not moving furniture (§7.4).
+    insert into public.purchase_return_units (
+      purchase_return_id, stock_item_id, unit_code, po_id,
+      category, item, item_spec, pickup_location, return_to
+    )
+    values (
+      v_return_id, v_item.id, v_item.unit_code, v_item.po_no,
+      nullif(btrim(v_unit ->> 'category'), ''),
+      nullif(btrim(v_unit ->> 'item'), ''),
+      nullif(btrim(v_unit ->> 'item_spec'), ''),
+      coalesce(nullif(btrim(v_unit ->> 'pickup_location'), ''),
+               (select w.name from public.warehouses w where w.id = v_item.warehouse_id)),
+      v_return_to
+    );
+    v_count := v_count + 1;
+  end loop;
+
+  insert into public.audit_log (role, actor_text, action, ref)
+  values (
+    v_role, auth.uid()::text, 'purchasing_issue_purchase_return',
+    v_return_id::text || ' claim=' || v_claim.claim_no || ' units=' || v_count
+  );
+
+  return v_return_id;
+end;
+$function$;
+
 -- ── sanity — the catalog, never a row count ─────────────────────────────────
 do $$
 begin
@@ -241,5 +379,13 @@ begin
   if public.supplier_claim_photo_entries('["a.jpg"]'::jsonb, null) -> 0 ->> 'path' <> 'a.jpg'
      or public.supplier_claim_photo_entries('[{"path":"b.jpg","unit_code":"U1"}]'::jsonb, null) -> 0 ->> 'unit_code' <> 'U1' then
     raise exception 'sanity: supplier_claim_photo_entries lost a path or its Unit';
+  end if;
+  if (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'purchasing_issue_purchase_return') <> 1 then
+    raise exception 'sanity: more than one purchasing_issue_purchase_return';
+  end if;
+  if has_function_privilege('anon', 'public.purchasing_issue_purchase_return(uuid, jsonb, date)', 'execute')
+     or not has_function_privilege('authenticated', 'public.purchasing_issue_purchase_return(uuid, jsonb, date)', 'execute') then
+    raise exception 'sanity: purchasing_issue_purchase_return grants changed';
   end if;
 end $$;

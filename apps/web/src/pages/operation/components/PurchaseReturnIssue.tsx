@@ -20,6 +20,7 @@
  */
 import { useMemo, useState } from "react";
 import {
+  PURCHASE_RETURN_TO_FROM_WORD,
   ISSUE_PURCHASE_RETURN,
   purchaseReturnIssueMissing,
   type PurchaseReturnIssueSource,
@@ -52,7 +53,7 @@ export function purchaseReturnDraftPrint(
     pr_no: null,
     pr_doc_date: new Date().toISOString(),
     supplier: { name: source.supplier_name ?? "", contact: null },
-    return_to: source.return_address,
+    return_to: source.return_to,
     claim_no: source.claim_no,
     grn_no: source.grn_no,
     confirmed_pickup_date: confirmed,
@@ -128,9 +129,12 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
         </div>
       </Block>
       <Block title="Return To">
-        {source.return_address
-          ? <Fact idPrefix="pr-issue" own={false} framed automatic label="Return To" value={<span className="whitespace-pre-wrap">{source.return_address}</span>} />
-          : <p className="text-body text-kit-red-11" data-testid="purchase-return-no-address">{`Add the return address of ${supplier}`}</p>}
+        {source.return_to
+          ? <div data-testid="purchase-return-return-to"><Fact idPrefix="pr-issue" own={false} framed automatic label="Return To" value={<>
+              <span className="whitespace-pre-wrap">{source.return_to}</span>
+              {source.return_to_from && <span className="block text-meta text-kit-slate-11">{PURCHASE_RETURN_TO_FROM_WORD[source.return_to_from]}</span>}
+            </>} /></div>
+          : <p className="text-body text-kit-red-11" data-testid="purchase-return-no-address">{`Add the address of ${supplier}`}</p>}
       </Block>
       <Block title="Confirmed Pickup">
         <DatePicker id="pr-confirmed-pickup" label="Confirmed Pickup" value={confirmed} onChange={setConfirmed} minDate={appTodayIso()} />

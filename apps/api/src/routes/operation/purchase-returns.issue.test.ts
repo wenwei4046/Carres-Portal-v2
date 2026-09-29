@@ -108,10 +108,10 @@ afterAll(() => _setJwksForTesting(null));
 
 describe("Issue Purchase Return", () => {
   it("the form reads Return To from Supplier Master and the Units with the door's own words", async () => {
-    const res = await call(client(), `/operation/purchase-returns/issue-source?claim=${CLAIM}`);
+    const res = await call(client(), `/operation/purchase-returns/issue-source?claim=${CLAIM}`)
     expect(res.status).toBe(200);
     const { source } = (await res.json()) as { source: Record<string, unknown> & { units: Array<Record<string, unknown>> } };
-    expect(source.return_address).toBe("Lot 9, Muar");
+    expect(source).toMatchObject({ return_to: "Lot 9, Muar", return_to_from: "return_address" });
     expect(source.units[0]).toMatchObject({ unit_code: "U1-000-001", category: "Sofa", item: "Kaya", item_spec: "3 seater", pickup_location: "Carres Klang", refusal: null });
   });
 
@@ -135,10 +135,16 @@ describe("Issue Purchase Return", () => {
     expect(await res.json()).toMatchObject({ code: "unit_changed", message: "U1-000-001: Changed since the form opened. No return was issued." });
   });
 
-  it("a missing return address is refused in the approved words", async () => {
-    const sb = client({ rpc: { purchasing_issue_purchase_return: { error: { code: "23514", message: "Add the return address of Hooka", details: "return_address_missing" } } } });
+  it("Return To falls back to the supplier's address when the return address is blank", async () => {
+    const res = await call(client({ tables: { suppliers: [{ id: "s1", name: "Hooka", return_address: " ", address: "No 5, Batu Pahat" }] } }), `/operation/purchase-returns/issue-source?claim=${CLAIM}`);
+    const { source } = (await res.json()) as { source: Record<string, unknown> };
+    expect(source).toMatchObject({ return_to: "No 5, Batu Pahat", return_to_from: "address" });
+  });
+
+  it("a missing address is refused in the approved words", async () => {
+    const sb = client({ rpc: { purchasing_issue_purchase_return: { error: { code: "23514", message: "Add the address of Hooka", details: "address_missing" } } } });
     const res = await call(sb, "/operation/purchase-returns", { method: "POST", body: { claim_id: CLAIM, units: [{ stock_item_id: UNIT, seen: "t" }] } });
-    expect(await res.json()).toMatchObject({ code: "return_address_missing", message: "Add the return address of Hooka" });
+    expect(await res.json()).toMatchObject({ code: "address_missing", message: "Add the address of Hooka" });
   });
 
   it("is internal only", async () => {

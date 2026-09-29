@@ -44,7 +44,7 @@ const RECORD = {
   decision: view === "claim-empty" ? null : "return_to_supplier", decision_at: CLAIM.carres_execution_at, decision_by_name: "Shasha", legacy_words: [],
 };
 const SOURCE: PurchaseReturnIssueSource = {
-  claim_id: "claim-1", claim_no: CLAIM.claim_no, supplier_name: "Hookka Industries", return_address: "{Supplier return address}\nMuar, Johor", grn_no: CLAIM.grn_no,
+  claim_id: "claim-1", claim_no: CLAIM.claim_no, supplier_name: "Hookka Industries", return_to: "{Supplier return address}\nMuar, Johor", return_to_from: "return_address", grn_no: CLAIM.grn_no,
   units: [
     { stock_item_id: "u-142", unit_code: "U1-000-142", po_no: CLAIM.po_id, category: "Sofa", item: "Sofa Lyra", item_spec: "Left arm", pickup_location: "Carres Klang", seen: "t", refusal: null },
     { stock_item_id: "u-143", unit_code: "U1-000-143", po_no: CLAIM.po_id, category: "Sofa", item: "Sofa Lyra", item_spec: "Left arm", pickup_location: "Carres Klang", seen: "t", refusal: null },

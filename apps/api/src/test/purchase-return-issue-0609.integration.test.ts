@@ -15,7 +15,7 @@ import pg from "pg";
  *   units     only this claim's held tracked Units are offered; a refused Unit
  *             says why in the same words the door refuses with
  *   issue     the door reads `Return To` from Supplier Master; absent →
- *             `Add the return address of {Supplier}`; a Unit that changed under
+ *             `Add the address of {Supplier}` when neither address is recorded (0614); a Unit that changed under
  *             the form is refused BY NAME and nothing is issued; issuing moves
  *             no stock
  *   send      `Return document sent to supplier` lands in document_sends as
@@ -231,14 +231,14 @@ describe.skipIf(!URL)("Purchase Return creation door (real PostgreSQL, 0609)", (
     expect(r.ok ? "" : r.detail).toBe("outcome_not_return_to_supplier");
   });
 
-  it("refuses when the supplier has no recorded return address, in the approved words", async () => {
+  it("refuses when the supplier has neither a return address nor an address (0614, owner ruling 2026-09-29)", async () => {
     const token = await seen(UNIT_BARE);
     await as(DUTY);
     const r = await issue(BARE_CLAIM, [{ stock_item_id: UNIT_BARE, seen: token }]);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.detail).toBe("return_address_missing");
-      expect(r.why).toBe(`Add the return address of IT Bare ${HEX}`);
+      expect(r.detail).toBe("address_missing");
+      expect(r.why).toBe(`Add the address of IT Bare ${HEX}`);
     }
   });
 

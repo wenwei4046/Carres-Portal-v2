@@ -25,7 +25,7 @@ vi.mock("@/lib/pdf/purchase-return-pdf", () => ({
 vi.mock("./SalesOrderLedger", () => ({ RecordRanks: ({ words }: { words: { title: string; identity: string; detail: string[] } }) => <><span>{words.title}</span><span>{words.identity}</span><span>{words.detail.join(" · ")}</span></> }));
 
 const SOURCE = (over: Partial<PurchaseReturnIssueSource> = {}): PurchaseReturnIssueSource => ({
-  claim_id: "c1", claim_no: "SC-1001", supplier_name: "Ohana", return_address: "Lot 9, Jalan Industri, Muar", grn_no: null,
+  claim_id: "c1", claim_no: "SC-1001", supplier_name: "Ohana", return_to: "Lot 9, Jalan Industri, Muar", return_to_from: "return_address", grn_no: null,
   units: [
     { stock_item_id: "a", unit_code: "U1-000-075", po_no: "PO-1", category: "Mattress", item: "Carres Cloud", item_spec: "King", pickup_location: "Carres Klang", seen: "t-a", refusal: null },
     { stock_item_id: "b", unit_code: "U1-000-076", po_no: "PO-1", category: "Mattress", item: "Carres Cloud", item_spec: "King", pickup_location: "Carres Klang", seen: "t-b", refusal: "Already on RO260928-4827" },
@@ -60,12 +60,18 @@ describe("Issue Purchase Return", () => {
     expect(issued).toHaveBeenCalledWith("pr1");
   });
 
-  it("with no recorded return address, names it and issues nothing", () => {
-    render(<MemoryRouter><IssueForm source={SOURCE({ return_address: null })} onClose={() => undefined} onIssued={() => undefined} /></MemoryRouter>);
-    expect(screen.getByTestId("purchase-return-no-address")).toHaveTextContent("Add the return address of Ohana");
+  it("with neither address recorded, names it and issues nothing", () => {
+    render(<MemoryRouter><IssueForm source={SOURCE({ return_to: null, return_to_from: null })} onClose={() => undefined} onIssued={() => undefined} /></MemoryRouter>);
+    expect(screen.getByTestId("purchase-return-no-address")).toHaveTextContent("Add the address of Ohana");
     fireEvent.click(screen.getByTestId("purchase-return-issue-save"));
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByTestId("purchase-return-missing")).toHaveTextContent("Add the return address of Ohana");
+    expect(screen.getByTestId("purchase-return-missing")).toHaveTextContent("Add the address of Ohana");
+  });
+
+  it("shows which address Return To resolved to (owner ruling 2026-09-29)", () => {
+    render(<MemoryRouter><IssueForm source={SOURCE({ return_to: "No 5, Jalan Addr", return_to_from: "address" })} onClose={() => undefined} onIssued={() => undefined} /></MemoryRouter>);
+    expect(screen.getByTestId("purchase-return-return-to")).toHaveTextContent("No 5, Jalan Addr");
+    expect(screen.getByTestId("purchase-return-return-to")).toHaveTextContent("From Address");
   });
 
   it("the preview is the DRAFT of exactly what will be issued — money-free", () => {
