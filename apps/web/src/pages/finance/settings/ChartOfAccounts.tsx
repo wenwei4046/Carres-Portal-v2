@@ -285,7 +285,10 @@ export default function ChartOfAccounts() {
       {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
       {adding && (
         <AddAccountModal
-          headings={rows.filter((r) => r.is_header && !inMoneyHeading(r.code))}
+          /* gl_account_add's own refusals (0580): nothing under a heading inside
+             a rule heading, and no heading under the rule heading itself. */
+          headings={rows.filter((r) => r.is_header && !inMoneyHeading(r.code) && !underRuleHeading(r.parent_code))}
+          ruleHeadings={ruleHeadings}
           onClose={() => setAdding(false)}
         />
       )}
@@ -386,7 +389,7 @@ export function addAccountSaveGap(f: {
  * too and both are added in one go. The refusals are gl_account_update's
  * sentences, shown as the database wrote them.
  */
-function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () => void }) {
+function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[]; ruleHeadings: Set<string>; onClose: () => void }) {
   const add = useAddAccount();
   const [parent, setParent] = useState<string | undefined>(undefined);
   const [code, setCode] = useState("");
@@ -396,6 +399,13 @@ function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () =
   const [firstName, setFirstName] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
   const gap = addAccountSaveGap({ parent, code, name, isHeading, firstCode, firstName });
+  const under = isHeading ? headings.filter((h) => !ruleHeadings.has(h.code)) : headings;
+  /* Ticking "It is a heading" drops a rule heading from Under, so a pick of
+     one is cleared and Save says "Save: pick Under" again. */
+  const tickHeading = (on: boolean) => {
+    setIsHeading(on);
+    if (on && parent && ruleHeadings.has(parent)) setParent(undefined);
+  };
   const submit = () => {
     setRefusal(null);
     const shaped = ledgerAccountCodeInput.safeParse(code);
@@ -437,13 +447,13 @@ function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () =
           id="account-add-under"
           label="Under"
           required
-          value={parent}
+          value={parent ?? ""}
           onValueChange={setParent}
-          options={headings.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))}
+          options={under.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))}
         />
         <Input id="account-add-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
         <Input id="account-add-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
-        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={setIsHeading} />
+        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={tickHeading} />
         {isHeading && (
           <>
             <Input id="account-add-first-code" label="First account number" required maxLength={8} value={firstCode} onChange={(e) => setFirstCode(e.target.value)} />

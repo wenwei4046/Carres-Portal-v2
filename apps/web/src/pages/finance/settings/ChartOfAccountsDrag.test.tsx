@@ -673,3 +673,58 @@ describe("Chart of accounts: headings three deep (0570)", () => {
     },
   );
 });
+
+/* gl_account_add (0580) refuses a heading under a rule heading, and anything
+   under a heading inside one. Add account's Under list offers neither. */
+describe("Chart of accounts: Add account offers only the headings gl_account_add takes (0580)", () => {
+  beforeEach(() => {
+    // 403-E000 is a heading inside the rule heading 403-0000.
+    net.chart.push(acc("403-E000", "Event deposits", "403-0000"), acc("403-E001", "Hall deposits", "403-E000"));
+  });
+
+  const underOptions = async (dialog: HTMLElement) => {
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
+    const names = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    return names;
+  };
+
+  async function openAdd() {
+    show();
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    return screen.findByRole("dialog");
+  }
+
+  it("an account: the rule heading is offered, a heading inside it is not", async () => {
+    const dialog = await openAdd();
+    expect(await underOptions(dialog)).toEqual([
+      "300-0000 Assets",
+      "320-0000 Receivables",
+      "400-0000 Liabilities",
+      "401-0000 Payables",
+      "402-0000 Borrowings",
+      "403-0000 Customer money held",
+    ]);
+  });
+
+  it("a heading: the rule heading goes too, and a pick of it is cleared", async () => {
+    const dialog = await openAdd();
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "403-0000 Customer money held" }));
+    fireEvent.change(within(dialog).getByLabelText(/^Number/), { target: { value: "403-F000" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: "Fair deposits" } });
+
+    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
+
+    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
+    expect(within(dialog).getByRole("combobox", { name: /Under/ })).toHaveTextContent("Select");
+    expect(await underOptions(dialog)).toEqual([
+      "300-0000 Assets",
+      "320-0000 Receivables",
+      "400-0000 Liabilities",
+      "401-0000 Payables",
+      "402-0000 Borrowings",
+    ]);
+  });
+});
