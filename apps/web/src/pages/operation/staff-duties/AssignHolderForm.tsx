@@ -1,3 +1,4 @@
+import Button from "@/components/kit/Button";
 import { useState } from "react";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
@@ -32,12 +33,18 @@ type Duty = WorkspaceDutiesResponse["duties"][number];
 export default function AssignHolderForm({
   duty,
   staff,
+  staffLoading = false,
+  staffError = false,
+  onRetryStaff,
   open,
   onClose,
   onDone,
 }: {
   duty: Duty;
   staff: OpsStaffMember[];
+  staffLoading?: boolean;
+  staffError?: boolean;
+  onRetryStaff?: () => void;
   open: boolean;
   onClose: () => void;
   /** The governed success sentence, handed up to be announced. */
@@ -51,6 +58,7 @@ export default function AssignHolderForm({
   const assign = useWorkspaceAssignDutyMutation();
 
   function submit() {
+    if (staffLoading || staffError) return;
     setRefusal(null);
     if (!holderId) return setRefusal("Choose a holder.");
     if (!effectiveFrom) return setRefusal("Choose when this holder starts.");
@@ -91,7 +99,7 @@ export default function AssignHolderForm({
       dutyLabel={duty.label}
       submitLabel="Assign holder"
       submitTestId="assign-submit"
-      pending={assign.isPending}
+      pending={assign.isPending || staffLoading || staffError}
       /* The browser's guiding sentence, else the server's own refusal. */
       error={
         refusal ??
@@ -104,6 +112,11 @@ export default function AssignHolderForm({
       }
       onSubmit={submit}
     >
+      {staffLoading ? <p role="status" className="text-meta text-kit-slate-11">Loading…</p> : null}
+      {staffError ? <div role="alert" className="text-meta text-kit-red-11">
+        <p>Staff &amp; Duties could not be opened</p><Button onClick={onRetryStaff}>Try again</Button>
+      </div> : null}
+      <p className="break-words text-body text-kit-slate-12">{(duty.resolution.is_cover ? duty.resolution.acting_user_name : duty.resolution.normal_user_name) ?? "Not assigned"}</p>
       <Select
         id="assign-holder"
         label="Holder"

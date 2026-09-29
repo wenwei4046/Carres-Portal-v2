@@ -115,6 +115,7 @@ function heldBy(key: string, label: string, name: string, id: string): Duty {
   return {
     key,
     label,
+    current_assignment_id: `as-${key}`,
     resolution: {
       duty_key: key,
       normal_user_id: id,
@@ -255,11 +256,7 @@ describe("the destination", () => {
   it("wears the destination word and its one purpose sentence", () => {
     draw();
     expect(screen.getByTestId("module-header")).toHaveTextContent("Staff & Duties");
-    expect(
-      screen.getByText(
-        "Who holds each company duty today and who covers an absence.",
-      ),
-    ).toBeVisible();
+    expect(screen.queryByText("Normal owner")).toBeNull();
   });
 
   it("is a catalogue beside a selected duty, not a stacked document", () => {
@@ -294,9 +291,7 @@ describe("the catalogue", () => {
   it("carries the exceptional state word beside the holder", () => {
     draw();
     expect(
-      within(screen.getByTestId("duty-catalogue-grn_duty")).getByText(
-        "Covered today",
-      ),
+      within(screen.getByTestId("duty-catalogue-grn_duty")).getByText("Shasha"),
     ).toBeVisible();
     expect(
       within(screen.getByTestId("duty-catalogue-delivery_duty")).getByText(
@@ -336,13 +331,13 @@ describe("the selected duty", () => {
   it("separates the normal owner from the person acting today", () => {
     draw("/operation?tab=staff-duties&duty=grn_duty");
     const detail = screen.getByTestId("selected-duty-grn_duty");
-    expect(within(detail).getByText("Normal owner")).toBeVisible();
-    expect(within(detail).getByText("Yu Jun")).toBeVisible();
-    expect(within(detail).getByText("Acting today")).toBeVisible();
+    expect(within(detail).queryByText("Normal owner")).toBeNull();
+    expect(within(detail).queryByText("Yu Jun")).toBeNull();
+    expect(within(detail).queryByText("Acting today")).toBeNull();
     expect(within(detail).getByText("Shasha")).toBeVisible();
-    expect(within(detail).getByText("Cover")).toBeVisible();
-    expect(within(detail).getByText("Reason")).toBeVisible();
-    expect(within(detail).getByText("Annual leave")).toBeVisible();
+    expect(within(detail).queryByText("Cover")).toBeNull();
+    expect(within(detail).queryByText("Reason")).toBeNull();
+    expect(within(detail).queryByText("Annual leave")).toBeNull();
     expect(
       within(detail).getByText(
         `${fmtDate(COVER_FROM)} to ${fmtDate(COVER_UNTIL)}`,
@@ -353,11 +348,11 @@ describe("the selected duty", () => {
   it("does not print the same person twice when nobody covers", () => {
     draw("/operation?tab=staff-duties&duty=po_duty");
     const detail = screen.getByTestId("selected-duty-po_duty");
-    expect(within(detail).getByText("Normal owner")).toBeVisible();
+    expect(within(detail).queryByText("Normal owner")).toBeNull();
     // §4.2: the same person is NOT repeated as acting when no cover exists.
     expect(within(detail).queryByText("Acting today")).toBeNull();
     expect(within(detail).getAllByText("Yu Jun")).toHaveLength(1);
-    expect(within(detail).getByText("Effective")).toBeVisible();
+    expect(within(detail).queryByText("Effective")).toBeNull();
   });
 
   it("gives an unassigned duty the honest sentence and the manager's door", () => {
@@ -370,9 +365,7 @@ describe("the selected duty", () => {
   it("gives a reader the quiet sentence and no write control at all", () => {
     state.duties = wholeCatalogue(false);
     draw("/operation?tab=staff-duties&duty=delivery_duty");
-    expect(
-      screen.getByText("Duty assignments are set by the manager."),
-    ).toBeVisible();
+    expect(screen.queryByText("Duty assignments are set by the manager.")).toBeNull();
     // Not a disabled button, not a hidden-but-present form: absent.
     expect(screen.queryByRole("button", { name: "Assign holder" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add cover" })).toBeNull();
@@ -577,12 +570,13 @@ function choose(triggerId: string, optionName: string) {
 
 function openAssign(url = "/operation?tab=staff-duties&duty=po_duty") {
   draw(url);
-  const door = screen.getByRole("button", { name: "Assign holder" });
+  const door = screen.getByRole("button", { name: "More actions" });
   /* A real click focuses the button; jsdom's `click` event does not. The
      dialog frame returns focus to whatever HAD it, so the test must put focus
      where a browser would. */
   door.focus();
-  fireEvent.click(door);
+  fireEvent.keyDown(door, { key: "Enter" });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Assign holder" }));
   return door;
 }
 
@@ -592,7 +586,7 @@ describe("assigning a holder", () => {
     expect(
       within(screen.getByTestId("selected-duty-delivery_duty")).getByRole(
         "button",
-        { name: "Assign holder" },
+        { name: "More actions" },
       ),
     ).toBeVisible();
   });
@@ -601,7 +595,8 @@ describe("assigning a holder", () => {
     draw("/operation?tab=staff-duties&duty=po_duty");
     // Before the door is used there is no form on the page at all.
     expect(screen.queryByRole("dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Assign holder" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "More actions" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Assign holder" }));
     expect(screen.getByRole("dialog", { name: "Assign holder" })).toBeVisible();
   });
 
@@ -727,9 +722,10 @@ describe("assigning a holder", () => {
 
 function openCover(url = "/operation?tab=staff-duties&duty=po_duty") {
   draw(url);
-  const door = screen.getByRole("button", { name: "Add cover" });
+  const door = screen.getByRole("button", { name: "More actions" });
   door.focus();
-  fireEvent.click(door);
+  fireEvent.keyDown(door, { key: "Enter" });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Add cover" }));
   return door;
 }
 
@@ -742,7 +738,7 @@ describe("adding cover", () => {
     // server would refuse is not an offer.
     expect(within(detail).queryByRole("button", { name: "Add cover" })).toBeNull();
     expect(
-      within(detail).getByRole("button", { name: "Assign holder" }),
+      within(detail).getByRole("button", { name: "More actions" }),
     ).toBeVisible();
   });
 
@@ -755,7 +751,7 @@ describe("adding cover", () => {
   it("shows who is being covered for before anything is confirmed", () => {
     openCover();
     const dialog = screen.getByRole("dialog", { name: "Add cover" });
-    expect(within(dialog).getByText("Normal owner")).toBeVisible();
+    expect(within(dialog).queryByText("Normal owner")).toBeNull();
     expect(within(dialog).getByText("Yu Jun")).toBeVisible();
   });
 
@@ -902,8 +898,9 @@ describe("opening, failing and empty", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("never infers that nobody holds a duty from a failed read", () => {
+  it("never infers that nobody holds a duty from a failed first read", () => {
     state.error = true;
+    state.duties = undefined;
     draw();
     expect(screen.queryByText("Not assigned")).toBeNull();
     expect(screen.queryByText(/Nobody holds/)).toBeNull();
@@ -923,6 +920,7 @@ describe("opening, failing and empty", () => {
 describe("the history", () => {
   it("is empty in its own words inside a healthy duty", () => {
     draw("/operation?tab=staff-duties&duty=delivery_duty");
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
     const history = screen.getByTestId("duty-history-delivery_duty");
     expect(within(history).getByText("No assignments yet")).toBeVisible();
     expect(within(history).getByText("No covers yet")).toBeVisible();
@@ -930,11 +928,12 @@ describe("the history", () => {
 
   it("reads event first, then who and when, then the note", () => {
     draw("/operation?tab=staff-duties&duty=grn_duty");
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
     const row = screen.getByTestId("assignment-as-grn_duty");
     expect(within(row).getByTestId("record-event")).toHaveTextContent(
       "Yu Jun holds GRN Duty",
     );
-    expect(within(row).getByTestId("record-actor")).toHaveTextContent(
+    expect(within(row).getByTestId("record-period")).toHaveTextContent(
       `from ${fmtDate(HELD_FROM)}`,
     );
     expect(within(row).getByTestId("record-actor")).toHaveTextContent(
@@ -944,11 +943,12 @@ describe("the history", () => {
 
   it("reads a cover the same way", () => {
     draw("/operation?tab=staff-duties&duty=grn_duty");
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
     const row = screen.getByTestId("cover-cv-grn");
     expect(within(row).getByTestId("record-event")).toHaveTextContent(
       "Shasha covering for Yu Jun",
     );
-    expect(within(row).getByTestId("record-actor")).toHaveTextContent(
+    expect(within(row).getByTestId("record-period")).toHaveTextContent(
       `${fmtDate(COVER_FROM)} to ${fmtDate(COVER_UNTIL)}`,
     );
     expect(within(row).getByTestId("record-note")).toHaveTextContent(
@@ -958,8 +958,9 @@ describe("the history", () => {
 
   it("is append-only: no edit and no delete exists anywhere in it", () => {
     draw("/operation?tab=staff-duties&duty=grn_duty");
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
     const history = screen.getByTestId("duty-history-grn_duty");
-    expect(within(history).queryAllByRole("button")).toHaveLength(0);
+    expect(within(history).queryAllByRole("button")).toHaveLength(1);
     for (const banned of [/^edit$/i, /^delete$/i, /^remove$/i, /^undo$/i]) {
       expect(within(history).queryByText(banned)).toBeNull();
     }
@@ -1002,10 +1003,10 @@ describe("a scheduled cover", () => {
     draw("/operation?tab=staff-duties&duty=po_duty");
     const detail = screen.getByTestId("selected-duty-po_duty");
     // The normal owner still acts today; only the DATE is news.
-    expect(within(detail).getByText("Normal owner")).toBeVisible();
+    expect(within(detail).queryByText("Normal owner")).toBeNull();
     expect(within(detail).queryByText("Acting today")).toBeNull();
     expect(
-      within(detail).getByText(`Starts ${fmtDate(plusDays(TODAY, 4))}`),
+      within(detail).getByText(`${fmtDate(plusDays(TODAY, 4))} to ${fmtDate(plusDays(TODAY, 6))}`),
     ).toBeVisible();
   });
 
@@ -1040,7 +1041,7 @@ describe("keyboard and narrow reading", () => {
     // At 390px a truncated person or date is an unanswerable screen.
     for (const id of ["selected-duty-grn_duty", "duty-history-grn_duty"]) {
       const block = screen.getByTestId(id);
-      expect(block.querySelectorAll(".truncate")).toHaveLength(0);
+      expect(block.querySelectorAll("p.truncate")).toHaveLength(0);
       expect(
         block.querySelectorAll("p.whitespace-nowrap, span.whitespace-nowrap"),
       ).toHaveLength(0);
@@ -1089,9 +1090,9 @@ describe("S2-A · the cover the detail shows is the resolver's own", () => {
     state.duties = all;
     draw("/operation?tab=staff-duties&duty=grn_duty");
     const detail = screen.getByTestId("selected-duty-grn_duty");
-    expect(within(detail).getByText("Sick leave")).toBeVisible();
+    expect(within(detail).getByText(`${fmtDate(COVER_FROM)} to ${fmtDate(COVER_UNTIL)}`)).toBeVisible();
     expect(within(detail).queryByText("Old leave")).toBeNull();
-    expect(within(detail).getByText("Shasha covering for Yu Jun")).toBeVisible();
+    expect(within(detail).getByText("Shasha")).toBeVisible();
   });
 
   it("names the acting person of a scheduled cover", () => {
@@ -1116,8 +1117,8 @@ describe("S2-A · the cover the detail shows is the resolver's own", () => {
     state.duties = all;
     draw("/operation?tab=staff-duties&duty=po_duty");
     const detail = screen.getByTestId("selected-duty-po_duty");
-    expect(within(detail).getByText("Shasha covering for Yu Jun")).toBeVisible();
-    expect(within(detail).getByText("Training")).toBeVisible();
+    expect(within(detail).getByText("Shasha")).toBeVisible();
+    expect(within(detail).getByText("Cover scheduled")).toBeVisible();
     expect(within(detail).queryByText("Acting today")).toBeNull();
   });
 });
@@ -1228,3 +1229,42 @@ function cleanupAndDraw(url: string) {
   document.body.innerHTML = "";
   draw(url);
 }
+
+describe("approved plain-person Settings view", () => {
+  it("prints the cover alone and keeps history collapsed until requested", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const detail = within(screen.getByTestId("duty-detail"));
+    expect(detail.queryByText("Normal owner")).not.toBeInTheDocument();
+    expect(detail.queryByText("Acting today")).not.toBeInTheDocument();
+    expect(detail.getByRole("button", { name: "History" })).toHaveAttribute("aria-expanded", "false");
+    expect(detail.queryByTestId("record-event")).not.toBeInTheDocument();
+    fireEvent.click(detail.getByRole("button", { name: "History" }));
+    expect(detail.getAllByTestId("record-event").length).toBeGreaterThan(0);
+  });
+
+  it("retains the last good catalogue with an explicit refresh failure", () => {
+    state.error = true;
+    draw();
+    expect(screen.getByTestId("duty-catalogue-po_duty")).toBeInTheDocument();
+    expect(screen.getByText("Staff & Duties could not be opened")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("puts manager adjustments in a keyboard-operated menu", async () => {
+    state.duties!.can_assign = true;
+    draw();
+    expect(screen.queryByRole("button", { name: "Assign holder" })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "More actions" }), { key: "Enter" });
+    const item = await screen.findByRole("menuitem", { name: "Assign holder" });
+    fireEvent.click(item);
+    expect(await screen.findByRole("dialog", { name: "Assign holder" })).toBeInTheDocument();
+  });
+
+  it("does not advertise manager-only actions to readers", () => {
+    state.duties!.can_assign = false;
+    draw();
+    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Duty assignments are set by the manager.")).not.toBeInTheDocument();
+  });
+});

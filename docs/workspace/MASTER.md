@@ -548,14 +548,30 @@ cover forms are BUILT in the inspected source; this is not verification of the n
 No additional owner policy is required for the bounded final Blueprint. Missing implementation
 is not a reason to re-interview the owner or expand the agreed surface.
 
+**BUILD IN PROGRESS — 2026-09-29; NOT DEPLOYED.** The Settings/plain-person presentation and
+read-path changes are implemented on `codex/staff-duties-delivery`: canonical Settings entry and
+legacy redirect, manager overflow actions, permission-gated People entry with return context,
+collapsed immutable history, separate recorded timestamps/effective dates, resolver-backed next
+assignment/cover selection, and retry retaining the last successful read. This is a partial Build,
+not completion of the approved operating model. Routine rotation, People leave and departure/access
+coordination, bounded manual exceptions and ordinary PO execution permissions remain outstanding.
+The current task has no callable Supabase read or `apply_migration` tools; production schema/body
+reconciliation, migration numbering/approval/application and production verification are not done.
+Do not infer automatic joiner/leaver handling from the new presentation.
+Local browser evidence uses intercepted fixture responses (not production identities/data) and the
+actual application shell at 1440, 1180, 820, 743 and 390 pixels. It verifies no horizontal overflow,
+manager-menu keyboard operation, History disclosure and narrow-screen return focus. Evidence lives
+under `docs/evidence/staff-duties/settings/`; it is not production or database-permission proof.
+
+
 | Measured evidence and severity | Operator consequence | Required convergence |
 |---|---|---|
 | StaffDuties.tsx, DutyCatalogue.tsx and DutyDetail.tsx already implement selected detail, search and state filter | Rebuilding from the old stacked-page audit would discard useful capabilities | KEEP those capabilities; apply §4.2's plain-name Settings composition, manager menu and approved widths |
-| DutyDetail prints normal/acting labels and permanent manual buttons; current production navigation was inspected in the main menu — yellow | Looks restrictive and manually maintained | Settings entry, one current person, plain dates, `Next`, collapsed `History`, manager-only `⋯` |
+| Settings/plain-name composition is implemented on the Build branch; production still needs verification — yellow | The approved page is not yet released | Verify and deliver the canonical Settings entry, one current person, plain dates, `Next`, collapsed `History`, manager-only `⋯` |
 | Migration 0437 prefilled named two-person monthly assignments through September 2027 — red target gap | This does not establish general joiner/leaver automation | The approved cyclic allocation and next-month admission rule must produce the single authoritative assignment source |
 | Existing assign writer accepts overlapping rows; current cover writer validates a whole normal-holder period — red target gap | Manual exceptions and automatic leave could otherwise give inconsistent answers | Dated §4.3 exceptions with impact preview and preserved baseline; §4.4 one effective cover answer and eligibility checks |
-| Duty API GET reads assignments/covers with global limits of 200, without history pagination — yellow | Complete retained evidence cannot be promised by rendering the returned subset alone | All authorised records must remain reachable; current/next resolution must not depend on a truncated history slice |
-| StaffDuties.tsx replaces the page on refresh error — yellow | Previously known facts disappear | Retain last good facts with failure/retry, never present them as newly verified |
+| Build-branch Duty API reads database pages, failing the read rather than truncating at its 20,000-row safety ceiling; future facts use the shared resolver — yellow | Old 200-row truncation is removed; arbitrarily large history still needs bounded client pagination | All authorised records must remain reachable; complete server/client pagination before claiming the history boundary closed |
+| Build-branch StaffDuties.tsx retains the last successful read on refresh failure and offers retry — delivery pending | Previously known facts remain visible with the failed refresh disclosed | Production verification must exercise initial failure and failed refresh separately |
 | HrPersonDrawer ExitBlock explicitly separates exit recording and access disablement — red target gap | Manager can finish one step and miss the other | HR §3 one confirmation, honest scheduled/partial effects, default current-only lists and personnel-only former-profile access |
 | Existing ordinary-action Duty-only permission doors differ from §3's broadened operational target — red target gap | A colleague or newcomer can be blocked from helping | Owning-module permission convergence with immutable actual-actor evidence; approval/amendment/void gates stay separately governed |
 

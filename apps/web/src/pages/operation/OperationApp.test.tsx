@@ -128,6 +128,7 @@ vi.mock("./OperationOrdersControl", () => ({
     </div>
   ),
 }));
+vi.mock("./SettingsWorkspace", () => ({ default: () => <div data-testid="settings-stub">Settings</div> }));
 vi.mock("./SalesOrderWorkspace", () => ({
   default: () => <div data-testid="workspace-stub">workspace</div>,
 }));
@@ -551,5 +552,20 @@ describe("OperationApp — the phone shell (owner review 2026-09-25, round 2)", 
     } finally {
       restore();
     }
+  });
+});
+
+
+describe("Staff & Duties relocation", () => {
+  it("preserves an old exact-duty bookmark at the canonical Settings destination", () => {
+    renderApp("/operation?tab=staff-duties&duty=grn_duty&source=work");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/operation/settings/staff-duties?duty=grn_duty&source=work");
+    expect(screen.getByTestId("settings-stub")).toBeVisible();
+    expect(screen.queryByTestId("global-topbar-stub")).toBeNull();
+  });
+  it("does not duplicate the destination's utility header", () => {
+    renderApp("/operation/settings/staff-duties");
+    expect(screen.getByTestId("settings-stub")).toBeVisible();
+    expect(screen.queryByTestId("global-topbar-stub")).toBeNull();
   });
 });

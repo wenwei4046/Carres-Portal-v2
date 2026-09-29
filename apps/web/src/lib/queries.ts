@@ -4288,6 +4288,7 @@ export interface WorkspaceDutyCover {
 }
 export interface WorkspaceDutiesResponse {
   can_assign: boolean;
+  can_manage_staff?: boolean;
   duties: Array<{
     key: string;
     label: string;
@@ -4299,6 +4300,8 @@ export interface WorkspaceDutiesResponse {
     covers: WorkspaceDutyCover[];
     /** The next cover the resolver will act through on its first day (S2-A). */
     scheduled_cover_id?: string | null;
+    current_assignment_id?: string | null;
+    next_assignment_id?: string | null;
   }>;
 }
 

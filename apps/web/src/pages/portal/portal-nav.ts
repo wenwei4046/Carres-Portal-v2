@@ -303,7 +303,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
        * Receiving & GRN card). Modules reference duties; they never keep a
        * second person list. */
-      { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       /* ⭐ `Old Orders (temporary)` LEFT THE RAIL (Jess, owner ruling
        * 2026-09-23): "Replace the previous standalone Sales Orders entry;

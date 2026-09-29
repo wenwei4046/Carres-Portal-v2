@@ -55,7 +55,7 @@ import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
-import StaffDuties from "./StaffDuties";
+
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
@@ -399,6 +399,7 @@ export default function OperationApp() {
             Receiving — Jess 2026-07-22, Q9 Option B — one clean top row, not
             two, so the module tab bar is the only chrome). */}
         {!isOrdersUrl &&
+          location.pathname !== "/operation/settings/staff-duties" &&
           !isDeliveryOrdersUrl &&
           !isEditDeliveryUrl &&
           !isOldOrdersUrl &&
@@ -598,7 +599,7 @@ export default function OperationApp() {
             {tab === "delivery-report" && <OperationDeliveryReport />}
             {/* Workspace → Staff & Duties — the ONE duty assignment door
                 (workspace/MASTER.md, LOCKED 2026-09-03). */}
-            {tab === "staff-duties" && <StaffDuties />}
+            {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}

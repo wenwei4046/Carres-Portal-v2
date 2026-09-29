@@ -1,5 +1,7 @@
+import Button from "@/components/kit/Button";
+import { readReturnTo } from "@/lib/return-to";
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 // Unified Internal Portal — shared role-aware rail (no props, self-owned state).
 import PortalSidebar from "@/pages/portal/PortalSidebar";
@@ -94,6 +96,9 @@ function MonthStepper({
 
 export default function HrApp() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const backToDuties = readReturnTo(location.state);
   const rawTab = searchParams.get("tab");
   // O1: Overview is the LANDING tab — HR should open onto "what needs me
   // today", not straight into the commission table. Existing `?tab=` deep
@@ -164,7 +169,7 @@ export default function HrApp() {
           )}
           {tab === "setup" && <HrSetupTab year={ym.year} month={ym.month} />}
           {tab === "team" && <HrTeamTab />}
-          {tab === "people" && <HrPeopleTab />}
+          {tab === "people" && <>{backToDuties?.startsWith("/operation/settings/staff-duties") ? <Button onClick={() => navigate(backToDuties, { state: (location.state as { returnState?: unknown } | null)?.returnState })}>Back to duties</Button> : null}<HrPeopleTab /></>}
           {tab === "performance" && (
             <HrPerformanceTab year={ym.year} month={ym.month} />
           )}
