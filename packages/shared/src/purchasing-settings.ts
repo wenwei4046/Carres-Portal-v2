@@ -110,6 +110,12 @@ export interface PurchasingSupplierRow {
   transitDays: number | null;
   /** 0530 — payment terms in days after the bill date. Null = not set. */
   termsDays?: number | null;
+  /** 0383/0611 — the supplier's full address, printed on the PO and Repair
+   *  Order PDFs. Null = not recorded. Optional for an older Worker. */
+  address?: string | null;
+  /** 0609/0611 — the Purchase Return `Return To` (Purchasing §9.6). Null =
+   *  not recorded, and Issue Purchase Return refuses. Never the `address`. */
+  returnAddress?: string | null;
 }
 
 /** One edit: who, when, and what it was before. */
@@ -536,6 +542,9 @@ export const purchasingSettingsResponseSchema = z.object({
       offDays: z.array(z.number().int().min(0).max(6)).nullable(),
       transitDays: z.number().int().min(0).max(60).nullable(),
       termsDays: z.number().int().min(0).nullable().optional(),
+      /** 0611 · the two supplier addresses. Optional for an older Worker. */
+      address: z.string().nullable().optional(),
+      returnAddress: z.string().nullable().optional(),
       /** 0585 · the supplier's own earlier last PO time (`HH:MM`); null =
        *  the standard PO windows. Optional for an older Worker. */
       poCutoff: z.string().nullable().optional(),
@@ -716,6 +725,19 @@ export const purchasingSetSupplierTermsDaysInput = z
   })
   .strict();
 export type PurchasingSetSupplierTermsDaysInput = z.infer<typeof purchasingSetSupplierTermsDaysInput>;
+
+/** 0611 — one supplier address at a time: `address` (PO / Repair Order PDF)
+ *  or `returnAddress` (Purchase Return `Return To`). Blank clears it; the
+ *  door trims and saves NULL. Saving one never touches the other. */
+export const SUPPLIER_ADDRESS_MAX = 500;
+export const purchasingSetSupplierAddressInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    kind: z.enum(["address", "returnAddress"]),
+    text: z.string().max(SUPPLIER_ADDRESS_MAX),
+  })
+  .strict();
+export type PurchasingSetSupplierAddressInput = z.infer<typeof purchasingSetSupplierAddressInput>;
 
 export const purchasingSetWorkWeekInput = z
   .object({

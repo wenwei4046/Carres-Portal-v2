@@ -233,6 +233,7 @@ import {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
+  type PurchasingSetSupplierAddressInput,
   type PurchasingSetWorkWeekInput,
   type PurchasingUpdateDestinationInput,
   type PurchasingSetSupplierCollectionInput,
@@ -5628,6 +5629,11 @@ export function useSetSupplierTransitDays() {
 /** 0530 — a supplier's payment terms in days (null clears). */
 export function useSetSupplierTermsDays() {
   return usePurchasingSettingsMutation<PurchasingSetSupplierTermsDaysInput>("/terms-days");
+}
+
+/** 0611 — one supplier's `Address` or `Return address` (blank clears). */
+export function useSetSupplierAddress() {
+  return usePurchasingSettingsMutation<PurchasingSetSupplierAddressInput>("/supplier-address");
 }
 
 /** 0530 — a PO's own payment terms in days (null clears). */

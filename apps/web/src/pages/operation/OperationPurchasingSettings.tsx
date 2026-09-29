@@ -2,7 +2,7 @@
 // module tab bar, so UI-KIT §8.3's Module-tab law applies: no breadcrumb and
 // no big title, because the active tab already says "Settings". Same shape as
 // its siblings Claims and Receiving.
-import { GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { GOODS_ABSENCE_WORDS, SUPPLIER_ADDRESS_MAX } from "@carres/shared";
 import { Block } from "./SalesOrderWorkspace";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import {
   useSetProductionDays,
   useSetSupplierTransitDays,
   useSetSupplierTermsDays,
+  useSetSupplierAddress,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetPurchasingPoWindows,
@@ -36,6 +37,7 @@ import {
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
 import Input from "@/components/kit/Input";
+import Textarea from "@/components/kit/Textarea";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import { fmtDate } from "@/lib/fmt-date";
@@ -285,6 +287,7 @@ export default function OperationPurchasingSettings({
   const setProduction = useSetProductionDays();
   const setTransit = useSetSupplierTransitDays();
   const setTerms = useSetSupplierTermsDays();
+  const setAddress = useSetSupplierAddress();
   const setWorkWeek = useSetSupplierWorkWeek();
   const createDestination = useCreatePurchasingDestination();
   const updateDestination = useUpdatePurchasingDestination();
@@ -295,6 +298,8 @@ export default function OperationPurchasingSettings({
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
   const [transitDraft, setTransitDraft] = useState<Record<string, string>>({});
   const [termsDraft, setTermsDraft] = useState<Record<string, string>>({});
+  /* 0611 · keyed `${supplierId}:${kind}` so the two addresses never share a draft. */
+  const [addressDraft, setAddressDraft] = useState<Record<string, string>>({});
   const [destinationDraft, setDestinationDraft] = useState<DestinationDraft | null>(null);
   const [collectionDrafts, setCollectionDrafts] = useState<Record<string, CollectionDraft>>({});
 
@@ -918,6 +923,75 @@ export default function OperationPurchasingSettings({
                 </div>
               );
             })}
+          </div>
+          </Block>
+        </div>
+
+        {/* ── Supplier addresses (0611) ─────────────────────────────────────
+            `Address` prints on the PO and Repair Order PDFs; `Return address`
+            is a Purchase Return's `Return To` (Purchasing §9.6). Two separate
+            facts, saved one at a time: one is never copied into the other,
+            and a blank saves nothing recorded. */}
+        <div className="mb-8 max-w-[860px]" data-testid="supplier-address-settings">
+          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go to the Return address.">
+          <div className="bg-white">
+            {data.suppliers.map((s) => (
+              <div
+                key={s.id}
+                className="py-3 border-b border-base-100 last:border-b-0"
+                data-testid={`address-row-${s.id}`}
+              >
+                <div className="mb-2 text-body font-semibold text-base-900">{s.name}</div>
+                <div className="grid grid-cols-1 gap-3 min-[820px]:grid-cols-2">
+                  {(["address", "returnAddress"] as const).map((kind) => {
+                    const key = `${s.id}:${kind}`;
+                    const saved = (kind === "address" ? s.address : s.returnAddress) ?? "";
+                    const draft = addressDraft[key] ?? saved;
+                    const dirty = draft.trim() !== saved.trim();
+                    const label = kind === "address" ? "Address" : "Return address";
+                    return (
+                      <div key={kind} className="flex flex-col gap-2">
+                        <Textarea
+                          id={`supplier-${kind}-${s.id}`}
+                          label={label}
+                          rows={3}
+                          maxLength={SUPPLIER_ADDRESS_MAX}
+                          value={draft}
+                          disabled={!canEdit}
+                          placeholder={canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
+                          onChange={(e) => setAddressDraft((d) => ({ ...d, [key]: e.target.value }))}
+                        />
+                        {canEdit && (
+                          <div>
+                            <button
+                              type="button"
+                              disabled={!dirty || setAddress.isPending}
+                              onClick={() =>
+                                setAddress
+                                  .mutateAsync({ supplierId: s.id, kind, text: draft })
+                                  .then(() => {
+                                    setAddressDraft((d) => {
+                                      const next = { ...d };
+                                      delete next[key];
+                                      return next;
+                                    });
+                                    toast.success("Saved");
+                                  })
+                                  .catch(fail)
+                              }
+                              className="btn-primary text-meta disabled:opacity-40"
+                              data-testid={`supplier-${kind}-save-${s.id}`}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
           </Block>
         </div>

@@ -9,6 +9,7 @@ import {
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
+  purchasingSetSupplierAddressInput,
   purchasingSetSupplierCollectionInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
@@ -223,6 +224,22 @@ purchasingSettingsRouter.put("/terms-days", requireOperationOrPrincipal, async (
   const { error } = await sb.rpc("purchasing_set_supplier_terms_days", {
     p_supplier_id: parsed.data.supplierId,
     p_days: parsed.data.days,
+  });
+  if (error) return fail(c, error);
+  return respondWithSettings(c);
+});
+
+/** PUT /supplier-address — 0611, one supplier's `Address` or `Return
+ *  address`, one field per call (blank clears). Same gate and history as the
+ *  other supplier rows; answers with the whole settings payload. */
+purchasingSettingsRouter.put("/supplier-address", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetSupplierAddressInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_supplier_address", {
+    p_supplier_id: parsed.data.supplierId,
+    p_kind: parsed.data.kind === "address" ? "address" : "return_address",
+    p_text: parsed.data.text,
   });
   if (error) return fail(c, error);
   return respondWithSettings(c);

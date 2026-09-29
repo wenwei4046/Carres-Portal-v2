@@ -23,6 +23,7 @@ const updateDestination = vi.fn();
 const setSupplierCollection = vi.fn();
 const setPoWindows = vi.fn();
 const setCutoff = vi.fn();
+const setAddress = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -42,6 +43,7 @@ vi.mock("@/lib/queries", async () => {
     useSetPurchasingSupplierCollection: () => mutation(setSupplierCollection),
     useSetPurchasingPoWindows: () => mutation(setPoWindows),
     useSetSupplierPoCutoff: () => mutation(setCutoff),
+    useSetSupplierAddress: () => mutation(setAddress),
   };
 });
 
@@ -187,7 +189,8 @@ describe("Purchasing → Settings", () => {
     render(wrap(<OperationPurchasingSettings />));
     fireEvent.click(screen.getByRole("button", { name: "Add Deliver To" }));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Yard" } });
-    fireEvent.change(screen.getByLabelText("Address"), {
+    /* 0611 · suppliers now have an `Address` too; this one is the Deliver To's. */
+    fireEvent.change(within(screen.getByTestId("deliver-to-settings")).getByLabelText("Address"), {
       target: { value: "12 Jalan Baru" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -617,5 +620,45 @@ describe("Supplier Claims reply timing (0606, Purchasing §9.5 owner-approved 20
     settingsQuery.mockReturnValue({ data: settings(), isLoading: false, error: null });
     render(wrap(<OperationPurchasingSettings />));
     expect(screen.queryByTestId("supplier-claims-settings")).toBeNull();
+  });
+});
+
+describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
+  it("saves each address on its own, and never copies one into the other", async () => {
+    setAddress.mockReset().mockResolvedValue({});
+    settingsQuery.mockReturnValue({
+      data: settings({
+        suppliers: [
+          { id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], transitDays: 1, address: "Ohana HQ, Klang", returnAddress: null },
+        ],
+      }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    const row = screen.getByTestId(`address-row-${OHANA}`);
+    expect(within(row).getByLabelText("Address")).toHaveValue("Ohana HQ, Klang");
+    /* A blank Return address stays blank: the Address is never offered in its place. */
+    expect(within(row).getByLabelText("Return address")).toHaveValue("");
+    expect(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`)).toBeDisabled();
+    fireEvent.change(within(row).getByLabelText("Return address"), { target: { value: "Ohana returns bay, Klang" } });
+    fireEvent.click(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`));
+    await waitFor(() => expect(setAddress).toHaveBeenCalledTimes(1));
+    expect(setAddress).toHaveBeenCalledWith({ supplierId: OHANA, kind: "returnAddress", text: "Ohana returns bay, Klang" });
+  });
+
+  it("a person who cannot edit sees the addresses but no Save", () => {
+    settingsQuery.mockReturnValue({
+      data: settings({
+        canEdit: false,
+        suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], transitDays: 1, address: null, returnAddress: "Returns bay" }],
+      }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    const row = screen.getByTestId(`address-row-${OHANA}`);
+    expect(within(row).getByLabelText("Return address")).toBeDisabled();
+    expect(screen.queryByTestId(`supplier-address-save-${OHANA}`)).not.toBeInTheDocument();
   });
 });
