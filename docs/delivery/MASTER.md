@@ -506,13 +506,29 @@ History**; the employee action is **`Record Delivery Result`** and an entry titl
 
 A Delivery Visit exists only when delivery actually proceeds. Advance rescheduling, cancellation,
 waiting for a reply, `Cannot Deliver` and Warehouse-not-ready are arrangement events, not visits.
-Each actual event stores DO, Partner, driver or team, vehicle when known, planned and actual
-times, item results, observed problem, goods location, proof, recorder and proxy provenance.
+Each actual event stores DO, Partner, driver or team, vehicle when known, scheduled facts, the
+actual delivery date, actual time only when reliably known, item results, observed problem, goods
+location, proof, recorder and proxy provenance.
 
 Employee results are **`Delivered`** · **`Partially Delivered`** · **`Failed Delivery`**.
 `Rescheduled` and `Delivery Cancelled` are arrangement states, never results.
 
-`Delivered` requires actual time, receiver, delivered goods and the governed evidence. Missing
+**ACTUAL DELIVERY DATE AND TIME — OWNER-APPROVED 2026-09-30 / APPROVED TARGET / NOT BUILT.**
+For an actual customer delivery or attempted delivery, the actual date is required and must be
+supported by the driver's report or delivery evidence. Exact hour/minute is optional: record it
+only when reliably known, with its source; otherwise leave it unrecorded. Never substitute the
+scheduled time, ETA, upload time, current time or midnight. A missing exact time does not prevent
+recording a truthful result and does not waive any other result or proof requirement.
+
+ERP evidence upload records its own system timestamp and actual uploader; proof review records
+its own system timestamp and actual reviewer. Both remain distinct from when the goods reached
+the customer. The actual delivery performer is not inferred from the uploader or assigned staff.
+A record with no exact actual time supports date-level reporting but cannot establish minute-level
+punctuality. Reliable future driver capture may support a later policy review; it does not silently
+make time mandatory today. This ruling changes customer-delivery result precision, not Warehouse
+handover timestamps, Subscription billing rules or the existing proof-acceptance gate.
+
+`Delivered` requires the actual date, receiver, delivered goods and the governed evidence. Missing
 evidence creates the `Upload delivery proof` work, whose row names `Upload delivery photo` and/or
 `Upload signed DO` (owner ruling 2026-09-25; the paper's full name stays `Signed Delivery Order` in
 prose and on the document); completing or reviewing proof never renames the result.
@@ -523,8 +539,8 @@ supplier × Delivery Visit. Failed or refused goods create no notice.
 
 `Partially Delivered` preserves delivered goods and requires failed quantity, reason, goods
 location, proof and next Work for every remainder. `Failed Delivery` requires reason, explanation,
-affected goods, actual time where applicable, goods location, reporter, proof and an explicit next
-action. No bare `Failed Delivery` may be saved or closed.
+affected goods, the actual attempt date (exact time optional under the rule above), goods location,
+reporter, proof and an explicit next action. No bare `Failed Delivery` may be saved or closed.
 
 ### 6.1 · Proof and its review
 
@@ -1723,7 +1739,10 @@ Central Reports owns Delivery Commitment Performance, First Delivery Success, Fa
 Analysis, Logistics Performance, Warehouse Performance, Delivery Proof Control, Schedule
 and Capacity, Customer Contact Performance, Return-to-Warehouse Control and Exception Ageing.
 
-Every measure declares source fact, date basis, coverage and drill-through. First-delivery success
+Every measure declares source fact, date basis, coverage and drill-through. Actual-delivery
+reporting uses §6's recorded date and only a reliably recorded exact time. Upload/review timestamps
+never stand in for the delivery event. Records without exact time cannot establish minute-level
+punctuality; report that coverage separately rather than inventing a time. First-delivery success
 counts only actual delivery events. NETS has no acceptance-speed measure because NETS is
 responsible without Accept; its contact and confirmation timeliness, `Cannot Deliver` rate, result
 timeliness and proof are measured instead. Warehouse and Logistics performance stay separate even
