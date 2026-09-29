@@ -5423,9 +5423,26 @@ Each leg identifies its goods, pickup and destination, contacts/transport party,
 separate actual pickup/receipt or supplier-handover evidence. Select existing exact Units for held
 goods; new goods retain the governed Catalog-to-issue identity process.
 
-When the same goods pass through multiple locations, link successive legs and preserve the same
-physical identities; a planned destination is not evidence of the next leg's actual pickup holder.
-Different goods may follow independent routes and dates. Prevent contradictory simultaneous
+**EXPLICIT DETAILS ON EVERY MOVEMENT CARD — OWNER CORRECTION, APPROVED TARGET / NOT BUILT;
+Jess, 2026-09-29.** Every card asks the same operational questions: which goods and quantities,
+where to collect, where to deliver, the relevant pickup/destination contacts, who transports them,
+and the planned dates. Unknown facts may remain visibly unresolved under the existing draft rules;
+never guess them from the preceding card. In particular, the second pickup may collect entirely
+different goods, a subset, or a combination; adjacency or a shared location proves none of these.
+
+Provide an optional, initially unchecked same-as-previous checkbox for a clearly named field/group
+where reuse is meaningful. It is not one ambiguous checkbox that copies the entire card. Only the
+operator's explicit selection brings forward that group's known planning values; show the source
+card and the resulting values so they remain reviewable. Goods can then be removed, added or their
+planned quantities adjusted, subject to exact-Unit and quantity rules. Manual changes clear that
+group's same-as-previous selection. A partial match must not be labelled wholly the same. Each new
+card starts without assumed goods, location, person or date; matching goods alone copies no other
+group. Source edits do not silently overwrite later cards. Never copy actual pickup/receipt,
+signatures, completion, document issue/send or commercial acceptance as a planning shortcut.
+
+Only when the selected goods actually match across successive legs, link those movements and
+preserve their physical identities; a planned destination is not evidence of the next leg's actual
+pickup holder. Different goods may follow independent routes and dates. Prevent contradictory simultaneous
 commitments for the same Unit; do not create duplicate Units to represent another leg. Partial
 results leave the specific remaining goods outstanding. Adding or changing a future leg preserves
 completed movement evidence and follows existing amendment/cancellation rules.
@@ -6109,8 +6126,12 @@ a simple one-leg arrangement. New literal action/field wording still follows COP
 Within a wide block, related facts use the kit's multi-column arrangement rather than six stacked
 fields. Source-owned action opens its existing form, with one primary writer at a time. Mobile
 stacks each block's facts in logical order. Every leg retains its own goods, contacts, dates,
-actual results and remaining scope. Existing facts prefill a linked next leg where applicable;
-the operator reviews the real destination and scope rather than re-entering known Unit identity.
+actual results and remaining scope. Every new card repeats the same operational questions under
+§9.8. No automatic carry-forward from the previous card: optional, initially unchecked reuse is
+explicit and field/group-scoped, with the source and copied values visible. Selecting existing
+goods still reads their authoritative Stock/Catalog facts; that is not an assumption that another
+movement uses the same goods. Use the existing kit Checkbox, not a new control. Final literal
+labels must identify what is being reused; a bare same-as-above caption cannot stand alone.
 
 Explanatory structure only, not final screen copy or a real completion record:
 
