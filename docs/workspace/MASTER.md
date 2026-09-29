@@ -460,6 +460,24 @@ originating Duty after a modal closes.
 
 ### 4.6 · Current → proposed gap audit — 2026-09-15
 
+**CROSS-CHAT RECONCILIATION — MEASURED 2026-09-29 / REVIEW INPUT, NOT NEW APPROVAL.**
+The owner supplied the MC/operational-actor ruling from PR #1705. That PR is OPEN, not merged,
+at inspected head `dd78b8383ea7bfa71e490362576a9528f80c2963`. Its Workspace §3 records the
+operational owner/actual-actor distinction and Team Work assistance during unrecorded sudden
+absence; its COPY proposal includes `Who can act`. Its manual-cover-for-lasting-absence wording
+must converge with this chat's later approved automatic PO/GRN cover from recorded leave (§4.4).
+Do not copy its older page composition over this chat's separately approved `Next assignment` and
+catalogue/detail rules or claim its broad operational-permission target is deployed.
+
+**REAL GAP — newcomer execution versus allocation.** This chat approved no first-month PO Duty,
+then automatic next-month rotation entry. The imported operational rule permits active Operation
+staff to execute PO work without being its holder. Whether a joining-month newcomer may actually
+issue PO as a non-holder is not explicitly reconciled. Resolve that boundary with the owner before
+claiming the combined permission Blueprint complete; do not silently treat either reading as law.
+`Who can act`/`End cover` presentation in the pasted third-segment proposal is not approved merely
+because the owner supplied it for reconciliation. Existing module approval, amendment, void and
+commercial gates must be checked against the exact operational-action scope.
+
 | Current branch evidence | Required Blueprint state |
 |---|---|
 | One shared catalogue/resolver, guarded assign/cover doors and append-only histories exist | Retain as the only authority; production-verify every catalogue consumer, not GRN alone |
