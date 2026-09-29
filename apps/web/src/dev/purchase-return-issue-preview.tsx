@@ -44,7 +44,7 @@ const RECORD = {
   decision: view === "claim-empty" ? null : "return_to_supplier", decision_at: CLAIM.carres_execution_at, decision_by_name: "Shasha", legacy_words: [],
 };
 const SOURCE: PurchaseReturnIssueSource = {
-  claim_id: "claim-1", claim_no: CLAIM.claim_no, supplier_name: "Hookka Industries", return_address: "{Supplier return address}\nMuar, Johor", grn_no: CLAIM.grn_no,
+  claim_id: "claim-1", claim_no: CLAIM.claim_no, supplier_name: "Hookka Industries", return_to: "{Supplier return address}\nMuar, Johor", return_to_from: "return_address", grn_no: CLAIM.grn_no,
   units: [
     { stock_item_id: "u-142", unit_code: "U1-000-142", po_no: CLAIM.po_id, category: "Sofa", item: "Sofa Lyra", item_spec: "Left arm", pickup_location: "Carres Klang", seen: "t", refusal: null },
     { stock_item_id: "u-143", unit_code: "U1-000-143", po_no: CLAIM.po_id, category: "Sofa", item: "Sofa Lyra", item_spec: "Left arm", pickup_location: "Carres Klang", seen: "t", refusal: null },
@@ -55,6 +55,16 @@ const unit = (code: string, over: Partial<PurchaseReturnDetail["units"][number]>
 const RETURNS: PurchaseReturnDetail[] = [
   { id: "pr-1", pr_no: "PR-20260929-1001", pr_doc_date: `${TODAY}T02:00:00Z`, supplier_id: "supplier-1", supplier_name: "Hookka Industries", supplier_claim_id: "claim-1", claim_no: CLAIM.claim_no, grn_no: CLAIM.grn_no, sent_at: null, confirmed_pickup_date: null, sends: [], confirmations: [], units: [unit("U1-000-142"), unit("U1-000-143")] },
   { id: "pr-2", pr_no: "PR-20260928-1000", pr_doc_date: `${day(-1)}T02:00:00Z`, supplier_id: "supplier-2", supplier_name: "Nice Future", supplier_claim_id: "claim-2", claim_no: "SC-1019", grn_no: null, sent_at: `${day(-1)}T03:00:00Z`, confirmed_pickup_date: day(1), sends: [{ id: "d1", channel: "whatsapp", recipient: "{Supplier WhatsApp group}", sent_at: `${day(-1)}T03:00:00Z`, sent_by_name: "Shasha" }], confirmations: [], units: [unit("U1-000-090", { item: "Mattress Classic", item_spec: "King", category: "Mattress" })] },
+  // 0614 `Record supplier receipt`: two Units picked up by Stock, one of them
+  // already received by the supplier; the third not picked up.
+  { id: "pr-4", pr_no: "PR-20260924-0998", pr_doc_date: `${day(-6)}T02:00:00Z`, supplier_id: "supplier-1", supplier_name: "Hookka Industries", supplier_claim_id: "claim-1", claim_no: CLAIM.claim_no, grn_no: CLAIM.grn_no, sent_at: `${day(-6)}T03:00:00Z`, confirmed_pickup_date: day(-3),
+    sends: [{ id: "d4", channel: "whatsapp", recipient: "{Supplier WhatsApp group}", sent_at: `${day(-6)}T03:00:00Z`, sent_by_name: "Shasha" }], confirmations: [],
+    receipts: [{ received_on: day(-1), unit_ids: ["U1-000-145"], files: 1, confirmed_by: null, confirmed_at: null, recorded_at: `${day(-1)}T06:00:00Z`, recorded_by_name: "Shasha" }],
+    units: [
+      unit("U1-000-145", { stock_item_id: "u-145", collected_by: "{Collector}", actual_pickup_date: `${day(-3)}T03:00:00Z`, supplier_received_date: day(-1), evidence: [{ purpose: "receipt", photos: 1, videos: 0 }] }),
+      unit("U1-000-146", { stock_item_id: "u-146", collected_by: "{Collector}", actual_pickup_date: `${day(-3)}T03:00:00Z` }),
+      unit("U1-000-147", { stock_item_id: "u-147" }),
+    ] },
   { id: "pr-3", pr_no: "PR-20260925-0999", pr_doc_date: `${day(-5)}T02:00:00Z`, supplier_id: "supplier-3", supplier_name: "Ohana", supplier_claim_id: "claim-3", claim_no: "SC-1018", grn_no: null, sent_at: `${day(-5)}T03:00:00Z`, confirmed_pickup_date: day(-2), sends: [{ id: "d2", channel: "email", recipient: "{Supplier email}", sent_at: `${day(-5)}T03:00:00Z`, sent_by_name: "Shasha" }], confirmations: [], units: [unit("U1-000-051", { item: "Bedframe Nora", item_spec: "Queen", category: "Bedframe" })] },
 ];
 const duty = { dutyKey: "po_duty", onDate: TODAY, normalOwner: { userId: ME, name: "Shasha" }, buddy: null, activeCover: null, actingPerson: { userId: ME, name: "Shasha" }, state: "primary" as const, assignmentId: null };
@@ -86,12 +96,13 @@ useAuth.setState({ role: "operation", user: { id: ME, email: "sha@carres.co" } a
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const start = view === "register" ? "/operation?tab=purchase-returns"
   : view === "record" ? "/operation?tab=purchase-returns&pr=pr-2"
+  : view === "receipt" ? "/operation?tab=purchase-returns&pr=pr-4"
   : view === "work" ? `/operation?tab=work&day=${new URLSearchParams(window.location.search).get("day") ?? "missed"}${new URLSearchParams(window.location.search).get("order") ? `&order=${encodeURIComponent(new URLSearchParams(window.location.search).get("order")!)}` : ""}`
   : "/operation?tab=claims&claim=claim-1";
 
 const body = view === "issue"
   ? <div className="h-full overflow-auto p-4"><IssueForm source={SOURCE} onClose={() => undefined} onIssued={() => undefined} /></div>
-  : view === "register" || view === "record" ? <OperationPurchaseReturns />
+  : view === "register" || view === "record" || view === "receipt" ? <OperationPurchaseReturns />
   : view === "work" ? <div className="flex h-full flex-col"><OperationWork /></div>
   : <OperationSupplierClaims />;
 

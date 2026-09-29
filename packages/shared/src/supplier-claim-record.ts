@@ -16,7 +16,7 @@
  * dates. An ask recorded before 0607 carries no snapshot and reads the
  * governed starting values below.
  */
-import { SUPPLIER_CLAIM_RESPONSES, supplierClaimResponseLabel } from "./supplier-claim";
+import { SUPPLIER_CLAIM_RESPONSES, supplierClaimResponseLabel, supplierClaimTypeLabel } from "./supplier-claim";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
 import { addWorkingDays, countWorkingDays, type IsoDate } from "./working-days";
@@ -343,4 +343,110 @@ export function supplierClaimAnswerParts(input: {
     ? (input.unitCodes.length === 1 ? input.unitCodes[0]! : input.unitCodes.length > 1 ? `${input.unitCodes[0]} + ${input.unitCodes.length - 1} more` : SUPPLIER_CLAIM_REPLY_SCOPE_WORD.units)
     : input.scope === "claim" ? SUPPLIER_CLAIM_REPLY_SCOPE_WORD.claim : SUPPLIER_CLAIM_ABSENT;
   return { answer: supplierClaimResponseLabel(input.response), scope };
+}
+
+// ── §9.5 Row expansion — the per-Unit evidence inspector (read-only) ────────
+//
+// `PO No (Unit ID on line two) · Items · Qty · Problem & Evidence · Supplier
+// Response`. Each tracked Unit is its own row, Qty 1, with ITS OWN recorded
+// problem note and ONLY the files that name it. A file is attributed to a Unit
+// only when its stored `unit_code` (0614) is one of THIS claim's Units; every
+// other file — including every photo stored before 0614 — stays on one honest
+// `Whole claim` row and is never spread across Units. Counted stock keeps its
+// genuine quantity on one row (`Counted stock`). A whole-claim answer prints as
+// the claim-level answer it is (`Whole claim` on line two); a Units answer
+// prints only on the Units it names; everything else reads `Not recorded`.
+
+/** The expansion's confirmed columns, in order (§9.5, 2026-09-18). */
+export const SUPPLIER_CLAIM_UNIT_COLUMN_LABELS = ["PO No", "Items", "Qty", "Problem & Evidence", "Supplier Response"] as const;
+
+export interface SupplierClaimInspectionFile {
+  path: string;
+  at: string | null;
+  kind: "photo" | "video";
+  /** The Unit the file shows, when it was filed with one (0614). */
+  unit_code: string | null;
+  url: string | null;
+}
+
+/** A Unit's own recorded problem at receiving (`receiving_unit_results.note`). */
+export interface SupplierClaimUnitProblem {
+  stock_item_id: string;
+  note: string | null;
+}
+
+export interface SupplierClaimInspection {
+  files: SupplierClaimInspectionFile[];
+  problems: SupplierClaimUnitProblem[];
+}
+
+export interface SupplierClaimInspectionRow {
+  key: string;
+  scope: "unit" | "counted" | "claim";
+  /** Line two under PO No: the Unit ID · `Counted stock` · `Whole claim`. */
+  unitLine: string;
+  qty: number;
+  problem: string;
+  note: string | null;
+  files: SupplierClaimInspectionFile[];
+  response: string;
+  /** `Whole claim` when the answer shown is the claim-level answer. */
+  responseLine: string | null;
+}
+
+export function supplierClaimInspectionRows(
+  claim: {
+    claim_type: string;
+    note: string | null;
+    qty: number;
+    supplier_response: string | null;
+    response_reply?: { scope: "claim" | "units"; unit_ids: string[] } | null;
+    units?: readonly SupplierClaimUnit[] | null;
+  },
+  inspection: SupplierClaimInspection,
+): SupplierClaimInspectionRow[] {
+  const units = claim.units ?? [];
+  const tracked = units.filter((u) => u.identity_scope === "unit" && u.unit_code);
+  const codes = new Set(tracked.map((u) => u.unit_code!));
+  const notes = new Map(inspection.problems.map((p) => [p.stock_item_id, p.note?.trim() || null]));
+  const problem = supplierClaimTypeLabel(claim.claim_type);
+  const reply = claim.response_reply ?? null;
+  const wholeAnswer = claim.supplier_response && (!reply || reply.scope === "claim") ? supplierClaimResponseLabel(claim.supplier_response) : null;
+  const answerFor = (unitId: string | null) => {
+    if (wholeAnswer) return { response: wholeAnswer, responseLine: SUPPLIER_CLAIM_REPLY_SCOPE_WORD.claim };
+    if (unitId && claim.supplier_response && reply?.scope === "units" && reply.unit_ids.includes(unitId)) {
+      return { response: supplierClaimResponseLabel(claim.supplier_response), responseLine: null };
+    }
+    return { response: SUPPLIER_CLAIM_ABSENT, responseLine: null };
+  };
+
+  const rows: SupplierClaimInspectionRow[] = tracked.map((u) => ({
+    key: u.id, scope: "unit", unitLine: u.unit_code!, qty: 1, problem, note: notes.get(u.id) ?? null,
+    files: inspection.files.filter((f) => f.unit_code === u.unit_code), ...answerFor(u.id),
+  }));
+  for (const u of units.filter((x) => x.identity_scope === "quantity")) {
+    rows.push({ key: u.id, scope: "counted", unitLine: "Counted stock", qty: u.qty ?? 0, problem, note: null, files: [], ...answerFor(null) });
+  }
+  const loose = inspection.files.filter((f) => !f.unit_code || !codes.has(f.unit_code));
+  if (loose.length) {
+    rows.push({ key: "claim", scope: "claim", unitLine: SUPPLIER_CLAIM_REPLY_SCOPE_WORD.claim, qty: claim.qty, problem, note: claim.note?.trim() || null, files: loose, ...answerFor(null) });
+  }
+  return rows;
+}
+
+/** `Photos {n}` · `Photo 1` · `Video {n}`. A kind with no file prints no control. */
+export function supplierClaimEvidenceControls(files: readonly SupplierClaimInspectionFile[]): Array<{ kind: "photo" | "video"; label: string }> {
+  const photos = files.filter((f) => f.kind === "photo").length;
+  const videos = files.filter((f) => f.kind === "video").length;
+  const out: Array<{ kind: "photo" | "video"; label: string }> = [];
+  if (photos) out.push({ kind: "photo", label: photos === 1 ? "Photo 1" : `Photos ${photos}` });
+  if (videos) out.push({ kind: "video", label: `Video ${videos}` });
+  return out;
+}
+
+/** 0614 — a receiving claim photo on the wire (`key` or `{path, unitCode}`)
+ *  as the receive engine stores it: a string stays a string (claim-level);
+ *  an object keeps `unit_code`. */
+export function claimPhotoWire(photo: string | { path: string; unitCode: string }): string | { path: string; unit_code: string } {
+  return typeof photo === "string" ? photo : { path: photo.path, unit_code: photo.unitCode };
 }
