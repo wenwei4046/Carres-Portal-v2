@@ -4964,7 +4964,7 @@ BUILT ON BRANCH `build/claim-unit-evidence-received-date`, migration 0614 NOT AP
 are blank, `Add the address of {Supplier}` (detail `address_missing`). 0614 re-issues
 `purchasing_issue_purchase_return` from the 0609 body applied in production with only that change;
 the resolved value is still snapshotted onto `purchase_return_units.return_to`, and the Issue form
-shows it with `From Return address` / `From Address` under it; (2) Stock's Outbound `Return to supplier` handover (Stock §12.8): Stock writer LIVE (0612,
+shows it with `From Return address` / `From Address` under it (words owner-approved 2026-09-30); (2) Stock's Outbound `Return to supplier` handover (Stock §12.8): Stock writer LIVE (0612,
 `stock_record_supplier_return_pickup`); Outbound screen pending owner design approval. Pickup proof
 files live in the private `issue-evidence` bucket under `purchase_return/<id>/…`; (3) `Supplier
 Received Date` — `Record supplier receipt` BUILT ON BRANCH `build/claim-unit-evidence-received-date`
