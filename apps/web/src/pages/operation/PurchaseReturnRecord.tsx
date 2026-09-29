@@ -144,7 +144,7 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
     </Block>
 
     <Block title="Units">
-      <PurchaseReturnUnitsTable units={pr.units} />
+      <PurchaseReturnUnitsTable units={pr.units} returnId={pr.id} />
     </Block>
 
     <HistorySection pr={pr} />

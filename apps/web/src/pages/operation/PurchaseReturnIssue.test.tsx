@@ -15,6 +15,8 @@ vi.mock("@/lib/queries", () => ({
   usePurchaseReturnWrite: (path: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: (o: unknown) => void }) => { mutate(path, body); opts?.onSuccess?.({ id: "pr1" }); }, isPending: false, error: doorError }),
   usePurchaseReturn: () => ({ data: undefined, isLoading: true }),
   usePurchaseReturnIssueSource: () => ({ data: undefined, isLoading: true }),
+  usePurchaseReturnEvidence: () => ({ data: { units: [{ unit_id: "U1-000-075", files: [{ purpose: "pickup", path: "purchase_return/pr1/p.jpg", kind: "photo", url: "https://signed/p.jpg" }] }] }, isError: false }),
+  fetchPurchaseReturnEvidence: vi.fn(),
 }));
 vi.mock("@/lib/pdf/purchase-return-pdf", () => ({
   usePurchaseReturnPdfUrl: () => ({ url: null, failed: false }),
@@ -152,5 +154,15 @@ describe("Record supplier receipt (§9.6, 0614)", () => {
     expect(screen.getByTestId("purchase-return-pickup-state")).toHaveTextContent("Supplier Received DateThu, 1 Oct");
     expect(screen.queryByTestId("purchase-return-supplier-receipt")).not.toBeInTheDocument();
     expect(screen.getAllByText("Supplier receipt recorded").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Pickup proof opens in the shared viewer (§9.6, 0614)", () => {
+  it("opens that Unit's pickup photo, labelled as pickup proof, never as damage", () => {
+    const pr = PR({ units: [{ unit_id: "U1-000-075", stock_item_id: "s-a", po_id: "PO-1", category: "Mattress", item: "Carres Cloud", item_spec: "King", pickup_location: "Carres Klang", return_to: "Lot 9", collected_by: "Ah Seng", actual_pickup_date: "2026-09-30T02:00:00Z", supplier_received_date: null, evidence: [{ purpose: "pickup", photos: 1, videos: 0 }] }] });
+    render(<MemoryRouter><PurchaseReturnPanel pr={pr} today="2026-10-02" /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId("purchase-return-evidence-toggle-U1-000-075"));
+    fireEvent.click(within(screen.getByTestId("purchase-return-evidence-U1-000-075")).getByRole("button", { name: /Photo 1/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("U1-000-075 · Pickup proof");
   });
 });

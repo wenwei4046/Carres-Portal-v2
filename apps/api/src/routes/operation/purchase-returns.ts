@@ -519,6 +519,52 @@ purchaseReturnsRouter.post("/:id/supplier-receipt", async (c) => {
   return c.json({ id: data ?? null });
 });
 
+/** The stored `kind` decides (0612/0614 entries carry one); an older entry
+ *  without it falls back to the extension, the delivery-photo shape's rule. */
+function evidenceKind(record: Row): "photo" | "video" | null {
+  if (record.kind === "pdf") return null;
+  if (record.kind === "video" || record.kind === "photo") return record.kind;
+  const path = typeof record.path === "string" ? record.path : "";
+  if (/\.pdf$/i.test(path)) return null;
+  return /\.(mp4|mov|m4v|webm)$/i.test(path) ? "video" : "photo";
+}
+
+// ----- GET /:id/evidence — Pickup proof and Supplier receipt proof, signed -----
+//
+// §9.6: the per-Unit files behind the Units table's `Photos {n}` / `Video {n}`,
+// by purpose, for the shared read-only SavedEvidenceViewer. Read through the
+// caller's JWT (the register's own read), then signed from the private
+// `issue-evidence` bucket. Problem evidence stays on the Supplier Claim.
+purchaseReturnsRouter.get("/:id/evidence", async (c) => {
+  gate(c);
+  const { row, error } = await readOne(c, c.req.param("id"));
+  if (error) return failDoor(c, error as never);
+  if (!row) throw new HTTPException(404, { message: "purchase return not found" });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const units = await readAll((from, to) => sb.from("purchase_return_units").select("id, unit_code, evidence").eq("purchase_return_id", row.id).range(from, to));
+  if (units.error) return failDoor(c, units.error as never);
+  const receipts = await readAll((from, to) => sb.from("purchase_return_supplier_receipts").select("id, evidence").eq("purchase_return_id", row.id).range(from, to));
+  if (receipts.error && !ledgerAbsent(receipts.error)) return failDoor(c, receipts.error as never);
+  const receiptUnits = receipts.error || receipts.rows.length === 0 ? { rows: [] as Row[], error: null }
+    : await readAllIn(receipts.rows.map((r) => r.id as string), (b, f, t) => sb.from("purchase_return_supplier_receipt_units").select("receipt_id, purchase_return_unit_id").in("receipt_id", b).range(f, t));
+  if (receiptUnits.error) return failDoor(c, receiptUnits.error as never);
+  const receiptEvidence = new Map(receipts.rows.map((r) => [r.id as string, r.evidence]));
+  const admin = adminClient(c.env);
+  const sign = async (path: string) => (await admin.storage.from("issue-evidence").createSignedUrl(path, 3600)).data?.signedUrl ?? null;
+  const out = await Promise.all(units.rows.map(async (u) => {
+    const own = (Array.isArray(u.evidence) ? u.evidence : []).filter((e) => (e as Row)?.purpose === "pickup").map((e) => ({ purpose: "pickup" as const, ...(e as Row) }));
+    const received = receiptUnits.rows.filter((ru) => ru.purchase_return_unit_id === u.id)
+      .flatMap((ru) => receiptFiles(receiptEvidence.get(ru.receipt_id as string)));
+    const files = await Promise.all([...own, ...received].map(async (e) => {
+      const kind = evidenceKind(e as Row);
+      const path = String((e as Row).path);
+      return kind ? { purpose: (e as { purpose: string }).purpose === "pickup" ? "pickup" : "receipt", path, kind, url: await sign(path) } : null;
+    }));
+    return { unit_id: String(u.unit_code ?? ""), files: files.filter(Boolean) };
+  }));
+  return c.json({ units: out });
+});
+
 /** The receipt ledger (0614) is not there yet: nothing can have been recorded. */
 function ledgerAbsent(error: unknown): boolean {
   const code = (error as { code?: string } | null)?.code;
@@ -526,10 +572,10 @@ function ledgerAbsent(error: unknown): boolean {
 }
 
 /** A receipt's files, as `receipt` evidence for each Unit it names. */
-function receiptFiles(raw: unknown): Array<{ purpose: "receipt"; path: string }> {
+function receiptFiles(raw: unknown): Array<{ purpose: "receipt"; path: string; kind: unknown }> {
   if (!Array.isArray(raw)) return [];
   return raw.filter((f) => f && typeof f === "object" && typeof (f as Row).path === "string")
-    .map((f) => ({ purpose: "receipt" as const, path: String((f as Row).path) }));
+    .map((f) => ({ purpose: "receipt" as const, path: String((f as Row).path), kind: (f as Row).kind }));
 }
 
 /**
@@ -550,12 +596,12 @@ function countEvidence(raw: unknown): PurchaseReturnEvidenceCount[] {
     const record = entry as Record<string, unknown>;
     const purpose = typeof record.purpose === "string" ? record.purpose : null;
     if (purpose !== "pickup" && purpose !== "receipt") continue;
-    const path = typeof record.path === "string" ? record.path : "";
+    const kind = evidenceKind(record);
+    // A PDF is neither a photo nor a video: it is never counted as one.
+    if (!kind) continue;
     const counts =
       byPurpose.get(purpose) ?? { purpose, photos: 0, videos: 0 };
-    // Same split the delivery-photo shape uses: the extension decides, because
-    // the stored entry carries no media type of its own.
-    if (/\.(mp4|mov|m4v|webm)$/i.test(path)) counts.videos += 1;
+    if (kind === "video") counts.videos += 1;
     else counts.photos += 1;
     byPurpose.set(purpose, counts);
   }

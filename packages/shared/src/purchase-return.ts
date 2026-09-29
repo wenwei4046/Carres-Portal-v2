@@ -206,7 +206,7 @@ export function purchaseReturnEvidenceLabel(
  *  no large pills". A purpose with neither file prints neither action — an
  *  absent count is not a `0`, it is nothing to open. */
 export function purchaseReturnPhotoAction(count: number): string | null {
-  return count > 0 ? `Photos ${count}` : null;
+  return count > 1 ? `Photos ${count}` : count === 1 ? "Photo 1" : null;
 }
 
 export function purchaseReturnVideoAction(count: number): string | null {

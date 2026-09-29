@@ -267,3 +267,20 @@ describe("Record supplier receipt (§9.6, 0614)", () => {
     expect(purchaseReturn.receipts).toEqual([{ received_on: "2026-09-07", unit_ids: ["U1-000-001"], files: 2, confirmed_by: null, confirmed_at: null, recorded_at: "2026-09-07T04:00:00Z", recorded_by_name: "Mei" }]);
   });
 });
+
+describe("GET /:id/evidence — Pickup proof and Supplier receipt proof, signed (§9.6)", () => {
+  it("returns each Unit's pickup files and the receipt files that name it, never a PDF as a photo", async () => {
+    const tables = {
+      purchase_returns: [{ id: PR, pr_no: "PR-1", pr_doc_date: "2026-09-29T02:00:00Z", supplier_id: "s1", supplier_claim_id: CLAIM, warehouse_receipt_id: null, confirmed_pickup_date: null }],
+      purchase_return_units: [{ id: "ru-1", purchase_return_id: PR, stock_item_id: UNIT, unit_code: "U1-000-001", actual_pickup_date: "2026-09-05T02:00:00Z", evidence: [{ purpose: "pickup", path: `purchase_return/${PR}/p.jpg`, kind: "photo" }] }],
+      purchase_return_supplier_receipts: [{ id: "r1", purchase_return_id: PR, received_on: "2026-09-07", evidence: [{ path: "purchase_return_receipt/x/v.mp4", kind: "video", purpose: "supplier_receipt" }, { path: "purchase_return_receipt/x/g.pdf", kind: "pdf", purpose: "supplier_receipt" }], recorded_by: ME, recorded_at: "2026-09-07T04:00:00Z" }],
+      purchase_return_supplier_receipt_units: [{ receipt_id: "r1", purchase_return_unit_id: "ru-1" }],
+    };
+    const res = await call(client({ tables }), `/operation/purchase-returns/${PR}/evidence`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ units: [{ unit_id: "U1-000-001", files: [
+      { purpose: "pickup", path: `purchase_return/${PR}/p.jpg`, kind: "photo", url: "u" },
+      { purpose: "receipt", path: "purchase_return_receipt/x/v.mp4", kind: "video", url: "u" },
+    ] }] });
+  });
+});
