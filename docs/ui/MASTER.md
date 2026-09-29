@@ -22,6 +22,12 @@
 
 # §1 · Overview
 
+**Workspace destination label — owner ruling 2026-09-29 / BUILT; production verification pending.**
+The main-menu link to `/operation?tab=work` reads `Workspace`, matching the page heading.
+Keep its route, icon, permissions, selected treatment and `My Task` / `Team Work` scopes.
+This is the same destination, not a new page. Workspace MASTER §1 and COPY-STANDARD own the
+navigation contract and exact word.
+
 ## Shared field-operation UI — owner ruling 2026-09-29
 
 **RULING / APPROVED DIRECTION / IMPLEMENTATION AND OPERATOR VALIDATION PENDING.**

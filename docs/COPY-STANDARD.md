@@ -4814,7 +4814,7 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 | Where | Use exactly | Do not use |
 |---|---|---|
-| Page and scope | page title `Workspace` · `My Task` · `Team Work` | `My Work` on this page |
+| Page and scope | main-menu destination and page title `Workspace` (owner ruling 2026-09-29) · `My Task` · `Team Work` | `Work` for the main-menu destination · `My Work` on this page |
 | Rail | `Search work…` · `Attention`: `Broken commitment` · `Missed` · `Waiting for answer` · `No date` · `Module`: `All modules`, then the module names · one row per order: `{SO No}` and its task count (a PO view row: `{PO No}`; a PO window row: `{time} PO window` over its date) | a customer name, `actions`, `Missed` or `No date` on an order row |
 | Order header | `{SO No}` over the customer · `Proceed Date` · `Customer Requested Delivery Date` · a missing value `Not recorded` | `Order Route · To do {n}` · band words `GOODS` / `DELIVERY` |
 | Stops | the Order Route node labels (`PURCHASING` · `SUPPLIER` · `RECEIVING` · `STOCK` · `LOAN` · `LOGISTICS` · `DELIVERY DATE` · `PAYMENT` · `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`) with `Missed` / `Due` only · `{n} of {m} done` (only steps with completion evidence count) | a second count on the stop · `T1` / `T2` / `T3` |

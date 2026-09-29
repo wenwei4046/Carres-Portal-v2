@@ -303,8 +303,8 @@ object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting s
 ```
 WORKSPACE
 ├── Dashboard
-├── Work
-│   ├── My Work
+├── Workspace
+│   ├── My Task
 │   └── Team Work
 └── Issue Tracker
 
