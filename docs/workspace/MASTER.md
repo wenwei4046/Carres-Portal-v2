@@ -294,18 +294,18 @@ combines those truths. A manager never assigns individual routine Work here.
 **OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** Jess approved the page-structure
 segment and the new `Next assignment` heading. Keep one Duty catalogue and one selected-Duty detail.
 The detail reads in this order: current resolved person and plain dates → relevant future cover
-when applicable → existing authorised actions → next effective primary assignment → collapsed
+when applicable → next effective primary assignment → collapsed
 `Assignment & cover history`. Future appointments are not presented as if their terms already ran.
 All authorised assignment/cover records remain reachable; collapsing history never deletes evidence.
 
 ```text
 Staff & Duties
 
-Search duties       │ PO Duty
+Search duties       │ PO Duty                          ⋯
 State: All duties   │ Yu Jun
                     │ Mon, 7 Sep to Wed, 30 Sep
 PO Duty             │
-GRN Duty            │ [Assign holder]  [Add cover]
+GRN Duty            │
 Purchasing Approver │
 …                   │ Next assignment
                     │ Shasha · Thu, 1 Oct to Sat, 31 Oct
@@ -364,6 +364,20 @@ must not force a third simultaneous narrow-screen column. §4.5 owns the retaine
 read-failure, unassigned and read-only states; no task-level Waiting/Completed/Missed state is added.
 Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
 or production completion; the remaining action/exception details continue in PLAN review.
+
+**MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Place existing authorised manual adjustments in the selected Duty header's visible `⋯` menu,
+accessible name `More actions`. Do not keep `Assign holder` / `Add cover` as permanent buttons
+beside the current person. Only authorised managers see this menu, and only applicable governed
+actions appear; omit an empty menu. Selecting an action opens its existing focused form with the
+Duty fixed. This is an entry-placement ruling, not approval for new override policies or new acts.
+Even an unassigned Duty uses this menu for an authorised manual assignment; the missing-person
+fact remains visible. Ordinary automatic PO/GRN assignment and leave cover need no menu action.
+
+Use the existing shared menu kit at all approved widths, with keyboard/touch operation, focus
+return to the trigger and no right-click-only dependency. Readers retain the same person/date view
+and their existing ordinary work execution rights. Keep source-owned permission checks, evidence
+and failures; no new token or component is introduced.
 
 ### 4.3 · Change-holder contract
 
@@ -478,7 +492,7 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Loading | Catalogue/detail skeletons retain page geometry · `Opening Staff & Duties…` is acceptable accessible status |
 | Empty catalogue | Configuration failure, because the governed catalogue is code-owned; never `No duties yet` |
 | No search match | `No duties match this search` · `Clear search`; catalogue truth remains healthy |
-| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Assign holder`; Work remains visible under Duty word |
+| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager reaches applicable `Assign holder` through `⋯`; Work remains visible under Duty word |
 | Cover active | Show the effective cover as the single current person with plain dates (§4.2); preserve separate normal/cover identities and reason in history |
 | Cover scheduled | Show today's resolved person; future cover and dates remain separate and never replace today's name early |
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |

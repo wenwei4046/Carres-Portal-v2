@@ -237,7 +237,7 @@ NOT BUILT; Workspace MASTER §4). The one global
 | Duty record disclosure (owner-approved 2026-09-28; NOT BUILT) | `Assignment & cover history` — collapsed by default, all authorised records remain reachable; distinguish record time from effective dates | future terms described as already completed |
 | Duty current facts (owner correction 2026-09-29; NOT BUILT) | Duty name + current resolved person name + plain dates; one prominent person, with assignment/cover evidence retained in history | `Normal owner` · `Acting today` · `Who can act` · `Effective` labels and routine permission-explanation paragraphs |
 | Duty assignment form (owner-approved 2026-09-28; NOT BUILT) | Read-only `Duty` + current person name + plain dates; inputs `Holder` · `Effective from` · `Until` · `Note`; `Cancel` / `Assign holder` | a future holder presented as current · a save claimed before confirmation from the source |
-| Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
+| Duty actions (menu placement owner-approved 2026-09-29; NOT BUILT) | Visible `⋯` with accessible name `More actions`; authorised applicable `Assign holder` · `Add cover` inside the menu | permanent manual-action buttons beside the current name · right-click-only entry · Change owner · Reassign · Take it · Release |
 | Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
 | Duty no match | `No duties match this search` · `Clear search` | No duties |
 | Duty read failure | `Staff & Duties could not be opened` · `Try again` | No duties · Error |

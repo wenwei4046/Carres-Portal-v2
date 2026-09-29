@@ -1193,8 +1193,9 @@ main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Set
 and preserves return context; contextual links are not duplicate editors. Preserve existing
 read-only visibility and manager-only writes. Workspace MASTER §4 owns the capability and this
 placement's acceptance boundary. Its §4.2 structure is separately owner-approved 2026-09-28 / NOT
-BUILT: current facts → next assignment → collapsed history, with existing authorised actions near
-the current facts. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
+BUILT: current facts → next assignment → collapsed history. Owner-approved 2026-09-29 / NOT
+BUILT: authorised manual actions live in the selected Duty header’s visible `⋯` menu (`More actions`),
+not permanent buttons. Only authorised managers see applicable actions; no right-click dependency. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
 Settings navigation opens on demand; never force a third narrow-screen column. The separately approved
 2026-09-28 catalogue shows today's holder/active cover/unassigned answer; future dates belong in
 detail (Workspace §4.2), with no token change. Remaining interaction
