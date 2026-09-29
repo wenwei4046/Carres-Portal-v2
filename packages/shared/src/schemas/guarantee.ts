@@ -507,7 +507,7 @@ export function guaranteeCoverageLine(g: {
   const what = g.coversLabel ?? "the covered item";
   const remedy = g.remedy === "replace" ? "one-for-one replacement" : "repair";
   const till = g.expiresOn ? ` · valid till ${g.expiresOn}` : " · starts on delivery";
-  return `${g.coverageYears}-year guarantee on ${what} — ${remedy}${till}`;
+  return `${g.coverageYears}-year guarantee on ${what} · ${remedy}${till}`;
 }
 
 // ── route payloads ─────────────────────────────────────────────────────────

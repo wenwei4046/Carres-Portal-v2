@@ -54,6 +54,8 @@ type Props<E extends { path: string; kind: string }> = {
   videoMimes: readonly string[];
   /** Absent = PDFs are not accepted (every caller before 0587). */
   pdfMimes?: readonly string[];
+  /** Cap for a PDF; defaults to the photo cap. */
+  pdfMaxBytes?: number;
   imageMaxBytes: number;
   videoMaxBytes: number;
   maxFiles: number;
@@ -72,6 +74,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
   imageMimes,
   videoMimes,
   pdfMimes = [],
+  pdfMaxBytes,
   imageMaxBytes,
   videoMaxBytes,
   maxFiles,
@@ -147,7 +150,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
         setPickError(`${file.name}: this file type is not accepted.`);
         continue;
       }
-      const cap = isVideo ? videoMaxBytes : imageMaxBytes;
+      const cap = isVideo ? videoMaxBytes : isPdf ? (pdfMaxBytes ?? imageMaxBytes) : imageMaxBytes;
       if (file.size > cap) {
         setPickError(`${file.name} is too large (max ${mb(cap)}).`);
         continue;
@@ -190,8 +193,14 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
       />
       {/* The limits are stated BEFORE a file is chosen (§9). */}
       <p className="mt-0.5 text-label text-base-500">
-        Photos (JPG, PNG, WEBP) up to {mb(imageMaxBytes)} · videos (MP4, MOV,
-        WEBM) up to {mb(videoMaxBytes)}{pdfMimes.length ? ` · PDF up to ${mb(imageMaxBytes)}` : ""} · up to {maxFiles} files. Pick several
+        {/* Only the kinds this field accepts are named — a field that takes
+            no video never promises a 0 MB video. Unchanged for every caller
+            that passes photos and videos. */}
+        {[
+          imageMimes.length ? `Photos (JPG, PNG, WEBP) up to ${mb(imageMaxBytes)}` : null,
+          videoMimes.length ? `videos (MP4, MOV, WEBM) up to ${mb(videoMaxBytes)}` : null,
+          pdfMimes.length ? `PDF up to ${mb(pdfMaxBytes ?? imageMaxBytes)}` : null,
+        ].filter(Boolean).join(" · ")} · up to {maxFiles} files. Pick several
         at once, or add more later.
       </p>
       {files.length > 0 && (

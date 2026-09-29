@@ -118,7 +118,7 @@ export function parseCsv(text: string): CsvParseResult {
       errors.push({
         row: r + 1,
         col: headers.length + 1,
-        message: `row has ${raw.length} cols, header has ${headers.length} — extras dropped`,
+        message: `row has ${raw.length} cols, header has ${headers.length}. Extras dropped`,
       });
     }
     out.push(obj);

@@ -32,7 +32,7 @@ function response(
   over: Partial<OpsStockHealthResponse> = {},
 ): OpsStockHealthResponse {
   return {
-    headline: "Nothing is watched yet — 2 items still need a number.",
+    headline: "Nothing is watched yet. 2 items still need a number.",
     counts: { critical: 0, low: 0, over: 0, healthy: 0, unrated: 2 },
     rows: [
       {
@@ -92,7 +92,7 @@ describe("the digest", () => {
     serve(response());
     renderPanel();
     expect((await screen.findByTestId("health-headline")).textContent).toBe(
-      "Nothing is watched yet — 2 items still need a number.",
+      "Nothing is watched yet. 2 items still need a number.",
     );
     // The card's Done-when, made literal: no SKU is on screen until asked for.
     expect(screen.queryByTestId(`health-row-${PILLOW}`)).toBeNull();
@@ -258,7 +258,7 @@ describe("did the plan work", () => {
     );
     renderPanel();
     expect((await screen.findByTestId("accuracy-2026-06")).textContent).toContain(
-      "we ordered too little",
+      "We ordered too little",
     );
   });
 

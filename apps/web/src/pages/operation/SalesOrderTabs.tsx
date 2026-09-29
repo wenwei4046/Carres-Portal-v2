@@ -33,7 +33,7 @@ export default function SalesOrderTabs({
   backLabel?: string;
 }) {
   useEffect(() => {
-    document.title = docTitle ?? `${identity} — Carres`;
+    document.title = docTitle ?? `${identity} · Carres`;
     return () => { document.title = "Carres Portal"; };
   }, [docTitle, identity]);
   return (

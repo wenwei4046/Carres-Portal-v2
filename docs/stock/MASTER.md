@@ -90,7 +90,8 @@ quantity`, 0218) whose technical register key is never shown, printed or scanned
 That key is `QTY-000000001` (0453) — deliberately not the shape of a Unit ID — and both register
 views expose `identity_scope` so no surface has to guess. **Every screen, PDF, export and scan
 resolves identity through the one shared resolver** (`unitIdOf()`), which answers `null` for
-counted goods; `null` prints `—`. A counted row cannot be reached by scanning, because nothing was
+counted goods; `null` prints nothing on a screen (owner ruling 2026-09-26: no dash stands in for a
+value; a PDF or export keeps COPY's governed absence). A counted row cannot be reached by scanning, because nothing was
 ever printed for it.
 Receiving verifies the identities Purchasing issued and never creates, replaces or renumbers one.
 
@@ -139,6 +140,7 @@ page or integration maintains another available quantity.
 | received, inspected, complete, unreserved and uncontrolled | Available |
 | bound by Sales Order | Reserved / sold |
 | ordered but not received | Incoming |
+| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; BUILT on branch build/purchasing-use-this-po, migration 0600 not yet applied) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
 | between confirmed handovers | In transit |
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
@@ -279,6 +281,14 @@ Work. It never moves a Unit or rewrites an actual handover. A Transfer may be ca
 only before collection, leaving Units at origin. After collection, cancel cannot teleport goods
 back; a governed return or redirect journey records the next handover while `Who has it` continues
 to state the actual current holder.
+
+**SHOWROOM TRANSPORT COORDINATION — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.**
+For display moves without a Sales Order, Delivery Duty coordinates transport under Delivery
+MASTER §13.1 and Workspace's shared owner/cover rules. PO Duty retains supplier commitments.
+This is coordination only: Stock retains the Transfer and custody facts, and physical handlers
+retain their evidence/permission requirements. No fake Sales Order, new Stock owner list or
+automatic assignment to the request recorder. Missing assignment and action-admission gaps remain
+explicit; this ruling is not proof that the Transfer/Work target is implemented.
 
 The requesting module explains why the movement is needed. Stock owns the Transfer and Unit-holder
 truth; origin operator, NETS Delivery and destination operator own their own physical evidence. The
@@ -630,7 +640,8 @@ is a gate. The UI offers the `Receive` control on exactly the same global answer
 server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
 decision and is not assumed here.**
 
-**EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT.**
+**EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25. The SQL gate is BUILT ON BRANCH
+`build/receiving-closure` (migration 0601, not applied); the Warehouse Settings `Access` row is not built.**
 Receiving is never blocked because the GRN Duty holder is on MC or busy: every active Carres
 Operation staff member (and the Principal) sees `Receive` on the row and may post a receipt. GRN Duty
 still OWNS the Work card (`Receive the goods`) and its lateness; the actual receiver is recorded on
@@ -640,8 +651,8 @@ and capability are different facts). `Not your duty today` is retired as a refus
 only refusals left are `No Site linked` and a Site that is not a Carres or transit Site. Warehouse
 Settings → `Access` shows this as `Receive goods · Everyone in Operation` by default, with the option
 to narrow it later. The database gate `receiving_require_post_authority` (GRN Duty · cover ·
-Operations Superuser) is overwritten by this ruling and must widen to active Operation staff in the
-same build.
+Operations Superuser) is overwritten by this ruling for posting; 0601 widens it to active Operation
+staff and the principal. Amend and Void Receiving keep the GRN Duty authority.
 
 **SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
 BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres
@@ -650,6 +661,20 @@ showroom · Logistics transit point) · Operated by · Full address · Active` a
 operated by HOUZS — owner instruction 2026-09-25: add it now, not later) are added in the same build. `Access` keeps `Manage Warehouse Settings` and `Receive goods` only; `Perform stock
 count` and `Confirm collection from Warehouse` return when Counts and NETS logins are built — no
 switch for a capability that does not exist.
+
+**SHOWROOM SPACE PLANNING — OWNER RULING, Jess 2026-09-28; APPROVED TARGET / NOT
+BUILT.** Do not add fixed Sofa, Mattress or Bedframe display-capacity settings at this stage.
+Showrooms can change their product mix and layout; independent category limits would not reliably
+represent usable space. Sites remain maintained in the existing Warehouse Settings authority.
+PJ's roughly 11 sofa sets is a current owner-reported layout reference only, not a configured
+maximum, verified occupancy, Unit-count limit or receipt gate. Reassess capacity management only
+when measured operational need justifies it; no capacity-setting work is currently approved.
+
+For each display arrangement, use actual displayed goods and planned incoming/outgoing goods,
+and have Operation coordinate available placement space with the receiving showroom under
+Purchasing MASTER §9.8. Do not calculate free capacity or full-site alerts from fixed category
+limits. Preserve verified Stock identities and physical evidence; no new display inventory,
+Positions/Rack/Bin or production data changes are authorised.
 
 **COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
 mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of
@@ -741,7 +766,7 @@ stock use`, `Orders / dates`) are retired as design, and a Unit's further facts 
 Detail, opened from the Unit ID. `Site · Ownership · Condition · Category · Last verified ·
 Supplier · Last moved` remain one click away in `Columns`. Every identifier prints in its ruled
 form — `U1-000-084` · `SO2609-4827` · `PO260924-4827` · a five-digit `DO`/`SDO` — and a quantity
-row prints `—` for Unit ID with `×{qty}` beside the product. Measured on production 2026-09-25:
+row prints nothing for Unit ID (owner ruling 2026-09-26: no dash on a screen) with `×{qty}` beside the product. Measured on production 2026-09-25:
 each composite row rendered about 70px and a 768px-tall screen showed six Units; at 40px the same
 screen shows fifteen.
 
@@ -765,7 +790,7 @@ page. One list, one column set: the rail rows (`Reserved`, `Ready Stock`, `Showr
 | Column | Meaning | Absence |
 |---|---|---|
 | `Goods Received Date` | the day it entered Carres control (posted receipt; a Unit booked in before Receiving existed keeps its recorded date in) | `Not received` for an `Incoming` Unit (no Receiving record); `Not recorded` for goods Carres holds whose date was never captured — measured 2026-09-26: 27 opening-stock rows |
-| `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints `—` | — |
+| `Unit ID` | pinned identity; opens Unit Detail; a quantity row prints nothing (no dash on a screen, owner 2026-09-26) | nothing |
 | `Item` | product name · SKU; a quantity row adds `×{qty}` | — |
 | `Inventory Status` | can it be sold: `Available` · `Reserved` (bound to the SO in `SO No`) · `Cannot sell` — the international word (Dynamics 365 / NetSuite `Inventory status`); `Stock use`, `Not available`, `Blocked`, `Reserved / sold` and any condition word are retired here | — |
 | `Stock Condition` | the physical state (owner rename 2026-09-25; the stock picker's `Condition` head follows so the portal keeps one word): `New` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection` — a `Cannot sell` row always has its reason here | — |
@@ -798,10 +823,13 @@ result `Received` makes a Unit `Available` automatically (SAP unrestricted stock
 receipt); there is no button to "release" good stock, and `Make available for sale` exists only for
 the way back from `Cannot sell`.
 
-**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT 2026-09-26 (migration 0589;
-authenticated production walk owed).** The page is the Sales Order object page's grammar (owner
+**UNIT DETAIL — owner rulings 2026-09-25 and 2026-09-26, BUILT and PRODUCTION-WALKED 2026-09-26
+(migrations 0589 + 0590 APPLIED; walk: `U1-000-282` reported damaged → Issue `IS-2609-0005`, Unit
+`Cannot sell · Waiting inspection`, History shows the condition, status and protection changes, the
+GRN Duty card `Check the damage on U1-000-282 and record the result · by Mon, 28 Sep` stands in Work,
+and `Make available for sale` refuses with `1 reported problem is still open`).** The page is the Sales Order object page's grammar (owner
 ruling 2026-09-26, Law C: one header, never a lookalike): the header row reads
-`← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are blue-titled blocks, and an old
+`← Inventory | {Unit ID} · {Item} | ⋮`, the four sections are the kit's `Block` cards (black titles, ONE KIT LAW 2026-09-27), and an old
 reference the portal never held prints `{ref} · not in this portal` instead of `No SO`. The
 `⋮` holds exactly three acts. **`Report a problem`** asks three things — `What did you see?`
 (`Damaged` · `Not found` · `Wrong item` · `Missing component` · `Label / Unit ID problem` ·
@@ -1731,18 +1759,66 @@ problem and reads processing state; cannot change ownership/cost/SO reservation/
 an authorised exact display Unit without moving it. Purchasing manages Consignment Order, exchange,
 Claim, collection and Sold to Settle without editing holder.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inventory rail contains `Showroom Display`, `WHO HAS IT → PJ
-Showroom / Other outlets` and `OWNERSHIP → Carres Owned / Supplier Consignment`. The saved view
-defaults to `Unit ID · Product · Site · Ownership · Stock use · SO No · Display since · Last
-condition check · Who has it · Expected collection · Work`. `Zone A3`, `Position 6`, Rack and other
-unverified placement fields are absent unless future measured outlet operations justify a governed
-extension.
+**UI / PAGE / OBJECT PLACEMENT →** the showroom uses Inventory's own columns and words (§7, owner
+rulings 2026-09-25): the rail row `STOCK → Showroom Display` filters the same eleven-column
+register, `OWNERSHIP → Carres Owned / Supplier Consignment` splits it, and `Stock Location` names
+the showroom (`PJ Showroom`, later the 2nd and 3rd showrooms by their own Site names). No second
+column set, no `Who has it`, no `Stock use`. `Zone A3`, `Position 6`, Rack and other unverified
+placement fields are absent unless future measured outlet operations justify a governed extension.
 
 **CROSS-MODULE CONNECTION →** Purchasing owns Consignment Order/supplier/exchange/Claim/Sold to
 Settle; Stock owns Unit/Site/holder/condition/Count; Showroom owns physical scans and evidence;
 Sales Order owns exact reservation/sale; Delivery owns collection/return/customer handover; Finance
 owns Supplier Invoice/Credit Note/settlement; the `Stock Adjustment Approver` approves major
 unexplained difference/write-off/compensation.
+
+**WHO OWNS WHAT IS ON DISPLAY — owner facts, Jess 2026-09-28 (persisted first in Purchasing §7.4a,
+PR #1725).** Showrooms are Carres's own Sites: PJ Showroom today, a 2nd and 3rd Carres-run
+showroom coming. Hookka and Ohana display goods are bought by Carres (`Carres Owned`). Every other
+supplier places its display goods on consignment (`Supplier Consignment`, the supplier named on the
+Unit, as `ops_stock_items` already enforces). A dealer such as Big Mattress buys from Carres; its
+display is the dealer's own stock, never a Carres Site and never a Unit in this register.
+
+**SHOWROOM SITES ARE A PREREQUISITE — owner fact 2026-09-28; readiness measured on production
+2026-09-28.** Repair Orders for a display Unit (Purchasing §9.7) and Consignment Order placement
+(Purchasing §7.6) both need the display Unit to stand in a governed showroom Site with its true
+ownership. What each side already does:
+
+| Capability | Today | Verdict |
+|---|---|---|
+| PJ Showroom as a Site | `warehouses` row `PJ Showroom`, kind `own`; holder party `PJ Showroom` (kind `showroom`) | 🟢 READY |
+| Ownership on the Unit | `carres_owned` · `supplier_consignment`; consignment requires a supplier (check constraint) | 🟢 READY |
+| A receipt landing at a showroom | receiving authority is not Site-scoped (§7), so a posted receipt can name PJ Showroom | 🟢 READY |
+| Inventory filtered to the showroom | `Showroom Display` rail row, `Stock Location`, `OWNERSHIP` group | 🟢 READY |
+| Adding the 2nd and 3rd showroom | Warehouse Settings `Sites` section | 🔴 APPROVED TARGET / NOT BUILT (§7) |
+| Moving a display Unit between Klang, a showroom and repair with evidence | the `Transfer` form | 🔴 APPROVED TARGET / NOT BUILT (§5) |
+| A personally signed-in showroom person scanning arrival, departure and Count | showroom identity and scan surfaces | 🔴 NOT BUILT |
+
+Purchasing needs nothing further from Stock to write its rules; the three 🔴 rows are Stock's build
+work, and the Settings `Sites` section plus the `Transfer` form come first because a display Unit
+cannot reach a repair or a consignment return without them.
+
+**TEST DATA IS WRONG ON OWNERSHIP, AND THE GO-LIVE IMPORT MUST NOT REPEAT IT.** The 2026-09-26 owner
+test load booked all 36 PJ Showroom Units as `Carres Owned`, including Armani, Dorsettloft, Todern
+and Nice Future goods. Under the 2026-09-28 facts only Hookka and Ohana display goods are Carres
+Owned. These are test rows (Constitution §6, no backfill); the go-live opening import sets
+`Supplier Consignment` and the supplier for every other supplier's display Unit. Measured the same
+day: one purchase order carries `is_consignment`.
+
+**Showroom document purpose — APPROVED TARGET / NOT BUILT; Jess, 2026-09-29.**
+Purchasing §§9.9–9.10 retain Consignment Order for obtaining supplier-owned display goods and
+Consignment Return for handing them back. One Display Request pre-fills these documents; no
+additional Consignment Note or duplicate stock writer. Showroom signature/acceptance belongs to
+actual Receiving evidence; supplier collection acknowledgement belongs to actual handover evidence.
+A showroom-to-Carres-warehouse move remains Stock Transfer, not a completed supplier return.
+Printing, issuing or sending instructions never changes custody or completes either physical leg.
+
+**Showroom handoff connection — APPROVED TARGET / NOT BUILT, Jess 2026-09-28.**
+Purchasing MASTER §9.8 owns the display-arrangement handoff: replacement/removal starts by selecting
+this register's existing showroom Units; new placement may have no outgoing Unit. Sales supplies
+negotiated goods/price/conditions; Operation prepares the governed documents and execution.
+Stock remains the sole authority for Unit identity, location, ownership and physical evidence.
+This connection introduces no second inventory, production data correction or new Stock action.
 
 ### 12.10 Month-end Stock Confirmation and Finance handoff
 

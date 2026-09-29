@@ -303,7 +303,7 @@ function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock })
 
   if (actions.length === 0) {
     return (
-      <span className="text-body text-base-700">Everything done — close this case.</span>
+      <span className="text-body text-base-700">Everything done. Close this case.</span>
     );
   }
 

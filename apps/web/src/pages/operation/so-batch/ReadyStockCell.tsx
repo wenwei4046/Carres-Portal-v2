@@ -4,6 +4,7 @@
 // wrapping a nested disclosure in a second ListPageShell would draw a page
 // inside a page — exactly the windows-inside-windows AutoCount pattern the
 // Constitution rejects (§2).
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -431,7 +432,7 @@ export function useSoBatchReadyStock({
           if (unit?.blocked === "counted_stock") {
             return READY_STOCK_BLOCKED_WORDS.counted_stock;
           }
-          if (!unit) return "";
+          if (!unit) return GOODS_ABSENCE_WORDS.notRecorded;
           /**
            * ⭐ A REPLACEMENT NEEDS ROOM THE DRAFT HAS ALREADY MADE.
            *

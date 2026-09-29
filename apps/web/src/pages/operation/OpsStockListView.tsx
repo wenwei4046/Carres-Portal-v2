@@ -741,7 +741,7 @@ function RowItem({
         {row.qty && row.qty > 1 ? (
           <span
             className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-label font-semibold text-base-600"
-            title="Bulk line — this record represents this many units"
+            title="Bulk line. This record represents this many units"
           >
             ×{row.qty}
           </span>

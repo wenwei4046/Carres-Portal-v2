@@ -568,8 +568,10 @@ describe("the settled nine column words", () => {
       "Purpose",
       "Items",
       "Supplier",
-      "Deliver To",
-      "Delivery Date",
+      /* Owner 2026-09-28: the request's destination and asked-for date are
+         the SUPPLIER's delivery facts, one word on every surface. */
+      "Supplier Deliver To",
+      "Supplier Delivery Date",
     ]);
     const words = JSON.stringify(MANUAL_PURCHASE_WORDS);
     expect(words).not.toContain("Requested Date");
@@ -594,8 +596,10 @@ describe("the settled nine column words", () => {
 
   it("the form's date words and the lead-days Send gap are governed", () => {
     expect(MANUAL_PURCHASE_WORDS.proceedDate).toBe("Proceed Date");
-    expect(MANUAL_PURCHASE_WORDS.deliveryDate).toBe("Delivery Date");
-    expect(MANUAL_PURCHASE_WORDS.sendNeedsLeadDays).toBe("Send — lead days are not set");
+    expect(MANUAL_PURCHASE_WORDS.deliveryDate).toBe("Supplier Delivery Date");
+    expect(MANUAL_PURCHASE_WORDS.secCreateDelivery).toBe("Supplier Delivery");
+    expect(MANUAL_PURCHASE_WORDS.createDeliverTo).toBe("Supplier Deliver To");
+    expect(MANUAL_PURCHASE_WORDS.sendNeedsLeadDays).toBe("Send: lead days are not set");
     expect(MANUAL_PURCHASE_WORDS.notRecorded).toBe("Not recorded");
     expect(MANUAL_PURCHASE_WORDS.orderDatePassed).toBe("Order date passed");
   });

@@ -199,6 +199,38 @@ describe("POST /api/warehouse/receipts", () => {
     });
   });
 
+  it("carries the arrival time captured at the count (0601)", async () => {
+    const sb = makeSb({ data: { id: "r1" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
+      ...validBody,
+      goodsReceivedTime: "2026-09-28T09:15:00+08:00",
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith(
+      "warehouse_submit_receipt",
+      expect.objectContaining({ p_goods_received_time: "2026-09-28T09:15:00+08:00" }),
+    );
+  });
+
+  it("still files the count, dated, on a database that does not take the time yet (0601 not applied)", async () => {
+    const sb = makeSb({ data: { id: "r1" } });
+    sb.rpc
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function public.warehouse_submit_receipt" } })
+      .mockResolvedValueOnce({ data: { id: "r1" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
+      ...validBody,
+      goodsReceivedTime: "2026-09-28T00:30:00+08:00",
+    });
+    expect(res.status).toBe(201);
+    const second = sb.rpc.mock.calls[1]![1] as Record<string, unknown>;
+    expect(second).not.toHaveProperty("p_goods_received_time");
+    expect(second.p_goods_received_at).toBe("2026-09-28");
+  });
+
   it("maps arrival evidence, extra lines and per-unit outcomes onto the RPC (0426)", async () => {
     const sb = makeSb({ data: { id: "r1" } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

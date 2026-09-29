@@ -129,7 +129,7 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
       const blob = await renderInvoicePdf(res.document);
       window.open(URL.createObjectURL(blob), "_blank", "noopener");
     } catch (e) {
-      toast.error(`The invoice document could not be opened — ${(e as Error).message}`);
+      toast.error(`The invoice document could not be opened: ${(e as Error).message}`);
     } finally {
       setPrinting(false);
     }
@@ -290,10 +290,10 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
           door for a principal or manager. */}
       <InvoiceCollectionOwner orderId={invoice.order_id} canRead={canReadOwner} />
       <Facts title="Invoice">
-        <p>{invoice.invoice_no ?? "No invoice number yet — this is a draft."}</p>
+        <p>{invoice.invoice_no ?? "No invoice number yet. This is a draft."}</p>
         <p>{invoice.status === "issued" && invoice.issued_at ? `Issued · ${fmtDate(invoice.issued_at)}`
           : invoice.status === "voided" ? `VOIDED · ${invoice.void_reason ?? "Reason not available"}`
-          : "Draft — it can still be edited and issued."}</p>
+          : "Draft. It can still be edited and issued."}</p>
         <p>{rm(invoice.amount)}{Number(invoice.tax_amount) > 0 ? ` · Tax ${rm(Number(invoice.tax_amount))}` : ""}</p>
         {invoice.replaces_invoice_id && <p>This invoice replaces a voided invoice.</p>}
         {invoice.invoice_no

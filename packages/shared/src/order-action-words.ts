@@ -181,7 +181,7 @@ const WORDS: readonly OrderActionWord[] = [
   {
     key: "confirm_ready_date",
     queue: "Confirm ready date",
-    line: (p) => `Call ${party(p.supplier, "supplier")} — confirm ready date`,
+    line: (p) => `Call ${party(p.supplier, "supplier")} to confirm ready date`,
     button: "Record ready date",
     done: null,
   },
@@ -496,7 +496,7 @@ export function orderActionDone(key: OrderActionKey): string | null {
  * to-do word — so it names the outstanding thing instead of the gap.
  */
 export function deliveryDateGapFact(logistics?: string | null): string {
-  return `${party(logistics, "Logistics")} — confirm delivery date`;
+  return `${party(logistics, "Logistics")}: confirm delivery date`;
 }
 
 /** Queue word → its action, for surfaces that only carry the label (the queue
@@ -600,7 +600,7 @@ const PURCHASING_ONLY: Record<
     // Counted per PO LINE — the only one of the six that is.
     queue: "Confirm balance delivery date",
     line: (p) =>
-      `Call ${party(p.supplier, "supplier")} — confirm balance delivery date`,
+      `Call ${party(p.supplier, "supplier")} to confirm balance delivery date`,
     button: "Record balance date",
     done: "Balance date recorded",
     empty: "Nothing short today.",
@@ -608,7 +608,7 @@ const PURCHASING_ONLY: Record<
   confirm_what_happens_next: {
     queue: "Confirm what happens next",
     line: (p) =>
-      `Call ${party(p.supplier, "supplier")} — confirm what happens next`,
+      `Call ${party(p.supplier, "supplier")} to confirm what happens next`,
     button: "Record what happens next",
     done: null,
     empty: "No claim is waiting for a supplier answer.",

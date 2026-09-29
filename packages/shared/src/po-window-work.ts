@@ -93,6 +93,8 @@ export interface PoWindowPoFact {
   sentCurrentVersion: boolean;
   /** The window each ORDER this PO serves put it in — the earliest wins. */
   poWindow: string | null;
+  /** The Sales Order this fact was read under (one SO Batch register row). */
+  orderId?: string | null;
 }
 
 export interface PoWindowPo {
@@ -104,6 +106,10 @@ export interface PoWindowPo {
   channel: PoSendChannel;
   /** The send line; null once the current version is marked sent. */
   act: string | null;
+  /** Every Sales Order this PO serves, from the SO Batch lineage (the same
+   *  rows that put the PO in its window). Work shows a PO under a Sales Order
+   *  only when this names that order alone (Workspace §5.10 A3). */
+  orderIds: string[];
 }
 
 export interface PoWindowWork {
@@ -159,7 +165,13 @@ export function poWindowWork(input: {
   /* A PO serving orders from two windows belongs to the EARLIEST — the one it
      was due for — and is counted once. */
   const earliest = new Map<string, PoWindowPoFact>();
+  const ordersOf = new Map<string, Set<string>>();
   for (const po of input.pos) {
+    if (po.orderId) {
+      const set = ordersOf.get(po.poId) ?? new Set<string>();
+      set.add(po.orderId);
+      ordersOf.set(po.poId, set);
+    }
     if (!po.poWindow || !parsePoWindowKey(po.poWindow)) continue;
     const seen = earliest.get(po.poId);
     if (!seen || po.poWindow < seen.poWindow!) earliest.set(po.poId, po);
@@ -181,6 +193,7 @@ export function poWindowWork(input: {
           sent: po.sentCurrentVersion,
           channel,
           act: po.sentCurrentVersion ? null : poSendActOf(documentNo, supplierName, channel),
+          orderIds: [...(ordersOf.get(po.poId) ?? [])].sort(),
         };
       })
       .sort((a, b) => Number(a.sent) - Number(b.sent) || a.poId.localeCompare(b.poId));
@@ -287,6 +300,7 @@ export function poWindowWorkFromSoBatch(
       supplierName: po.supplierName,
       sentCurrentVersion: po.sentCurrentVersion || po.status === "received",
       poWindow: po.poWindow ?? null,
+      orderId: reg.orderId,
     }))),
     channelOf: (supplierId) => {
       const door = supplierId ? doors.get(supplierId) : undefined;

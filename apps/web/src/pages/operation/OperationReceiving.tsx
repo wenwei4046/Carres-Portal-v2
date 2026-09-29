@@ -1,3 +1,4 @@
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -480,7 +481,11 @@ export default function OperationReceiving() {
         sortable: true,
         searchValue: (r) => r.goods_received_at ?? "",
         exportValue: (r) =>
-          r.goods_received_at ? fmtDate(r.goods_received_at) : "",
+          r.goods_received_time
+            ? fmtDate(r.goods_received_time, { time: true })
+            : r.goods_received_at
+              ? `${fmtDate(r.goods_received_at)} · Time not recorded`
+              : "",
         /* The table's date column OWNS detailed date filtering (owner
            correction 2026-09-06) — the rail's date group is the GRN's
            creation date, which is a different fact. */
@@ -488,9 +493,20 @@ export default function OperationReceiving() {
         dateValue: (r) => r.goods_received_at,
         sortFn: (a, b) =>
           (a.goods_received_at ?? "").localeCompare(b.goods_received_at ?? ""),
+        /* 0601 · the date, then its KL clock on the inline second line; an
+           older GRN says `Time not recorded` — never back-filled. */
         accessor: (r) => (
-          <span className="tabular-nums text-body text-base-900">
-            {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
+          <span className="flex flex-col" data-testid={`grn-received-${r.id}`}>
+            <span className="tabular-nums text-body text-base-900">
+              {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
+            </span>
+            {r.goods_received_at ? (
+              <span className="tabular-nums text-meta text-base-500">
+                {r.goods_received_time
+                  ? fmtDate(r.goods_received_time, { timeOnly: true })
+                  : "Time not recorded"}
+              </span>
+            ) : null}
           </span>
         ),
       },
@@ -773,7 +789,7 @@ export default function OperationReceiving() {
         category: words?.category ?? "",
         unitIds: [],
         /* Extra goods never enter Inventory, so they never become a Unit. */
-        unitAbsence: "",
+        unitAbsence: GOODS_ABSENCE_WORDS.countedByQuantity,
         deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
         deliverToAbsence: "Not recorded",
         supplier: r.supplier_name ?? undefined,
@@ -1121,7 +1137,7 @@ export default function OperationReceiving() {
                 return (
                   <span className="flex items-center gap-3">
                     <span data-testid="grn-page-range" className="truncate">
-                      Showing {from}–{to} of {page.total}
+                      Showing {from} to {to} of {page.total}
                     </span>
                     <button
                       type="button"
@@ -1216,7 +1232,7 @@ function FindPoView({
           <p className="py-3 text-meta text-base-500" data-testid="receiving-find-empty">
             {q.trim() === ""
               ? "No supplier delivery is ready to receive."
-              : "No open purchase order matches. Check the number with Purchasing — an unknown delivery never invents a source."}
+              : "No open purchase order matches. Check the number with Purchasing. An unknown delivery never invents a source."}
           </p>
         ) : (
           candidates.map((p) => {

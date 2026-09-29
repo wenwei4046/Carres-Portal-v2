@@ -325,6 +325,9 @@ export const officeReceiveInput = z.object({
   doFilePath: z.string().min(1).max(400),
   // ISO yyyy-mm-dd. Bounds are the server's — a browser clock is not evidence.
   goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** 0601 — Goods Received Date as a time point (ISO with offset). The
+   *  server refuses a future time or one before the PO date; omitted = now. */
+  goodsReceivedTime: z.string().datetime({ offset: true }).optional(),
   note: z.string().max(500).optional(),
   /** 0426 — where the goods PHYSICALLY arrived, when it differs from the
    *  PO's booked warehouse. Never overwrites Deliver To. */
@@ -387,7 +390,23 @@ export const receivingAmendInput = z
   .object({
     reason: z.string().min(3).max(500),
     saveKey: z.string().uuid().optional(),
+    /** 0601 — the GRN version this correction starts from. First save wins:
+     *  an older one is refused whole (`Someone changed this GRN.`). */
+    basedOnRevision: z.number().int().nonnegative(),
     goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    /** 0601 — Goods Received Date as a time point (ISO with offset). */
+    goodsReceivedTime: z.string().datetime({ offset: true }).optional(),
+    /** 0601 — the person names each exact Unit: Received ↔ Not received.
+     *  The system never picks a Unit. */
+    units: z
+      .array(
+        z.object({
+          stockItemId: z.string().uuid(),
+          outcome: z.enum(["received", "not_received"]),
+        }),
+      )
+      .max(500)
+      .optional(),
     doNumber: z.string().min(3).max(60).optional(),
     actualSiteId: z.string().uuid().nullable().optional(),
     /** A corrected signed-DO file (0427) — the old path is preserved in the

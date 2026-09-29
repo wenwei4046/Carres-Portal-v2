@@ -129,14 +129,14 @@ export async function claimPwpCodesForLines(
       return {
         status: "bad_request",
         code: "pwp_code_rejected",
-        message: "This PWP voucher claim is missing its pricing rule — please re-add the offer and retry.",
+        message: "This PWP voucher claim is missing its pricing rule. Please re-add the offer and retry.",
       };
     }
     if (!c.claimGroup) {
       return {
         status: "bad_request",
         code: "pwp_code_rejected",
-        message: "This PWP voucher claim is missing its submit group — please re-add the offer and retry.",
+        message: "This PWP voucher claim is missing its submit group. Please re-add the offer and retry.",
       };
     }
     if (claimGroup === "") claimGroup = c.claimGroup;
@@ -144,7 +144,7 @@ export async function claimPwpCodesForLines(
       return {
         status: "bad_request",
         code: "pwp_code_rejected",
-        message: "PWP voucher claims in this order disagree on their submit group — please rebuild the cart and retry.",
+        message: "PWP voucher claims in this order disagree on their submit group. Please rebuild the cart and retry.",
       };
     }
   }
@@ -156,7 +156,7 @@ export async function claimPwpCodesForLines(
       return {
         status: "bad_request",
         code: "pwp_code_rejected",
-        message: "The same PWP voucher cannot be applied to two lines — please re-add the offer and retry.",
+        message: "The same PWP voucher cannot be applied to two lines. Please re-add the offer and retry.",
       };
     }
     seen.add(c.code);
@@ -213,8 +213,8 @@ export async function claimPwpCodesForLines(
         status: "bad_request",
         code: "pwp_code_rejected",
         message: c.crossOrder
-          ? "This saved voucher can't be redeemed — check the customer's phone, or it may be used or expired."
-          : "This PWP voucher is no longer reservable — please re-add the offer and retry.",
+          ? "This saved voucher can't be redeemed. Check the customer's phone, or it may be used or expired."
+          : "This PWP voucher is no longer reservable. Please re-add the offer and retry.",
       };
     }
     claimed.push({ code: c.code, crossOrder: c.crossOrder });

@@ -199,7 +199,7 @@ export default function Login() {
             </h1>
 
             <p className="deck">
-              <strong>One workspace</strong> for dealers, suppliers, operation &amp; finance — every order, every approval, every signal in one place.
+              <strong>One workspace</strong> for dealers, suppliers, operation &amp; finance. Every order, every approval, every signal in one place.
             </p>
           </div>
 
@@ -236,7 +236,7 @@ export default function Login() {
             )}
             {!supabaseConfigured && (
               <div className="alert alert-error">
-                Supabase not configured — set apps/web/.env.local
+                Supabase not configured. Set apps/web/.env.local
               </div>
             )}
 

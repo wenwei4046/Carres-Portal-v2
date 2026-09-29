@@ -70,7 +70,7 @@ export async function storageBlock(
       amount: hold.owing,
       message:
         `Storage fee of RM ${hold.owing.toLocaleString()} must be collected before this order ` +
-        `can be dispatched — or a manager releases the delivery.`,
+        `can be dispatched, or a manager releases the delivery.`,
     };
   } catch {
     // Fail OPEN — a gate-lookup hiccup must not block dispatch of the live

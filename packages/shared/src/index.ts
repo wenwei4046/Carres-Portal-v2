@@ -2,6 +2,7 @@ export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
 export * from "./unit-problem";
+export * from "./repair-order";
 
 /* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
    the fee onto the order. The Worker cannot import from the web app, which
@@ -113,6 +114,8 @@ export {
   purchasingSetSupplierCollectionInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
+  purchasingSetPoWindowsInput,
+  poWindowsHistoryLabel,
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
@@ -133,6 +136,7 @@ export {
   type PurchasingSetSupplierCollectionInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
+  type PurchasingSetPoWindowsInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
@@ -1197,6 +1201,7 @@ export {
   receivingWorkItems,
   RECEIVING_UNIT_OUTCOME_LABEL,
   RECEIVING_AUTHORITY_LABEL,
+  receivedByWords,
   RECEIVING_WORK_WORDS,
   // 2026-09-06 owner correction — the Register is the GRN record; the rail
   // speaks exactly five governed category rows through the shared ladder.
@@ -1921,6 +1926,8 @@ export {
   // register footer so Receiving and Sales Orders speak one rule.
   GOODS_CATEGORY_WORDS,
   goodsCategoryWordOf,
+  catalogCategoryWordOf,
+  CATALOG_CATEGORY_NOT_RECORDED,
   type GoodsCategoryWord,
   type CoreCat,
   type LineClass,
@@ -2329,6 +2336,7 @@ export {
   type ToOrderRow,
   type ToOrderSortKey,
   type ToOrderSupplier,
+  GOODS_ABSENCE_WORDS,
 } from "./to-order";
 export {
   MANUAL_PURCHASE_WORDS,
@@ -2439,6 +2447,14 @@ export {
   soBatchOrderSelection,
   soBatchOrderPlanning,
   soBatchOrderUnselectableReason,
+  soBatchOrderStatusWhy,
+  soBatchLeafStatusWhy,
+  soBatchLineReservedWhy,
+  soBatchPoOfferSentence,
+  soBatchPoReservedSentences,
+  SO_BATCH_STATUS_DOOR,
+  type SoBatchStatusDoor,
+  type SoBatchStatusWhy,
   soBatchOrderSafetyDays,
   soBatchOrderStatusWord,
   type SoBatchSafetyDaysCell,
@@ -2493,6 +2509,8 @@ export {
   readyStockReserveInputSchema,
   readyStockReserveResultSchema,
   readyStockSaveInputSchema,
+  readyStockUsePoInputSchema,
+  readyStockUsePoResultSchema,
   readyStockSaveResultSchema,
   readyStockResponseSchema,
   readyStockUnitSchema,
@@ -2501,6 +2519,8 @@ export {
   type ReadyStockReserveInput,
   type ReadyStockReserveResult,
   type ReadyStockSaveInput,
+  type ReadyStockUsePoInput,
+  type ReadyStockUsePoResult,
   type ReadyStockSaveResult,
   type ReadyStockResponse,
   type ReadyStockUnit,
@@ -3289,3 +3309,5 @@ export * from "./logistics-card";
 export * from "./customer-card";
 export * from "./supplier-card";
 export * from "./mission-route";
+
+export * from "./sales-order-register-filters";

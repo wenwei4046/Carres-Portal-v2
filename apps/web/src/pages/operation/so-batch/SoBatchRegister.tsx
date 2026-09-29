@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ApiError, apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import {
@@ -18,6 +21,10 @@ import {
   soBatchOrderLineOutstandingQty,
   soBatchOrderPlanning,
   soBatchOrderUnselectableReason,
+  soBatchOrderStatusWhy,
+  soBatchLeafStatusWhy,
+  soBatchLineReservedWhy,
+  readyStockRefusalWord,
   soBatchOrderSafetyDays,
   soBatchOrderStatusWord,
   soBatchOrderByAbsenceWord,
@@ -37,7 +44,11 @@ import {
   type SoBatchRailFilter,
   type SoBatchSafetyDaysCell,
   type SoBatchSelection,
+  type SoBatchStatusDoor,
+  type SoBatchStatusWhy,
+  GOODS_ABSENCE_WORDS,
 } from "@carres/shared";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   DataGrid,
   type DataGridColumn,
@@ -212,6 +223,103 @@ function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
 /** Governed absence — a muted sentence, never a bare dash. */
 function Absent({ children }: { children: string }) {
   return <span className="text-kit-slate-11">{children}</span>;
+}
+
+/** Where each Status line-two door leads — the existing Operation destinations. */
+const STATUS_DOOR_PATH: Record<Exclude<SoBatchStatusDoor, "use_po">, string> = {
+  /* The Operation costing Catalog (SKU, supplier, cost) — `portal-nav.ts` `op-catalog`. */
+  catalog: "/operation?tab=op-catalog",
+  /* Purchasing Settings owns production days and collection. */
+  settings: "/operation/settings/purchasing",
+};
+
+/** The kit link-style door on Status line two (slice 1's `Fix in Catalog`). */
+const STATUS_DOOR_CLASS =
+  "text-kit-blue-11 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
+
+/**
+ * ⭐ `Use this PO` — owner ruling 2026-09-28 (Purchasing §9.1). Reserves the
+ * named PO's incoming Unit IDs for the named item line through the one door
+ * (`/ready-stock/use-po`, 0600). Disabled while the act is in flight; a
+ * refusal prints the door's own governed sentence. The Register is re-read,
+ * never edited in place.
+ */
+function UseThisPoButton({ orderId, usePo }: { orderId: string; usePo: { orderLineId: string; poId: string } }) {
+  const queryClient = useQueryClient();
+  const reserve = useMutation({
+    mutationFn: () =>
+      apiFetch<unknown>("/api/operation/purchase/demands/ready-stock/use-po", {
+        method: "POST",
+        body: JSON.stringify({ orderId, orderLineId: usePo.orderLineId, poId: usePo.poId }),
+      }),
+    onError: (e: Error) => {
+      const code = e instanceof ApiError ? ((e.body as { code?: string } | null)?.code ?? null) : null;
+      toast.error(readyStockRefusalWord(code));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void queryClient.invalidateQueries({ queryKey: ["so-batch-ready-stock", orderId] });
+      void queryClient.invalidateQueries({ queryKey: ["operation", "orders", orderId, "expansion"] });
+    },
+  });
+  return (
+    <button
+      type="button"
+      className={STATUS_DOOR_CLASS}
+      disabled={reserve.isPending}
+      aria-busy={reserve.isPending || undefined}
+      data-testid={`so-batch-use-po-${usePo.orderLineId}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        reserve.mutate();
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {W.statusUseThisPo}
+    </button>
+  );
+}
+
+/**
+ * ⭐ STATUS LINE TWO — owner ruling 2026-09-28 (Purchasing §9.1).
+ *
+ * Why the row cannot be ticked, in the muted absence text, with the door that
+ * fixes it where one exists. The door never toggles or opens the row.
+ */
+function StatusWhy({
+  why,
+  testId,
+  orderId,
+  onDoor,
+}: {
+  why: SoBatchStatusWhy;
+  testId: string;
+  orderId: string;
+  onDoor: (door: Exclude<SoBatchStatusDoor, "use_po">) => void;
+}) {
+  const door = why.door;
+  return (
+    <span className="block text-meta text-kit-slate-11" data-testid={testId}>
+      <span className="block">{why.text}</span>
+      {door === "use_po" && why.usePo ? (
+        <UseThisPoButton orderId={orderId} usePo={why.usePo} />
+      ) : door && door !== "use_po" ? (
+        <button
+          type="button"
+          className={STATUS_DOOR_CLASS}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDoor(door);
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {door === "catalog" ? W.statusFixInCatalog : W.statusOpenSettings}
+        </button>
+      ) : null}
+    </span>
+  );
 }
 
 /**
@@ -684,14 +792,33 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
          */
         key: "status",
         label: "Status",
-        width: 112, minWidth: 96,
+        /* The shared Purchasing field width (UI MASTER §6.8); line two wraps
+           — the inline second line is the one allowed exception. */
+        width: REGISTER_FIELD_WIDTH.status, minWidth: 96,
+        wrap: true,
         sortable: true,
         chooserGroup: "Buying",
-        accessor: (o) => (
-          <span data-testid={`so-batch-status-${o.orderId}`}>
-            {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
-          </span>
-        ),
+        accessor: (o) => {
+          /* ⭐ THE TWO-LINE STATUS RULE (owner ruling 2026-09-28): line one
+             is unchanged; line two is the SAME refusal the disabled tick
+             carries, read from the same projection. */
+          const why = soBatchOrderStatusWhy(o, leafsByOrder.get(o.orderId) ?? [], stateWords);
+          return (
+            <span className="block" data-testid={`so-batch-status-${o.orderId}`}>
+              <span className="block">
+                {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
+              </span>
+              {why ? (
+                <StatusWhy
+                  why={why}
+                  testId={`so-batch-status-why-${o.orderId}`}
+                  orderId={o.orderId}
+                  onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
+                />
+              ) : null}
+            </span>
+          );
+        },
         filterValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
         sortFn: (a, b) =>
           soBatchOrderStatusWord(orderByFacts.get(a.orderId)!.group).localeCompare(
@@ -1055,7 +1182,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
         },
       },
     ],
-    [orderByFacts, safetyDaysFacts, compareOrderBy,
+    [orderByFacts, safetyDaysFacts, compareOrderBy, stateWords,
       navigate,
       data.destinations,
       leafsByOrder,
@@ -1626,6 +1753,7 @@ function SoBatchOrderExpansion({
     if (leaf) linesPerLeaf.set(leaf.id, (linesPerLeaf.get(leaf.id) ?? 0) + 1);
   }
 
+  const stateWords = purchaseDemandStateWords(safetyDays);
   const lines: GoodsMiniLine[] = order.lines.map((l) => {
     const leaf = leafByLineId.get(l.orderLineId);
     const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);
@@ -1649,7 +1777,7 @@ function SoBatchOrderExpansion({
       testId: `so-batch-part-${l.sku}`,
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: [],
-      unitAbsence: "",
+      unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
       /* The four numbers that used to hide inside `Covered by`: what the
          customer ordered, what the shelf already answered, how much documents
          have ORDERED for this line, and what is left.
@@ -1671,6 +1799,31 @@ function SoBatchOrderExpansion({
          need for a document; it grants no permission, and a line that reads
          `Need PO` can still refuse the tick with its own stated reason. */
       status: soBatchOrderLineOutstandingQty(l) > 0 ? W.statusNeedPo : W.statusNoPoNeeded,
+      /* Line two (owner ruling 2026-09-28): the leaf's own refusal, only
+         beside `Need PO`, from the facts the refused tick reads. */
+      ...(() => {
+        /* Beside `Need PO`, the leaf's refusal, where a pool-covered line reads
+           the `Use this PO` offer; beside `No PO needed`, the goods reserved
+           on a PO for this line (owner ruling 2026-09-28). */
+        const why =
+          soBatchOrderLineOutstandingQty(l) > 0
+            ? leaf
+              ? soBatchLeafStatusWhy(leaf, order.status, stateWords, l)
+              : null
+            : soBatchLineReservedWhy(l);
+        return why
+          ? {
+              statusNote: (
+                <StatusWhy
+                  why={why}
+                  testId={`so-batch-line-status-why-${l.orderLineId}`}
+                  orderId={order.orderId}
+                  onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
+                />
+              ),
+            }
+          : {};
+      })(),
       /* ⭐ A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY (owner correction
          2026-09-11). `To buy` means *what is left to buy*, so printing the
          engine's covering quantity there on a row nobody may tick presented a
@@ -1692,9 +1845,9 @@ function SoBatchOrderExpansion({
         return { toBuy: null };
       })(),
       orderBy: eligible ? leaf.orderBy ?? null : null,
-      orderByAbsence: leaf && !isPurchaseDemandTimingState(leaf.state) && order.status !== "ordered" ? "Not planned" : "",
+      orderByAbsence: leaf && !isPurchaseDemandTimingState(leaf.state) && order.status !== "ordered" ? "Not planned" : GOODS_ABSENCE_WORDS.alreadyOrdered,
       orderedQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
-      orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "" : "Not ordered yet",
+      orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? GOODS_ABSENCE_WORDS.fromReadyStock : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
          line states the destination the issued document carries. */
       ...(drawEditor
@@ -1723,9 +1876,9 @@ function SoBatchOrderExpansion({
             : issuedDest.kind === "one"
               ? [issuedDest.value]
               : [W.multiple],
-      deliverToAbsence: eligible ? "Not chosen" : "",
+      deliverToAbsence: eligible ? "Not chosen" : GOODS_ABSENCE_WORDS.noPurchaseNeeded,
       supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? undefined,
-      supplierAbsence: "",
+      supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
       sku: l.sku,
       qty: l.qty,
       item: l.item,
@@ -1759,11 +1912,11 @@ function SoBatchOrderExpansion({
         testId: `so-batch-part-${part.sku}`,
         category: leaf.category ? categoryWord(leaf.category) : "Other goods",
         unitIds: [],
-        unitAbsence: "",
+        unitAbsence: GOODS_ABSENCE_WORDS.unitAtIssue,
         orderedQtyAbsence: "Not ordered yet",
         deliverTo: [],
-        deliverToAbsence: "",
-        supplierAbsence: "",
+        deliverToAbsence: GOODS_ABSENCE_WORDS.noPurchaseNeeded,
+        supplierAbsence: GOODS_ABSENCE_WORDS.supplierNotSet,
         supplier: leaf.supplier ?? undefined,
         sku: part.sku,
         qty: part.qty,
@@ -1804,7 +1957,6 @@ function SoBatchOrderExpansion({
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
   }
 
-  const stateWords = purchaseDemandStateWords(safetyDays);
   /* An `Ordered` order's leaves are not blockers and must not be listed as
      any. They fail `isSelectableForOrder` because the order is FINISHED
      buying, not because something is wrong with them — printing

@@ -5,6 +5,9 @@ import {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoOfferSentence,
+  soBatchPoReservedSentences,
+  soBatchLineReservedWhy,
   soBatchPoDocumentState,
   soBatchToBuyState,
   soBatchRailFacts,
@@ -1336,5 +1339,48 @@ describe("soBatchOrderSafetyDays — the tightest measured margin, or a stated a
     expect(soBatchOrderPlanning(o, leaves).group).toBe("to-buy");
     expect(soBatchOrderStatusWord(soBatchOrderPlanning(o, leaves).group)).toBe("Need PO");
     expect(soBatchOrderSafetyDays(o, leaves).kind).toBe("days");
+  });
+});
+
+/* ⭐ RESERVE GOODS ALREADY ON A PO — owner ruling 2026-09-28 (Purchasing §9.1). */
+describe("goods reserved on a PO", () => {
+  const line = {
+    orderLineId: "l1", sku: "FEN-K", qty: 2, stockTaken: 0, item: "Ohana Fenrir",
+    variant: "King", category: null, pos: [],
+  };
+
+  it("a Unit reserved on a PO covers the line exactly like Ready Stock (one arithmetic)", () => {
+    expect(soBatchOrderLineOutstandingQty(line)).toBe(2);
+    expect(soBatchOrderLineOutstandingQty({ ...line, poReserved: [{ poId: "PO1", qty: 1 }] })).toBe(1);
+    expect(soBatchOrderLineOutstandingQty({ ...line, stockTaken: 1, poReserved: [{ poId: "PO1", qty: 1 }] })).toBe(0);
+  });
+
+  it("speaks the COPY sentences with the real PO number, count and goods", () => {
+    expect(soBatchPoOfferSentence(line, { poId: "PO260924-4827", qty: 3 }))
+      .toBe("PO260924-4827 has 3 Ohana Fenrir King available.");
+    expect(soBatchPoReservedSentences({ ...line, poReserved: [{ poId: "PO260924-4827", qty: 1 }] }))
+      .toEqual(["1 Ohana Fenrir King on PO260924-4827 is reserved for this order."]);
+    expect(soBatchLineReservedWhy(line)).toBeNull();
+    expect(W.statusUseThisPo).toBe("Use this PO");
+  });
+});
+
+describe("the Use this PO offer never blocks buying (owner ruling 2026-09-28)", () => {
+  const base = {
+    id: "b", state: "can_order_early", lineIds: ["l1"], orderId: "o", so: 1, customer: "C",
+    customerDelivery: "2026-12-01", orderBy: "2026-10-01", item: "I", variant: null,
+    category: "mattress", skus: ["S"], supplierId: "s", supplier: "S", qtyNeeded: 1,
+    readyStock: 0, takenFromStock: 0, onPo: 1, poNumbers: ["PO1"], toBuy: 1,
+    goodsMustArrive: null, issueRef: { proposalKey: "p", buildKey: "b" }, parts: [],
+  } as unknown as PurchaseDemandRow;
+
+  it("a pool-only covered build is tickable and buys its quantity; plain covered is not", () => {
+    const pool = { ...base, fullyOnPo: true, poolOnly: true };
+    const covered = { ...base, fullyOnPo: true };
+    expect(isSelectableForOrder(covered, "blank")).toBe(false);
+    expect(soBatchToBuyState(covered, "blank")).toEqual({ kind: "covered" });
+    expect(isSelectableForBuying(pool)).toBe(true);
+    expect(isSelectableForOrder(pool, "blank")).toBe(true);
+    expect(soBatchToBuyState(pool, "blank")).toEqual({ kind: "buy", qty: 1 });
   });
 });

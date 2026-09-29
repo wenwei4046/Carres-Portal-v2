@@ -82,7 +82,7 @@ export function FilesCard({ kind, id, files, canAdd }: {
   const input = useRef<HTMLInputElement>(null);
   const upload = useUploadApFile(kind, id);
   const open = (path: string) => {
-    openApFile(path).catch((e: unknown) => toast.error(`The file could not be opened — ${refusal(e)}`));
+    openApFile(path).catch((e: unknown) => toast.error(`The file could not be opened: ${refusal(e)}`));
   };
   return (
     <Facts title="Files" testId="ap-files">

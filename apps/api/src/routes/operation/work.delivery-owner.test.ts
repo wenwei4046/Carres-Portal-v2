@@ -134,3 +134,33 @@ describe("the Work feed — delivery actions carry the order's PIC", () => {
     }
   });
 });
+
+describe("the Work feed — Delivery's own arrangement names the company (Workspace §5.10 build finding, SO-1333)", () => {
+  it("an order whose leg-0 arrangement names a partner owes no `Assign logistics`, although the order row names none", () => {
+    const items = projectSalesOrdersFromModuleFacts({
+      orders: [order("order-yj", 1401, YUJUN.userId)],
+      stock: [{ sku: "SOFA-1", available: 1 }],
+      staff: [{ user_id: YUJUN.userId, name: YUJUN.name, email: "yujun@carres.test" }],
+      dutyResolutions: {},
+      responsibleOperationFor: (orderId) => collectionOwnerResolution(contextRow(orderId, YUJUN), TODAY),
+      today: TODAY,
+      safetyDays: 3,
+      arrangements: new Map([["order-yj", { confirmedDate: null, partnerId: "partner-nets" }]]),
+    });
+    expect(assignOf(items, "order-yj")).toBeUndefined();
+  });
+
+  it("control: with no partner on the arrangement either, `Assign logistics` stays open", () => {
+    const items = projectSalesOrdersFromModuleFacts({
+      orders: [order("order-yj", 1401, YUJUN.userId)],
+      stock: [{ sku: "SOFA-1", available: 1 }],
+      staff: [{ user_id: YUJUN.userId, name: YUJUN.name, email: "yujun@carres.test" }],
+      dutyResolutions: {},
+      responsibleOperationFor: (orderId) => collectionOwnerResolution(contextRow(orderId, YUJUN), TODAY),
+      today: TODAY,
+      safetyDays: 3,
+      arrangements: new Map([["order-yj", { confirmedDate: null, partnerId: null }]]),
+    });
+    expect(assignOf(items, "order-yj")).toBeDefined();
+  });
+});

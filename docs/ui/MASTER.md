@@ -69,6 +69,32 @@ STILL GATED    a NEW business rule · a change to an approved workflow or
 conversation deciding between options, sketch before code (Constitution §10). The gate that
 is gone is the one that parked autonomous production execution on a synchronous approval.
 
+## §1.1.1 · THE PRE-SHOW GATE — owner ruling, Jess 2026-09-26 · APPROVED / LOCKED
+
+**"How can I avoid having to look and check every time before you design my UI?"** The answer
+is a gate the chat runs on its own screenshot BEFORE the owner sees it. A page that fails any line
+is not shown; it is fixed first. The chat states the six results in one line with the screenshot.
+
+```
+1  WORDS      every visible word is in COPY-STANDARD, with its row named; none invented
+2  ONE BLUE   the page has ONE washed/filled blue = the chosen record/row; rail choices are
+              bold + left line; tabs are grey; no blue words; links grey underlined
+3  WIDTH      a card wider than 480px with more than three facts lays them in columns;
+              nothing is a single column of six lines with an empty right half
+4  ICONS      a record door is the kit's `open` icon with its accessible name, not the word
+              `Open …` beside a title (Gmail's reading pane, not a form)
+5  REFERENCE  the surface was put beside its reference (Gmail reading pane · Linear issue ·
+              the Sales Orders Register) and the difference is named or removed
+6  SELF-RATE  the chat rates its own screenshot out of 10 with the 🔴/🟡 list; under 8 it
+              is not shown
+```
+
+**Why:** the owner rated the first Work rebuild 3/10 after ten review rounds she had to lead
+herself ("i need always ask you check, copy who, how how how, rate rate rate"). Every one of the
+faults — invented column words, five blue rows, a six-line card with an empty right half, the word
+`Open` beside a title, a dashed date range — was visible in the chat's own screenshot before she saw
+it. **The owner reviews design; she does not run the checklist.**
+
 ## §1.2 · Plan / Design Research Law — APPROVED / LOCKED, owner ruling 2026-08-11
 
 Plan/design work continues from authoritative UI truth. **APPROVED / LOCKED decisions are not
@@ -530,6 +556,33 @@ below; a Sales Order keeps its tabs and a PO its 50/50 edit split. Sales facts i
 the first panel's control `View Sales Order` unfolds the governed Sales Order document in place
 (owner ruling 2026-09-25 — INSPECT stays INSPECT, no fourth surface), and the row's `SO No` is the
 door to change them. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
+
+### ONE CARD GRAMMAR FOR EVERY OBJECT, DETAIL AND REVIEW SURFACE — OWNER INSTRUCTION 2026-09-26, BUILT
+Jess, on the Review Purchase Orders pane: *"pls follow sales order ui kit … make sure every page of
+purchasing fix this problem yourself."* The Sales Order object card is therefore the portal's ONE
+section chrome for facts: a white card (`rounded-card`, `kit-slate-5` hairline, `px-4 py-3`), a
+**black bold sentence-case `text-strong` (slate-12) title over a 1px `kit-slate-5` rule** (ONE KIT LAW,
+owner ruling 2026-09-27 — it overwrites the 2026-09-21/22 "remain blue": blue is the primary button,
+links and selection only), one 12px body gap, and inside it the Sales Order fact
+grammar — `text-label` label over a 13px value, three to a row on a full-width page, two in a
+half-width pane, one on a phone. **The shared `Block` (`SalesOrderWorkspace.tsx`) has exactly this
+chrome and no second tone:** the former "shared" tone — a mono UPPERCASE title beside a left band —
+is retired; the cream `SectionBand` stays the Orders LIST / drawer chrome only. **The box travels with the
+grammar (owner, same day, pointing at the SO page: "got box … I want follow"):** on Purchasing pages
+every fact prints in the Sales Order's bordered box, whether or not that page can change it; the SO
+page's own three plain exceptions (`../orders/MASTER.md`, field standard 2026-09-22) remain the SO
+page's. Drawn 2026-09-26 on: the Purchase Order object (`Purchase order` · `Goods lines` ·
+`Receiving` · `Claims and returns` · `Revisions` · `History` · `Order Route`), the `Supplier reply` and
+`Record supplier answer` in-card headings (label rank, sentence case), the Manual Purchase saved-request
+detail, the Review Purchase Orders work pane (`Purchase order` facts + `Goods lines`), the Supplier
+Claim panel and the seven Purchasing Settings sections. Table heads keep their uppercase `text-label`
+row; a document's own heading (GRN, PO paper) keeps its document face.
+**On a form the person is filling in, a value the SYSTEM fills wears a GREY box (owner ruling
+2026-09-28, Jess "yes" after reading the white `Requested By` / `Proceed Date` as fields to fill).**
+The shared `Fact` takes `automatic`: the same bordered box with the kit's `kit-slate-3` fill (the
+disabled-control grey) and `data-kit="automatic-field"`; text stays slate-12. Everything the person
+fills stays white. First drawn on the Manual Purchase create page (`Requested By`, `Proceed Date`); a
+detail or review page, where nothing is being filled in, keeps the white box.
 
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
@@ -1286,6 +1339,16 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**RAIL GROUPS ARE HEADERS FIRST — OWNER RULING 2026-09-28 (Jess: "international keep got description
+under menu? … it should every category header, and click to expand listing"), overwrites the
+2026-09-27 "icon + title + one supporting line".** Shopify, Linear and SAP Fiori facet panels show
+the group title only. Every `FilterRailGroup` is **closed until the operator opens it** (the choice is
+remembered per rail and group); a closed group still shows its **chosen value on the header**. No
+description line under a group title. A page with two views of the same records switches them with
+the kit `Tabs` bar at the top of the rail, never with a collapsible group. A closed group's rows are
+not drawn (the body's display follows `open`; `hidden` alone had lost to `flex`, so every rail drew
+its rows even when closed — fixed the same day).
+
 **LOCAL FILTER RAIL — COMPACT FACT DROPDOWN — APPROVED / LOCKED, owner ruling 2026-09-11.**
 A rail SECTION whose facts are a long, open-ended list collapses into ONE control —
 `FilterRailSelect` in the same `workspace-rail.tsx` — instead of printing every value as a row.
@@ -1660,6 +1723,22 @@ table styling. A fifth table does not exist until it joins the kit.
 | 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
 
 
+**THE WORK ROUTE KIT — admitted by Jess 2026-09-28 ("kit ok"; Workspace MASTER §5.10) · BUILT 2026-09-28.**
+Four pieces joined the kit with the Work page; each has its `/ui` example (section `route`) and a
+page imports it, never draws it:
+
+| Piece | File | Locked values |
+|---|---|---|
+| `Block` — the ONE card | `components/kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
+| `RouteStop` | `components/kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
+| `ChecklistRow` | `components/kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
+| `QuietRouteRow` | `components/kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
+
+Two opt-in props came with them, and no other page moves: `Tabs fill` (tabs share a narrow bar by
+their own length with no gap, so Work's four Communication tabs stay on one row at 280px) and
+`FilterRailRow tone="workspace"` (14/400 rows with the count on the right; the chosen row is the
+`blue-3` wash with the 3px blue edge; `indent` for a record row under its module row).
+
 **Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
 PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
 no other page moves until its own round. First adopter: Sales Orders (Card 12, NOT BUILT). The four pages
@@ -1785,10 +1864,8 @@ This is the shared default for ALL Portal listings, not a PO visual pilot. It su
 listing typography, rail appearance and blue-grey surface prescriptions in this document.
 Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
 
-- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles — and, from 2026-09-27
-  (owner ruling, after the flat data-table dashboard reference), ONE 11px slate-11 supporting line under
-  the title saying what the group narrows (`Dealer / Sales Location` · `Where the order was sold`) through
-  the existing `supportingText` slot, no new component; collapsible groups with remembered
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, and NO supporting line
+  under a title (owner ruling 2026-09-28, RAIL GROUPS ARE HEADERS FIRST); collapsible groups with remembered
   expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
   leave that space empty. Icons supplement labels and come from the existing kit. Each group
   remains single-choice; no new multi-select. Preserve each page's filter content and control type:

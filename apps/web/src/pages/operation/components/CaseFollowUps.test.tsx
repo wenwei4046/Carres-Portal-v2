@@ -43,13 +43,13 @@ describe("CaseFollowUps", () => {
   it("lists the whole chain the customer's answer set off, with the factory named", () => {
     render(wrap(<CaseFollowUps caseId="c1" answers={REPAIR} progress={[]} />));
 
-    expect(screen.getByText("Call Ohana — confirm the repair date")).toBeInTheDocument();
+    expect(screen.getByText("Call Ohana to confirm the repair date")).toBeInTheDocument();
     expect(screen.getByText("Collect the item from Ryan Chong")).toBeInTheDocument();
     expect(screen.getByText("Send the item to Ohana")).toBeInTheDocument();
     expect(screen.getByText("Check in the item from Ohana")).toBeInTheDocument();
     expect(screen.getByText("Deliver the item back to Ryan Chong")).toBeInTheDocument();
     expect(
-      screen.getByText("Call Ryan Chong — confirm the problem is solved"),
+      screen.getByText("Call Ryan Chong to confirm the problem is solved"),
     ).toBeInTheDocument();
     expect(screen.getByText("0 of 6 done")).toBeInTheDocument();
   });
@@ -143,7 +143,7 @@ describe("CaseFollowUps", () => {
       ),
     );
 
-    expect(screen.getByText("Call Walk-in — confirm the problem is solved")).toBeInTheDocument();
+    expect(screen.getByText("Call Walk-in to confirm the problem is solved")).toBeInTheDocument();
     expect(screen.getByText("0 of 1 done")).toBeInTheDocument();
   });
 

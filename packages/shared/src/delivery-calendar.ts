@@ -280,10 +280,10 @@ export function carrierDayNote(load: CarrierDayLoad): string | null {
   // a rule none of them set.
   if (weekdayOf(load.dateIso) === 0) return null;
   if (!load.runs) {
-    return `${load.partnerName} is not running on this day — call them or move these`;
+    return `${load.partnerName} is not running on this day. Call them or move these`;
   }
   if (load.atLimit && load.capacity != null) {
-    return `${load.partnerName} is at its limit of ${load.capacity} deliveries a day — call them before promising more`;
+    return `${load.partnerName} is at its limit of ${load.capacity} deliveries a day. Call them before promising more`;
   }
   return null;
 }

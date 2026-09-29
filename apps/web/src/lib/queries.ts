@@ -223,6 +223,7 @@ import {
   type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
+  type PurchasingSetPoWindowsInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
@@ -312,6 +313,9 @@ import {
   type DeliveryTemplateRow,
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
+  type RepairOrderDetail,
+  type RepairOrderEligibleUnit,
+  type RepairOrderListRow,
 } from "@carres/shared";
 import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
 import {
@@ -3805,6 +3809,69 @@ export interface SupplierClaimsResponse {
 }
 
 /**
+ * ⭐ REPAIR ORDERS — `docs/purchasing/MASTER.md` §9.7, migration 0602. The row
+ * shapes are `@carres/shared`'s, so the API, the register, the object page and
+ * the tests read one idea of what a Repair Order is.
+ */
+export interface RepairOrdersResponse {
+  repairOrders: RepairOrderListRow[];
+}
+export function useOperationRepairOrders(opts?: Partial<UseQueryOptions<RepairOrdersResponse>>) {
+  return useQuery({
+    queryKey: ["operation", "repair-orders"] as const,
+    queryFn: () => apiFetch<RepairOrdersResponse>("/api/operation/repair-orders"),
+    ...opts,
+  });
+}
+export function useOperationRepairOrder(idOrNo: string | null) {
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "one", idOrNo] as const,
+    enabled: Boolean(idOrNo),
+    queryFn: () =>
+      apiFetch<{ repairOrder: RepairOrderDetail }>(`/api/operation/repair-orders/${encodeURIComponent(idOrNo ?? "")}`),
+  });
+}
+export interface RepairOrderOptions {
+  sites: { id: string; name: string; carres: boolean }[];
+  suppliers: { id: string; name: string }[];
+}
+export function useRepairOrderOptions() {
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "options"] as const,
+    queryFn: () => apiFetch<RepairOrderOptions>("/api/operation/repair-orders/options"),
+  });
+}
+export function useRepairOrderEligibleUnits(site: string | null, claim: string | null, search: string) {
+  const p = new URLSearchParams();
+  if (site) p.set("site", site);
+  if (claim) p.set("claim", claim);
+  if (search.trim()) p.set("search", search.trim());
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "eligible", site, claim, search.trim()] as const,
+    enabled: Boolean(site),
+    queryFn: () => apiFetch<{ units: RepairOrderEligibleUnit[] }>(`/api/operation/repair-orders/eligible-units?${p}`),
+  });
+}
+export interface RepairOrderEvidenceUrl {
+  stock_item_id: string;
+  unit_id: string;
+  path: string;
+  kind: "photo" | "video";
+  source: "unit" | "claim";
+  url: string | null;
+}
+export function fetchRepairOrderEvidence(id: string) {
+  return apiFetch<{ files: RepairOrderEvidenceUrl[]; quotation: { path: string; url: string | null } | null }>(`/api/operation/repair-orders/${encodeURIComponent(id)}/evidence`);
+}
+export function useRepairOrderEvidence(id: string | null) {
+  return useQuery({
+    queryKey: ["operation", "repair-orders", "evidence", id] as const,
+    enabled: Boolean(id),
+    queryFn: () => fetchRepairOrderEvidence(id ?? ""),
+  });
+}
+
+/**
  * The Purchase Returns register's read (`docs/purchasing/MASTER.md` §9.6).
  *
  * The row shape is `PurchaseReturnListRow` from `@carres/shared` — the same
@@ -3980,7 +4047,15 @@ export interface WarehouseReceiptQueueRow {
   actual_site_name?: string | null;
   posted_duty_holder_name?: string | null;
   posted_duty_cover_name?: string | null;
-  posted_authority?: "grn_duty" | "cover" | "superuser" | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | null;
+  /** 0601 — Goods Received Date as a time point; null on an older record
+   *  (`Time not recorded`, never back-filled). */
+  goods_received_time?: string | null;
+  /** 0601 — `Received by {company or staff name}` (see `receivedByWords`). */
+  received_by_kind?: "company" | "staff" | null;
+  received_by_name?: string | null;
+  /** 0601 — the version an amendment starts from (first save wins). */
+  revision?: number;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
   /** 0440-era detail read: the same files, each with a signed VIEW url. */
   arrival_evidence_files?: Array<{
@@ -4031,7 +4106,13 @@ export interface ReceivingDutyContext {
   /** The cover row the resolver is acting through today (0425), when any. */
   cover_id?: string | null;
   is_superuser: boolean;
+  /** 0601 — may POST or check in a receipt: every active Operation staff
+   *  member and the principal (owner ruling 2026-09-25). */
   allowed: boolean;
+  /** 0601 — may AMEND or VOID a GRN: GRN Duty, its dated cover or an
+   *  Operations Superuser (unchanged 0425 authority). Absent before 0601,
+   *  when `allowed` still meant exactly this. */
+  may_amend?: boolean;
   source: "assignment" | "not_assigned";
 }
 
@@ -4167,6 +4248,20 @@ export function useWorkspaceCoverDutyMutation(
   });
 }
 
+/** 0601 — who the GRN will name as `Received by` if the signed-in person
+ *  saves at this Site. `null` = not known (the form draws nothing). */
+export function useReceivingReceiver(siteId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "receiving-receiver", siteId ?? ""] as const,
+    queryFn: () =>
+      apiFetch<{ receiver: { kind: "company" | "staff"; name: string | null } | null }>(
+        `/api/operation/warehouse-receipts/receiver?site=${encodeURIComponent(siteId!)}`,
+      ),
+    enabled: !!siteId,
+    staleTime: 60_000,
+  });
+}
+
 export function useReceivingDuty(
   opts?: Partial<UseQueryOptions<ReceivingDutyContext>>,
 ) {
@@ -4229,7 +4324,13 @@ export function useReceivingSessionDetail(id: string | null) {
 export interface ReceivingAmendBody {
   reason: string;
   saveKey?: string;
+  /** 0601 — the GRN version this correction starts from. */
+  basedOnRevision: number;
   goodsReceivedAt?: string;
+  /** 0601 — the corrected arrival time point (ISO with offset). */
+  goodsReceivedTime?: string;
+  /** 0601 — each exact Unit the person names: Received ↔ Not received. */
+  units?: Array<{ stockItemId: string; outcome: "received" | "not_received" }>;
   doNumber?: string;
   actualSiteId?: string | null;
   /** 0427 — a corrected signed-DO file; the old path is preserved in the
@@ -4694,6 +4795,10 @@ export interface PurchaseRequestLineRow {
   stock_reserved_qty?: number;
   required_by: string | null;
   remark: string | null;
+  /** 0591 — the line's configuration, chosen like a Sales portal line
+   *  (colour · fabric · size · options); the shape of `order_lines.attrs`.
+   *  Absent on a payload from a Worker before 0591. */
+  attrs?: Record<string, unknown> | null;
   po_id: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
@@ -5014,13 +5119,15 @@ export function useResubmitManualPurchase() {
       destinationId: string;
       requiredBy: string;
       why: string | null;
-      /** 0562 — the round REPLACES the requirement, so clearing it is a real
-       *  edit rather than a fact that can never be taken back. */
-      purchaseRequirement: string | null;
+      /** Retired from the screen 2026-09-26 (owner: no free text). The door
+       *  still accepts it, so an omitted value clears it. */
+      purchaseRequirement?: string | null;
       serviceCaseId: string | null;
       staffUserId: string | null;
       subsidiaryName: string | null;
-      lines: Array<{ id: string | null; sku: string; qty: number; note: string | null }>;
+      /** A line is configured like a Sales line (0591): `attrs` replaces the
+       *  retired free-text `note`. */
+      lines: Array<{ id: string | null; sku: string; qty: number; attrs: Record<string, unknown> | null; note?: string | null }>;
     }) => {
       const { id, ...body } = input;
       return apiFetch<{ id: string; round: number }>(
@@ -5280,6 +5387,10 @@ export function useSetPurchasingNumber() {
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
+}
+/** 0585 · `First PO window` · `Second PO window` + its switch (MASTER §5.6.1). */
+export function useSetPurchasingPoWindows() {
+  return usePurchasingSettingsMutation<PurchasingSetPoWindowsInput>("/po-windows");
 }
 export function useSetProductionDays() {
   return usePurchasingSettingsMutation<PurchasingSetProductionDaysInput>("/production-days");
@@ -5754,6 +5865,23 @@ export function useMonthlyDemandFacts(enabled: boolean) {
       ]);
       return { orders: demand.orders ?? [], toBuyByLine };
     },
+  });
+}
+
+/** The Order list's two server-owned fact filters (Orders MASTER §Left rail):
+ *  obligations through the object page's completion, cases from Service. A
+ *  fact the server could not establish is `null` and matches no filter. */
+export interface SalesOrderRegisterFacts {
+  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }>;
+  failed: { obligations: boolean; cases: boolean };
+}
+
+export function useSalesOrderRegisterFacts(enabled: boolean) {
+  return useQuery<SalesOrderRegisterFacts>({
+    queryKey: ["operation", "orders", "register-facts"] as const,
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => apiFetch<SalesOrderRegisterFacts>("/api/operation/orders/register-facts"),
   });
 }
 

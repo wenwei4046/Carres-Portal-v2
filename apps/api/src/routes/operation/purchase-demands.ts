@@ -15,6 +15,7 @@ import {
   soBatchAction,
   soBatchOrderLineOutstandingQty,
   soBatchOrderStatusOf,
+  stockMatchKey,
   PURCHASE_DEMAND_OWNER_DUTY,
   type ProductCategory,
   type PurchaseDemandRow,
@@ -27,6 +28,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import {
+  buildMayBuyOverPool,
   chunk,
   loadToOrder,
   type RegisterFacts,
@@ -102,6 +104,7 @@ async function loadRegisterRows(
   sb: ReturnType<typeof userClient>,
   facts: RegisterFacts,
   supplierNames: Map<string, string>,
+  poFreeByKey?: Map<string, { poId: string; qty: number }[]> | null,
 ): Promise<
   { ok: true; registerRows: SoBatchOrderRow[] } | { ok: false; status: number; body: unknown }
 > {
@@ -273,7 +276,8 @@ async function loadRegisterRows(
             null,
         }))
         .sort((a, b) => a.poId.localeCompare(b.poId) || (a.poLineId ?? "").localeCompare(b.poLineId ?? ""));
-      const required = Math.max(0, l.qty - l.stockTaken);
+      const poReservedQty = (l.poReserved ?? []).reduce((n, r) => n + r.qty, 0);
+      const required = Math.max(0, l.qty - l.stockTaken - poReservedQty);
       const sent = pos.reduce(
         (s, p) => (sentCurrent(poById.get(p.poId)!) ? s + p.qty : s),
         0,
@@ -289,7 +293,16 @@ async function loadRegisterRows(
         variant: l.variant,
         category: (l.category as ProductCategory | null) ?? null,
         pos,
+        ...(l.poReserved && l.poReserved.length > 0 ? { poReserved: l.poReserved } : {}),
       };
+      /* 0600 · `Use this PO` — the first open PO (by PO No) whose incoming
+         Unit IDs of these goods no order holds, from the ONE SQL arithmetic.
+         Only a line that still needs goods is offered anything; a balance that
+         could not be read is stated, never guessed. */
+      if (soBatchOrderLineOutstandingQty(lineFact) > 0 && poFreeByKey !== undefined) {
+        if (poFreeByKey === null) lineFact.poOfferUnread = true;
+        else lineFact.poOffer = poFreeByKey.get(stockMatchKey(l.sku))?.[0] ?? null;
+      }
       if (soBatchOrderLineOutstandingQty(lineFact) > 0 && l.supplierId) {
         outstandingSupplierIds.add(l.supplierId);
       }
@@ -624,6 +637,9 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
              whether `toBuy` is a remainder or the coverage it would buy a
              second time. No new arithmetic. */
           fullyOnPo: q.fullyOnPo,
+          /* ⭐ 2026-09-28 — pool-only cover with a `Use this PO` offer stays
+             buyable; the issue door asks the same rule. */
+          ...(buildMayBuyOverPool(build, res.data) ? { poolOnly: true } : {}),
           poNumbers: build.coveredByOpenPoPos,
           toBuy: q.toBuy,
           goodsMustArrive,
@@ -744,7 +760,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   }
 
   /* ── 3 · Card 02-B — one permanent row per proceeded Sales Order ────────── */
-  const registerRes = await loadRegisterRows(sb, registerFacts, supplierNames);
+  const registerRes = await loadRegisterRows(sb, registerFacts, supplierNames, res.data.poFreeByKey);
   if (!registerRes.ok) {
     return c.json(registerRes.body as Record<string, unknown>, registerRes.status as 400);
   }

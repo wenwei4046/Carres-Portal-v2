@@ -384,5 +384,28 @@ export function goodsCategoryWordOf(line: {
     : "Other goods";
 }
 
+/**
+ * ⭐ A RECEIPT READS THE CATALOG — owner ruling 2026-09-28 (Purchasing §9.4).
+ *
+ * The GRN reader, its register expansion and the GRN paper print the goods'
+ * Catalog category (`product_models.category`) through the governed words.
+ * When the Catalog cannot answer — no row, a failed read, or a category that
+ * is not goods (`guarantee`) — the fact prints `Not recorded`. It never falls
+ * to the SKU-text classifier or to `Other goods`: a receiving document states
+ * what is recorded, never a guess.
+ */
+export const CATALOG_CATEGORY_NOT_RECORDED = "Not recorded" as const;
+
+export function catalogCategoryWordOf(
+  sku: string,
+  catalogCategory: string | null | undefined,
+): GoodsCategoryWord | typeof CATALOG_CATEGORY_NOT_RECORDED {
+  const recorded = (catalogCategory ?? "").trim().toLowerCase();
+  if (!["mattress", "bedframe", "sofa", "accessory", "service"].includes(recorded)) {
+    return CATALOG_CATEGORY_NOT_RECORDED;
+  }
+  return goodsCategoryWordOf({ sku, category: recorded });
+}
+
 // NOTE: STOCK_LOCATIONS is NOT re-exported here — it already leaves the shared
 // barrel via schemas/ops-order-control; a second export would collide.

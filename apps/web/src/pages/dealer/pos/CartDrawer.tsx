@@ -126,7 +126,7 @@ export default function CartDrawer({
     const group = target ? lineBundleGroup(target) : null;
     if (group !== null) {
       onChange({ ...draft, lines: draft.lines.filter((l) => lineBundleGroup(l) !== group) });
-      toast.info(`Bundle removed — "${lineBundleLabel(target!) ?? "bundle"}" items go together.`);
+      toast.info(`Bundle removed: "${lineBundleLabel(target!) ?? "bundle"}" items go together.`);
       return;
     }
     onChange({ ...draft, lines: draft.lines.filter((l) => l.localId !== localId) });
@@ -149,7 +149,7 @@ export default function CartDrawer({
         if (camp && freed > camp.maxFreeQty) {
           lines = lines.map((l) => (l.localId === localId ? unmarkLineFree(l) : l));
           toast.warning(
-            `"${camp.name}" allows ${camp.maxFreeQty} free per order — the line is back to its real price.`,
+            `"${camp.name}" allows ${camp.maxFreeQty} free per order. The line is back to its real price.`,
           );
         }
       }
@@ -203,7 +203,7 @@ export default function CartDrawer({
       customer: { ...draft.customer, name: quoteName.trim(), phone: quotePhone.trim() },
     });
     setQuoteFormOpen(false);
-    toast.success(`Quote saved — "${q.label}". Cart cleared.`);
+    toast.success(`Quote saved: "${q.label}". Cart cleared.`);
     onClose();
   }
 
@@ -287,7 +287,7 @@ export default function CartDrawer({
         <div className="cart__body">
           {empty ? (
             <p className="t-small text-base-500 text-center py-12">
-              Your cart is empty — pick a product to get started.
+              Your cart is empty. Pick a product to get started.
             </p>
           ) : (
             <div className="flex flex-col">
@@ -335,7 +335,7 @@ export default function CartDrawer({
                           type="button"
                           onClick={() => bumpLineQty(l.localId, -1)}
                           disabled={l.qty <= 1 || inBundle}
-                          title={inBundle ? "Bundle items are fixed — remove the bundle to change it" : undefined}
+                          title={inBundle ? "Bundle items are fixed. Remove the bundle to change it" : undefined}
                           aria-label="Decrease quantity"
                           className="disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -346,7 +346,7 @@ export default function CartDrawer({
                           type="button"
                           onClick={() => bumpLineQty(l.localId, 1)}
                           disabled={inBundle}
-                          title={inBundle ? "Bundle items are fixed — remove the bundle to change it" : undefined}
+                          title={inBundle ? "Bundle items are fixed. Remove the bundle to change it" : undefined}
                           aria-label="Increase quantity"
                           className="disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -1039,7 +1039,7 @@ function PwpCrossOrderRow({
       bind(v);
       setManualCode("");
     } catch {
-      setManualError("Couldn't check that voucher — please retry.");
+      setManualError("Couldn't check that voucher. Please retry.");
     } finally {
       setManualBusy(false);
     }

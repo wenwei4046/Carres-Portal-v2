@@ -148,9 +148,10 @@ the order.`). Card titles are black bold (`text-strong` slate-12) under the ONE 
 which overwrites the 2026-09-21 "remain blue" ruling on this page.
 **Rules 6 and 7 of THE LOCKED STATE are superseded, not built:** the owner's correction of 2026-09-27
 — Operation never creates a Sales Order by any door — removes the office create door they describe.
-**Not built in C:** a locked field that HAS a value still draws its disabled box (name, phone, address,
-a chosen State); only absent values and number boxes print as text. A chosen value a `Select` no
-longer offers prints an empty box.
+A locked field that HAS a value keeps its grey box: that is THE SO PAGE FIELD STANDARD (Jess
+2026-09-22, a grey box means "this can be changed with `Edit`"), not a gap; absent values and number
+boxes print as text. A chosen value a `Select` no longer offers prints as itself (kit `Select`, BUILT
+2026-09-28), never an empty box.
 
 **Scope D, first half · Register close-out — BUILT 2026-09-28, production walk owed.** The row menu
 reads `Edit · View · Print · ─ Cancel SO`, and carries nothing of Delivery's. The engine draws
@@ -173,8 +174,11 @@ Order and Invoice papers; a quantity line's Unit ID cell on the PO paper and the
 dash, is removed. **Not swept here:** `WarehouseStockRegister`, `WarehouseUnitDetail` and
 `WarehouseUnitProblemReport` belong to the open Inventory change (#1677), which removes their dashes;
 and a dash used as a separator or inside a sentence (`{a} — {b}`, `Total — unchanged`): measured
-752 lines in 226 files, many of them owner-approved words, so it is a separate pass that reads each
-sentence.
+752 lines in 226 files. **Owner ruling 2026-09-28:** these go too, approved words included. Two facts
+become two lines where the surface has room, otherwise one clear line (COPY § NO DASH AS A
+SEPARATOR EITHER). **BUILT 2026-09-28 (#1709, `a91aca00`), production walk owed.** Left on purpose:
+never-rendered rule descriptions, catalog descriptions parsed as data, and the three Warehouse files of
+open #1677.
 
 **Scope E · Read-failure faces — BUILT 2026-09-28, production walk owed.** `readFailureWords`
 (`packages/shared`) reads the status and nothing else; `SalesOrderReadFailure` draws it with the kit's
@@ -183,8 +187,10 @@ History and the Order Route all call it, and `SalesOrderAbsence` is the same blo
 permission words with the way back and no retry (the Register prints no button and its footer no
 count); a 404 or an invalid parameter prints `Sales Order not found.`; anything else keeps the
 surface's own sentence with `Try again`. No transport message reaches the screen.
-**Not built in E:** loading does not yet reserve the final geometry on the object page (two panes)
-or the Route (the 320px canvas skeleton); both still draw the kit `Loading` line.
+**Loading geometry BUILT 2026-09-28:** the object page loads into its own split (form card skeleton ·
+A4 paper frame, the same `half` / `form-first` / `stack` grid) and the Route into the canvas's own
+framed box (`h-[calc(100vh-260px)]`, min 420px) with one node-sized skeleton; the kit `Loading` line is
+gone from both.
 
 **The office create door — RETIRED IN CODE 2026-09-28 (owner ruling 2026-09-27), production walk
 owed.** The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;
@@ -194,10 +200,10 @@ with the Operation permission boundary kept. **Not removed yet:** the page's own
 `sales_order_create` database function is untouched.
 
 **Scope F · Monthly demand — BUILT 2026-09-28, production walk owed.** The Sales Orders page has
-the shared 240px rail with a fixed `View` group (`Order list` · `Monthly demand`, kept in the URL as
-`?view=monthly`). Monthly demand's groups are `Period` (`Starting month` · `Months` 1 to 6, the
-resolved window printed beneath) · `Dealer / Sales Location` · `Delivery State / City` · `Product
-category`, all single choice, no `Clear filters`; they live in the URL and never carry into the
+the shared 240px rail with the kit `Tabs` bar `Order list` · `Monthly demand` on the rail's top
+divider (one row, one line; kept in the URL as `?view=monthly`). Monthly demand's groups are `Period` (`Starting month` · `Months` 1 to 6, the
+resolved window printed beneath; the header prints no month count) · `Sales Location` · `Customer
+Delivery Location` · `Product category`, all single choice, no `Clear filters`; they live in the URL and never carry into the
 Order list. The page is two blocks: `This month · {Mon YYYY}` (`Total Qty` · `Delivered` · `Not
 delivered`, ONE month) and one table, one row per month (`Before` · six months · `After` · `No
 delivery date` · `Total`), columns `Month` · the four categories · `Not in catalog` (only when a
@@ -212,8 +218,24 @@ counts; an unread SO Batch prints `Unavailable`, never zero. The kit admits `Doc
 3, its first column fixed while the rest scroll) and `TotalsSummary` (recipe 4), each with a `/ui`
 example. Measured at 1440 / 1180 / 820 / 743 / 390: no sideways page scroll, no dash, the table
 scrolls inside its own frame.
-**Not built in F:** Export of the matrix; the Order list's own filter groups (Dealer, State / City,
-Date, Delivery, Obligations, Service Cases); a search box in the Dealer group. **Measured gaps:**
+**Order list rail — Sales Location · Customer Delivery Location · Delivery BUILT 2026-09-28,
+production walk owed.** Each is a read-only fact filter: Delivery asks the one goods arithmetic
+(`registerDeliveryConditionOf` over `resolveUnitAllocation`: nothing sold · some sold · every
+committed unit sold; a service-only order is under All only); a row clicked again is deselected;
+nothing carries between the two views. **No Date group — owner ruling 2026-09-28 (Jess: "why date
+got proceed date? ... today? this week, this month? i dont get it"; approved "yes").** A date is
+narrowed on its OWN column's ▽ (`Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date`,
+each with `Today` · `This week` · `This month` · `From` / `To`), the way Shopify and Linear filter a
+date: on the field itself, never a rail field picker plus a range. An old `?date=` / `?range=` link
+narrows nothing, so no filter the rail cannot show.
+**Obligations and Service Cases BUILT 2026-09-28, production walk owed.** `GET /orders/register-facts`
+answers per order `obligations` through `completionOfOrder` (the ONE composition the object page's
+`/:id/completion` now calls: goods, money in with storage, money out, loan) and `cases` from
+`service_case_statuses.is_closed`; a read that failed is `null` and matches no chosen value, and the
+group says it could not read. **Monthly demand Export BUILT 2026-09-28:** the view's own Row 2 carries
+`Export` alone (no Search, no Columns) and writes the `By month` table as on screen (`Monthly demand
+{first} to {last} {date}.xlsx`; `Unavailable` stays a word). **Not built in F:** a custom date range;
+search and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
 SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
 `To buy` is `0` for an Accessory or a `Not in catalog` line; a Unit sold before 0471 names no line
 and is matched to the first line of its SKU.
@@ -573,7 +595,7 @@ do not present missing required dates as an ordinary monthly demand category. As
 requested delivery date, never document date, Proceed Date, supplier ETA or confirmed transport
 booking. Do not manufacture a date for ambiguous/missing source data. These buckets preserve
 visibility; they do not relax the order-entry requirement for a requested date. The local filter
-rail belongs to this monthly view and filters Dealer / Sales Location, customer delivery region
+rail belongs to this monthly view and filters Sales Location, customer delivery region
 and product category. Dealer location and customer delivery destination remain different facts.
 Both views use the shared rail shell under the following owner ruling.
 
@@ -582,15 +604,14 @@ Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240p
 wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
 each view exposes only its own controls. Do not add a second handmade rail.
 
-- Order list: Dealer / Sales Location; customer delivery State / City; date field (Proceed Date,
-  SO Doc Date, Customer Requested Delivery Date) and range (All dates, Today, This week, This month,
-  custom); delivery condition (All, Not delivered, Partially delivered, Fully delivered); whole-order
+- Order list: Sales Location; customer delivery State / City; delivery condition (All, Not delivered, Partially delivered, Fully delivered); whole-order
   obligations (All, Outstanding obligations, No action required); linked Service Cases (All,
-  Has open cases, Closed cases only, No cases). These are read-only factual filters, not a mutable
+  Has open cases, Closed cases only, No cases). Dates filter on their own column's ▽, not in the
+  rail (owner ruling 2026-09-28). These are read-only factual filters, not a mutable
   overall status, work queue or new status/group column. Service case filters read Service's truth.
   Unknown underlying facts must not be classified as completed or no cases.
 - Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
-  Dealer / Sales Location, customer delivery State / City, actual catalog product categories.
+  Sales Location, customer delivery State / City, actual catalog product categories.
   The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
   do not appear here and do not silently carry over from the list.
 - No Clear filters button inside either SO rail: this is Jess's explicit instruction, not
@@ -649,25 +670,22 @@ operating model above is unchanged; this fixes how it is drawn and where every n
 
 - **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (Search · Export · Columns;
   no create button — owner 2026-09-27). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
-  top region with the view selector `Order list` · `Monthly demand`; the scrolling region shows only
+  top region with the kit `Tabs` bar `Order list` · `Monthly demand` (owner ruling 2026-09-28: a tab bar, not a collapsible group; every group closed until clicked, no description under a title); the scrolling region shows only
   the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
   months) and Export produces the matrix.
-- **Order list groups:** `Dealer / Sales Location` (multi-select with search) · `Delivery State /
-  City` (two selects) · `Date` (field select `Proceed Date` · `SO Doc Date` · `Customer Requested
-  Delivery Date` + range select `All dates` · `Today` · `This week` · `This month` · `Custom`) ·
-  `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
+- **Order list groups:** `Sales Location` (`All sales locations`) · `Customer Delivery
+  Location` (two selects) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
   (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
   cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
   select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
-  `Dealer / Sales Location` · `Delivery State / City` · `Product category` (multi-select, no
-  search). No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
+  `Sales Location` · `Customer Delivery Location` · `Product category`. No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
 - **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
   title", "not like other pages?").** Every group is single-choice like every other Portal rail
   (icon + 13px/600 title, 36px rows, chosen value in blue at the right, press again to unchoose);
-  `Dealer / Sales Location` keeps a search box because dealers are many; there is NO multi-select
-  and NO `FilterRailMultiSelect` — the 2026-09-22 multi-selection line is withdrawn and no kit
-  component is admitted. Several dealers together = `All dealers`.
+  `Sales Location` is one select (a search box waits for a kit admission); there is NO multi-select
+  and NO `FilterRailMultiSelect`; the 2026-09-22 multi-selection line is withdrawn and no kit
+  component is admitted. Several sales locations together = `All sales locations`.
 - **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
   "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
   **Corrected again the same day (Jess: "4 KPI is what? repeated?"): two blocks, not three.**
@@ -1845,10 +1863,10 @@ only lineage. The plate says `{m} to buy from factory` for goods already on an i
 | Node | Reads (the owner's record, per line lineage) | Prints | Completion fact | Action (owner) |
 |---|---|---|---|---|
 | plate | `order_lines.qty` (current Revision) · Σ `po_line_sources.qty` | `Qty {n}` · `Qty {n} · {m} on order` · `Qty {n} · {m} to buy` | — | — |
-| `PURCHASING` | `purchase_orders` through `po_line_sources(order_line_id → po_line_id)` — never SKU matching, never `purchase_orders.so` | `{PO No}` · `Issued: {date}` · `Open {PO No} →`; uncovered qty: `⚠ No Purchase Order yet` | a non-cancelled PO line covers the qty | `Issue PO` (PO Duty, resolver chip) |
-| `SUPPLIER` | `official_delivery_date` (immutable) · the newest per-line answer through `effectiveArrivalOf` · `tomorrowDeliveryCallOf` | `PO Delivery Date: {d}` · `Expected arrival: {d} · Delayed · {governed reason}` (or ` · Earlier`) · legacy with no date: `Ready date not confirmed` | the answer is `confirmed` or a Supplier DO is recorded | `Confirm ready date` (PO Duty) ONLY while the day-before check is open — never a standing action (Purchasing §5.8: no immediate reply is owed) |
+| `PURCHASING` | `purchase_orders` through `po_line_sources(order_line_id → po_line_id)` — never SKU matching, never `purchase_orders.so` | `{PO No}` · `Issued: {date}` · `Open {PO No} →`; uncovered qty: `⚠ No Purchase Order yet` | a non-cancelled PO line covers the qty AND its CURRENT version is marked `PO sent to supplier` (`po_sends` `confirmed_sent`, 0377; goods already received also prove it) | `Issue PO` (PO Duty, resolver chip); issued but not sent: **`Send {PO No} to {Supplier}`** (Purchasing §5.6, corrected 2026-09-28) |
+| `SUPPLIER` | `official_delivery_date` (immutable) · the newest per-line answer through `effectiveArrivalOf` · `tomorrowDeliveryCallOf` | `PO Delivery Date: {d}` · `Expected arrival: {d} · Delayed · {governed reason}` (or ` · Earlier`) · legacy with no date: `Ready date not confirmed` | the answer is `confirmed` or a Supplier DO is recorded | **`Ask {Supplier} for the Supplier DO for {PO No}`** (PO Duty) ONLY while the day-before check is open and the PO was sent — never a standing action (Purchasing §5.7/§5.8; `confirm_ready_date` is retired, corrected 2026-09-28) |
 | `RECEIVING` | `receivingSummaryOf` over this line's share of the PO lines · the latest posted `warehouse_receipts` row | `{received} of {order} received` · `Latest: {GRN No} · Received: {date}` · `{k} damaged or wrong` (only when k > 0; the claim itself is on `LINKED PROBLEMS`) · complete: `{GRN No} · Received: {date}` | `pendingDeliveryQty = 0` | `Check in` (GRN Duty, resolver chip) |
-| `STOCK` | `ops_stock_items` by `reserved_order_line_id` (0471); eligible Ready Stock by `stock_match_key` | `{n} of {m} Units ready` · line 2 `Waiting for purchase` (no PO covers it) / `Waiting for receiving` (issued, not received) / the Unit IDs when whole | bound Units ≥ committed qty | **`Choose Ready Unit`** (SO PIC) only when eligible Ready Stock exists for the SKU — door `Open Ready Stock →`; otherwise NO action line: the wait belongs to Purchasing or Receiving |
+| `STOCK` | `ops_stock_items` by `reserved_order_line_id` (0471); eligible Ready Stock by `stock_match_key` | `Warehouse has {n} of {m} Units ready` · line 2 `Carres has not ordered the goods` (no PO covers it) / `Warehouse has not received the goods` (issued, not received) / the Unit IDs when whole — the same words when the goods read is absent | bound Units ≥ committed qty | **`Choose Ready Unit`** (SO PIC) only when eligible Ready Stock exists for the SKU — door `Open Ready Stock →`; otherwise NO action line: the wait belongs to Purchasing or Receiving |
 
 - **The goods gate's partial scope is the lane's `trip_groups`** (THE DELIVERY GROUP ruling), no
   longer `ops_order_control.booking_groups`.
@@ -1993,7 +2011,7 @@ must see it on Order Route.
 | Split quantity | one fork per Purchase Order, each in its own column |
 | Partial receiving | `3 of 5 received` · `Latest: {GRN No} · Received: {date}` — the count rides the factual line and stays after a receipt is posted; RECEIVING holds the goods CURRENT until `pendingDeliveryQty = 0` |
 | Received with damage | RECEIVING adds `{k} damaged or wrong`; the Supplier Claim is a `LINKED PROBLEMS` strip, never a node |
-| Short, and Ready Stock exists | STOCK is CURRENT with `Choose Ready Unit`; otherwise STOCK waits with `Waiting for purchase` / `Waiting for receiving` and no action |
+| Short, and Ready Stock exists | STOCK is CURRENT with `Choose Ready Unit`; otherwise STOCK waits with `Carres has not ordered the goods` / `Warehouse has not received the goods` and no action |
 | Two lines of one SKU | two lanes; each PO joins the lane its `po_line_sources` row names |
 | Service lines | no goods fork; a linked case appears on the strip only |
 | Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |

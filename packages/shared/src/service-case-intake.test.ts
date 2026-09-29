@@ -130,7 +130,7 @@ describe("composeCaseSummary", () => {
 
   it("renders the five answers as one plain sentence", () => {
     expect(composeCaseSummary(base)).toBe(
-      "Colour uneven — Sofa · SF2201 3 Seater. Found by Customer. Still usable: No. " +
+      "Colour uneven: Sofa · SF2201 3 Seater. Found by Customer. Still usable: No. " +
         "Customer wants: Repair, Replace.",
     );
   });
@@ -147,7 +147,7 @@ describe("composeCaseSummary", () => {
       productSku: null,
       productQty: null,
     });
-    expect(s.startsWith("Colour uneven — Other.")).toBe(true);
+    expect(s.startsWith("Colour uneven: Other.")).toBe(true);
     expect(s).toContain("Found by Customer.");
   });
 

@@ -292,3 +292,38 @@ describe("STOCK reads the Units bound to the line", () => {
     expect(lines.map((l) => l.unitCodes)).toEqual([["U1"], ["U2"]]);
   });
 });
+
+describe("PURCHASING reads the send mark of the CURRENT version (Purchasing §5.6)", () => {
+  const base = {
+    sources: [{ order_line_id: "L1", po_id: "PO-1", po_line_id: "pl1", qty: 1 }],
+  };
+  const withSends = (sends: Array<{ kind: string; po_version: number }> | undefined, version = 1) =>
+    routeGoodsLinesOf(
+      facts({
+        ...base,
+        purchaseOrders: [
+          po({
+            id: "PO-1",
+            version,
+            supplier_name: "Ohana",
+            sends,
+            lines: [{ id: "pl1", sku: "B1201S", qty: 1, received_qty: 0 }],
+          }),
+        ],
+      }),
+    )[0]!.sources[0]!;
+
+  it("an issued PO with no confirmed send is not sent; an opened app proves nothing", () => {
+    expect(withSends([])).toMatchObject({ sent: false, supplierName: "Ohana" });
+    expect(withSends([{ kind: "external_open", po_version: 1 }]).sent).toBe(false);
+    expect(withSends([{ kind: "confirmed_sent", po_version: 1 }]).sent).toBe(true);
+  });
+
+  it("a send of an earlier version does not cover the current one", () => {
+    expect(withSends([{ kind: "confirmed_sent", po_version: 1 }], 2).sent).toBe(false);
+  });
+
+  it("a reader that brought no send marks invents no send work", () => {
+    expect(withSends(undefined).sent).toBe(true);
+  });
+});

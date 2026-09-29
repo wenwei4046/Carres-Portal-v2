@@ -180,7 +180,7 @@ export default function WarehouseHandoverBlock({
                 >
                   {step.label}
                   {e?.kind === "handed_over" && e.receiver_name
-                    ? ` — received by ${e.receiver_name}`
+                    ? ` · received by ${e.receiver_name}`
                     : ""}
                 </span>
                 {e && (
@@ -207,7 +207,7 @@ export default function WarehouseHandoverBlock({
       ) : next === "received_by_logistics" ? (
         <div className="flex flex-col gap-2" data-testid="handover-receipt-form">
           <span className="text-label text-base-600">
-            Logistics&rsquo; own count — correct any quantity that differs; both
+            Logistics&rsquo; own count. Correct any quantity that differs; both
             counts stay on record.
           </span>
           <ul className="flex flex-col gap-1">
@@ -234,7 +234,7 @@ export default function WarehouseHandoverBlock({
             value={receiptNote}
             onChange={(e) => setReceiptNote(e.target.value)}
             className="h-8 rounded-md border border-base-300 px-2 text-body"
-            placeholder="Note (optional — say what differs and why)"
+            placeholder="Note (optional, say what differs and why)"
           />
           <div>
             <button
@@ -252,7 +252,7 @@ export default function WarehouseHandoverBlock({
                     })),
                     ...(receiptNote.trim() ? { note: receiptNote.trim() } : {}),
                   },
-                  "Received by logistics — out for delivery",
+                  "Received by logistics. Out for delivery",
                 )
               }
             >

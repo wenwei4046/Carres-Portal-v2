@@ -131,7 +131,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
         <strong>{po.suppliers?.name ?? "supplier"}</strong>&rsquo;s goods to{" "}
         <strong>{po.warehouses?.name ?? "warehouse"}</strong>. Upload the signed
         DO and tick received qty per SKU. The PO flips straight to{" "}
-        <strong>received</strong> when you submit — operation doesn&rsquo;t
+        <strong>received</strong> when you submit. Operation doesn&rsquo;t
         need to re-confirm.
       </div>
 

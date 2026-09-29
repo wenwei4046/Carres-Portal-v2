@@ -103,7 +103,7 @@ export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Pr
               : isError
                 ? "Couldn’t load alerts"
                 : count === 0
-                  ? "No alerts — all SKUs above threshold"
+                  ? "No alerts. All SKUs above threshold"
                   : reorderCount > 0
                     ? `${count} SKU${count === 1 ? "" : "s"} to reorder`
                     : `${count} SKU${count === 1 ? "" : "s"} below threshold`}

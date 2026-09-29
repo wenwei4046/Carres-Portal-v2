@@ -739,7 +739,7 @@ export default function SofaConfigurePage({
     }
     if (!(customerPhone ?? "").trim()) {
       setPwpErr(
-        "Enter the customer's phone (step 02) first to redeem a saved voucher — or apply it from the cart.",
+        "Enter the customer's phone (step 02) first to redeem a saved voucher, or apply it from the cart.",
       );
       return;
     }
@@ -769,7 +769,7 @@ export default function SofaConfigurePage({
       }
       setPwpApplied({ ruleId: v.ruleId, code: v.code, crossOrder: true });
     } catch {
-      setPwpErr("Couldn't check that voucher — please retry.");
+      setPwpErr("Couldn't check that voucher. Please retry.");
     } finally {
       setPwpBusy(false);
     }
@@ -801,7 +801,7 @@ export default function SofaConfigurePage({
     const rule = covering.find((r) => r.id === pwpApplied.ruleId);
     const price = rule ? pwpRewardPrice(line, catalog, rule) : null;
     if (!rule || price == null) {
-      toast.error("The PWP code doesn't cover this sofa — added at the normal price.");
+      toast.error("The PWP code doesn't cover this sofa. Added at the normal price.");
       return line;
     }
     if (pwpApplied.code && pwpClaimGroup) {
@@ -967,7 +967,7 @@ export default function SofaConfigurePage({
                 </span>
                 {pwpCovering && !qpAppliedRule && (
                   <span className="t-small text-warning" data-testid="sofa-pwp-uncovered">
-                    doesn't cover this layout — adds at normal price
+                    doesn't cover this layout, adds at normal price
                   </span>
                 )}
                 <button
@@ -1041,7 +1041,7 @@ export default function SofaConfigurePage({
               {mode === "quick"
                 ? heroPick
                   ? "Quick pick"
-                  : "Pick a layout — it lands on the canvas assembled"
+                  : "Pick a layout. It lands on the canvas assembled"
                 : "Drag modules · rotate · we price the connected sofa live"}
             </div>
           </div>
@@ -1098,7 +1098,7 @@ export default function SofaConfigurePage({
                 disabled={!heroPick || (qpDisplayTotal !== null && qpDisplayTotal < 0)}
                 title={
                   qpDisplayTotal !== null && qpDisplayTotal < 0
-                    ? "The remark adjustment puts the sofa below RM 0 — reduce the discount"
+                    ? "The remark adjustment puts the sofa below RM 0. Reduce the discount"
                     : undefined
                 }
                 onClick={() => heroPick && addQuickPick(heroPick)}

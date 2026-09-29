@@ -12,8 +12,9 @@
  * paper itself — nothing is silently editable.
  */
 import {
+  CATALOG_CATEGORY_NOT_RECORDED,
   countedOnLine,
-  goodsCategoryWordOf,
+  receivedByWords,
   receivingDisplayNo,
   RECEIVING_AUTHORITY_LABEL,
   RECEIVING_UNIT_OUTCOME_LABEL,
@@ -21,12 +22,17 @@ import {
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import type { GrnTemplateData } from "@/lib/pdf/types";
+import { appDateIsoOf, fmtDate } from "@/lib/fmt-date";
 import type { ReceivingSessionDetail } from "@/lib/queries";
 
 /** The proposed correction, exactly as the Amend form holds it mid-edit. */
 export interface GrnAmendDraft {
   reason: string;
   goodsReceivedAt?: string;
+  /** 0601 — the proposed arrival time point (ISO with offset). */
+  goodsReceivedTime?: string;
+  /** 0601 — each named Unit's proposed outcome, by stock item id. */
+  units?: Record<string, "received" | "not_received">;
   doNumber?: string;
   /** The proposed physical arrival location's NAME (display fact). */
   goodsArrivedAt?: string;
@@ -62,7 +68,20 @@ export function grnTemplateDataOf(
     (detail.po?.purchase_order_lines ?? []).map((pl) => [pl.id, pl]),
   );
 
-  const unitResults = (r.unit_results ?? []).map((u) => ({
+  // 0601 · a named Unit's proposed outcome moves its own line's count.
+  const unitDelta = new Map<string, number>();
+  const unitResults = (r.unit_results ?? []).map((saved) => {
+    const proposed = draft?.units?.[saved.stock_item_id];
+    const u =
+      proposed && proposed !== saved.outcome && saved.outcome !== "received_with_issue"
+        ? { ...saved, outcome: proposed, issue_kind: null }
+        : saved;
+    if (u !== saved && saved.po_line_id)
+      unitDelta.set(
+        saved.po_line_id,
+        (unitDelta.get(saved.po_line_id) ?? 0) + (proposed === "received" ? 1 : -1),
+      );
+    return {
     lineId: u.po_line_id,
     unit_code: u.unit_code,
     outcome_label: [
@@ -70,12 +89,14 @@ export function grnTemplateDataOf(
       u.issue_kind === "wrong_item" ? "wrong item" : null,
       u.issue_kind === "damaged" ? "damaged" : null,
     ].filter(Boolean).join(" · "),
-  }));
+    };
+  });
   const printedLineIds = new Set(docLines.map((line) => line.id));
 
   const lines = docLines.map((l) => {
     const pl = poLineById.get(l.id);
-    const receivedNow = draft?.lines?.[l.id] ?? l.received_now;
+    const receivedNow =
+      (draft?.lines?.[l.id] ?? l.received_now) + (unitDelta.get(l.id) ?? 0);
     // A proposed received_now change moves the PO's cumulative received by
     // the same delta — the preview's Pending must say what saving would.
     const delta = receivedNow - l.received_now;
@@ -86,9 +107,8 @@ export function grnTemplateDataOf(
         .map(({ unit_code, outcome_label }) => ({ unit_code, outcome_label })),
       sku: l.sku,
       description: info[l.sku]?.description ?? l.sku,
-      // Server-resolved word first; the same shared ladder covers version
-      // skew (an older Worker sends no line_info).
-      category: info[l.sku]?.category ?? goodsCategoryWordOf({ sku: l.sku }),
+      // 0601 · the Catalog's category, never a guess from the SKU text.
+      category: info[l.sku]?.category ?? CATALOG_CATEGORY_NOT_RECORDED,
       order_qty: orderQty,
       received_qty: receivedNow,
       damaged_qty: l.damaged_qty,
@@ -135,7 +155,8 @@ export function grnTemplateDataOf(
     deliver_to: r.warehouse_name ?? "",
     goods_arrived_at:
       draft?.goodsArrivedAt ?? r.actual_site_name ?? r.warehouse_name ?? "",
-    goods_received_on: draft?.goodsReceivedAt ?? r.goods_received_at ?? null,
+    ...arrivalOf(draft, r),
+    received_by: receivedByWords(r),
     lines,
     // Preserve unmatched historical evidence; never guess a line from a SKU
     // or attach an unreceived line's Units to another item on this receipt.
@@ -164,3 +185,25 @@ export function grnTemplateDataOf(
         : null,
   };
 }
+
+/** 0601 · Goods Received Date and its clock, in Kuala Lumpur. A proposed
+ *  time wins, then a proposed date (no clock), then the saved facts. An
+ *  older record keeps its date and no clock (`Time not recorded`). */
+function arrivalOf(
+  draft: GrnAmendDraft | null | undefined,
+  r: ReceivingSessionDetail["receipt"],
+): { goods_received_on: string | null; goods_received_time: string | null } {
+  const time = draft?.goodsReceivedTime
+    ?? (draft?.goodsReceivedAt ? null : (r.goods_received_time ?? null));
+  if (time) {
+    return {
+      goods_received_on: appDateIsoOf(time) || null,
+      goods_received_time: fmtDate(time, { timeOnly: true }) || null,
+    };
+  }
+  return {
+    goods_received_on: draft?.goodsReceivedAt ?? r.goods_received_at ?? null,
+    goods_received_time: null,
+  };
+}
+

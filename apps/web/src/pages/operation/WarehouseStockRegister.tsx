@@ -343,7 +343,7 @@ export default function WarehouseStockRegister() {
         sortable: true,
         chooserGroup: "Unit",
         // Display, search and EXPORT all read the one resolver. Counted goods
-        // have no identity, so the column prints `—` rather than the technical
+        // have no identity, so the column prints nothing rather than the technical
         // key that keys their row (0453).
         searchValue: (u) => unitIdOf(u) ?? "",
         exportValue: (u) => displayUnitId(u),
@@ -353,7 +353,9 @@ export default function WarehouseStockRegister() {
               {displayUnitId(u)}
             </Link>
           ) : (
-            <span className="font-mono text-base-900">—</span>
+            /* A counted row has no identity; nothing stands in for it (owner
+               ruling 2026-09-26: no dash on a screen). */
+            <Blank />
           ),
       },
       {

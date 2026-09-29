@@ -57,7 +57,7 @@ export const DELIVERY_GROUPS = [
     key: "bed",
     label: "Bed set",
     description:
-      "Mattress and bed frame always go together — never send one without the other",
+      "Mattress and bed frame always go together. Never send one without the other.",
   },
   {
     key: "sofa",
@@ -153,5 +153,5 @@ export function deliveryScopeSentence(
   if (waiting.length === 0) return null;
   const going = scope.map(deliveryGroupLabel).join(" + ");
   const later = waiting.map(deliveryGroupLabel).join(" + ");
-  return `${going} only — ${later} follows on a second trip`;
+  return `${going} only. ${later} follows on a second trip`;
 }

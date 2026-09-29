@@ -184,7 +184,18 @@ function ReplyProofField({
 /** Exported for the Work Logistics card (owner ruling 2026-09-24): Work
  *  embeds THIS Delivery-owned form and calls the same door — it never draws a
  *  second form for the same act (Law C). */
-export function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard; onDone: () => void }) {
+export function DeliveryDatesEdit({
+  card,
+  onDone,
+  layout = "stack",
+}: {
+  card: DeliveryMonitorCard;
+  onDone: () => void;
+  /** `grid` — the Work route card (Workspace MASTER §5.10 BUILD SHEET): the
+   *  same fields and the same save, three per row, 36px buttons. The
+   *  Requested date is on the Route already, so the card repeats no fact. */
+  layout?: "stack" | "grid";
+}) {
   const row = card.scope;
   const arrangement = row.arrangement;
   const leg = card.leg ?? 0;
@@ -236,13 +247,17 @@ export function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard;
   return (
     <form
       className="flex flex-col gap-3"
+      data-layout={layout}
       data-testid="delivery-brief-dates-edit"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
       }}
     >
-      <Fact label={MONITOR_COPY.customerRequested} value={requestedDeliveryText({ iso: requestedIso, tbd: row.customerDateTbd })} />
+      {layout === "stack" ? (
+        <Fact label={MONITOR_COPY.customerRequested} value={requestedDeliveryText({ iso: requestedIso, tbd: row.customerDateTbd })} />
+      ) : null}
+      <div className={layout === "grid" ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
       <DatePicker
         id={`delivery-brief-date-${card.scopeId}`}
         label={MONITOR_COPY.confirmedDateField}
@@ -276,17 +291,18 @@ export function DeliveryDatesEdit({ card, onDone }: { card: DeliveryMonitorCard;
           });
         }}
       />
+      </div>
       <div className="flex items-center gap-2">
         <Button
           variant="primary"
-          size="sm"
+          size={layout === "grid" ? "touch" : "sm"}
           type="submit"
           disabled={!canSave}
           data-testid="delivery-brief-save-dates"
         >
           {needsReply ? MONITOR_COPY.saveConfirmedDeliveryNeedsReply : MONITOR_COPY.saveConfirmedDelivery}
         </Button>
-        <Button size="sm" type="button" onClick={onDone} data-testid="delivery-brief-cancel-dates">
+        <Button size={layout === "grid" ? "touch" : "sm"} type="button" onClick={onDone} data-testid="delivery-brief-cancel-dates">
           {MONITOR_COPY.cancel}
         </Button>
       </div>

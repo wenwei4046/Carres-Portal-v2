@@ -74,14 +74,14 @@ describe("CaseDeadline", () => {
   it("asks for the call by name once the window is open", () => {
     draw();
     expect(
-      screen.getByText("Call Ryan Chong — say why it is taking longer"),
+      screen.getByText("Call Ryan Chong to say why it is taking longer"),
     ).toBeInTheDocument();
   });
 
   it("stops asking once the customer has been told about this deadline", () => {
     draw({ events: [told()] });
     expect(
-      screen.queryByText("Call Ryan Chong — say why it is taking longer"),
+      screen.queryByText("Call Ryan Chong to say why it is taking longer"),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Ryan Chong was told why it is taking longer/)).toBeInTheDocument();
     expect(screen.getByText(/Factory has not given a date/)).toBeInTheDocument();

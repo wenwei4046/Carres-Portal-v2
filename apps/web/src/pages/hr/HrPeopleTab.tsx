@@ -250,7 +250,7 @@ export default function HrPeopleTab() {
           <Info size={14} className="shrink-0 text-base-400" />
           <span className="text-meta text-base-400">
             Showing all {people.length}. Store logins, supplier and partner accounts are not
-            people — they have no CR code, so they never appear here.
+            people. They have no CR code, so they never appear here.
           </span>
         </div>
       </SectionCard>

@@ -175,8 +175,23 @@ export default function DealerPos({
   const cancelPendingOrder = useCancelOrder(stripePending?.orderId ?? "");
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  // The category drawer belongs only to catalog step 1. Close it before a
+  // later step mounts so returning to the catalog never revives stale UI.
+  useEffect(() => {
+    if (step !== 1) setCategoryOpen(false);
+  }, [step]);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const nonPhone = window.matchMedia("(min-width: 768px)");
+    const closeOutsidePhone = (event: MediaQueryListEvent) => {
+      if (event.matches) setCategoryOpen(false);
+    };
+    nonPhone.addEventListener("change", closeOutsidePhone);
+    return () => nonPhone.removeEventListener("change", closeOutsidePhone);
+  }, []);
   // 0255 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
   const [teamOpen, setTeamOpen] = useState(false);
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
@@ -625,7 +640,7 @@ export default function DealerPos({
       // happened, or the store re-submits and double-signs the customer.
       setSubmitError(
         done.length > 0
-          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart — check Admin → Rental first.`
+          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart. Check Admin → Rental first.`
           : msg,
       );
     } finally {
@@ -847,7 +862,7 @@ export default function DealerPos({
     setStripeAutoFire(false);
     if (stripePending || uploading || createOrder.isPending) return;
     if (draft.paid <= 0) {
-      toast.info("Pick the amount to collect first — 50% / Full / Custom above.");
+      toast.info("Pick the amount to collect first: 50% / Full / Custom above.");
       return;
     }
     if (!draft.signature || !draft.signature.startsWith("data:image/")) {
@@ -893,13 +908,13 @@ export default function DealerPos({
     if (!sp) return;
     if (
       !window.confirm(
-        `Void order CO-${sp.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+        `Void order CO-${sp.so}? The customer hasn't paid. The order is cancelled and you return to editing.`,
       )
     )
       return;
     try {
       await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at handover" });
-      toast.info(`Order CO-${sp.so} voided — nothing was charged.`);
+      toast.info(`Order CO-${sp.so} voided. Nothing was charged.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not void the order");
       return;
@@ -912,7 +927,7 @@ export default function DealerPos({
     if (stripePaidPending > 0) return stripeFinalize("paid");
     if (
       window.confirm(
-        "Customer hasn't paid yet.\n\nOK — keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel — stay on the QR.",
+        "Customer hasn't paid yet.\n\nOK: keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel: stay on the QR.",
       )
     ) {
       stripeFinalize("keep");
@@ -1193,16 +1208,17 @@ export default function DealerPos({
         </div>
       </header>
 
-      {/* Phone-only top bar. The disabled menu button reserves Day 5's stable
-          category-drawer trigger; the existing catalog FAB remains the only
-          phone cart entrance until it becomes Day 8's sticky cart bar. */}
+      {/* Phone-only top bar. The category button opens Day 5's catalog drawer;
+          the existing catalog FAB remains the only phone cart entrance until
+          it becomes Day 8's sticky cart bar. */}
       <header className={`pos-mobile-topbar hidden${submitted ? " is-complete" : ""}`}>
         <div className="pos-mobile-topbar__main">
           <button
             type="button"
             className="pos-mobile-topbar__icon"
-            aria-label="Categories menu unavailable"
-            disabled
+            aria-label={step === 1 ? "Open categories" : "Categories available in catalog"}
+            onClick={() => setCategoryOpen(true)}
+            disabled={step !== 1}
           >
             <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -1446,6 +1462,8 @@ export default function DealerPos({
               }}
               cartOpen={cartOpen}
               onCartOpenChange={setCartOpen}
+              categoryOpen={categoryOpen}
+              onCategoryOpenChange={setCategoryOpen}
               pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
               pwpClaimGroup={pwpActive ? getClaimGroup() : undefined}
               customerPhone={pwpActive ? customerPhone : undefined}

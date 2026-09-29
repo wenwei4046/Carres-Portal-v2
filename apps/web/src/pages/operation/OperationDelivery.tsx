@@ -238,7 +238,7 @@ function goodsLinesText(lines: readonly { name: string; qty: number; shortQty: n
   return lines
     .map(
       (l) =>
-        `${l.name} × ${l.qty}${l.shortQty > 0 ? ` — ${ARRIVAL_COPY.short(l.shortQty)}` : ""}`,
+        `${l.name} × ${l.qty}${l.shortQty > 0 ? `, ${ARRIVAL_COPY.short(l.shortQty)}` : ""}`,
     )
     .join(" · ");
 }

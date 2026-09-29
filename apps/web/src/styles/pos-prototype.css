@@ -9,7 +9,8 @@
    portal/backoffice pages keep the v17 look untouched.
    ===================================================================== */
 
-.pos-proto {
+.pos-proto,
+[data-kit="drawer"]:has(.pos-category-drawer) {
   /* ---- Carres palette (colors_and_type.css) ---- */
   --c-cream: #F5F3F0;
   --c-beige: #DDD7CF;
@@ -4696,6 +4697,136 @@ button.step-pill:disabled { cursor: default; color: inherit; }
   }
 
   .cat-toolbar__count {
+    margin-left: auto;
+  }
+
+  .pos-mobile-category-chips {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 12px;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pos-mobile-category-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pos-mobile-category-chip {
+    display: inline-flex;
+    min-height: 44px;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--pos-panel);
+    color: var(--fg);
+    padding: 0 14px;
+    font-family: var(--font-button);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    touch-action: manipulation;
+  }
+
+  .pos-mobile-category-chip.is-active:not(:disabled) {
+    border-color: var(--c-ink);
+    background: var(--c-ink);
+    color: var(--c-cream);
+  }
+
+  .pos-mobile-category-chip:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .pos-mobile-category-chip:not(:disabled):active,
+  .pos-category-drawer__item:not(:disabled):active {
+    opacity: 0.72;
+  }
+
+  .pos-mobile-category-chip:focus-visible,
+  .pos-category-drawer__item:focus-visible {
+    outline: 2px solid var(--c-burnt);
+    outline-offset: 2px;
+  }
+
+  .pos-mobile-category-chip__count,
+  .pos-category-drawer__count {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.6;
+  }
+
+  .pos-category-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: transparent;
+  }
+
+  [data-kit="drawer"]:has(.pos-category-drawer) {
+    right: auto;
+    left: 0;
+    width: 82vw;
+    max-width: 82vw;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+    background: var(--pos-rail);
+  }
+
+  .pos-category-drawer__list,
+  .pos-category-drawer__quick {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .pos-category-drawer__quick {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+
+  .pos-category-drawer__item {
+    display: flex;
+    min-height: 44px;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border-radius: 10px;
+    color: var(--fg);
+    padding: 0 12px;
+    font-family: var(--font-button);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    touch-action: manipulation;
+  }
+
+  .pos-category-drawer__item.is-active:not(:disabled) {
+    background: var(--c-ink);
+    color: var(--c-cream);
+  }
+
+  .pos-category-drawer__item:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .pos-category-drawer__item svg {
+    flex: 0 0 auto;
+  }
+
+  .pos-category-drawer__count {
     margin-left: auto;
   }
 

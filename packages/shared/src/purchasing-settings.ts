@@ -507,6 +507,11 @@ export const purchasingSettingsResponseSchema = z.object({
   earliestSellDays: z.number().int(),
   logisticsCallWorkingDays: z.number().int(),
   poDays: weekdayList,
+  /** 0585 · the daily PO windows (MASTER §5.6.1). Optional so a browser on
+   *  this build still reads an older Worker. */
+  poWindows: z
+    .object({ first: z.string(), second: z.string().nullable(), secondEnabled: z.boolean() })
+    .optional(),
   manualPurchaseMinDeliveryDays: z.number().int(),
   suppliers: z.array(
     z.object({
@@ -614,6 +619,26 @@ export type PurchasingSetNumberInput = z.infer<typeof purchasingSetNumberInput>;
 
 export const purchasingSetPoDaysInput = z.object({ days: weekdayList }).strict();
 export type PurchasingSetPoDaysInput = z.infer<typeof purchasingSetPoDaysInput>;
+
+/** `HH:MM`, 24-hour, Malaysia wall clock — what an `<input type="time">` sends. */
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time like 11:30.");
+
+/**
+ * 0585 · `First PO window` · `Second PO window` + its on/off switch
+ * (MASTER §5.6.1, owner 2026-09-24/25). The SQL door re-checks both rules.
+ */
+export const purchasingSetPoWindowsInput = z
+  .object({ first: clockTime, second: clockTime.nullable(), secondEnabled: z.boolean() })
+  .strict()
+  .refine((v) => !v.secondEnabled || v.second != null, {
+    message: "The second PO window needs a time.",
+    path: ["second"],
+  })
+  .refine((v) => v.second == null || v.second > v.first, {
+    message: "The second PO window must be later than the first.",
+    path: ["second"],
+  });
+export type PurchasingSetPoWindowsInput = z.infer<typeof purchasingSetPoWindowsInput>;
 
 export const purchasingSetProductionDaysInput = z
   .object({
@@ -776,5 +801,26 @@ export function settingValueLabel(
   if (raw === "") return null;
   if (settingKey === "supplier_work_week") return workWeekLabel(parsePgIntArray(raw));
   if (settingKey === "po_days") return weekdayListLabel(parsePgIntArray(raw));
+  if (settingKey === "po_windows") return poWindowsHistoryLabel(raw);
   return raw;
+}
+
+/**
+ * 0585 records a PO-window change as `11:30:00 · 16:00:00 · on` (the second
+ * time may be absent). The history line reads it in the screen's clock words
+ * — `11:30 AM and 4:00 PM` · `11:30 AM, second window off` — never the
+ * database's spelling, never a dash.
+ */
+export function poWindowsHistoryLabel(raw: string): string {
+  const [first, second, state] = raw.split("·").map((part) => part.trim());
+  const clock = (t: string | undefined) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(t ?? "");
+    if (!m) return null;
+    const h = Number(m[1]);
+    return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+  };
+  const one = clock(first);
+  if (!one) return raw;
+  const two = clock(second);
+  return state === "on" && two ? `${one} and ${two}` : `${one}, second window off`;
 }

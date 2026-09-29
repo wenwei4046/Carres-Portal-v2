@@ -904,12 +904,12 @@ describe("monthDayCounts", () => {
 
   it("the cell's sentence says the same three facts in words — zero lines omitted", () => {
     expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 })).toBe(
-      "Fri, 4 Sep — 3 deliveries · 1 exception · 2 Logistics not assigned",
+      "Fri, 4 Sep: 3 deliveries · 1 exception · 2 Logistics not assigned",
     );
     expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, transfers: 0, exceptions: 0, noLogistics: 0 })).toBe(
-      "Fri, 4 Sep — 1 delivery",
+      "Fri, 4 Sep: 1 delivery",
     );
-    expect(monthDaySentence("Fri, 4 Sep", undefined)).toBe("Fri, 4 Sep — No deliveries");
+    expect(monthDaySentence("Fri, 4 Sep", undefined)).toBe("Fri, 4 Sep: No deliveries");
   });
 });
 
@@ -935,7 +935,7 @@ describe("the schedule separates customer deliveries from transfers", () => {
     const alOnly = filterMonitorCalendarCards(set, { ...noFilters, logisticsPartnerId: "p-al" }, ["2026-09-04"]);
     expect(scheduleCountsOf(alOnly)).toEqual({ deliveries: 0, transfers: 1 });
     expect(scheduleCountsOf(filterMonitorCalendarCards(set, noFilters, ["2026-09-05"]))).toEqual({ deliveries: 1, transfers: 0 });
-    expect(monthDaySentence("Fri, 4 Sep", monthDayCounts(friday, TODAY).get("2026-09-04"))).toBe("Fri, 4 Sep — 2 transfers");
+    expect(monthDaySentence("Fri, 4 Sep", monthDayCounts(friday, TODAY).get("2026-09-04"))).toBe("Fri, 4 Sep: 2 transfers");
   });
 });
 

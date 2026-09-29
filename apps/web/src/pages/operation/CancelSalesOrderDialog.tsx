@@ -144,7 +144,7 @@ export default function CancelSalesOrderDialog({
           {canCancel && Number(impact.paid) > 0 && (
             <p className="text-body text-base-900" data-testid="cancel-so-money">
               The customer has paid RM {Number(impact.paid).toLocaleString()} on this order. Money
-              already collected stays recorded — giving it back is a separate decision.
+              already collected stays recorded. Giving it back is a separate decision.
             </p>
           )}
 

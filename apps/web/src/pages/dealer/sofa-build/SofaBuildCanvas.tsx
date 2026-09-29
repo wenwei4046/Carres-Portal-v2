@@ -921,7 +921,7 @@ export default function SofaBuildCanvas({
                         className="sof-cv__btn"
                         style={{ width: "auto", padding: "0 10px", gap: 5 }}
                         aria-label="Edit modules"
-                        title="Unlock — select / move / rotate the modules individually"
+                        title="Unlock: select / move / rotate the modules individually"
                         data-testid="sofa-group-edit"
                       >
                         <Ungroup size={13} />
@@ -1256,7 +1256,7 @@ export default function SofaBuildCanvas({
               disabled={!canAdd}
               className="btn btn--secondary btn--lg"
               data-testid="sofa-build-create-quickpick"
-              title="Save this arrangement as a Quick Pick preset — no price (principal)"
+              title="Save this arrangement as a Quick Pick preset, no price (principal)"
             >
               Create quick pick
             </button>

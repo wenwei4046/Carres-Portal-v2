@@ -281,7 +281,7 @@ export const RENT_TO_OWN_V5_BLOCKS: AgreementBlock[] = [
 /** The document's own identity — what the tab offers to create. */
 export const RENT_TO_OWN_V5 = {
   docKey: "rent_to_own",
-  name: "Rental Agreement — Terms and Conditions (v5)",
+  name: "Rental Agreement: Terms and Conditions (v5)",
   bindsTo: ["mattress", "bedframe", "sofa"],
   effectiveFrom: "2026-07-06",
   blocks: RENT_TO_OWN_V5_BLOCKS,

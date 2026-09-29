@@ -59,6 +59,7 @@ type PurchasingPage =
   | "receiving"
   | "claims"
   | "purchase-returns"
+  | "repair-orders"
   | "receiving-report"
   | "purchasing-report"
   | "purchasing-settings";
@@ -86,6 +87,8 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   claims: "Supplier Claims",
   /* §9.6, owner-confirmed 2026-09-18. The SIDEBAR's own word, not a new one. */
   "purchase-returns": "Purchase Returns",
+  /* §9.7 — the SIDEBAR's own word. */
+  "repair-orders": "Repair Orders",
   /* Central Reports → Receiving & Inbound (owner instruction 2026-09-04).
      Like the Purchasing Report, reachable by direct URL — no rail row. */
   "receiving-report": "Receiving & Inbound",
@@ -109,6 +112,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
         ? "claims"
       : tabParam === "purchase-returns"
         ? "purchase-returns"
+      : tabParam === "repair-orders"
+        ? "repair-orders"
       : tabParam === "receiving-report"
         ? "receiving-report"
         : tabParam === "purchasing-report"
@@ -122,7 +127,7 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
     <ModuleHeader
       testId="purchasing-tabs"
       word={activeLabel}
-      docTitle={`${activeLabel} · Purchasing — Carres`}
+      docTitle={`${activeLabel} · Purchasing · Carres`}
       destinationHeader
       right={right}
     />

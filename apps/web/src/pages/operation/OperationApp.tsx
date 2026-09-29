@@ -59,6 +59,7 @@ import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
+import OperationRepairOrders from "./OperationRepairOrders";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 // Q3 (Loo, 2026-08-04) — Purchasing → Report: the "look at the numbers" layer.
 import OperationPurchasingReport from "./OperationPurchasingReport";
@@ -196,6 +197,12 @@ export default function OperationApp() {
      a new route joins BOTH lists in the same commit. Measured live 2026-09-03
      on /operation/stock/unit/id-aam135002 before the fix. */
   const isStockUnitUrl = location.pathname.startsWith("/operation/stock/unit");
+  /* The legacy `/operation/purchasing` address rendered the old Operation
+     dashboard (owner ruling 2026-09-28, Purchasing §9.1). It is a real route
+     now — a redirect to SO Batch Purchase — so it joins this gate too. */
+  const isLegacyPurchasingUrl =
+    location.pathname === "/operation/purchasing" ||
+    location.pathname.startsWith("/operation/purchasing/");
   const isUrlDriven =
     isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
     /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
@@ -204,7 +211,8 @@ export default function OperationApp() {
        the production walk, invisible to a component test that never mounts the
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
-    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl;
+    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl ||
+    isLegacyPurchasingUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -417,6 +425,8 @@ export default function OperationApp() {
              production walk, like every one before it; the test below now
              catches the whole CLASS instead of waiting for the next walk. */
           tab !== "purchase-returns" &&
+          /* §9.7 Repair Orders draws PurchasingTabs (its own ModuleHeader). */
+          tab !== "repair-orders" &&
           /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
              live rail destination that draws its own ModuleHeader and has been
              showing two top rows. The class test above found it the minute it
@@ -493,6 +503,8 @@ export default function OperationApp() {
                 Batch Purchase component. Query params (`?so=` plus its rail
                 filters) remain component-owned; no second mode or engine. */}
             <Route path="to-order" element={<OperationToOrder />} />
+            {/* Legacy address (owner ruling 2026-09-28): SO Batch Purchase. */}
+            <Route path="purchasing/*" element={<Navigate to="/operation?tab=purchase" replace />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
             <Route
               path="procurement/:slug"
@@ -595,6 +607,7 @@ export default function OperationApp() {
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and
                 the RPCs refuse the write regardless. */}

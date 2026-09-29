@@ -201,27 +201,29 @@ describe("Order Route — the nodes", () => {
 
   it("gives CURRENT its own mark and puts the owner beside the instruction", () => {
     draw();
-    const supplier = nodeEl("PO-2048:supplier");
-    expect(supplier).toHaveAttribute("data-current", "true");
-    expect(supplier).toHaveAttribute("data-mark", "current");
-    expect(supplier).toHaveTextContent("Confirm ready date");
+    /* Waiting on the supplier is not Carres' work (Purchasing §5.8): the
+       position being worked is Receiving's. */
+    const receiving = nodeEl("PO-2048:receiving");
+    expect(receiving).toHaveAttribute("data-current", "true");
+    expect(receiving).toHaveAttribute("data-mark", "current");
+    expect(receiving).toHaveTextContent("Check in");
     /* Initials on the node; the sentence never repeats the name. */
-    expect(supplier).toHaveTextContent("YJ");
-    expect(supplier).not.toHaveTextContent("Yu Jun: Confirm");
+    expect(receiving).toHaveTextContent("SH");
+    expect(receiving).not.toHaveTextContent("Shasha: Check");
   });
 
   it("keeps fact, owner action and document due context on three separate rows", () => {
     draw();
-    const supplier = nodeEl("PO-2048:supplier");
-    const fact = screen.getByTestId("route-fact-PO-2048:supplier-0");
-    const action = screen.getByTestId("route-action-PO-2048:supplier");
-    const context = screen.getByTestId("route-context-PO-2048:supplier");
+    const supplier = nodeEl("PO-2048:receiving");
+    const fact = screen.getByTestId("route-fact-PO-2048:receiving-0");
+    const action = screen.getByTestId("route-action-PO-2048:receiving");
+    const context = screen.getByTestId("route-context-PO-2048:receiving");
 
-    expect(fact).toHaveTextContent("Supplier has not confirmed");
-    expect(screen.getByTestId("route-fact-PO-2048:supplier-1")).toHaveTextContent("the ready date");
+    expect(fact).toHaveTextContent("Warehouse has not received");
+    expect(screen.getByTestId("route-fact-PO-2048:receiving-1")).toHaveTextContent("the goods");
     expect(fact).toHaveClass("text-body", "font-semibold");
-    expect(action).toHaveTextContent("YJ");
-    expect(action).toHaveTextContent("Confirm ready date");
+    expect(action).toHaveTextContent("SH");
+    expect(action).toHaveTextContent("Check in");
     expect(action).toHaveClass("text-label");
     /* Three rows, broken at the separators — never one row ending in "…". */
     expect(context).toHaveTextContent(
@@ -243,7 +245,7 @@ describe("Order Route — the nodes", () => {
 
   it("marks a step nobody has reached as a future path", () => {
     draw();
-    expect(nodeEl("PO-2048:receiving")).toHaveAttribute("data-mark", "future");
+    expect(nodeEl("PO-2048:supplier")).toHaveAttribute("data-mark", "future");
   });
 
   it("says what is missing, why and who does what next — never a banned empty word", () => {
@@ -301,7 +303,7 @@ describe("Order Route — the gate", () => {
       }),
     );
     expect(nodeEl("delivery-order")).toHaveTextContent(
-      "Date falls on a Sunday — pick another day",
+      "Date falls on a Sunday. Pick another day",
     );
   });
 });
@@ -335,12 +337,12 @@ describe("Order Route — the loan", () => {
 describe("Order Route — accessibility", () => {
   it("makes every node focusable and reads its lines in order", () => {
     draw();
-    const supplier = nodeEl("PO-2048:supplier");
-    expect(supplier).toHaveAttribute("tabindex", "0");
-    expect(supplier.getAttribute("aria-label")).toBe(
-      "SUPPLIER — Supplier has not confirmed the ready date — Yu Jun: Confirm ready date — PO-2048 · 3 Units · Carres Warehouse · Customer requested: Thu, 24 Sep",
+    const receiving = nodeEl("PO-2048:receiving");
+    expect(receiving).toHaveAttribute("tabindex", "0");
+    expect(receiving.getAttribute("aria-label")).toBe(
+      "RECEIVING — Warehouse has not received the goods — Shasha: Check in — PO-2048 · 3 Units · Carres Warehouse · Customer requested: Thu, 24 Sep",
     );
-    expect(supplier).toHaveAttribute("aria-current", "step");
+    expect(receiving).toHaveAttribute("aria-current", "step");
   });
 
   it("puts the tab order in reading order — SO, goods, delivery, money, gate, tail", () => {
@@ -365,8 +367,8 @@ describe("Order Route — accessibility", () => {
     /* complete carries the tick glyph, future carries the dashed border, the
        exception carries its words — each readable without the hue. */
     expect(nodeEl("PO-2048:purchasing")).toHaveAttribute("data-mark", "complete");
-    expect(nodeEl("PO-2048:receiving").className).toContain("border-dashed");
-    expect(nodeEl("PO-2048:supplier")).toHaveTextContent("Current");
+    expect(nodeEl("PO-2048:supplier").className).toContain("border-dashed");
+    expect(nodeEl("PO-2048:receiving")).toHaveTextContent("Current");
   });
 
   it("⭐ pans a focused off-frame node into view — the browser cannot scroll a transformed canvas", () => {
@@ -690,5 +692,31 @@ describe("stacked goods lines", () => {
     expect(plate).toHaveAttribute("data-mark", "unreadable");
     expect(plate.getAttribute("aria-label")).toContain("Could not read Purchasing for this line.");
     expect(nodeEl("L2:goods-line")).not.toHaveAttribute("data-mark", "unreadable");
+  });
+});
+
+describe("Order Route — loading holds the canvas geometry (Scope E)", () => {
+  it("draws the framed canvas box, not a bare line, while the route loads", () => {
+    render(
+      <MemoryRouter>
+        <SalesOrderRoute route={map()} owners={owners} loading />
+      </MemoryRouter>,
+    );
+    const frame = screen.getByTestId("route-loading");
+    expect(frame.className).toContain("h-[calc(100vh-260px)]");
+    expect(frame.className).toContain("min-h-[420px]");
+    expect(screen.queryByTestId("route-canvas")).not.toBeInTheDocument();
+  });
+});
+
+describe("Order Route — the zoom controls never sit on a node (SO-1365 check)", () => {
+  it("keeps `− + ⛶` bottom-left on the canvas's own strip, outside the drawn map", () => {
+    draw();
+    const viewport = screen.getByTestId("route-viewport");
+    const strip = screen.getByTestId("route-controls");
+    expect(viewport).not.toContainElement(screen.getByTestId("route-zoom-in"));
+    expect(strip).toContainElement(screen.getByTestId("route-zoom-in"));
+    expect(screen.getByTestId("route-canvas")).toContainElement(strip);
+    expect(strip.compareDocumentPosition(viewport) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 });

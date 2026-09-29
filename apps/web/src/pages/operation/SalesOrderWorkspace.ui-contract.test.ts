@@ -6,6 +6,11 @@ import { POS_FORM_BUILTINS } from "@carres/shared";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
+/* `Block` — the one card — lives in the kit since 2026-09-28 (Workspace §5.10
+   admission); its classes are read from there, the page still asks for its tone. */
+const block = readFileSync(join(here, "../../components/kit/Block.tsx"), "utf8");
+/* The Route's input is built by the ONE shared builder (Work reads it too). */
+const routeInput = readFileSync(join(here, "sales-order-route-input.ts"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const panels = readFileSync(join(here, "SalesOrderChangePanels.tsx"), "utf8");
@@ -100,17 +105,21 @@ describe("Sales Order object template contract", () => {
      (Jess). It overwrites the 2026-09-21 / 2026-09-22 "remain blue" ruling:
      every page follows the one kit, and the kit's title is `text-strong`
      15/600 slate-12, never blue. The 1px rule under it stays. */
-  it("draws card titles black bold and sentence case over a 1px rule, with no band", () => {
-    expect(workspace).toContain('"text-strong text-kit-slate-12"');
-    expect(workspace).not.toContain("text-strong text-kit-blue-11");
-    expect(workspace).toContain('"border-b border-kit-slate-5 pb-2"');
-    /* ⭐ AND THE BLUE IS THE SALES ORDER'S ALONE. `Block` is shared with
-       `PurchaseOrdersPage`, so the ruling is opt-in: every Sales Order card
-       asks for it and no other page moves. */
+  it("draws card titles black bold, sentence case, over a 1px rule, with no band", () => {
+    expect(block).toContain('className="text-strong text-kit-slate-12"');
+    expect(block).not.toContain("text-strong text-kit-blue-11");
+    expect(block).toContain("border-b border-kit-slate-5 pb-2");
+    /* ⭐ AND IT IS THE ONE CHROME. Owner instruction 2026-09-26 "follow sales
+       order ui kit … every page of purchasing": `Block` has no second, opt-in
+       tone — the mono uppercase title beside a band is retired for every page
+       that shares this card. */
+    expect(workspace).not.toContain("titleTone");
+    expect(block).not.toContain("titleTone");
+    expect(block).not.toContain("font-mono text-strong uppercase");
+    expect(block).not.toContain("border-l-2 border-base-300");
     /* Six Order-tab cards + the Revisions/History card (kit-sizes card,
-       2026-09-23), which now wears the same section grammar. */
-    expect(workspace.match(/titleTone="sales-order"/g)).toHaveLength(7);
-    expect(workspace).toContain('titleTone = "shared"');
+       2026-09-23) all draw it. */
+    expect(workspace.match(/<Block\s+title=/g)!.length).toBeGreaterThanOrEqual(6);
     /* The tab underline is the screen's one accent, and it marks the current
        view — the accent's own job. */
     expect(workspace.match(/bg-kit-blue-9/g)).toHaveLength(1);
@@ -160,7 +169,7 @@ describe("Sales Order object template contract", () => {
       "mode === \"oldrev\" && viewedRevision ? templateData : base",
     );
     expect(workspace).toContain(
-      'toast.message("You have unsaved changes — printing the saved version")',
+      'toast.message("You have unsaved changes. Printing the saved version")',
     );
     /* The draft's own blob is never handed to Print. */
     expect(workspace).not.toContain("window.open(pdfUrl,");
@@ -358,7 +367,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('delivery_date_tbd: "Delivery date to be confirmed"');
     expect(workspace).toContain("<WaitingRequest");
     expect(panels).toContain("Waiting for management");
-    expect(panels).toContain("Out of date — propose again");
+    expect(panels).toContain("Out of date. Propose again");
   });
 
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
@@ -371,7 +380,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
     // `\s+`, not a literal newline: a Windows checkout holds CRLF, CI's Linux
     // checkout holds LF, and the same file must match on both.
-    const start = workspace.search(/<Block\s+titleTone="sales-order"\s+title="Customer"/);
+    const start = workspace.search(/<Block\s+title="Customer"/);
     const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(customer).toContain("headerSlot=");
@@ -535,7 +544,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("needDealer && !draft.proceed_date");
     /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
        ended up with two of them. */
-    expect(workspace).toContain("Proceed date — pick the day production should start");
+    expect(workspace).toContain("Proceed date: pick the day production should start");
   });
 
   it("puts no toolbar on or above the paper", () => {
@@ -697,7 +706,7 @@ describe("Sales Order object template contract", () => {
     for (const column of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
       expect(workspace, `${column} left the draft table`).toContain(column);
     expect(workspace).toContain("const protectedLine = (l: DraftLine) =>");
-    expect(workspace).toContain("Free item — it follows the item it came with");
+    expect(workspace).toContain("Free item. It follows the item it came with");
     expect(workspace).toContain("Free item: check it is still allowed without the cancelled item");
   });
 
@@ -749,7 +758,7 @@ describe("Sales Order object template contract", () => {
 
   it("carries the approved reconstruction notice ONLY on a version with no stored file", () => {
     expect(workspace).toContain('data-testid="oldrev-rebuilt"');
-    expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
+    expect(workspace).toContain("Reconstructed copy. The original issued document is unavailable.");
     /* Every one of the three notices is gated on the legacy case. A version
        that kept its document must not be told it is a reconstruction. */
     expect(workspace).toContain("{isReconstruction && (");
@@ -767,7 +776,7 @@ describe("Sales Order object template contract", () => {
        prints the same sentence the document prints, so a reader on screen and a
        customer holding the PDF are told the same thing. */
     expect(workspace).toContain("Signature version not recorded.");
-    expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
+    expect(workspace).toContain("Reconstructed copy. The original issued document is unavailable.");
     expect(workspace).toContain("{isReconstruction && base?.signature_url && (");
     /* ...and the document is told by the SAME condition the page notice uses,
        so the two cannot drift apart. */
@@ -851,7 +860,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    const start = workspace.search(/<Block[^>]*\stitleTone="sales-order"[\s\S]{0,40}title="Payment"/);
+    const start = workspace.search(/<Block[\s\S]{0,40}title="Payment"/);
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(money).toContain("headerSlot=");
@@ -1001,9 +1010,13 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
     /* ⭐ THE SO PAGE FIELD STANDARD (2026-09-22): a grey box means editable, and
        the three exceptions print as plain text. */
-    expect(workspace).toContain('data-kit={framed ? "readonly-field" : "plain-fact"}');
+    /* A system-filled value on a form wears the grey automatic box (owner
+       2026-09-28); every other framed fact is the white readonly field. */
+    expect(workspace).toContain('data-kit={framed ? (automatic ? "automatic-field" : "readonly-field") : "plain-fact"}');
     expect(workspace).toContain('<Fact own={false} label="SO Doc Date"');
-    expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
+    /* ONE skin: the white control, or the same control with the kit's
+       disabled-grey fill for an automatic value. Never a second copy. */
+    expect(workspace).toContain('${automatic ? CONTROL_BASE.replace("bg-white", "bg-kit-slate-3") : CONTROL_BASE} ${CONTROL_BORDER.rest}');
     /* Announced as what it is drawn as. A box that looks typable and reads to
        a screen reader as loose text is the same defect in the other channel. */
     expect(workspace).toContain('role="textbox"');
@@ -1101,7 +1114,7 @@ describe("Sales Order object page — one form grammar", () => {
     /* The rendered STRING is gone; the governance comment recording WHY it
        went stays, which is why this pins the quoted literal. */
     expect(workspace).not.toContain('"Not allocated"');
-    expect(route).toContain("unitsShortWords(readyQty, line.committedQty)");
+    expect(route).toContain("`Warehouse has ${readyQty} of ${line.committedQty} Units ready`");
     expect(route).not.toContain("Waiting for purchase");
     /* A LOAD IS NOT A SHORTAGE — the Deliver To cell has always guarded this;
        the Unit ID cell printed a shortage while the read was still in flight. */
@@ -1175,10 +1188,17 @@ describe("Sales Order object page — one form grammar", () => {
         expect(body, `${selector.trim()} may not re-case the sentence-case title`).not.toMatch(/text-transform/);
       }
     }
-    /* ⛔ AND PURCHASE ORDERS DID NOT MOVE. The band is Purchasing's, on a page
-       this work never reopened; retiring it here may not retire it there. */
-    expect(detailCss).toMatch(/:is\(\.po-detail-style, \.mp-create-style\) \[data-block\] > div:first-child \{/);
-    expect(detailCss).toContain("background-color: #b9c9d8;");
+    /* ⭐ AND SINCE 2026-09-26 PURCHASING MOVED TOO — owner instruction "follow
+       sales order ui kit … every page of purchasing": no stylesheet may paint
+       ANY page's card header. The band rules for `.po-detail-style` and
+       `.mp-create-style` are gone, not merely narrowed. */
+    for (const css of [detailCss, themeCss]) {
+      const bands = [...css.matchAll(/([^\n{}]*\[data-block\] > div:first-child)\s*\{([^}]*)\}/g)];
+      for (const [, selector, body] of bands) {
+        expect(body, `${selector.trim()} may not paint a card header`).not.toMatch(/background(-color)?:/);
+      }
+    }
+    expect(detailCss).not.toContain("#b9c9d8");
   });
 
   it("keeps the Items table a document on a locked order, doors and all", () => {
@@ -1188,11 +1208,11 @@ describe("Sales Order object page — one form grammar", () => {
        still offering `Edit`. One composition is the ruling; a live writer on a
        locked record is not part of it. */
     const items = workspace.slice(
-      workspace.indexOf('<Block titleTone="sales-order" title="Items">'),
+      workspace.indexOf('<Block title="Items">'),
     );
     const card = items.slice(0, items.indexOf("</Block>"));
     expect(card, "the Items card is inside the 0562 lock").not.toBe("");
-    const before = workspace.slice(0, workspace.indexOf('<Block titleTone="sales-order" title="Items">'));
+    const before = workspace.slice(0, workspace.indexOf('<Block title="Items">'));
     expect(
       before.slice(-400),
       "a `fieldset disabled={formLocked}` opens immediately before the Items card",
@@ -1215,7 +1235,7 @@ describe("Sales Order object page — one form grammar", () => {
        column, which is the one thing that sentence forbids.
        Every earlier contract read the card's NAMES; none read their ORDER, and
        that is exactly the gap the defect lived in. */
-    const card = workspace.slice(workspace.indexOf('<Block titleTone="sales-order" title="SO info">'));
+    const card = workspace.slice(workspace.indexOf('<Block title="SO info">'));
     const body = card.slice(0, card.indexOf("</Block>"));
     /* The LABEL as it is rendered, not a mention of it in prose above it. */
     const at = (label: string) => {
@@ -1482,7 +1502,7 @@ describe("Sales Order object page — one form grammar", () => {
     /* Two ranks only (orders/MASTER § "Order view"): the in-card label is
        13px/600 slate-11, one rank below the 15px card title. */
     const sub = "text-body font-semibold text-kit-slate-11";
-    expect(workspace, "the card title").toContain(title);
+    expect(block, "the card title").toContain(title);
     expect(workspace, "the subsection heading").toContain(sub);
     /* THE OLD SHAPE: the subsection heading copying the card title's own
        shouting treatment. */
@@ -1553,10 +1573,8 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   const table = readFileSync(join(here, "components/so-document-table.ts"), "utf8");
   const serviceCode = readFileSync(join(here, "../../lib/service-code.ts"), "utf8");
 
-  it("spaces every SO section's groups with ONE 12px body gap, opt-in by tone", () => {
-    expect(workspace).toContain(
-      'className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}',
-    );
+  it("spaces every SO section's groups with ONE 12px body gap — the Block's one body", () => {
+    expect(block).toContain('className="mt-3 flex flex-col gap-3 [&>*:empty]:hidden"');
     /* The per-group margins it replaced may not return. */
     expect(workspace).not.toContain('<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">');
     expect(workspace).not.toContain('<div className="mt-4 border-t border-kit-slate-5 pt-3">');
@@ -1615,7 +1633,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
   });
 
   it("draws Revisions and History through the same SO section Block — no off-scale p-5, no 20px title", () => {
-    expect(workspace).toContain('<Block titleTone="sales-order" title={objectView}>');
+    expect(workspace).toContain('<Block title={objectView}>');
     expect(workspace).not.toContain("rounded-card border border-kit-slate-5 bg-white p-5");
     expect(workspace).not.toContain('<h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>');
   });
@@ -1629,10 +1647,11 @@ describe("Order Route reads its owners only when it is open", () => {
   });
 
   it("hands the resolver the failed reads and the waiting change request", () => {
-    expect(workspace).toContain("unreadable: {");
-    expect(workspace).toContain("delivery: facts.failed.delivery");
-    expect(workspace).toContain("payments: facts.failed.payments");
-    expect(workspace).toContain("amendment: amendmentQ.isError");
+    expect(routeInput).toContain("unreadable: {");
+    expect(routeInput).toContain("delivery: a.facts.failed.delivery");
+    expect(routeInput).toContain("payments: a.facts.failed.payments");
+    expect(workspace).toContain("amendmentFailed: amendmentQ.isError");
+    expect(workspace).toContain("salesOrderRouteInputOf({");
     expect(workspace).toContain("onRetry={retryRouteRead}");
   });
 });

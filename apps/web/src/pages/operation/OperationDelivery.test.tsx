@@ -72,6 +72,14 @@ vi.mock("@/lib/queries", async () => {
 
 import OperationDelivery from "./OperationDelivery";
 import { MONITOR_COPY } from "./delivery-monitor";
+import { openRailGroups } from "@/test/rail";
+
+/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 
 /** The one consistent example: Friday, 4 September 2026. */
 const TODAY = "2026-09-04";
@@ -177,7 +185,7 @@ const CALENDAR_ENTRY = "/operation?tab=delivery&view=week";
 
 function wrap(node: React.ReactNode, initialEntry = CALENDAR_ENTRY) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return renderOpen(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialEntry]}>
         {node}
@@ -514,12 +522,12 @@ describe("Day · Week · Month (owner correction 2026-09-07)", () => {
     expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
     const fourth = screen.getByTestId("delivery-monitor-month-day-2026-09-04");
     expect(fourth.getAttribute("aria-label")).toBe(
-      "Fri, 4 Sep — 2 deliveries · 1 exception · 2 Logistics not assigned",
+      "Fri, 4 Sep: 2 deliveries · 1 exception · 2 Logistics not assigned",
     );
     expect(within(fourth).getByText("Deliveries")).toBeTruthy();
     expect(within(fourth).getByText("Exceptions")).toBeTruthy();
     const fifth = screen.getByTestId("delivery-monitor-month-day-2026-09-05");
-    expect(fifth.getAttribute("aria-label")).toBe("Fri, 5 Sep — 1 delivery".replace("Fri", "Sat"));
+    expect(fifth.getAttribute("aria-label")).toBe("Sat, 5 Sep: 1 delivery");
     expect(within(fifth).queryByText("Exceptions")).toBeNull();
     expect(within(fifth).queryByText("Logistics not assigned")).toBeNull();
     /* Sunday visible, not a choice. */
@@ -1499,7 +1507,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
     const save = screen.getByTestId("delivery-brief-save-dates");
     /* The button names its gap while disabled — the governed sentence. */
-    expect(save.textContent).toBe("Save scheduled delivery — upload the WhatsApp reply");
+    expect(save.textContent).toBe("Save scheduled delivery: upload the WhatsApp reply");
     expect(save).toBeDisabled();
     /* `Information received from` offers the partner, the customer, and
        Operation on behalf of the partner — nothing else. */
@@ -1704,7 +1712,7 @@ describe("Call customer — the contact week", () => {
     seedContacts();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&date=2026-09-08");
     const strip = screen.getByTestId("delivery-monitor-contact-week");
-    expect(within(strip).getByText("Contact deadlines — not supplier or delivery dates")).toBeTruthy();
+    expect(within(strip).getByText("Contact deadlines, not supplier or delivery dates")).toBeTruthy();
 
     cleanup();
     seedContacts();

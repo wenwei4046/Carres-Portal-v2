@@ -178,7 +178,7 @@ export default function CardSettlementPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="card-settlement-destination-header" word="Card settlement" docTitle="Card settlement — Carres" />
+      <ModuleHeader destinationHeader testId="card-settlement-destination-header" word="Card settlement" docTitle="Card settlement · Carres" />
       {query.isError ? (
         <LoadFailed what="Card settlement" onRetry={() => void query.refetch()} />
       ) : (

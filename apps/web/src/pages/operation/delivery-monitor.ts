@@ -82,7 +82,7 @@ import { fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
  */
 export const MONITOR_COPY = {
   page: "Monitor",
-  docTitle: "Monitor — Carres",
+  docTitle: "Monitor · Carres",
   search: "Search deliveries…",
   /** Owner correction 2026-09-06 — the short per-day absence; the spanning
    *  sentence below owns the fully-empty range. */
@@ -210,7 +210,7 @@ export const MONITOR_COPY = {
   operationOnBehalfOf: (partner: string) => `Operation on behalf of ${partner}`,
   whatsappProof: "WhatsApp proof",
   saveConfirmedDelivery: "Save scheduled delivery",
-  saveConfirmedDeliveryNeedsReply: "Save scheduled delivery — upload the WhatsApp reply",
+  saveConfirmedDeliveryNeedsReply: "Save scheduled delivery: upload the WhatsApp reply",
   cancel: "Cancel",
   notDeliveryDay: "Sunday and Malaysian public holidays are not delivery days",
   deliveryConfirmedDone: (date: string, slot: string | null) =>
@@ -231,11 +231,11 @@ export const MONITOR_COPY = {
   pickOne: "Pick one",
   driverName: "Driver name",
   condoRegistrationHint:
-    "What the building's management needs before the truck may enter — permit reference, registered time, in their words.",
+    "What the building's management needs before the truck may enter: permit reference, registered time, in their words.",
   recordCannotDeliver: (partner: string) => `Record Cannot Deliver on behalf of ${partner}`,
   cannotDeliverReason: "Reason",
   cannotDeliverNote: "Note",
-  cannotDeliverRecorded: (partner: string) => `${partner} cannot deliver — recorded`,
+  cannotDeliverRecorded: (partner: string) => `${partner} cannot deliver. Recorded.`,
   showBrief: "Show delivery brief",
   hideBrief: "Hide delivery brief",
   /** The first carrier on a scope — the governed word, never `Set partner`. */
@@ -283,7 +283,7 @@ export const MONITOR_COPY = {
   /* ── THE CONTACT WEEK (owner ruling 2026-09-10) ────────────────────────── */
   /** The strip's own caption — these dates are CONTACT deadlines, and a reader
    *  who mistakes them for delivery appointments will call on the wrong day. */
-  contactWeekScope: "Contact deadlines — not supplier or delivery dates",
+  contactWeekScope: "Contact deadlines, not supplier or delivery dates",
   contactWeek: "Contact-work week",
   previousWeek: "Previous week",
   nextWeek: "Next week",
@@ -1567,7 +1567,7 @@ export function monthDayCounts(
 
 /** The month cell's aria sentence — the same three facts, in words. */
 export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | undefined): string {
-  if (!counts || counts.deliveries + counts.transfers === 0) return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
+  if (!counts || counts.deliveries + counts.transfers === 0) return `${dateLabel}: ${MONITOR_COPY.emptyDay}`;
   const parts = [];
   if (counts.deliveries > 0) parts.push(`${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`);
   if (counts.transfers > 0) parts.push(`${counts.transfers} ${counts.transfers === 1 ? "transfer" : "transfers"}`);
@@ -1575,7 +1575,7 @@ export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | und
     parts.push(`${counts.exceptions} ${counts.exceptions === 1 ? "exception" : "exceptions"}`);
   }
   if (counts.noLogistics > 0) parts.push(`${counts.noLogistics} ${MONITOR_COPY.noLogistics}`);
-  return `${dateLabel} — ${parts.join(" · ")}`;
+  return `${dateLabel}: ${parts.join(" · ")}`;
 }
 
 /** Presentation of the existing stock/payment facts, not a permission to

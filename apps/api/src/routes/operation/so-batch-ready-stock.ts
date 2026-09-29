@@ -3,11 +3,13 @@ import {
   READY_STOCK_DRAW_REASON,
   readyStockReserveInputSchema,
   readyStockSaveInputSchema,
+  readyStockUsePoInputSchema,
   stockMatchKey,
   type ReadyStockLine,
   type ReadyStockResponse,
   type ReadyStockSaveResult,
   type ReadyStockUnit,
+  type ReadyStockUsePoResult,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { readFreeStock } from "../../lib/purchase-demand-read";
@@ -115,7 +117,9 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
           .from("ops_stock_items")
           .select("unit_code, qty, reserved_order_line_id")
           .in("reserved_order_line_id", lineIds)
-          .in("status", ["reserved", "sold"]),
+          /* 0600 — a Unit reserved on its PO by `Use this PO` is saved
+             against the line too, so `Change selection` can give it back. */
+          .in("status", ["reserved", "sold", "incoming"]),
         sb
           .from("po_line_sources")
           .select("order_line_id, qty, purchase_orders!inner(status)")
@@ -454,6 +458,68 @@ soBatchReadyStockRouter.post("/ready-stock/save", requireOperation, async (c) =>
   }
 
   return c.json(data as ReadyStockSaveResult);
+});
+
+/**
+ * POST /api/operation/purchase/demands/ready-stock/use-po
+ *
+ * ⭐ `Use this PO` — owner ruling 2026-09-28 (Purchasing §9.1). Goods already on
+ * an open PO that no order holds are reserved for this item line exactly like
+ * Ready Stock: the PO's incoming Unit IDs are bound to the line (status stays
+ * `incoming` until Receiving posts), all or none, by `so_batch_use_po_units`
+ * (0600) through the one draw door. The browser names the line and the PO;
+ * the door picks the Units and re-derives every quantity on the locked rows.
+ * The reservation is given back through `/ready-stock/save` like any other.
+ */
+soBatchReadyStockRouter.post("/ready-stock/use-po", requireOperation, async (c) => {
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json", code: "invalid_json" }, 400);
+  }
+  const parsed = readyStockUsePoInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { orderId, orderLineId, poId } = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: order, error: orderErr } = await sb
+    .from("orders")
+    .select("id, so")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (orderErr) return fail(c, orderErr);
+  if (!order) return c.json({ error: "order_not_found", code: "order_not_found" }, 404);
+
+  const reference = referenceOf(order as OrderRow);
+  if (!reference) {
+    return c.json({ error: "no_reference", code: "no_reference" }, 422);
+  }
+
+  const { data, error } = await sb.rpc("so_batch_use_po_units", {
+    p_ref: reference,
+    p_reason: READY_STOCK_DRAW_REASON,
+    p_note: `SO Batch Purchase · ${reference} · ${poId}`,
+    p_order_id: orderId,
+    p_line: orderLineId,
+    p_po_id: poId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    const code =
+      (error as { message?: string }).message?.match(
+        /(order_line_not_in_order|order_line_not_found|line_not_in_order|unit_not_found|unit_does_not_match_line|unit_not_available|quantity_row_not_bindable|line_already_covered|unit_no_longer_free|po_has_no_free_units|po_not_open|po_goods_held|unit_not_on_a_po|line_needs_sales_order_ref)/,
+      )?.[1] ?? null;
+    const itemId = readyStockRefusedUnitId(error);
+    return c.json(
+      { ...(m.body as object), ...(code ? { code } : {}), ...(itemId ? { itemId } : {}) },
+      m.status,
+    );
+  }
+
+  return c.json(data as ReadyStockUsePoResult);
 });
 
 export default soBatchReadyStockRouter;

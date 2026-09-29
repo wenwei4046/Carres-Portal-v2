@@ -1,29 +1,24 @@
 /**
- * THE WORK SHELL — owner correction 2026-09-24; density ruling 2026-09-25.
+ * THE WORK SHELL — inbox · this order · communication (owner ruling, Jess
+ * 2026-09-27: "left like Gmail's inbox, the middle is the working panel, the
+ * right is WhatsApp and communication, a full pane").
  *
  * ```
- *   grey canvas · 16px padding
- *   ┌ toolbar (one white section) ─────────────────────────────────┐
- *   └──────────────────────────────────────────────────────────────┘
- *                            16px
- *   ┌ Date ──┐   Heading                 ┌ detail section ─────────┐
- *   └────────┘   [To do|Waiting|Done]    └─────────────────────────┘
- *     16px       ┌ card 104 ┐   8px      ┌ detail section ─────────┐
- *   ┌ Module ┐   ┌ card 104 ┐            └─────────────────────────┘
- *   └────────┘
- *    240px   16   420px               16   remaining (≥480px)
+ *   ┌ inbox 280 ┬ this order (rest, ≥560) ┬ communication 340 ┐
+ *   │ calendar  │ header + Order Route    │ To · Template     │
+ *   │ the list  │ the step cards          │ message · doors   │
+ *   └───────────┴─────────────────────────┴───────────────────┘
  * ```
  *
- * The workspace is an UNFRAMED grid: no border, fill, radius or shadow
- * around it. Every white surface is its own section. The three columns
- * scroll independently.
+ *   three  ≥1040px of page — all three columns (260 · ≥420 · 300 below 1280)
+ *   two    760–1039px      — inbox and order; communication slides over the
+ *                            order from the right when asked for
+ *   one    <760px          — one stage at a time: the inbox, or the order with
+ *                            its communication beneath it
  *
- *   three  ≥1280px of page — rail · list · detail
- *   two    768–1279px      — the rail collapses (a toolbar control reopens
- *                            it); the list is exactly 400px and can never
- *                            be collapsed
- *   one    <768px          — Date and Module open from compact controls; the
- *                            list (100% wide) and the detail share ONE stage
+ * Geometry only: no border, fill, radius or shadow of its own. The inbox and
+ * the communication pane are flat white columns; the order is the one canvas
+ * region with 16px around its cards.
  */
 import type { ReactNode } from "react";
 
@@ -35,64 +30,51 @@ const COLUMN = "flex min-h-0 min-w-0 flex-col";
 export default function WorkSplitShell({
   layout,
   activePanel = "list",
-  railOpen = false,
-  rail,
-  railBeside = false,
   list,
   detail,
+  comm = null,
+  commOpen = false,
+  wide = true,
 }: {
   layout: WorkLayout;
   activePanel?: WorkPanel;
-  /** Only read at `two`: whether the collapsible rail is showing. */
-  railOpen?: boolean;
-  /** Absent since the §6.0 shell (owner ruling 2026-09-25): Date and Page are
-   *  toolbar selects, so the list and the detail share the whole width. */
-  rail?: ReactNode;
-  /** At `two` the page's own rail (drawn beside this shell) is open: the
-   *  list takes the width and the detail waits for a pick. */
-  railBeside?: boolean;
   list: ReactNode;
   detail: ReactNode;
+  /** The communication pane of the selected order; null when nothing is selected. */
+  comm?: ReactNode;
+  /** Only read at `two`: the pane slid over the order. */
+  commOpen?: boolean;
+  /** Canvas ≥1280px: 280 · ≥560 · 340; narrower three-column: 260 · ≥420 · 300. */
+  wide?: boolean;
 }) {
   if (layout === "one") {
     return (
       <div data-testid="work-split-shell" data-layout="one" className={`${COLUMN} flex-1`}>
         {activePanel === "detail" ? (
-          <section aria-label="Selected work" className={`${COLUMN} flex-1 gap-2 overflow-y-auto`}>{detail}</section>
+          <section aria-label="Selected work" className={`${COLUMN} flex-1 gap-2 overflow-y-auto`}>
+            {detail}
+            {comm}
+          </section>
         ) : (
           <section aria-label="Work actions" className={`${COLUMN} flex-1`}>{list}</section>
         )}
       </div>
     );
   }
-
-  const showRail = rail != null && (layout === "three" || railOpen);
-  /* At `two` the rail and the detail never share the page (Jess, 2026-09-26:
-     a 140px detail is no detail): the rail beside the list, or the list
-     beside the detail. Choosing a card hides the rail. */
-  const hideDetail = layout === "two" && (showRail || railBeside);
-  const columns = layout === "three"
-    ? showRail ? "grid-cols-[240px_420px_minmax(480px,1fr)]" : "grid-cols-[420px_minmax(480px,1fr)]"
-    : showRail
-      ? "grid-cols-[240px_minmax(0,1fr)]"
-      : hideDetail
-        ? "grid-cols-[minmax(0,1fr)]"
-        : "grid-cols-[400px_minmax(0,1fr)]";
+  const three = layout === "three";
+  const inbox = three ? (wide ? "280px" : "260px") : "300px";
+  const columns = three && comm
+    ? wide ? "grid-cols-[280px_minmax(560px,1fr)_340px]" : "grid-cols-[260px_minmax(420px,1fr)_300px]"
+    : three ? (wide ? "grid-cols-[280px_minmax(0,1fr)]" : "grid-cols-[260px_minmax(0,1fr)]") : "grid-cols-[300px_minmax(0,1fr)]";
+  void inbox;
   return (
-    <div data-testid="work-split-shell" data-layout={layout} className={`grid min-h-0 flex-1 gap-4 ${columns}`}>
-      {showRail ? (
-        <aside aria-label="Work filters" className={`${COLUMN} gap-4 overflow-y-auto`}>
-          {rail}
-        </aside>
+    <div data-testid="work-split-shell" data-layout={layout} className={`relative grid min-h-0 flex-1 ${columns}`}>
+      <section aria-label="Work actions" className={COLUMN}>{list}</section>
+      <section aria-label="Selected work" className={`${COLUMN} overflow-y-auto bg-white`}>{detail}</section>
+      {comm && three ? <aside aria-label="Communication" className={`${COLUMN} overflow-y-auto border-l border-kit-slate-5 bg-white`}>{comm}</aside> : null}
+      {comm && !three && commOpen ? (
+        <aside aria-label="Communication" className={`${COLUMN} absolute inset-y-0 right-0 z-20 w-[340px] max-w-full overflow-y-auto border-l border-kit-slate-5 bg-white shadow-lg`}>{comm}</aside>
       ) : null}
-      <section aria-label="Work actions" className={COLUMN}>
-        {list}
-      </section>
-      {hideDetail ? null : (
-        <section aria-label="Selected work" className={`${COLUMN} gap-2 overflow-y-auto`}>
-          {detail}
-        </section>
-      )}
     </div>
   );
 }

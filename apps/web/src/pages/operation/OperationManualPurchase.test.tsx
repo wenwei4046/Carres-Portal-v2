@@ -42,9 +42,10 @@ vi.mock("@/lib/pdf/render", () => ({
 const previewState = vi.hoisted(() => ({ ready: true }));
 vi.mock("@/components/kit/PdfPreview", () => ({
   default: ({ src, title, onReady, "data-testid": testId }: {
-    src: string; title: string; onReady: (ready: boolean) => void; "data-testid": string;
+    src: string; title: string; onReady?: (ready: boolean) => void; "data-testid": string;
   }) => {
-    useEffect(() => { onReady(previewState.ready); }, [src]);
+    /* `onReady` is optional on the real kit component too. */
+    useEffect(() => { onReady?.(previewState.ready); }, [src]);
     return <section aria-label={title} data-testid={testId} data-src={src} />;
   },
 }));
@@ -470,6 +471,15 @@ async function answerStockQuestion(answer: "yes" | "no" = "yes") {
     name: answer === "yes" ? MW.canStockAnswerYes : MW.canStockAnswerNo,
   });
   fireEvent.click(option);
+}
+
+/** Drive the kit purpose `Select` the way an operator does. */
+async function choosePurpose(value: string) {
+  const label = DEMAND_PURPOSES.find((p) => p.value === value)!.label;
+  const trigger = document.getElementById("mp-purpose")!;
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("option", { name: label }));
 }
 
 const pickRow = (sku: string) =>
@@ -1034,30 +1044,28 @@ describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
 });
 
 describe("the create workspace — full page, never a dialog (card §3)", () => {
-  it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
+  it("the ITEMS block is the Sales Order document table (ONE KIT LAW, 2026-09-27): # · Item Code · Description · Supplier · Qty, no free-text Note, `+ Add line` under it", async () => {
     await openWorkspace();
     const lines = screen.getByTestId("mp-lines");
-    // The word. COPY-STANDARD rules `Note` for this form's field; `Remark` was
-    // the retired dialog's word and may not survive the port.
-    /* D1 — each cell also carries its own caption for the narrow reflow
-       (hidden on a wide form); the caption ROW is the one that sits over it. */
-    const caption = within(lines)
-      .getAllByText("Note")
-      .find((el) => el.classList.contains("mp-line-head"))!;
-    expect(lines.contains(caption)).toBe(true);
+    const table = screen.getByTestId("mp-lines-table");
+    expect(lines.contains(table)).toBe(true);
+    /* The table's OWN header — the stock picker under a line is a table of its own. */
+    expect([...(table as HTMLTableElement).tHead!.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["#", "Item Code", "Description", "Supplier", "Qty"]);
+    /* Owner 2026-09-26: the free-text `Note` column is gone — a line is
+       CONFIGURED through the Sales portal's `Configure` instead. */
+    expect(within(lines).queryByText("Note")).toBeNull();
+    expect(document.getElementById("mp-note-0")).toBeNull();
     expect(lines.textContent).not.toContain("Remark");
-    expect(screen.getByLabelText("Note")).toBe(document.getElementById("mp-note-0"));
-    // ONE grid: the caption row and the line share a parent, so the four
-    // tracks are resolved once and the caption sits over the note it names.
+    // ONE table: every line is a row group of the same table as the header.
     const line0 = screen.getByTestId("mp-line-0");
-    expect(line0.parentElement).toBe(caption.parentElement);
-    expect(line0.className).toContain("contents");
-    // The add control FOLLOWS the list, where the operator's eye ends.
+    expect(line0.tagName).toBe("TBODY");
+    expect(line0.closest("table")).toBe(table);
+    // The add control FOLLOWS the table, where the operator's eye ends.
     const add = screen.getByTestId("mp-line-add");
     expect(lines.contains(add)).toBe(true);
-    expect(line0.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(add);
-    expect(screen.getByTestId("mp-line-1").parentElement).toBe(caption.parentElement);
+    expect(screen.getByTestId("mp-line-1").closest("table")).toBe(table);
   });
 
   it("offers exactly the approved six purposes (Cards 03/04)", () => {
@@ -1074,6 +1082,20 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     ]);
   });
 
+  it("automatic facts are GREY, input fields stay white (owner 2026-09-28)", async () => {
+    /* Jess read the white `Requested By` / `Proceed Date` boxes as fields to
+       fill. The system fills them, so they wear the grey box; what the person
+       fills stays white. */
+    await openWorkspace({ answerStockQuestion: false });
+    for (const id of ["mp-raised-by", "mp-proceed-date"]) {
+      const box = screen.getByTestId(id);
+      expect(box.getAttribute("data-kit")).toBe("automatic-field");
+      expect(box.className).toContain("bg-kit-slate-3");
+      expect(box.className).not.toContain("bg-white");
+    }
+    expect(document.getElementById("mp-purpose")!.className).toContain("bg-white");
+  });
+
   it("Card 06 · Proceed Date is a read-only server preview; the browser holds no clock", async () => {
     await openWorkspace();
     // The server's Malaysia date, as a FACT — no input anywhere near it.
@@ -1081,6 +1103,17 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       expect(screen.getByTestId("mp-proceed-date").textContent).not.toBe(""),
     );
     expect(screen.getByTestId("mp-proceed-date").querySelector("input")).toBeNull();
+  });
+
+  it("Proceed Date is never a blank box: before the plan answers it reads the server's own date (owner 2026-09-28)", async () => {
+    /* The plan read never answers here. The Register's `todayIso` is the
+       server's Malaysia date, and the form prints it rather than an empty box. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) return new Promise(() => {});
+      return Promise.resolve(respond(url, init));
+    });
+    await openWorkspace({ answerStockQuestion: false });
+    expect(screen.getByTestId("mp-proceed-date").textContent).toBe("Sun, 30 Aug");
   });
 
   it("Card 06 · complete lead facts DEFAULT Delivery Date from the slowest line — Send goes live", async () => {
@@ -1164,9 +1197,9 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-raised-by").textContent).not.toContain("(you)");
     expect(screen.getByTestId("mp-raised-by").textContent).not.toContain("@");
     expect(screen.getByTestId("mp-raised-by").querySelector("input")).toBeNull();
-    /* The fact is named on BOTH halves — the form asks it, the preview reads
-       it back — so the query is the plural one on purpose. */
-    expect(screen.getAllByText(MW.createRequestedBy).length).toBe(2);
+    /* The right half is the draft PO paper now (owner 2026-09-28), which
+       names no requester — the form states the fact once. */
+    expect(screen.getAllByText(MW.createRequestedBy).length).toBe(1);
   });
 
   it("WHAT WE ALREADY HAVE renders per line, and `still needed` is PRINTED", async () => {
@@ -1176,10 +1209,11 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     fireEvent.change(document.getElementById("mp-qty-0")!, { target: { value: "3" } });
 
     const block = await screen.findByTestId("mp-already-have-0");
-    await waitFor(() => expect(block.textContent).toContain(MW.alreadyOnPo));
+    await waitFor(() => expect(block.textContent).toContain(MW.colAlreadyOnPo));
     // free 2 (the picker's own number) · already on PO 1 (the endpoint's) →
     // still needed 0 — the arithmetic the screen prints, never the reader's.
-    expect(block.textContent).toContain(MW.freeStock);
+    expect(block.textContent).toContain(MW.colFreeStock);
+    expect(block.textContent).toContain("What we already have");
     expect(screen.getByTestId("mp-still-needed-0").textContent).toContain("0");
     expect(block.textContent).toContain("PO-2041");
     expect(block.textContent).toContain("may not be needed");
@@ -1197,7 +1231,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
        1130px through the form's own container query (CSS, not JS). */
     const panes = screen.getByTestId("object-two-panes");
     expect(panes).toBeTruthy();
-    expect(screen.getByTestId("mp-create-preview")).toBeTruthy();
+    expect(screen.getByTestId("mp-create-pdf-preview")).toBeTruthy();
 
     /* ONE reading order, and it is the ruling's: Request Details → Delivery →
        Items. Blocks are the shared Sales Order `Block`, so the band, the
@@ -1210,20 +1244,14 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       MW.secCreateDelivery,
       MW.secCreateItems,
     ]);
-    /* The preview repeats the SAME sequence — a second order would make the
-       operator re-find every fact they just typed. */
-    const previewSections = [
-      ...screen.getByTestId("mp-create-preview").querySelectorAll("[data-preview-section]"),
-    ].map((el) => el.getAttribute("data-preview-section"));
-    expect(previewSections).toEqual([
-      MW.secCreateRequestDetails,
-      MW.secCreateDelivery,
-      MW.secCreateItems,
-    ]);
-    /* It is a DRAFT and says so — never an MPR number, never a PO number. */
-    expect(screen.getByTestId("mp-preview-draft").textContent).toBe(MW.draft);
-    expect(screen.getByTestId("mp-create-preview").textContent).not.toMatch(/MPR-\d/);
-    expect(screen.getByTestId("mp-create-preview").textContent).not.toMatch(/PO-\d/);
+    /* ⭐ THE RIGHT HALF IS THE PAPER (owner 2026-09-28, "it should pdf
+       preview … it same with so batch"): SO Batch's own not-sendable sentence
+       over a DRAFT purchase order — never an MPR or PO number. */
+    const pane = screen.getByTestId("mp-create-pdf-preview");
+    expect(pane.textContent).toContain("This is a preview. Issue PO creates the number.");
+    expect(await within(pane).findByTestId("mp-draft-po-pdf-0")).toBeTruthy();
+    expect(pane.textContent).not.toMatch(/MPR-\d/);
+    expect(pane.textContent).not.toMatch(/PO-\d/);
   });
 
   it("the create form says `Purpose`, and the retired `Need for` is gone from it", async () => {
@@ -1237,31 +1265,40 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(label.textContent).toBe(MW.createPurpose);
   });
 
-  it("the live preview follows the form — the picked item, its supplier and the total", async () => {
+  it("the draft PO paper follows the form — the picked item, its supplier, the quantity and the purpose", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
     await openWorkspace();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     fireEvent.change(document.getElementById("mp-qty-0")!, { target: { value: "3" } });
-    const preview = screen.getByTestId("mp-create-preview");
-    await waitFor(() => expect(preview.textContent).toContain("5539-2NA"));
-    /* Catalog's supplier rides along — the operator never types one, and the
-       preview is where they see WHICH factory this line will go to. */
-    expect(preview.textContent).toContain("Ohana");
-    expect(screen.getByTestId("mp-preview-total").textContent).toBe("3");
+    /* The SAME template SO Batch renders, handed a DRAFT: no number, no PO
+       dates, the Catalog supplier, and the line as the supplier will read it. */
+    await waitFor(() =>
+      expect(renderPoPdf).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          draft: true,
+          po_number: "DRAFT",
+          eta_date: null,
+          supplier: expect.objectContaining({ name: "Ohana" }),
+          lines: [expect.objectContaining({ sku: "5539-2NA", qty: 3 })],
+        }),
+      ),
+    );
   });
 
-  it("`Purchase requirement` is optional, on every purpose, and rides the wire", async () => {
-    /* ⭐ OWNER RULING 2026-09-22. It is NOT `What is this for?`: that one is
-       Other Purchase's required reason. `Ready Stock` is the default purpose
-       here, so this proves the requirement is asked where the reason is not. */
+  it("NO FREE TEXT (owner, 2026-09-26): no Purchase requirement, no Note — a line rides its configuration", async () => {
+    /* The owner's blueprint: "I order what, got colour to choose … no free
+       text". The retired 0562 requirement and the per-line Note are gone from
+       the form and from the wire; an unconfigured line sends `attrs: null`
+       and the picked line offers the Sales portal's `Configure`. */
     await openWorkspace();
-    expect(screen.queryByTestId("mp-why")).toBeNull();
+    expect(screen.queryByTestId("mp-requirement")).toBeNull();
+    expect(document.getElementById("mp-note-0")).toBeNull();
+    expect(screen.queryByText("Purchase requirement")).toBeNull();
     pickDeliveryDate();
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
-    fireEvent.change(screen.getByTestId("mp-requirement"), {
-      target: { value: "Firm feel, king size only" },
-    });
+    expect(screen.getByTestId("mp-line-configure-0")).toHaveTextContent("Configure");
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() =>
@@ -1279,39 +1316,15 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
         String(c[0]).endsWith("/purchasing/requests"),
     )!;
     const body = JSON.parse(String((post[1] as RequestInit).body)) as {
-      purchaseRequirement?: string | null;
+      purchaseRequirement?: unknown;
+      lines: Array<{ sku: string; attrs: unknown; note?: unknown }>;
       why?: string | null;
     };
-    expect(body.purchaseRequirement).toBe("Firm feel, king size only");
+    expect("purchaseRequirement" in body).toBe(false);
+    expect(body.lines[0]).toMatchObject({ sku: "5539-2NA", attrs: null });
+    expect("note" in body.lines[0]!).toBe(false);
     /* The reason stays empty — a routine purpose is never asked it. */
     expect(body.why).toBeNull();
-  });
-
-  it("an EMPTY requirement rides as a real absence, never an empty string", async () => {
-    await openWorkspace();
-    pickDeliveryDate();
-    fireEvent.focus(document.getElementById("mp-item-0")!);
-    fireEvent.click(pickRow("5539-2NA"));
-    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
-    fireEvent.click(screen.getByTestId("mp-send"));
-    await waitFor(() =>
-      expect(
-        apiFetch.mock.calls.some(
-          (c) =>
-            (c[1] as RequestInit | undefined)?.method === "POST" &&
-            String(c[0]).endsWith("/purchasing/requests"),
-        ),
-      ).toBe(true),
-    );
-    const post = apiFetch.mock.calls.find(
-      (c) =>
-        (c[1] as RequestInit | undefined)?.method === "POST" &&
-        String(c[0]).endsWith("/purchasing/requests"),
-    )!;
-    const body = JSON.parse(String((post[1] as RequestInit).body)) as {
-      purchaseRequirement?: string | null;
-    };
-    expect(body.purchaseRequirement).toBeNull();
   });
 
   /* ⭐ RE-PINNED, NOT DELETED (0410, YH 2026-09-01).
@@ -2044,6 +2057,22 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     expect(within(row).getByTestId(`mp-approval-${REQ1}`)).toHaveTextContent("Need approval");
   });
 
+  it("⭐ TWO-LINE STATUS (owner ruling 2026-09-28): plain `Need PO`, and line two says `Need approval first`", async () => {
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ1}`);
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
+    /* Plain text, never a coloured pill (ONE KIT LAW). */
+    expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
+  });
+
+  it("an approved request's Status is plain text with no second line", async () => {
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ2}`);
+    expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
+    expect(within(cell).queryByTestId(`mp-status-why-${REQ2}`)).toBeNull();
+  });
+
   it("`MPR No` is the identity and the entrance; a request with no number states the absence", async () => {
     await loaded();
     const entrance = screen.getByTestId(`mp-open-${REQ1}`);
@@ -2285,6 +2314,19 @@ describe("R2 · group membership", () => {
     const cell = screen.getByTestId(`mp-approval-${REQ1}`);
     expect(cell).toHaveTextContent("Sent back for changes");
     expect(within(cell).getByTestId("mp-row-owner")).toHaveAttribute("aria-label", "Siti · Edit and send again");
+  });
+
+  it("a sent-back request's `Need PO` also says `Need approval first`", async () => {
+    withRegister({
+      ...REGISTER,
+      requests: REGISTER.requests.map((r) =>
+        r.id === REQ1 ? { ...r, sent_back_at: "2026-08-20T00:00:00Z" } : r,
+      ),
+    });
+    await loaded();
+    const cell = screen.getByTestId(`mp-status-${REQ1}`);
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
   });
 
   it("a sent-back request whose requester is unknown says so — never a shared account", async () => {
@@ -2753,7 +2795,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
     expect(await within(box).findByTestId("mp-stock-block-l2")).toHaveTextContent(
-      "This purchase did not record whether stock can answer it, so stock cannot be chosen.",
+      "This purchase did not record whether to use our stock, so stock cannot be chosen.",
     );
   });
 
@@ -3292,7 +3334,10 @@ describe("Card 05 · the object detail", () => {
     return await screen.findByTestId("mp-detail");
   }
 
-  it("renders the six sections, full width, in the Card's exact order", async () => {
+  it("renders the sections, full width, in the Card's exact order — Approval only when there is a decision to make or read", async () => {
+    /* Owner 2026-09-26: a waiting request shows its state as the Request
+       card's `Approval Status` fact; the Approval card appears for the
+       approver (the decision) and after a decision (the record). */
     const detail = await openObject();
     const blocks = [...detail.querySelectorAll("[data-block]")].map((b) =>
       b.getAttribute("data-block"),
@@ -3301,10 +3346,12 @@ describe("Card 05 · the object detail", () => {
       "Request",
       "Items Requested",
       "What We Already Have",
-      "Approval",
       "Purchase Orders",
       "History",
     ]);
+    const fact = within(detail).getByTestId("mp-approval-fact");
+    expect(fact.closest("[data-block]")?.getAttribute("data-block")).toBe("Request");
+    expect(fact).toHaveTextContent("Need approval");
     // ONE scroll — no tabs, no split preview, no centred narrow island.
     expect(within(detail).queryByRole("tablist")).toBeNull();
     expect(detail.querySelector(".max-w-\\[720px\\]")).toBeNull();
@@ -3321,7 +3368,7 @@ describe("Card 05 · the object detail", () => {
        no number or UUID appears anywhere in the header. */
     expect(within(detail).getByTestId("object-identity")).toHaveTextContent("Display");
     expect(within(detail).getByTestId("object-identity").textContent).not.toContain("REQ-");
-    expect(document.title).toBe("Manual Purchase Request — Carres");
+    expect(document.title).toBe("Manual Purchase Request · Carres");
     expect(within(detail).getByTestId("object-identity-status")).toHaveTextContent(
       "Waiting for approval",
     );
@@ -3615,10 +3662,9 @@ describe("Card 06 · the object's date facts", () => {
       fmtDate("2026-09-12"),
     );
     // The derived timing fact — quiet, and NOT past due at the server's date.
-    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(
-      `Order by ${fmtDate("2026-09-01")}`,
-    );
-    expect(screen.getByTestId("mp-detail-order-by").textContent).not.toContain(
+    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(fmtDate("2026-09-01"));
+    // One title, one box (owner 2026-09-26): the timing state is its own fact.
+    expect(screen.getByTestId("mp-detail-order-timing").textContent).not.toContain(
       "Order date passed",
     );
     // Retired words never return to this object.
@@ -3637,9 +3683,9 @@ describe("Card 06 · the object's date facts", () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
-    const timing = screen.getByTestId("mp-detail-order-by");
+    const timing = screen.getByTestId("mp-detail-order-timing");
     expect(timing).toHaveTextContent("Order date passed");
-    expect(timing).toHaveTextContent(`Order by ${fmtDate("2026-09-01")}`);
+    expect(screen.getByTestId("mp-detail-order-by")).toHaveTextContent(fmtDate("2026-09-01"));
     // Still no object-side Issue PO door arrives with the fact (Card 05/06).
     expect(screen.queryByTestId("mp-issue-selected")).toBeNull();
   });
@@ -3713,7 +3759,11 @@ describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by
        so no anchor vocabulary was invented for this. */
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
     const target = scrollIntoView.mock.instances[0] as Element;
-    expect(target.getAttribute("data-block")).toBe("Approval");
+    /* The approver lands on the Approval card; anyone else on the Request
+       card's `Approval Status` fact (owner, 2026-09-26). */
+    expect(
+      target.getAttribute("data-block") ?? target.getAttribute("data-testid"),
+    ).toMatch(/^(Approval|mp-approval-fact)$/);
   });
 });
 
@@ -3831,6 +3881,9 @@ describe("Round 2 · the object's rounds", () => {
        NULL and not a single Unit could ever be allocated. This is the question
        that feeds them, and the reason the whole feature is reachable. */
     await openWorkspace({ answerStockQuestion: false });
+    /* Ready Stock answers No by itself (owner 2026-09-28), so the gap is
+       asserted on a purpose that still asks. */
+    await choosePurpose("showroom_display");
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     await waitFor(() =>
@@ -3841,12 +3894,11 @@ describe("Round 2 · the object's rounds", () => {
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
   });
 
-  it("⛔ 0549 · NO DEFAULT ANSWER — a pre-picked option would be the guess the ruling bans", async () => {
+  it("⛔ 0549 · NO DEFAULT ANSWER outside Ready Stock — the SKU and the shelf never decide it", async () => {
     await openWorkspace({ answerStockQuestion: false });
-    /* Both answers must be reachable and NEITHER chosen. The ruling of
-       2026-09-18 forbids inferring the intent from the SKU, the shelf count or
-       the purpose; a pre-selected option is that inference with the operator's
-       name on it. */
+    await choosePurpose("showroom_display");
+    /* Both answers must be reachable and NEITHER chosen: only the Ready Stock
+       purpose answers by itself (owner 2026-09-28). */
     const trigger = document.getElementById("mp-stock-answer")!;
     expect(trigger.textContent).not.toContain(MW.canStockAnswerYes);
     expect(trigger.textContent).not.toContain(MW.canStockAnswerNo);
@@ -3855,6 +3907,23 @@ describe("Round 2 · the object's rounds", () => {
     expect(
       (await screen.findAllByRole("option")).map((o) => o.textContent),
     ).toEqual([MW.canStockAnswerYes, MW.canStockAnswerNo]);
+  });
+
+  it("⭐ OWNER 2026-09-28 · Ready Stock answers No by itself, the person may change it, and leaving Ready Stock takes the filled answer back", async () => {
+    await openWorkspace({ answerStockQuestion: false });
+    const trigger = () => document.getElementById("mp-stock-answer")!;
+    /* The form opens on Ready Stock: buying for the shelf is buying new stock. */
+    await waitFor(() => expect(trigger().textContent).toContain(MW.canStockAnswerNo));
+    /* A purpose that does not buy for the shelf takes the filled answer back. */
+    await choosePurpose("showroom_display");
+    await waitFor(() => expect(trigger().textContent).not.toContain(MW.canStockAnswerNo));
+    /* Back to Ready Stock: filled in again. */
+    await choosePurpose("ready_stock");
+    await waitFor(() => expect(trigger().textContent).toContain(MW.canStockAnswerNo));
+    /* The person's own answer wins and survives a purpose change. */
+    await answerStockQuestion("yes");
+    await choosePurpose("showroom_display");
+    await waitFor(() => expect(trigger().textContent).toContain(MW.canStockAnswerYes));
   });
 
   it("⭐ 0549 · THE ANSWER REACHES THE WIRE — both ways, and never invented", async () => {
@@ -3874,7 +3943,7 @@ describe("Round 2 · the object's rounds", () => {
     const sent = JSON.parse(
       String((requestPosts().at(-1)![1] as RequestInit).body),
     ) as { fulfilmentIntent?: string };
-    /* `No — this buys extra stock` is `additional_stock`, and the mapping is
+    /* `No, buy new stock` is `additional_stock`, and the mapping is
        asserted rather than assumed: send the wrong one and the shelf would be
        netted against a purchase that was meant to add to it. */
     expect(sent.fulfilmentIntent).toBe("additional_stock");
@@ -3916,34 +3985,32 @@ describe("Round 2 · the object's rounds", () => {
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => expect(posts(`/${REQ1}/resubmit`).length).toBe(1));
     const body = JSON.parse(String((posts(`/${REQ1}/resubmit`)[0]![1] as RequestInit).body));
-    expect(body.lines).toEqual([{ id: "l1", sku: "5539-2NA", qty: 1, note: "grey, not beige" }]);
+    expect(body.lines).toEqual([{ id: "l1", sku: "5539-2NA", qty: 1, attrs: null }]);
     expect(body.requiredBy).toBe("2026-09-12");
     // Nothing new was created: no POST to the create door.
     expect(posts("/purchasing/requests").length).toBe(0);
   });
 
-  it("R4 · a returned request reopens with its requirement, and the round REPLACES it", async () => {
-    /* ⭐ 0562 · the requirement travels with the edit. Clearing it must be a
-       real edit — a coalesced column could never be emptied again. */
+  it("R4 · a returned request reopens with each line's configuration, and sends it again", async () => {
+    /* 0591 · the configuration travels with the edit, printed under the
+       item and sent back on the wire; nothing free-text rides beside it. */
+    const attrs = { color: "Sand", fabric_name: "Fabric CG-012" };
     await openObject(false, {
-      request: {
-        ...REGISTER.requests[0],
-        purpose: "ready_stock",
-        sent_back_at: "2026-08-21T01:00:00Z",
-        purchase_requirement: "Firm feel, king size only",
-      },
+      request: { ...REGISTER.requests[0], purpose: "ready_stock", sent_back_at: "2026-08-21T01:00:00Z" },
+      lines: REGISTER.lines.filter((l) => l.request_id === REQ1).map((l) => ({ ...l, attrs })),
       canEditAndSendAgain: true,
     });
     fireEvent.click(screen.getByTestId("mp-edit-and-send-again"));
     await screen.findByTestId("manual-purchase-create");
-    expect(screen.getByTestId("mp-requirement")).toHaveValue("Firm feel, king size only");
-    fireEvent.change(screen.getByTestId("mp-requirement"), { target: { value: "" } });
+    expect(screen.getByTestId("mp-line-config-0")).toHaveTextContent("Sand");
+    expect(screen.queryByTestId("mp-requirement")).toBeNull();
     await answerStockQuestion();
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => expect(posts(`/${REQ1}/resubmit`).length).toBe(1));
     const body = JSON.parse(String((posts(`/${REQ1}/resubmit`)[0]![1] as RequestInit).body));
-    expect(body.purchaseRequirement).toBeNull();
+    expect(body.lines[0]).toMatchObject({ id: "l1", sku: "5539-2NA", attrs });
+    expect("purchaseRequirement" in body).toBe(false);
   });
 
   it("R3 · the requester withdraws after one confirmation; others never see the door", async () => {
@@ -4025,9 +4092,10 @@ describe("Round 2 · D1 · the create form keeps Send reachable when narrow", ()
     expect(screen.getByTestId("mp-send")).toBeInTheDocument();
     const footer = screen.getByTestId("mp-create-footer");
     expect(within(footer).getByTestId("mp-send-footer").textContent).toBe(screen.getByTestId("mp-send").textContent);
-    // Each line cell carries its own caption for the narrow reflow.
-    const line0 = screen.getByTestId("mp-line-0");
-    expect(line0.querySelector(".mp-line-item .mp-line-caption")).not.toBeNull();
-    expect(line0.querySelector(".mp-line-qty .mp-line-caption")).not.toBeNull();
+    // The document table (ONE KIT LAW, 2026-09-27) scrolls inside its own box
+    // on a narrow screen — never the page — so no per-cell captions exist.
+    const table = screen.getByTestId("mp-lines-table");
+    expect(table.parentElement?.className).toContain("overflow-x-auto");
+    expect(screen.getByTestId("mp-line-0").querySelector(".mp-line-caption")).toBeNull();
   });
 });

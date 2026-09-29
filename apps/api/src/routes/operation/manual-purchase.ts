@@ -554,7 +554,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
             .from("purchase_demands")
             .select(
               `id, request_id, sku, supplier_id, destination_id, qty, approved_qty,
-               issued_qty, remaining_qty, required_by, remark, po_id, cancelled_at,
+               issued_qty, remaining_qty, required_by, remark, attrs, po_id, cancelled_at,
                cancel_reason`,
             )
             .in("request_id", ids);
@@ -904,7 +904,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     .from("purchase_demands")
     .select(
       `id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty,
-       remaining_qty, required_by, remark, po_id, cancelled_at, cancel_reason,
+       remaining_qty, required_by, remark, attrs, po_id, cancelled_at, cancel_reason,
        cancelled_by`,
     )
     .eq("request_id", id);
@@ -1752,6 +1752,10 @@ const resubmitBody = z
           sku: z.string().min(1),
           qty: z.number().int().min(1),
           note: z.string().max(500).nullish(),
+          /* 0591 — the line's configuration, chosen like a Sales portal line
+             (colour · fabric · size · options); the same shape as
+             `order_lines.attrs`. Kept on the demand, copied to the PO line. */
+          attrs: z.record(z.unknown()).nullish(),
         }),
       )
       .min(1),
@@ -1811,6 +1815,7 @@ manualPurchaseRouter.post("/:id/resubmit", requireOperation, async (c) => {
       sku: l.sku,
       qty: l.qty,
       remark: (l.note ?? "").trim() || null,
+      attrs: l.attrs && Object.keys(l.attrs).length > 0 ? l.attrs : null,
     })),
   });
   if (error) return refuseRoundError(c, sb, id, error);
@@ -1971,6 +1976,10 @@ const headerBody = z
           qty: z.number().int().min(1),
           requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
           note: z.string().max(500).nullish(),
+          /* 0591 — the line's configuration, chosen like a Sales portal line
+             (colour · fabric · size · options); the same shape as
+             `order_lines.attrs`. Kept on the demand, copied to the PO line. */
+          attrs: z.record(z.unknown()).nullish(),
         }),
       )
       .min(1)
@@ -2083,6 +2092,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
         qty: l.qty,
         required_by: l.requiredBy ?? null,
         remark: (l.note ?? "").trim() || null,
+        attrs: l.attrs && Object.keys(l.attrs).length > 0 ? l.attrs : null,
       })),
     });
     if (!error) return c.json(data);
@@ -2387,7 +2397,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   const { data: allLines, error: lineErr } = await sb
     .from("purchase_demands")
     .select(
-      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at",
+      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at, attrs",
     )
     .in("request_id", requestIds);
   if (lineErr) return fail(c, lineErr);
@@ -2645,6 +2655,9 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
              transaction; with no price there is nothing to compare. */
           expected_catalog_cost: priced ? cost : null,
           demand_id: l.id,
+          /* 0591 — the requester's configuration reaches the PO line, so the
+             paper prints it exactly as a Sales-Order line's does. */
+          attrs: (l.attrs as Record<string, unknown> | null | undefined) ?? null,
         };
       }),
     });

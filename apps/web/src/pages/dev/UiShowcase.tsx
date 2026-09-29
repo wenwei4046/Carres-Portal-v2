@@ -28,6 +28,10 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 import Badge from "@/components/kit/Badge";
+import Block from "@/components/kit/Block";
+import ChecklistRow from "@/components/kit/ChecklistRow";
+import QuietRouteRow from "@/components/kit/QuietRouteRow";
+import RouteStop from "@/components/kit/RouteStop";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
 import Checkbox from "@/components/kit/Checkbox";
@@ -943,6 +947,44 @@ export default function UiShowcase() {
               </div>
             </Card>
           </Grid>
+        </Section>
+
+        <Section
+          id="route"
+          title="Route stop · Checklist row · Quiet route row · Block"
+          note="The Work route (Workspace MASTER §5.10, admitted 2026-09-28). Placeholders in braces; a page fills them from records."
+        >
+          <div className="max-w-[640px] rounded-card border border-kit-slate-5 bg-white p-6">
+            <RouteStop label="{Stop}" tone="missed" data-testid="ui-route-stop-missed">
+              <Block
+                title="{What to do}"
+               
+                why={{ text: "{Why it is owed now}", tone: "missed" }}
+                headerSlot={<Button size="touch">{"{Owning form}"}</Button>}
+              >
+                <div className="flex flex-col">
+                  <ChecklistRow mark="done" step="{Step done}" value="{date}" doc={<span className="text-meta underline">{"{Document No}"}</span>} />
+                  <ChecklistRow mark="missed" step="{Step that is the act}" value="{state}" />
+                </div>
+                <p className="self-end text-meta text-kit-slate-11">1 of 2 done</p>
+              </Block>
+            </RouteStop>
+            <RouteStop label="{Stop}" tone="due">
+              <Block title="{What to do}" why={{ text: "{Why}", tone: "due" }}>
+                <ChecklistRow mark="due" step="{Step that is the act}" value="{state}" />
+                <ChecklistRow mark="none" step="{A fact}" value="{Opens date}" />
+              </Block>
+            </RouteStop>
+            <RouteStop label="{Stop}" tone="none" hideLabel>
+              <QuietRouteRow label="{STOP}" status="{Who has not done what}" progress="0 of 2 done" open={false} onToggle={() => {}} />
+            </RouteStop>
+            <RouteStop label="{Stop}" tone="done" last hideLabel>
+              <QuietRouteRow label="{STOP}" status="{Done sentence}" progress="2 of 2 done" open={false} onToggle={() => {}} />
+            </RouteStop>
+          </div>
+          <div className="max-w-[640px]">
+            <ChecklistRow mark="open" step="{Step not yet}" value="{state}" stacked />
+          </div>
         </Section>
 
         <Section

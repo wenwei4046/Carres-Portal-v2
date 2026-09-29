@@ -61,8 +61,10 @@ export const LOGISTICS_COPY = {
   decideNext: "Decide the next step for this delivery",
   decideNextResult: (partner: string) => `Keep ${partner} with a new date, or change logistics`,
   nothingMissing: "Nothing missing",
-  stillToCollect: (amount: string) => `RM ${amount} still to collect`,
-  financeHolding: (reason: string) => (reason ? `Finance is holding this delivery: ${reason}` : "Finance is holding this delivery"),
+  /* Owner re-ruling 2026-09-25 (COPY): `still to collect` and `Finance is
+     holding this delivery` are retired — the gate word is `Hold delivery`. */
+  holdUnpaid: (amount: string) => `Hold delivery · RM ${amount} unpaid`,
+  financeHold: (reason: string) => (reason ? `Hold delivery · Finance hold · ${reason}` : "Hold delivery · Finance hold"),
 } as const;
 
 /* ── the stock route ───────────────────────────────────────────────────── */
@@ -172,6 +174,9 @@ export interface LogisticsCardModel {
   currentAction: LogisticsAction | null;
   /** The ONE exception worth the collapsed card's last line. */
   exception: string | null;
+  /** What that exception is about — the Work right panel drops a `money`
+   *  line because the Sales Order card's Balance already says it. */
+  exceptionKind: "cannot_deliver" | "finance_hold" | "money" | "gap" | null;
 }
 
 function timingOf(dueIso: string | null, todayIso: string): LogisticsAction["timing"] {
@@ -267,8 +272,8 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
   /* ── 1 working day before — exceptions only ── */
   const t1Open = stateFor(t1Due, today, input.startedIso);
   const gaps: LogisticsGap[] = [...input.dayBeforeGaps];
-  if (input.financeHold !== null) gaps.unshift({ fact: LOGISTICS_COPY.financeHolding(input.financeHold), action: null });
-  if (input.moneyOwed) gaps.unshift({ fact: LOGISTICS_COPY.stillToCollect(input.moneyOwed), action: null });
+  if (input.financeHold !== null) gaps.unshift({ fact: LOGISTICS_COPY.financeHold(input.financeHold), action: null });
+  if (input.moneyOwed) gaps.unshift({ fact: LOGISTICS_COPY.holdUnpaid(input.moneyOwed), action: null });
   const t1Checked = t1Open === "open" || t1Open === "missed";
   const t1: LogisticsCheckRow = {
     key: "t1",
@@ -333,14 +338,15 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
 
   /* ── the ONE exception line ── */
   let exception: string | null = null;
+  let exceptionKind: LogisticsCardModel["exceptionKind"] = null;
   if (!input.settled) {
-    if (input.answer?.kind === "cannot_deliver" && !t2Done) exception = LOGISTICS_COPY.cannotDeliver(input.answer.reasonLabel);
-    else if (input.financeHold !== null) exception = LOGISTICS_COPY.financeHolding(input.financeHold);
-    else if (input.moneyOwed) exception = LOGISTICS_COPY.stillToCollect(input.moneyOwed);
-    else if (t1Checked && t1.gaps[0]) exception = t1.gaps[0].fact;
+    if (input.answer?.kind === "cannot_deliver" && !t2Done) [exception, exceptionKind] = [LOGISTICS_COPY.cannotDeliver(input.answer.reasonLabel), "cannot_deliver"];
+    else if (input.financeHold !== null) [exception, exceptionKind] = [LOGISTICS_COPY.financeHold(input.financeHold), "finance_hold"];
+    else if (input.moneyOwed) [exception, exceptionKind] = [LOGISTICS_COPY.holdUnpaid(input.moneyOwed), "money"];
+    else if (t1Checked && t1.gaps[0]) [exception, exceptionKind] = [t1.gaps[0].fact, "gap"];
   }
 
-  return { anchorIso: anchor, anchorKind, rows, doneCount, currentAction, exception };
+  return { anchorIso: anchor, anchorKind, rows, doneCount, currentAction, exception, exceptionKind };
 }
 
 /**

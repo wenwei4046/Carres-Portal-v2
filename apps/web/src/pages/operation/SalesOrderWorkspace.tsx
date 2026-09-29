@@ -65,26 +65,19 @@ import {
   composeEmergencyContact,
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
-  deliveryReasonLabel,
   fmtMoney,
   EMERGENCY_RELATIONSHIPS,
   LIFT_OPTIONS,
   lineClass,
-  lineKind,
   MAX_DELIVERY_FLOOR,
   maxLeadDaysFor,
   minDeliveryDateISO,
   orderMoney,
   parseEmergencyContact,
-  receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
-  routeDeliveryScopesOf,
-  routeGoodsLinesOf,
   salesOrderNumberWord,
   salesOrderParamOf,
-  supplierClaimStatusLabel,
-  myHolidaySet,
   mytDayOf,
   type CustomField,
   type OrderEntryTab,
@@ -142,7 +135,7 @@ import {
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
-import { workspaceDutyActor } from "./workspace-duty-owner";
+import { routeActionOwnersOf } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
@@ -153,7 +146,8 @@ import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
-import SalesOrderRoute, { type RouteRetryOwner } from "./SalesOrderRoute";
+import SalesOrderRoute, { RouteLoadingFrame, type RouteRetryOwner } from "./SalesOrderRoute";
+import { salesOrderRouteInputOf, type RouteOrderDetail } from "./sales-order-route-input";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
 
@@ -710,7 +704,7 @@ export function snapshotTemplateData(
        is not made at all by the time it matters. `signature_unknown` uses the
        SAME condition as the `oldrev-signature-unknown` page notice — one fact,
        one test, so the screen and the paper cannot drift. */
-    rebuilt_notice: "Reconstructed copy — original issued document unavailable.",
+    rebuilt_notice: "Reconstructed copy. The original issued document is unavailable.",
     signature_unknown: Boolean(base?.signature_url),
     /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
        snapshot stores none, so this reads the SAME payments ledger Payments
@@ -794,169 +788,9 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
 
 /* ── Small atoms ───────────────────────────────────────────────────────────── */
 
-/**
- * A left-pane block. The bar beside the title is the section's whole chrome —
- * §6.4 ④ ruled the panel CALM: sections, not a box around every field.
- *
- * **The bar is GREY, and that is a token law, not taste.**
- * `../../01-design-tokens.md` §2.2 is frozen: *"Blue appears ONCE on a screen —
- * on the primary button."* Eight blue rules down the left of one form would
- * spend the accent eight times and leave nothing to mark the current thing.
- * The tab underline above already holds the screen's one accent.
- */
-export function Block({
-  title,
-  /** ⭐ THE BLUE TITLE IS THE SALES ORDER PAGE'S, NOT EVERY PAGE'S. `Block` is
-   *  shared — `PurchaseOrdersPage` draws its object with the same card — and the
-   *  owner ruling that made the title blue (Jess, 2026-09-21/22) is a SALES
-   *  ORDER ruling. So the blue is opt-in and the shared default is unchanged;
-   *  no other page moves. */
-  titleTone = "shared",
-  note,
-  headerSlot,
-  subtitle,
-  summary,
-  forceOpen,
-  children,
-}: {
-  title: string;
-  titleTone?: "shared" | "sales-order";
-  note?: string;
-  /** ⭐ A STANDING FACT ABOUT THE WHOLE CARD BELONGS BESIDE ITS NAME
-   *  (Jess, 2026-08-26). `note` is prose; this slot takes a rendered chip, so a
-   *  fact the reader wants BEFORE reading the fields — is this a new customer or
-   *  one we already have — is answered by the heading rather than by a row eight
-   *  fields down.
-   *
-   *  ⭐ AND A READ-ONLY DOOR MAY RIDE HERE TOO (YH, 2026-09-01). The original
-   *  rule read "a fact, never a control: nothing in here writes", and the
-   *  second half of that sentence is the part that matters. A door that only
-   *  NAVIGATES writes nothing — it is the Law C escape hatch, not a form — and
-   *  a whole bordered row at the bottom of a card to hold one link is the
-   *  "extra row for one control" this page has been removing all week.
-   *  ⛔ STILL NEVER A WRITER. Nothing mounted here may submit, decide, or
-   *  change a record; a control that writes belongs beside the fact it
-   *  changes, where the reader can see what it will move. */
-  headerSlot?: React.ReactNode;
-  /** ⭐ WHAT THIS BLOCK IS FOR, in the operator's words (2026-08-24).
-   *
-   *  Jess's objective is that someone who does not know ERP can work this page
-   *  without asking what a section means. The block TITLES are locked words
-   *  (COPY-STANDARD "Use exactly", and MASTER.md's SALES ORDER OBJECT PAGE V2
-   *  names them in its block order), so the answer is not to rename them — it
-   *  is to EXPLAIN them. A subtitle teaches; a new noun would only move the
-   *  confusion somewhere else. */
-  subtitle?: string;
-  /** One line standing in for the whole block while collapsed. Passing this is
-   *  what makes a block collapsible at all — a block with no honest one-line
-   *  summary must stay open, because a chevron hiding an unknown is worse than
-   *  a card the reader can simply see. */
-  summary?: string;
-  /** ⭐ NEVER HIDE AN UNSAVED CHANGE. The dark save bar says `⚠ {n} changes`;
-   *  if one of those changes sat inside a collapsed block the operator would be
-   *  told something changed with no way to find it. A dirty block force-opens
-   *  and cannot be closed until it is saved or discarded. */
-  forceOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const collapsible = Boolean(summary);
-  const [open, setOpen] = useState(false);
-  const isOpen = !collapsible || open || Boolean(forceOpen);
-  const headingId = `block-h-${title.replace(/\s+/g, "-").toLowerCase()}`;
-  const bodyId = `block-b-${title.replace(/\s+/g, "-").toLowerCase()}`;
-
-  return (
-    <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
-      {/* ⭐ THE CARD TITLE IS BLUE, SENTENCE CASE, OVER A 1px RULE — OWNER
-          RULING (Jess, 2026-09-21), re-affirmed 2026-09-22: **"remain blue"**,
-          kept after the challenge that blue elsewhere means clickable
-          (`docs/orders/MASTER.md` § "Order view — one page, foreign facts
-          read-only" → CARD ORDER AND NAMES).
-
-          Two ranks only: card title `text-strong` 15px/600 sentence case in
-          `kit-blue-11`, on a WHITE card with a 1px rule; the in-card label is
-          13px/600 slate-11.
-
-          ⛔ WHAT THIS RETIRES: the mono UPPERCASE `text-signature-700` heading
-          and the `border-l-2` blue-grey band beside it. Both were this page's
-          own 2026-08-24/28 answers to "a section must read as a section"; the
-          owner has since ruled the answer, so the older reasoning is removed
-          rather than left beside it to be re-argued. */}
-      <div
-        className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 ${
-          titleTone === "sales-order" ? "border-b border-kit-slate-5 pb-2" : "border-l-2 border-base-300 pl-2"
-        }`}
-      >
-        <h2
-          id={headingId}
-          className={
-            titleTone === "sales-order"
-              ? /* ONE KIT LAW (owner ruling 2026-09-27): a card title is black bold,
-                   never blue. It overwrites the 2026-09-21 "remain blue" ruling. */
-                "text-strong text-kit-slate-12"
-              : "font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
-          }
-        >
-          {title}
-        </h2>
-        {headerSlot}
-        {note && <span className="text-meta font-normal text-base-600">{note}</span>}
-      </div>
-      {subtitle && (
-        <p className="mt-1 text-meta font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
-          {subtitle}
-        </p>
-      )}
-      {collapsible && !isOpen ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-expanded={false}
-          aria-controls={bodyId}
-          className="mt-2 flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-body text-base-600 hover:bg-hovertint"
-          data-testid={`block-expand-${title}`}
-        >
-          <span className="text-base-400">▸</span>
-          <span className="min-w-0 flex-1 truncate">{summary}</span>
-        </button>
-      ) : (
-        <>
-          {collapsible && (
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              /* A dirty block cannot be closed — the change must stay findable. */
-              disabled={Boolean(forceOpen)}
-              aria-expanded
-              aria-controls={bodyId}
-              className="mt-2 flex items-center gap-2 rounded-control px-2 py-1 text-left text-meta text-base-500 hover:bg-hovertint disabled:cursor-not-allowed disabled:opacity-50"
-              data-testid={`block-collapse-${title}`}
-              title={forceOpen ? "This section has unsaved changes" : undefined}
-            >
-              <span className="text-base-400">▾</span>
-              <span>{forceOpen ? "Unsaved changes here" : "Hide"}</span>
-            </button>
-          )}
-          {/* ⭐ ONE GAP BETWEEN THE GROUPS OF A SECTION (SO page kit-sizes
-              card, 2026-09-23). Each SO section used to space its own field
-              groups — `mt-3` here, `mt-4` there, none at all between Delivery's
-              address and its access fields (measured 0px). The body now owns
-              it: 12px (`gap-3`, the standard gap) between every group, and a
-              group that renders nothing takes no gap. Children carry no top
-              margin of their own. Opt-in with the SO tone because Purchase
-              Orders and Manual Purchase share this component and space their
-              own bodies. */}
-          <div
-            id={bodyId}
-            className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}
-          >
-            {children}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
+/** The one card lives in the kit (Workspace §5.10 admission, 2026-09-28). */
+import Block from "@/components/kit/Block";
+export { Block };
 
 /**
  * A named division INSIDE a card — the merge law's other half (Jess, 2026-08-26).
@@ -1065,21 +899,51 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
  * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
  * as changeable as the phone number beside it (reviewer finding 16).
  */
-function Fact({ label, value, own = true, framed = own }: { label: string; value: React.ReactNode; own?: boolean; framed?: boolean }) {
-  const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
-  return (
-    <FieldFrame id={id} label={label}>
+export function Fact({
+  label,
+  value,
+  own = true,
+  framed = own,
+  idPrefix = "so-fact",
+  testId,
+  hint,
+  wide = false,
+  automatic = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  own?: boolean;
+  framed?: boolean;
+  /** The id/testid family — `so-fact` here, `po-fact` / `mp-fact` on the
+   *  Purchasing pages that share this ONE fact grammar (owner, 2026-09-26). */
+  idPrefix?: string;
+  /** A page that already pins its own test id keeps it. */
+  testId?: string;
+  /** One quiet line under the value (`Provisional. The date is recorded when
+   *  issued.`) through FieldFrame's own hint slot — never a second markup. */
+  hint?: string;
+  /** Spans the whole fact grid row — a free-text reason or requirement. */
+  wide?: boolean;
+  /** A value the SYSTEM fills on a form the person is filling in
+   *  (`Requested By`, `Proceed Date` on a create page). Drawn in a grey
+   *  box so it never reads as a field waiting for input (owner 2026-09-28:
+   *  "yes" to grey automatic fields, the Shopify / SAP read-only look). */
+  automatic?: boolean;
+}) {
+  const id = `${idPrefix}-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  const field = (
+    <FieldFrame id={id} label={label} hint={hint}>
       <div
         id={id}
         role="textbox"
         aria-readonly
         aria-label={label}
-        data-kit={framed ? "readonly-field" : "plain-fact"}
+        data-kit={framed ? (automatic ? "automatic-field" : "readonly-field") : "plain-fact"}
         data-editable={own ? "yes" : "no"}
-        data-testid={id}
+        data-testid={testId ?? id}
         className={
           framed
-            ? `${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
+            ? `${automatic ? CONTROL_BASE.replace("bg-white", "bg-kit-slate-3") : CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
             : "flex min-h-8 min-w-0 items-center break-words px-0 py-1 text-body text-base-900"
         }
       >
@@ -1087,6 +951,9 @@ function Fact({ label, value, own = true, framed = own }: { label: string; value
       </div>
     </FieldFrame>
   );
+  /* The kit owns one field and takes no className; the grid span is the
+     caller's layout, drawn here around it. */
+  return wide ? <div className="col-span-full">{field}</div> : field;
 }
 
 /** The 0219 custom fields of one tab, rendered from the SAME contract the POS
@@ -1744,12 +1611,12 @@ function SalesOrderWorkspaceBody() {
     }
     const printable = printableRef.current.url;
     if (!printable) return;
-    if (dirty) toast.message("You have unsaved changes — printing the saved version");
+    if (dirty) toast.message("You have unsaved changes. Printing the saved version");
     /* A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT — and
        this branch is only reached when no file was ever stored for the
        version, which is the legacy case the notice exists for. */
     if (isReconstruction) {
-      toast.message("Reconstructed copy — original issued document unavailable.");
+      toast.message("Reconstructed copy. The original issued document is unavailable.");
     }
     window.open(printable, "_blank");
   };
@@ -1856,7 +1723,7 @@ function SalesOrderWorkspaceBody() {
      * cannot keep, and the POS has refused it since 2026-05-22 — this door
      * now refuses it too, with the same arithmetic rather than a second one. */
     if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
-      return `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
+      return `Delivery is too soon. The earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
     }
     /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
        The POS has refused an order without one since Phase 11.1; this door did
@@ -1864,7 +1731,7 @@ function SalesOrderWorkspaceBody() {
        whose Proceed date renders read-only as `Not recorded` forever.
        `createOrderInput` and `sales_order_create` (0391) refuse it again. */
     if (needDealer && !draft.proceed_date) {
-      return "Proceed date — pick the day production should start";
+      return "Proceed date: pick the day production should start";
     }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
       return "The proceed date is after the delivery date";
@@ -1873,7 +1740,7 @@ function SalesOrderWorkspaceBody() {
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
      * An unknown address cannot demand one; a known address must say. */
     if (!draft.customer_address_unknown && !draft.building_type) {
-      return "Fill in the building type first — a condominium can only take a half-day delivery.";
+      return "Fill in the building type first. A condominium can only take a half-day delivery.";
     }
     for (const a of draft.addons.filter((row) => !row.removed)) {
       if (SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key)) continue;
@@ -1881,7 +1748,7 @@ function SalesOrderWorkspaceBody() {
       const changed = needDealer || a.added || !original || a.qty !== original.qty || JSON.stringify(a.attrs) !== JSON.stringify(original.attrs);
       const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
       if (changed && addonSizeOptions(pos).length && disposalUnitSizes(pos).some((size) => !size))
-        return `${addonNameByKey.get(a.addon_key) ?? a.addon_key} — Size`;
+        return `Size for ${addonNameByKey.get(a.addon_key) ?? a.addon_key}`;
     }
     return null;
   };
@@ -1980,11 +1847,11 @@ function SalesOrderWorkspaceBody() {
         JSON.stringify(was.attrs ?? null) !== JSON.stringify(l.attrs ?? null);
       if (!changed) continue;
       const name = nameOfSku(l.sku);
-      if (l.added) out.push(`${name}: new goods — Purchasing buys them after approval`);
-      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier — Purchasing settles it with the supplier`);
-      else out.push(`${name}: no PO yet — Purchasing re-counts what to buy`);
+      if (l.added) out.push(`${name}: new goods. Purchasing buys them after approval`);
+      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier. Purchasing settles it with the supplier`);
+      else out.push(`${name}: no PO yet. Purchasing re-counts what to buy`);
       const units = l.id ? unitsOf.get(l.id) ?? [] : [];
-      if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved — Warehouse keeps the Unit until the change is decided`);
+      if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved. Warehouse keeps the Unit until the change is decided`);
     }
     if (after.lines.some((l) => l.removed && !protectedLine(l)) && after.lines.some((l) => protectedLine(l) && !l.removed))
       out.push("Free item: check it is still allowed without the cancelled item");
@@ -2002,8 +1869,8 @@ function SalesOrderWorkspaceBody() {
       /* ⛔ A SUMMARY WITH NO RECORDS BEHIND IT IS NOT A PAID FIGURE (Payments
          MASTER; owner 2026-09-22): no refund or balance is worked out from it. */
       const verified = rows != null && (paid === 0 || rows.some((r) => isLivePayment(r)));
-      if (!verified) out.push("Payments: payment data to check first — no refund or balance is worked out");
-      else if (paid > next) out.push(`Payments: ${fmtMoney(paid - next)} paid more than the new total — Payments reviews a refund`);
+      if (!verified) out.push("Payments: payment data to check first. No refund or balance is worked out");
+      else if (paid > next) out.push(`Payments: ${fmtMoney(paid - next)} paid more than the new total. Payments reviews a refund`);
       else out.push(`Payments: balance due becomes ${fmtMoney(next - paid)}`);
     }
     return out;
@@ -2107,7 +1974,7 @@ function SalesOrderWorkspaceBody() {
       if (r.action === "saved") toast.success(`Saved (${r.revision})`);
       else {
         toast.success("Sent for approval. The order stays as it is until management approves.");
-        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded — record it on the request.");
+        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded. Record it on the request.");
       }
       setDraft(baseline);
       setEditing(false);
@@ -2406,187 +2273,25 @@ function SalesOrderWorkspaceBody() {
     const caseStatus = new Map(
       (serviceCasesQ.data?.items ?? []).map((item) => [item.id, item.statusLabel ?? null]),
     );
-    return resolveSalesOrderRoute({
-      order: {
-        id: orderId,
-        so: detail.order.so,
-        customerName: displayCustomerName(detail.order.customer_name),
-        placedAt: detail.order.placed_at,
-        deliveryDate: detail.order.delivery_date,
-        deliveredAt: detail.order.delivered_at,
-      },
-      lineLabels: Object.fromEntries(detail.lines.map((line) => [line.sku, line.label?.trim() || line.sku])),
-      /* Deliver To is PURCHASING's answer, quantity split included. Sales
-         Order stores neither the destination nor its split, so the Route
-         reads it and never infers one. */
-      lineDestinations: Object.fromEntries(
-        (goodsTruthQ.data?.lines ?? []).map((line) => [line.sku, line.deliverTo]),
-      ),
-      cancelledLines,
-      /* ⭐ THE GOODS CHAIN READS ITS OWNERS (owner ruling 2026-09-26): the
-         `po_line_sources` lineage, the supplier's newest evidenced answer, the
-         posted receipts and the Units bound to each line — arranged by the
-         shared `routeGoodsLinesOf`. A service line moves no Unit and draws no
-         goods lane. */
-      goods: facts.goods
-        ? routeGoodsLinesOf({
-            ...facts.goods,
-            todayIso: appTodayIso(),
-            holidays: myHolidaySet(),
-            lines: facts.goods.lines
-              .filter((line) => lineKind(line.sku) !== "service")
-              .map((line) => ({
-                ...line,
-                qty: Number(line.qty),
-                label:
-                  detail.lines.find((row) => row.id === line.id)?.label?.trim() ||
-                  detail.lines.find((row) => row.sku === line.sku)?.label?.trim() ||
-                  line.sku,
-              })),
-          })
-        : undefined,
-      allocation: facts.allocation,
-      purchaseOrders: detail.pos.map((po) => ({
-        id: po.id,
-        issuedAt: po.placed_at ? po.placed_at.slice(0, 10) : null,
-        expectedReadyDate: po.expected_ready_date ?? null,
-        lines: po.lines.map((line) => ({
-          sku: line.sku,
-          qty: Number(line.qty),
-          receivedQty: Number(line.received_qty),
-        })),
-      })),
-      receivingRecords: facts.receiving.map((record) => ({
-        id: record.id,
-        recordNo: receivingRecordNo({
-          id: record.id,
-          goods_received_at: record.goods_received_at ?? undefined,
-          submitted_at: record.submitted_at,
-        }),
-        poId: record.po_id,
-        receivedAt: record.goods_received_at,
-      })),
-      delivery: {
-        /* ⭐ DELIVERY'S OWN RECORDS, ONE SCOPE PER LANE (owner ruling
-           2026-09-26). The arrangement, the live Delivery Order, its attempts,
-           its handover facts and the photos bound to its number — arranged by
-           the shared `routeDeliveryScopesOf`. The V1 booking fields below are
-           only the fallback for an order Delivery has recorded nothing on. */
-        scopes: facts.delivery
-          ? routeDeliveryScopesOf({
-              stops: detail.order.delivery_stops ?? [],
-              arrangements: facts.delivery.arrangements,
-              deliveryOrders: facts.delivery.deliveryOrders,
-              attempts: facts.delivery.attempts,
-              handoverEvents: facts.delivery.handoverEvents,
-              photos: detail.control?.delivery_photos ?? [],
-              lines: detail.lines.map((line) => ({ sku: line.sku, qty: Number(line.qty) })),
-              fallbackPartnerName: facts.brief?.assignedLogistics?.partnerName ?? null,
-              fallbackConfirmedDate: facts.brief?.appointment?.dateIso ?? null,
-              fallbackConfirmedTime: facts.brief?.appointment?.slot ?? null,
-            })
-          : undefined,
+    /* ONE input builder, shared with the Work page's route stops (Law D). */
+    return resolveSalesOrderRoute(
+      salesOrderRouteInputOf({
+        orderId,
+        detail: detail as RouteOrderDetail,
+        facts,
+        caseStatus,
+        deliverToLines: goodsTruthQ.data?.lines,
+        cancelledLines,
+        money,
         /* Payment must be complete 3 working days before an outstation
            delivery, 2 in the Klang Valley — the Work panel's own reading of
            the partner (Law D). */
         outstation: routePartnerQ.data?.partner ? !routePartnerQ.data.partner.kvDefault : false,
-        /* The document's own number (0356/Law D) — the gate stops depending on
-           an attempt existing before it can print the number the system
-           already minted. */
-        doNumber: detail.order.do_number ?? null,
-        /* Delivery's own answer about who carries this order — the LOGISTICS
-           node never infers a company from the region default. */
-        logistics: facts.brief?.assignedLogistics
-          ? { partnerName: facts.brief.assignedLogistics.partnerName }
-          : null,
-        booking: facts.brief?.appointment
-          ? {
-              confirmedDate: facts.brief.appointment.dateIso,
-              slot: facts.brief.appointment.slot,
-              scope: facts.brief.appointment.scope,
-            }
-          : null,
-        /* `ops_order_control.delivery_photos` (0280) — the ledger the
-           `Upload delivery photo` queue already counts. */
-        photos: (detail.control?.delivery_photos ?? []).map((photo) => ({
-          at: photo.at ?? null,
-          by: photo.by ?? null,
-        })),
-        attempts: facts.attempts.map((attempt) => ({
-          id: attempt.id,
-          attemptNo: attempt.attempt_no,
-          result: attempt.result,
-          reason: attempt.reason_key ? deliveryReasonLabel(attempt.reason_key) : attempt.note,
-          doNumber: attempt.do_number,
-          scheduledDate: attempt.scheduled_date,
-          recordedAt: attempt.recorded_at,
-        })),
-      },
-      /* Straight from the ONE arithmetic (§8): what is known and what is owed.
-         Under the 2026-08-19 ruling the outstanding figure is a GATE input
-         again — money in full before delivery, or an approved COD. */
-      money: {
-        known: money.known,
-        outstanding: money.outstanding,
-      },
-      /* The two money records (0355 + 0362) — the same tables the server-side
-         gate reads, so the canvas cannot lie about the refusal. */
-      financeExceptions: (facts.financeExceptions ?? []).map((row) => ({
-        id: row.id,
-        status: row.status,
-        reason: row.reason,
-      })),
-      paymentApprovals: (facts.paymentApprovals ?? []).map((row) => ({
-        id: row.id,
-        status: row.status,
-      })),
-      cases: facts.cases.map((item) => ({
-        id: item.id,
-        caseNo: item.caseNo,
-        statusLabel: caseStatus.get(item.id) ?? null,
-        closed: item.statusIsClosed,
-      })),
-      claims: facts.claims.map((item) => ({
-        id: item.id,
-        claimNo: item.claim_no,
-        statusLabel: supplierClaimStatusLabel(item.status),
-        closed: item.status === "closed",
-      })),
-      /* Card 6 — an INDEPENDENT obligation. It renders only while an item is
-         out, and it never blocks the delivery. */
-      loans: facts.loans.map((loan) => ({
-        id: loan.id,
-        label: loan.borrowed_label?.trim() || loan.item_sku || loan.borrowed_sku || "item",
-        qty: 1,
-        returned: loan.status === "returned",
-        unitId: loan.item_unit_code ?? null,
-      })),
-      /* 0492 (Card 15) — the offer conversation; the map prints the current
-         state, the drawer keeps the history. */
-      loanOffers: (facts.loanOffers ?? []).map((offer) => ({
-        id: offer.id,
-        seq: offer.seq,
-        event: offer.event,
-        label: offer.label,
-        reason: offer.reason,
-        recordedAt: offer.recorded_at,
-      })),
-      /* Sunday and Malaysian public holidays are the two days no company runs
-         (§8) — the gate names the refused day instead of failing silently. */
-      publicHolidays: [...myHolidaySet()],
-      /* ⭐ A FAILED READ IS `unreadable`, NEVER A BUSINESS SENTENCE (owner
-         ruling 2026-09-26). The group whose owner could not be read says so;
-         every other group draws from its own read. */
-      unreadable: {
-        delivery: facts.failed.delivery,
-        payments: facts.failed.payments,
-        purchasing: facts.failed.purchasing,
-        amendment: amendmentQ.isError,
-      },
-      /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
-         still waiting for a decision is announced. */
-      amendment:
-        liveAmendment && (liveAmendment.status === "submitted" || liveAmendment.stale)
+        amendmentFailed: amendmentQ.isError,
+        /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
+           still waiting for a decision is announced. */
+        amendment:
+          liveAmendment && (liveAmendment.status === "submitted" || liveAmendment.stale)
           ? {
               status: liveAmendment.stale ? "stale" : "submitted",
               submittedAt: liveAmendment.submitted_at ? mytDayOf(liveAmendment.submitted_at) : null,
@@ -2600,7 +2305,8 @@ function SalesOrderWorkspaceBody() {
               })),
             }
           : null,
-    });
+      }),
+    );
   }, [
     orderId,
     detailQ.data,
@@ -2634,13 +2340,7 @@ function SalesOrderWorkspaceBody() {
     return userId && name ? { userId, name, email: "" } : null;
   }, [orderOwnerQ.data]);
   const routeOwners = useMemo(
-    () => ({
-      purchasing: workspaceDutyActor(dutyQ.data, "po_duty"),
-      receiving: workspaceDutyActor(dutyQ.data, "grn_duty"),
-      /* `Choose Ready Unit` is the Sales Order PIC's — the person acting for
-         the order today, cover included, from the one owner read. */
-      sales: routeOrderOwner,
-    }),
+    () => routeActionOwnersOf(dutyQ.data, routeOrderOwner),
     [dutyQ.data, routeOrderOwner],
   );
 
@@ -2905,7 +2605,7 @@ function SalesOrderWorkspaceBody() {
                     {!known && <div className="text-meta text-kit-amber-11">{NOT_IN_CATALOG}</div>}
                     {l.added && <div className="text-meta text-kit-blue-11">New line</div>}
                     {l.removed && <div className="text-meta text-danger">Cancelled when approved · Restore to keep it</div>}
-                    {protectedLine(l) && <div className="text-meta text-base-600">Free item — it follows the item it came with</div>}
+                    {protectedLine(l) && <div className="text-meta text-base-600">Free item. It follows the item it came with</div>}
                     {/* ⭐ ONE COMPOSITION, NOT ONE SET OF DOORS (finding 9). The
                         seven-column table is now the document in BOTH states,
                         which is the ruling — but a door that WRITES is an Edit
@@ -3104,7 +2804,7 @@ function SalesOrderWorkspaceBody() {
           )}
           {isReconstruction && (
             <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
-              Reconstructed copy — original issued document unavailable.
+              Reconstructed copy. The original issued document is unavailable.
             </p>
           )}
           {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
@@ -3154,7 +2854,7 @@ function SalesOrderWorkspaceBody() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="SO info">
+      <Block title="SO info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact own={false} label="SO Doc Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
           {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
@@ -3198,7 +2898,7 @@ function SalesOrderWorkspaceBody() {
               <DatePicker id="so-proceed" label="Proceed Date" value={draft.proceed_date}
                 hint={
                   mode === "object" && !baseline.proceed_date
-                    ? "Never recorded — fill it in once, then it locks"
+                    ? "Never recorded. Fill it in once, then it locks"
                     : undefined
                 }
                 error={
@@ -3216,10 +2916,10 @@ function SalesOrderWorkspaceBody() {
           {mode === "create" || (!formLocked && editing) ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
-                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
+                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} (production lead)` : undefined}
                 error={
                   draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
-                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
+                    ? `Too soon. Earliest is ${fmtDate(earliestPromise)}`
                     : undefined
                 }
                 /* A date changes only into another date: picking one in Edit ends a legacy TBD (owner ruling 2026-09-26). */
@@ -3370,7 +3070,6 @@ function SalesOrderWorkspaceBody() {
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
       <Block
-        titleTone="sales-order"
         title="Customer"
         headerSlot={
           !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
@@ -3525,7 +3224,7 @@ function SalesOrderWorkspaceBody() {
           a working line and charged once in GOODS. */}
       {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="Delivery">
+      <Block title="Delivery">
           {/* Merged from the retired `Delivery address` card (Jess,
               2026-08-26). Same fields, same ids, same one-address fact — it
               simply stopped being a separate card two sections away from the
@@ -3611,7 +3310,7 @@ function SalesOrderWorkspaceBody() {
             <Select id="so-building-type" label="Building type" required={!formLocked}
               error={
                 !formLocked && !draft.customer_address_unknown && !draft.building_type
-                  ? "Fill in the building type first — a condominium can only take a half-day delivery."
+                  ? "Fill in the building type first. A condominium can only take a half-day delivery."
                   : undefined
               }
               value={draft.building_type || undefined}
@@ -3816,7 +3515,7 @@ function SalesOrderWorkspaceBody() {
               ) : (
                 <>
                   {stairWorking.items} of {stairWorking.itemsTotal} item
-                  {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
+                  {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor},
                   charged{" "}
                 </>
               )}
@@ -3846,7 +3545,7 @@ function SalesOrderWorkspaceBody() {
           other cards use is what keeps that promise; without it the boxes on a
           locked order accepted keystrokes. */}
       <fieldset disabled={formLocked} className="contents">
-      <Block titleTone="sales-order" title="Items">
+      <Block title="Items">
         {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
             `data-pos-field` the POS-parity contract test string-matches, with
             no control behind it — so the page passed a completeness test it
@@ -3960,7 +3659,6 @@ function SalesOrderWorkspaceBody() {
           navigates to the desk that owns collection, already scoped to this
           order, which is the one thing Law C lets a summary add. */}
       <Block
-        titleTone="sales-order"
         title="Payment"
         headerSlot={
           !isNew && order ? (
@@ -4054,7 +3752,7 @@ function SalesOrderWorkspaceBody() {
           work: a section that says "nothing" on every order is a section the
           operator learns to skip. */}
       {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
-        <Block titleTone="sales-order" title="What this change started elsewhere">
+        <Block title="What this change started elsewhere">
           <CorrectionWorkList
             work={correctionWorkQ.data?.work ?? []}
             canClose={false}
@@ -4101,7 +3799,7 @@ function SalesOrderWorkspaceBody() {
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
-        docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
+        docTitle={isNew ? "New Sales Order · Carres" : order ? `SO-${order.so} · Carres` : undefined}
         right={headerRight}
         navigation={!isNew ? (
           <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
@@ -4163,7 +3861,7 @@ function SalesOrderWorkspaceBody() {
       {showRoute ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
-            <Loading label="Opening the order route" />
+            <RouteLoadingFrame />
           ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <SalesOrderReadFailure
@@ -4188,7 +3886,7 @@ function SalesOrderWorkspaceBody() {
               is a 15px blue title over a 1px rule. It is now that same `Block`,
               so padding, title and gap come from one place. */}
           <div className="mx-auto max-w-5xl">
-          <Block titleTone="sales-order" title={objectView}>
+          <Block title={objectView}>
             {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
                 guards a 403 or a 500 falls straight through to the ledger's
                 governed EMPTY sentences (`No revisions recorded` / `No history
@@ -4252,8 +3950,21 @@ function SalesOrderWorkspaceBody() {
            and the page scrolls normally. */
         <div ref={splitHostRef} className={`min-h-0 flex-1 bg-kit-slate-3 ${split === "stack" ? "overflow-auto" : "overflow-hidden"}`}>
           {!isNew && detailQ.isLoading && (
-            <div className="px-4 py-4">
-              <Loading label="Opening the sales order" />
+            /* Loading holds the two panes' final geometry: the same split the
+               form and the paper will fill, so the page does not jump. */
+            <div
+              data-testid="so-loading"
+              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
+              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
+            >
+              <div className="min-w-0 px-4 py-4">
+                <div className="rounded-card border border-kit-slate-5 bg-white p-4">
+                  <Loading variant="skeleton" lines={6} label="Opening the sales order" />
+                </div>
+              </div>
+              <div className={`min-w-0 bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}>
+                <div className="mx-auto aspect-[210/297] max-w-[700px] rounded-card border border-kit-slate-5 bg-white" />
+              </div>
             </div>
           )}
           {!isNew && !detailQ.isLoading && detailQ.isError && (
@@ -4508,7 +4219,7 @@ export function catalogPriceHint(
 ): string | undefined {
   if (!known) return undefined;
   const shown = `Catalog RM ${known.price.toFixed(2)}`;
-  return known.price === unitPrice ? shown : `${shown} — this line differs`;
+  return known.price === unitPrice ? shown : `${shown}, this line differs`;
 }
 
 /**

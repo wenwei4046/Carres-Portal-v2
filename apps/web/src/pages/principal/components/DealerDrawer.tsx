@@ -355,7 +355,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                 </div>
               </>
             )}
-            <ProfileField label="Business address" hint="Single text field — full address line">
+            <ProfileField label="Business address" hint="Single text field: full address line">
               <textarea
                 value={draft.address}
                 onChange={(e) => setField("address", e.target.value)}

@@ -33,6 +33,8 @@ vi.mock("@/lib/queries", async () => {
       data: { sessions: [], events: [], expected_units: [] },
       isLoading: false,
     }),
+    // 0601 — the grey automatic `Received by` asks the server; none here.
+    useReceivingReceiver: () => ({ data: { receiver: null }, isLoading: false }),
     useOfficeReceiveMutation: (
       _poId: string,
       opts?: { onError?: (e: Error) => void; onSuccess?: (d: unknown) => void },
@@ -195,7 +197,7 @@ describe("Receiving · repeated submission", () => {
        with an unexplained grey. */
     expect(screen.getByTestId("receiving-save")).toBeDisabled();
     expect(screen.getByTestId("receiving-save")).toHaveTextContent(
-      "Save — add a DO number",
+      "Save: add a DO number",
     );
     fireEvent.click(screen.getByTestId("receiving-save"));
     expect(h.calls).toHaveLength(0);
@@ -204,7 +206,7 @@ describe("Receiving · repeated submission", () => {
       target: { value: "DO-8821" },
     });
     expect(screen.getByTestId("receiving-save")).toHaveTextContent(
-      "Save — upload signed DO",
+      "Save: upload signed DO",
     );
     fireEvent.click(screen.getByTestId("receiving-save"));
     expect(h.calls).toHaveLength(0);
@@ -225,7 +227,7 @@ describe("Receiving · repeated submission", () => {
     });
     expect(screen.getByTestId("receiving-save")).toBeDisabled();
     expect(screen.getByTestId("receiving-save")).toHaveTextContent(
-      "Save — count at least one unit",
+      "Save: count at least one unit",
     );
     fireEvent.click(screen.getByTestId("receiving-save"));
     expect(h.calls).toHaveLength(0);

@@ -2,6 +2,8 @@
 // module tab bar, so UI-KIT §8.3's Module-tab law applies: no breadcrumb and
 // no big title, because the active tab already says "Settings". Same shape as
 // its siblings Claims and Receiving.
+import { GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { Block } from "./SalesOrderWorkspace";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -26,11 +28,14 @@ import {
   useSetSupplierTermsDays,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
+  useSetPurchasingPoWindows,
   useSetSupplierWorkWeek,
   useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
 import Input from "@/components/kit/Input";
+import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
 import { fmtDate } from "@/lib/fmt-date";
 import { INPUT_CLS } from "./components/Modal";
 import PurchasingTabs from "./PurchasingTabs";
@@ -101,7 +106,7 @@ function ChangeLine({
   const was = settingValueLabel(settingKey, change.oldValue);
   return (
     <div className="text-label text-base-500 mt-1" data-testid="setting-change-line">
-      {change.changedBy ?? ""} · {fmtDate(change.changedAt)}
+      {change.changedBy ?? GOODS_ABSENCE_WORDS.notRecorded} · {fmtDate(change.changedAt)}
       {was ? ` · was ${was}` : ""}
     </div>
   );
@@ -361,18 +366,32 @@ export default function OperationPurchasingSettings({
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The settings the ordering engine reads. Change one here and SO Batch Purchase uses it
           the same day.
-          {!canEdit && " Manager only — read-only for your role."}
+          {!canEdit && " Manager only. Read-only for your role."}
         </div>
 
-        <section className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
-          <div className="mb-3 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-strong font-semibold text-base-900 mb-1">Deliver To</h2>
-              <p className="text-meta text-base-500">
-                Where suppliers may send goods. The default is used until staff choose another.
-              </p>
-            </div>
-            {canEdit && destinationDraft?.mode !== "add" && (
+        {/* ⭐ PO WINDOWS (Purchasing MASTER §5.6.1, owner 2026-09-24/25): the
+            days a window opens and its two times, in ONE card. Work and SO
+            Batch read these through the same window reader. */}
+        <div className="mb-8 max-w-[860px]" data-testid="po-windows-settings">
+          <PoWindowsSection
+            settings={data}
+            canEdit={canEdit}
+            poDays={poDays}
+            poDirty={poDirty}
+            onPoDays={setPoDraft}
+            savingPoDays={setPoDays.isPending}
+            onSavePoDays={() =>
+              setPoDays.mutateAsync({ days: poDays }).then(() => setPoDraft(null))
+            }
+            onFail={fail}
+          />
+        </div>
+
+        <div className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
+          <Block
+            title="Deliver To"
+            subtitle="Where suppliers may send goods. The default is used until staff choose another."
+            headerSlot={canEdit && destinationDraft?.mode !== "add" ? (
               <button
                 type="button"
                 className="btn-secondary text-meta shrink-0"
@@ -380,11 +399,11 @@ export default function OperationPurchasingSettings({
               >
                 Add Deliver To
               </button>
-            )}
-          </div>
+            ) : undefined}
+          >
 
           {destinationDraft && (
-            <div className="mb-3 rounded-[10px] border border-base-200 bg-white p-4">
+            <div className="mb-3 border-b border-kit-slate-5 bg-white pb-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-meta font-semibold text-base-700">
                   Name
@@ -471,7 +490,7 @@ export default function OperationPurchasingSettings({
             </div>
           )}
 
-          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+          <div className="overflow-hidden bg-white">
             {data.destinations.length === 0 ? (
               <div className="p-4 text-body text-base-600">No Deliver To has been added yet.</div>
             ) : (
@@ -513,17 +532,12 @@ export default function OperationPurchasingSettings({
               ))
             )}
           </div>
-        </section>
+          </Block>
+        </div>
 
-        <section className="mb-8 max-w-[860px]" data-testid="supplier-collection-settings">
-          <h2 className="text-strong font-semibold text-base-900 mb-1">
-            Supplier collection
-          </h2>
-          <p className="text-meta text-base-500 mb-3">
-            Who collects from a supplier that does not deliver, and where those goods always go.
-            Issue review reads this rule; it does not ask again.
-          </p>
-          <div className="overflow-hidden rounded-[10px] border border-base-200 bg-white">
+        <div className="mb-8 max-w-[860px]" data-testid="supplier-collection-settings">
+          <Block title="Supplier collection" subtitle={"Who collects from a supplier that does not deliver, and where those goods always go. Issue review reads this rule; it does not ask again."}>
+          <div className="overflow-hidden bg-white">
             {(data.supplierCollections ?? []).length === 0 ? (
               <div className="p-4 text-body text-base-600">
                 No supplier needs Carres to arrange collection.
@@ -643,18 +657,13 @@ export default function OperationPurchasingSettings({
               })
             )}
           </div>
-        </section>
+          </Block>
+        </div>
 
         {/* ── Production working days, per supplier × category ─────────────── */}
-        <section className="mb-8 max-w-[860px]">
-          <h2 className="text-strong font-semibold text-base-900 mb-1">
-            Production working days
-          </h2>
-          <p className="text-meta text-base-500 mb-3">
-            How long each factory takes to make an item. Only the factories that
-            have SKUs appear here.
-          </p>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+        <div className="mb-8 max-w-[860px]">
+          <Block title="Production working days" subtitle={"How long each factory takes to make an item. Only the factories that have SKUs appear here."}>
+          <div className="bg-white">
             {rows.length === 0 && (
               <div className="py-4 text-body text-base-600">
                 No factory has SKUs yet. Add SKUs in Operation Catalog and the
@@ -737,10 +746,11 @@ export default function OperationPurchasingSettings({
             })}
           </div>
           <p className="text-label text-base-500 mt-2">
-            One factory at a time — a PO already sent keeps the date it was sent
+            One factory at a time. A PO already sent keeps the date it was sent
             with.
           </p>
-        </section>
+          </Block>
+        </div>
 
         {/* ── Transit days, per supplier ───────────────────────────────────
             THE SECOND LEG OF THE LEAD TIME (owner correction, 2026-09-09).
@@ -750,15 +760,9 @@ export default function OperationPurchasingSettings({
             "Add transit days for {supplier} in Settings". This is that field.
             The stored values are read as they are; nothing is defaulted, and a
             supplier nobody has set reads `Set a number`. */}
-        <section className="mb-8 max-w-[860px]" data-testid="transit-days-settings">
-          <h2 className="text-strong font-semibold text-base-900 mb-1">
-            Transit days
-          </h2>
-          <p className="text-meta text-base-500 mb-3">
-            Working days between the factory finishing and the goods reaching
-            Carres. Counted on the Carres work week, not the factory&rsquo;s.
-          </p>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+        <div className="mb-8 max-w-[860px]" data-testid="transit-days-settings">
+          <Block title="Transit days" subtitle={"Working days between the factory finishing and the goods reaching Carres. Counted on the Carres work week, not the factory’s."}>
+          <div className="bg-white">
             {data.suppliers.length === 0 && (
               <div className="py-4 text-body text-base-600">
                 No factory has SKUs yet. Add SKUs in Operation Catalog and the
@@ -844,20 +848,16 @@ export default function OperationPurchasingSettings({
             Order By allows for this time as well as production time, so the
             Safety days stay whole.
           </p>
-        </section>
+          </Block>
+        </div>
 
         {/* ── Payment terms, per supplier (0530) ───────────────────────────
             Days after the bill date. A PO's own terms win over these; the
             bill form fills in the due date from whichever is set. Empty = not
             set, and nothing waits on it. */}
-        <section className="mb-8 max-w-[860px]" data-testid="terms-days-settings">
-          <h2 className="text-strong font-semibold text-base-900 mb-1">
-            Payment terms
-          </h2>
-          <p className="text-meta text-base-500 mb-3">
-            Days after the supplier&rsquo;s bill date that the bill is due. A PO&rsquo;s own terms come first.
-          </p>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+        <div className="mb-8 max-w-[860px]" data-testid="terms-days-settings">
+          <Block title="Payment terms" subtitle={"Days after the supplier’s bill date that the bill is due. A PO’s own terms come first."}>
+          <div className="bg-white">
             {data.suppliers.map((s) => {
               const saved = s.termsDays ?? null;
               const draft = termsDraft[s.id] ?? (saved == null ? "" : String(saved));
@@ -914,17 +914,13 @@ export default function OperationPurchasingSettings({
               );
             })}
           </div>
-        </section>
+          </Block>
+        </div>
 
         {/* ── Supplier work week ───────────────────────────────────────────── */}
-        <section className="mb-8 max-w-[860px]">
-          <h2 className="text-strong font-semibold text-base-900 mb-1">
-            Supplier work week
-          </h2>
-          <p className="text-meta text-base-500 mb-3">
-            The days each factory works. Pick the days it is open.
-          </p>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+        <div className="mb-8 max-w-[860px]">
+          <Block title="Supplier work week" subtitle={"The days each factory works. Pick the days it is open."}>
+          <div className="bg-white">
             {data.suppliers.map((s) => {
               const off = weekDraft[s.id] ?? s.offDays ?? [SUNDAY];
               const working = WEEKDAYS.map((w) => w.day).filter((d) => !off.includes(d));
@@ -994,14 +990,13 @@ export default function OperationPurchasingSettings({
               );
             })}
           </div>
-        </section>
+          </Block>
+        </div>
 
         {/* ── The single numbers ───────────────────────────────────────────── */}
-        <section className="mb-8 max-w-[860px]">
-          <h2 className="text-strong font-semibold text-base-900 mb-3">
-            The other numbers
-          </h2>
-          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+        <div className="mb-8 max-w-[860px]">
+          <Block title="The other numbers">
+          <div className="bg-white">
             <NumberRow
               label="Safety days"
               hint="Extra time allowed for delays."
@@ -1066,51 +1061,9 @@ export default function OperationPurchasingSettings({
               <ChangeLine settings={data} settingKey="logistics_call_working_days" />
             </NumberRow>
 
-            <div className="py-3 border-b border-base-100 last:border-b-0">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="min-w-[240px]">
-                  <div className="text-body text-base-900">PO days</div>
-                  <div className="text-meta text-base-500 mt-0.5">
-                    The days POs are sent. A late line never waits for one.
-                  </div>
-                  <ChangeLine settings={data} settingKey="po_days" />
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <DayPicker
-                    selected={poDays}
-                    canEdit={canEdit}
-                    onChange={setPoDraft}
-                    testId="po-days"
-                    /* Jess, 2026-08-01: the Carres OFFICE does not work
-                     * Saturday, and a PO run nobody is in the office to run
-                     * is a checkbox that lies. Supplier work weeks keep
-                     * their Saturday — Ohana works it. */
-                    days={WEEKDAYS.filter((w) => w.day <= 5)}
-                  />
-                  {canEdit && (
-                    <button
-                      type="button"
-                      disabled={!poDirty || poDays.length === 0 || setPoDays.isPending}
-                      onClick={() =>
-                        setPoDays
-                          .mutateAsync({ days: poDays })
-                          .then(() => {
-                            setPoDraft(null);
-                            toast.success("Saved");
-                          })
-                          .catch(fail)
-                      }
-                      className="btn-primary text-meta disabled:opacity-40"
-                      data-testid="po-days-save"
-                    >
-                      Save
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
-        </section>
+          </Block>
+        </div>
       </div>
     </div>
   );
@@ -1141,4 +1094,160 @@ export default function OperationPurchasingSettings({
       })
       .catch(fail);
   }
+}
+
+/**
+ * ⭐ PO WINDOWS — `PO Days` · `First PO window` · `Second PO window` with its
+ * switch (MASTER §5.6.1; storage and audited door 0585). A change never
+ * rewrites an issued PO; the SQL door records the old and new value, and the
+ * history line reads it in clock words.
+ */
+function PoWindowsSection({
+  settings,
+  canEdit,
+  poDays,
+  poDirty,
+  onPoDays,
+  savingPoDays,
+  onSavePoDays,
+  onFail,
+}: {
+  settings: PurchasingSettingsResponse;
+  canEdit: boolean;
+  poDays: number[];
+  poDirty: boolean;
+  onPoDays: (days: number[]) => void;
+  savingPoDays: boolean;
+  onSavePoDays: () => Promise<unknown>;
+  onFail: (e: unknown) => void;
+}) {
+  const saved = settings.poWindows;
+  const setWindows = useSetPurchasingPoWindows();
+  const [draft, setDraft] = useState<{ first: string; second: string; secondEnabled: boolean } | null>(null);
+  const current = draft ?? {
+    first: saved?.first ?? "",
+    second: saved?.second ?? "",
+    secondEnabled: saved?.secondEnabled ?? false,
+  };
+  const dirty =
+    draft !== null &&
+    (draft.first !== (saved?.first ?? "") ||
+      draft.second !== (saved?.second ?? "") ||
+      draft.secondEnabled !== (saved?.secondEnabled ?? false));
+  /* The same two rules the SQL door enforces, said before the round trip. */
+  const problem =
+    current.first === ""
+      ? "The first PO window needs a time."
+      : current.secondEnabled && current.second === ""
+        ? "The second PO window needs a time."
+        : current.second !== "" && current.second <= current.first
+          ? "The second PO window must be later than the first."
+          : null;
+  const patch = (next: Partial<typeof current>) => setDraft({ ...current, ...next });
+
+  return (
+    <Block title="PO windows" subtitle="When POs are bought each day. Lines added before a window are bought in it.">
+      <div className="bg-white">
+        <div className="py-3 border-b border-base-100">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-[240px]">
+              <div className="text-body text-base-900">PO Days</div>
+              <div className="text-meta text-base-500 mt-0.5">The days a PO window opens.</div>
+              <ChangeLine settings={settings} settingKey="po_days" />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <DayPicker
+                selected={poDays}
+                canEdit={canEdit}
+                onChange={onPoDays}
+                testId="po-days"
+                /* Jess, 2026-08-01: the Carres OFFICE does not work Saturday. */
+                days={WEEKDAYS.filter((w) => w.day <= 5)}
+              />
+
+            </div>
+          </div>
+        </div>
+
+        {saved == null ? (
+          <p className="py-3 text-meta text-kit-slate-11" data-testid="po-windows-unread">
+            Could not be loaded
+          </p>
+        ) : (
+          <div className="py-3" data-testid="po-windows">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                id="po-window-first"
+                type="time"
+                label="First PO window"
+                hint="Lines added before this time are bought in this window."
+                value={current.first}
+                disabled={!canEdit}
+                onChange={(e) => patch({ first: e.target.value })}
+              />
+              <div className="flex flex-col gap-2">
+                {/* The switch sits on the second window it governs, above its
+                    time: decide whether there IS one, then give it a time. */}
+                <Checkbox
+                  id="po-window-second-on"
+                  label="Use a second PO window"
+                  checked={current.secondEnabled}
+                  disabled={!canEdit}
+                  onCheckedChange={(on) => patch({ secondEnabled: on, second: current.second || (saved.second ?? "16:00") })}
+                />
+                <Input
+                  id="po-window-second"
+                  type="time"
+                  label="Second PO window"
+                  hint="Lines added after the first window are bought here."
+                  value={current.second}
+                  disabled={!canEdit || !current.secondEnabled}
+                  onChange={(e) => patch({ second: e.target.value })}
+                />
+              </div>
+            </div>
+            <ChangeLine settings={settings} settingKey="po_windows" />
+            {canEdit && (
+              <div className="mt-3 flex items-center gap-3">
+                {/* ONE Save for the card: it stores whichever of the two facts
+                    moved, PO Days first, each through its own audited door. */}
+                <Button
+                  size="sm"
+                  disabled={
+                    (!dirty && !poDirty) ||
+                    (dirty && problem != null) ||
+                    (poDirty && poDays.length === 0) ||
+                    setWindows.isPending ||
+                    savingPoDays
+                  }
+                  onClick={async () => {
+                    try {
+                      if (poDirty) await onSavePoDays();
+                      if (dirty) {
+                        await setWindows.mutateAsync({
+                          first: current.first,
+                          second: current.second === "" ? null : current.second,
+                          secondEnabled: current.secondEnabled,
+                        });
+                        setDraft(null);
+                      }
+                      toast.success("Saved");
+                    } catch (e) {
+                      onFail(e);
+                    }
+                  }}
+                  data-testid="po-windows-save"
+                >
+                  Save
+                </Button>
+                {dirty && problem ? (
+                  <span className="text-meta text-kit-red-11" data-testid="po-windows-problem">{problem}</span>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Block>
+  );
 }

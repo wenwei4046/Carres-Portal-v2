@@ -53,6 +53,11 @@ const useCatalogSpy = vi.fn((..._args: unknown[]) => catalogHookState);
  * nothing, so a register that went back to it would fail twice — here on the
  * call, and below on the DO number that vanished. */
 /* Monthly demand's facts — only read while that view is chosen. */
+/* The Order list's server facts (obligations, cases), per order id. */
+let registerFactsState: { data?: unknown; isError?: boolean } = {
+  data: { facts: {}, failed: { obligations: false, cases: false } },
+};
+const useSalesOrderRegisterFactsSpy = vi.fn((..._args: unknown[]) => registerFactsState);
 const useMonthlyDemandFactsSpy = vi.fn((..._args: unknown[]) => ({
   data: {
     orders: [
@@ -92,6 +97,7 @@ vi.mock("@/lib/queries", async () => {
     useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
     useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
     useMonthlyDemandFacts: (...args: unknown[]) => useMonthlyDemandFactsSpy(...args),
+    useSalesOrderRegisterFacts: (...args: unknown[]) => useSalesOrderRegisterFactsSpy(...args),
   };
 });
 
@@ -126,6 +132,11 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     order_addons: [],
     ...over,
   }) as operationOrderListRow;
+
+/** A word printed by the page itself, not by the rail's choices (the rail
+ *  lists every dealer, state and date range as a filter). */
+const outsideRail = (text: string) =>
+  screen.getAllByText(text).filter((el) => !el.closest('[data-testid="sales-orders-rail"]'));
 
 function mount(at = "/operation/orders") {
   /* The register's own list hook is the mocked spy; the provider serves the
@@ -273,7 +284,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       outlets: { name: "Carres Maluri Cheras" },
     })] };
     mount();
-    expect(screen.getByText("Carres Maluri Cheras")).toBeInTheDocument();
+    expect(outsideRail("Carres Maluri Cheras")).toHaveLength(1);
   });
 
   it("keeps one work toolbar with discoverable Search, Export and Columns", () => {
@@ -290,7 +301,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByTestId("new-sales-order")).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+    /* `Not delivered` is a rail FACT filter (owner approved 2026-09-22), never a
+       toolbar status. */
+    expect(within(screen.getByTestId("work-toolbar")).queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
   it("labels Export and its menu offers Excel, PDF and Print", () => {
@@ -386,7 +399,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       customer_address_state: "Kuala Lumpur",
     })] };
     mount();
-    expect(screen.getByText("Kuala Lumpur")).toBeInTheDocument();
+    expect(outsideRail("Kuala Lumpur")).toHaveLength(1);
     expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
     expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
   });
@@ -670,13 +683,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "PO No",
       "DO No",
     ]);
-    expect(screen.getByText("Carres Kelana Jaya")).toBeInTheDocument();
+    expect(outsideRail("Carres Kelana Jaya")).toHaveLength(1);
     expect(screen.getByText("Khoo Aik Yean")).toBeInTheDocument();
     /* The retired word never prints (COPY-STANDARD, SO Doc Date). */
     expect(screen.queryByText("SO Date")).not.toBeInTheDocument();
     /* Flat: no status groups, no Service Case column. */
     expect(document.querySelector("[data-testid^='grid-group-']")).toBeNull();
-    expect(screen.queryByText(/Service Case/)).not.toBeInTheDocument();
+    /* `Service Cases` is a rail FACT filter, never a column (owner approved 2026-09-22). */
+    expect(
+      screen.queryAllByText(/Service Case/).filter((el) => !el.closest('[data-testid="sales-orders-rail"]')),
+    ).toHaveLength(0);
   });
 
   /* ⭐ THE ONE-LINE LISTING ROW IS 40px ON THIS PAGE ONLY (ui MASTER §6.0 rule 5,
@@ -1079,7 +1095,7 @@ describe("Sales Orders table correction", () => {
     fireEvent.click(sort);
     expect(screen.getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Filter Customer Requested Delivery Date" }));
-    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(outsideRail("Today")).toHaveLength(1);
   });
 
   it("preserves saved widths and optional columns, but a saved order cannot move Proceed Date · SO Doc Date · SO No off the front", () => {
@@ -1276,30 +1292,31 @@ describe("the Sales Orders rail and its two views", () => {
     useMonthlyDemandFactsSpy.mockClear();
   });
 
-  it("has one View group with Order list and Monthly demand, and no Clear filters", () => {
+  it("switches Order list and Monthly demand with a tab bar, and has no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    expect(within(rail).getByText("View")).toBeInTheDocument();
-    expect(screen.getByTestId("sales-orders-view-list")).toHaveTextContent("Order list");
-    expect(screen.getByTestId("sales-orders-view-monthly")).toHaveTextContent("Monthly demand");
+    /* Two views of the same orders: a tab bar, not a collapsible group (owner ruling 2026-09-28). */
+    expect(within(rail).getByRole("tab", { name: "Order list" })).toBeInTheDocument();
+    expect(within(rail).getByRole("tab", { name: "Monthly demand" })).toBeInTheDocument();
+    expect(within(rail).queryByText("View")).not.toBeInTheDocument();
     expect(within(rail).queryByText(/Clear filters/i)).not.toBeInTheDocument();
   });
 
   it("opens on the Order list, which does not read Monthly demand", () => {
     mount();
-    expect(screen.getByTestId("sales-orders-view-list")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Order list" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("register-column")).toBeInTheDocument();
     expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(false);
   });
 
   it("choosing Monthly demand writes it to the URL, replaces the list, and reads its facts", () => {
     mount();
-    fireEvent.click(screen.getByTestId("sales-orders-view-monthly"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
     expect(screen.getByTestId("location")).toHaveTextContent("view=monthly");
     expect(screen.queryByTestId("register-column")).not.toBeInTheDocument();
     expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(true);
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Period", "Dealer / Sales Location", "Delivery State / City", "Product category"]) {
+    for (const group of ["Period", "Sales Location", "Customer Delivery Location", "Product category"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
   });
@@ -1322,10 +1339,179 @@ describe("the Sales Orders rail and its two views", () => {
 
   it("Monthly demand's filters never carry into the Order list", () => {
     mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
-    fireEvent.click(screen.getByTestId("sales-orders-view-list"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Order list" }));
     const at = screen.getByTestId("location").textContent ?? "";
     expect(at).not.toContain("view=");
     expect(at).not.toContain("dealer=");
     expect(at).not.toContain("months=");
+  });
+});
+
+describe("the Order list rail: read-only fact filters (owner approved 2026-09-22)", () => {
+  const sold = (sku: string, qty = 1) => ({ sku, status: "sold" as const, qty });
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [
+          order({
+            id: "a", so: 1501, dealers: { name: "{dealer 1}" },
+            customer_address_state: "{state 1}", customer_address_city: "{city 1}",
+            order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 100 }],
+            allocated_units: [],
+          }),
+          order({
+            id: "b", so: 1502, dealers: { name: "{dealer 2}" },
+            customer_address_state: "{state 2}", customer_address_city: "{city 2}",
+            order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 100 }],
+            allocated_units: [sold("B1201S-K")],
+          }),
+          order({
+            id: "c", so: 1503, dealers: { name: "{dealer 2}" },
+            customer_address_state: "{state 2}", customer_address_city: "{city 3}",
+            order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100 }],
+            allocated_units: [sold("B1201S-K")],
+          }),
+        ],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1501, 1502, 1503].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+
+  it("the Order list carries Sales Location, Customer Delivery Location and Delivery, no Date group and no Clear filters", () => {
+    mount();
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const group of ["Sales Location", "Customer Delivery Location", "Delivery"]) {
+      expect(within(rail).getByText(group)).toBeInTheDocument();
+    }
+    /* A date is narrowed on its own column's ▽ (Jess, 2026-09-28). */
+    expect(within(rail).queryByText("Date")).not.toBeInTheDocument();
+    expect(within(rail).queryByText("Proceed Date")).not.toBeInTheDocument();
+    expect(within(rail).queryByText(/Clear/i)).not.toBeInTheDocument();
+    expect(shown()).toEqual([1501, 1502, 1503]);
+  });
+
+  it("Sales Location narrows to where the order was sold", () => {
+    mount();
+    fireEvent.change(screen.getByTestId("sales-orders-rail-dealer"), { target: { value: "{dealer 2}" } });
+    expect(shown()).toEqual([1502, 1503]);
+    expect(screen.getByTestId("register-column")).toHaveTextContent("Sales Location: {dealer 2}");
+  });
+
+  it("State narrows, City narrows within it, and a new State clears the City", () => {
+    mount("/operation/orders?state=%7Bstate%202%7D&city=%7Bcity%203%7D");
+    expect(shown()).toEqual([1503]);
+    fireEvent.change(screen.getByTestId("sales-orders-rail-state"), { target: { value: "{state 1}" } });
+    expect(screen.getByTestId("location").textContent).not.toContain("city=");
+    expect(shown()).toEqual([1501]);
+  });
+
+  it("Delivery reads the one goods arithmetic: nothing sold, some sold, all sold", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-not_delivered"));
+    expect(shown()).toEqual([1501]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-partially_delivered"));
+    expect(shown()).toEqual([1502]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-fully_delivered"));
+    expect(shown()).toEqual([1503]);
+  });
+
+  it("a chosen row clicked again is deselected: no chosen value means All", () => {
+    mount();
+    const row = screen.getByTestId("sales-orders-rail-delivery-fully_delivered");
+    fireEvent.click(row);
+    expect(shown()).toEqual([1503]);
+    fireEvent.click(row);
+    expect(shown()).toEqual([1501, 1502, 1503]);
+    expect(screen.getByTestId("location").textContent).not.toContain("delivery=");
+  });
+
+  it("an old date link no longer narrows the list: no filter the rail cannot show", () => {
+    const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, proceeded_at: `${today}T01:00:00Z` }),
+      order({ id: "b", so: 1502, proceeded_at: "2020-01-02T01:00:00Z" }),
+    ];
+    mount("/operation/orders?date=doc&range=today");
+    expect(shown()).toEqual([1501, 1502]);
+    expect(screen.getByTestId("register-column")).not.toHaveTextContent("Today");
+  });
+
+  it("the Order list's filters never carry into Monthly demand", () => {
+    mount("/operation/orders?dealer=%7Bdealer%201%7D&delivery=not_delivered");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
+    const at = screen.getByTestId("location").textContent ?? "";
+    expect(at).not.toContain("dealer=");
+    expect(at).not.toContain("delivery=");
+  });
+});
+
+describe("the Order list rail: Obligations and Service Cases are the server's facts", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [order({ id: "a", so: 1601 }), order({ id: "b", so: 1602 }), order({ id: "c", so: 1603 })],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    registerFactsState = {
+      data: {
+        facts: {
+          a: { obligations: "outstanding", cases: "open" },
+          b: { obligations: "none", cases: "none" },
+          c: { obligations: null, cases: "closed" },
+        },
+        failed: { obligations: false, cases: false },
+      },
+    };
+  });
+  afterEach(() => {
+    registerFactsState = { data: { facts: {}, failed: { obligations: false, cases: false } } };
+  });
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1601, 1602, 1603].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+
+  it("Obligations narrows by the completion fact; an unknown fact matches neither value", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-rail-obligations-outstanding"));
+    expect(shown()).toEqual([1601]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-obligations-none"));
+    expect(shown()).toEqual([1602]);
+    expect(screen.getByTestId("register-column")).toHaveTextContent("No action required");
+  });
+
+  it("Service Cases narrows to open, closed only, or none", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-open"));
+    expect(shown()).toEqual([1601]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-closed"));
+    expect(shown()).toEqual([1603]);
+    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-none"));
+    expect(shown()).toEqual([1602]);
+  });
+
+  it("a read the server could not make says so instead of pretending none", () => {
+    registerFactsState = {
+      data: { facts: {}, failed: { obligations: true, cases: true } },
+    };
+    mount("/operation/orders?cases=none");
+    expect(screen.getByTestId("sales-orders-rail-obligations-unread")).toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-rail-cases-unread")).toBeInTheDocument();
+    expect(shown()).toEqual([]);
   });
 });

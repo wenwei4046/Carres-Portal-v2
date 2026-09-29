@@ -89,7 +89,7 @@ export default function ProductMaintenancePage({
               and where the other half lives — the question she could not get an
               answer to now has one on the page. */}
           <p className="text-body text-base-600 mt-1">
-            The product list, from the selling side — what we sell and what the customer pays,
+            The product list, from the selling side: what we sell and what the customer pays,
             plus models, combos and delivery / add-on config. Costs and suppliers are on the
             Operations catalog.
           </p>
@@ -111,7 +111,7 @@ export default function ProductMaintenancePage({
       )}
       {catalogQ.isError && !catalogQ.isLoading && (
         <div className="text-body text-danger">
-          Failed to load the catalog. Try refreshing — your session may have expired.
+          Failed to load the catalog. Try refreshing. Your session may have expired.
         </div>
       )}
 

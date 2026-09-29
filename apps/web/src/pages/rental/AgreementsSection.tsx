@@ -58,8 +58,8 @@ export default function AgreementsSection({
       </div>
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         The wording a rental signs, printed as written. The POS fills the blanks and the customer
-        signs at the sales order — no signature, no order, so there is no draft agreement.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        signs at the sales order. No signature, no order, so there is no draft agreement.
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {templates.length === 0 && (
@@ -136,7 +136,7 @@ export default function AgreementsSection({
 
       {editing && (
         <Modal
-          title={editing.docKey ? `New version — ${editing.name}` : "New agreement document"}
+          title={editing.docKey ? `New version: ${editing.name}` : "New agreement document"}
           onClose={() => setEditing(null)}
           size="lg"
         >
@@ -302,7 +302,7 @@ function WordingForm({
             className={INPUT_CLS}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Rental Agreement — Terms and Conditions"
+            placeholder="Rental Agreement: Terms and Conditions"
             data-testid="agreement-name"
           />
         </div>
@@ -335,7 +335,7 @@ function WordingForm({
           data-testid="agreement-text"
         />
         <p className="text-meta text-base-400 mt-1.5">
-          The words are yours — nothing is added. Write <span className="t-num">{"{{customer.name}}"}</span>{" "}
+          The words are yours. Nothing is added. Write <span className="t-num">{"{{customer.name}}"}</span>{" "}
           style placeholders wherever the system should fill a blank.
         </p>
       </div>
@@ -345,7 +345,7 @@ function WordingForm({
       >
         {blocks.length} block{blocks.length === 1 ? "" : "s"} ·{" "}
         {tokens.length === 0 ? (
-          "no fields — the document will print exactly as typed"
+          "no fields. The document will print exactly as typed"
         ) : (
           <>
             fills {tokens.length}: <span className="t-num">{tokens.join(" · ")}</span>

@@ -63,6 +63,13 @@ export default function Select({
   /* D0.5b.1 — null outside a dialog, which is Radix's own "use <body>", so the
    * ordinary case does not move. */
   const dialogContainer = useDialogContainer();
+  /* A value the list no longer offers (a retired choice, a legacy import) is
+   * still the record's value: it prints as itself, disabled, instead of an
+   * empty box that reads as "nothing recorded". */
+  const shown: readonly SelectOption[] =
+    value && !options.some((o) => o.value === value)
+      ? [...options, { value, label: value, disabled: true }]
+      : options;
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
       <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -90,7 +97,7 @@ export default function Select({
             className={`${FLOATING_SURFACE} min-w-[var(--radix-select-trigger-width)] p-1`}
           >
             <RadixSelect.Viewport className="flex flex-col gap-0.5">
-              {options.map((o) => (
+              {shown.map((o) => (
                 <RadixSelect.Item
                   key={o.value}
                   value={o.value}

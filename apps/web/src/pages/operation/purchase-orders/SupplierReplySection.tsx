@@ -1,3 +1,4 @@
+import TableScroller from "@/components/TableScroller";
 // design-standard: not-a-list-page — one section of the Purchase Order object page (its
 // facts column), drawn as a per-line table inside the page's own shell; not a List page.
 import { useMemo, useState } from "react";
@@ -58,6 +59,8 @@ const ANSWER_WORD: Record<AnswerKind, string> = {
 const control = "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-meta";
 const cell = "px-2 py-0 align-middle";
 const head = "h-9 px-2 text-left text-label font-semibold text-kit-slate-11";
+/** The read table's heads may wrap (`Supplier Confirmed Delivery Date` at 112px). */
+const readHead = "px-2 py-1.5 text-left align-bottom text-label font-semibold leading-tight text-kit-slate-11";
 
 export function stillToDeliver(line: { qty: number; receivedQty: number }): number {
   return Math.max(0, Number(line.qty) - Number(line.receivedQty));
@@ -84,7 +87,7 @@ function AnswerCell({ answer, previousDate, officialDate }: { answer: PoLineSupp
 
 export default function SupplierReplySection({
   poId, version, officialDeliveryDate, supplierName, lines, promises, canRecord,
-  defaultChannel, defaultRecipient, supplierDo, onSaved,
+  defaultChannel, defaultRecipient, supplierDo, onSaved, startEditing = false, onCancel,
 }: {
   poId: string;
   version: number;
@@ -97,6 +100,10 @@ export default function SupplierReplySection({
   defaultRecipient: string;
   supplierDo: { number: string | null; uploadedAt: string | null; file: string | null } | null;
   onSaved: () => void;
+  /** Work's route card opens the form straight away (Workspace MASTER §5.10):
+   *  the card's own `Record supplier answer` button already said which act. */
+  startEditing?: boolean;
+  onCancel?: () => void;
 }) {
   const record = useRecordSupplierAnswers(poId);
   const openLines = lines.filter((l) => stillToDeliver(l) > 0);
@@ -114,7 +121,7 @@ export default function SupplierReplySection({
     return paths.size;
   }, [promises, version]);
 
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [drafts, setDrafts] = useState<Record<string, LineDraft>>({});
   const [doReceived, setDoReceived] = useState(false);
   const [doNumber, setDoNumber] = useState("");
@@ -137,7 +144,7 @@ export default function SupplierReplySection({
     setChannel(defaultChannel); setRecipient(defaultRecipient); setProblem(null); setBulk("");
     setEditing(true);
   }
-  function cancel() { setEditing(false); setProblem(null); }
+  function cancel() { setEditing(false); setProblem(null); onCancel?.(); }
 
   const later = (date: string) => !!date && !!officialDeliveryDate && date > officialDeliveryDate;
 
@@ -251,9 +258,9 @@ export default function SupplierReplySection({
   /* ── READ ────────────────────────────────────────────────────────────── */
   if (!editing) {
     return (
-      <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
+      <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">SUPPLIER REPLY</div>
+          <div className="text-label font-semibold text-kit-slate-11">Supplier reply</div>
           <div className="text-meta text-kit-slate-11">PO Delivery Date · {officialDeliveryDate ? fmtDate(officialDeliveryDate) : "Not recorded"}</div>
           <div className="flex-1" />
           {canRecord ? (
@@ -263,12 +270,17 @@ export default function SupplierReplySection({
             </button>
           ) : null}
         </div>
-        <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-meta" data-testid="po-supplier-reply-table">
+        <div className="mt-2"><TableScroller label="Supplier reply">
+          {/* The READ table: the narrow columns are fixed and the Item column
+              takes the rest, wrapping its Unit IDs — but never below 180px
+              (measured 2026-09-26 at the owner's 1074px viewport: without a
+              floor the item name broke into one word per line). Below 560px
+              the card's own scroller takes over, like the Goods lines table. */}
+          <table className="w-full min-w-[560px] border-collapse text-meta" data-testid="po-supplier-reply-table">
             <thead className="bg-kit-slate-3">
               <tr>
-                <th className={head}>Item</th><th className={`${head} text-right`}>Qty</th><th className={`${head} text-right`}>To deliver</th>
-                <th className={head}>Supplier Confirmed Delivery Date</th><th className={head}>Last answer</th>
+                <th className={`${readHead} min-w-[180px]`}>Item</th><th className={`${readHead} w-12 text-right`}>Qty</th><th className={`${readHead} w-16 text-right`}>To deliver</th>
+                <th className={`${readHead} w-[112px]`}>Supplier Confirmed Delivery Date</th><th className={`${readHead} w-[128px]`}>Last answer</th>
               </tr>
             </thead>
             <tbody>
@@ -286,7 +298,7 @@ export default function SupplierReplySection({
               })}
             </tbody>
           </table>
-        </div>
+        </TableScroller></div>
         <div className="mt-2 flex flex-wrap gap-x-4 text-meta text-kit-slate-11" data-testid="po-supplier-reply-foot">
           <span>Supplier DO · {supplierDo?.number ? <span className="font-medium text-kit-slate-12">{supplierDo.number}</span> : "Not recorded"}{supplierDo?.uploadedAt ? ` · ${fmtDate(supplierDo.uploadedAt)}` : ""}{supplierDo?.file ? <> · <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void openFile(supplierDo.file!)}>PDF</button></> : null}</span>
           <span>Last answer · {lastAnswer ? `${fmtDate(lastAnswer.recordedAt)}${lastAnswer.recordedByName ? ` · recorded by ${lastAnswer.recordedByName}` : ""} · Evidence ${evidenceCount}` : "None recorded yet"}</span>
@@ -308,9 +320,9 @@ export default function SupplierReplySection({
   );
 
   return (
-    <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
+    <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">RECORD SUPPLIER ANSWER</div>
+        <div className="text-label font-semibold text-kit-slate-11">Record supplier answer</div>
         <label className="flex items-center gap-1.5 text-meta">
           <input type="checkbox" checked={doReceived} onChange={(e) => setDoReceived(e.target.checked)} data-testid="po-answer-do-received" />
           Supplier DO received
@@ -325,7 +337,7 @@ export default function SupplierReplySection({
         <button type="button" onClick={cancel} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3" data-testid="po-answer-cancel">Cancel</button>
         <button type="button" disabled={!ready} onClick={save} data-testid="po-answer-save"
           className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11">
-          {record.isPending ? "Saving…" : gap ? `Save — ${gap}` : "Save"}
+          {record.isPending ? "Saving…" : gap ? `Save: ${gap}` : "Save"}
         </button>
       </div>
       <div className="mt-2 min-w-0 max-w-full overflow-x-auto">

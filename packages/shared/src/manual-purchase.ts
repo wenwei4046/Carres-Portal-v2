@@ -31,16 +31,16 @@ export const MANUAL_PURCHASE_WORDS = {
   /** The disabled Send NAMES its gap (the Receiving law: a grey button that
    *  will not say why is banned). The FIRST missing header fact wins, in the
    *  form's own top-to-bottom order — lead days first (Card 06). */
-  sendNeedsLeadDays: "Send — lead days are not set",
-  sendNeedsDate: "Send — pick a date",
+  sendNeedsLeadDays: "Send: lead days are not set",
+  sendNeedsDate: "Send: pick a date",
   /** 0422 — the chosen date is before the earliest Delivery Date a Manual
    *  Purchase may ask for (Proceed Date + the Purchasing Settings number);
    *  the sentence under the field says so. */
-  sendNeedsLaterDate: "Send — pick a later date",
-  sendNeedsWhy: "Send — say what it is for",
-  sendNeedsServiceCase: "Send — pick the Service Case",
-  sendNeedsStaff: "Send — pick the staff member",
-  sendNeedsSubsidiary: "Send — name the subsidiary",
+  sendNeedsLaterDate: "Send: pick a later date",
+  sendNeedsWhy: "Send: say what it is for",
+  sendNeedsServiceCase: "Send: pick the Service Case",
+  sendNeedsStaff: "Send: pick the staff member",
+  sendNeedsSubsidiary: "Send: name the subsidiary",
   /**
    * ⭐ THE RECORDED INTENT, ASKED AT CREATION (0549) — and the reason it is a
    * QUESTION rather than a derivation.
@@ -51,19 +51,17 @@ export const MANUAL_PURCHASE_WORDS = {
    * ever wrote it, so every request stored NULL and not one Unit could be
    * allocated. This is the question that feeds them.
    *
-   * ⛔ NO DEFAULT. A pre-selected answer is a guess wearing the operator's
-   * name, which is the exact thing the ruling bans; the field starts empty and
-   * `Send` names the gap like every other missing header fact.
+   * The field starts empty and `Send` names the gap like every other missing
+   * header fact. One owner exception (Jess, 2026-09-28): a `Ready Stock`
+   * purpose answers `No, buy new stock` by itself; the requester may change it.
    *
-   * The words reuse the vocabulary the read-only reasons already carry —
-   * `This purchase buys extra stock` and `whether stock can answer it` — so
-   * the question and its later consequence read as one sentence rather than
-   * two dialects.
+   * Plain words (Jess, 2026-09-28, "what mean can answer this?"): the question
+   * says what the person decides, use the stock we have or buy new.
    */
-  canStockAnswer: "Can stock answer this?",
-  canStockAnswerYes: "Yes — existing stock can answer this",
-  canStockAnswerNo: "No — this buys extra stock",
-  sendNeedsStockAnswer: "Send — say whether stock can answer this",
+  canStockAnswer: "Use stock we already have?",
+  canStockAnswerYes: "Yes, use our free stock first",
+  canStockAnswerNo: "No, buy new stock",
+  sendNeedsStockAnswer: "Send: say whether to use our stock",
   cancel: "Cancel",
   /** The Deliver To door on an existing request (0421): the text button that
    *  opens the choice, and the act that closes it. */
@@ -83,7 +81,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * rename is not a licence to respell another's stored history.
    */
   secCreateRequestDetails: "Request Details",
-  secCreateDelivery: "Delivery",
+  secCreateDelivery: "Supplier Delivery",
   secCreateItems: "Items",
   /** The create form's word for the purpose — the Register's own column word,
    *  so the operator meets ONE name for one fact on the two surfaces they use
@@ -91,7 +89,7 @@ export const MANUAL_PURCHASE_WORDS = {
   createPurpose: "Purpose",
   /** The create form's Deliver To, capitalised as the dictionary spells the
    *  fact (`Deliver To`); the listings say `Supplier Deliver To`. */
-  createDeliverTo: "Deliver To",
+  createDeliverTo: "Supplier Deliver To",
   /** The requester, named on the create form the way the Register names them.
    *  It is a FACT the server stamps, never a control. */
   createRequestedBy: "Requested By",
@@ -121,7 +119,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * retired from every surface.
    */
   proceedDate: "Proceed Date",
-  deliveryDate: "Delivery Date",
+  deliveryDate: "Supplier Delivery Date",
   deliverTo: "Deliver to",
   raisedBy: "Raised by",
   /** Card 04 — ONLY `Other Purchase` asks this; routine purposes stopped
@@ -141,10 +139,12 @@ export const MANUAL_PURCHASE_WORDS = {
    *  `Remark` was the retired To Order dialog's word and rode in with the
    *  port; the state, the input id and the payload always said `note`. */
   note: "Note",
-  alreadyHave: "WHAT WE ALREADY HAVE",
-  freeStock: "free stock",
-  alreadyOnPo: "already on PO",
-  stillNeeded: "still needed",
+  /** Sentence case over three framed facts headed `Free Stock` ·
+   *  `Already On PO` · `Still Needed` (the col* words below) — the Sales
+   *  Order kit, owner 2026-09-27. */
+  alreadyHave: "What we already have",
+  /** The hint under `Still Needed` when it is 0. */
+  mayNotBeNeeded: "This request may not be needed at all.",
   /**
    * THE PERMANENT REGISTER'S NINE COLUMNS — the settled design, owner
    * ruling 2026-09-11, exactly and in this order:
@@ -202,6 +202,12 @@ export const MANUAL_PURCHASE_WORDS = {
    * in `To buy`, says so, and cannot be ticked — unknown is never zero and
    * never complete (MASTER §9.2).
    */
+  /**
+   * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28 (§9.1/§9.2). A
+   * request that reads `Need PO` while its approval is still `Need approval`
+   * or `Sent back for changes` says so on Status line two.
+   */
+  statusNeedApprovalFirst: "Need approval first",
   remainderNotChecked: "Remaining quantity not checked",
   remainderNotCheckedWhy:
     "The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.",
@@ -222,9 +228,9 @@ export const MANUAL_PURCHASE_WORDS = {
    *  `Supplier Deliver To` (Purchasing UI dictionary, 2026-09-18) — the
    *  destination instructed to the supplier, which is not the customer's
    *  address and not the site the goods actually reach. */
-  colDeliverTo: "Deliver To",
+  colDeliverTo: "Supplier Deliver To",
   colSupplierDeliverTo: "Supplier Deliver To",
-  colDeliveryDate: "Delivery Date",
+  colDeliveryDate: "Supplier Delivery Date",
   /**
    * ── THE COLUMNS THE 2026-09-18 RULING ADDED ──────────────────────────────
    *
@@ -307,7 +313,7 @@ export const MANUAL_PURCHASE_WORDS = {
   expOrderedQty: "Ordered Qty",
   expStillToOrder: "Still To Order",
   expSupplier: "Supplier",
-  expDeliverTo: "Deliver To",
+  expDeliverTo: "Supplier Deliver To",
   expPoNo: "PO No",
   /** The goods row that is not on any purchase order yet. */
   goodsToPurchase: "To purchase",
@@ -354,7 +360,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * as a contradiction. Reference stock never reduces the request.
    */
   skuReferenceNote:
-    "For each SKU across Carres — free stock and open purchase orders. This request's own purchase orders are listed below. Stock shown here does not reduce what this request asks for.",
+    "For each SKU across Carres: free stock and open purchase orders. This request's own purchase orders are listed below. Stock shown here does not reduce what this request asks for.",
   /** Approval — the decision facts and controls. */
   approve: "Approve",
   refuse: "Refuse",

@@ -153,7 +153,7 @@ export function StopsEditor({
             halt(e);
             onDone();
           }}
-          title="Done — close the route editor (the route is kept)"
+          title="Done. Close the route editor (the route is kept)"
           className="inline-flex items-center gap-1 text-meta font-semibold text-base-600 hover:text-base-900 bg-white border border-base-200 rounded-full px-2.5 py-0.5 shrink-0 ml-1"
         >
           ✓ Done

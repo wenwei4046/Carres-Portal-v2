@@ -54,7 +54,7 @@ export default function StockTabs({ right }: { right?: ReactNode } = {}) {
     <ModuleHeader
       testId="stock-tabs"
       word={activeLabel}
-      docTitle={`${activeLabel} · Warehouse — Carres`}
+      docTitle={`${activeLabel} · Warehouse · Carres`}
       destinationHeader
       right={right}
     />

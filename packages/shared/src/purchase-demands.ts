@@ -136,7 +136,7 @@ export function purchaseDemandStateWords(
   return {
     can_order_early: "Can order early",
     safety_days_full: `${safetyDays} safety days left`,
-    safety_days_low: `1–${Math.max(safetyDays - 1, 1)} safety days left`,
+    safety_days_low: `1 to ${Math.max(safetyDays - 1, 1)} safety days left`,
     safety_days_none: "No safety days left",
     /* Card 02-C (owner ruling 2026-08-27): `days`, never `time` — the same
        unit the arithmetic itself counts in. The state KEY keeps its wire
@@ -271,6 +271,17 @@ export interface PurchaseDemandRow {
    * absent and says nothing rather than guessing.
    */
   fullyOnPo?: boolean;
+  /**
+   * ⭐ RESERVE GOODS ALREADY ON A PO — owner ruling 2026-09-28 (§9.1): "the
+   * operator may ignore it and tick the row to issue a new PO instead; the
+   * second line never blocks buying". TRUE when `fullyOnPo` comes ONLY from
+   * the anonymous open-PO pool — no line of this build has exact PO lineage
+   * (`po_line_sources`) — and an open PO holds goods for it that no order
+   * holds (the `Use this PO` offer). Such a build stays tickable and the issue
+   * door accepts it. Exact lineage and bound Units are still refused (0430).
+   * Computed by the server's one rule (`buildMayBuyOverPool`); optional.
+   */
+  poolOnly?: boolean;
   poNumbers: string[];
   toBuy: number | null;
   /**
@@ -895,6 +906,7 @@ export const purchaseDemandRowSchema = z.object({
   /* Optional on the wire: an older Worker sends none and the screen says
      nothing rather than guessing which kind of number `toBuy` is. */
   fullyOnPo: z.boolean().optional(),
+  poolOnly: z.boolean().optional(),
   poNumbers: z.array(z.string()),
   toBuy: z.number().nullable(),
   goodsMustArrive: z.string().nullable(),

@@ -245,7 +245,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
   };
 
   const header = <SalesOrderTabs identity="New journal entry" backLabel="Journal" backTo="?"
-    docTitle="New journal entry — Carres"
+    docTitle="New journal entry · Carres"
     onBack={(event) => { event.preventDefault(); onBack(); }} />;
 
   if (chart.isError) {
@@ -312,7 +312,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" disabled={gap !== null} onClick={askFirst}>
-            {gap ? `Record journal entry — ${gap}` : "Record journal entry"}
+            {gap ? `Record journal entry: ${gap}` : "Record journal entry"}
           </Button>
           <Button variant="ghost" onClick={onBack}>Back to Journal</Button>
         </div>

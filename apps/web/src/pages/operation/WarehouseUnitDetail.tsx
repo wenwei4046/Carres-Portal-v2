@@ -18,7 +18,7 @@ import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { Block } from "./SalesOrderWorkspace";
+import Block from "@/components/kit/Block";
 import WarehouseUnitProblemReport from "./WarehouseUnitProblemReport";
 
 /**
@@ -176,7 +176,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
         ) : unit ? (
           <div className="flex flex-col gap-6">
             {/* ── STOCK DETAILS — owner words 2026-09-25 ─────────────────── */}
-            <Block titleTone="sales-order" title="Stock Details">
+            <Block title="Stock Details">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Fact label="Inventory Status">{status}</Fact>
                 <Fact label="Stock Condition">{stockConditionOf(unit)}</Fact>
@@ -201,7 +201,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
                 {unit.qty > 1 ? (
                   <Fact label="Pieces in this record" span>
                     <span className="text-kit-amber-11">
-                      {unit.qty} pieces — this record stands for all of them, so no
+                      {unit.qty} pieces. This record stands for all of them, so no
                       Sales Order can promise one of them by itself.
                     </span>
                   </Fact>
@@ -210,7 +210,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
             </Block>
 
             {/* ── DOCUMENTS ──────────────────────────────────────────────── */}
-            <Block titleTone="sales-order" title="Documents">
+            <Block title="Documents">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Fact label="PO No / Ref No">
                   {unit.poNo ? (
@@ -241,7 +241,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
             </Block>
 
             {/* ── CURRENT WORK — the one shared Work contract for this Unit ── */}
-            <Block titleTone="sales-order" title="Current work">
+            <Block title="Current work">
               {issuesQ.isLoading ? (
                 <p className="text-meta text-base-500">Loading…</p>
               ) : issuesQ.isError ? (
@@ -275,7 +275,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
             </Block>
 
             {/* ── HISTORY — append-only: receipts, departures, every change ── */}
-            <Block titleTone="sales-order" title="History">
+            <Block title="History">
               <div className="flex flex-col gap-4">
                 <section>
                   <h3 className="text-label text-kit-slate-11">Site visits</h3>
@@ -324,8 +324,14 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
                         <li key={e.id} className="flex flex-wrap items-baseline gap-3 py-2">
                           <span className="w-44 shrink-0 text-meta text-base-500">{fmtDate(e.eventAt, { time: true })}</span>
                           <span className="text-meta text-base-900">{EVENT_LABEL[e.event] ?? e.event}</span>
-                          {e.fromValue || e.toValue ? (
-                            <span className="text-meta text-base-600">{e.fromValue ?? "—"} → {e.toValue ?? "—"}</span>
+                          {/* No dash stands in for a value (owner ruling 2026-09-26):
+                              a change with only a new value prints that value alone. */}
+                          {e.fromValue && e.toValue ? (
+                            <span className="text-meta text-base-600">{e.fromValue} → {e.toValue}</span>
+                          ) : e.toValue ? (
+                            <span className="text-meta text-base-600">{e.toValue}</span>
+                          ) : e.fromValue ? (
+                            <span className="text-meta text-base-600">was {e.fromValue}</span>
                           ) : null}
                           {e.note ? <span className="text-meta text-base-500">{e.note}</span> : null}
                         </li>

@@ -177,7 +177,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
   const { data, isLoading } = useOrderControl(orderId);
   const save = useSaveOrderControl(orderId, {
     onSuccess: () => toast.success("Control fields saved"),
-    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't save: ${e.message}`),
   });
 
   const loaded: Draft = useMemo(() => {
@@ -376,11 +376,11 @@ export function RoutingFields({
   );
   const setLogistic = useSetOpsAssignedLogistic(_orderId, {
     onSuccess: () => toast.success("Logistics updated"),
-    onError: (e) => toast.error(`Couldn't set logistic — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't set logistic: ${e.message}`),
   });
   const setDate = useOperationSetDeliveryDate(_orderId, {
     onSuccess: () => toast.success("Delivery date updated"),
-    onError: (e) => toast.error(`Couldn't set date — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't set date: ${e.message}`),
   });
 
   const area = areaForAddress(customerAddress);
@@ -410,7 +410,7 @@ export function RoutingFields({
             }
             className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
           >
-            <option value="">— pick logistics —</option>
+            <option value="">Logistics</option>
             {partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -545,7 +545,7 @@ export function StorageExtensionRow({
       // deliveryReasonLabel passes those through as-is).
       const reasonLabel = deliveryReasonLabel(control?.extension_reason);
       const reasonText = control?.extension_note
-        ? `${reasonLabel} — ${control.extension_note}`
+        ? `${reasonLabel}: ${control.extension_note}`
         : reasonLabel;
       const blob = await renderExtensionAgreementPdf({
         order_code: meta?.orderCode ?? "",
@@ -558,7 +558,7 @@ export function StorageExtensionRow({
       });
       window.open(URL.createObjectURL(blob), "_blank");
     } catch (e) {
-      toast.error(`Couldn't open agreement — ${(e as Error).message}`);
+      toast.error(`Couldn't open agreement: ${(e as Error).message}`);
     }
   };
 
@@ -567,7 +567,7 @@ export function StorageExtensionRow({
       toast.success("Storage extension recorded");
       setOpen(false);
     },
-    onError: (e) => toast.error(`Couldn't extend — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't extend: ${e.message}`),
   });
 
   const [open, setOpen] = useState(false);
@@ -764,15 +764,15 @@ export function StorageCollectWaiver({
   const waiverStatus = control?.storage_waiver_status ?? "none";
 
   const collect = useCollectStorage(orderId, {
-    onSuccess: () => toast.success("Storage fee collected — receipt issued"),
-    onError: (e) => toast.error(`Couldn't collect — ${e.message}`),
+    onSuccess: () => toast.success("Storage fee collected. Receipt issued"),
+    onError: (e) => toast.error(`Couldn't collect: ${e.message}`),
   });
   const requestWaiver = useRequestStorageWaiver(orderId, {
-    onSuccess: () => toast.success("Release requested — the manager decides"),
-    onError: (e) => toast.error(`Couldn't request — ${e.message}`),
+    onSuccess: () => toast.success("Release requested. The manager decides"),
+    onError: (e) => toast.error(`Couldn't request: ${e.message}`),
   });
   const decideWaiver = useDecideStorageWaiver(orderId, {
-    onError: (e) => toast.error(`Couldn't decide — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't decide: ${e.message}`),
   });
 
   const [collecting, setCollecting] = useState(false);
@@ -1001,7 +1001,7 @@ export function StorageCollectWaiver({
 
         {waiverStatus === "rejected" && (
           <div className="text-meta text-danger">
-            Release rejected — collect the storage fee before this order goes out.
+            Release rejected. Collect the storage fee before this order goes out.
           </div>
         )}
       </div>
@@ -1052,7 +1052,7 @@ function AreaBadge({ area }: { area: "KV" | "Outstation" | "Unknown" }) {
         ? "Klang Valley"
         : area === "Outstation"
           ? "Outstation"
-          : "Area —"}
+          : "Area unknown"}
     </span>
   );
 }

@@ -225,7 +225,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** Delivery's arrangement per order (leg 0) — THE booking fact (owner
    *  decision 2026-09-25, Workspace §5.9 gap 6). Absent ⇒ the legacy booking
    *  signal (a caller that has not read Delivery, e.g. an older test). */
-  arrangements?: ReadonlyMap<string, { confirmedDate: string | null }> | null;
+  arrangements?: ReadonlyMap<string, { confirmedDate: string | null; partnerId?: string | null }> | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -282,7 +282,11 @@ export function projectSalesOrdersFromModuleFacts(input: {
       stockStatusByLine: control?.line_stock_status ?? null,
       deliveryDate: row.delivery_date,
       deliveryDateTbd: row.delivery_date_tbd === true,
-      logisticsAssigned: Boolean(row.delivery_partner_id || row.ops_assigned_logistic),
+      /* Delivery OWNS the arrangement (correction 2026-08-24): the company
+         its leg-0 record names is assigned, as the Order Route reads it —
+         the order row's legacy columns alone raised `Assign logistics` on an
+         order the Route showed as assigned (SO-1333, 2026-09-28). */
+      logisticsAssigned: Boolean(arrangement?.partnerId || row.delivery_partner_id || row.ops_assigned_logistic),
       bookingStage: booking.stage,
       confirmedDate: booking.confirmedDate,
       deliveryOrderNumber: row.do_number,
@@ -510,7 +514,13 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
     const dates = [...new Set(arrivals.map((a) => a.arrival))].sort();
     /* The supplier's recorded channel: the one the current version was sent on. */
     const currentSend = (po.sends ?? []).find((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === version);
-    const channel = currentSend?.channel === "whatsapp" || currentSend?.channel === "email" ? currentSend.channel : null;
+    /* ⛔ NO SEND MARK, NO DAY-BEFORE CHECK (Purchasing §§5.6.1, 5.7). The
+       supplier cannot confirm a delivery for a PO it never received, and the
+       supplier-answer form is drawn only after the current version is marked
+       `PO sent to supplier`. Until then the PO acts through the PO window's
+       send line alone (Workspace BUILD finding 2026-09-28). */
+    if (!currentSend) return [];
+    const channel = currentSend.channel === "whatsapp" || currentSend.channel === "email" ? currentSend.channel : null;
     return dates.flatMap((date) => {
       const confirmedFor = (po.arrival_confirmations ?? []).some((c) =>
         c.po_version === version && c.for_date === date && !!po.destination_id && c.destination_id === po.destination_id)
@@ -1504,18 +1514,18 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
 async function readArrangements(
   c: Context<AppEnv>,
   orderIds: readonly string[],
-): Promise<Map<string, { confirmedDate: string | null }>> {
+): Promise<Map<string, { confirmedDate: string | null; partnerId: string | null }>> {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const out = new Map<string, { confirmedDate: string | null }>();
+  const out = new Map<string, { confirmedDate: string | null; partnerId: string | null }>();
   for (const batch of chunk([...orderIds], 100)) {
     const { data, error } = await sb
       .from("ops_delivery_arrangements")
-      .select("order_id, confirmed_date")
+      .select("order_id, confirmed_date, partner_id")
       .eq("leg", 0)
       .in("order_id", batch);
     if (error) throw new Error("Workspace delivery-arrangement source could not be read");
-    for (const row of (data ?? []) as Array<{ order_id: string; confirmed_date: string | null }>) {
-      out.set(row.order_id, { confirmedDate: row.confirmed_date });
+    for (const row of (data ?? []) as Array<{ order_id: string; confirmed_date: string | null; partner_id: string | null }>) {
+      out.set(row.order_id, { confirmedDate: row.confirmed_date, partnerId: row.partner_id });
     }
   }
   return out;

@@ -29,7 +29,7 @@
  * PURE — no I/O, no clock.
  */
 import { docNumber } from "./doc-number";
-import { goodsCategoryWordOf } from "./line-category";
+import { catalogCategoryWordOf } from "./line-category";
 import {
   receiveLineClaimProblems,
   RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
@@ -345,7 +345,15 @@ export interface WarehouseReceiptRow {
    *  (posted_by). Never collapsed into one name. */
   posted_duty_holder_name?: string | null;
   posted_duty_cover_name?: string | null;
-  posted_authority?: "grn_duty" | "cover" | "superuser" | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | null;
+  /** 0601 — Goods Received Date as a time point; null on an older record
+   *  (`Time not recorded`, never back-filled). */
+  goods_received_time?: string | null;
+  /** 0601 — the receiving party (see `receivedByWords`). */
+  received_by_kind?: "company" | "staff" | null;
+  received_by_name?: string | null;
+  /** 0601 — the version an amendment starts from (first save wins). */
+  revision?: number;
   void_at?: string | null;
   void_by_name?: string | null;
   void_reason?: string | null;
@@ -554,13 +562,13 @@ export function receivingSaveBlocker(d: {
   claimProblems: readonly ReceiveLineClaimProblem[];
 }): string | null {
   if (d.doNumber.trim().length < WAREHOUSE_DO_NUMBER_MIN)
-    return "Save — add a DO number";
-  if (!d.doFilePath) return "Save — upload signed DO";
-  if (d.counted === 0) return "Save — count at least one unit";
+    return "Save: add a DO number";
+  if (!d.doFilePath) return "Save: upload signed DO";
+  if (d.counted === 0) return "Save: count at least one unit";
   if (d.overCounted)
-    return "Save — lower Receive now, the line counts more than is owed";
+    return "Save: lower Receive now, the line counts more than is owed";
   if (d.claimProblems.length > 0)
-    return `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[d.claimProblems[0]].toLowerCase()}`;
+    return `Save: ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[d.claimProblems[0]].toLowerCase()}`;
   return null;
 }
 
@@ -584,15 +592,14 @@ export const RECEIVING_CATEGORY_ROWS = [
 export type ReceivingCategoryRow = (typeof RECEIVING_CATEGORY_ROWS)[number];
 
 /**
- * The category words ONE receiving record answers to — derived through the
- * governed shared ladder (`goodsCategoryWordOf`: recorded → catalog →
- * classifier), never a receiving-local SKU rule. Only lines the delivery
+ * The category words ONE receiving record answers to — the Catalog's own
+ * category through `catalogCategoryWordOf` (0601, owner 2026-09-28): never a
+ * SKU-text guess, never a receiving-local rule. Only lines the delivery
  * actually counted (good, damaged or wrong) speak; a zero line is the PO's
  * fact, not this arrival's. Returned in the rail's own order, unique.
  *
  * `categoryBySku` is the catalog's answer (`product_models.category` via the
- * one shared reader); an absent SKU falls to the ladder's measured-gap branch
- * exactly as the Sales Orders register does.
+ * one shared reader); an absent SKU lights no row.
  */
 export function receiptCategoryWords(
   lines: readonly WarehouseReceiptLine[] | null | undefined,
@@ -608,12 +615,9 @@ export function receiptCategoryWords(
       }) <= 0
     )
       continue;
-    seen.add(
-      goodsCategoryWordOf({
-        sku: l.sku,
-        category: categoryBySku.get(l.sku) ?? null,
-      }),
-    );
+    // 0601 · the Catalog's answer only — an unreadable category lights no
+    // row rather than a guessed one (owner ruling 2026-09-28).
+    seen.add(catalogCategoryWordOf(l.sku, categoryBySku.get(l.sku) ?? null));
   }
   return RECEIVING_CATEGORY_ROWS.filter((w) => seen.has(w));
 }
@@ -623,7 +627,25 @@ export const RECEIVING_AUTHORITY_LABEL: Record<string, string> = {
   grn_duty: "GRN Duty",
   cover: "GRN Duty cover",
   superuser: "Operations Superuser",
+  /** 0601 — every active Operation staff member may post (owner 2026-09-25). */
+  operation_staff: "Operation staff",
 };
+
+/**
+ * `Received by {company or staff name}` — the GRN receiver (owner ruling
+ * 2026-09-28). A partner-run Site names its operating company; a Carres-run
+ * Site names the staff member who saved. A shared login is never printed as a
+ * person, and a GRN saved before 0601 recorded no receiver: `Not recorded`.
+ * Never the posting actor relabelled.
+ */
+export function receivedByWords(r: {
+  received_by_kind?: "company" | "staff" | null;
+  received_by_name?: string | null;
+}): string {
+  if (r.received_by_kind === "company") return r.received_by_name ?? "Not recorded";
+  if (r.received_by_kind === "staff") return r.received_by_name ?? "Staff identity not recorded";
+  return "Not recorded";
+}
 
 // ── The Work Engine feed (owner-approved 2026-08-29 slice) ──────────────────
 

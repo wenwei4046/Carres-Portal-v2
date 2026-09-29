@@ -210,11 +210,11 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const cases: Array<[Record<string, unknown>, string]> = [
-      [{ customer: { name: "Raw Customer", addressUnknown: true } }, "Delivery address — ask the customer for the address before you save the order"],
-      [{ customer: { name: "Raw Customer", address: "12 Jalan A, KL", addressUnknown: false } }, "Delivery address — pick the State"],
-      [{ entryData: { fields: { referral: "Fair 2026" } } }, "Building type — pick the building the goods go to"],
-      [{ deliveryFloor: undefined }, "Floor — enter the floor the goods go to"],
-      [{ deliveryHasLift: undefined }, "Lift — say whether the building has a lift"],
+      [{ customer: { name: "Raw Customer", addressUnknown: true } }, "Delivery address: ask the customer for the address before you save the order"],
+      [{ customer: { name: "Raw Customer", address: "12 Jalan A, KL", addressUnknown: false } }, "Delivery address: pick the State"],
+      [{ entryData: { fields: { referral: "Fair 2026" } } }, "Building type: pick the building the goods go to"],
+      [{ deliveryFloor: undefined }, "Floor: enter the floor the goods go to"],
+      [{ deliveryHasLift: undefined }, "Lift: say whether the building has a lift"],
       [{ deliveryDate: null }, "Delivery date is required. Ask the customer for the date before you save the order."],
     ];
     for (const [over, word] of cases) {

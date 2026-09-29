@@ -250,7 +250,7 @@ describe("Inbound · the Site strip", () => {
     expect(screen.getByTestId("inbound-unmapped-note")).toHaveTextContent(
       "Ohana (1)",
     );
-    expect(screen.getByText("Ohana — no Site linked")).toBeInTheDocument();
+    expect(screen.getByText("Ohana: no Site linked")).toBeInTheDocument();
   });
 
   it("offers no receipt door where Carres never takes the goods in", async () => {
@@ -426,13 +426,14 @@ describe("Inbound · receiving happens here", () => {
     expect(screen.queryByTestId("inbound-receive-denied-PO-1")).toBeNull();
   });
 
-  it("refuses the door to an operator whose duty it is not", async () => {
+  it("offers no door to a viewer who is not Operation staff — and never says Not your duty today (0601)", async () => {
     h.duty = { allowed: false, loading: false };
     mount("&site=w");
     await screen.findByTestId("inbound-row-PO-1");
     expect(screen.getByTestId("inbound-receive-denied-PO-1")).toHaveTextContent(
-      "Not your duty today",
+      "Only Operation staff may save a receiving.",
     );
+    expect(screen.queryByText("Not your duty today")).toBeNull();
     expect(screen.queryByTestId("inbound-receive-PO-1")).toBeNull();
   });
 });
@@ -452,7 +453,7 @@ describe("Inbound · the list itself", () => {
     mount("&site=w&status=all");
     await waitFor(() =>
       expect(screen.getByTestId("inbound-page-range")).toHaveTextContent(
-        "Showing 1–1 of 1 arrangements",
+        "Showing 1 to 1 of 1 arrangements",
       ),
     );
     fireEvent.change(screen.getByLabelText("Arrival date from"), {
@@ -521,7 +522,7 @@ describe("Inbound · the listing fits the screen", () => {
     mount("&site=unmapped");
     await screen.findByRole("link", { name: "PO-2" });
     expect(screen.getByRole("button", { name: "To" })).toBeInTheDocument();
-    expect(screen.getByText("Ohana — no Site linked")).toBeInTheDocument();
+    expect(screen.getByText("Ohana: no Site linked")).toBeInTheDocument();
   });
 
   it("says WHICH date the from/to filter applies to", async () => {

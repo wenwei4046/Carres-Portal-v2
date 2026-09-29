@@ -41,9 +41,9 @@ import { skuMargin } from "../margin";
  */
 
 const TIER_LABELS: Record<FabricTierValue, string> = {
-  PRICE_1: "P1 – Base",
-  PRICE_2: "P2 – Mid",
-  PRICE_3: "P3 – Premium",
+  PRICE_1: "P1 Base",
+  PRICE_2: "P2 Mid",
+  PRICE_3: "P3 Premium",
 };
 
 function fmtRM(n: number): string {
@@ -404,7 +404,7 @@ function SofaComboHistoryModal({
           ))}
         </div>
         <p className="text-meta text-base-400">
-          A full price-change log (every edit versioned) isn&apos;t tracked yet — this shows the
+          A full price-change log (every edit versioned) isn&apos;t tracked yet. This shows the
           current version&apos;s key dates.
         </p>
       </div>
@@ -676,7 +676,7 @@ function SofaComboEditor({
           </div>
           {offeredCodes.length === 0 && (
             <p className="text-meta text-base-400 mb-2">
-              This model offers no compartments yet — tick some in Offered compartments above first.
+              This model offers no compartments yet. Tick some in Offered compartments above first.
             </p>
           )}
           <div className="flex flex-col gap-2">
@@ -901,7 +901,7 @@ function SlotCodePicker({
       {/* Selected chips */}
       <div className="flex flex-wrap gap-1.5 mb-1.5" data-testid={`${testId}-selected`}>
         {selected.length === 0 ? (
-          <span className="text-meta text-base-400">No codes — tick one or more below.</span>
+          <span className="text-meta text-base-400">No codes. Tick one or more below.</span>
         ) : (
           selected.map((code) => (
             <span

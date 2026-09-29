@@ -469,8 +469,8 @@ function POCard({
               }
               title={
                 supplierKind === "factory_pickup"
-                  ? "Factory pickup — skip ack and go straight to production"
-                  : "Skip ack — pending → in_production"
+                  ? "Factory pickup: skip ack and go straight to production"
+                  : "Skip ack: pending → in_production"
               }
             >
               Mark in production

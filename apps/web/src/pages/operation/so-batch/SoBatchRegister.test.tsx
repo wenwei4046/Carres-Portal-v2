@@ -701,8 +701,11 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     expect(screen.getByTestId("so-batch-select-cost-order")).toBeDisabled();
     fireEvent.click(screen.getByTestId("so-batch-expand-cost-order"));
     const box = await screen.findByTestId("so-batch-inspector-cost-order");
-    expect(within(box).getByText("Catalog cost is missing")).toBeInTheDocument();
-    expect(within(box).getByText("Set the cost of B1201S in Catalog")).toBeInTheDocument();
+    const panel = within(box).getByTestId("so-batch-blocker-build::cost::b1");
+    expect(within(panel).getByText("Catalog cost is missing")).toBeInTheDocument();
+    expect(within(panel).getByText("Set the cost of B1201S in Catalog")).toBeInTheDocument();
+    /* And the item line's own Status names the same fact (owner ruling 2026-09-28). */
+    expect(within(box).getByTestId("so-batch-line-status-why-cost-line")).toHaveTextContent("Catalog cost is missing");
   });
 
   it("a Partial order selects only its uncovered eligible remainder", () => {
@@ -976,7 +979,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     for (const word of [
       "Can order early",
       "14 safety days left",
-      "1–13 safety days left",
+      "1 to 13 safety days left",
       "No safety days left",
       "Not enough production days",
       "All products",
@@ -2459,5 +2462,172 @@ describe("a PO window opens pre-ticked (Purchasing §5.6.1, owner ruling 2026-09
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("so-batch-select-o1")).not.toBeChecked();
     expect(screen.getByTestId("selection-bar")).toHaveTextContent("2 Sales Orders");
+  });
+});
+
+/**
+ * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28, Purchasing §9.1.
+ *
+ * `Status` keeps its governed first line. When a `To buy` order cannot be
+ * ticked, line two says WHY in plain words — read from the same projection
+ * the refused tick reads — and, where a door exists, the next step.
+ */
+describe("the two-line Status rule", () => {
+  function blockedOrder(state: PurchaseDemandRow["state"], over: Partial<PurchaseDemandRow> = {}) {
+    const blocked = leaf({
+      id: `build::ob::${state}`,
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      lineIds: ["lb1"],
+      skus: ["B1201S-K"],
+      state,
+      ...over,
+    });
+    const order = orderRow({
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      status: "blank",
+      lines: [
+        { orderLineId: "lb1", sku: "B1201S-K", qty: 1, stockTaken: 0,
+          item: "Booqit", variant: "King", category: "mattress", pos: [] },
+      ],
+    });
+    return { rows: [blocked], registerRows: [order] };
+  }
+
+  it("a To-buy order blocked by a missing SKU reads `Need PO` · `SKU not found` · `Fix in Catalog`", () => {
+    renderRegister(blockedOrder("no_sku"));
+    const cell = screen.getByTestId("so-batch-status-ob");
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId("so-batch-status-why-ob")).toHaveTextContent("SKU not found");
+    const door = within(cell).getByRole("button", { name: "Fix in Catalog" });
+    fireEvent.click(door);
+    expect(navigate).toHaveBeenCalledWith("/operation?tab=op-catalog");
+    /* The door does not also open the row. */
+    expect(screen.queryByTestId("so-batch-inspector-ob")).not.toBeInTheDocument();
+  });
+
+  it("a missing production-days setting opens Purchasing Settings", () => {
+    renderRegister(blockedOrder("no_production_days"));
+    const cell = screen.getByTestId("so-batch-status-ob");
+    expect(cell).toHaveTextContent("Need PO");
+    expect(within(cell).getByTestId("so-batch-status-why-ob")).toHaveTextContent("Production days not set");
+    fireEvent.click(within(cell).getByRole("button", { name: "Open Settings" }));
+    expect(navigate).toHaveBeenCalledWith("/operation/settings/purchasing");
+  });
+
+  it("a missing customer date names the fact and offers no door", () => {
+    renderRegister(blockedOrder("no_customer_date"));
+    const cell = screen.getByTestId("so-batch-status-ob");
+    expect(within(cell).getByTestId("so-batch-status-why-ob")).toHaveTextContent("Customer delivery date is missing");
+    expect(within(cell).queryByRole("button")).toBeNull();
+  });
+
+  it("an order already covered by an open PO says so on Status, not only in PO Safety Days", () => {
+    renderRegister(blockedOrder("can_order_early", { fullyOnPo: true }));
+    expect(screen.getByTestId("so-batch-status-why-ob")).toHaveTextContent("Already on a PO");
+  });
+
+  /* ⭐ RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28). */
+  function coveredWithOffer(line: Record<string, unknown>) {
+    const base = blockedOrder("can_order_early", { fullyOnPo: true });
+    const order = base.registerRows[0]!;
+    return { ...base, registerRows: [{ ...order, lines: [{ ...order.lines[0]!, ...line }] }] };
+  }
+
+  it("a pool-covered line reads `{PO No} has {n} {Item} available.` with `Use this PO`, never `Already on a PO`", async () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    const cell = screen.getByTestId("so-batch-status-ob");
+    expect(cell).toHaveTextContent("Need PO");
+    const why = within(cell).getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(why).not.toHaveTextContent("Already on a PO");
+    fireEvent.click(within(why).getByRole("button", { name: "Use this PO" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/api/operation/purchase/demands/ready-stock/use-po",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    const call = apiFetch.mock.calls.find((c) => c[0] === "/api/operation/purchase/demands/ready-stock/use-po")!;
+    expect(JSON.parse((call[1] as { body: string }).body)).toEqual({
+      orderId: "ob", orderLineId: "lb1", poId: "PO260924-4827",
+    });
+    /* The door does not also open the row. */
+    expect(screen.queryByTestId("so-batch-inspector-ob")).not.toBeInTheDocument();
+  });
+
+  it("the offer never blocks buying: a pool-only line stays tickable and still shows `Use this PO`", () => {
+    const base = blockedOrder("can_order_early", { fullyOnPo: true, poolOnly: true, orderBy: "2026-10-01" });
+    const order = base.registerRows[0]!;
+    renderRegister({
+      ...base,
+      registerRows: [{ ...order, lines: [{ ...order.lines[0]!, poOffer: { poId: "PO260924-4827", qty: 2 } }] }],
+    });
+    expect(screen.getByTestId("so-batch-select-ob")).not.toBeDisabled();
+    const why = screen.getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(within(why).getByRole("button", { name: "Use this PO" })).toBeInTheDocument();
+  });
+
+  it("a line covered by exact lineage (no poolOnly) stays refused", () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+  });
+
+  it("the item line carries the same offer and door", async () => {
+    renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+    const box = await screen.findByTestId("so-batch-inspector-ob");
+    const why = within(box).getByTestId("so-batch-line-status-why-lb1");
+    expect(why).toHaveTextContent("PO260924-4827 has 2 Booqit King available.");
+    expect(within(why).getByRole("button", { name: "Use this PO" })).toBeInTheDocument();
+  });
+
+  it("a PO balance that could not be read says `Coverage not checked`, never a number", () => {
+    renderRegister(coveredWithOffer({ poOfferUnread: true }));
+    const why = screen.getByTestId("so-batch-status-why-ob");
+    expect(why).toHaveTextContent("Coverage not checked");
+    expect(within(why).queryByRole("button")).toBeNull();
+  });
+
+  it("goods reserved on a PO read `No PO needed` · `{n} {Item} on {PO No} is reserved for this order.`", async () => {
+    const order = orderRow({
+      orderId: "or",
+      so: 1501,
+      customer: "RESERVED ONE",
+      status: "blank",
+      lines: [
+        { orderLineId: "lr1", sku: "B1201S-K", qty: 1, stockTaken: 0, item: "Booqit", variant: "King",
+          category: "mattress", pos: [], poReserved: [{ poId: "PO260924-4827", qty: 1 }] },
+      ],
+    });
+    renderRegister({ rows: [], registerRows: [order] });
+    const cell = screen.getByTestId("so-batch-status-or");
+    expect(cell).toHaveTextContent("No PO needed");
+    expect(within(cell).getByTestId("so-batch-status-why-or"))
+      .toHaveTextContent("1 Booqit King on PO260924-4827 is reserved for this order.");
+    fireEvent.click(screen.getByTestId("so-batch-expand-or"));
+    const box = await screen.findByTestId("so-batch-inspector-or");
+    expect(within(box).getByTestId("so-batch-line-status-why-lr1"))
+      .toHaveTextContent("1 Booqit King on PO260924-4827 is reserved for this order.");
+  });
+
+  it("a tickable order carries no second line", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent(/^Need PO$/);
+    expect(screen.queryByTestId("so-batch-status-why-o1")).toBeNull();
+  });
+
+  it("the item line's Status carries the same second line and door", async () => {
+    renderRegister(blockedOrder("no_sku"));
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+    const box = await screen.findByTestId("so-batch-inspector-ob");
+    const status = within(box).getByTestId("goods-status-lb1").closest("td")!;
+    expect(status).toHaveTextContent("Need PO");
+    expect(status).toHaveTextContent("SKU not found");
+    expect(within(status).getByRole("button", { name: "Fix in Catalog" })).toBeInTheDocument();
   });
 });

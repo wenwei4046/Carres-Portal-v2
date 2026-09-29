@@ -322,7 +322,7 @@ export default function ServiceCaseWizard({
               {order && (
                 <div>
                   <p className="text-meta mb-2 uppercase tracking-wider text-base-500">
-                    {order.so} · {order.customerName} — tap the item with the problem
+                    {order.so} · {order.customerName}. Tap the item with the problem
                   </p>
                   {order.lines.length === 0 ? (
                     <p className="text-body text-base-500">

@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   arrivalReceivingInput,
   buildGrnRegisterView,
-  goodsCategoryWordOf,
+  catalogCategoryWordOf,
   poSupplierDeliveryDateOf,
   receiptCategoryWords,
   receivingAmendInput,
@@ -140,6 +140,10 @@ async function readByIds<T>(
  *  list cannot quietly read two different rows. */
 const RECEIPT_FIELDS =
   "po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason";
+/** 0601 — the arrival time point, the receiver and the amendment version. */
+const RECEIPT_FIELDS_0601 =
+  "goods_received_time, received_by_kind, received_by_name, revision";
+const RECEIPT_SELECT_0601 = `id, arrival_source_id, ${RECEIPT_FIELDS}, ${RECEIPT_FIELDS_0601}`;
 const RECEIPT_SELECT = `id, arrival_source_id, ${RECEIPT_FIELDS}`;
 /** `arrival_source_id` lands with the arrival-source tables, still an
  *  unnumbered draft (docs/stock/MASTER.md §13.9). Until they exist every
@@ -151,12 +155,17 @@ const RECEIPT_SELECT_WITHOUT_ARRIVAL = `id, ${RECEIPT_FIELDS}`;
  *  column when the deployed schema does not carry it. Any other error is the
  *  caller's to handle unchanged. */
 async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> {
-  try {
-    return await run(RECEIPT_SELECT);
-  } catch (error) {
-    if (!isMissingRelationError(error)) throw error;
-    return run(RECEIPT_SELECT_WITHOUT_ARRIVAL);
+  // 0601's columns first; a schema that does not carry them yet (the Worker
+  // deploys on merge, the migration is applied through its governed path)
+  // still opens every record, reading `Time not recorded` and no receiver.
+  for (const select of [RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
+    try {
+      return await run(select);
+    } catch (error) {
+      if (!isMissingRelationError(error)) throw error;
+    }
   }
+  return run(RECEIPT_SELECT_WITHOUT_ARRIVAL);
 }
 
 /**
@@ -625,10 +634,8 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     for (const sku of pageSkus) {
       lineInfo[sku] = {
         description: productWordBySku.get(sku) ?? null,
-        category: goodsCategoryWordOf({
-          sku,
-          category: scanCatalog.get(sku) ?? null,
-        }),
+        // 0601 · the Catalog's category, or `Not recorded` — never a guess.
+        category: catalogCategoryWordOf(sku, scanCatalog.get(sku) ?? null),
       };
     }
 
@@ -1049,6 +1056,33 @@ warehouseReceiptsRouter.get("/duty", requireOperation, async (c) => {
 });
 
 /**
+ * GET /receiver?site= — who the GRN will name as `Received by` if the
+ * signed-in person saves at this Site (0601 `receiving_receiver_preview`, the
+ * SAME rule the posting trigger stamps). The form draws it as a grey automatic
+ * fact. A database without 0601 answers no receiver, and the form draws none.
+ */
+warehouseReceiptsRouter.get("/receiver", requireOperation, async (c) => {
+  const site = z.string().uuid().safeParse(c.req.query("site"));
+  if (!site.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "site must be a warehouse id", field: "site" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_receiver_preview", { p_site_id: site.data });
+  if (error) {
+    if ((error as { code?: string }).code === "PGRST202") return c.json({ receiver: null });
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const r = (data ?? null) as { kind?: "company" | "staff"; name?: string | null } | null;
+  return c.json({
+    receiver: r?.kind ? { kind: r.kind, name: r.name ?? null } : null,
+  });
+});
+
+/**
  * GET /:id — one Receiving Session / GRN record: the row, its per-Unit
  * results and its append-only events, names resolved.
  */
@@ -1207,10 +1241,9 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
     for (const sku of docSkus) {
       lineInfo[sku] = {
         description: descriptions.get(sku) ?? null,
-        category: goodsCategoryWordOf({
-          sku,
-          category: catalog.get(sku) ?? null,
-        }),
+        // 0601 · the Catalog's category, or `Not recorded` — never a guess
+        // (owner ruling 2026-09-28: the SMOKE item printed `Other goods`).
+        category: catalogCategoryWordOf(sku, catalog.get(sku) ?? null),
       };
     }
   }
@@ -1293,7 +1326,12 @@ warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, receivingAmendInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const d = parsed.data;
-  const changes: Record<string, unknown> = {};
+  // 0601 · the version this correction starts from — first save wins.
+  const changes: Record<string, unknown> = {
+    based_on_revision: d.basedOnRevision,
+  };
+  if (d.goodsReceivedTime !== undefined)
+    changes.goods_received_time = d.goodsReceivedTime;
   if (d.goodsReceivedAt !== undefined)
     changes.goods_received_at = d.goodsReceivedAt;
   if (d.doNumber !== undefined) changes.do_number = d.doNumber;
@@ -1306,6 +1344,12 @@ warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
       id: l.id,
       received_now: l.receivedNow,
     }));
+  // 0601 · the person names each exact Unit; the system never picks one.
+  if (d.units !== undefined)
+    changes.units = d.units.map((u) => ({
+      stock_item_id: u.stockItemId,
+      outcome: u.outcome,
+    }));
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("receiving_amend", {
     p_receipt_id: c.req.param("id"),
@@ -1315,6 +1359,18 @@ warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
   });
   if (error) {
     const m = mapPgError(error);
+    // 0601 · every locked Unit comes back by name with its own reason, so
+    // the form can mark each one (the RPC carries them in its HINT).
+    const hint = (error as { hint?: string | null }).hint;
+    if ((error as { details?: string }).details === "units_locked" && hint) {
+      try {
+        const units = JSON.parse(hint) as unknown;
+        if (Array.isArray(units))
+          return c.json({ ...m.body, units }, m.status);
+      } catch {
+        /* an unreadable hint still returns the named sentence */
+      }
+    }
     return c.json(m.body, m.status);
   }
   return c.json(data ?? {});

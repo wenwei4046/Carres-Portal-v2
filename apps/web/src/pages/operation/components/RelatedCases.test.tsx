@@ -85,7 +85,7 @@ describe("deriveRelatedCases", () => {
     expect(rows[0]).toMatchObject({
       kind: "guarantee_claim",
       ref: "ABCD123456",
-      title: "Guarantee claim — B1201S King",
+      title: "Guarantee claim: B1201S King",
       status: "Claimed",
       settled: true,
       guaranteeSearch: "ABCD123456",
@@ -118,7 +118,7 @@ describe("deriveRelatedCases", () => {
       guarantees: [gt({ displayId: null, coversLabel: null })],
     });
     expect(rows[0].ref).toBe("Guarantee");
-    expect(rows[0].title).toBe("Guarantee claim — Mattress Guarantee 15 Years");
+    expect(rows[0].title).toBe("Guarantee claim: Mattress Guarantee 15 Years");
     expect(rows[0].guaranteeSearch).toBeUndefined();
   });
 });

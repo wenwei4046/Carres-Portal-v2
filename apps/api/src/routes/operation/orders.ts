@@ -20,14 +20,9 @@ import {
   reselectPartnerInput,
   deliveryQueueLeads,
   myHolidaySet,
-  orderMoney,
   resolveBookingBrief,
   resolveCurrentCustomerCommitment,
-  resolveOrderCompletion,
   resolveUnitAllocation,
-  invoiceStorageSumOf,
-  storageHold,
-  storageObligation,
   salesOrderNumberWord,
   salesOrderParamOf,
   type AllocationUnit,
@@ -56,6 +51,12 @@ import { todayIsoMYT } from "../../lib/today";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import { chunk } from "../../lib/purchase-demand-read";
+import {
+  completionOfOrder,
+  type CompletionOrderRow,
+  type CompletionReads,
+  type CompletionUnitRow,
+} from "../../lib/order-completion";
 import type { AppEnv } from "../../types";
 
 /**
@@ -791,6 +792,130 @@ operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
  * Declared BEFORE `/:id`, which would otherwise read the word as an order id.
  */
 const MONTHLY_DEMAND_PAGE = 1000;
+/**
+ * GET /register-facts — the Order list's two server-owned fact filters
+ * (Orders MASTER §Left rail, owner approved 2026-09-22):
+ *
+ *   obligations  `outstanding` | `none` — CARD 8's derived completion through
+ *                the ONE composition the object page calls (`completionOfOrder`):
+ *                goods, money in (with storage), money out, loan.
+ *   cases        `open` | `closed` | `none` — Service's own truth
+ *                (`service_case_statuses.is_closed`); an unreadable read is
+ *                `null`, never `none`.
+ *
+ * Same population as the Register (`salesOrderRegisterPopulation`). Read-only;
+ * a fact this reader could not establish is left out, never guessed.
+ */
+operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  type OrderRow = CompletionOrderRow;
+  const orders: OrderRow[] = [];
+  for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+    const { data, error } = await salesOrderRegisterPopulation(
+      sb
+        .from("orders")
+        .select(
+          "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+        ),
+    )
+      .order("id", { ascending: true })
+      .range(from, from + MONTHLY_DEMAND_PAGE - 1);
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    const page = (data ?? []) as unknown as OrderRow[];
+    orders.push(...page);
+    if (page.length < MONTHLY_DEMAND_PAGE) break;
+  }
+  const ids = orders.map((o) => o.id);
+  const idBySoRef = new Map(orders.map((o) => [`SO-${o.so}`, o.id]));
+
+  /* Every row of a batched `.in()` read, paged so no cap hides a row. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const readAll = async <T,>(query: (batch: string[]) => any, keys: string[]): Promise<T[] | null> => {
+    const out: T[] = [];
+    for (const batch of chunk(keys, 100)) {
+      if (batch.length === 0) continue;
+      for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
+        const { data, error } = await query(batch).order("id", { ascending: true }).range(from, from + MONTHLY_DEMAND_PAGE - 1);
+        if (error) return null;
+        const page = (data ?? []) as T[];
+        out.push(...page);
+        if (page.length < MONTHLY_DEMAND_PAGE) break;
+      }
+    }
+    return out;
+  };
+  const UNIT_FIELDS = "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at, reserved_ref, sold_order_id";
+  type UnitRow = CompletionUnitRow & { reserved_ref: string | null; sold_order_id: string | null };
+  const [reserved, sold, refunds, loans, invoices, cases] = await Promise.all([
+    readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "reserved").in("reserved_ref", b), [...idBySoRef.keys()]),
+    readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "sold").in("sold_order_id", b), ids),
+    readAll<{ order_id: string; status: CompletionReads["refunds"][number]["status"] }>((b) => sb.from("order_refunds").select("id, order_id, status").in("order_id", b), ids),
+    readAll<{ order_id: string } & CompletionReads["loans"][number]>((b) => sb.from("ops_sofa_loans").select("id, order_id, status, source, returned_to_supplier_at").in("order_id", b), ids),
+    readAll<{ order_id: string } & NonNullable<CompletionReads["invoices"]>[number]>((b) => sb.from("invoices").select("id, order_id, kind, status, amount, tax_amount, voided_at").in("order_id", b), ids),
+    readAll<{ order_id: string; status: { is_closed: boolean | null } | Array<{ is_closed: boolean | null }> | null }>(
+      (b) => sb.from("service_cases").select("id, order_id, status:service_case_statuses(is_closed)").in("order_id", b),
+      ids,
+    ),
+  ]);
+
+  const byOrder = <T,>(rows: T[] | null, key: (r: T) => string | null | undefined) => {
+    const map = new Map<string, T[]>();
+    for (const r of rows ?? []) {
+      const id = key(r);
+      if (!id) continue;
+      map.set(id, [...(map.get(id) ?? []), r]);
+    }
+    return map;
+  };
+  /* Completion needs all five of its reads; one that failed leaves
+     `obligations` unknown for every order rather than half-computed. */
+  const completionReadable = reserved && sold && refunds && loans && invoices;
+  const unitsBy = byOrder([...(reserved ?? []), ...(sold ?? [])], (u) =>
+    u.status === "sold" ? u.sold_order_id : idBySoRef.get(u.reserved_ref ?? ""),
+  );
+  const refundsBy = byOrder(refunds, (r) => r.order_id);
+  const loansBy = byOrder(loans, (r) => r.order_id);
+  const invoicesBy = byOrder(invoices, (r) => r.order_id);
+  const casesBy = byOrder(cases, (r) => r.order_id);
+  const storageCats = completionReadable
+    ? await storageSkuCategories(sb, orders.flatMap((o) => (o.order_lines ?? []).map((l) => String(l.sku))))
+    : new Map<string, string>();
+  const asOf = todayIsoMYT();
+
+  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }> = {};
+  for (const o of orders) {
+    const obligations = completionReadable
+      ? completionOfOrder({
+          ord: o,
+          commitmentLines: (o.order_lines ?? []).map((l) => ({ sku: l.sku, qty: Number(l.qty) || 0 })),
+          units: unitsBy.get(o.id) ?? [],
+          refunds: refundsBy.get(o.id) ?? [],
+          loans: loansBy.get(o.id) ?? [],
+          invoices: (invoicesBy.get(o.id) ?? []) as CompletionReads["invoices"],
+          storageCategories: storageCats,
+          asOf,
+        }).noActionRequired
+        ? "none"
+        : "outstanding"
+      : null;
+    let caseFact: "open" | "closed" | "none" | null = null;
+    if (cases) {
+      const mine = casesBy.get(o.id) ?? [];
+      const closed = mine.map((row) => (Array.isArray(row.status) ? row.status[0]?.is_closed : row.status?.is_closed));
+      caseFact =
+        mine.length === 0
+          ? "none"
+          : closed.some((v) => v === false)
+            ? "open"
+            : closed.every((v) => v === true)
+              ? "closed"
+              : null;
+    }
+    facts[o.id] = { obligations, cases: caseFact };
+  }
+  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null } });
+});
+
 operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   type Row = {
@@ -1494,9 +1619,9 @@ operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
     const sourceRows = (sources.data ?? []) as Array<{ po_id: string }>;
     const poIds = [...new Set(sourceRows.map((row) => row.po_id).filter(Boolean))];
     if (poIds.length === 0) return { sources: [], purchaseOrders: [], receipts: [] };
-    const [pos, poLines, promises, confirmations, receipts] = await Promise.all([
+    const [pos, poLines, promises, confirmations, receipts, sends] = await Promise.all([
       sb.from("purchase_orders")
-        .select("id, status, supplier_id, destination_id, placed_at, official_delivery_date, eta_date, version").in("id", poIds),
+        .select("id, status, supplier_id, destination_id, placed_at, official_delivery_date, eta_date, version, suppliers(name)").in("id", poIds),
       sb.from("purchase_order_lines")
         .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty").in("po_id", poIds),
       sb.from("po_supplier_promises")
@@ -1506,14 +1631,18 @@ operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
         .select("po_id, po_version, for_date, destination_id").in("po_id", poIds),
       sb.from("warehouse_receipts")
         .select("id, po_id, grn_no, goods_received_at, status, lines").in("po_id", poIds),
+      /* Purchasing §5.6: only `confirmed_sent` for the current version is a sent PO (0377). */
+      sb.from("po_sends").select("po_id, po_version, kind").in("po_id", poIds),
     ]);
-    if (pos.error || poLines.error || promises.error || confirmations.error || receipts.error) return null;
+    if (pos.error || poLines.error || promises.error || confirmations.error || receipts.error || sends.error) return null;
     const ofPo = <T extends { po_id?: unknown }>(list: T[] | null, poId: string) =>
       (list ?? []).filter((row) => row.po_id === poId);
     return {
       sources: sources.data ?? [],
-      purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string }>).map((po) => ({
+      purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string; suppliers?: unknown }>).map(({ suppliers, ...po }) => ({
         ...po,
+        supplier_name: (Array.isArray(suppliers) ? suppliers[0] : suppliers as { name?: string } | null)?.name ?? null,
+        sends: ofPo(sends.data as Array<Record<string, unknown>>, po.id).map(({ po_id: _po, ...send }) => send),
         lines: ofPo(poLines.data as Array<Record<string, unknown>>, po.id).map(({ po_id: _po, ...line }) => line),
         promises: ofPo(promises.data as Array<Record<string, unknown>>, po.id),
         arrival_confirmations: ofPo(confirmations.data as Array<Record<string, unknown>>, po.id),
@@ -1777,94 +1906,22 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     }
   }
 
-  const units: AllocationUnit[] = ((unitsRes.data ?? []) as Array<{
-    id: string; unit_code: string | null; sku: string; status: string;
-    condition: string; warehouse_id: string | null; po_no: string | null;
-    qty: number | null; date_in: string | null; sold_at: string | null;
-  }>).map((r) => ({
-    id: r.id,
-    unitCode: r.unit_code,
-    sku: r.sku,
-    status: r.status as AllocationUnit["status"],
-    condition: r.condition,
-    warehouseId: r.warehouse_id,
-    poNo: r.po_no,
-    qty: r.qty ?? 1,
-    dateIn: r.date_in,
-    soldAt: r.sold_at,
-  }));
-
-  const allocation = resolveUnitAllocation({
-    orderId: id,
-    soRef,
-    commitmentLines: commitment.lines.map((l) => ({
-      sku: l.sku,
-      qty: Number(l.qty) || 0,
-    })),
-    units,
-  });
-
-  const lines = (ord.order_lines ?? []) as Array<{ sku: string; qty: number; unit_price: number | string | null }>;
-  const addons = (ord.order_addons ?? []) as Array<{ qty: number; unit_price: number | string | null }>;
-  const ctrl = Array.isArray(ord.ops_order_control)
-    ? (ord.ops_order_control[0] ?? null)
-    : (ord.ops_order_control as Record<string, unknown> | null);
-  const price = (x: { qty: number; unit_price?: number | string | null }) =>
-    Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
-  // CARD-2026-08-28 - the CATALOG owns which rate applies. This handler is
-  // NOT the detail endpoint, so it cannot borrow that one's `categoryBySku`;
-  // it takes its own bounded read through the same one shared reader. A SKU
-  // the catalog does not hold falls back to the parser, per line.
-  const storageCats = await storageSkuCategories(sb, lines.map((l) => String(l.sku)));
-  const hold = storageHold({
-    storageFrom:
-      ((ctrl?.extension_original_date as string | null) ??
-        (ctrl?.storage_from as string | null) ??
-        (ord.delivery_date as string | null)) || null,
-    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
-    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
-    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
-    skus: lines.map((l) => String(l.sku)),
-    categories: storageCats,
+  // CARD-2026-08-28 - the CATALOG owns which rate applies; a SKU the catalog
+  // does not hold falls back to the parser, per line.
+  const storageCats = await storageSkuCategories(
+    sb,
+    ((ord.order_lines ?? []) as Array<{ sku: string }>).map((l) => String(l.sku)),
+  );
+  // The ONE composition the Order list's Obligations filter also calls.
+  const completion = completionOfOrder({
+    ord: ord as unknown as CompletionOrderRow,
+    commitmentLines: commitment.lines.map((l) => ({ sku: l.sku, qty: Number(l.qty) || 0 })),
+    units: (unitsRes.data ?? []) as CompletionUnitRow[],
+    refunds: (refundsRes.data ?? []) as CompletionReads["refunds"],
+    loans: (loansRes.data ?? []) as CompletionReads["loans"],
+    invoices: (invoicesRes.data ?? []) as CompletionReads["invoices"],
+    storageCategories: storageCats,
     asOf: todayIsoMYT(),
-    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
-    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
-  });
-  // Gate convergence (2026-09-07): invoice-backed storage beats legacy C9
-  // when papers exist, netted so `paid` subtracts once (`storageObligation`,
-  // the ONE precedence law) — `owing`, never `fee`, survives on the legacy
-  // path exactly as before (collectedAt clears it; Law D readers agree).
-  const lineSum = lines.reduce((s, l) => s + price(l), 0);
-  const addonSum = addons.reduce((s, a) => s + price(a), 0);
-  const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
-  const storage = storageObligation({
-    invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-    goodsTotal: lineSum + addonSum,
-    paid: ord.paid,
-    legacyOwing: hold.owing,
-    legacyReleased: hold.released,
-  });
-  const money = orderMoney({
-    lineSum,
-    addonSum,
-    paid: ord.paid,
-    controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: storage.owing,
-    storageReleased: storage.released,
-  });
-
-  const completion = resolveOrderCompletion({
-    cancelled: ord.status === "cancelled",
-    allocation,
-    money: { outstanding: money.outstanding, known: money.known },
-    refunds: (refundsRes.data ?? []) as Array<{
-      status: "requested" | "approved" | "rejected" | "paid";
-    }>,
-    loans: (loansRes.data ?? []) as Array<{
-      status: "on_loan" | "returned";
-      source: "warehouse" | "supplier";
-      returned_to_supplier_at: string | null;
-    }>,
   });
 
   return c.json({ completion });
@@ -3105,7 +3162,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
         error: "rule_violation",
         code: "do_missing",
         message:
-          "No delivery order for this trip yet — the system issues it when the goods, logistics and date are ready.",
+          "No delivery order for this trip yet. The system issues it when the goods, logistics and date are ready.",
       },
       422,
     );
@@ -3158,7 +3215,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
 
   // customer_address may be null (customer_address_unknown=true on TBD/showroom orders);
   // template requires a string so coerce to "—" placeholder.
-  const customerAddress: string = ord.customer_address ?? "—";
+  const customerAddress: string = ord.customer_address ?? "";
 
   // Dealer block: inject warehouse address line if present, since the DO ships
   // FROM the dealer-affiliated HQ warehouse — useful as a "ship from" hint

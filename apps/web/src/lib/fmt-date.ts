@@ -202,3 +202,48 @@ export function appTodayIso(): string {
     parts.find((part) => part.type === type)?.value ?? "";
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
+
+/**
+ * The business DATE (`YYYY-MM-DD`) an instant falls on, in Carres' timezone —
+ * the date a Kuala Lumpur reader would say it happened on. A bare date passes
+ * through unchanged. Empty for an unusable input.
+ */
+export function appDateIsoOf(iso: string | null | undefined): string {
+  if (!iso) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/**
+ * A `datetime-local` input's value (`YYYY-MM-DDTHH:MM`) for an instant, read
+ * in Carres' timezone — so the field shows Kuala Lumpur time on any laptop.
+ * No instant = now.
+ */
+export function appDateTimeInput(iso?: string | null): string {
+  const d = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(d.getTime())) return "";
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const v = (t: Intl.DateTimeFormatPartTypes) => p.find((x) => x.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")}T${v("hour")}:${v("minute")}`;
+}
+
+/** The instant a `datetime-local` value names in Kuala Lumpur (UTC+08:00, no
+ *  daylight saving), as ISO with its offset — what the server stores. */
+export function appDateTimeInputToIso(value: string): string {
+  return `${value}:00+08:00`;
+}

@@ -82,6 +82,15 @@ identities and write no completion. Module filter rails do not copy those action
 
 ---
 
+**SHOWROOM DOCUMENT PURPOSE — APPROVED TARGET / NOT BUILT, Jess 2026-09-29.**
+Purchasing exposes Display Requests, Consignment Orders, Consignment Returns and Consignment Sale
+Notices. Staff record one arrangement; the system pre-fills the order to obtain supplier-owned
+goods and/or return to hand goods back. Keep these names and roles distinct. Do not merge them
+into Consignment Note or add another manual acknowledgement document. A same-supplier swap sends
+one combined instruction while receipt and return retain separate actual evidence. Receiving owns
+showroom receipt, Stock/physical handlers own custody/handover, Finance owns supplier billing.
+Existing identities and historical documents remain unchanged (Purchasing §§9.9–9.10).
+
 # §1 · The five ownership laws
 
 ### Law A · One record, one owner

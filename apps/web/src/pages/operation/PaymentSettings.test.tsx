@@ -134,9 +134,9 @@ describe("Settings → Payment (§16)", () => {
     show();
     await waitFor(() => expect(screen.getByRole("button", { name: "Add a payment method" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Add a payment method" }));
-    expect(screen.getByRole("button", { name: "Save method — type a name" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save method: type a name" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Probe Wallet" } });
-    expect(screen.getByRole("button", { name: "Save method — choose a money account" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save method: choose a money account" })).toBeDisabled();
     // The kit Select opens from the keyboard in jsdom (no PointerEvent).
     fireEvent.keyDown(screen.getByLabelText("Money account"), { key: "Enter" });
     fireEvent.keyDown(await screen.findByRole("option", { name: "1110 · Cash" }), { key: "Enter" });

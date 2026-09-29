@@ -168,7 +168,7 @@ export async function syncCompartmentSku(
       body: {
         error: "rule_violation",
         code: "sku_collision",
-        message: `Cannot auto-create compartment sku '${sku}' — it collides with an existing product. Rename the compartment code or the model key.`,
+        message: `Cannot auto-create compartment sku '${sku}'. It collides with an existing product. Rename the compartment code or the model key.`,
       },
     };
   }

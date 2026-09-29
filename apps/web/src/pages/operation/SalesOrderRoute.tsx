@@ -636,12 +636,26 @@ function Node({
         /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
            with the owner as a chip rather than a name inside the sentence. */
         <div
-          className="flex items-center gap-1.5 text-label"
-          style={{ height: ACTION_H }}
+          className="flex items-start gap-1.5 text-label"
           data-testid={`route-action-${node.id}`}
         >
-          {person && <OwnerChip person={person} />}
-          <span className="truncate text-label text-base-600">{node.action.label}</span>
+          {person && (
+            <span className="grid shrink-0 place-items-center" style={{ height: ACTION_H }}>
+              <OwnerChip person={person} />
+            </span>
+          )}
+          {/* A long instruction wraps under the chip; it never ends in "…". */}
+          <span className="text-label text-base-600">
+            {wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).map((row, i) => (
+              <span
+                key={i}
+                className="block whitespace-nowrap"
+                style={{ height: i === 0 ? ACTION_H : CONTEXT_H, lineHeight: `${i === 0 ? ACTION_H : CONTEXT_H}px` }}
+              >
+                {row}{" "}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 
@@ -834,7 +848,7 @@ export default function SalesOrderRoute({
     [],
   );
 
-  if (loading) return <Loading label="Opening the order route" />;
+  if (loading) return <RouteLoadingFrame />;
 
   return (
     <div className="flex flex-col gap-3" data-testid="sales-order-route">
@@ -904,9 +918,15 @@ export default function SalesOrderRoute({
       )}
 
       <div
-        ref={frame}
         data-testid="route-canvas"
-        className="relative h-[calc(100vh-260px)] min-h-[420px] overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+        className="relative flex h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+      >
+      {/* The map draws only ABOVE the control strip, so `− + ⛶` (bottom-left,
+          always visible) never sits on top of a node (Jess, SO-1365 check). */}
+      <div
+        ref={frame}
+        data-testid="route-viewport"
+        className="relative min-h-0 flex-1 overflow-hidden"
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest("[data-testid^='route-node-']")) return;
           drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
@@ -964,9 +984,12 @@ export default function SalesOrderRoute({
             />
           ))}
         </div>
+      </div>
 
-        {/* `− + ⛶`, bottom-left, always visible and keyboard-operable. */}
-        <div className="absolute bottom-3 left-3 flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
+        {/* `− + ⛶`, bottom-left, always visible and keyboard-operable, on the
+            canvas's own control strip. */}
+        <div className="flex h-11 shrink-0 items-center border-t border-kit-slate-5 bg-white px-3" data-testid="route-controls">
+        <div className="flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
           <button
             type="button"
             onClick={() => zoom(-1)}
@@ -995,6 +1018,22 @@ export default function SalesOrderRoute({
             <Maximize2 size={14} aria-hidden="true" />
           </button>
         </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Loading holds the canvas's final geometry (Orders MASTER § A READ FAILURE
+ *  HAS THREE FACES): the same framed box the map will fill, so nothing jumps. */
+export function RouteLoadingFrame() {
+  return (
+    <div
+      data-testid="route-loading"
+      className="relative flex h-[calc(100vh-260px)] min-h-[420px] items-start overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 p-6"
+    >
+      <div className="w-[208px] rounded-card border border-kit-slate-5 bg-white p-3">
+        <Loading variant="skeleton" lines={3} label="Opening the order route" />
       </div>
     </div>
   );

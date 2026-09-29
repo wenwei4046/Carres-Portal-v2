@@ -286,8 +286,15 @@ export type GrnTemplateData = {
   supplier_do_no: string;
   deliver_to: string;
   goods_arrived_at: string;
-  /** ISO date — the physical arrival date. */
+  /** ISO date — the physical arrival date, in Kuala Lumpur. */
   goods_received_on: string | null;
+  /** 0601 — the physical arrival clock, `HH:MM` in Kuala Lumpur. Null on an
+   *  older record: the paper prints `Time not recorded`, never a guess. */
+  goods_received_time?: string | null;
+  /** 0601 — `Received by {company or staff name}` (owner ruling 2026-09-28):
+   *  the operating company at a partner-run Site, the saving Carres staff
+   *  member at a Carres site. `Not recorded` on an older GRN. */
+  received_by?: string | null;
   lines: Array<{
     sku: string;
     /** Human words first (catalog variant); the caller falls back to the SKU. */

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, Printer } from "lucide-react";
 import {
+  receivedByWords,
   receivingDisplayNo,
   receivingExtraQty,
   receivingSummaryOf,
@@ -12,7 +13,12 @@ import {
   type ReceivingArrivalEvidence,
   type WarehouseReceiptLine,
 } from "@carres/shared";
-import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import {
+  appDateTimeInput,
+  appDateTimeInputToIso,
+  appTodayIso,
+  fmtDate,
+} from "@/lib/fmt-date";
 import {
   useOperationWarehouse,
   fetchReceivingSessionDetail,
@@ -79,11 +85,19 @@ export default function ReceivingRecord({
   const todayIso = useMemo(() => appTodayIso(), []);
   const previewDraft: GrnAmendDraft | null = useMemo(() => {
     if (!amending || !draft || !r) return null;
+    const originalTime = r.goods_received_time ? appDateTimeInput(r.goods_received_time) : "";
+    const changedUnits = Object.fromEntries(
+      Object.entries(draft.unitEdits).filter(
+        ([id, outcome]) =>
+          (r.unit_results ?? []).find((u) => u.stock_item_id === id)?.outcome !== outcome,
+      ),
+    );
     return {
       reason: draft.reason,
-      ...(draft.goodsReceivedAt !== (r.goods_received_at ?? "")
-        ? { goodsReceivedAt: draft.goodsReceivedAt }
+      ...(draft.goodsReceivedTime && draft.goodsReceivedTime !== originalTime
+        ? { goodsReceivedTime: appDateTimeInputToIso(draft.goodsReceivedTime) }
         : {}),
+      ...(Object.keys(changedUnits).length ? { units: changedUnits } : {}),
       ...(draft.doNumber.trim() !== r.do_number
         ? { doNumber: draft.doNumber.trim() }
         : {}),
@@ -143,6 +157,9 @@ export default function ReceivingRecord({
   const extraQty = receivingExtraQty(r.extra_lines);
   const cumulative = po ? receivingSummaryOf(po.purchase_order_lines) : null;
   const dutyAllowed = dutyQ.data?.allowed ?? false;
+  /** Amend and Void keep the GRN Duty authority (0601): the widened posting
+   *  rule of 2026-09-25 does not reach them. */
+  const mayAmend = dutyQ.data?.may_amend ?? dutyQ.data?.allowed ?? false;
   const displayNo = receivingDisplayNo(r);
   const hasIssue = totals.issue > 0;
 
@@ -166,7 +183,12 @@ export default function ReceivingRecord({
     if (!r.po_id) return;
     setDraft({
       reason: "",
-      goodsReceivedAt: r.goods_received_at ?? "",
+      goodsReceivedTime: r.goods_received_time ? appDateTimeInput(r.goods_received_time) : "",
+      unitEdits: Object.fromEntries(
+        (r.unit_results ?? [])
+          .filter((u) => u.outcome === "received" || u.outcome === "not_received")
+          .map((u) => [u.stock_item_id, u.outcome as "received" | "not_received"]),
+      ),
       doNumber: r.do_number,
       actualSiteId: r.actual_site_id ?? r.warehouse_id,
       arrivedAtName: null,
@@ -218,7 +240,7 @@ export default function ReceivingRecord({
       {r.status === "voided" && (
         <div className="mt-2 rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 py-2 text-body text-kit-slate-12" data-testid="void-banner">
           Cancelled {r.void_at ? fmtDate(r.void_at.slice(0, 10)) : ""}
-          {r.void_by_name ? ` by ${r.void_by_name}` : ""} —{" "}
+          {r.void_by_name ? ` by ${r.void_by_name}` : ""}:{" "}
           {r.void_reason ?? ""}. The record and its evidence are preserved;
           its stock consequences were reversed.
         </div>
@@ -226,7 +248,7 @@ export default function ReceivingRecord({
 
       {amending && draft && r.po_id ? (
         <AmendPanel
-          receipt={{...r,po_id:r.po_id}}
+          receipt={{ ...r, po_id: r.po_id }}
           lines={lines}
           draft={draft}
           onDraft={setDraft}
@@ -245,11 +267,23 @@ export default function ReceivingRecord({
               {r.actual_site_name ?? r.warehouse_name ?? ""}
             </Prop>
             <Prop label="Goods Received Date">
-              <span className="tabular-nums">
-                {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
-                {r.goods_received_at && /^\d{4}-\d{2}-\d{2}$/.test(r.goods_received_at) ? " · Time not recorded" : ""}
+              {/* 0601 · the physical arrival clock, in Kuala Lumpur; an older
+                  record keeps its date and says so — never back-filled. */}
+              <span className="tabular-nums" data-testid="record-goods-received">
+                {r.goods_received_time
+                  ? fmtDate(r.goods_received_time, { time: true })
+                  : r.goods_received_at
+                    ? `${fmtDate(r.goods_received_at)} · Time not recorded`
+                    : "Not recorded"}
               </span>
             </Prop>
+            {isGrn ? (
+              /* 0601 · `Received by {company or staff name}` (owner ruling
+                 2026-09-28) — a separate fact from the posting trio below. */
+              <Prop label="Received by">
+                <span data-testid="record-received-by">{receivedByWords(r)}</span>
+              </Prop>
+            ) : null}
             {r.submitted_from === "warehouse" && r.submitted_at ? (
               <Prop label="Count submitted">
                 <span className="tabular-nums">
@@ -414,7 +448,7 @@ export default function ReceivingRecord({
                   {x.sku}
                 </span>
                 <span className="w-40 text-right tabular-nums text-kit-amber-11">
-                  {x.qty} extra — not Inventory
+                  {x.qty} extra, not Inventory
                 </span>
               </div>
             ))}
@@ -458,7 +492,7 @@ export default function ReceivingRecord({
 
           {/* ── The governed doors — Amend is primary; Void hides in
                  More ▾ (owner correction §5: not a normal action). ──────── */}
-          {r.po_id && r.status === "posted" && dutyAllowed && !voiding && (
+          {r.po_id && r.status === "posted" && mayAmend && !voiding && (
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"
@@ -623,7 +657,7 @@ export default function ReceivingRecord({
           <div ref={setPane} data-testid="grn-pdf-pane" />
           {pdfError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-12">
-              The GRN preview could not be drawn — {pdfError}{" "}
+              The GRN preview could not be drawn: {pdfError}{" "}
               <button
                 type="button"
                 onClick={retry}
@@ -748,7 +782,7 @@ function SubmittedReview({
       ) : null}
       {!dutyAllowed ? (
         <p className="mt-1 text-label text-kit-slate-9" data-testid="review-duty-refusal">
-          Only GRN duty may save a receiving.
+          Only Operation staff may save a receiving.
         </p>
       ) : returning ? (
         <div className="mt-2">
@@ -823,7 +857,11 @@ function SubmittedReview({
  *  half can preview the proposed document live. */
 export interface AmendFormDraft {
   reason: string;
-  goodsReceivedAt: string;
+  /** 0601 · the arrival time as a KL `datetime-local` value; "" = unchanged
+   *  on an older record that never had a clock. */
+  goodsReceivedTime: string;
+  /** 0601 · each named Unit's outcome — Received ↔ Not received. */
+  unitEdits: Record<string, "received" | "not_received">;
   doNumber: string;
   actualSiteId: string;
   /** The chosen site's NAME — resolved by the select for the preview. */
@@ -846,10 +884,18 @@ function AmendPanel({
     id: string;
     po_id: string;
     goods_received_at?: string;
+    goods_received_time?: string | null;
     do_number: string;
     grn_no?: string | null;
     warehouse_id: string;
     actual_site_id?: string | null;
+    revision?: number;
+    unit_results?: Array<{
+      stock_item_id: string;
+      po_line_id?: string | null;
+      unit_code: string;
+      outcome: "received" | "received_with_issue" | "not_received";
+    }>;
   };
   lines: WarehouseReceiptLine[];
   draft: AmendFormDraft;
@@ -857,27 +903,60 @@ function AmendPanel({
   onClose: () => void;
 }) {
   const [err, setErr] = useState<string | null>(null);
+  /** 0601 · each locked Unit's own refusal, by Unit ID (the server names
+   *  them: reserved, on a DO, delivered or on a Supplier Claim). */
+  const [locked, setLocked] = useState<Record<string, string>>({});
   const [saveKey] = useState(() => crypto.randomUUID());
   const warehousesQ = useOperationWarehouse();
   const warehouses = warehousesQ.data?.warehouses ?? [];
   const amend = useReceivingAmendMutation(receipt.id, {
     onSuccess: onClose,
-    onError: (e) => setErr(e.message),
+    onError: (e) => {
+      setErr(e.message);
+      const units = (e as { body?: { units?: Array<{ unit_code: string; words: string }> } })
+        .body?.units;
+      setLocked(
+        Array.isArray(units)
+          ? Object.fromEntries(units.map((u) => [u.unit_code, u.words]))
+          : {},
+      );
+    },
   });
+
+  /** The Units this GRN recorded that may be corrected here. A Unit received
+   *  with an issue is corrected through its Supplier Claim, not here. */
+  const namedUnits = (receipt.unit_results ?? []).filter(
+    (u) => u.outcome === "received" || u.outcome === "not_received",
+  );
+  const unitLineIds = new Set(
+    (receipt.unit_results ?? []).map((u) => u.po_line_id).filter(Boolean),
+  );
+  const changedUnits = namedUnits.filter(
+    (u) => (draft.unitEdits[u.stock_item_id] ?? u.outcome) !== u.outcome,
+  );
+  const originalTime = receipt.goods_received_time
+    ? appDateTimeInput(receipt.goods_received_time)
+    : "";
+  const timeChanged =
+    draft.goodsReceivedTime !== "" && draft.goodsReceivedTime !== originalTime;
 
   const set = (patch: Partial<AmendFormDraft>) => onDraft({ ...draft, ...patch });
 
   const originalSiteId = receipt.actual_site_id ?? receipt.warehouse_id;
-  const changedLines = lines.filter(
+  // A line traced by Unit ID is corrected by naming its Units (0601): the
+  // system never picks a Unit, so it offers no bare quantity for that line.
+  const quantityLines = lines.filter((l) => !unitLineIds.has(l.id));
+  const changedLines = quantityLines.filter(
     (l) => (draft.lineEdits[l.id] ?? l.received_now) !== l.received_now,
   );
   const changedHeader =
-    draft.goodsReceivedAt !== (receipt.goods_received_at ?? "") ||
+    timeChanged ||
     draft.doNumber.trim() !== receipt.do_number ||
     draft.actualSiteId !== originalSiteId ||
     draft.doFilePath !== null ||
     draft.evidenceAdd.length > 0;
-  const nothingChanged = changedLines.length === 0 && !changedHeader;
+  const nothingChanged =
+    changedLines.length === 0 && changedUnits.length === 0 && !changedHeader;
 
   const FIELD =
     "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12";
@@ -887,7 +966,7 @@ function AmendPanel({
       <p className="text-label text-kit-slate-9">
         The original record is preserved; the correction and its reason join
         History, and the preview beside this form shows the corrected GRN with
-        its amendment marked — the number never changes. The GRN number, the
+        its amendment marked. The number never changes. The GRN number, the
         source PO/CO and the supplier cannot be amended: if those identities
         are wrong, use Void Receiving and start Receiving from the correct
         source. Damaged and wrong quantities are corrected through their
@@ -912,13 +991,18 @@ function AmendPanel({
           Goods Received Date
         </span>
         <span className="tabular-nums text-kit-slate-9">
-          {receipt.goods_received_at ? fmtDate(receipt.goods_received_at) : ""}
+          {receipt.goods_received_time
+            ? fmtDate(receipt.goods_received_time, { time: true })
+            : receipt.goods_received_at
+              ? `${fmtDate(receipt.goods_received_at)} · Time not recorded`
+              : "Not recorded"}
         </span>
         <span className="text-kit-slate-9">→</span>
         <input
-          type="date"
-          value={draft.goodsReceivedAt}
-          onChange={(e) => set({ goodsReceivedAt: e.target.value })}
+          type="datetime-local"
+          value={draft.goodsReceivedTime}
+          max={appDateTimeInput()}
+          onChange={(e) => set({ goodsReceivedTime: e.target.value })}
           aria-label="Goods Received Date"
           data-testid="amend-received-at"
           className={FIELD}
@@ -980,7 +1064,7 @@ function AmendPanel({
         />
         {draft.doFilePath ? (
           <p className="text-label text-kit-slate-11" data-testid="amend-do-file-ready">
-            Corrected DO ready — it replaces the paper on record when the
+            Corrected DO ready. It replaces the paper on record when the
             amendment is saved.
           </p>
         ) : null}
@@ -997,7 +1081,44 @@ function AmendPanel({
           testId="amend-evidence-add"
         />
       </div>
-      {lines.map((l) => (
+      {namedUnits.map((u) => (
+        /* 0601 · the person names each Unit, both ways. Original → Corrected. */
+        <div key={u.stock_item_id} className="receiving-details-row mt-1 flex flex-wrap items-center gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 break-words font-mono text-label text-kit-slate-9">
+            {u.unit_code}
+          </span>
+          <span className="w-24 text-kit-slate-9">
+            {RECEIVING_UNIT_OUTCOME_LABEL[u.outcome]}
+          </span>
+          <span className="text-kit-slate-9">→</span>
+          <select
+            value={draft.unitEdits[u.stock_item_id] ?? u.outcome}
+            onChange={(e) =>
+              set({
+                unitEdits: {
+                  ...draft.unitEdits,
+                  [u.stock_item_id]: e.target.value as "received" | "not_received",
+                },
+              })
+            }
+            aria-label={`Unit ${u.unit_code}`}
+            data-testid={`amend-unit-${u.stock_item_id}`}
+            className={FIELD}
+          >
+            <option value="received">{RECEIVING_UNIT_OUTCOME_LABEL.received}</option>
+            <option value="not_received">{RECEIVING_UNIT_OUTCOME_LABEL.not_received}</option>
+          </select>
+          {locked[u.unit_code] ? (
+            <span
+              className="basis-full text-label text-kit-red-11"
+              data-testid={`amend-unit-locked-${u.stock_item_id}`}
+            >
+              {u.unit_code} cannot change. {locked[u.unit_code]}
+            </span>
+          ) : null}
+        </div>
+      ))}
+      {quantityLines.map((l) => (
         <div key={l.id} className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 break-words font-mono text-label text-kit-slate-9">
             {l.sku}
@@ -1048,8 +1169,18 @@ function AmendPanel({
             amend.mutate({
               reason: draft.reason.trim(),
               saveKey,
-              ...(draft.goodsReceivedAt !== (receipt.goods_received_at ?? "")
-                ? { goodsReceivedAt: draft.goodsReceivedAt }
+              // 0601 · first save wins: the version this form was drawn from.
+              basedOnRevision: receipt.revision ?? 0,
+              ...(timeChanged
+                ? { goodsReceivedTime: appDateTimeInputToIso(draft.goodsReceivedTime) }
+                : {}),
+              ...(changedUnits.length
+                ? {
+                    units: changedUnits.map((u) => ({
+                      stockItemId: u.stock_item_id,
+                      outcome: draft.unitEdits[u.stock_item_id] ?? u.outcome,
+                    })) as Array<{ stockItemId: string; outcome: "received" | "not_received" }>,
+                  }
                 : {}),
               ...(draft.doNumber.trim() !== receipt.do_number
                 ? { doNumber: draft.doNumber.trim() }
@@ -1077,9 +1208,9 @@ function AmendPanel({
           {amend.isPending
             ? "Saving…"
             : draft.reason.trim().length < 3
-              ? "Save — add a correction reason"
+              ? "Save: add a correction reason"
               : nothingChanged
-                ? "Save — nothing changed yet"
+                ? "Save: nothing changed yet"
                 : "Save Amendment"}
         </button>
       </div>
@@ -1151,7 +1282,7 @@ function VoidPanel({
           {voidM.isPending
             ? "Voiding…"
             : reason.trim().length < 3
-              ? "Void — add a reason"
+              ? "Void: add a reason"
               : "Void Receiving"}
         </button>
       </div>

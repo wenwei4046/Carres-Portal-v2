@@ -151,6 +151,8 @@ export function GrnTemplate(data: GrnTemplateData) {
     deliver_to,
     goods_arrived_at,
     goods_received_on,
+    goods_received_time,
+    received_by,
     lines,
     unit_results,
     extra_lines,
@@ -169,7 +171,13 @@ export function GrnTemplate(data: GrnTemplateData) {
   const receiptRows: Array<[string, string | null]> = [
     ["GRN Doc Date", niceDate(grn_doc_date)],
     ["Goods arrived at", goods_arrived_at],
-    ["Goods Received Date", goods_received_on ? `${niceDate(goods_received_on)}${/^\d{4}-\d{2}-\d{2}$/.test(goods_received_on) ? " · Time not recorded" : ""}` : null],
+    // 0601 · the physical arrival clock in Kuala Lumpur; an older record
+    // keeps its date and says so, never a back-filled time.
+    ["Goods Received Date", goods_received_on
+      ? `${niceDate(goods_received_on)}${goods_received_time ? ` ${goods_received_time}` : " · Time not recorded"}`
+      : null],
+    // 0601 · `Received by {company or staff name}` (owner ruling 2026-09-28).
+    ["Received by", received_by ?? "Not recorded"],
   ];
 
   const quantities = [
@@ -291,7 +299,7 @@ export function GrnTemplate(data: GrnTemplateData) {
               <Text style={styles.descSku}>{l.sku}</Text>
               {outcomeRuns(l.unit_results ?? []).map((u) => (
                 <Text key={`${u.first}-${u.outcome}`} style={styles.unitLine}>
-                  <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
+                  <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null}: {u.outcome}
                 </Text>
               ))}
             </View>
@@ -329,7 +337,7 @@ export function GrnTemplate(data: GrnTemplateData) {
             <Text style={styles.blockLabel}>Unit results</Text>
             {outcomeRuns(unit_results ?? []).map((u) => (
               <Text key={`${u.first}-${u.outcome}`} style={[styles.unitLine, { paddingLeft: 0 }]}>
-                · <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null} — {u.outcome}
+                · <UnitCode code={u.first} />{u.last ? <> to <UnitCode code={u.last} /></> : null}: {u.outcome}
               </Text>
             ))}
           </View>
@@ -342,7 +350,7 @@ export function GrnTemplate(data: GrnTemplateData) {
             {(extra_lines ?? []).map((x, i) => (
               <Text key={`x-${i}`} style={[styles.noteText, { marginTop: mm(0.8) }]}>
                 · {x.sku} × {x.qty}
-                {x.note ? ` — ${x.note}` : ""} (recorded separately; not Inventory)
+                {x.note ? `: ${x.note}` : ""} (recorded separately; not Inventory)
               </Text>
             ))}
           </View>

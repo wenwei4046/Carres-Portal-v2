@@ -298,10 +298,10 @@ describe("each reference appears exactly once, and keeps its link", () => {
 describe("work the board cannot place", () => {
   it("says how many, in words that never imply lateness", () => {
     expect(undatedSummaryWordOf(20)).toBe(
-      "20 with no date yet — not shown on any column",
+      "20 with no date yet. Not shown on any column",
     );
     expect(undatedSummaryWordOf(1)).toBe(
-      "1 with no date yet — not shown on any column",
+      "1 with no date yet. Not shown on any column",
     );
     expect(undatedSummaryWordOf(20)).not.toMatch(/overdue|late/i);
   });
