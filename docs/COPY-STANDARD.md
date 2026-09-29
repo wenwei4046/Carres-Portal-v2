@@ -232,17 +232,17 @@ NOT BUILT; Workspace MASTER §4). The one global
 | Right Rail refresh failure — **retires with the rail My Work slot** | `My Work could not be refreshed` | No work due now · No open work |
 | Duty destination (owner-approved 2026-09-28; NOT BUILT) | `Settings → Staff & Duties` · page `Staff & Duties`, reached via `All System Settings`; contextual links open the exact Duty | Workspace main-menu Duty row · Duty roster |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |
-| Duty catalogue (owner-approved 2026-09-28; NOT BUILT) | Duty label + current holder name, `{acting person} covering for {normal owner}`, or `Not assigned`; future dates appear in detail | `Starts {date}` / `Ends {date}` in catalogue rows · a future cover shown as today's actor |
+| Duty catalogue (owner-approved 2026-09-28; NOT BUILT) | Duty label + today’s resolved person name (effective cover when present), or `Not assigned`; future dates appear in detail | `Starts {date}` / `Ends {date}` in catalogue rows · a future cover shown as today's actor |
 | Duty next primary assignment (owner-approved 2026-09-28; NOT BUILT) | `Next assignment` — person and effective dates; omit when none exists; does not change today's normal owner | Upcoming owner · a future person shown as current |
 | Duty record disclosure (owner-approved 2026-09-28; NOT BUILT) | `Assignment & cover history` — collapsed by default, all authorised records remain reachable; distinguish record time from effective dates | future terms described as already completed |
-| Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |
-| Duty assignment form (owner-approved 2026-09-28; NOT BUILT) | Read-only `Duty` · `Normal owner` · `Effective`; inputs `Holder` · `Effective from` · `Until` · `Note`; `Cancel` / `Assign holder` | a future holder presented as current · a save claimed before confirmation from the source |
-| Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
+| Duty current facts (owner correction 2026-09-29; NOT BUILT) | Duty name + current resolved person name + plain dates; one prominent person, with assignment/cover evidence retained in history | `Normal owner` · `Acting today` · `Who can act` · `Effective` labels and routine permission-explanation paragraphs |
+| Duty assignment form (owner-approved 2026-09-28; NOT BUILT) | Read-only `Duty` + current person name + plain dates; inputs `Holder` · `Effective from` · `Until` · `Note`; `Cancel` / `Assign holder` | a future holder presented as current · a save claimed before confirmation from the source |
+| Duty actions (menu placement owner-approved 2026-09-29; NOT BUILT) | Visible `⋯` with accessible name `More actions`; authorised applicable `Assign holder` · `Add cover` inside the menu | permanent manual-action buttons beside the current name · right-click-only entry · Change owner · Reassign · Take it · Release |
 | Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
 | Duty no match | `No duties match this search` · `Clear search` | No duties |
 | Duty read failure | `Staff & Duties could not be opened` · `Try again` | No duties · Error |
 | Duty unassigned | `Not assigned` · `Nobody holds {Duty}.` | Unowned · Available · — |
-| Duty resolution with cover | `{acting person} covering for {normal owner}` | `{acting person}` alone · owner name inside action sentence |
+| Duty current cover display (Staff & Duties; owner correction 2026-09-29; NOT BUILT) | Current cover’s name as the one prominent person; normal assignment/cover evidence remains in history | competing normal/acting labels · treating the displayed name as exclusive permission |
 | Duty write success | `{name} holds {Duty} from {date}` · `{acting person} covers {normal owner} for {Duty}, {from}–{until}` | Saved · Updated successfully |
 | Duty validation | `Choose a holder.` · `Choose when this holder starts.` · `Choose who will cover this duty.` · `Choose valid cover dates.` | Required · Invalid date · Error |
 | Duty conflict | `{Duty} already has a holder for these dates. Choose different dates.` · `{Duty} already has cover for these dates. Choose different dates.` | Conflict · Overlap found |

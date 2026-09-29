@@ -198,6 +198,10 @@ absence follows §4.4; do not treat absence as departure.
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,
 current/future eligible pickers and Duty routing; preserve historical names, acts and records.
+**OWNER-CONFIRMED 2026-09-29 / NOT BUILT:** default staff views show current employees only;
+former staff profiles are available by deliberate historical lookup, not continually shown in
+routine lists. Existing PO/GRN and other historical records retain the real actor's name. This
+approves hiding former staff from daily operation, not deleting their identity or source records.
 This is not deletion, a second employment switch in Workspace, or permission for ordinary staff to
 disable other accounts. Settings may link to the owning People/account action. The exact entry
 presentation remains under review.
@@ -293,19 +297,19 @@ combines those truths. A manager never assigns individual routine Work here.
 
 **OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** Jess approved the page-structure
 segment and the new `Next assignment` heading. Keep one Duty catalogue and one selected-Duty detail.
-The detail reads in this order: current normal owner and effective period → current/scheduled cover
-when applicable → existing authorised actions → next effective primary assignment → collapsed
+The detail reads in this order: current resolved person and plain dates → relevant future cover
+when applicable → next effective primary assignment → collapsed
 `Assignment & cover history`. Future appointments are not presented as if their terms already ran.
 All authorised assignment/cover records remain reachable; collapsing history never deletes evidence.
 
 ```text
 Staff & Duties
 
-Search duties       │ PO Duty
-State: All duties   │ Normal owner  Yu Jun
-                    │ Effective     Mon, 7 Sep to Wed, 30 Sep
+Search duties       │ PO Duty                          ⋯
+State: All duties   │ Yu Jun
+                    │ Mon, 7 Sep to Wed, 30 Sep
 PO Duty             │
-GRN Duty            │ [Assign holder]  [Add cover]
+GRN Duty            │
 Purchasing Approver │
 …                   │ Next assignment
                     │ Shasha · Thu, 1 Oct to Sat, 31 Oct
@@ -323,8 +327,8 @@ and retains the shared event → who/when → detail grammar. Opening history ch
 
 **CATALOGUE — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** The left catalogue
 follows the shared Duty catalogue order and answers who is responsible today. Each row shows the
-Duty label and today's normal holder, `{acting person} covering for {normal owner}` when cover is
-active, or `Not assigned`. Future appointments never replace today's answer early. `Starts {date}`
+Duty label and today's resolved person (effective cover when present, otherwise normal holder),
+or `Not assigned`. Future appointments never replace today's answer early. `Starts {date}`
 and `Ends {date}` do not appear in catalogue rows; effective periods and future arrangements belong
 in the selected detail's assignment/cover facts and `Next assignment`.
 
@@ -336,12 +340,27 @@ and completes no Work. Long names wrap; rows support keyboard selection. Returni
 detail restores the catalogue's search/filter and position. Existing read-only users can navigate
 and inspect the same authorised facts.
 
-The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
-`Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
-carry a full-name accessible label and never replace the printed name. Selecting a Work
-configuration failure opens the required Duty in this same Settings page and preserves return context.
-Readers see the existing manager-only sentence; only authorised managers see the existing focused
-assignment/cover actions. This composition does not authorise new actions or change their gates.
+**PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Show the Duty and the name of the person currently responsible for its work, followed by applicable
+plain dates. Do not print `Normal owner`, `Acting today`, `Who can act`, `Effective` or explanatory
+permission paragraphs in the routine catalogue/detail. When a cover is effective, the prominent
+name is that cover; otherwise it is the currently resolved normal person. Show only one current
+person, not competing normal/acting labels. This name identifies responsibility, never exclusive
+permission and never proof that this person completed a task. Other active authorised Operation
+people, including newcomers, can still perform ordinary work under §3.
+
+Current cover source, normal assignment and actual completed actor remain distinct in authoritative
+records and accessible assignment/cover history; simplifying the current display deletes none of
+that evidence. The catalogue follows this same one-current-name grammar, replacing the former
+`{acting person} covering for {normal owner}` line on this surface. Other modules' governed evidence
+presentation is unchanged. Keep future arrangements and history in their approved separate sections.
+A missing current resolved person retains `Not assigned`; never invent a name from stale history.
+
+Avatar initials carry a full-name accessible label and never replace the printed name. Selecting a
+Work configuration failure opens the exact Duty and preserves return context. Manager-only write
+controls retain their actual gates; ordinary readers see facts without a routine permissions lecture.
+The previously reviewed manual form must likewise identify its current person by name and dates,
+without restoring the retired owner/actor labels. This changes wording/presentation, not write rights.
 
 At 1440px and 1180px retain catalogue/detail. At 820px, 743px and 390px show the catalogue, then a
 full-width selected detail with `Back to duties`. Settings navigation is available on demand and
@@ -350,11 +369,25 @@ read-failure, unassigned and read-only states; no task-level Waiting/Completed/M
 Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
 or production completion; the remaining action/exception details continue in PLAN review.
 
+**MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Place existing authorised manual adjustments in the selected Duty header's visible `⋯` menu,
+accessible name `More actions`. Do not keep `Assign holder` / `Add cover` as permanent buttons
+beside the current person. Only authorised managers see this menu, and only applicable governed
+actions appear; omit an empty menu. Selecting an action opens its existing focused form with the
+Duty fixed. This is an entry-placement ruling, not approval for new override policies or new acts.
+Even an unassigned Duty uses this menu for an authorised manual assignment; the missing-person
+fact remains visible. Ordinary automatic PO/GRN assignment and leave cover need no menu action.
+
+Use the existing shared menu kit at all approved widths, with keyboard/touch operation, focus
+return to the trigger and no right-click-only dependency. Readers retain the same person/date view
+and their existing ordinary work execution rights. Keep source-owned permission checks, evidence
+and failures; no new token or component is introduced.
+
 ### 4.3 · Change-holder contract
 
 **FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
-`Assign holder` opens one focused action surface. Show read-only `Duty`, `Normal owner` and the
-current assignment's `Effective` period above the inputs, followed by required `Holder` and
+`Assign holder` opens one focused action surface. Show read-only `Duty`, the current person's name and applicable
+plain dates above the inputs, followed by required `Holder` and
 `Effective from`, optional `Until` and optional factual `Note`. Do not preselect a person or start
 date. The selected person and effective dates remain visible before the single primary
 `Assign holder` confirmation; `Cancel` closes without a write.
@@ -370,8 +403,8 @@ after the authoritative assignment write succeeds. A successful future assignmen
 
 Use the shared focused dialog at 1440/1180px and a single-column form at 820/743/390px. Names wrap,
 content scrolls vertically, and controls remain reachable above the on-screen keyboard. Closing
-returns focus to the originating action. Readers retain `Duty assignments are set by the manager.`
-and see no write imitation. This surface introduces no Waiting/Urgent/Missed task state.
+returns focus to the originating action. Readers see the plain read view under §4.2
+and no write imitation. This surface introduces no Waiting/Urgent/Missed task state.
 
 This approval covers form presentation only. The conflict between §4.4.1's primary-period refusal
 copy and the current newest-effective-assignment behaviour remains under PLAN review; this approval
@@ -407,7 +440,7 @@ When nobody qualifies for cover, expose the missing acting person to authorised 
 silently route to an absent normal holder or grant a new capability. Existing source-owned rights
 such as Receiving posting by active Operation staff remain distinct from Duty responsibility.
 Commercial/Principal/Finance approver duties do not inherit this automatic operational selection.
-The page shows separate `Normal owner`, `Acting today` and `Cover` dates; future cover never becomes
+The page shows the current resolved person and plain dates under §4.2; future cover never becomes
 today's actor early. Automatic cover changes neither due dates nor source-owned completion.
 
 The existing authorised manual cover capability below is retained for governed exceptions and
@@ -459,13 +492,13 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 
 | State | Required presentation and behaviour |
 |---|---|
-| Non-manager | Full authorised read view · `Duty assignments are set by the manager.` · no disabled or hidden write imitation |
+| Non-manager | Full authorised read view without an owner/permission explanation block · no disabled or hidden write imitation |
 | Loading | Catalogue/detail skeletons retain page geometry · `Opening Staff & Duties…` is acceptable accessible status |
 | Empty catalogue | Configuration failure, because the governed catalogue is code-owned; never `No duties yet` |
 | No search match | `No duties match this search` · `Clear search`; catalogue truth remains healthy |
-| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Assign holder`; Work remains visible under Duty word |
-| Cover active | Normal and acting person shown separately with effective dates/reason |
-| Cover scheduled | Normal owner remains today's actor; future cover and start date are visible in detail |
+| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager reaches applicable `Assign holder` through `⋯`; Work remains visible under Duty word |
+| Cover active | Show the effective cover as the single current person with plain dates (§4.2); preserve separate normal/cover identities and reason in history |
+| Cover scheduled | Show today's resolved person; future cover and dates remain separate and never replace today's name early |
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |

@@ -1180,14 +1180,28 @@ auditable Workspace, never inside the launcher. Module tabs, portal navigation, 
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
 
+**FORMER STAFF VISIBILITY — OWNER-CONFIRMED 2026-09-29 / NOT BUILT.** Default staff lists and
+current selection surfaces show current employees only. Former profiles are reached through
+intentional historical lookup; past source documents retain their real actor names. HR MASTER §3
+owns the employee fact, Workspace §4 consumes it. This is neither a delete action nor approval of
+the still-proposed staff-management entry design; no new screen copy or token is introduced.
+
+**STAFF & DUTIES PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / NOT BUILT.**
+Workspace §4.2 shows one current resolved person name and plain dates. Remove `Normal owner`,
+`Acting today`, `Who can act`, `Effective` labels and routine permission lectures from that surface.
+An effective cover supplies the displayed name; history preserves the separate source identities.
+The name does not restrict ordinary operational execution to that person. Existing page structure,
+shared components and token values remain; this is not a new component or a permission change.
+
 **STAFF & DUTIES PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT.** The header gear →
 `All System Settings` → `Staff & Duties` is the one maintained destination. Remove its persistent
 main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Settings destination
 and preserves return context; contextual links are not duplicate editors. Preserve existing
 read-only visibility and manager-only writes. Workspace MASTER §4 owns the capability and this
 placement's acceptance boundary. Its §4.2 structure is separately owner-approved 2026-09-28 / NOT
-BUILT: current facts → next assignment → collapsed history, with existing authorised actions near
-the current facts. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
+BUILT: current facts → next assignment → collapsed history. Owner-approved 2026-09-29 / NOT
+BUILT: authorised manual actions live in the selected Duty header’s visible `⋯` menu (`More actions`),
+not permanent buttons. Only authorised managers see applicable actions; no right-click dependency. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
 Settings navigation opens on demand; never force a third narrow-screen column. The separately approved
 2026-09-28 catalogue shows today's holder/active cover/unassigned answer; future dates belong in
 detail (Workspace §4.2), with no token change. Remaining interaction
