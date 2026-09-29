@@ -3212,7 +3212,7 @@ sideways under the pinned `PO Date · PO No` (`PO No` alone below 768px) rather 
 column. **Owed:** the same measurement signed in on production, where JetBrains Mono renders
 document numbers wider than the fixture font.
 
-**PO OBJECT PAGE COMPOSITION — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** The page a PO
+**PO OBJECT PAGE COMPOSITION — OWNER-APPROVED (Jess, 2026-09-25) · BUILT 2026-09-29.** The page a PO
 number opens. It follows UI MASTER §4.1 (Object Header → one scroll; tabs only `Document ·
 Revisions · History · Order Route`; viewing never splits, `Edit` does) and shares the Portal shell
 (sidebar + content + right rail); it has no local filter rail. Measured on `main` before this
@@ -3257,6 +3257,22 @@ Document               the current version's PDF, full width, last
   becomes `Open PDF`.
 - **Words:** all existing (§5.8, COPY Purchasing dictionary) plus `Nothing to do until {date}` and
   the menu item `Revise quantity or Deliver To`.
+
+**BUILT 2026-09-29 (Jess "back to purchasing"; top-to-toe of the PO page).** Viewing is one column:
+`Current action` → `Purchase order` (facts `Supplier` · `Supplier Deliver To` · `PO Doc Date` ·
+`PO Delivery Date` · `Sent`, with `Supplier reply` inside) → `Goods lines` (the kit DocumentTable) →
+`Receiving` → `Claims and returns` → `Document` (the current version's PDF, full width, last). The
+header reads `{PO No}({n}) · {Supplier}` with the state word once; `Status`, `PO Version` and the
+per-PO `Supplier Confirmed Delivery Date` facts are gone (the confirmed dates are per line in
+`Supplier reply`). Header actions are `Download PDF` and `Edit ▾` → `Revise quantity or Deliver To`;
+`Issue current PDF` is the one primary button inside `Current action`. The Work sentence for an
+unsent PO now says `Send {PO No}({n}) to {Supplier}` (the 2026-09-25 send line). **Deliberate
+differences from the sketch above:** `Source` stays removed (owner 2026-09-26); `Supplier reply`
+stays inside `Purchase order` (§5.7, owner 2026-09-26); the fact keeps `PO Delivery Date` because the
+PO read carries no working-day count (the PDF prints `PO {n}-Day`); `Edit ▾` has no `Change Deliver
+To` or `Cancel purchase order` item because neither door exists yet; with no action and no expected
+date the block reads `Nothing to do now`. The page's own raw-hex table band and line colours were
+removed; the tables are the kit's.
 
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.

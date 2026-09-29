@@ -7,7 +7,7 @@ import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
-import { ArrowLeft, Download, FileCheck2, RotateCcw, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Download, FileCheck2, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
@@ -26,6 +26,7 @@ import {
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
   GOODS_ABSENCE_WORDS,
+  poDocumentNumberOf,
 } from "@carres/shared";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -44,7 +45,9 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
+import DropdownMenu from "@/components/kit/DropdownMenu";
 import { Fact } from "../SalesOrderWorkspace";
+import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-document-table";
 import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
@@ -1331,22 +1334,18 @@ function PurchaseOrderObject({
             <ArrowLeft size={18} />
           </button>
           <div className="min-w-0 flex-1">
+            {/* ⭐ PO OBJECT PAGE COMPOSITION (Purchasing MASTER §9.3, owner
+                2026-09-25): the version is the number's `(n)` and the state
+                lives HERE, once, beside `number · party`. The `Status` and
+                `PO Version` facts are retired from the grid. */}
             <h1 className="text-page font-semibold text-kit-slate-12">
-              <span className="font-mono">{po.id}</span> · {row.supplierName}
+              <span className="font-mono">{poDocumentNumberOf(po.id, row.facts.version)}</span> · {row.supplierName}
+              <span className="ml-3 inline-block whitespace-nowrap align-middle text-body font-normal text-kit-slate-11" data-testid="po-object-state">
+                {row.facts.operationStatus ?? row.facts.documentState}
+              </span>
             </h1>
-            <p className="text-meta text-kit-slate-11">PO V{row.facts.version} · {row.facts.operationStatus ?? row.facts.documentState}</p>
           </div>
           <div className="ml-auto flex flex-wrap justify-end gap-2 max-[960px]:basis-full max-[960px]:pl-7" data-testid="po-object-actions">
-            {po.status === "open" && mode === "read" ? (
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta font-medium" onClick={() => setMode("revise")}>
-                <RotateCcw size={14} /> Revise
-              </button>
-            ) : null}
-            {issueNeeded && mode === "read" ? (
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white" onClick={() => setMode("issue")}>
-                <FileCheck2 size={14} /> Issue current PDF
-              </button>
-            ) : null}
             {/* ⛔ A BUTTON THAT CAN ONLY REFUSE IS NOT AN ACTION (defect 18).
                 The database refuses to print a cancelled PO BY DESIGN
                 (`po_not_printable`, 0402), and cancelled POs are deliberately
@@ -1381,6 +1380,20 @@ function PurchaseOrderObject({
                 <Download size={14} /> Download PDF
               </button>
             )}
+            {/* `Edit ▾` holds the document changes (MASTER §9.3). Issuing and
+                sending moved to CURRENT ACTION: the one primary button is the
+                Work sentence, never a header button. */}
+            {po.status === "open" && mode === "read" ? (
+              <DropdownMenu
+                label="Edit purchase order"
+                trigger={
+                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta font-medium" data-testid="po-object-edit">
+                    Edit <ChevronDown size={14} />
+                  </button>
+                }
+                items={[{ key: "revise", label: "Revise quantity or Deliver To", onSelect: () => setMode("revise") }]}
+              />
+            ) : null}
           </div>
         </div>
         {pdfProblem ? (
@@ -1411,7 +1424,7 @@ function PurchaseOrderObject({
       <main
         className={
           view === "Document" && mode === "read"
-            ? "min-h-0 flex-1 overflow-auto lg:overflow-hidden"
+            ? "min-h-0 flex-1 overflow-y-auto"
             : "min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
         }
       >
@@ -1472,6 +1485,7 @@ function PurchaseOrderObject({
           <DocumentView
             row={row}
             owner={owner}
+            onIssue={issueNeeded ? () => setMode("issue") : null}
             onSupplierDateSaved={onChanged}
             units={unitsQ.data?.units ?? []}
             receiving={receivingQ.data?.sessions ?? []}
@@ -1566,22 +1580,49 @@ function PurchaseOrderObject({
   );
 }
 
-function WorkCard({ row, owner }: { row: RegisterRow; owner: { userId: string; name: string | null } | null }) {
-  if (!row.work) return null;
+/**
+ * ⭐ CURRENT ACTION (Purchasing MASTER §9.3, owner 2026-09-25): the same fact
+ * and action lines the Work card prints, the owner's avatar, and the ONE primary
+ * button for the PO's state. `Sending not confirmed` opens the one send area
+ * (`PoIssueEvidence`); the supplier-answer door lives in `Supplier reply` below
+ * and is not drawn twice. Waiting with nothing due says `Nothing to do until
+ * {date}`; a completed or cancelled PO has no block.
+ */
+function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { userId: string; name: string | null } | null; onIssue: (() => void) | null }) {
+  const state = row.facts.operationStatus;
+  if (state === "Completed" || state === "Cancelled") return null;
+  const fact = row.work?.problem ?? (onIssue ? "The PO PDF has not been sent" : null);
+  const action = row.work?.action ?? (onIssue ? `Send ${poDocumentNumberOf(row.id, row.facts.version)} to ${row.supplierName}` : null);
+  const nextArrival = row.answerSummary.date ?? row.po.official_delivery_date ?? null;
   return (
-    <div className="flex items-start gap-3 border border-kit-slate-5 bg-kit-amber-3 px-3 py-2" data-testid="po-object-work">
-      <OwnerBadge userId={owner?.userId ?? null} name={owner?.name ?? null} />
-      <div className="min-w-0">
-        <div className="text-body font-semibold text-kit-slate-12">{row.work.problem}</div>
-        <div className="text-meta text-kit-slate-11">{row.work.action}</div>
-      </div>
-    </div>
+    <Block title="Current action">
+      {fact && action ? (
+        <div className="flex flex-wrap items-center gap-3" data-testid="po-object-work">
+          <OwnerBadge userId={owner?.userId ?? null} name={owner?.name ?? null} />
+          <div className="min-w-0 flex-1">
+            <div className="text-strong text-kit-slate-12">{fact}</div>
+            <div className="text-meta text-kit-slate-11">{action}</div>
+          </div>
+          {onIssue ? (
+            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white" onClick={onIssue} data-testid="po-object-primary">
+              <FileCheck2 size={14} /> Issue current PDF
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-body text-kit-slate-11" data-testid="po-object-nothing">
+          {nextArrival ? `Nothing to do until ${fmtDate(nextArrival)}` : "Nothing to do now"}
+        </p>
+      )}
+    </Block>
   );
 }
 
-function DocumentView({ row, owner, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
+function DocumentView({ row, owner, onIssue, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
   row: RegisterRow;
   owner: { userId: string; name: string | null } | null;
+  /** The issue/send door when the current version is not marked sent. */
+  onIssue: (() => void) | null;
   units: Array<{ unit_code: string; sku: string; status: string; po_line_id?: string | null }>;
   receiving: Array<{ id: string; do_number: string | null; status: string; goods_received_at: string; return_reason: string | null }>;
   claims: Array<{ id: string; claim_no: string; status: string; requested_action: string | null }>;
@@ -1634,13 +1675,13 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
        `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
        the PANE rather than scroll inside it, and the document would be
        squeezed to nothing. */
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-visible" data-testid="po-document-panes">
-      {/* Below `lg` the two panes STACK and the page scrolls as one column, so
-          neither pane may shrink or clip (measured 2026-09-26 at 743px: the
-          document pane was drawn over the Terms field). Beside each other at
-          `lg`, each pane scrolls on its own so the paper holds its place. */}
-      <div className="flex min-w-0 shrink-0 flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:overflow-auto">
-      <WorkCard row={row} owner={owner} />
+    /* ⭐ VIEWING NEVER SPLITS (Purchasing MASTER §9.3 composition, owner
+       2026-09-25; UI MASTER §4.1). One scroll: Current action → Purchase order
+       → Goods lines → Receiving → Claims and returns → Document, the current
+       version's PDF full width and last. Only `Edit` and issuing open the
+       50/50 split beside the paper. */
+    <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-3 p-3 sm:p-4" data-testid="po-document-panes">
+      <CurrentAction row={row} owner={owner} onIssue={onIssue} />
       <Block title="Purchase order">
         {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
             boxed value, three to a row, 12px gaps — "got box … I want follow":
@@ -1649,13 +1690,12 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="po-object-facts">
           <PoFact label="Supplier" value={row.supplierName} />
           <PoFact label="Supplier Deliver To" value={row.deliverTo} />
+          <PoFact label="PO Doc Date" value={poDateOf(po) ? fmtDate(poDateOf(po)!) : "Not recorded"} />
           <PoFact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
-          {/* Show the actual evidenced date, even when it matches the PO. */}
-          <PoFact label="Supplier Confirmed Delivery Date" value={row.answerSummary.date ? fmtDate(row.answerSummary.date) : row.answerSummary.distinctDates.length > 1 ? `${row.answerSummary.distinctDates.length} dates` : "Not confirmed"} />
-          {/* The CURRENT version and its sent mark, in the register's own words;
-              earlier versions' marks stay in Revisions (MASTER §9.3). */}
-          <PoFact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
-          <PoFact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
+          {/* The CURRENT version's send record (MASTER §9.3 `Sent`). The
+              supplier's confirmed dates are per line in `Supplier reply`, so
+              they are not repeated here; earlier versions stay in Revisions. */}
+          <PoFact label="Sent" value={versionLine(row)} />
         </div>
         <SupplierReplySection
           key={`${row.id}:${row.facts.version}`}
@@ -1684,15 +1724,19 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         {/* Wider than the half pane: it scrolls inside the card and SAYS so
             (the Sales Order Items grammar — fade + one step button). */}
         <TableScroller label="Goods lines" testId="po-goods-lines-scroller">
-          <table className="w-full min-w-[900px] border-collapse text-body">
-            <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-11">
-              <tr><th className="px-3 py-2.5 align-top text-left">SKU</th><th className="px-3 py-2.5 align-top text-left">Item</th><th className="px-3 py-2.5 align-top text-left">Unit ID</th><th className="px-3 py-2.5 align-top text-left">Source</th><th className="px-3 py-2.5 align-top text-left">Deliver To</th><th className="px-3 py-2.5 align-top text-left">Order Qty</th><th className="px-3 py-2.5 align-top text-left">Received Qty</th><th className="px-3 py-2.5 align-top text-left">Pending Delivery Qty</th></tr>
+          {/* The kit DOCUMENT TABLE (ONE KIT LAW recipe 3, the Sales Order Items
+              table): plain label heads over a hairline, no grey band. */}
+          <table className={`${SO_TABLE} min-w-[900px]`}>
+            <thead>
+              <tr className={SO_HEAD_ROW}>{["SKU", "Item", "Unit ID", "Source", "Deliver To", "Order Qty", "Received Qty", "Pending Delivery Qty"].map((head) => (
+                <th key={head} className={`${SO_TH} text-left`}>{head}</th>
+              ))}</tr>
             </thead>
             <tbody>
               {po.purchase_order_lines.map((line) => (
-                <tr key={line.id} className="h-[38px] border-b border-kit-slate-4">
-                  <td className="px-3 py-2.5 align-top text-left whitespace-nowrap font-mono">{line.sku}</td>
-                  <td className="px-3 py-2.5 align-top text-left">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
+                <tr key={line.id} className={SO_ROW}>
+                  <td className={`${SO_TD} whitespace-nowrap font-mono`}>{line.sku}</td>
+                  <td className={SO_TD}>{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
                   {/* The Units are the line's own rows: one permanent Unit ID
                       per physical piece, born with the official PO and bound
                       to this line (0442/0443). A quantity line has none by
@@ -1700,18 +1744,18 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       integrity failure, never an ordinary empty state. They
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
-                  <td className="px-3 py-2.5 align-top text-left" data-testid={`po-line-units-${line.id}`}>{
+                  <td className={SO_TD} data-testid={`po-line-units-${line.id}`}>{
                     unitLoading ? <span className="text-kit-slate-11">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
                       ? <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
                     : unitsOf(line).length
-                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
+                      ? <div className="flex max-w-[240px] flex-wrap gap-x-2 font-mono text-meta text-kit-slate-12">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
                       ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line. Do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
                   }</td>
-                  <td className="px-3 py-2.5 align-top text-left">{line.governed_sources?.length ? line.governed_sources.map((source) => {
+                  <td className={SO_TD}>{line.governed_sources?.length ? line.governed_sources.map((source) => {
                     /* Card 08 §3.5 — several Manual Purchases behind one
                        document stay apart by business facts, never by a
                        number: the purpose and Proceed Date join the label
@@ -1724,14 +1768,14 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       : source.reference;
                     return source.qty == null ? label : `${label} ×${source.qty}`;
                   }).join(" · ") : <Absence />}</td>
-                  <td className="px-3 py-2.5 align-top text-left">{
+                  <td className={SO_TD}>{
                     line.destination_id
                       ? destinations.find((destination) => destination.id === line.destination_id)?.name ?? <Absence />
                       : row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo
                   }</td>
-                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{line.qty}</td>
-                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{line.received_qty}</td>
-                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{Math.max(0, line.qty - line.received_qty)}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{line.qty}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{line.received_qty}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{Math.max(0, line.qty - line.received_qty)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1752,27 +1796,20 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
       </div>
-      </div>
-      {/* The document pane. Its own scroller, so the paper holds its place
-          while the facts scroll beside it — the whole reason the two are side
-          by side. */}
-      <aside
-        className="min-w-0 shrink-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:border-l lg:border-t-0 lg:overflow-auto"
-        aria-label="Purchase order document"
-        data-testid="po-document-column"
-      >
+      <Block title="Document">
+        <div data-testid="po-document-column">
         {/* A cancelled purchase order has no official document to preview —
             0402 refuses to print one by design. Saying so beats mounting a frame
             that can only fill with an error strip. */}
         {row.po.status === "cancelled" ? (
-          <section className="border border-kit-slate-5 bg-white px-3 py-2" data-testid="po-cancelled-no-document">
-            <div className="text-label font-semibold text-kit-slate-11">Official document</div>
-            <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
-          </section>
+          <p className="text-body text-kit-slate-11" data-testid="po-cancelled-no-document">
+            A cancelled purchase order has no official document.
+          </p>
         ) : (
           <OfficialPreview poId={po.id} />
         )}
-      </aside>
+        </div>
+      </Block>
     </div>
   );
 }
@@ -1800,7 +1837,7 @@ function PoFact({ label, value }: { label: string; value: string }) {
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <Absence>{empty}</Absence>}</div></Block>;
+  return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <p className="text-meta text-kit-slate-11">{empty}</p>}</div></Block>;
 }
 
 function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {

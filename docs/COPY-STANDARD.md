@@ -3060,11 +3060,13 @@ detail's work card and Order Route:
 
 | Fact (line 1) | Action (line 2, with structured owner avatar) |
 |---|---|
-| `The PO PDF has not been sent` | `Issue the purchase order to {supplier}` |
+| `The PO PDF has not been sent` | `Send {PO No}({n}) to {supplier}` (owner 2026-09-25 send line; `Issue the purchase order to {supplier}` retired 2026-09-29, the PO was already issued) |
 | `Confirm tomorrow's supplier delivery` | `Ask {supplier} for the Supplier DO or confirmation for {date}` |
 | `The supplier delivery date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
-| `{PO No}({n}) has not been sent` | `Issue {PO No}({n}) to {supplier}` |
+| `{PO No}({n}) has not been sent` | `Send {PO No}({n}) to {supplier}` |
+
+The PO page (2026-09-29, Purchasing §9.3 composition) prints these lines in its `Current action` block, with `Issue current PDF` as its one primary button; with nothing due it reads `Nothing to do until {date}`, or `Nothing to do now` when no date is recorded. Its facts are `Supplier` · `Supplier Deliver To` · `PO Doc Date` · `PO Delivery Date` · `Sent`; its last block is `Document`; its header menu is `Edit` → `Revise quantity or Deliver To`.
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
 
 The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their

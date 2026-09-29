@@ -1,3 +1,4 @@
+import { poDocumentNumberOf } from "./po-workspace";
 import { addWorkingDays, countWorkingDays } from "./working-days";
 import {
   PURCHASING_OFFICE_OFF_DAYS,
@@ -248,16 +249,21 @@ export function purchaseOrderWork(
   facts: PurchaseOrderRegisterFacts,
 ): PurchaseOrderWorkCopy | null {
   if (facts.operationStatus === "Completed" || facts.operationStatus === "Cancelled") return null;
+  /* ⭐ ISSUED IS NOT SENT, AND THE LINE SAYS SEND (owner 2026-09-25, the PO
+     window send line; Purchasing §5.6.1 · COPY). The PO already exists, so
+     `Issue …` told the operator to do what was done. The Work card, the PO
+     page's CURRENT ACTION and the Order Route now say the same sentence. */
+  const docNo = poDocumentNumberOf(input.id, facts.version);
   if (facts.filters.includes("supplier_update_required")) {
     return {
-      problem: `PO V${facts.version} has not been sent`,
-      action: `Issue PO V${facts.version} to ${input.supplierName}`,
+      problem: `${docNo} has not been sent`,
+      action: `Send ${docNo} to ${input.supplierName}`,
     };
   }
   if (facts.filters.includes("pdf_not_sent")) {
     return {
       problem: "The PO PDF has not been sent",
-      action: `Issue the purchase order to ${input.supplierName}`,
+      action: `Send ${docNo} to ${input.supplierName}`,
     };
   }
   /* A sent PO the supplier has not answered is NOT work (owner ruling
