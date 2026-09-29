@@ -274,8 +274,8 @@ export default function ChangeDeliverToForm({
           <table className={SO_TABLE}>
             <thead>
               <tr className={SO_HEAD_ROW}>
-                <th className={SO_TH}>Item</th>
-                <th className={SO_TH}>Deliver To</th>
+                <th className={`${SO_TH} text-left`}>Item</th>
+                <th className={`${SO_TH} text-left`}>Deliver To</th>
                 <th className={`${SO_TH} text-right`}>Qty</th>
               </tr>
             </thead>
