@@ -31,3 +31,11 @@ export function workspaceActivityWindow(
     cutoff: new Date(`${day}T${valid[period]}:00+08:00`).toISOString(),
   };
 }
+
+export const workspaceActivitySettingsInput = workspaceActivitySettingsSchema.extend({
+  revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+});
+export const workspaceActivitySettingsResponseSchema = workspaceActivitySettingsInput.extend({
+  canEdit: z.boolean(),
+});
+export type WorkspaceActivitySettingsResponse = z.infer<typeof workspaceActivitySettingsResponseSchema>;

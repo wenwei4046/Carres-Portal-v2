@@ -40,6 +40,7 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // R6 — the ops half: review what the warehouse filed, then replay it through
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
+import workActivityRouter from "./routes/operation/work-activity";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
 import operationWorkRouter from "./routes/operation/work";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
@@ -332,6 +333,7 @@ api.route("/operation/purchase-returns", purchaseReturnsRouter);
 api.route("/operation/repair-orders", repairOrdersRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/workspace-duties", workspaceDutiesRouter);
+api.route("/operation/work-activity", workActivityRouter);
 api.route("/operation/work", operationWorkRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);

@@ -444,22 +444,30 @@ the entered facts for correction without optimistic owner changes.
 
 ### 4.4 · Automatic assignment changes and two daily checks
 
-**Build evidence 2026-09-29 — FOUNDATION ONLY / NOT WIRED / NOT DEPLOYED.**
-The `codex/staff-activity-checks` draft prepares validated time settings/company-period windows
-(`packages/shared/src/workspace-activity.ts`) and a disposable trusted-foreground-interaction
-collector (`apps/web/src/lib/work-activity.ts`). The collector sends no identity/client time,
-never sends from mount, focus or timers, and does not carry a lunch event into the afternoon.
-It is deliberately not connected to the existing heartbeat or automatic resolver: doing that
-alone would retain the old SQL 10:00/all-day policy and falsely suggest the two checks work.
-Measured additional source: `apps/api/src/routes/operation/staff.ts` also calls `touch_last_seen`
-from `/auto-assign`; that system call must not become human activity evidence. It remains
-unchanged until the shared persistence/assignment change can be verified together.
-The current task has no connected Supabase query/apply tool. ENGINEERING §5 requires tracker
-inspection and the governed exact-file probe/apply path before migration/dependent deployment.
-Outstanding: persisted audited settings and period events, authoritative server-time/personal
-identity gates, scheduler/calendar eligibility, recorded assignment movement/no late bounce-back,
-shared consumers, Settings controls, offline-work evidence handling and production verification.
-These foundations do not prove attendance or resolve the offline-work evidence gap.
+**Build evidence 2026-09-29 — DRAFT PR #1798 / NOT DEPLOYED.**
+The `codex/staff-activity-checks` draft contains validated company-period windows and trusted
+foreground-interaction collection, plus the Settings time form, manager-gated API and migration
+`0613_work_activity_has_two_office_periods`. The collector is not yet wired to OperationApp;
+no scheduler or assignment resolver has been switched to the new evidence. The old heartbeat and
+`/auto-assign` presence stamp remain until the complete engine is ready; changing them alone
+would retain the old SQL 10:00/all-day assignment semantics.
+
+Supabase connectivity is confirmed for `kfprgpjpaffedghytstl`. An exact-draft rolled-back probe
+verified settings audit, valid/invalid times, revision conflict, manager refusal, activity
+minute deduplication, lunch/overnight exclusion and sealed direct-write/time-spoofing grants.
+No table or probe tracker row persisted. Migration 0613 is **NOT APPLIED**: numbering follows
+tracker 0611 and all-branch maximum 0612 (Supplier Return pickup, owned by another lane).
+
+**Measured data gap:** both active Operation people (Shasha and Yu Jun) have NULL
+`hr_employees.join_date` and no `hr_employment_events`; no month-of-joining eligibility may be
+inferred from account creation or an invented employment date. Owner has been asked for their
+joining dates. People owns that fact; there is no second Workspace joining-date field.
+The current assignment source remains dated assignments, not the target's general cyclic roster.
+
+Outstanding before release: period collector wiring, authoritative scheduler/calendar/eligible
+pool, immutable assignment movements/no late bounce-back and shared consumers, missing-period
+versus offline-work evidence handling, full release checks and production verification.
+These components do not prove attendance or claim that automatic reassignment is live.
 
 **OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains
 TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially

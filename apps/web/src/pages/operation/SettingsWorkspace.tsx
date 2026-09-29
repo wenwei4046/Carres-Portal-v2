@@ -31,6 +31,7 @@ import { useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import StaffDuties from "./StaffDuties";
+import ActivitySettings from "./staff-duties/ActivitySettings";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
@@ -188,7 +189,7 @@ export default function SettingsWorkspace() {
           </div>
         )}
         <Routes>
-          <Route path="staff-duties" element={<StaffDuties settingsNavigation={!railOpen ? (
+          <Route path="staff-duties" element={<StaffDuties activitySettings={<ActivitySettings />} settingsNavigation={!railOpen ? (
             <button type="button" aria-label="Show settings" title="Show settings" data-testid="settings-show-rail"
               className="grid h-7 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
               onClick={() => setRailVisible(true)}>

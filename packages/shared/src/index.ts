@@ -3333,6 +3333,9 @@ export * from "./sales-order-register-filters";
 
 export {
   workspaceActivitySettingsSchema,
+  workspaceActivitySettingsInput,
+  workspaceActivitySettingsResponseSchema,
+  type WorkspaceActivitySettingsResponse,
   INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
   workspaceActivityWindow,
   type WorkspaceActivitySettings,

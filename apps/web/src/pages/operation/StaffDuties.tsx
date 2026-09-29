@@ -29,7 +29,7 @@ import { useWorkspaceDuties } from "@/lib/queries";
  * `can_assign` fact and never offers a control the server would refuse: a
  * reader gets the quiet sentence, not a disabled form.
  */
-export default function StaffDuties({ settingsNavigation }: { settingsNavigation?: ReactNode } = {}) {
+export default function StaffDuties({ settingsNavigation, activitySettings }: { settingsNavigation?: ReactNode; activitySettings?: ReactNode } = {}) {
   const dutiesQ = useWorkspaceDuties();
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,6 +104,7 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
           {settingsNavigation}
           {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
         </div> : null}
+        {activitySettings}
         {dutiesQ.isLoading ? (
           /* Skeletons keep the page's geometry, so nothing jumps when the read
              lands — and nothing here claims a duty is unheld while it is still

@@ -1,3 +1,4 @@
+import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
 import {
   keepPreviousData,
@@ -441,6 +442,7 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    workActivitySettings: () => ["operation", "work-activity-settings"] as const,
     work:      () => ["operation", "work"] as const,
     /** 0136 — AutoCount-imported orders still in Inbox triage (no logistic
      *  assigned). Polled 15s while the page is open so newly-imported orders
@@ -12328,5 +12330,26 @@ export function useClearFinanceException(
       await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+export function useWorkActivitySettings() {
+  return useQuery({
+    queryKey: qk.operation.workActivitySettings(),
+    queryFn: async () => workspaceActivitySettingsResponseSchema.parse(
+      await apiFetch<unknown>("/api/operation/work-activity/settings"),
+    ),
+    staleTime: 30_000,
+  });
+}
+export function useSaveWorkActivitySettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<WorkspaceActivitySettingsResponse, "canEdit">) =>
+      workspaceActivitySettingsResponseSchema.parse(await apiFetch<unknown>(
+        "/api/operation/work-activity/settings", { method: "PUT", body: JSON.stringify(input) },
+      )),
+    onSuccess: (data) => client.setQueryData(qk.operation.workActivitySettings(), data),
+    onError: () => { void client.invalidateQueries({ queryKey: qk.operation.workActivitySettings() }); },
   });
 }
