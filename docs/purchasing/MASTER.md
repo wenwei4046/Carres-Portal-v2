@@ -5883,8 +5883,9 @@ Duty coordinates display transport without a Sales Order, and authorised managem
 Sales successor for a departed negotiator. §§9.8–9.11 remain the detailed business authority.
 Register/object copy and exact composition, verified
 opening/set identity and Finance matching/ownership details remain closure items, not implicitly
-approved by this operating-model acceptance. Section 3's detailed UI and section 6's detailed
-Finance recommendations remain PROPOSAL / NOT LAW where not already governed. The preceding
+approved by this operating-model acceptance. Section 3's Display Request semantic structure is
+separately approved on 2026-09-29; remaining detailed UI and section 6's detailed Finance
+recommendations remain PROPOSAL / NOT LAW where not already governed. The preceding
 research matrix is evidence. No Card, application build, cutover or PLAN MISSION COMPLETE is authorised.
 
 **Current → problem → recommendation → trade-off.** Current Stock has Site/Unit/ownership facts,
@@ -5975,9 +5976,13 @@ actions. One arrangement pre-fills the correct documents; one combined swap PDF 
 instructions while receipt and handover remain independently evidenced. Detailed shared-kit
 composition still needs design closure; naming approval is not rendered-screen acceptance.
 
-**DISPLAY REQUEST OBJECT — REVIEW PROPOSAL / NOT LAW; 2026-09-29.** This is semantic page
-composition for the approved journey, not a rendered mockup, final new English copy or permission
-to build. Reuse the shared Object Detail and Block grammar; Workspace embeds the same owning forms.
+**DISPLAY REQUEST OBJECT STRUCTURE — APPROVED TARGET / NOT BUILT; Jess, 2026-09-29.**
+Owner approved the one-page reading order below: arrangement identity, current applicable action,
+goods, each movement leg, connected documents/evidence, commercial follow-up and History. Keep
+concurrent legs and remaining scope visible; all completed-looking states require owning evidence.
+This is semantic structure approval, not a rendered mockup, final new English copy, responsive
+acceptance or application-build instruction. Reuse the shared Object Detail and Block grammar;
+Workspace embeds the same owning forms.
 
 | Reading order | What the operator sees / does | Guard against repeated or misleading work |
 |---|---|---|
@@ -6095,8 +6100,8 @@ This is acceptance intent only: no rendered Showroom mockup or responsive valida
 for this proposal, so no visual score or production readiness is claimed. New words/components
 need their existing governance; do not implement a local substitute.
 
-The integrated operating journey and the two assignment rules have owner approval. Exact
-register/object copy/composition, Finance matching/ownership
+The integrated operating journey, two assignment rules and Display Request semantic page structure
+have owner approval. Exact register design, object copy/rendered composition, Finance matching/ownership
 consequences and verified opening/set identity remain explicit closure items. The planner owns
 further authority/design checking; these are not permission to hand incomplete truth to build.
 Persist the remaining reviewed result before PLAN MISSION COMPLETE. No rendered UI, complete
