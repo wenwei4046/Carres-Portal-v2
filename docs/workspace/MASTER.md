@@ -198,6 +198,10 @@ absence follows §4.4; do not treat absence as departure.
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,
 current/future eligible pickers and Duty routing; preserve historical names, acts and records.
+**OWNER-CONFIRMED 2026-09-29 / NOT BUILT:** default staff views show current employees only;
+former staff profiles are available by deliberate historical lookup, not continually shown in
+routine lists. Existing PO/GRN and other historical records retain the real actor's name. This
+approves hiding former staff from daily operation, not deleting their identity or source records.
 This is not deletion, a second employment switch in Workspace, or permission for ordinary staff to
 disable other accounts. Settings may link to the owning People/account action. The exact entry
 presentation remains under review.
