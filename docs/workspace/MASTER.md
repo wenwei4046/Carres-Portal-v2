@@ -23,7 +23,7 @@ grouped or repeated as `Workspace → Dashboard`.
 Dashboard
 
 WORKSPACE
-  Work
+  Workspace
   Issue Tracker
 
 HEADER SETTINGS
@@ -31,9 +31,13 @@ HEADER SETTINGS
     Staff & Duties
 ```
 
-`Workspace` is the left-bar section label for coordination destinations, not a landing page and not
-another Dashboard. Selecting `Work` opens My Work by default for staff and managers. Dashboard may
-drill into filtered Work, while Work never becomes a Dashboard tab.
+**NAVIGATION LABEL — OWNER-APPROVED 2026-09-29 / BUILT; production verification pending.**
+The main-menu destination is `Workspace`, matching its existing page title. This replaces the
+visible destination name `Work`; the existing `work` route key and `/operation?tab=work` address
+remain unchanged. `Workspace` also names the coordination section; it creates no extra landing
+page or Dashboard. The page retains `My Task` and `Team Work`, with `My Task` the default for staff
+and managers. Dashboard may drill into the same filtered work set. Internal references to Work
+describe the shared action engine, not a second navigation destination.
 
 ### 1.1 · Cross-destination relationship
 

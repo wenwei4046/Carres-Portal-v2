@@ -305,10 +305,11 @@ object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting s
 (`To Order`), never a state.**
 
 ```
+Dashboard
+
 WORKSPACE
-├── Dashboard
-├── Work
-│   ├── My Work
+├── Workspace
+│   ├── My Task
 │   └── Team Work
 └── Issue Tracker
 

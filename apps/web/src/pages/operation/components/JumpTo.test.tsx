@@ -120,7 +120,7 @@ describe("the empty query", () => {
      * word. ⌘K composes from `visibleItems`, so the rail and the jump surface
      * can never drift into two words for one destination. */
     expect(labels.slice(0, 5)).toEqual([
-      "WorkOperations",
+      "WorkspaceOperations",
       "Outright SalesOperations",
       "InventoryOperations",
       // `operation:payments` is the Payments module's `Monitor` since the

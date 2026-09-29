@@ -169,15 +169,15 @@ uses the governed maximum-four-step `What to do` block below.
 
 ## Workspace destination words
 
-These words govern Work and Issue Tracker under the left-bar `WORKSPACE` section, and the
+These words govern Workspace and Issue Tracker under the left-bar `WORKSPACE` section, and the
 Workspace-owned Staff & Duties page under global Settings (placement approved 2026-09-28 /
 NOT BUILT; Workspace MASTER §4). The one global
 `Dashboard` remains an independent top-level destination and is never called `Workspace Dashboard`.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Workspace destinations | `Work` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
-| Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
+| Workspace destinations | `Workspace` · `Issue Tracker` (owner ruling 2026-09-29; existing work route) | Work as the menu destination · Workspace Dashboard · Tasks · Duty roster · Service Notes |
+| Work scopes | `My Task` · `Team Work` (Workspace MASTER §5.10) | My Work on this page · My Tasks · Team Tasks · Work queue |
 | Work header search (Jess reverted the `Search` rename, 2026-09-26) | `Jump to…` beside its keyboard hint | Search · Find · Go to |
 | Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
@@ -4817,7 +4817,7 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 | Where | Use exactly | Do not use |
 |---|---|---|
-| Page and scope | page title `Workspace` · `My Task` · `Team Work` | `My Work` on this page |
+| Page and scope | main-menu destination and page title `Workspace` (owner ruling 2026-09-29) · `My Task` · `Team Work` | `Work` for the main-menu destination · `My Work` on this page |
 | Rail | `Search work…` · `Attention`: `Broken commitment` · `Missed` · `Waiting for answer` · `No date` · `Module`: `All modules`, then the module names · one row per order: `{SO No}` and its task count (a PO view row: `{PO No}`; a PO window row: `{time} PO window` over its date) | a customer name, `actions`, `Missed` or `No date` on an order row |
 | Order header | `{SO No}` over the customer · `Proceed Date` · `Customer Requested Delivery Date` · a missing value `Not recorded` | `Order Route · To do {n}` · band words `GOODS` / `DELIVERY` |
 | Stops | the Order Route node labels (`PURCHASING` · `SUPPLIER` · `RECEIVING` · `STOCK` · `LOAN` · `LOGISTICS` · `DELIVERY DATE` · `PAYMENT` · `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`) with `Missed` / `Due` only · `{n} of {m} done` (only steps with completion evidence count) | a second count on the stop · `T1` / `T2` / `T3` |
