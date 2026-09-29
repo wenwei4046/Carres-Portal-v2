@@ -11,6 +11,7 @@ import {
   type CustomerOwingRow,
 } from "./money-owed";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
+import { customerBalanceRows } from "./FinancePaymentReport";
 
 /* The buckets finance_ar_aging used (0062/0125), aged from the day the sales
    invoice was issued (owner ruling 18 Sep 2026): today − issue day, buckets 0-30 · 31-60 · 61-90 · 90+ with each upper edge inclusive, Overdue
@@ -40,6 +41,26 @@ const invoice = (orderId: string, issuedAt: string | null): InvoiceRegisterRow =
     order_lines: [{ qty: 1, unit_price: 1000 }], order_addons: [],
     ops_order_control: [{ balance: null, confirmed_date: null, line_etas: null, line_stock_status: null }],
   },
+});
+
+describe("customerOwingRows", () => {
+  it("an order paid in full is not owing, even when the float sum leaves a crumb", () => {
+    // 0.1 + 0.2 in float is 0.30000000000000004: paid 0.3 must read as paid in full.
+    const paidUp: InvoiceRegisterRow = {
+      ...invoice("o1", "2026-09-13"),
+      amount: 0.3,
+    };
+    paidUp.orders = { ...paidUp.orders!, paid: 0.3, order_lines: [{ qty: 1, unit_price: 0.1 }, { qty: 1, unit_price: 0.2 }] };
+    expect(customerOwingRows([paidUp])).toEqual([]);
+    // Reports → Payment filters the same rows itself: the crumb is gone there too.
+    expect(customerBalanceRows([paidUp])[0].outstanding).toBe(0);
+  });
+
+  it("an order one sen short still owes, and its figure is in sen", () => {
+    const short: InvoiceRegisterRow = { ...invoice("o1", "2026-09-13"), amount: 0.3 };
+    short.orders = { ...short.orders!, paid: 0.29, order_lines: [{ qty: 1, unit_price: 0.1 }, { qty: 1, unit_price: 0.2 }] };
+    expect(customerOwingRows([short]).map((r) => r.outstanding)).toEqual([0.01]);
+  });
 });
 
 describe("A/R aging", () => {

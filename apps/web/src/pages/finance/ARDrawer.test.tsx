@@ -144,4 +144,101 @@ describe("ARDrawer", () => {
     const call = vi.mocked(apiFetch).mock.calls.find(([u]) => u === "/api/finance/payments/order-receipt")!;
     expect(JSON.parse(String((call[1] as RequestInit).body)).method).toBe("bank");
   });
+  const receiptBodies = () => vi.mocked(apiFetch).mock.calls
+    .filter(([u]) => u === "/api/finance/payments/order-receipt")
+    .map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+
+  function openForm() {
+    render(wrap(drawer()));
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "MBB-1" } });
+  }
+
+  it("a retry after a lost answer sends the same key, so the money is recorded once", async () => {
+    let n = 0;
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/payment-settings/methods")) throw new Error("down");
+      if (url.includes("/order-receipt")) { n += 1; if (n === 1) throw new Error("network"); return { id: "p1" }; }
+      return [];
+    });
+    openForm();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Confirm" })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(2));
+    const [first, retry] = receiptBodies();
+    expect(retry.idempotencyKey).toBe(first.idempotencyKey);
+
+    // After it succeeds, the next receipt is a new payment with a new key.
+    await waitFor(() => expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "MBB-2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(3));
+    expect(receiptBodies()[2].idempotencyKey).not.toBe(first.idempotencyKey);
+  });
+
+  it("a changed amount after a lost answer keeps the key, so the server refuses a second payment", async () => {
+    // If the first try was recorded, the server refuses the same key on a
+    // different amount (idempotency_conflict). If it was not, the key is free.
+    // Either way the money is never recorded twice.
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/payment-settings/methods")) throw new Error("down");
+      if (url.includes("/order-receipt")) throw new Error("network");
+      return [];
+    });
+    openForm();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Confirm" })).not.toBeDisabled());
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(2));
+    expect(receiptBodies()[1].idempotencyKey).toBe(receiptBodies()[0].idempotencyKey);
+
+    // Cancel ends the draft: the next form is a new payment.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "MBB-3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(3));
+    expect(receiptBodies()[2].idempotencyKey).not.toBe(receiptBodies()[0].idempotencyKey);
+  });
+
+  it("a trailing point while typing is not refused", () => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("down"));
+    openForm();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1200." } });
+    expect(screen.queryByText("Type the amount in numbers, like 1500.00.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm" })).not.toBeDisabled();
+  });
+
+  it("reads 1,200.00 as RM 1,200.00, never RM 1.00", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/payment-settings/methods")) throw new Error("down");
+      if (url.includes("/order-receipt")) return { id: "p1" };
+      return [];
+    });
+    openForm();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1,200.00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(1));
+    expect(receiptBodies()[0].amount).toBe(1200);
+  });
+
+  it.each([
+    ["1200abc", "Type the amount in numbers, like 1500.00."],
+    ["", "Type the amount."],
+    ["0", "The amount must be more than RM 0.00."],
+    ["12.345", "An amount has at most two decimals."],
+  ])("refuses %j: Confirm stays off and says why", (typed, why) => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("down"));
+    openForm();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: typed } });
+    expect(screen.getByText(why)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(receiptBodies()).toHaveLength(0);
+  });
 });

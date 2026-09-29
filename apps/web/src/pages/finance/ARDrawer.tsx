@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
@@ -12,6 +12,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useManualMethods } from "@/lib/payment-methods";
 import { requiredPaymentReference } from "@carres/shared";
+import { parseTypedAmount } from "@carres/shared/other-money-in";
 import type { CustomerOwingRow } from "./money-owed";
 
 /** One receipt on the order, as the invoice register returns it. */
@@ -58,10 +59,19 @@ export default function ARDrawer({
     ? chosenMethod : methods[0]?.value ?? chosenMethod;
   const refWord = requiredPaymentReference(recMethod); // §16 (0535)
   const soWord = balance.so !== null ? `SO-${balance.so}` : "SO not available";
+  const amount = readAmount(recAmt);
+
+  // One key per open form, kept across retries and edits. If a try was
+  // recorded but its answer was lost, a retry with the same amount returns
+  // that payment, and one with a changed amount is refused by the server
+  // (idempotency_conflict). A try that was not recorded leaves the key free.
+  // Success or Cancel ends the form; the next one gets a new key.
+  const receiptKey = useRef<string | null>(null);
 
   const recordReceipt = useRecordReceipt({
-    onSuccess: () => {
-      toast.success(`Recorded ${rm(parseFloat(recAmt || "0"))} for ${soWord}`);
+    onSuccess: (_row, sent) => {
+      toast.success(`Recorded ${rm(sent.amount)} for ${soWord}`);
+      receiptKey.current = null;
       setRecAmt("");
       setRecRef("");
       setRecPanelOpen(false);
@@ -70,21 +80,18 @@ export default function ARDrawer({
   });
 
   function submitReceipt() {
-    const amt = parseFloat(recAmt);
-    if (!amt || amt <= 0) {
-      toast.error("Amount must be positive");
-      return;
-    }
+    if (amount.value === null) return;
     if (refWord && !recRef.trim()) {
       toast.error(`Enter the ${refWord.toLowerCase()}`);
       return;
     }
+    receiptKey.current ??= crypto.randomUUID();
     recordReceipt.mutate({
       orderId:   balance.orderId,
-      amount:    amt,
+      amount:    amount.value,
       method:    recMethod,
       reference: recRef || null,
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: receiptKey.current,
     });
   }
 
@@ -133,6 +140,7 @@ export default function ARDrawer({
                   <span className="text-label">Amount (RM)</span>
                   <input aria-label="Amount" value={recAmt} inputMode="decimal"
                     onChange={(e) => setRecAmt(e.target.value)} className={fieldCls} />
+                  {amount.error && <span className="text-label font-normal">{amount.error}</span>}
                 </label>
                 <label className="block">
                   <span className="text-label">Method</span>
@@ -150,10 +158,11 @@ export default function ARDrawer({
                     onChange={(e) => setRecRef(e.target.value)} className={fieldCls} />
                 </label>
                 <div className="flex gap-2">
-                  <Button variant="primary" onClick={submitReceipt} loading={recordReceipt.isPending}>
+                  <Button variant="primary" onClick={submitReceipt} loading={recordReceipt.isPending}
+                    disabled={amount.value === null}>
                     {recordReceipt.isPending ? "Recording…" : "Confirm"}
                   </Button>
-                  <Button variant="ghost" onClick={() => setRecPanelOpen(false)}>Cancel</Button>
+                  <Button variant="ghost" onClick={() => { receiptKey.current = null; setRecPanelOpen(false); }}>Cancel</Button>
                 </div>
               </div>
             )}
@@ -186,4 +195,16 @@ export default function ARDrawer({
       </div>
     </Drawer>
   );
+}
+
+/** The typed amount, read the way the other finance forms read it: commas are
+ *  thousands, anything else that is not a number is refused, never guessed.
+ *  A trailing point (`12.`) is the number typed so far. */
+function readAmount(typed: string): { value: number | null; error?: string } {
+  const n = parseTypedAmount(typed.replace(/\.\s*$/, ""));
+  if (n === null) return { value: null, error: "Type the amount." };
+  if (Number.isNaN(n)) return { value: null, error: "Type the amount in numbers, like 1500.00." };
+  if (n <= 0) return { value: null, error: "The amount must be more than RM 0.00." };
+  if (Math.abs(Math.round(n * 100) - n * 100) > 1e-6) return { value: null, error: "An amount has at most two decimals." };
+  return { value: n };
 }

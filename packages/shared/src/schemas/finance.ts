@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { departmentFilterFields, departmentFilterMessage, departmentFilterOk } from '../department';
 import { paymentMethodKeySchema } from './order-payments';
 import { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE } from '../finance-ledger';
+import { moneyInAmount } from '../other-money-in';
 
 /**
  * Phase 5 — HQ Finance role inputs.
@@ -53,7 +54,9 @@ export type FinanceTopupApproveInput = z.infer<typeof financeTopupApproveInput>;
  */
 export const financeRecordReceiptInput = z.object({
   orderId:    z.string().uuid(),
-  amount:     z.number().positive().finite(),
+  /** More than zero, at most two decimals: a third decimal is refused, never
+   *  rounded (order_payments.amount is numeric(12,2)). */
+  amount:     moneyInAmount,
   /** 0476: a method KEY — a system word, an alias (`bank_transfer` → bank) or
    *  a method from Settings → Payment. `finance_record_receipt` takes text and
    *  the one writer decides; the old enum sent `bank_transfer`, which the

@@ -22,7 +22,8 @@ import { cents, num } from "./payables/payables-words";
 
 export type CustomerOwingRow = ReturnType<typeof customerBalanceRows>[number];
 
-/** Every order a customer still owes money on, largest first. */
+/** Every order a customer still owes money on, largest first. Outstanding is
+ *  already in whole sen (`customerBalanceRows`), so a paid order never owes. */
 export function customerOwingRows(rows: readonly InvoiceRegisterRow[]): CustomerOwingRow[] {
   return customerBalanceRows(rows).filter((r) => r.outstanding > 0);
 }

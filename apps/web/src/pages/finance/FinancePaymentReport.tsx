@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/api";
 import { useInvoiceRegister, usePaymentRegister } from "@/lib/queries";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
+import { cents } from "./payables/payables-words";
 
 /**
  * Reports → Payment (docs/payment/MASTER.md §11 + §16 — the six approved
@@ -82,9 +83,10 @@ export function customerBalanceRows(rows: readonly InvoiceRegisterRow[]): Array<
       so: door.orders?.so ?? null,
       customer: door.orders?.customer_name ?? "Customer not available",
       doorId: door.id,
-      outstanding: money.outstanding,
-      storageOwing: money.storageOwing,
-      overpaid: money.overpaid,
+      // To the sen: a paid order's float crumb (5.6e-17) must not read as owing.
+      outstanding: cents(money.outstanding),
+      storageOwing: cents(money.storageOwing),
+      overpaid: cents(money.overpaid),
       issuedAt: mine.find((r) => r.kind === "sales" && r.status === "issued")?.issued_at ?? null,
     });
   }
