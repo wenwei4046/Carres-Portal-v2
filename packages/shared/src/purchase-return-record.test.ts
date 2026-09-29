@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  CARRES_NEXT_CHOICES,
+  SUPPLIER_CLAIM_DECISIONS,
+  supplierClaimDecision,
+  supplierClaimLegacyWords,
   PURCHASE_RETURN_WORK_RULE,
   WHAT_CARRES_DOES_NOT_RECORDED,
   carresNextWord,
@@ -34,19 +36,26 @@ const pr = (over: Partial<PurchaseReturnDetail> = {}): PurchaseReturnDetail => (
   ...over,
 });
 
-describe("Record what Carres does next — the five stored values and their display words", () => {
-  it("prints the 2026-09-25 display words in the approved order", () => {
-    expect(CARRES_NEXT_CHOICES.map((c) => c.label)).toEqual([
-      "Return to supplier", "Collect defective item", "Replace first", "Collect first", "Exchange on collection",
-    ]);
-    expect(CARRES_NEXT_CHOICES.map((c) => c.key)).toEqual([
-      "return_to_supplier", "collect_defective_item", "replace_first", "collect_first", "exchange_on_collection",
-    ]);
+describe("Record what Carres does next — the three supplier-side decisions (owner ruling 2026-09-29)", () => {
+  it("offers exactly Return to supplier · Repair · Replacement", () => {
+    expect(SUPPLIER_CLAIM_DECISIONS.map((c) => c.label)).toEqual(["Return to supplier", "Repair", "Replacement"]);
+    expect(SUPPLIER_CLAIM_DECISIONS.map((c) => c.key)).toEqual(["return_to_supplier", "repair", "replacement"]);
+  });
+  it("is ONE decision read from the facts the downstream doors read", () => {
+    expect(supplierClaimDecision({ carres_execution: "return_to_supplier", customer_resolution: null })).toBe("return_to_supplier");
+    expect(supplierClaimDecision({ carres_execution: null, customer_resolution: "repair" })).toBe("repair");
+    expect(supplierClaimDecision({ carres_execution: null, customer_resolution: "replace" })).toBe("replacement");
+    // A legacy customer movement or customer remedy is not a decision.
+    expect(supplierClaimDecision({ carres_execution: "replace_first", customer_resolution: "accept_as_is" })).toBeNull();
+  });
+  it("keeps a legacy value readable as history, never translated", () => {
+    expect(supplierClaimLegacyWords({ carres_execution: "collect_first", customer_resolution: "accept_as_is" })).toEqual(["Collect First", "Accept As-Is"]);
+    expect(supplierClaimLegacyWords({ carres_execution: "return_to_supplier", customer_resolution: "repair" })).toEqual([]);
   });
   it("an unrecorded decision says so", () => {
     expect(carresNextWord(null)).toBe(WHAT_CARRES_DOES_NOT_RECORDED);
     expect(WHAT_CARRES_DOES_NOT_RECORDED).toBe("What Carres does · Not recorded");
-    expect(carresNextWord("replace_first")).toBe("Replace first");
+    expect(carresNextWord("replacement")).toBe("Replacement");
   });
 });
 

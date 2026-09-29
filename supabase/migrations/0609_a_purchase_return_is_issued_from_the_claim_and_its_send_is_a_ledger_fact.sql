@@ -38,18 +38,38 @@
 --      It still moves NO stock (§7.4).
 --   6. `purchase_return_record_send` · `purchase_return_record_pickup_confirmation`
 --      — the two new writers; any active Operation person, the recorder kept.
---   7. `supplier_claim_record_carres_execution` (0409) re-issued from its
---      production definition with only two additions: the actor must be PO
---      Duty, its dated cover or an Operations Superuser (the one PO issue
---      capability, `purchasing_actor_may_issue`, 0403), and a claim that has
---      an issued Purchase Return cannot be moved off `Return to supplier`.
+--   7. `Record what Carres does next` — OWNER RULING (Jess, 2026-09-29):
+--      the claim offers ONLY the three supplier-side decisions, `Return to
+--      supplier` · `Repair` · `Replacement`, and that ONE decision IS the
+--      Authorised Outcome. The four customer movements belong to the Service
+--      Case. The existing door `supplier_claim_record_carres_execution` (0409)
+--      is re-issued as the one decision writer; it writes the fact each
+--      downstream door already reads, so there is one decision and no second
+--      arithmetic (`supplier_claim_decision`):
+--        Return to supplier → carres_execution = 'return_to_supplier'
+--                             (purchasing_issue_purchase_return)
+--        Repair             → customer_resolution = 'repair'
+--                             (repair_order_create 0602, arrival_source_create)
+--        Replacement        → customer_resolution = 'replace'
+--                             (arrival_source_create, supplier-replacement)
+--      Legacy stored values (the four customer movements, Accept As-Is, No
+--      Replacement Required) are never deleted or translated: nothing here
+--      rewrites them, and a decision that replaces one names it in History.
+--      Only PO Duty, its dated cover or an Operations Superuser, through the
+--      ONE Shared Duty Resolver (`workspace_resolve_duty('po_duty')`,
+--      `purchasing_po_duty_may_act`) — the ops_po_duty month path is retired
+--      for this door. The decision cannot change once its execution document
+--      exists: a PR (Return), an active RO (Repair), an active
+--      supplier-replacement arrival source (Replacement).
+--   8. The legacy 0324 customer-resolution door is closed to signed-in
+--      callers (EXECUTE revoked, function kept): it would be a second writer
+--      of the Authorised Outcome.
 --
 -- What it deliberately does NOT do:
 --   · no stock, holder, location or availability write — Stock's Outbound
 --     `Return to supplier` handover owns the physical facts (Stock §12.8);
 --   · no Supplier Received Date writer — recorded from supplier evidence in a
 --     later scope;
---   · no Authorised Outcome writer (§9.5) — none is approved here;
 --   · no row count is asserted and no existing row is changed (red line 8).
 -- =============================================================================
 
@@ -404,10 +424,47 @@ $fn$;
 revoke all on function public.purchase_return_record_pickup_confirmation(uuid, date, text) from public, anon;
 grant execute on function public.purchase_return_record_pickup_confirmation(uuid, date, text) to authenticated;
 
--- ── 7 · `Record what Carres does next` — PO Duty, cover or superuser ────────
---
--- Re-issued from the production definition (0409, read back 2026-09-29) with
--- two additions only; everything else is unchanged.
+-- ── 7 · `Record what Carres does next` — the ONE supplier-side decision ─────
+
+-- The ONE Shared Duty Resolver, asked for the PO Duty capability: the normal
+-- holder, today's dated cover, or a governed Operations Superuser. The same
+-- resolver Work owners read (Workspace §3); ops_po_duty is not consulted.
+create or replace function public.purchasing_po_duty_may_act(p_user uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_duty jsonb;
+begin
+  if p_user is null then return false; end if;
+  if public.is_operations_superuser(p_user) then return true; end if;
+  v_duty := public.workspace_resolve_duty('po_duty', null);
+  -- coalesce: an unassigned duty is NULL, and NULL must never pass a gate (0500).
+  return coalesce(p_user = (v_duty->>'normal_user_id')::uuid, false)
+      or coalesce(p_user = (v_duty->>'acting_user_id')::uuid, false);
+end;
+$fn$;
+revoke all on function public.purchasing_po_duty_may_act(uuid) from public, anon;
+grant execute on function public.purchasing_po_duty_may_act(uuid) to authenticated;
+
+-- ONE arithmetic for the decision, read by the record, Work and the doors.
+create or replace function public.supplier_claim_decision(p_claim supplier_claims)
+returns text
+language sql
+stable
+set search_path = public, pg_temp
+as $fn$
+  select case
+    when p_claim.carres_execution = 'return_to_supplier' then 'return_to_supplier'
+    when p_claim.customer_resolution = 'repair' then 'repair'
+    when p_claim.customer_resolution = 'replace' then 'replacement'
+  end;
+$fn$;
+grant execute on function public.supplier_claim_decision(supplier_claims) to authenticated;
+
 create or replace function public.supplier_claim_record_carres_execution(
   p_claim_id uuid,
   p_execution text,
@@ -418,32 +475,33 @@ security definer
 set search_path = public, pg_temp
 as $fn$
 declare
-  v_role      app_role;
-  v_uid       uuid;
-  v_actor     text;
-  v_claim     supplier_claims;
-  v_execution text;
-  v_note      text;
-  v_pr        text;
+  v_role     app_role;
+  v_uid      uuid;
+  v_actor    text;
+  v_claim    supplier_claims;
+  v_decision text;
+  v_current  text;
+  v_note     text;
+  v_doc      text;
+  v_was      text;
 begin
   v_role := public.supplier_claim_gate();
   v_uid  := auth.uid();
 
-  -- ⭐ 0609 — a Carres commitment: PO Duty, its dated cover or an Operations
-  -- Superuser (the one PO issue capability, 0403).
-  if not public.purchasing_actor_may_issue(v_uid) then
+  if not public.purchasing_po_duty_may_act(v_uid) then
     raise exception 'Only PO Duty records what Carres does next'
       using errcode = '42501', detail = 'not_po_duty';
   end if;
 
-  v_execution := nullif(btrim(coalesce(p_execution, '')), '');
-  v_note      := nullif(btrim(coalesce(p_note, '')), '');
-  if p_claim_id is null or v_execution is null then
+  v_decision := nullif(btrim(coalesce(p_execution, '')), '');
+  v_note     := nullif(btrim(coalesce(p_note, '')), '');
+  if p_claim_id is null or v_decision is null then
     raise exception 'p_claim_id and p_execution are required'
       using errcode = '22023', detail = 'invalid_input';
   end if;
-  if not public.supplier_claim_carres_execution_allowed(v_execution) then
-    raise exception '% is not one of the five Carres executions', v_execution
+  -- OWNER RULING 2026-09-29: three supplier-side decisions, nothing else.
+  if v_decision not in ('return_to_supplier', 'repair', 'replacement') then
+    raise exception '% is not one of the three supplier-side decisions', v_decision
       using errcode = 'P0001', detail = 'execution_invalid';
   end if;
 
@@ -451,47 +509,85 @@ begin
   if not found then
     raise exception 'claim not found' using errcode = '42P01', detail = 'claim_not_found';
   end if;
-
   if v_claim.status = 'closed' then
     raise exception 'claim % is already closed', v_claim.claim_no
       using errcode = 'P0001', detail = 'claim_closed';
   end if;
 
-  -- ⭐ 0609 — an issued Purchase Return is the commitment in paper; moving the
-  -- claim off `Return to supplier` would orphan it.
-  if v_claim.carres_execution = 'return_to_supplier' and v_execution <> 'return_to_supplier' then
-    select pr_no into v_pr from purchase_returns where supplier_claim_id = v_claim.id limit 1;
-    if v_pr is not null then
-      raise exception '% is already issued', v_pr
-        using errcode = '23514', detail = 'purchase_return_issued';
+  -- The decision cannot change once its execution document exists.
+  v_current := public.supplier_claim_decision(v_claim);
+  if v_current is not null and v_current <> v_decision then
+    if v_current = 'return_to_supplier' then
+      select pr_no into v_doc from purchase_returns where supplier_claim_id = v_claim.id limit 1;
+      if v_doc is not null then
+        raise exception '% is already issued', v_doc using errcode = '23514', detail = 'purchase_return_issued';
+      end if;
+    elsif v_current = 'repair' then
+      select ro_no into v_doc from repair_orders
+       where supplier_claim_id = v_claim.id and cancelled_at is null limit 1;
+      if v_doc is not null then
+        raise exception '% is already issued', v_doc using errcode = '23514', detail = 'repair_order_issued';
+      end if;
+    elsif v_current = 'replacement' then
+      select source_no into v_doc from arrival_sources
+       where claim_id = v_claim.id and kind = 'supplier-replacement' and cancelled_at is null limit 1;
+      if v_doc is not null then
+        raise exception '% is already issued', v_doc using errcode = '23514', detail = 'replacement_issued';
+      end if;
     end if;
   end if;
 
-  update supplier_claims
-     set carres_execution      = v_execution,
-         carres_execution_note = v_note,
-         carres_execution_at   = now(),
-         carres_execution_by   = v_uid,
-         updated_at            = now()
-   where id = p_claim_id;
+  -- A legacy value this decision replaces is named in History, never lost
+  -- silently (nothing here rewrites a legacy customer movement).
+  v_was := case
+    when v_decision <> 'return_to_supplier' and v_claim.customer_resolution is not null
+         and v_claim.customer_resolution not in ('repair', 'replace') then v_claim.customer_resolution
+  end;
+
+  if v_decision = 'return_to_supplier' then
+    update supplier_claims
+       set carres_execution      = 'return_to_supplier',
+           carres_execution_note = v_note,
+           carres_execution_at   = now(),
+           carres_execution_by   = v_uid,
+           customer_resolution    = case when customer_resolution in ('repair', 'replace') then null else customer_resolution end,
+           customer_resolution_at = case when customer_resolution in ('repair', 'replace') then null else customer_resolution_at end,
+           customer_resolution_by = case when customer_resolution in ('repair', 'replace') then null else customer_resolution_by end,
+           updated_at            = now()
+     where id = p_claim_id;
+  else
+    update supplier_claims
+       set customer_resolution      = case v_decision when 'repair' then 'repair' else 'replace' end,
+           customer_resolution_note = v_note,
+           customer_resolution_at   = now(),
+           customer_resolution_by   = v_uid,
+           carres_execution         = case when carres_execution = 'return_to_supplier' then null else carres_execution end,
+           carres_execution_note    = case when carres_execution = 'return_to_supplier' then null else carres_execution_note end,
+           carres_execution_at      = case when carres_execution = 'return_to_supplier' then null else carres_execution_at end,
+           carres_execution_by      = case when carres_execution = 'return_to_supplier' then null else carres_execution_by end,
+           updated_at               = now()
+     where id = p_claim_id;
+  end if;
 
   v_actor := coalesce((select name from app_users where id = v_uid), initcap(v_role::text));
 
   insert into po_history (po_id, text, by_role)
   values (v_claim.po_id,
-          format('Claim %s — how the goods move: %s%s', v_claim.claim_no, v_execution,
+          format('Claim %s — what Carres does next: %s%s%s', v_claim.claim_no, v_decision,
+                 case when v_was is null then '' else format(' (was %s)', v_was) end,
                  case when v_note is null then '' else format(' (%s)', v_note) end),
           v_role);
 
   insert into audit_log (role, actor_text, action, ref)
   values (v_role, v_actor,
-          format('Supplier claim %s — Carres execution %s', v_claim.claim_no, v_execution),
+          format('Supplier claim %s — decision %s%s', v_claim.claim_no, v_decision,
+                 case when v_was is null then '' else format(' (was %s)', v_was) end),
           v_claim.claim_no);
 
   return jsonb_build_object(
-    'claim_no',         v_claim.claim_no,
-    'carres_execution', v_execution,
-    'status',           v_claim.status
+    'claim_no', v_claim.claim_no,
+    'decision', v_decision,
+    'status',   v_claim.status
   );
 end;
 $fn$;
@@ -499,6 +595,9 @@ $fn$;
 revoke execute on function public.supplier_claim_record_carres_execution(uuid, text, text) from public;
 revoke execute on function public.supplier_claim_record_carres_execution(uuid, text, text) from anon;
 grant  execute on function public.supplier_claim_record_carres_execution(uuid, text, text) to authenticated;
+
+-- ── 8 · the legacy customer-resolution door is no second writer ─────────────
+revoke execute on function public.supplier_claim_record_customer_resolution(uuid, text, text) from authenticated;
 
 -- ── sanity — the catalog, never a row count ─────────────────────────────────
 do $$
@@ -520,6 +619,12 @@ begin
   end if;
   if not has_function_privilege('authenticated', 'public.purchasing_issue_purchase_return(uuid, jsonb, date)', 'execute') then
     raise exception 'sanity: authenticated lost execute on the purchase return door';
+  end if;
+  if has_function_privilege('authenticated', 'public.supplier_claim_record_customer_resolution(uuid, text, text)', 'execute') then
+    raise exception 'sanity: the legacy customer-resolution door still writes the Authorised Outcome';
+  end if;
+  if has_function_privilege('anon', 'public.purchasing_po_duty_may_act(uuid)', 'execute') then
+    raise exception 'sanity: anon can ask the PO Duty capability';
   end if;
   if pg_get_constraintdef((select oid from pg_constraint where conname = 'document_sends_document_kind_check')) !~ 'purchase_return' then
     raise exception 'sanity: document_sends does not admit purchase_return';

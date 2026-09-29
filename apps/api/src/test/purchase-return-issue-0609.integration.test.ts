@@ -6,9 +6,12 @@ import pg from "pg";
  * Returns creation door (Purchasing MASTER §9.6 "CREATION DOOR — OWNER-APPROVED
  * (Jess, 2026-09-25)"):
  *
- *   decide    `Record what Carres does next` is PO Duty, dated cover or
- *             Operations Superuser only; it cannot leave `Return to supplier`
- *             once a Purchase Return is issued
+ *   decide    `Record what Carres does next` offers the THREE supplier-side
+ *             decisions (owner ruling 2026-09-29): Return to supplier · Repair ·
+ *             Replacement. It is the Authorised Outcome: it writes the fact the
+ *             downstream doors read. PO Duty, dated cover or Operations
+ *             Superuser through the ONE Shared Duty Resolver (not ops_po_duty);
+ *             it cannot change once its execution document exists
  *   units     only this claim's held tracked Units are offered; a refused Unit
  *             says why in the same words the door refuses with
  *   issue     the door reads `Return To` from Supplier Master; absent →
@@ -34,6 +37,7 @@ const uid = (tail: string) => `fffffff9-0000-4000-8000-${HEX}${tail.padStart(7, 
 const OP = uid("2");
 const DUTY = uid("3");
 const SUPER = uid("5");
+const COVER = uid("6");
 const DEALER = uid("4");
 const SUPPLIER = uid("51");
 const BARE_SUPPLIER = uid("52");
@@ -42,6 +46,7 @@ const PO = `PO-IT9-${HEX}`;
 const CLAIM = uid("81");
 const BARE_CLAIM = uid("82");
 const OTHER_CLAIM = uid("83");
+const REPAIR_CLAIM = uid("84");
 const UNIT_A = uid("b1");
 const UNIT_B = uid("b2");
 const UNIT_FREE = uid("b3");
@@ -87,19 +92,25 @@ describe.skipIf(!URL)("Purchase Return creation door (real PostgreSQL, 0609)", (
     await db.connect();
     await q("begin");
     await q("set local session_replication_role = replica");
-    for (const [id, role, superuser] of [[OP, "operation", false], [DUTY, "operation", false], [SUPER, "operation", true], [DEALER, "dealer", false]] as const) {
+    for (const [id, role, superuser] of [[OP, "operation", false], [DUTY, "operation", false], [SUPER, "operation", true], [COVER, "operation", false], [DEALER, "dealer", false]] as const) {
       const email = `it-0609-${id.slice(-7)}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
       await q("insert into app_users (id, email, name, role, status, is_person, operations_superuser) values ($1, $2, $3, $4, 'active', true, $5)", [id, email, `IT ${role} ${id.slice(-2)}`, role, superuser]);
     }
+    // ⭐ THE ONE SHARED DUTY RESOLVER: DUTY holds `po_duty` in Staff & Duties
+    // and COVER covers today. OP holds the RETIRED ops_po_duty month row — it
+    // must no longer grant anything.
     const month = (await q("select to_char(timezone('Asia/Kuala_Lumpur', now()), 'YYYY-MM') as m")).rows[0].m as string;
     await q("delete from ops_po_duty_cover where month = $1", [month]);
-    await q("insert into ops_po_duty (month, user_id) values ($1, $2) on conflict (month) do update set user_id = excluded.user_id", [month, DUTY]);
+    await q("insert into ops_po_duty (month, user_id) values ($1, $2) on conflict (month) do update set user_id = excluded.user_id", [month, OP]);
+    await q("delete from workspace_duty_covers where duty_key = 'po_duty'");
+    await q("insert into workspace_duty_assignments (duty_key, holder_id, effective_from, created_at) values ('po_duty', $1, (timezone('Asia/Kuala_Lumpur', now()))::date, now() + interval '1 hour')", [DUTY]);
+    await q("insert into workspace_duty_covers (duty_key, normal_user_id, acting_user_id, starts_on, ends_on) values ('po_duty', $1, $2, (timezone('Asia/Kuala_Lumpur', now()))::date, (timezone('Asia/Kuala_Lumpur', now()))::date)", [DUTY, COVER]);
     await q("insert into suppliers (id, name, kind, slug, return_address) values ($1, $2, (select enum_range(null::supplier_kind))[1], $3, $4)", [SUPPLIER, `IT Hooka ${HEX}`, `it-pr-${HEX}`, `Lot 9, Jalan IT ${HEX}, Muar`]);
     await q("insert into suppliers (id, name, kind, slug) values ($1, $2, (select enum_range(null::supplier_kind))[1], $3)", [BARE_SUPPLIER, `IT Bare ${HEX}`, `it-pr-bare-${HEX}`]);
     await q("insert into warehouses (id, name, kind) values ($1, $2, 'own')", [WH, `IT Klang ${HEX}`]);
     await q("insert into purchase_orders (id, supplier_id, warehouse_id) values ($1, $2, $3)", [PO, SUPPLIER, WH]);
-    for (const [id, no, supplier] of [[CLAIM, `SC-IT9-${HEX}`, SUPPLIER], [BARE_CLAIM, `SC-IT9B-${HEX}`, BARE_SUPPLIER], [OTHER_CLAIM, `SC-IT9C-${HEX}`, SUPPLIER]] as const) {
+    for (const [id, no, supplier] of [[CLAIM, `SC-IT9-${HEX}`, SUPPLIER], [BARE_CLAIM, `SC-IT9B-${HEX}`, BARE_SUPPLIER], [OTHER_CLAIM, `SC-IT9C-${HEX}`, SUPPLIER], [REPAIR_CLAIM, `SC-IT9D-${HEX}`, SUPPLIER]] as const) {
       await q(
         `insert into supplier_claims (id, claim_no, po_id, supplier_id, sku, product_category, claim_type, qty, photos)
          values ($1, $2, $4, $3, 'IT-SKU', 'other', 'damaged', 2, '[{"path":"claims/it.jpg"}]'::jsonb)`,
@@ -138,18 +149,69 @@ describe.skipIf(!URL)("Purchase Return creation door (real PostgreSQL, 0609)", (
     expect(col.rowCount).toBe(1);
   });
 
-  it("`Record what Carres does next` refuses an Operation person who is not PO Duty", async () => {
+  it("the resolver names DUTY today, and an unknown caller is refused (NULL never passes)", async () => {
+    await q("reset role");
+    expect((await q("select public.workspace_resolve_duty('po_duty', null)->>'normal_user_id' as n")).rows[0].n).toBe(DUTY);
+    expect((await q("select public.purchasing_po_duty_may_act($1) as a", [uid("ff")])).rows[0].a).toBe(false);
+  });
+
+  it("refuses an Operation person who holds only the retired ops_po_duty row", async () => {
     await as(OP);
     const r = await decide(CLAIM, "return_to_supplier");
     expect(r.ok ? "" : r.detail).toBe("not_po_duty");
   });
 
-  it("PO Duty and an Operations Superuser may record it", async () => {
+  it("PO Duty, today's dated cover and an Operations Superuser may record it", async () => {
     await as(SUPER);
     expect((await decide(BARE_CLAIM, "return_to_supplier")).ok).toBe(true);
+    await as(COVER);
+    expect((await decide(OTHER_CLAIM, "replacement")).ok).toBe(true);
     await as(DUTY);
     const r = await decide(CLAIM, "return_to_supplier");
     expect(r.ok).toBe(true);
+  });
+
+  it("offers only the three supplier-side decisions; a customer movement is refused", async () => {
+    await as(DUTY);
+    for (const legacy of ["collect_defective_item", "replace_first", "collect_first", "exchange_on_collection", "replace", "accept_as_is"]) {
+      const r = await decide(REPAIR_CLAIM, legacy);
+      expect(r.ok ? "" : r.detail, legacy).toBe("execution_invalid");
+    }
+  });
+
+  it("is the Authorised Outcome: each decision writes the fact its downstream door reads, and only that one", async () => {
+    await as(DUTY);
+    const row = async () => { await q("reset role"); return (await q("select carres_execution, customer_resolution, public.supplier_claim_decision(c) as d from supplier_claims c where id = $1", [REPAIR_CLAIM])).rows[0]; };
+    expect((await decide(REPAIR_CLAIM, "replacement")).ok).toBe(true);
+    expect(await row()).toEqual({ carres_execution: null, customer_resolution: "replace", d: "replacement" });
+    await as(DUTY);
+    expect((await decide(REPAIR_CLAIM, "return_to_supplier")).ok).toBe(true);
+    expect(await row()).toEqual({ carres_execution: "return_to_supplier", customer_resolution: null, d: "return_to_supplier" });
+    await as(DUTY);
+    expect((await decide(REPAIR_CLAIM, "repair")).ok).toBe(true);
+    expect(await row()).toEqual({ carres_execution: null, customer_resolution: "repair", d: "repair" });
+  });
+
+  it("a Repair decision cannot change once an active Repair Order exists", async () => {
+    await q("reset role");
+    await q("set local session_replication_role = replica");
+    await q(
+      "insert into repair_orders (request_id, ro_no, ro_doc_date, supplier_id, supplier_claim_id, pickup_site_id, return_site_id, created_by) values (gen_random_uuid(), $1, current_date, $2, $3, $4, $4, $5)",
+      [`RO-IT9-${HEX}`, SUPPLIER, REPAIR_CLAIM, WH, DUTY],
+    );
+    await q("set local session_replication_role = origin");
+    await as(DUTY);
+    const r = await decide(REPAIR_CLAIM, "replacement");
+    expect(r.ok ? "" : r.detail).toBe("repair_order_issued");
+    expect(r.ok ? "" : r.why).toBe(`RO-IT9-${HEX} is already issued`);
+    // Re-recording the same decision is not a change.
+    expect((await decide(REPAIR_CLAIM, "repair")).ok).toBe(true);
+  });
+
+  it("the retired customer-resolution door is closed to signed-in callers", async () => {
+    await q("reset role");
+    const r = (await q("select has_function_privilege('authenticated', 'public.supplier_claim_record_customer_resolution(uuid, text, text)', 'execute') as a")).rows[0];
+    expect(r.a).toBe(false);
   });
 
   it("offers only this claim's held tracked Units and names each refusal", async () => {
@@ -235,9 +297,9 @@ describe.skipIf(!URL)("Purchase Return creation door (real PostgreSQL, 0609)", (
     expect(r.ok ? "" : r.why).toBe(`${code(101)}: Already on ${pr}`);
   });
 
-  it("will not change what Carres does once a return is issued", async () => {
+  it("will not change the decision once a return is issued", async () => {
     await as(DUTY);
-    const r = await decide(CLAIM, "collect_first");
+    const r = await decide(CLAIM, "repair");
     expect(r.ok ? "" : r.detail).toBe("purchase_return_issued");
   });
 

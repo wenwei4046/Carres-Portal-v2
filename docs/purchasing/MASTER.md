@@ -3754,29 +3754,39 @@ C1 delivers the confirmed 12-column Register (engine `pinnedPrefix`, 51px two-li
 closed rail groups), the full-width record in the approved order, `Record what we asked` · `Record
 supplier reply` (answer · Applies to · Supplier's date · Evidence · Note) · `Claim sent to supplier`
 (`document_sends` kind `supplier_claim`), and the three Claim Work rules (Workspace §6.1). C2 adds,
-on the record's Result section, `Record what Carres does next` (§9.6 creation door; writes
-`carres_execution` through the existing `POST /:id/carres-execution`, now PO Duty / dated cover /
-Operations Superuser only — `purchasing_actor_may_issue`, asked by the route and again by the
-database) and the server-confirmed `Plan Repair`: the record read returns `plan_repair.allowed` only
-when `customer_resolution = 'repair'` (the value 0602's RO create door checks), the claim holds exact
-tracked Units on hold, and the actor has that same capability; otherwise it names the missing fact
-(`Authorised Outcome` · `Units` · `PO Duty`). **Still APPROVED TARGET / NOT BUILT:** the Authorised
-Outcome WRITER — the only code that writes `customer_resolution` is the legacy 0324 route
-`POST /:id/customer-resolution`, which this MASTER does not treat as the approved writer and no
-screen calls, so `Plan Repair` never shows in practice until a governed writer exists; Stock-Unit
+on the record's Result section, the ONE supplier-side decision and Authorised Outcome (owner ruling
+2026-09-29 below) through the existing `POST /:id/carres-execution`, and the server-confirmed `Plan
+Repair` / `Plan Supplier replacement` / `Issue Purchase Return` doors; the missing fact names itself
+(`Authorised Outcome` · `Units` · `PO Duty`). **Still APPROVED TARGET / NOT BUILT:** Stock-Unit
 intake, the per-Unit read-only row expansion, Split/Cancel/Reopen, the claim pack PDF and the two
 Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
 `claim_escalation_extra_days` onto the claim when the ask is recorded** (read by name, 2 and 2 when
 the columns are absent); `Reply expected` and escalation read that snapshot, so a later Settings
 change never moves an asked claim's dates. An ask recorded before 0607 reads 2 and 2.
 
-🟡 **CONTRADICTION FOUND IN BUILD, NOT RESOLVED HERE (2026-09-29).** "Customer arrangement and
-supplier execution boundary" below (2026-09-18) says the four customer movement choices
-(`Collect Defective Item` · `Replace First` · `Collect First` · `Exchange on Collection`) belong to
-the Service Case and that Purchasing must not offer a second customer arrangement picker on the
-Claim. The newer §9.6 creation-door ruling (2026-09-25) lists all five values on the claim record's
-`Record what Carres does next`. C2 implements the newer ruling exactly (all five); the owner must
-say whether the four customer movements stay on the Claim or move to the Service Case.
+**OWNER RULING (Jess, 2026-09-29, "yes") — ONE SUPPLIER-SIDE DECISION, WHICH IS THE AUTHORISED
+OUTCOME.** `Record what Carres does next` on the Supplier Claim offers ONLY the three supplier-side
+decisions: `Return to supplier` · `Repair` · `Replacement`. The four customer movement choices
+(`Collect defective item` · `Replace first` · `Collect first` · `Exchange on collection`) belong to
+the related Service Case and are not offered on the claim — the customer-arrangement boundary below
+stands. This ONE decision is the claim's Authorised Outcome; there is no second picker and no second
+arithmetic. It is stored as the fact each downstream door already reads (0609,
+`supplier_claim_decision`): `Return to supplier` → `carres_execution = 'return_to_supplier'`
+(Purchase Return door) · `Repair` → `customer_resolution = 'repair'` (Repair Order create door 0602,
+repair-return arrival) · `Replacement` → `customer_resolution = 'replace'` (supplier-replacement
+arrival source). Only PO Duty, its dated cover or an Operations Superuser records it, resolved through
+the ONE Shared Duty Resolver (`workspace_resolve_duty('po_duty')`, the resolver Work owners read;
+the ops_po_duty month path is retired for this door). It cannot change once its execution document
+exists: a Purchase Return (Return), an active Repair Order (Repair) — and, by the same rule, an
+active supplier-replacement arrival source (Replacement; build reading, overturned by one owner
+sentence). Existing legacy values (the four customer movements, Accept As-Is, No Replacement
+Required) stay readable on the record as `Earlier record · {word}` and are never deleted or
+translated; the legacy 0324 customer-resolution door is closed to callers. The record then shows:
+`Issue Purchase Return` for Return to supplier; `Plan Repair` (server-confirmed: decision Repair ·
+exact Units held on the claim · the actor may act) opening the Repair Order create page prefilled
+with the Claim; `Plan Supplier replacement` for Replacement, opening its existing owning door (the
+supplier-replacement arrival source). **BUILT ON BRANCH `build/purchase-return-issue` 2026-09-29
+(PR #1795), 0609 NOT APPLIED.**
 
 **OWNER-APPROVED / LOCKED — 2026-09-06; claim boundary owner-approved 2026-09-14.** This is the
 single complete Supplier Claims operating model. Existing built facts and unbuilt target rules are
@@ -4893,10 +4903,10 @@ reason and only inside comments. Re-applying the exact file is safe whenever a p
 stream bytes exists — every statement in 0548 is idempotent (`create … if not exists`,
 `create or replace`, `drop policy/trigger if exists` then create).
 
-**CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25) · BUILT ON BRANCH `build/purchase-return-issue`
-2026-09-29 (slice C2); migration 0609 NOT APPLIED; not merged, not deployed.** Built: `Record what
-Carres does next` on the claim record's Result section (five stored values, their approved words,
-PO Duty / dated cover / Operations Superuser only); `Issue Purchase Return` once `Return to
+**CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25; decision list overwritten by the owner ruling
+of 2026-09-29) · BUILT ON BRANCH `build/purchase-return-issue` 2026-09-29 (slice C2, PR #1795);
+migration 0609 NOT APPLIED; not merged, not deployed.** Built: `Record what Carres does next` on the
+claim record's Result section (the three supplier-side decisions of §9.5's 2026-09-29 ruling); `Issue Purchase Return` once `Return to
 supplier` is recorded — the approved form beside its DRAFT paper, calling the ONE 0548 door
 (`purchasing_issue_purchase_return`, re-issued by 0609 with the same signature: claim must be open,
 every Unit re-checked by `purchase_return_unit_refusal` and against the `seen` token the form read,
@@ -4923,10 +4933,11 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
               → Supplier Received Date
 ```
 
-- **`Record what Carres does next`** on the record's Result section writes `carres_execution`
-  through the existing route; options are the five stored values, displayed `Return to supplier` ·
-  `Collect defective item` · `Replace first` · `Collect first` · `Exchange on collection`. It is
-  a Carres commitment: PO Duty, dated cover or Operations Superuser only.
+- **`Record what Carres does next`** on the record's Result section — **OWNER RULING (Jess,
+  2026-09-29)**: the three supplier-side decisions `Return to supplier` · `Repair` · `Replacement`,
+  which are the claim's Authorised Outcome (§9.5, same ruling; storage and door there). The four
+  customer movements belong to the related Service Case. PO Duty, dated cover or Operations
+  Superuser only, through the Shared Duty Resolver; locked once its execution document exists.
 - **`Issue Purchase Return`** appears once `Return to supplier` is recorded and calls the 0548 door
   through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
   held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
@@ -4943,7 +4954,7 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   Stock's Outbound `Return to supplier` (Stock §12.8) — collector, time, exact Units, proof —
   read here as `Not picked up` · `Partly picked up` · `Fully picked up`. `Supplier Received Date`
   is recorded from supplier evidence; fully picked up never implies it.
-- **Record states:** `What Carres does · Not recorded` → `Return to supplier` (Issue available) →
+- **Record states:** `What Carres does · Not recorded` → `What Carres does · Return to supplier` (Issue available) →
   `Sending not confirmed` → `Return document sent · {channel} · {date}` → `Pickup date not
   confirmed` / confirmed → picked-up facts → `Supplier Received Date`. **`Sending not confirmed`
   replaces the ruling's `Return document not sent` (build decision 2026-09-29, resolving the §9.7
@@ -4956,7 +4967,8 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   owner sentence. (a) Once a Purchase Return is issued, the claim cannot be moved off `Return to
   supplier` (`purchase_return_issued`) — no approved cancel/void exists for a PR. (b) `Issue
   Purchase Return` and the send / pickup-confirmation doors are open to any active Operation person
-  (0548's gate, unchanged); only `Record what Carres does next` is PO Duty only. (c) A Unit whose
+  (0548's gate, unchanged); only `Record what Carres does next` is PO Duty only (Shared Duty
+  Resolver). (c) A Unit whose
   claim hold was released reads `Hold released` and is not offered ("this claim's HELD tracked
   Units"). (d) A Confirmed Pickup date in the past is refused, and a confirmation must say who
   confirmed (`Who confirmed`). (e) The day-before check closes only on a confirmation for that date

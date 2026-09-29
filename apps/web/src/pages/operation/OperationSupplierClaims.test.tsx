@@ -265,13 +265,14 @@ describe("the claim record's Result — `Record what Carres does next` and `Issu
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("combobox"));
     const options = screen.getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual(["Return to supplier", "Collect defective item", "Replace first", "Collect first", "Exchange on collection"]);
+    // OWNER RULING 2026-09-29: the three supplier-side decisions only.
+    expect(options).toEqual(["Return to supplier", "Repair", "Replacement"]);
     fireEvent.click(screen.getByRole("option", { name: "Return to supplier" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Record what Carres does next" }));
     expect(writeMutate).toHaveBeenCalledWith("/api/operation/supplier-claims/c1/carres-execution", { carres_execution: "return_to_supplier" });
   });
   it("once `Return to supplier` is recorded, leads with `Issue Purchase Return` and opens the 50/50 form", () => {
-    recordQuery.mockReturnValue({ data: RECORD({ carres_execution: "return_to_supplier", carres_execution_at: "2026-09-29T02:00:00Z", carres_execution_by_name: "Mei", may_record_next: true }), isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "return_to_supplier", decision_at: "2026-09-29T02:00:00Z", decision_by_name: "Mei", may_record_next: true }), isLoading: false });
     claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", supplier_response: "return_and_replace", carres_execution: "return_to_supplier" })] }, isLoading: false });
     show("/operation?tab=claims&claim=c1");
     expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Return to supplier · Tue, 29 Sep · Mei");
@@ -283,7 +284,7 @@ describe("the claim record's Result — `Record what Carres does next` and `Issu
     expect(screen.queryByTestId("claim-result")).not.toBeInTheDocument();
   });
   it("an issued return reads `Sending not confirmed` and Stock's pickup word, never `not sent`", () => {
-    recordQuery.mockReturnValue({ data: RECORD({ carres_execution: "return_to_supplier", purchase_returns: [{ id: "pr1", pr_no: "PR-20260929-1001" }] }), isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "return_to_supplier", purchase_returns: [{ id: "pr1", pr_no: "PR-20260929-1001" }] }), isLoading: false });
     returnsQuery.mockReturnValue({ data: { returns: [{ id: "pr1", pr_no: "PR-20260929-1001", pr_doc_date: "2026-09-29T02:00:00Z", supplier_id: "s1", supplier_name: "Ohana", claim_no: "SC-1001", grn_no: null, sent_at: null, confirmed_pickup_date: null, sends: [], confirmations: [],
       units: [{ unit_id: "U1-000-075", po_id: null, category: null, item: null, item_spec: null, pickup_location: null, return_to: "Lot 9", collected_by: null, actual_pickup_date: null, supplier_received_date: null, evidence: [] }] }] }, isLoading: false });
     show("/operation?tab=claims&claim=c1");
@@ -295,8 +296,17 @@ describe("the claim record's Result — `Record what Carres does next` and `Issu
     expect(box).not.toHaveTextContent(/not sent/i);
     expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
   });
+  it("Replacement opens only its existing owning door; a legacy customer movement stays readable", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "replacement", decision_at: "2026-09-29T02:00:00Z", decision_by_name: "Mei", legacy_words: ["Collect First"], plan_replacement: { allowed: true } }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Replacement");
+    expect(screen.getByTestId("claim-plan-replacement")).toHaveAttribute("href", "/operation?tab=arrival-source&kind=supplier-replacement&claim=c1");
+    expect(screen.getByTestId("claim-legacy-decision")).toHaveTextContent("Earlier record · Collect First");
+    expect(screen.queryByTestId("claim-plan-repair")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
+  });
   it("`Plan Repair` appears only when the server confirms all three facts", () => {
-    recordQuery.mockReturnValue({ data: RECORD({ authorised_outcome: "Repair", plan_repair: { allowed: true, missing: null } }), isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "repair", authorised_outcome: "Repair", plan_repair: { allowed: true, missing: null } }), isLoading: false });
     show("/operation?tab=claims&claim=c1");
     expect(screen.getByTestId("claim-plan-repair")).toHaveAttribute("href", "/operation?tab=repair-orders&create=1&claim=c1");
   });

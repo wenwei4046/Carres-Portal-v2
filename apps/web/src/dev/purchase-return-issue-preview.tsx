@@ -41,6 +41,7 @@ const RECORD = {
   units: UNITS, requested_by_name: "Shasha", repair_orders: [], purchase_returns: [], authorised_outcome: null,
   plan_repair: { allowed: false, missing: "Authorised Outcome" }, po_duty_name: "Shasha", approver_name: "Jess",
   carres_execution: CLAIM.carres_execution, carres_execution_at: CLAIM.carres_execution_at, carres_execution_by_name: "Shasha", may_record_next: true,
+  decision: view === "claim-empty" ? null : "return_to_supplier", decision_at: CLAIM.carres_execution_at, decision_by_name: "Shasha", legacy_words: [],
 };
 const SOURCE: PurchaseReturnIssueSource = {
   claim_id: "claim-1", claim_no: CLAIM.claim_no, supplier_name: "Hookka Industries", return_address: "{Supplier return address}\nMuar, Johor", grn_no: CLAIM.grn_no,

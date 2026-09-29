@@ -10,9 +10,11 @@
  * Problem         type · note · evidence (the ONE shared viewer) · reported date and reporter
  * Supplier        what we asked · sending evidence · the reply state · the recorded answers
  *                 `Record what we asked` then `Record supplier reply`
- * Result          What Carres does (`Record what Carres does next`, PO Duty) ·
- *                 `Issue Purchase Return` · each PR's send and pickup state ·
- *                 Authorised Outcome · Item Outcome · RO door (`Plan Repair`)
+ * Result          What Carres does = the Authorised Outcome (`Record what Carres
+ *                 does next`: Return to supplier · Repair · Replacement, PO Duty;
+ *                 owner ruling 2026-09-29) · `Issue Purchase Return` · each PR's
+ *                 send and pickup state · `Plan Repair` · `Plan Supplier
+ *                 replacement` · Item Outcome
  * Related         Service Case (hidden when none)
  * Documents       Claim sent to supplier · channel · recipient · actor · time
  * History         three-rank records
@@ -25,7 +27,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  CARRES_NEXT_CHOICES,
+  SUPPLIER_CLAIM_DECISIONS,
+  supplierClaimDecision,
   ISSUE_PURCHASE_RETURN,
   RECORD_WHAT_CARRES_DOES_NEXT,
   carresNextWord,
@@ -144,7 +147,9 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
     reply_waiting_days: claim.reply_waiting_days ?? null, escalation_extra_days: claim.escalation_extra_days ?? null,
   };
   const open = claim.status === "open";
-  const execution = record.data?.carres_execution ?? claim.carres_execution ?? null;
+  // The ONE decision (owner ruling 2026-09-29) — the record's server read,
+  // else the same arithmetic over the row.
+  const execution = record.data?.decision !== undefined ? record.data.decision : supplierClaimDecision(claim);
   // §9.6: `Return to supplier` recorded and no Purchase Return yet — the same
   // fact Work projects as `Issue the purchase return to {Supplier}`.
   const pendingReturn = open && execution === "return_to_supplier" && record.data != null && (record.data.purchase_returns ?? []).length === 0;
@@ -333,9 +338,10 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
   // send, Stock's pickup facts) — never a second arithmetic here.
   const returns = useOperationPurchaseReturns(prRefs.length ? claim.id : null, { enabled: prRefs.length > 0 });
   const prs = returns.data?.returns ?? [];
-  const execution = record?.carres_execution ?? claim.carres_execution ?? null;
-  const executionBy = record?.carres_execution_by_name ?? null;
-  const executionAt = record?.carres_execution_at ?? claim.carres_execution_at ?? null;
+  const execution = record?.decision !== undefined ? record.decision : supplierClaimDecision(claim);
+  const executionBy = record?.decision_by_name ?? null;
+  const executionAt = record?.decision_at ?? null;
+  const legacy = record?.legacy_words ?? [];
   const mayRecord = open && Boolean(record?.may_record_next);
   const canIssue = open && execution === "return_to_supplier" && record != null && prRefs.length === 0;
   return <Block title="Result" headerSlot={mayRecord ? <Button variant="neutral" onClick={onNext} data-testid="claim-record-next">{RECORD_WHAT_CARRES_DOES_NEXT}</Button> : undefined}>
@@ -344,6 +350,7 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
         {execution ? `What Carres does · ${carresNextWord(execution)}` : carresNextWord(null)}
         {execution && executionAt ? <span className="text-kit-slate-11">{` · ${fmtDate(executionAt)} · ${executionBy ?? "Staff identity not recorded"}`}</span> : null}
       </p>
+      {legacy.length > 0 && <p className="text-meta text-kit-slate-11" data-testid="claim-legacy-decision">{`Earlier record · ${legacy.join(" · ")}`}</p>}
       {canIssue && onIssue && <div className="flex flex-wrap items-center gap-3">
         <Button variant="neutral" onClick={onIssue} data-testid="claim-issue-return">{ISSUE_PURCHASE_RETURN}</Button>
       </div>}
@@ -364,7 +371,6 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
           })}
       </div>}
       <Facts>
-        <Fact idPrefix="claim-fact" own={false} framed label="Authorised Outcome" value={record?.authorised_outcome ?? absent} />
         <Fact idPrefix="claim-fact" own={false} framed label="Item Outcome" value={heldUnitsLine(claim.held_units, claim.hold_reason)} />
         {ros.length > 0 && <Fact idPrefix="claim-fact" own={false} framed label="RO No" value={<span className="flex flex-wrap gap-2">{ros.map((ro) => <Link key={ro.id} className="text-kit-blue-11 hover:underline" to={`/operation?tab=repair-orders&ro=${encodeURIComponent(ro.id)}`}>{ro.ro_no}</Link>)}</span>} />}
       </Facts>
@@ -372,13 +378,17 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
           server confirms Authorised Outcome = Repair, the exact Units and the
           actor's permission. Otherwise the missing fact above names itself. */}
       {record?.plan_repair.allowed && <Link className="inline-block text-kit-blue-11 underline" to={`/operation?tab=repair-orders&create=1&claim=${encodeURIComponent(claim.id)}`} data-testid="claim-plan-repair">Plan Repair</Link>}
+      {/* Replacement's owning door is the supplier-replacement arrival source;
+          nothing new is invented here (owner ruling 2026-09-29). */}
+      {record?.plan_replacement?.allowed && <Link className="inline-block text-kit-blue-11 underline" to={`/operation?tab=arrival-source&kind=supplier-replacement&claim=${encodeURIComponent(claim.id)}`} data-testid="claim-plan-replacement">Plan Supplier replacement</Link>}
     </div>
   </Block>;
 }
 
-/** `Record what Carres does next` — the five stored values in their approved
- *  words. A Carres commitment: PO Duty, dated cover or Operations Superuser
- *  (the server refuses anyone else). */
+/** `Record what Carres does next` — OWNER RULING 2026-09-29: the three
+ *  supplier-side decisions, which are the Authorised Outcome. The four
+ *  customer movements belong to the Service Case. PO Duty, dated cover or
+ *  Operations Superuser (the server refuses anyone else). */
 function NextDialog({ claim, current, open, onClose }: { claim: SupplierClaimListRow; current: string | null; open: boolean; onClose: () => void }) {
   const door = usePurchaseReturnWrite(`/api/operation/supplier-claims/${encodeURIComponent(claim.id)}/carres-execution`);
   const [choice, setChoice] = useState<string | undefined>(current ?? undefined);
@@ -387,7 +397,7 @@ function NextDialog({ claim, current, open, onClose }: { claim: SupplierClaimLis
     canSave={Boolean(choice)} saveWord={RECORD_WHAT_CARRES_DOES_NEXT}
     onSave={() => door.mutate({ carres_execution: choice, ...(note.trim() ? { note: note.trim() } : {}) }, { onSuccess: onClose })}>
     <Select id="claim-next" label="What Carres does" value={choice} onValueChange={setChoice}
-      options={CARRES_NEXT_CHOICES.map((c) => ({ value: c.key, label: c.label }))} />
+      options={SUPPLIER_CLAIM_DECISIONS.map((c) => ({ value: c.key, label: c.label }))} />
     <Textarea id="claim-next-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
   </DoorDialog>;
 }

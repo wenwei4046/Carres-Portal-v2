@@ -2,8 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
-  CARRES_EXECUTION_KEYS,
-  CUSTOMER_RESOLUTION_KEYS,
+  SUPPLIER_CLAIM_DECISION_KEYS,
   HELD_STOCK_STATUS,
   STOCK_HOLD_OUTCOME_KEYS,
   SUPPLIER_CLAIM_LATE,
@@ -19,7 +18,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
-import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
+import { purchasingPoDutyMayAct } from "../../lib/purchasing-po-authority";
 import type { AppEnv } from "../../types";
 
 /**
@@ -555,40 +554,14 @@ supplierClaimsRouter.post("/:id/hold-resolve", async (c) => {
   return c.json(data ?? {});
 });
 
-// ----- Layer ③ · what we are doing for the CUSTOMER -------------------------
+// ----- Layer ③ · the customer resolution — RETIRED as a door ----------------
 //
-// Beside the item's outcome, never instead of it. Loo's test (2026-08-05): can
-// both be true at the same time? The customer cancelled AND the mattress is
-// destroyed — so two fields, two doors, and this one touches no stock.
-//
-// Deliberately NOT gated on the supplier's answer: a customer who cancels does
-// not wait for the factory to reply. Re-recordable while the claim is open and
-// refused once closed — the RPC decides both, exactly as with the other moves.
-const customerResolutionSchema = z.object({
-  customer_resolution: z.enum(CUSTOMER_RESOLUTION_KEYS),
-  note: noteSchema,
-});
-
-supplierClaimsRouter.post("/:id/customer-resolution", async (c) => {
-  gate(c);
-  const parsed = await parseJsonBody(c, customerResolutionSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc(
-    "supplier_claim_record_customer_resolution",
-    {
-      p_claim_id: c.req.param("id"),
-      p_resolution: parsed.data.customer_resolution,
-      p_note: parsed.data.note ?? null,
-    },
-  );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data ?? {});
-});
+// OWNER RULING (Jess, 2026-09-29): the customer remedy belongs to the related
+// Service Case, and `customer_resolution = repair / replace` is now written
+// ONLY by the one supplier-side decision below (it is the value the Repair
+// Order and supplier-replacement doors read). The 0324 route that wrote it
+// directly is removed and its database door is closed to callers (0609); the
+// stored values stay readable on the claim's rows.
 
 /**
  * Layer ④ — in what ORDER the goods move (0409).
@@ -609,7 +582,7 @@ supplierClaimsRouter.post("/:id/customer-resolution", async (c) => {
  * produces is unruled, and this route is not where that gets guessed.
  */
 const carresExecutionSchema = z.object({
-  carres_execution: z.enum(CARRES_EXECUTION_KEYS),
+  carres_execution: z.enum(SUPPLIER_CLAIM_DECISION_KEYS),
   note: noteSchema,
 });
 
@@ -619,15 +592,16 @@ supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  /* §9.6 (owner approval 2026-09-25): `Record what Carres does next` is a
-     Carres commitment — PO Duty, its dated cover or an Operations Superuser.
-     The database (0609) asks the same capability again. */
-  const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
+  /* §9.5/§9.6 OWNER RULING 2026-09-29: `Record what Carres does next` is the
+     ONE supplier-side decision and the Authorised Outcome — PO Duty, its dated
+     cover or an Operations Superuser through the Shared Duty Resolver. The
+     database (0609) asks the same capability again. */
+  const authority = await purchasingPoDutyMayAct(sb, c.var.auth.id);
   if (authority.error) {
     const m = mapPgError(authority.error);
     return c.json(m.body, m.status);
   }
-  if (!authority.mayIssue) {
+  if (!authority.mayAct) {
     return c.json({ error: "forbidden", code: "not_po_duty", message: "Only PO Duty records what Carres does next" }, 403);
   }
   const { data, error } = await sb.rpc(

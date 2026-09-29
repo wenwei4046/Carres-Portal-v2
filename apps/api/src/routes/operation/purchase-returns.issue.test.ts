@@ -58,6 +58,8 @@ function client(opts: { tables?: Record<string, unknown[]>; rpc?: Record<string,
     supplier_claim_replies: [],
     ops_stock_items: [],
     repair_orders: [],
+    salespersons: [],
+    app_users: [{ id: ME, name: "Mei", email: "mei@x" }],
     ...opts.tables,
   };
   const rpcs: Record<string, Rpc> = {
@@ -65,7 +67,7 @@ function client(opts: { tables?: Record<string, unknown[]>; rpc?: Record<string,
     purchasing_issue_purchase_return: { data: PR },
     purchase_return_record_send: { data: "d1" },
     purchase_return_record_pickup_confirmation: { data: "p1" },
-    purchasing_actor_may_issue: { data: true },
+    purchasing_po_duty_may_act: { data: true },
     supplier_claim_record_carres_execution: { data: { claim_no: "SC-1" } },
     workspace_resolve_duty: { data: null },
     actor_display_names: { data: [{ id: ME, name: "Mei" }] },
@@ -178,7 +180,7 @@ describe("send and pickup", () => {
 
 describe("Record what Carres does next and Plan Repair", () => {
   it("refuses an Operation person who is not PO Duty, cover or superuser", async () => {
-    const sb = client({ rpc: { purchasing_actor_may_issue: { data: false } } });
+    const sb = client({ rpc: { purchasing_po_duty_may_act: { data: false } } });
     const res = await call(sb, `/operation/supplier-claims/${CLAIM}/carres-execution`, { method: "POST", body: { carres_execution: "return_to_supplier" } });
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: "not_po_duty" });
@@ -196,9 +198,25 @@ describe("Record what Carres does next and Plan Repair", () => {
     const repairClaim = (resolution: string | null) => ({ supplier_claims: [{ id: CLAIM, claim_no: "SC-1", status: "open", customer_resolution: resolution, carres_execution: null, carres_execution_at: null, carres_execution_by: null, requested_by: null, requested_at: null, responded_by: null, supplier_response_reply_id: null }], ops_stock_items: [{ id: UNIT, unit_code: "U1-000-001", identity_scope: "unit", qty: 1, status: "on_hold" }] });
     const read = async (sb: ReturnType<typeof client>) => ((await (await call(sb, `/operation/supplier-claims/${CLAIM}/record`)).json()) as { plan_repair: { allowed: boolean; missing: string | null }; may_record_next: boolean });
     expect((await read(client({ tables: repairClaim(null) }))).plan_repair).toEqual({ allowed: false, missing: "Authorised Outcome" });
-    expect((await read(client({ tables: repairClaim("repair"), rpc: { purchasing_actor_may_issue: { data: false } } }))).plan_repair).toEqual({ allowed: false, missing: "PO Duty" });
+    expect((await read(client({ tables: repairClaim("repair"), rpc: { purchasing_po_duty_may_act: { data: false } } }))).plan_repair).toEqual({ allowed: false, missing: "PO Duty" });
     const ok = await read(client({ tables: repairClaim("repair") }));
     expect(ok.plan_repair).toEqual({ allowed: true, missing: null });
     expect(ok.may_record_next).toBe(true);
+  });
+
+  it("the ONE decision is the Authorised Outcome; Replacement opens its existing door only", async () => {
+    const claimWith = (over: Record<string, unknown>) => ({ supplier_claims: [{ id: CLAIM, claim_no: "SC-1", status: "open", customer_resolution: null, carres_execution: null, carres_execution_at: null, carres_execution_by: null, customer_resolution_at: null, customer_resolution_by: null, requested_by: null, requested_at: null, responded_by: null, supplier_response_reply_id: null, ...over }] });
+    const read = async (sb: ReturnType<typeof client>) => (await (await call(sb, `/operation/supplier-claims/${CLAIM}/record`)).json()) as Record<string, unknown>;
+    const replacement = await read(client({ tables: claimWith({ customer_resolution: "replace", customer_resolution_at: "2026-09-29T02:00:00Z", customer_resolution_by: ME }) }));
+    expect(replacement).toMatchObject({ decision: "replacement", authorised_outcome: "Replacement", decision_by_name: "Mei", plan_replacement: { allowed: true } });
+    const legacy = await read(client({ tables: claimWith({ carres_execution: "collect_first", customer_resolution: "accept_as_is" }) }));
+    expect(legacy).toMatchObject({ decision: null, authorised_outcome: null, legacy_words: ["Collect First", "Accept As-Is"] });
+  });
+
+  it("refuses a customer movement before the database", async () => {
+    const sb = client();
+    const res = await call(sb, `/operation/supplier-claims/${CLAIM}/carres-execution`, { method: "POST", body: { carres_execution: "collect_first" } });
+    expect(res.status).toBe(422);
+    expect(sb.rpc.mock.calls.some(([n]) => n === "supplier_claim_record_carres_execution")).toBe(false);
   });
 });

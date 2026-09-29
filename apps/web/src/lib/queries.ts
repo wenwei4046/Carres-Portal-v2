@@ -4081,6 +4081,13 @@ export interface SupplierClaimRecord {
   carres_execution_by_name?: string | null;
   /** The server confirms: PO Duty, dated cover or Operations Superuser. */
   may_record_next?: boolean;
+  /** OWNER RULING 2026-09-29: the ONE supplier-side decision = Authorised Outcome. */
+  decision?: "return_to_supplier" | "repair" | "replacement" | null;
+  decision_at?: string | null;
+  decision_by_name?: string | null;
+  /** Values recorded before the ruling, as history. */
+  legacy_words?: string[];
+  plan_replacement?: { allowed: boolean };
   po_duty_name: string | null;
   approver_name: string | null;
 }

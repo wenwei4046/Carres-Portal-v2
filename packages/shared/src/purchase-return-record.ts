@@ -20,7 +20,7 @@
  * module reads `actual_pickup_date` per Unit and never writes it. `Fully picked
  * up` never implies `Supplier Received Date`.
  */
-import type { CarresExecution } from "./supplier-claim";
+import { carresExecutionLabel, customerResolutionLabel } from "./supplier-claim";
 import type { PurchaseReturnListRow } from "./purchase-return";
 import { purchaseReturnCollectedQty, purchaseReturnQty } from "./purchase-return";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
@@ -30,17 +30,46 @@ import type { WorkItem } from "./work-engine";
 import { operationWorkItemFromProjection, type OperationWorkItem } from "./operation-work";
 import type { WorkspaceDutyResolution } from "./workspace-duty";
 
-// ── `Record what Carres does next` ──────────────────────────────────────────
+// ── `Record what Carres does next` — OWNER RULING (Jess, 2026-09-29) ───────
+//
+// The claim offers ONLY the three supplier-side decisions, and that ONE
+// decision IS the Authorised Outcome. The four customer movements (`Collect
+// defective item` · `Replace first` · `Collect first` · `Exchange on
+// collection`) belong to the related Service Case. The decision is stored as
+// the fact each downstream door already reads (0609):
+//
+//   Return to supplier → carres_execution = 'return_to_supplier'  (Purchase Return door)
+//   Repair             → customer_resolution = 'repair'           (Repair Order door, 0602)
+//   Replacement        → customer_resolution = 'replace'          (supplier-replacement arrival)
+//
+// `supplierClaimDecision` is the ONE arithmetic (SQL mirror:
+// `supplier_claim_decision`, 0609). Legacy stored values are history.
 
-/** The five stored values (0409) and their 2026-09-25 display words, in the
- *  approved order. The stored keys never change; only the words on screen. */
-export const CARRES_NEXT_CHOICES = [
+export type SupplierClaimDecision = "return_to_supplier" | "repair" | "replacement";
+
+export const SUPPLIER_CLAIM_DECISIONS = [
   { key: "return_to_supplier", label: "Return to supplier" },
-  { key: "collect_defective_item", label: "Collect defective item" },
-  { key: "replace_first", label: "Replace first" },
-  { key: "collect_first", label: "Collect first" },
-  { key: "exchange_on_collection", label: "Exchange on collection" },
-] as const satisfies ReadonlyArray<{ key: CarresExecution; label: string }>;
+  { key: "repair", label: "Repair" },
+  { key: "replacement", label: "Replacement" },
+] as const satisfies ReadonlyArray<{ key: SupplierClaimDecision; label: string }>;
+
+export const SUPPLIER_CLAIM_DECISION_KEYS = SUPPLIER_CLAIM_DECISIONS.map((d) => d.key) as [SupplierClaimDecision, ...SupplierClaimDecision[]];
+
+export function supplierClaimDecision(c: { carres_execution?: string | null; customer_resolution?: string | null }): SupplierClaimDecision | null {
+  if (c.carres_execution === "return_to_supplier") return "return_to_supplier";
+  if (c.customer_resolution === "repair") return "repair";
+  if (c.customer_resolution === "replace") return "replacement";
+  return null;
+}
+
+/** Legacy values recorded before the 2026-09-29 ruling, in the words they were
+ *  recorded with — history, never deleted and never translated. */
+export function supplierClaimLegacyWords(c: { carres_execution?: string | null; customer_resolution?: string | null }): string[] {
+  const out: string[] = [];
+  if (c.carres_execution && c.carres_execution !== "return_to_supplier") out.push(carresExecutionLabel(c.carres_execution));
+  if (c.customer_resolution && c.customer_resolution !== "repair" && c.customer_resolution !== "replace") out.push(customerResolutionLabel(c.customer_resolution));
+  return out;
+}
 
 export const RECORD_WHAT_CARRES_DOES_NEXT = "Record what Carres does next";
 export const WHAT_CARRES_DOES_NOT_RECORDED = "What Carres does · Not recorded";
@@ -50,7 +79,7 @@ export const NO_RETURN_WAS_ISSUED = "No return was issued.";
 
 export function carresNextWord(key: string | null | undefined): string {
   if (!key) return WHAT_CARRES_DOES_NOT_RECORDED;
-  return CARRES_NEXT_CHOICES.find((c) => c.key === key)?.label ?? key;
+  return SUPPLIER_CLAIM_DECISIONS.find((c) => c.key === key)?.label ?? key;
 }
 
 // ── the PR record ───────────────────────────────────────────────────────────
