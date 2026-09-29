@@ -1103,6 +1103,27 @@ result `Consignment order issued to {supplier}`. Existing source/permission cont
 Exact register column copy and composition remain subject to design closure; no new component is
 admitted by this naming ruling. Chinese explanations may accompany names in owner discussions.
 
+### Showroom movement controls — proposed copy for owner review, 2026-09-29
+
+**PROPOSAL / NOT LAW; not approved for application use.** Purchasing MASTER §§9.8, 9.13 own the
+approved expanded movement cards and explicit per-card answers. These are the remaining literal
+copy candidates for the consolidated review, not a change to those business rules:
+
+| Purpose | Proposed text | Boundary |
+|---|---|---|
+| Add another independently answered route | `Add movement` | Adds planning scope only; no stock movement or document issuance |
+| Identify a route card | `Movement {n}` | Display position only; never replaces permanent document or Unit identity |
+| Explicitly reuse preceding goods | `Same goods as movement {n}` | Initially unchecked; show actual source and copied goods; manual difference clears the claim |
+| Explicitly reuse transport party | `Same transport as movement {n}` | Initially unchecked; copies transport party only, not goods, dates or location contacts |
+| Resolve missing goods | `Choose goods for this movement` | New goods use Catalog; held goods use Stock identity; no assumed match with another card |
+| Resolve missing pickup | `Choose pickup location` | A location choice does not prove actual custody |
+| Resolve missing destination | `Choose delivery location` | A planned destination is not an actual arrival |
+
+Use established field/error/loading/save words elsewhere. Reuse for another field/group must name
+that scope and actual source in the same explicit way; never use a bare `Same as above` label.
+These controls create no new Checkbox/Button component. Approval of the capability alone does not
+certify the final wording, rendered dimensions or accessibility behaviour.
+
 ### Purchasing navigation words — owner ruling 2026-08-22
 
 These are the exact visible words for the Purchasing sidebar tree. They name doors only; they
