@@ -916,6 +916,23 @@ describe("GET /account-ledger", () => {
     expect(ops(calls[1], "range")).toEqual([["range", 1000, 1999]]);
   });
 
+  it("hands a credit account's running balance through as the database counted it", async () => {
+    // gl_account_ledger counts a LIABILITY as credit less debit, from the
+    // opening balance (everything before `from`). The route keeps that sign
+    // and the kind, which is how the Journal knows the side.
+    const row = { report_status: "OK", go_live_on: "2026-09-10", account_code: "2110", account_name: "Trade payables", kind: "LIABILITY" };
+    fakeClient(() => ok([
+      { ...row, ordinal: 1, row_kind: "OPENING", running_balance: "1000.00" },
+      { ...row, ordinal: 2, row_kind: "LINE", entry_no: "JE-T-0002", debit: "300.00", credit: "0.00", running_balance: "700.00" },
+      { ...row, ordinal: 3, row_kind: "LINE", entry_no: "JE-T-0003", debit: "0.00", credit: "50.00", running_balance: "750.00" },
+      { ...row, ordinal: 4, row_kind: "CLOSING", debit: "300.00", credit: "50.00", running_balance: "750.00" },
+    ]));
+    const body = await json(await get("/account-ledger?account=2110&from=2026-09-12&to=2026-09-30"));
+    expect(body.kind).toBe("LIABILITY");
+    expect(body.rows.map((r: { row_kind: string; running_balance: number }) => [r.row_kind, r.running_balance]))
+      .toEqual([["OPENING", 1000], ["LINE", 700], ["LINE", 750], ["CLOSING", 750]]);
+  });
+
   it("needs an account and both dates", async () => {
     expect((await get("/account-ledger?account=1210&from=2026-09-01")).status).toBe(422);
   });

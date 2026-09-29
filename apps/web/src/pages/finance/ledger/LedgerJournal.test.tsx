@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { itSaysNoBannedWord, visibleStrings } from "@/test/banned-words";
-import LedgerJournal from "./LedgerJournal";
-import { readJournal } from "./ledger-queries";
+import LedgerJournal, { balanceWords } from "./LedgerJournal";
+import { parseAccountBalances, readJournal } from "./ledger-queries";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
@@ -159,6 +159,123 @@ describe("Journal", () => {
     show();
     expect(await screen.findByRole("alert")).toHaveTextContent("The Journal could not be loaded. Try again.");
     expect(screen.queryByText(/No entries yet/)).not.toBeInTheDocument();
+  });
+});
+
+describe("one account's running balance", () => {
+  const line = (entry_no: string, entry_date: string, debit: number, credit: number, running_balance: number) =>
+    ({ row_kind: "LINE", entry_no, entry_date, debit, credit, running_balance });
+  // 1210 opens at RM 500.00 (everything before the read's first day), then
+  // each line moves it. JE-0006 has two lines on 1210: its balance is after both.
+  const LEDGER = {
+    status: "OK", go_live_on: "2026-09-10", account_code: "1210", account_name: "Trade receivables", kind: "ASSET",
+    rows: [
+      { row_kind: "OPENING", running_balance: 500 },
+      line("JE-202609-0003", "2026-09-10", 150, 0, 650),
+      line("JE-202609-0004", "2026-09-10", 0, 70, 580),
+      line("JE-202609-0005", "2026-09-11", 70, 0, 650),
+      line("JE-202609-0006", "2026-09-11", 0, 600, 50),
+      line("JE-202609-0006", "2026-09-11", 0, 100, -50),
+      line("JE-202609-0007", "2026-09-11", 10, 0, -40),
+      { row_kind: "CLOSING", debit: 230, credit: 770, running_balance: -40 },
+    ],
+  };
+  // The server lists the Journal by date and then by when each entry was
+  // made; the ledger counts by date and then entry number. Here the two differ.
+  const withLedger = (url: string, ledger: object = LEDGER) => url.startsWith("/api/finance/ledger/account-ledger?")
+    ? Promise.resolve(ledger)
+    : url.startsWith("/api/finance/ledger/entries?") ? Promise.resolve({ rows: [E4, E5, E3, E1, E2], total: 5 })
+    : answer(url);
+  const ledgerAsked = () => api.fetch.mock.calls.map(([u]) => String(u))
+    .filter((u) => u.startsWith("/api/finance/ledger/account-ledger?"));
+  const balanceByEntry = () => Object.fromEntries(screen.getAllByRole("row")
+    .map((r) => r.textContent ?? "")
+    .map((t) => [t.match(/JE-\d{6}-\d{4}/)?.[0], t.match(/RM [\d,.]+ (Debit|Credit)|RM 0\.00$/)?.[0]])
+    .filter(([no]) => no));
+
+  it("shows the balance after every entry, counted from the opening balance, newest first", async () => {
+    api.fetch.mockImplementation((u: string) => withLedger(u));
+    show("/finance/ledger?account=1210");
+    await screen.findByText("JE-202609-0003");
+    expect(await screen.findByRole("columnheader", { name: "Running balance" })).toBeInTheDocument();
+    // No dates picked: from the oldest entry shown to the newest. The opening
+    // balance carries everything before the oldest.
+    const asked = new URL(ledgerAsked()[0]!, "http://t").searchParams;
+    expect(Object.fromEntries(asked)).toEqual({ account: "1210", from: "2026-09-10", to: "2026-09-11" });
+    expect(balanceByEntry()).toEqual({
+      "JE-202609-0007": "RM 40.00 Credit",
+      "JE-202609-0006": "RM 50.00 Credit",
+      "JE-202609-0005": "RM 650.00 Debit",
+      "JE-202609-0004": "RM 580.00 Debit",
+      "JE-202609-0003": "RM 650.00 Debit",
+    });
+    // Rows run in the ledger's order, so the figures follow on down the page.
+    const order = screen.getAllByRole("row").map((r) => r.textContent?.match(/JE-\d{6}-\d{4}/)?.[0]).filter(Boolean);
+    expect(order).toEqual(["JE-202609-0007", "JE-202609-0006", "JE-202609-0005", "JE-202609-0004", "JE-202609-0003"]);
+  });
+
+  it("puts a credit account's balance on the credit side, and the debit side when it turns", async () => {
+    api.fetch.mockImplementation((u: string) => withLedger(u, { ...LEDGER, account_code: "2110", kind: "LIABILITY" }));
+    show("/finance/ledger?account=2110");
+    await screen.findByRole("columnheader", { name: "Running balance" });
+    expect(balanceByEntry()).toEqual({
+      "JE-202609-0007": "RM 40.00 Debit",
+      "JE-202609-0006": "RM 50.00 Debit",
+      "JE-202609-0005": "RM 650.00 Credit",
+      "JE-202609-0004": "RM 580.00 Credit",
+      "JE-202609-0003": "RM 650.00 Credit",
+    });
+  });
+
+  it("reads the opening balance from the day picked, not from the page", async () => {
+    api.fetch.mockImplementation((u: string) => withLedger(u));
+    show("/finance/ledger?account=1210&from=2026-09-11&to=2026-09-30&dept=SHOWROOM");
+    await screen.findByRole("columnheader", { name: "Running balance" });
+    const asked = new URL(ledgerAsked()[0]!, "http://t").searchParams;
+    expect(asked.get("from")).toBe("2026-09-11");
+    expect(asked.get("to")).toBe("2026-09-30");
+    expect(asked.get("departmentType")).toBe("SHOWROOM");
+  });
+
+  it("has no balance with every account in the list", async () => {
+    api.fetch.mockImplementation((u: string) => withLedger(u));
+    show();
+    await screen.findByText("JE-202609-0003");
+    expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument();
+    expect(ledgerAsked()).toEqual([]);
+  });
+
+  it("hides the balance while another column sorts the rows", async () => {
+    api.fetch.mockImplementation((u: string) => withLedger(u));
+    show("/finance/ledger?account=1210");
+    await screen.findByRole("columnheader", { name: "Running balance" });
+    const amount = screen.getByRole("columnheader", { name: /Amount/ });
+    fireEvent.click(within(amount).getByRole("button", { name: "Amount" }));
+    await waitFor(() => expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument());
+  });
+
+  it("says so when the balances cannot be read, and shows no figure", async () => {
+    api.fetch.mockImplementation((url: string) => url.startsWith("/api/finance/ledger/account-ledger?")
+      ? Promise.reject(new Error("boom")) : answer(url));
+    show("/finance/ledger?account=1210");
+    expect(await screen.findByTestId("journal-balances-failed")).toHaveTextContent("The running balances could not be loaded. Try again.");
+    expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument();
+  });
+
+  it("refuses an answer whose last line is not its closing balance", () => {
+    const short = { ...LEDGER, rows: LEDGER.rows.filter((r) => r.running_balance !== -40 || r.row_kind === "CLOSING") };
+    expect(() => parseAccountBalances(short, "1210")).toThrow("The running balances could not be loaded. Try again.");
+    expect(() => parseAccountBalances({ ...LEDGER, account_code: "2110" }, "1210")).toThrow();
+    expect(parseAccountBalances(LEDGER, "1210").after.get("JE-202609-0006")).toBe(-50);
+  });
+
+  it("puts a balance on the account's own side, and the other side when it turns", () => {
+    expect(balanceWords("ASSET", 650)).toBe("RM 650.00 Debit");
+    expect(balanceWords("EXPENSE", -5)).toBe("RM 5.00 Credit");
+    expect(balanceWords("LIABILITY", 1200)).toBe("RM 1,200.00 Credit");
+    expect(balanceWords("INCOME", 300)).toBe("RM 300.00 Credit");
+    expect(balanceWords("EQUITY", -20)).toBe("RM 20.00 Debit");
+    expect(balanceWords("LIABILITY", 0)).toBe("RM 0.00");
   });
 });
 
