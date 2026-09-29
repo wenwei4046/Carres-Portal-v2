@@ -533,7 +533,7 @@ export {
   setMessageTemplateInput,
   setLineDestinationInput,
   setLineOpsRemarkInput,
-  splitLineDestinationInput,
+  changePoDeliverToInput,
   recordBalanceDateInput,
   attachDoInput,
   receivePoWithDoInput,

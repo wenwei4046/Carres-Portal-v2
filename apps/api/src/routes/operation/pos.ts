@@ -21,7 +21,7 @@ import {
   setMessageTemplateInput,
   setLineDestinationInput,
   setLineOpsRemarkInput,
-  splitLineDestinationInput,
+  changePoDeliverToInput,
   warehouseReceiptTotals,
   type AwaitingStockShortageResponse,
   type PoReportLine,
@@ -2199,6 +2199,15 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   reason_required: "reason_required",
   nothing_changed: "nothing_changed",
   sent_po_needs_revision: "sent_po_needs_revision",
+  // 0610 · Change Deliver To's own refusals.
+  deliver_to_closed: "deliver_to_closed",
+  same_destination: "same_destination",
+  all_received: "all_received",
+  qty_out_of_range: "qty_out_of_range",
+  unit_chosen_twice: "unit_chosen_twice",
+  unit_not_on_line: "unit_not_on_line",
+  unit_count_mismatch: "unit_count_mismatch",
+  deliver_to_line_exists: "deliver_to_line_exists",
   // 0585 · the delay and day-before evidence refusals.
   other_note_required: "other_note_required",
   screenshot_required: "screenshot_required",
@@ -2512,6 +2521,28 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
   return c.json({ ok: true, result: data });
 });
 
+// ----- POST /:id/change-deliver-to -----
+// Purchasing MASTER §5.4 `Change Deliver To` (0610). One transaction on the
+// SAME PO: the moved qty joins the line already going to the new Deliver To
+// or becomes a new line; exact Units keep their IDs and follow; Sales Order
+// lineage follows once; the prior version is snapshotted and the next
+// version enters the send journey. Total quantity never changes.
+operationPosRouter.post("/:id/change-deliver-to", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, changePoDeliverToInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_change_po_deliver_to", {
+    p_po_id: c.req.param("id"),
+    p_line_id: parsed.data.lineId,
+    p_qty: parsed.data.qty,
+    p_destination_id: parsed.data.destinationId,
+    p_reason: parsed.data.reason,
+    p_unit_codes: parsed.data.unitCodes && parsed.data.unitCodes.length ? parsed.data.unitCodes : null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true, result: data });
+});
+
 // ----- PUT /:id/terms-days -----
 // 0530 — the PO's own payment terms. They win over the supplier's when the
 // bill form fills in a due date. Null clears them.
@@ -2539,10 +2570,11 @@ operationPosRouter.put("/message-template", requireOperation, async (c) => {
   return c.json({ ok: true, result: data });
 });
 
-// ----- POST /lines/:lineId/destination · /split · /ops-remark -----
+// ----- POST /lines/:lineId/destination · /ops-remark -----
 // Where each LINE goes (Jess, 2026-08-02 — 0311). Purchasing's only per-line
-// job: ten to Klang, one to AL. A whole line moves; a PART of a line SPLITS
-// (the PO stays one document with one supplier — her frozen law). The ops
+// job: ten to Klang, one to AL. A whole line moves here; a PART of a line
+// moves through /:id/change-deliver-to (0610), which carries its Units and
+// Sales Order lineage and mints the next version. The ops
 // remark is internal and, by 0311's own sanity check, can never print.
 operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, setLineDestinationInput);
@@ -2550,19 +2582,6 @@ operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("purchasing_set_line_destination", {
     p_line_id: c.req.param("lineId"),
-    p_destination_id: parsed.data.destinationId,
-  });
-  if (error) return mapSupplierCallError(c, error);
-  return c.json({ ok: true, result: data });
-});
-
-operationPosRouter.post("/lines/:lineId/split", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, splitLineDestinationInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("purchasing_split_line_destination", {
-    p_line_id: c.req.param("lineId"),
-    p_move_qty: parsed.data.moveQty,
     p_destination_id: parsed.data.destinationId,
   });
   if (error) return mapSupplierCallError(c, error);

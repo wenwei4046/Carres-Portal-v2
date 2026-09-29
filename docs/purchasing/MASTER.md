@@ -20,7 +20,7 @@ page 3 Supplier Claim record · page 4 Purchase Return document + send · page 5
 Purchasing · page 6 Work right-panel Purchasing cards (Workspace template) · page 7 Stock Unit
 Detail `Report a problem` (Stock lane). Cards are authored only after the owner agrees every
 page; recommended Card order A Settings · B shared send ledger · C PO window Work + SO Batch ·
-D per-item answer + day-before Work · E Change Deliver To · F Claim reply → decision → PRTN.
+D per-item answer + day-before Work · E Change Deliver To (BUILT 2026-09-29, 0610) · F Claim reply → decision → PRTN.
 Restart prompt: `Purchasing — PLAN / DESIGN, page-by-page UI review. Read CLAUDE.md, this
 RESUME block, UI MASTER §4.1/§6.7–6.10, tokens; continue at the next unapproved page; persist
 each owner-approved page to this MASTER + COPY + Workspace before moving on.`
@@ -442,11 +442,11 @@ receiving/logistics.
 
 #### `Change Deliver To` — send part of a sent PO to another destination
 
-**APPROVED TARGET / NOT BUILT (Jess, 2026-09-22).** The existing PO Edit does not yet do this. The
-staff member picks, inside the PO, the goods to send elsewhere; the system writes the next revision
-of the SAME PO. Nothing is typed twice and no second PO exists.
+**APPROVED (Jess, 2026-09-22) · BUILT 2026-09-29 (migration 0610 `purchasing_change_po_deliver_to`).**
+The staff member picks, inside the PO, the goods to send elsewhere; the system writes the next
+revision of the SAME PO. Nothing is typed twice and no second PO exists.
 
-Place: PO detail → `Edit` → `Deliver To`.
+Place: PO detail → `Edit ▾` → `Change Deliver To` (opens the 50/50 edit split beside the official PDF).
 
 ```text
 Change Deliver To
@@ -469,7 +469,7 @@ Reason              [ ... ]
 |---|---|---:|
 | Forte Mattress · King | Carres Klang Warehouse | 4 |
 | Forte Mattress · King | AL Sungai Buloh | 2 |
-| **Total — unchanged** | | **6** |
+| **Total unchanged** | | **6** |
 
 On confirm, one transaction saves the new revision and the change record (who, when, reason). The
 moved quantity becomes its own goods line on the SAME PO; its SO allocation moves with it, so the
@@ -490,25 +490,44 @@ demand is covered once, never twice.
 - The PDF of a PO with several Deliver To prints each destination from a new page
   (`docs/pdf/PO-PDF-STANDARD.md` §2).
 
-**Build boundary — owner confirmed the design 2026-09-25 · NOT BUILT.** Measured on `main`:
-`purchasing_revise_po` (0443) changes a whole line's quantity or Deliver To and mints a version, but
-cannot split a line, move exact Units to a new line, or carry `po_line_sources` with them — so today
-an operator can only move all 6 or open a second PO, both forbidden above. The build adds a split
-door on the same PO (new migration; 0443 untouched) and the `Change Deliver To` form beside each
-line under PO `Edit`. Decisions taken by the planner, not owner questions:
-- `Units moving` is **pre-selected by the system** (the line's last n IDs) and the operator may
-  change it. The choice is arbitrary by nature — the goods are still at the factory and, as the
-  owner noted 2026-09-25, the ID is on the packaging, not the product — so the screen never asks
-  for a reason to pick one Unit over another.
-- The SO allocation follows the Unit's existing line binding; a multi-source line splits by those
-  bindings, never by a second operator entry.
-- `Still to deliver` = ordered − received (Receiving's GRN); only that quantity may move. A fully
-  received line has no `Change Deliver To` and reads `All received · use a transfer instead`.
-- After save the new version enters the §5.6 send journey (`Version ({n}) must be sent to
-  {Supplier} again`); the prior version's PDF and send record are untouched.
+**How it is built (2026-09-29, 0610).** One SQL door, `purchasing_change_po_deliver_to(po, line,
+qty, deliver_to, reason, unit_codes)`, one transaction on the SAME PO:
+- **Checks first:** reason given · PO open · line on this PO · new Deliver To open and different from
+  where the goods go now · `1 ≤ Qty to move ≤ Qty you can move` (ordered − received). A fully
+  received line cannot be chosen and reads `All received · use a transfer instead`.
+- **Where the moved goods land:** the whole line just changes its Deliver To; part of a line lowers
+  it and joins the line of the same item already going to the new Deliver To, or becomes a new line
+  copied from it (same SKU, configuration, cost, demand). One line per item per Deliver To: the
+  0076 duplicate guard became `(PO, SKU, attrs, Deliver To)`. Moving a WHOLE line onto a sibling
+  line is refused (`{Item} already has a line going to {Deliver To}`) because a line is never
+  emptied or deleted.
+- **Units:** `Units moving` is pre-selected by the system (the line's last n IDs) and the operator
+  may change it; the screen never asks why one Unit over another. The chosen Units keep their Unit
+  IDs, status, site and reservation and rebind to the landing line — the only exception the Unit
+  permanence trigger allows (still `incoming`, same PO, flag set by this door only). Each Unit gets
+  a `line_moved` (or `deliver_to_changed`) history row.
+- **Sales Order lineage:** a Unit already reserved for a Sales Order line (0600) carries that
+  reservation; the line's customer lineage (`po_line_sources`) for the rest of the moved qty moves
+  newest first, never more than the moved qty. Coverage across the PO is unchanged: the demand is
+  covered once.
+- **The record:** the prior version is snapshotted into `po_revisions` (the same shape Revise
+  writes, so the send check keeps one spelling), the version goes up by one, History reads
+  `Version {n}: {qty} {Item} moved from {A} to {B}. Total unchanged. Reason: {reason}`. The new
+  version enters the §5.6 send journey (`Version ({n}) must be sent to {Supplier} again`); the prior
+  version's PDF and send record are untouched. Total PO quantity never changes.
+- **Screen:** `Item` · grey automatic `Current Deliver To` · `Qty on this PO` · `Qty you can move` ·
+  `Qty to move` · `New Deliver To` (open destinations except the current one) · `Units moving` ·
+  `Reason` → `Review changes` shows `{PO number (n)} · {Supplier}`, every line of that item after the
+  change and `Total unchanged`, then `Save version ({n})`. Any edit after Review throws the review
+  away. Refusals print in two lines from `purchasing-refusals.ts`.
+- **Retired:** 0311's `purchasing_split_line_destination` and its `/lines/:id/split` route (no screen
+  called it; it split a line without its Units, lineage or a version). Revoked, not dropped.
 - Cross-module: the destination change changes the customer's stock route (Workspace §5.9); Delivery
   reads it and owns any re-planning prompt on an already-booked delivery. Receiving records the
-  moved quantity at the new destination's station.
+  moved quantity at the new destination's station; the Unit's site is set by Receiving on arrival.
+- **Not built, by design:** the operator does not pick which Sales Order moves with unreserved goods
+  (the newest lineage moves). **PROPOSAL / NOT LAW:** show the Sales Orders that move in `Review
+  changes`. Falsifier: an owner walk where the moved customer is not the one intended.
 
 ### 5.5 Supplier and SKU resolution
 
@@ -3224,7 +3243,7 @@ Revisions · History · Order Route`; viewing never splits, `Edit` does) and sha
 (sidebar + content + right rail); it has no local filter rail. Measured on `main` before this
 ruling: the reply form was one date per PO, the send area appeared only in issue/edit mode, no
 "what to do now" block existed, `Status` and `PO Version` split one state across two facts, the
-PDF sat in a right pane during viewing, and `Change Deliver To` had no door.
+PDF sat in a right pane during viewing, and `Change Deliver To` had no door (built 2026-09-29, §5.4).
 
 ```text
 Object Header · 50px   ← Purchase Orders   PO260925-4827(1) · Ohana   {state word}
