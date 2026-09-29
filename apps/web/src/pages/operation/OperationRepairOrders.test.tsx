@@ -4,7 +4,7 @@
  * 2026-09-28). Every assertion names an owner ruling.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -17,6 +17,8 @@ import {
 import { RepairOrdersRegister } from "./OperationRepairOrders";
 import { RepairOrderView } from "./RepairOrderObject";
 
+vi.mock("@/lib/pdf/repair-order-pdf", () => ({ renderRepairOrderPdfFor: vi.fn(async () => new Blob(["%PDF"], { type: "application/pdf" })) }));
+vi.mock("@/components/kit/PdfPreview", () => ({ default: (p: { title: string; "data-testid"?: string }) => <section aria-label={p.title} data-testid={p["data-testid"]} /> }));
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Repair Orders</header> }));
 vi.mock("@/components/EvidenceUploadField", () => ({ default: (p: { testId?: string }) => <div data-testid={p.testId ?? "upload"} /> }));
 vi.mock("@/lib/queries", () => ({
@@ -237,5 +239,43 @@ describe("the RO object: one primary door per stop, in the owner-approved words"
   it("an unknown price reads Not recorded, never RM0", () => {
     wrap(<RepairOrderView ro={detail()} />);
     expect(screen.getByTestId("ro-fact-price")).toHaveTextContent("Not recorded");
+  });
+});
+
+describe("slice B — the paper and the Supplier's stop (Purchasing §9.7, 2026-09-29)", () => {
+  // jsdom has no blob URLs; the paper is a blob URL the preview reads.
+  Object.assign(URL, { createObjectURL: vi.fn(() => "blob:ro"), revokeObjectURL: vi.fn() });
+  const out = (target: string) => detail({
+    issued: true, supplier_received_at: "2026-09-28T03:00:00Z", return_target_date: target,
+    units: [unit({ actual_pickup_date: "2026-09-29T02:00:00Z" }), unit({ stock_item_id: "si2", unit_id: "U1-000-002", actual_pickup_date: "2026-09-29T02:00:00Z" })],
+  });
+
+  it("while the Supplier holds the goods the Returned stop is waiting, not Due", () => {
+    wrap(<RepairOrderView ro={out("2099-12-31")} />);
+    expect(screen.getByTestId("repair-order-stop-Returned").getAttribute("data-tone")).toBe("none");
+    expect(within(screen.getByTestId("repair-order-route")).queryByText("Due")).not.toBeInTheDocument();
+  });
+
+  it("once the Carres return target has passed the Returned stop is Missed", () => {
+    wrap(<RepairOrderView ro={out("2000-01-03")} />);
+    expect(screen.getByTestId("repair-order-stop-Returned").getAttribute("data-tone")).toBe("missed");
+  });
+
+  it("the header carries Open PDF, which opens the A4 Repair Order over the page", async () => {
+    wrap(<RepairOrderView ro={detail()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
+    expect(await screen.findByTestId("repair-order-pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+  });
+
+  it("Issue opens the governed 50/50: the send record on the left, the paper on the right", async () => {
+    wrap(<RepairOrderView ro={detail()} />);
+    fireEvent.click(within(screen.getByTestId("repair-order-current-action")).getByRole("button", { name: "Issue repair order" }));
+    const split = await screen.findByTestId("repair-order-issue");
+    expect(within(split).getByTestId("repair-order-issue-form")).toBeInTheDocument();
+    expect(await within(split).findByTestId("repair-order-issue-preview")).toBeInTheDocument();
+    expect(within(split).getByLabelText("Recipient")).toBeInTheDocument();
+    expect(within(split).getByRole("button", { name: "Record what you sent" })).toBeDisabled();
   });
 });

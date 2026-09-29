@@ -464,6 +464,48 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     dueRule: "the promised arrival day",
     completionFact: "a posted Receiving Session (warehouse_receipts + receiving_events 'posted')",
   },
+  /* ⭐ REPAIR ORDERS (Purchasing §9.7 · §10, owner rulings 2026-09-19/20/28).
+   * The RO's own facts; `repairOrderWorkItems` is the one projector. */
+  {
+    key: "repair_order.issue",
+    module: "purchasing",
+    trigger: "a Repair Order exists and its current version is not marked as sent",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Issue repair order to {supplier}",
+    dueRule: "the next OFFICE working day after the RO Doc Date",
+    completionFact: "a confirmed send of the current RO version (document_sends, 0602)",
+  },
+  {
+    key: "repair_order.confirm_receipt",
+    module: "purchasing",
+    trigger: "the current RO version was sent and the Supplier's receipt of it is not recorded",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask {Supplier} to confirm they received {RO No}",
+    dueRule: "the next OFFICE working day after the first confirmed send of the current version",
+    completionFact: "an evidenced Supplier receipt of the RO with its snapshotted Carres return target (repair_orders, 0602)",
+  },
+  {
+    key: "repair_order.return_date_passed",
+    module: "purchasing",
+    trigger: "the Carres return target has passed and a Unit on the RO has not been received back",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask {Supplier} when {Unit ID} will return",
+    dueRule: "the Carres return target: 14 OFFICE working days from the evidenced Supplier receipt",
+    completionFact: "every Unit received back on the RO's return leg (posted GRN) or the RO cancelled; a recorded new Supplier date never closes it",
+  },
+  {
+    key: "repair_order.owner_consent",
+    module: "purchasing",
+    trigger: "a non-Carres-owned Unit on the RO has no given owner consent",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask {owner} to agree to repair {Unit ID}",
+    dueRule: "no governed date — the follow-up stays until consent is given",
+    completionFact: "a given owner consent recorded for every such Unit (repair_order_owner_consents, 0602); a refusal keeps it open",
+  },
   {
     key: "claims.confirm_what_happens_next",
     module: "claims",
@@ -505,6 +547,10 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   "payment.check_stored_furniture": "A due storage inspection is recorded",
   "receiving.check_in": "The Receiving Session is posted",
   "claims.confirm_what_happens_next": "The customer resolution is recorded",
+  "repair_order.issue": "The current repair order version is marked as sent",
+  "repair_order.confirm_receipt": "Supplier receipt of the repair order is recorded",
+  "repair_order.return_date_passed": "The Units are received back",
+  "repair_order.owner_consent": "The owner's consent is recorded",
 };
 
 export const WORK_RULES: readonly WorkRule[] = [

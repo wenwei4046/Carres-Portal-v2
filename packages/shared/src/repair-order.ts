@@ -133,6 +133,9 @@ export interface RepairOrderUnitRow {
   item: string | null;
   item_spec: string | null;
   ownership: string | null;
+  /** The recorded owner of a non-Carres-owned Unit (Stock's supplier on the
+   *  Unit), read for the owner-consent follow-up; absent on older reads. */
+  owner_name?: string | null;
   /** The Unit is Display goods at its site (second line under the location). */
   display: boolean;
   problem: string;
@@ -567,4 +570,38 @@ export interface RepairOrderEligibleUnit {
   ownership: string | null;
   /** NULL = can be ticked; otherwise the reason printed on the row. */
   refusal: string | null;
+}
+
+// ── the A4 REPAIR ORDER (docs/pdf/DOCUMENT-KIT.md §3 rules 11–12, §4) ────────
+/**
+ * What the paper prints — and nothing else. MONEY-FREE BY SHAPE: there is no
+ * price, quotation or cost field here, so the template cannot print one
+ * (DOCUMENT-KIT §4: a printed repair price reads as Carres accepting the
+ * supplier's charge). `photos` are the Unit's and the Claim's own evidence,
+ * read through (signed URLs from the API; the browser turns them into images).
+ */
+export interface RepairOrderPrintData {
+  ro_no: string;
+  version: number;
+  ro_doc_date: string;
+  supplier: { name: string; address: string | null; contact: string | null };
+  /** Only when the RO came from a Supplier Claim. */
+  claim_no: string | null;
+  pickup: { name: string; address: string | null };
+  return_to: { name: string; address: string | null };
+  /** The RO's recording actor — the family footer's audit cell. */
+  issued_by: string | null;
+  units: Array<{
+    unit_id: string;
+    po_no: string | null;
+    category: string | null;
+    item: string | null;
+    item_spec: string | null;
+    /** The governed problem word (`Damaged` · `Missing component` · `Something else`). */
+    problem: string;
+    /** `What happened, in one sentence` — printed verbatim in the Reason box. */
+    problem_note: string;
+    repair_requirement: string;
+    photos: string[];
+  }>;
 }

@@ -79,6 +79,9 @@ import opsStaffRouter from "./staff";
 import financeInvoicesRouter from "../finance/invoices";
 import issuesRouter from "../ops/issues";
 import purchaseDemandsRouter from "./purchase-demands";
+import repairOrdersRouter from "./repair-orders";
+import { projectRepairOrderWork } from "../../lib/repair-order-work";
+import type { RepairOrderDetail } from "@carres/shared";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
@@ -1607,6 +1610,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/finance-invoices", financeInvoicesRouter);
   internal.route("/issues", issuesRouter);
   internal.route("/purchase/demands", purchaseDemandsRouter);
+  internal.route("/repair-orders", repairOrdersRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
          invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
@@ -1780,6 +1784,13 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         poDuty,
         today,
         now: observedAt,
+      }),
+      // Repair Orders (Purchasing §9.7 · §10): the RO's own facts, PO Duty.
+      ...projectRepairOrderWork({
+        repairOrders: (await readInternal<{ repairOrders: RepairOrderDetail[] }>(internal, "/repair-orders/work-source", c)).repairOrders,
+        poDuty,
+        today,
+        observedAt,
       }),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),

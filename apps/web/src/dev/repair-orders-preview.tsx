@@ -57,13 +57,27 @@ window.fetch = async (input, init) => {
   if (url.includes("/api/operation/repair-orders/eligible-units")) return json({ units: eligible });
   if (url.includes("/api/ops/issues/evidence/upload-url")) return json({ token: "t", path: "x" });
   if (/\/api\/operation\/repair-orders\/[^/?]+\/evidence/.test(url)) return json({ files: [], quotation: null });
+  // Slice B: the A4 paper. The photographs stand in with the Carres mark (a
+  // local file) — no invented damage picture.
+  if (/\/api\/operation\/repair-orders\/[^/?]+\/print-data/.test(url)) return json({
+    ro_no: base.ro_no, version: 1, ro_doc_date: base.ro_doc_date,
+    supplier: { name: "Hookka Industries", address: null, contact: null }, claim_no: null,
+    pickup: { name: "Carres Klang", address: null }, return_to: { name: "Carres Klang", address: null },
+    issued_by: "{Operation staff}",
+    units: base.units.map((u) => ({
+      unit_id: u.unit_id, po_no: u.po_no, category: u.category, item: u.item, item_spec: u.item_spec,
+      problem: u.problem === "damaged" ? "Damaged" : "Missing component", problem_note: u.problem_note,
+      repair_requirement: u.repair_requirement, photos: u.evidence.length ? ["/carres-logo.png", "/carres-logo.png"] : [],
+    })),
+  });
   if (/\/api\/operation\/repair-orders\/[^/?]+/.test(url)) return json({ repairOrder: base });
   if (url.includes("/api/operation/repair-orders")) return json({ repairOrders: [base, second] });
   return json({});
 };
 
 const view = new URLSearchParams(window.location.search).get("view") ?? "register";
-const entry = view === "create" ? "/operation?tab=repair-orders&create=1" : view === "object" ? "/operation?tab=repair-orders&ro=ro-1" : "/operation?tab=repair-orders";
+if (view === "object-out") Object.assign(base, second, { id: "ro-1", units: second.units });
+const entry = view === "create" ? "/operation?tab=repair-orders&create=1" : view === "object" || view === "object-out" ? "/operation?tab=repair-orders&ro=ro-1" : "/operation?tab=repair-orders";
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 createRoot(document.getElementById("root")!).render(

@@ -18,6 +18,7 @@ import { InvoiceTemplate } from "./invoice-template";
 import { DoTemplate } from "./do-template";
 import { GrnTemplate } from "./grn-template";
 import { PoTemplate } from "./po-template";
+import { RepairOrderTemplate } from "./repair-order-template";
 import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
@@ -39,6 +40,7 @@ import type {
   SalesOrderTemplateData,
 } from "./types";
 import type { PickupEventPrintPayload } from "@/lib/queries";
+import type { RepairOrderPrintData } from "@carres/shared";
 
 /** All four PDFs share the render pipeline; only the template differs. */
 async function toBlob(element: ReactElement): Promise<Blob> {
@@ -145,6 +147,11 @@ export function renderRegisterListPdf(data: RegisterListTemplateData): Promise<B
 
 export function renderPoPdf(data: PoTemplateData): Promise<Blob> {
   return toBlob(PoTemplate(data));
+}
+
+/** The A4 REPAIR ORDER (DOCUMENT-KIT §3 rules 11–12) — money-free by payload. */
+export function renderRepairOrderPdf(data: RepairOrderPrintData): Promise<Blob> {
+  return toBlob(RepairOrderTemplate(data));
 }
 
 /** Task 13 (2026-05-15) — pickup-event DO render (supplier / partner /
