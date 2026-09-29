@@ -6052,6 +6052,99 @@ result. Read view does not show a meaningless blank PDF pane. Errors preserve dr
 loading/failure/unknown are not zero quantities. Keyboard and mobile reflow must preserve the
 same meaning and next action, with no claimed visual validation until the governed render review.
 
+**Display Request composition review — PROPOSAL / NOT LAW, 2026-09-29.**
+Applies the installed `design:design-critique` skill to the approved semantic journey, not to a
+rendered screen. This is a three-option owner review of remaining presentation; it changes no
+business rule, document purpose or section order. Source snapshot
+`f1b2ed63c641dd05d3fa8c8c4ef24c43026855e9`; `portal-nav.ts:402–405` still marks the four Showroom
+pages `soon: true`. No screenshot, accessibility pass or numeric visual score is claimed.
+
+Whole-page review, including entry and downstream consequences:
+
+| Severity / evidence | Operator impact | Required resolution in every option |
+|---|---|---|
+| Red design risk: §9.8 allows parallel legs, while no rendered Display Request exists | A sequential-looking page could hide old goods still awaiting collection | Show all leg identities and remaining scope; never gate new-in on old-out or mark the whole request done from one receipt |
+| Red integration gap: §9.8 and Stock §12.9 identify unverified opening ownership/identity | A model or count can select the wrong physical goods | Catalog for new goods, exact Stock Units for old goods; show identity/ownership gaps without fabricated IDs or receipts |
+| Amber composition gap: §9.13.3 specifies meaning but no exact presentation | New staff may open several documents to understand one arrangement | Keep identity, applicable action, goods, legs, documents, commercial evidence and History on the one page; prefill owning actions |
+| Red evidence risk: Stock §5 separates origin handover from arrival | A pickup tick could wrongly put goods at the destination | Keep both actual events and current holder; partial/mismatched goods retain their own outstanding facts |
+| Amber assignment integration gap: §9.13.5 and Workspace §2 | A named Duty alone does not supply an executable personal action | Resolve actual active holder/cover and permission; no fake Sales Order or universal arrangement owner; Work admission remains unbuilt |
+| Amber commercial risk: §9.8 permits missing price | Price questions could obstruct transport or disappear after it | Commercial follow-up remains separate and visible; unknown price is not zero or accepted terms |
+| Red downstream gap: §9.12 Finance capability mapping | Invoice-number deduplication could be mistaken for exact sold-Unit matching | Link to Finance without a local payable writer or unsupported matched/paid claim |
+| Amber unmeasured behaviour: no rendered object | Phone, keyboard, long descriptions and failed saves could hide the next action | Preserve identity, visible missing facts and input; dirty/error section stays open; validate governed viewport/zoom/keyboard cases after approved composition is rendered |
+
+**Reference evidence and limits.** Official documentation was inspected on 2026-09-29:
+
+- [Shopify receiving transfers](https://help.shopify.com/en/manual/products/inventory/inventory-transfers/receiving-and-managing-transfers): individual receiving quantities and remaining progress inform option A. Carres keeps its own custody/inspection rules; Shopify availability and cancellation semantics are not imported.
+- [Linear parent and sub-issues](https://linear.app/docs/parent-and-sub-issues): related work remains under one parent and may be shared across teammates. This informs option B's compact related-leg overview, not a claim that Linear uses the proposed collapse layout. Reject inherited ownership and automatic parent closure for Carres physical facts.
+- [Trello boards and lists](https://support.atlassian.com/trello/docs/creating-a-new-board/): parallel lists/cards inform option C's side-by-side comparison. Carres columns represent fixed movement legs, not workflow stages; reject drag-to-complete and a new board engine.
+- Local 2990 `docs/SUPPLY-CHAIN-DOCUMENTS.md` retains distinct supplier order/receive/return records and shared PDF generators. KEEP source/document linkage under all options, not document-first input or extra manually created records. This local code evidence is not a live 2990 UI inspection.
+- Odoo batch-transfer full-page retrieval failed in this pass; its search extract is not evidence for any proposed layout.
+
+All three options retain the approved page order and full-width, one-scroll internal object with
+no PDF split or new tabs. The following sketches are explanatory structure, NOT final screen copy.
+Unspecified models, IDs, dates and actual completion remain unknown in the Dorsettloft example.
+
+**A — Expanded movement sections (RECOMMENDED).** One shared `Block` per leg, open by default;
+within a wide block, related facts use the kit's multi-column arrangement rather than six stacked
+fields. Source-owned action opens its existing form, with one primary writer at a time.
+
+```text
+Request identity / applicable action / incoming and outgoing goods
+[2990 → PJ]           [party/contact] [planned date]
+ exact goods          pickup evidence / arrival evidence / remainder
+[PJ → warehouse]      [party/contact] [planned date]
+ exact old Units      pickup evidence / arrival evidence / remainder
+[warehouse → supplier] [party/contact] [collection date]
+ same old Units       actual handover / remainder
+Connected documents / commercial evidence / History
+```
+
+Best fit: new Operation staff and this three-leg swap. Trade-off: more vertical scrolling;
+all route facts can be read without opening another section. Mobile stacks each block's facts in
+the same logical order. Falsifier: operators repeatedly lose the pending supplier collection or
+must open other records merely to discover pickup/destination/remaining goods already known here.
+
+**B — Compact movement summaries, expand for detail.** Reuse `Block.summary`; keep every leg's
+route and meaningful unresolved scope visible when collapsed. The active or dirty/error block is
+open, and multiple blocks may stay open. A block without a truthful summary remains expanded.
+
+```text
+Request identity / applicable action / incoming and outgoing goods
+> 2990 → PJ             actual result / remaining goods
+v PJ → warehouse        actual result / remaining goods
+  exact old Units / contacts / dates / pickup and arrival evidence
+> warehouse → supplier  actual result / remaining goods
+Connected documents / commercial evidence / History
+```
+
+Best fit: experienced staff revisiting long arrangements. Trade-off: less scrolling but more
+expansion and a greater risk of missing detail. No completed-looking summary without evidence;
+no hidden unresolved exception. Kit evidence: existing `Block` supports `summary` and `forceOpen`.
+
+**C — Movement sections side by side on a wide screen.** The same existing Blocks share one
+movement region, with no independent scrollers or drag interaction. At constrained widths they
+stack in the approved logical order; this is a composition, not a new board component.
+
+```text
+Request identity / applicable action / incoming and outgoing goods
+[2990 → PJ]       [PJ → warehouse]       [warehouse → supplier]
+ goods            exact old Units        same old Units
+ party / date     party / date           party / date
+ actual / left    actual / left          actual / left
+Connected documents / commercial evidence / History
+```
+
+Best fit: desktop coordination comparing three legs together. Trade-off: less vertical travel,
+but narrow columns wrap long model/contact details and comparison disappears on a phone. Do not
+truncate identity or force sideways page scrolling to preserve the three-column appearance.
+
+**Recommendation / approval boundary:** select A for the Display Request movement region.
+Keep shared kit values, semantic section order, permission boundaries and source-owned completion.
+B and C are alternatives for this review only, not additional user-selectable page modes. Owner
+approval chooses the default composition; it does not approve application build, unresolved literal
+copy, Finance rules or unverified responsive behaviour. Once chosen, overwrite this comparison
+with the selected current rule; Git retains the research alternatives.
+
 **4. Exceptions and record lifecycle**
 
 - Draft editing preserves creator/history and consumes no official new Unit IDs. Repeated saves
