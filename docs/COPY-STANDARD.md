@@ -3883,6 +3883,9 @@ cannot say what it means or does. A stored key never reaches the screen.
 | | **`Trial Balance`** | Every account's balance on one day, debits beside credits. |
 | | **`Self-check`** | The books test themselves and name what is wrong. |
 | Journal columns | **`Entry No`** · **`Date`** · **`Source`** · **`Document`** · **`Narration`** · **`Amount`** · **`Reversal`** | The entry's number, day, what made it, its document, its note, its total, its reversed pair. |
+| Journal column, one account picked | **`Running balance`** | The picked account's balance after the entry, counted by the ledger from everything posted before the first day read. Shows only while one account is picked and no column sort is on (the rows then run by date and entry number, newest first). |
+| | **`{money} Debit`** · **`{money} Credit`** · **`RM 0.00`** | The side the balance sits on. An asset or expense account on its usual side reads Debit, the other kinds Credit; a balance that turned reads the other side, never a negative figure. |
+| | **`The running balances could not be loaded. Try again.`** · **`Try again`** | The balance read failed; the column is not shown, never a blank or a zero. |
 | Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Payment voucher`** · **`Other debtor invoice`** · **`Other receipt`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
 | | **`{source} reversal`** | The entry that cancels one of those. |
 | | **`Other entry`** | A source this list does not name yet. Never the key. |

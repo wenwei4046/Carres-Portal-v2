@@ -12,11 +12,12 @@
  * the manual journal form at `?entry=new`; for anyone else `new` is just a
  * number nobody has.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DepartmentFilter } from "../department";
 import type { LedgerEntryRow } from "@carres/shared/finance-ledger";
 import {
+  isZeroMoney,
   ledgerDocWord,
   ledgerReversalKind,
   ledgerReversalText,
@@ -35,9 +36,11 @@ import { EntryLinesTable, EntryObject, ReversalLink, ReversalPill } from "./Ledg
 import {
   JOURNAL_MAX_PAGES,
   JOURNAL_PAGE_SIZE,
+  useAccountBalances,
   useLedgerChart,
   useLedgerEntries,
   useLedgerEntry,
+  type AccountBalances,
   type JournalScope,
 } from "./ledger-queries";
 import ManualJournalForm from "./ManualJournalForm";
@@ -116,6 +119,18 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   const scopedAccount = scope.account ? accounts.find((a) => a.code === scope.account) : undefined;
   const scoped = scope.account !== null || scope.from !== null || scope.to !== null || !!scope.dept;
 
+  // One account picked: each entry shows the account's balance after it. The
+  // rows run in the ledger's own order (date, then entry number, newest first)
+  // so the balances read down the page, and the column shows only while no
+  // column sort is on: sorted any other way, the figures would not follow on.
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const loaded = query.data?.rows;
+  const rows = useMemo(() => !loaded || !scope.account ? loaded ?? [] : [...loaded].sort((a, b) =>
+    b.entry_date.localeCompare(a.entry_date) || (a.entry_no < b.entry_no ? 1 : a.entry_no > b.entry_no ? -1 : 0)),
+  [loaded, scope.account]);
+  const balances = useAccountBalances(scope, rows[rows.length - 1]?.entry_date ?? null, rows[0]?.entry_date ?? null);
+  const balanceData = scope.account ? balances.data : undefined;
+
   const columns = useMemo<DataGridColumn<LedgerEntryRow>[]>(() => [
     { key: "entry", label: "Entry No", width: 150, accessor: (r) => r.entry_no,
       searchValue: (r) => r.entry_no, filterValue: (r) => r.entry_no, filterType: "numbering" },
@@ -134,7 +149,8 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       accessor: (r) => <ReversalLink row={r} search={search} />,
       searchValue: (r) => ledgerReversalText(r), filterValue: (r) => ledgerReversalKind(r),
       filterType: "enum", exportValue: (r) => ledgerReversalText(r) },
-  ], [search]);
+    ...(balanceData && !sort ? [balanceColumn(balanceData)] : []),
+  ], [search, balanceData, sort]);
 
   const accountOptions = useMemo(() => [
     { value: ALL_ACCOUNTS, label: "All accounts" },
@@ -157,8 +173,13 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
         className="flex h-10 shrink-0 items-center gap-2 bg-kit-amber-3 px-4 text-body text-kit-amber-11">
         ⚠ The Journal shows the newest {(JOURNAL_PAGE_SIZE * JOURNAL_MAX_PAGES).toLocaleString("en-MY")} of {query.data.total.toLocaleString("en-MY")} entries. Pick an account to see older ones.
       </div>}
+      {scope.account && balances.isError && <div role="status" data-testid="journal-balances-failed"
+        className="flex h-10 shrink-0 items-center gap-3 bg-kit-amber-3 px-4 text-body text-kit-amber-11">
+        The running balances could not be loaded. Try again.
+        <button type="button" className="underline underline-offset-2" onClick={() => void balances.refetch()}>Try again</button>
+      </div>}
       <ListPageShell register>
-        <DataGrid rows={query.data?.rows ?? []} columns={columns} rowKey={(r) => r.id}
+        <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort}
           storageKey="carres.finance.journal.v1" appearance="reference" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
@@ -186,6 +207,25 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       </ListPageShell>
     </>}
   </div>;
+}
+
+/** Which side a balance sits on. The same rule the database counts by
+ *  (gl_account_ledger, gl_trial_balance): ASSET and EXPENSE accounts are
+ *  debit accounts, every other kind a credit account. */
+export function balanceWords(kind: string, balance: number): string {
+  if (isZeroMoney(balance)) return rm(0);
+  const debitAccount = kind === "ASSET" || kind === "EXPENSE";
+  return `${rm(Math.abs(balance))} ${(balance > 0) === debitAccount ? "Debit" : "Credit"}`;
+}
+
+/** The account's balance after the row's entry. Blank for an entry that did
+ *  not move the account inside the department picked. Not sortable: the
+ *  column exists only while the rows are in the ledger's own order. */
+function balanceColumn(b: AccountBalances): DataGridColumn<LedgerEntryRow> {
+  const after = (r: LedgerEntryRow) => b.after.get(r.entry_no);
+  return { key: "balance", label: "Running balance", width: 190, align: "right", sortable: false,
+    accessor: (r) => { const v = after(r); return v === undefined ? "" : balanceWords(b.kind, v); },
+    numberValue: (r) => after(r) ?? null, exportValue: (r) => after(r) ?? "" };
 }
 
 /** The row's one expansion job: its lines. */
