@@ -169,15 +169,15 @@ uses the governed maximum-four-step `What to do` block below.
 
 ## Workspace destination words
 
-These words govern Work and Issue Tracker under the left-bar `WORKSPACE` section, and the
+These words govern Workspace and Issue Tracker under the left-bar `WORKSPACE` section, and the
 Workspace-owned Staff & Duties page under global Settings (placement approved 2026-09-28 /
 NOT BUILT; Workspace MASTER §4). The one global
 `Dashboard` remains an independent top-level destination and is never called `Workspace Dashboard`.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Workspace destinations | `Work` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
-| Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
+| Workspace destinations | `Workspace` · `Issue Tracker` (owner ruling 2026-09-29; existing work route) | Work as the menu destination · Workspace Dashboard · Tasks · Duty roster · Service Notes |
+| Work scopes | `My Task` · `Team Work` (Workspace MASTER §5.10) | My Work on this page · My Tasks · Team Tasks · Work queue |
 | Work header search (Jess reverted the `Search` rename, 2026-09-26) | `Jump to…` beside its keyboard hint | Search · Find · Go to |
 | Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
