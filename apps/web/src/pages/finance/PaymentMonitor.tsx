@@ -160,7 +160,7 @@ type MonitorRow = PaymentMonitorRow & {
 };
 
 function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
-  const person = owner.acting ?? owner.normal;
+  const person = owner.acting;
   if (!person?.userId) {
     /* ⭐ 0504 (owner instruction 2026-09-16 — the stale `Nobody holds Delivery
        Duty.` hint is cleared): the collection owner is the individual the Sales
@@ -174,21 +174,14 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   }
   const colors = avatarColor(person.userId);
   const label = personLabel(person.name, "");
-  // Normal owner and today's cover are DISTINCT facts: the avatar is the
-  // acting person; the title keeps the normal owner beside the cover.
-  const normal = owner.normal?.name ? personLabel(owner.normal.name, "") : null;
-  const title = owner.activeCover && normal && normal !== label
-    ? `Normal owner: ${normal} · Today's cover: ${label}`
-    : label;
+  const title = `Assigned to ${label}`;
   return <span
-    className={`inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold${owner.activeCover ? " ring-2 ring-kit-amber-3" : ""}`}
+    className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
     style={{ background: colors.bg, color: colors.fg }}
     title={title}
     role="img"
-    aria-label={label}
+    aria-label={title}
     data-testid="monitor-owner-avatar"
-    data-normal-owner={normal ?? undefined}
-    data-cover={owner.activeCover ? label : undefined}
   >{personInitials(person.name, "")}</span>;
 }
 

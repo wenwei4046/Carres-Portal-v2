@@ -58,16 +58,10 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
   </div></SectionCard>;
 }
 
-/** `Normal owner: Shasha · Today's cover: Yu Jun · Actual staff: Yu Jun` —
- *  three distinct facts, never collapsed into one name. */
+/** Current responsibility comes from the shared resolver, never a completion claim. */
 function OwnerFacts({ owner }: { owner: CollectionOwnerContextRow }) {
   return <div data-testid="collection-owner-facts">
-    <p>Normal owner: <span data-testid="collection-owner-normal">{owner.normal_user_name ?? "Name not recorded"}</span></p>
-    <p>Today's cover: <span data-testid="collection-owner-cover">{owner.is_cover ? `${owner.cover_user_name ?? "Name not recorded"}${owner.cover_ends_on ? ` · until ${fmtDate(owner.cover_ends_on)}` : ""}` : "No cover today"}</span></p>
-    <p>Acting today: <span data-testid="collection-owner-acting">{owner.acting_user_name ?? "Name not recorded"}</span></p>
-    <p className="text-label font-normal">
-      {owner.source === "handover" ? "Handed over" : "Responsible Delivery Operation"} · since {fmtDate(owner.effective_from)}
-    </p>
+    <p>Assigned to: <span data-testid="collection-owner-assigned">{owner.acting_user_id ? owner.acting_user_name ?? "Name not recorded" : "Not assigned"}</span></p>
   </div>;
 }
 

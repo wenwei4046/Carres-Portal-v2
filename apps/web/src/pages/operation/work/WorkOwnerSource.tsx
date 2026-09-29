@@ -9,8 +9,7 @@ import { WORK_MODULE_WORD } from "./module-word";
 import { WorkSection } from "./WorkCard";
 
 export default function WorkOwnerSource({ item }: { item: OperationWorkItem }) {
-  const normal = item.owner.normal?.name ?? null;
-  const acting = item.owner.acting?.name ?? null;
+  const assigned = item.owner.acting;
   const read = item.observedAt;
   return (
     <WorkSection className="mx-4 my-3 shrink-0 min-[768px]:mx-6" data-testid="work-owner-source">
@@ -20,14 +19,8 @@ export default function WorkOwnerSource({ item }: { item: OperationWorkItem }) {
           <span aria-hidden="true" className="text-kit-slate-11 transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
         </summary>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-work-line px-3 py-2.5 text-[12px] leading-4 min-[768px]:px-4">
-          <dt className="text-kit-slate-11">Normal owner</dt>
-          <dd className="text-kit-slate-12">{normal ?? "Not assigned"}</dd>
-          {acting && acting !== normal ? (
-            <>
-              <dt className="text-kit-slate-11">Acting today</dt>
-              <dd className="text-kit-slate-12">{acting}</dd>
-            </>
-          ) : null}
+          <dt className="text-kit-slate-11">Assigned to</dt>
+          <dd className="text-kit-slate-12">{assigned?.userId ? assigned.name ?? "Name not recorded" : "Not assigned"}</dd>
           <dt className="text-kit-slate-11">Action day</dt>
           <dd className="text-kit-slate-12">{item.timing.actionOn ? fmtDate(item.timing.actionOn) : item.timing.noDateReason ?? "No working date"}</dd>
           {item.timing.businessDueOn && item.timing.businessDueOn !== item.timing.actionOn ? (

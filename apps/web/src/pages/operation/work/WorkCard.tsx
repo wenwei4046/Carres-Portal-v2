@@ -88,10 +88,9 @@ export default function WorkCard({
   selected,
   onSelect,
   onOpenRecord,
-  cover,
+  cover: _cover,
 }: {
-  /** `Covered for {normal owner}` / `Covered by {cover}` — the Global Owner
-   *  Law's cover fact rides beside the document number, never in the action. */
+  /** Legacy caller compatibility; current assignment comes only from the Work row. */
   cover?: string | null;
   item: WorkRow;
   moduleLabel: string;
@@ -103,6 +102,7 @@ export default function WorkCard({
   onSelect: () => void;
   onOpenRecord: () => void;
 }) {
+  const assigned = item.ownerId ? `Assigned to ${item.ownerName ?? "Name not recorded"}` : "Not assigned";
   const status = workDateStatus(item, today);
   const parts = item.dueIso ? dateParts(item.dueIso) : null;
   const ModuleIcon = MODULE_ICON[item.module];
@@ -163,11 +163,11 @@ export default function WorkCard({
           {action}
         </span>
         <span className="-mx-3 mt-auto flex h-7 shrink-0 items-center gap-2 border-t border-work-line pl-3 pr-2" data-testid="work-card-footer">
-          {/* The number never shrinks; only the cover name may, and its tooltip
+          {/* The number never shrinks; only the assigned name may, and its tooltip
               keeps the whole sentence. */}
-          <span title={cover ? `${item.soRef} · ${cover}` : item.soRef} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[11px] leading-4 text-work-muted">
-            <span className={cover ? "shrink-0" : "min-w-0 truncate"}>{item.soRef}</span>
-            {cover ? <span className="min-w-0 truncate text-kit-amber-11">· {cover}</span> : null}
+          <span title={`${item.soRef} · ${assigned}`} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[11px] leading-4 text-work-muted">
+            <span className="shrink-0">{item.soRef}</span>
+            <span className="min-w-0 truncate">· {assigned}</span>
           </span>
           <button
             type="button"

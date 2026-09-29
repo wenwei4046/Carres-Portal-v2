@@ -87,7 +87,7 @@ function toWorkRow(item: OperationWorkItem, generatedOn: string): WorkRow {
     activeCover: item.owner.activeCover,
     actingPerson: item.owner.acting,
     ownerState: item.owner.state,
-    ownerName: item.owner.acting?.name ?? item.owner.normal?.name ?? null,
+    ownerName: item.owner.acting?.name ?? null,
     ownerUserId: item.owner.acting?.userId ?? null,
     ...(!item.owner.acting && item.owner.dutyKey
       ? { ownerDuty: item.owner.dutyKey }
